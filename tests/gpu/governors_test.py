@@ -9,7 +9,7 @@ Every poke builds a BatchSim from a fixture, forces state in-memory, then
 drives the exact engine twin (_transfer_city, the step-tail era boundary,
 _seat_city_loyalty/_seat_loyalty_flips, _seat_phase). EVERY constant comes from rules.json
 through the engine's own loaders (sim._era_len/_era_dark/_era_gold/_era_pts/
-_gov_per/_gov_max/_gov_loy/_age_factor) — nothing is hardcoded.
+_gov_title_civics/_gov_loy/_age_factor) — nothing is hardcoded.
 
 Covered:
   a. Event hooks: _transfer_city bumps the RECEIVER's era_score by the
@@ -23,10 +23,10 @@ Covered:
      seat's contribution by its age factor (Dark ½ / Normal 1 / Golden 1½);
      asserted by an EXACT reconstruction across five age combos
      (quantized-milli).
-  d. Governor pick: titles = min(govMax, civics//perTitle) sit in the LOWEST-
-     loyalty alive cities (+GOVERNOR_LOYALTY), ties → lower slot index. The civ
-     path via _seat_phase two-run diff (a boundary tie resolves to the lower
-     slot); the seat-0 path via the same bodies driven at row 0.
+  d. Governor pick: one title per NAMED civic appoints one governor, and each
+     seats the LOWEST-loyalty alive city (+GOVERNOR_LOYALTY), ties → lower slot
+     index. The civ path via _seat_phase two-run diff (a boundary tie resolves
+     to the lower slot); the seat-0 path via the same bodies driven at row 0.
   e. Golden reachability: forcing era_score[0] ≥ goldenT across a boundary
      flips seat 0 to Golden (the axis the scripted gate never reaches) — then
      its OWN-pressure term scales ×1.5 vs Normal.
@@ -67,6 +67,10 @@ def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
     sim.city_center[0, 0, col] = tile
     sim.city_pop[0, 0, col] = pop
     sim.city_loyalty[0, 0, col] = loy
+    # a city ADDRESSED by id (the governor roster is one) needs a real one —
+    # the unset 0 aliases the capital
+    sim.city_id[0, 0, col] = int(sim.civ_next_city_id[0, 0])
+    sim.civ_next_city_id[0, 0] += 1
 
 
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
@@ -224,10 +228,19 @@ def poke_age_pressure(rules, path):
     print(f"  c age pressure OK (factors {sim._age_factor.tolist()} reconstructed exactly across {len(combos)} age combos)")
 
 
+def _grant_titles(sim, row: int, n: int) -> None:
+    """Research the first `n` of the thirteen civics that each grant a title."""
+    sim.civ_civics[0, row, :] = False
+    keep = sim._gov_title_civics[sim._gov_title_civics >= 0].tolist()
+    for c in keep[:n]:
+        sim.civ_civics[0, row, c] = True
+
+
 def poke_governor_civ(rules, path):
-    """d(civ). titles=2 seat the two LOWEST-loyalty cities via _seat_phase;
-    a boundary TIE resolves to the lower slot index. Two-run diff (titles 2 vs
-    0) isolates the +GOVERNOR_LOYALTY from the (identical) pressure."""
+    """d(civ). Two title civics appoint two governors, which seat the two
+    LOWEST-loyalty cities via _seat_phase; a boundary TIE resolves to the lower
+    slot index. Two-run diff (2 titles vs 0) isolates the +GOVERNOR_LOYALTY
+    from the (identical) pressure."""
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
     r = 0
@@ -255,15 +268,13 @@ def poke_governor_civ(rules, path):
 
     def run(nc):
         sim.restore(snap)
-        sim.civ_civics[0, r + 1, :] = False
-        if nc:
-            sim.civ_civics[0, r + 1, :nc] = True
-        titles = int((sim.civ_civics[0, r + 1].sum() // sim._gov_per).clamp(max=sim._gov_max))
+        _grant_titles(sim, r + 1, nc)
+        titles = int(sim._governor_titles_earned(r + 1)[0])
         sim._seat_phase()
         return titles, {s: float(sim.city_loyalty[0, r + 1, s]) for s in [cap] + noncap}
 
     t0, l0 = run(0)
-    t2, l2 = run(2 * sim._gov_per)  # civics → titles 2
+    t2, l2 = run(2)  # two title civics → two appointments
     assert t0 == 0 and t2 == 2, f"titles must be 0 and 2 (got {t0}, {t2})"
     diff = {s: l2[s] - l0[s] for s in [cap] + noncap}
     got8 = sorted(s for s in noncap if abs(diff[s] - gov) < 1e-9)
@@ -274,18 +285,21 @@ def poke_governor_civ(rules, path):
 
 
 def poke_governor_seat0(rules, path):
-    """d(seat 0). titles=1 seats the single LOWEST-loyalty non-capital seat-0
-    city; two-run diff (titles 1 vs 0) isolates the +GOVERNOR_LOYALTY."""
+    """d(seat 0). One title civic appoints one governor, who seats the single
+    LOWEST-loyalty non-capital row-0 city; two-run diff (1 title vs 0) isolates
+    the +GOVERNOR_LOYALTY."""
     sim, cols = two_city_setup(rules, path)  # loyalties 55, 59; capital 100
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
     gov = sim._gov_loy
     weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column
-    sim.civ_civics[0, 0, : sim._gov_per] = True  # titles 1
+    _grant_titles(sim, 0, 1)
     snap = sim.snapshot()
+    sim._governor_phase(0)
     apply_loyalty_row(sim, tier)
     with_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
     sim.restore(snap)
-    sim.civ_civics[:, 0] = False  # titles 0
+    _grant_titles(sim, 0, 0)
+    sim._governor_phase(0)
     apply_loyalty_row(sim, tier)
     no_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in with_gov}
     for c in with_gov:
@@ -351,7 +365,7 @@ def poke_capital_immunity(rules, path):
     r = 0
     cap = next(s for s in sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0].tolist() if bool(sim.city_is_cap[0, r + 1, s]))
     sim.city_loyalty[0, r + 1, cap] = 5.0                 # lowest → would be picked
-    sim.civ_civics[0, r + 1, : sim._gov_per] = True       # titles 1
+    _grant_titles(sim, r + 1, 1)
     sim._seat_phase()
     assert float(sim.city_loyalty[0, r + 1, cap]) == lmax, f"a governor-picked civ capital must pin at {lmax}"
 
@@ -360,7 +374,8 @@ def poke_capital_immunity(rules, path):
     sim2.major_unit_alive[:] = False
     pcap = int(sim2.city_is_cap[0, 0].nonzero()[0])
     sim2.city_loyalty[0, 0, pcap] = 5.0
-    sim2.civ_civics[0, 0, : sim2._gov_per] = True
+    _grant_titles(sim2, 0, 1)
+    sim2._governor_phase(0)
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     apply_loyalty_row(sim2, tier)
     assert float(sim2.city_loyalty[0, 0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"

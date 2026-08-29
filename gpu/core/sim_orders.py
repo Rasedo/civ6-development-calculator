@@ -510,7 +510,12 @@ class SimOrders:
                     # LARGER tree — 1 + 9 * max(techs/67, civics/50)
                     _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
                                                      civics.sum(dim=1).double() / 50.0)
-                    amount = js_round(20.0 * _psc).to(self.dtype)
+                    # CIV6 (Groundbreaker): "+50% yields from plot harvests and
+                    # feature removals in city" — the harvested tile's own city.
+                    _hm = torch.ones_like(_psc)
+                    if self.n_governors:
+                        _hm = self._governor_tile_mult(row, "harvestMult")[cr, ct]
+                    amount = js_round(20.0 * _psc * _hm).to(self.dtype)
                     # the Deforestation Treaty pays a SECOND lump, in gold —
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]

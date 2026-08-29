@@ -4,8 +4,8 @@ import { seatOf, civsAtWar, seatsAllied } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
-import { seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
-import { computeAdoption } from './effects';
+import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
+import { computeAdoption, inDarkAge } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
 import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
@@ -56,7 +56,7 @@ function policyTreatyFavor(state: GameState, seat: number): number {
   const sx = seatOf(state, seat);
   if (!sx) return 0;
   const held: number[] = [];
-  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state)).policies) {
+  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat)).policies) {
     const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
     if (i >= 0) held.push(i);
   }
@@ -97,7 +97,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
                              allianceCount(state, seat),
-                             seatBuildingSum(state, seat, 'favorPerTurn'),
+                             seatBuildingSum(state, seat, 'favorPerTurn') + cardFavorPerBuilding(state, seat),
                              pollutionFavorPenalty(state, seat),
                              grievanceFavorPenalty(state, seat)));
   // The GRIEVANCE ledger's own turn: what this seat is still owed decays
@@ -119,7 +119,7 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
 }
 
 export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
-  if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit);
+  if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit, city);
   else if (item.kind === 'project') chargeProjectResource(state, seat, item.project);
   city.queue.push(item);
   if (process.env.CIV6_ALOG) {

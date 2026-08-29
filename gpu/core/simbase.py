@@ -109,6 +109,8 @@ class Rules:
     districts: list  # catalog [{id, idx, cost, adjYield, adjacency, housing, ...}]
     governments: list  # [{id, tier, unlockCivic, slots:[m,e,d,w], cityYields[6], capitalYields[6]}] table order
     policies: list  # [{id, kind, unlockCivic, cityYields[6], capitalYields[6]}] table order
+    governors: list  # [{id, establish, cityStates, base}] catalog order (= the GPU governor index)
+    governor_promotions: list  # [{id, gov, tier, requires, <every effect channel>}] catalog order
     governments_live: bool  # master switch (GOVERNMENTS_ADOPTION_LIVE)
     district_scaffold: dict  # {campusIdx, campusUnlockTech}
     shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
@@ -151,6 +153,8 @@ class Rules:
     b_influence: torch.Tensor  # long [NB] — influence points per turn, paid to the SEAT
     b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
+    b_amen_gov: torch.Tensor  # f64 [NB] — amenities in every city that HOLDS a governor
+    b_house_gov: torch.Tensor  # f64 [NB] — housing in every city that HOLDS a governor
     b_power_supply: torch.Tensor  # f64 [NB] — renewable Power it supplies its own city, no stockpile behind it
     b_flood_barrier: torch.Tensor  # bool [NB] — the FLOOD BARRIER row, whose price is its city's lowland tiles
     b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
@@ -274,6 +278,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         districts=r.get("districts", []),
         governments=r.get("governments", []),
         policies=r.get("policies", []),
+        governors=r["governors"],
+        governor_promotions=r["governorPromotions"],
         governments_live=bool(r.get("governmentsLive", False)),
         district_scaffold=r.get("districtScaffold", {}),
         shipyard_bidx=int(r.get("shipyardBidx", -1)),
@@ -316,6 +322,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_influence=torch.tensor([int(b.get("influencePerTurn", 0)) for b in B], dtype=torch.long),
         b_favor=torch.tensor([int(b.get("favorPerTurn", 0)) for b in B], dtype=torch.long),
         b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
+        b_amen_gov=torch.tensor([float(b.get("amenitiesWithGovernor", 0)) for b in B], dtype=torch.float64),
+        b_house_gov=torch.tensor([float(b.get("housingWithGovernor", 0)) for b in B], dtype=torch.float64),
         b_power_supply=torch.tensor([float(b.get("powerSupply", 0)) for b in B], dtype=torch.float64),
         b_flood_barrier=torch.tensor([bool(b["floodBarrier"]) for b in B], dtype=torch.bool),
         b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),
@@ -660,7 +668,9 @@ _MUTABLE = [
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
-    "city_gov_out", "city_spy_sources",  # the two clocks a spy mission leaves behind
+    "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
+    # THE GOVERNOR ROSTER — one slot per catalog governor per major row
+    "civ_gov_appointed", "civ_gov_city", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
     "antiquity_era", "antiquity_seat",  # ...and what a dug Artifact remembers
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig

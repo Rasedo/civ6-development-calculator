@@ -25,6 +25,7 @@ import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { gpCityPermOf } from '../data/greatPeople';
 import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
+import { getModifiers } from './effects';
 
 export interface RuleResult {
   ok: boolean;
@@ -49,6 +50,8 @@ function gates(state: GameState, seat: number): Unlocks | null {
  */
 export function canFoundCity(state: GameState, tileIndex: number, seat: number): RuleResult {
   const tile = state.map.tiles[tileIndex];
+  // CIV6 (Isolationism): "Can't train or buy Settlers nor settle new cities."
+  if (getModifiers(state, seat).noSettlers) return no('Isolationism forbids new cities.');
   if (citiesOf(state, seat).length >= 6) return no('Cannot govern more cities (6 max).');
   if (!isExplored(state, seat, tileIndex)) return no('Unexplored — send a unit to scout it first.');
   if (isWater(tile)) return no('Cities must be founded on land.');

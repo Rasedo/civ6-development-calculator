@@ -97,6 +97,7 @@ class SimStep:
                 torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
             ))
             self.prev_age.copy_(_was)
+            self._eff_version += 1  # a new AGE is a new Dark-Age card pool
             self.dedications.copy_(torch.where(
                 (_was == 0) & (self.civ_age == 2),
                 torch.full_like(self.dedications, self._heroic_ded),

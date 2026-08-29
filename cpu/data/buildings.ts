@@ -76,6 +76,10 @@ export interface BuildingDef {
   /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors" — over
    *  every city the OWNING SEAT holds, not just the building's own. */
   loyaltyWithoutGovernor?: number;
+  /** CIV6 (Audience Chamber): "+2 Amenities and +4 Housing in Cities with
+   *  Governors." */
+  amenitiesWithGovernor?: number;
+  housingWithGovernor?: number;
   /**
    * CIV6 (Grove): "+1 Food and Faith to adjacent unimproved Charming tiles.
    * Yields increased to +2 Food, Faith and Culture for adjacent unimproved
@@ -230,7 +234,7 @@ const rawList: BuildingDef[] = [
   // buildings, one per tier. CIV6: "Government Plaza buildings, unlike those
   // of other districts, cannot be purchased with Gold."
   { id: 'ANCESTRAL_HALL', name: 'Ancestral Hall', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['AUDIENCE_CHAMBER', 'WARLORDS_THRONE'] },
-  { id: 'AUDIENCE_CHAMBER', name: 'Audience Chamber', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'WARLORDS_THRONE'], loyaltyWithoutGovernor: -2 },
+  { id: 'AUDIENCE_CHAMBER', name: 'Audience Chamber', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'WARLORDS_THRONE'], loyaltyWithoutGovernor: -2, amenitiesWithGovernor: 2, housingWithGovernor: 4 },
   { id: 'WARLORDS_THRONE', name: "Warlord's Throne", district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER'] },
   { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'] },
   { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, pillageFaithImp: 15, pillageFaithDist: 30, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },

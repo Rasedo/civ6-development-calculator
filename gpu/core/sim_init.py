@@ -525,8 +525,40 @@ class SimInit:
         self._era_dark = int(_er.get("darkT", 3))
         self._era_gold = int(_er.get("goldenT", 10))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
-        self._gov_per = int(_er.get("govCivicsPerTitle", 10))
-        self._gov_max = int(_er.get("govMaxTitles", 5))
+        # THE GOVERNOR CATALOG. `governors` order IS the governor index; the
+        # thirteen title civics, the neutralize clock and the Governance
+        # Doctrine favor ride the era block beside the ages that gate them.
+        _gv = rules.governors
+        _gp = rules.governor_promotions
+        self.n_governors = len(_gv)
+        self.n_gov_promos = len(_gp)
+        self._gov_establish = torch.tensor([int(g["establish"]) for g in _gv] or [0],
+                                           dtype=torch.long, device=device)
+        self._gov_minor_ok = torch.tensor([bool(g["cityStates"]) for g in _gv] or [False],
+                                          dtype=torch.bool, device=device)
+        self._gov_base_promo = torch.tensor([int(g["base"]) for g in _gv] or [0],
+                                            dtype=torch.long, device=device)
+        self._gov_title_civics = torch.tensor(_er.get("governorTitleCivics", []) or [-1],
+                                              dtype=torch.long, device=device)
+        self._gov_neutralize = int(_er["governorNeutralizeTurns"])
+        self._gov_doctrine_favor = int(_er["governanceDoctrineFavor"])
+        self._gpromo_gov = torch.tensor([int(p["gov"]) for p in _gp] or [0], dtype=torch.long, device=device)
+        self._gpromo_tier = torch.tensor([int(p["tier"]) for p in _gp] or [0], dtype=torch.long, device=device)
+        self._gpromo_req = torch.tensor([int(p["requires"]) for p in _gp] or [0], dtype=torch.long, device=device)
+        self._gpromo = {}
+        if _gp:
+            for _k in ("cityYields", "perCitizen", "yieldMult", "adjacencyMult",
+                       "loyaltyToOwn", "loyaltyToForeign",
+                       "faithPerSpecialty", "districtProdMult", "projectProdMult", "growthMult",
+                       "gppMult", "gwTourismMult", "pressureMult", "builderCharges",
+                       "settlerFreePop", "harvestMult", "cityDefense", "territoryCS",
+                       "extraStrikes", "freePromoOnTrain", "theologyCS", "fullHeal",
+                       "ignoreForeignPressure", "faithOnBuildPct", "waterWorks",
+                       "spyLevelPenalty", "noSiege", "stockpilePerTurn", "resourceDiscountPct",
+                       "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries"):
+                self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
+        self._water_works_housing = int(_er.get("waterWorksHousing", 2))
+        self._water_works_amenities = int(_er.get("waterWorksAmenities", 1))
         self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))
         self._ded_monumentality = int(_er.get("dedMonumentality", 0))
         self._ded_free_inquiry = int(_er.get("dedFreeInquiry", 1))
@@ -804,9 +836,16 @@ class SimInit:
         # other, matching TS's single `allCities(state)` loop over one
         # religionPressure field.
         self.city_pressure = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
-        # ESPIONAGE clocks: turns this city's governor is off duty, and the
-        # per-SEAT Gain Sources clock (a spy of that seat operates higher here).
-        self.city_gov_out = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, dtype=torch.long, device=device)
+        # THE GOVERNOR ROSTER, one slot per catalog governor per major row.
+        # The neutralize clock follows the PERSON, not the city — a governor a
+        # spy turns out keeps counting down in the Palace.
+        _ng = max(1, self.n_governors)
+        self.civ_gov_appointed = torch.zeros(B, self.n_majors, _ng, dtype=torch.bool, device=device)
+        self.civ_gov_city = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
+        self.civ_gov_establish = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
+        self.civ_gov_out = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
+        self.civ_gov_promos = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
+        # the per-SEAT Gain Sources clock (a spy of that seat operates higher here)
         self.city_spy_sources = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
         self.city_followed = torch.full((B, self.n_majors + s_pad, civ_city_pad), -1, dtype=torch.long, device=device)
         self._bel = {}
@@ -1490,6 +1529,11 @@ class SimInit:
             # (MERCHANT_REPUBLIC gold, THEOCRACY faith, DEMOCRACY culture,
             # COMMUNISM production).
             self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            # the two channels a GOVERNOR gates: Merchant Republic's gold wants
+            # an ESTABLISHED one, Theocracy's and Communism's per-citizen
+            # yields only a seated one.
+            self._gov_gov_ymult = torch.tensor([[float(x) for x in g.get("governorYieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)
+            self._gov_gov_percit = torch.tensor([[float(x) for x in g.get("governorPerCitizen", [0] * 6)] for g in _govs], dtype=dtype, device=device)
             self._gov_ehprod = torch.tensor([float(g.get("encampHarborProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
             self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov]
             # The amenity + district-conditional channels, applied for EVERY
@@ -1616,6 +1660,43 @@ class SimInit:
             # yieldMult, the channel a card gained with COLLECTIVE_ACTIVISM's
             # per-suzerainty culture; the government table has always had it.
             self._pol_ymult = torch.tensor([[float(x) for x in p.get("yieldMult", [1] * 6)] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
+            # THE DARK-AGE window: [firstEra, lastEra], [-1, -1] on every
+            # ordinary card. A Dark Age card needs no unlocking civic — the
+            # seat's AGE and this window are its whole gate.
+            _pdk = [r.get("dark", [-1, -1]) for r in _pols]
+            self._pol_dark_lo = torch.tensor([int(x[0]) for x in _pdk], dtype=torch.long, device=device)
+            self._pol_dark_hi = torch.tensor([int(x[1]) for x in _pdk], dtype=torch.long, device=device)
+            self._pol_route_ymult = torch.tensor([float(r.get("routeYieldMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_dom_route = torch.tensor([[float(x) for x in r.get("domesticRouteYield", [0] * 6)] for r in _pols], dtype=dtype, device=device)
+            self._pol_no_settlers = torch.tensor([bool(r.get("noSettlers", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_heal_home = torch.tensor([bool(r.get("healOnlyHome", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_relig_home = torch.tensor([float(r.get("religiousCsHome", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_raider_prod = torch.tensor([float(r.get("navalRaiderProdMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_raider_moves = torch.tensor([int(r.get("navalRaiderMoves", 0)) for r in _pols], dtype=torch.long, device=device)
+            self._pol_griev_hold = torch.tensor([bool(r.get("grievanceNoDecay", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_proj_prod = torch.tensor([float(r.get("projectProdMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_loyalty_all = torch.tensor([float(r.get("loyaltyAll", 0)) for r in _pols], dtype=dtype, device=device)
+            _pfb = [r.get("favorPerBuilding", [-1, 0]) for r in _pols]
+            self._pol_favor_b = torch.tensor([int(x[0]) for x in _pfb], dtype=torch.long, device=device)
+            self._pol_favor_n = torch.tensor([float(x[1]) for x in _pfb], dtype=dtype, device=device)
+            self._pol_no_envoy = torch.tensor([bool(r.get("noEnvoyInfluence", 0)) for r in _pols], dtype=torch.bool, device=device)
+            _pve = [r.get("unitCsVsEra", [-1, 0]) for r in _pols]
+            self._pol_era_cs_min = torch.tensor([int(x[0]) for x in _pve], dtype=torch.long, device=device)
+            self._pol_era_cs = torch.tensor([float(x[1]) for x in _pve], dtype=torch.float64, device=device)
+            self._pol_land_cost = torch.tensor([float(r.get("landUnitCostMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_concert = torch.tensor([float(r.get("concertShare", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_mil_maint = torch.tensor([float(r.get("militaryMaintenanceAdd", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_imp_y = torch.tensor([[[float(y) for y in i] for i in r.get("improvementYields", [])] or [[0.0] * 6] for r in _pols], dtype=dtype, device=device)
+            # [target, yield, x1000 multiplier] rows, padded to the widest
+            # card with a -1 target that matches nothing
+            for _nm, _key in (("_pol_dist_ym", "districtYieldMult"), ("_pol_bldg_ym", "buildingYieldMult")):
+                _rows = [r.get(_key, []) for r in _pols]
+                _w = max([len(x) for x in _rows] + [1])
+                _pad = [[list(map(int, y)) for y in x] + [[-1, 0, 1000]] * (_w - len(x)) for x in _rows]
+                setattr(self, _nm, torch.tensor(_pad, dtype=torch.long, device=device))
+            # the two GOVERNOR-GATED government channels
+            self._pol_gov_ymult = torch.tensor([[float(x) for x in r.get("governorYieldMult", [1] * 6)] for r in _pols], dtype=dtype, device=device)
+            self._pol_gov_percit = torch.tensor([[float(x) for x in r.get("governorPerCitizen", [0] * 6)] for r in _pols], dtype=dtype, device=device)
             # the civic that RETIRES the card; -1 = it never leaves the pool
             _pucs = [r.get("unitCombatCS", [0, 0, 0]) for r in _pols]
             self._pol_ucs_mask = torch.tensor([int(x[0]) for x in _pucs], dtype=torch.long, device=device)
@@ -1890,6 +1971,17 @@ class SimInit:
         self._b_influence = rules.b_influence.to(device)
         self._b_favor = rules.b_favor.to(device)
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
+        self._b_amen_gov = rules.b_amen_gov.to(device)
+        self._b_house_gov = rules.b_house_gov.to(device)
+        # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
+        # Canal/Dam — the district roster, by catalog id.
+        _dids = [str(d.get("id", "")) for d in self.districts_cat]
+        self._d_water_house = torch.tensor(
+            [float(self._water_works_housing) if i in ("NEIGHBORHOOD", "AQUEDUCT") else 0.0 for i in _dids] or [0.0],
+            dtype=torch.float64, device=device)
+        self._d_water_amen = torch.tensor(
+            [float(self._water_works_amenities) if i in ("CANAL", "DAM") else 0.0 for i in _dids] or [0.0],
+            dtype=torch.float64, device=device)
         self._b_appeal_y = rules.b_appeal_y.to(device)  # [NB, 2, 6]
         self._b_appeal_rows = [i for i in range(len(rules.b_appeal_y)) if float(rules.b_appeal_y[i].abs().sum()) != 0]
         self._laser_power_load = float(rules.laser_power_load)

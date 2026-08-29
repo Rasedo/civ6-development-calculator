@@ -30,7 +30,7 @@ import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
-import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, GRIEVANCE_WAR_SURPRISE, GRIEVANCE_WAR_FORMAL, GRIEVANCE_WAR_ON_FRIEND, GRIEVANCE_WAR_ON_SUZERAIN, GRIEVANCE_WAR_ON_CS_FRIEND, GRIEVANCE_CITY_TAKEN, GRIEVANCE_CITY_RAZED, GRIEVANCE_LAST_CITY, GRIEVANCE_CS_CONQUERED, GRIEVANCE_CS_RAZED, GRIEVANCE_DENOUNCE, GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_ALLY_SHARE, GRIEVANCE_FRIEND_SHARE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DECAY_FLOOR, GRIEVANCE_OCCUPIED_DECAY, GRIEVANCE_OCCUPIED_CAPITAL_DECAY, GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX, GRIEVANCE_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CONGRESS_ENERGY_DISCOUNT, CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, TOURISM_GOV_MULT, TOURISM_RELIGIOUS_PENALTY_PCT, GOV_INTOLERANCE, CULTURE_PER_DOMESTIC_TOURIST, HOLY_CITY_TOURISM, ENLIGHTENMENT_CIVIC, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_SKY, DED_BODYGUARD, DED_AUTOMATON, SKY_EUREKAS, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, GRIEVANCE_WAR_SURPRISE, GRIEVANCE_WAR_FORMAL, GRIEVANCE_WAR_ON_FRIEND, GRIEVANCE_WAR_ON_SUZERAIN, GRIEVANCE_WAR_ON_CS_FRIEND, GRIEVANCE_CITY_TAKEN, GRIEVANCE_CITY_RAZED, GRIEVANCE_LAST_CITY, GRIEVANCE_CS_CONQUERED, GRIEVANCE_CS_RAZED, GRIEVANCE_DENOUNCE, GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_ALLY_SHARE, GRIEVANCE_FRIEND_SHARE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DECAY_FLOOR, GRIEVANCE_OCCUPIED_DECAY, GRIEVANCE_OCCUPIED_CAPITAL_DECAY, GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX, GRIEVANCE_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CONGRESS_ENERGY_DISCOUNT, CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, TOURISM_GOV_MULT, TOURISM_RELIGIOUS_PENALTY_PCT, GOV_INTOLERANCE, CULTURE_PER_DOMESTIC_TOURIST, HOLY_CITY_TOURISM, ENLIGHTENMENT_CIVIC, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_SKY, DED_BODYGUARD, DED_AUTOMATON, SKY_EUREKAS, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
@@ -92,6 +92,42 @@ const boostRow = (b: BuildingYieldBoost | undefined): number[] =>
 
 /** Every channel a government or a policy card can carry, in one row so the
  *  two tables cannot drift. A government and a card layer identically. */
+const governorEffectRow = (fx: GovernorEffects) => ({
+  cityYields: YIELD_KEYS.map((k) => fx.cityYields?.[k] ?? 0),
+  perCitizen: YIELD_KEYS.map((k) => fx.perCitizen?.[k] ?? 0),
+  yieldMult: YIELD_KEYS.map((k) => fx.yieldMult?.[k] ?? 1),
+  adjacencyMult: PLACEABLE_DISTRICTS.map((d) => fx.adjacencyMult?.[d] ?? 1),
+  faithPerSpecialty: fx.faithPerSpecialty ?? 0,
+  districtProdMult: fx.districtProdMult ?? 1,
+  projectProdMult: fx.projectProdMult ?? 1,
+  growthMult: fx.growthMult ?? 1,
+  gppMult: fx.gppMult ?? 1,
+  gwTourismMult: fx.gwTourismMult ?? 1,
+  pressureMult: fx.pressureMult ?? 1,
+  builderCharges: fx.builderCharges ?? 0,
+  settlerFreePop: fx.settlerFreePop ? 1 : 0,
+  harvestMult: fx.harvestMult ?? 1,
+  cityDefense: fx.cityDefense ?? 0,
+  territoryCS: fx.territoryCS ?? 0,
+  extraStrikes: fx.extraStrikes ?? 0,
+  freePromoOnTrain: fx.freePromoOnTrain ? 1 : 0,
+  theologyCS: fx.theologyCS ?? 0,
+  fullHeal: fx.fullHeal ? 1 : 0,
+  ignoreForeignPressure: fx.ignoreForeignPressure ? 1 : 0,
+  faithOnBuildPct: fx.faithOnBuildPct ?? 0,
+  waterWorks: fx.waterWorks ? 1 : 0,
+  // [range, loyalty] per turn onto this seat's OTHER cities / onto foreign ones
+  loyaltyToOwn: fx.loyaltyToOwn ? [fx.loyaltyToOwn.range, fx.loyaltyToOwn.loyalty] : [0, 0],
+  loyaltyToForeign: fx.loyaltyToForeign ? [fx.loyaltyToForeign.range, fx.loyaltyToForeign.loyalty] : [0, 0],
+  spyLevelPenalty: fx.spyLevelPenalty ?? 0,
+  noSiege: fx.noSiege ? 1 : 0,
+  stockpilePerTurn: fx.stockpilePerTurn ?? 0,
+  resourceDiscountPct: fx.resourceDiscountPct ?? 0,
+  envoysAtMinor: fx.envoysAtMinor ?? 0,
+  envoyDoubleAtMinor: fx.envoyDoubleAtMinor ? 1 : 0,
+  minorLuxuries: fx.minorLuxuries ? 1 : 0,
+});
+
 const effectRow = (fx: PolicyEffects) => ({
   cityYields: YIELD_KEYS.map((k) => fx.cityYields?.[k] ?? 0),
   capitalYields: YIELD_KEYS.map((k) => fx.capitalYields?.[k] ?? 0),
@@ -140,6 +176,34 @@ const effectRow = (fx: PolicyEffects) => ({
     ? [fx.cityWithDistrict.housing, fx.cityWithDistrict.amenities]
     : [0, 0],
   gpp: GP_CLASSES.map((c) => fx.gppFlat?.[c] ?? 0),
+  governorYieldMult: YIELD_KEYS.map((k) => fx.governorYieldMult?.[k] ?? 1),
+  governorPerCitizen: YIELD_KEYS.map((k) => fx.governorPerCitizen?.[k] ?? 0),
+  // ---- the DARK-AGE channels ----
+  improvementYields: IMPROVEMENT_IDS.map((i) => YIELD_KEYS.map((k) => fx.improvementYields?.[i as ImprovementId]?.[k] ?? 0)),
+  // [district index, yield index, x1000 multiplier] rows
+  districtYieldMult: (fx.districtYieldMult ?? []).map((r) =>
+    [PLACEABLE_DISTRICTS.indexOf(r.district), YIELD_KEYS.indexOf(r.yield), Math.round(r.mult * 1000)]),
+  // [building index, yield index, x1000 multiplier] rows
+  buildingYieldMult: (fx.buildingYieldMult ?? []).map((r) =>
+    [buildingIdx.get(r.building) ?? -1, YIELD_KEYS.indexOf(r.yield), Math.round(r.mult * 1000)]),
+  domesticRouteYield: YIELD_KEYS.map((k) => fx.domesticRouteYield?.[k] ?? 0),
+  routeYieldMult: fx.routeYieldMult ?? 1,
+  noSettlers: fx.noSettlers ? 1 : 0,
+  healOnlyHome: fx.healOnlyHome ? 1 : 0,
+  religiousCsHome: fx.religiousCsHome ?? 0,
+  navalRaiderProdMult: fx.navalRaiderProdMult ?? 1,
+  navalRaiderMoves: fx.navalRaiderMoves ?? 0,
+  grievanceNoDecay: fx.grievanceNoDecay ? 1 : 0,
+  projectProdMult: fx.projectProdMult ?? 1,
+  loyaltyAll: fx.loyaltyAll ?? 0,
+  favorPerBuilding: fx.favorPerBuilding
+    ? [buildingIdx.get(fx.favorPerBuilding.building) ?? -1, fx.favorPerBuilding.favor]
+    : [-1, 0],
+  noEnvoyInfluence: fx.noEnvoyInfluence ? 1 : 0,
+  unitCsVsEra: fx.unitCsVsEra ? [fx.unitCsVsEra.minEra, fx.unitCsVsEra.cs] : [-1, 0],
+  landUnitCostMult: fx.landUnitCostMult ?? 1,
+  concertShare: fx.concertShare ?? 0,
+  militaryMaintenanceAdd: fx.militaryMaintenanceAdd ?? 0,
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST } from '../data/constants';
@@ -160,6 +224,7 @@ import { clearableFeatures } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
+import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, type GovernorEffects } from '../data/governors';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
  *  Exported to the GPU as scenario.settlerPopGate. */
@@ -405,8 +470,14 @@ export function buildRules() {
       darkT: ERA_DARK_T,
       goldenT: ERA_GOLDEN_T,
       agePressure: AGE_PRESSURE,
-      govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
-      govMaxTitles: GOV_MAX_TITLES,
+      // CIV6 (Governor): the thirteen civics that each "grant 1 Governor
+      // Title", by civic index; the Government Plaza's own titles ride the
+      // district and building rows.
+      governorTitleCivics: GOVERNOR_TITLE_CIVICS.map((c) => civicIdx.get(c) ?? -1).filter((i) => i >= 0),
+      governorNeutralizeTurns: GOVERNOR_NEUTRALIZE_TURNS,
+      waterWorksHousing: WATER_WORKS_HOUSING,
+      waterWorksAmenities: WATER_WORKS_AMENITIES,
+      governanceDoctrineFavor: GOVERNANCE_DOCTRINE_FAVOR,
       grievanceWarSurprise: GRIEVANCE_WAR_SURPRISE, grievanceWarFormal: GRIEVANCE_WAR_FORMAL, grievanceWarOnFriend: GRIEVANCE_WAR_ON_FRIEND, grievanceWarOnSuzerain: GRIEVANCE_WAR_ON_SUZERAIN, grievanceWarOnCsFriend: GRIEVANCE_WAR_ON_CS_FRIEND, grievanceCityTaken: GRIEVANCE_CITY_TAKEN, grievanceCityRazed: GRIEVANCE_CITY_RAZED, grievanceLastCity: GRIEVANCE_LAST_CITY, grievanceCsConquered: GRIEVANCE_CS_CONQUERED, grievanceCsRazed: GRIEVANCE_CS_RAZED, grievanceDenounce: GRIEVANCE_DENOUNCE, grievanceHeldCapital: GRIEVANCE_HELD_CAPITAL_PER_TURN, grievanceAllyShare: GRIEVANCE_ALLY_SHARE, grievanceFriendShare: GRIEVANCE_FRIEND_SHARE, grievanceDecayBase: GRIEVANCE_DECAY_BASE, grievanceDecayFloor: GRIEVANCE_DECAY_FLOOR, grievanceOccupiedDecay: GRIEVANCE_OCCUPIED_DECAY, grievanceOccupiedCapitalDecay: GRIEVANCE_OCCUPIED_CAPITAL_DECAY, grievanceFavorFloor: GRIEVANCE_FAVOR_FLOOR, grievanceFavorStep: GRIEVANCE_FAVOR_STEP, grievanceFavorMax: GRIEVANCE_FAVOR_MAX, grievanceGang: GRIEVANCE_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, dedWish: DED_WISH, dedSky: DED_SKY, dedBodyguard: DED_BODYGUARD, dedAutomaton: DED_AUTOMATON,
       // which catalog entries each WORLD ERA offers, padded to a rectangle
       // with -1 (the GPU walks `dedEraLen` entries of each row)
@@ -1289,6 +1360,8 @@ export function buildRules() {
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,
       loyaltyWithoutGovernor: b.loyaltyWithoutGovernor ?? 0,
+      amenitiesWithGovernor: b.amenitiesWithGovernor ?? 0,
+      housingWithGovernor: b.housingWithGovernor ?? 0,
       powerSupply: b.powerSupply ?? 0,
       regionalRange: b.regionalRange ?? 0,
       // the PRESERVE rows: what they pay an adjacent unimproved tile at
@@ -1347,6 +1420,21 @@ export function buildRules() {
       ],
       ...effectRow(g.effects),
     })),
+    governors: GOVERNORS.map((g) => ({
+      id: g.id,
+      establish: g.establishTurns,
+      cityStates: g.cityStates ? 1 : 0,
+      // the DEFAULT ability's row in `governorPromotions`
+      base: GOVERNOR_DEFAULT_PROMOTION[GOVERNOR_INDEX[g.id]],
+    })),
+    governorPromotions: GOVERNOR_PROMOTIONS.map((p) => ({
+      id: p.id,
+      gov: GOVERNOR_INDEX[p.governor],
+      tier: p.tier,
+      // a bitmask over this list: at least ONE of these must be held
+      requires: (p.requires ?? []).reduce((m, r) => m | (1 << GOVERNOR_PROMOTION_INDEX[r]), 0),
+      ...governorEffectRow(p.effects),
+    })),
     policies: Object.values(POLICIES).map((p) => ({
       id: p.id,
       kind: SLOT_KIND_IDX[p.kind],
@@ -1355,6 +1443,8 @@ export function buildRules() {
       ),
       // the civic that RETIRES the card; -1 = it never leaves the pool
       obsoleteCivic: p.obsoleteCivic ? civicIdx.get(p.obsoleteCivic) ?? -1 : -1,
+      // a DARK AGE card's era window; [-1, -1] on every ordinary card
+      dark: p.dark ? [p.dark.firstEra, p.dark.lastEra] : [-1, -1],
       ...effectRow(p.effects),
     })),
   };

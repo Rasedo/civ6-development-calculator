@@ -58,6 +58,7 @@ import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn } from './rules';
+import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ARTIFACT_SLOTS, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
@@ -372,6 +373,11 @@ const SEAT: Record<string, Extractor> = {
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
   rockBandsBought: overSeats((s) => s.rockBandsBought ?? 0),
+  governorAppointed: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? 1 : 0))),
+  governorCity: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? g.cityId : -1))),
+  governorEstablish: overSeats((s) => governorsOf(s).map((g) => g.establishTurns)),
+  governorOut: overSeats((s) => governorsOf(s).map((g) => g.outTurns)),
+  governorPromotions: overSeats((s) => governorsOf(s).map((g) => g.promotions)),
   grievances: overSeats((s, state) => grievanceLine(state, s.seat)),
   diplomaticFavor: overSeats((s) => s.diplomaticFavor),
   diplomaticPoints: overSeats((s) => s.diplomaticPoints),
@@ -543,7 +549,6 @@ const CITY: Record<string, Extractor> = {
   origCapitalSeat: overCities((r) => r.city.origCapitalSeat ?? -1),
   founderSeat: overCities((r) => r.city.founderSeat ?? -1),
   loyalty: overCities((r) => r.city.loyalty ?? 100),
-  governorOutTurns: overCities((r) => r.city.governorOutTurns ?? 0),
   spySources: overCities((r) => (r.city.spySources ?? []).reduce((a, b) => a + b, 0)),
   // Ids the production layout does not carry (PALACE, the scripted-held
   // buildings) have no GPU column at all, so they are dropped rather than

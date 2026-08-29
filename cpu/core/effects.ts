@@ -1,11 +1,12 @@
 
-import type { CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, Yields } from './types';
+import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf, campTiles, isCiv } from './seats';
+import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
 import { tileAppeal, appealBand, gpAppealResolver, type GpAppeal } from './appeal';
@@ -18,6 +19,8 @@ import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain, suzer
 import { GP_PERM } from '../data/greatPeople';
 import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { PROJECTS } from '../data/projects';
+import { cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
+import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 export interface Unlocks {
   improvements: Set<string>;
   districts: Set<string>;
@@ -172,6 +175,37 @@ export interface Modifiers {
   wwCutPct: number;
   gppMult: number;
   cityWithDistrict: { housing: number; amenities: number }[];
+  /** yields per CITIZEN of the city — a governor's Tax Collector, Connoisseur
+   *  and Researcher, and the two governments that pay by citizen. */
+  perCitizen: Partial<Yields>;
+  /** faith per SPECIALTY district in the city (Moksha's Bishop). */
+  faithPerSpecialty: number;
+  /** Liang's Water Works: housing per Neighborhood/Aqueduct, amenities per
+   *  Canal/Dam. */
+  waterWorks: boolean;
+  /** the two GOVERNOR-GATED government channels, folded per city. */
+  governorYieldMult: Partial<Yields>;
+  governorPerCitizen: Partial<Yields>;
+
+  // ---- the DARK-AGE channels ----
+  districtYieldMult: { district: DistrictId; yield: keyof Yields; mult: number }[];
+  buildingYieldMult: { building: string; yield: keyof Yields; mult: number }[];
+  domesticRouteYield: Partial<Yields>;
+  routeYieldMult: number;
+  noSettlers: boolean;
+  healOnlyHome: boolean;
+  religiousCsHome: number;
+  navalRaiderProdMult: number;
+  navalRaiderMoves: number;
+  grievanceNoDecay: boolean;
+  projectProdMult: number;
+  loyaltyAll: number;
+  favorPerBuilding: { building: string; favor: number }[];
+  noEnvoyInfluence: boolean;
+  unitCsVsEra: { minEra: number; cs: number }[];
+  landUnitCostMult: number;
+  concertShare: number;
+  militaryMaintenanceAdd: number;
 }
 
 export function defaultModifiers(): Modifiers {
@@ -224,6 +258,29 @@ export function defaultModifiers(): Modifiers {
     wwCutPct: 0,
     gppMult: 1,
     cityWithDistrict: [],
+    perCitizen: {},
+    faithPerSpecialty: 0,
+    waterWorks: false,
+    governorYieldMult: {},
+    governorPerCitizen: {},
+    districtYieldMult: [],
+    buildingYieldMult: [],
+    domesticRouteYield: {},
+    routeYieldMult: 1,
+    noSettlers: false,
+    healOnlyHome: false,
+    religiousCsHome: 0,
+    navalRaiderProdMult: 1,
+    navalRaiderMoves: 0,
+    grievanceNoDecay: false,
+    projectProdMult: 1,
+    loyaltyAll: 0,
+    favorPerBuilding: [],
+    noEnvoyInfluence: false,
+    unitCsVsEra: [],
+    landUnitCostMult: 1,
+    concertShare: 0,
+    militaryMaintenanceAdd: 0,
   };
 }
 
@@ -278,6 +335,28 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.wwCutPct) mods.wwCutPct += fx.wwCutPct;
   if (fx.gppMult) mods.gppMult *= fx.gppMult;
   if (fx.cityWithDistrict) mods.cityWithDistrict.push(fx.cityWithDistrict);
+  for (const [imp, y] of Object.entries(fx.improvementYields ?? {})) {
+    const cur = (mods.improvementYields[imp as ImprovementId] ??= {});
+    addPartial(cur, y);
+  }
+  for (const r of fx.districtYieldMult ?? []) mods.districtYieldMult.push(r);
+  for (const r of fx.buildingYieldMult ?? []) mods.buildingYieldMult.push(r);
+  addPartial(mods.domesticRouteYield, fx.domesticRouteYield);
+  if (fx.routeYieldMult) mods.routeYieldMult *= fx.routeYieldMult;
+  if (fx.noSettlers) mods.noSettlers = true;
+  if (fx.healOnlyHome) mods.healOnlyHome = true;
+  if (fx.religiousCsHome) mods.religiousCsHome += fx.religiousCsHome;
+  if (fx.navalRaiderProdMult) mods.navalRaiderProdMult *= fx.navalRaiderProdMult;
+  if (fx.navalRaiderMoves) mods.navalRaiderMoves += fx.navalRaiderMoves;
+  if (fx.grievanceNoDecay) mods.grievanceNoDecay = true;
+  if (fx.projectProdMult) mods.projectProdMult *= fx.projectProdMult;
+  if (fx.loyaltyAll) mods.loyaltyAll += fx.loyaltyAll;
+  if (fx.favorPerBuilding) mods.favorPerBuilding.push(fx.favorPerBuilding);
+  if (fx.noEnvoyInfluence) mods.noEnvoyInfluence = true;
+  if (fx.unitCsVsEra) mods.unitCsVsEra.push(fx.unitCsVsEra);
+  if (fx.landUnitCostMult) mods.landUnitCostMult *= fx.landUnitCostMult;
+  if (fx.concertShare) mods.concertShare += fx.concertShare;
+  if (fx.militaryMaintenanceAdd) mods.militaryMaintenanceAdd += fx.militaryMaintenanceAdd;
   for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
     const key = cls as GreatPersonClass;
     mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
@@ -314,7 +393,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   const mods = modifiersFromResearch(s.research);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state));
+    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat));
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -372,6 +451,18 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
  *  Combat Strength" (the PROMOTION-class axis: MELEE, ANTICAV, NAVAL_MELEE)
  *  and "All units gain +5 Combat Strength" — read beside `congressUnitCS` at
  *  every roll that composes a unit's strength. */
+/** CIV6 (Cyber Warfare): "+10 Combat Strength against units from Information
+ *  and Future Eras." The card is the ASKER's; the era is the FOE's chassis. */
+export function eraMatchupCS(state: GameState, unit: { seat: number }, foeType: string | undefined): number {
+  if (!foeType || !isCiv(unit.seat)) return 0;
+  const rows = getModifiers(state, unit.seat).unitCsVsEra;
+  if (rows.length === 0) return 0;
+  const era = UNIT_ERA_INDEX[foeType] ?? 0;
+  let n = 0;
+  for (const r of rows) if (era >= r.minEra) n += r.cs;
+  return n;
+}
+
 export function governmentUnitCS(state: GameState, unit: { type: string; seat: number }): number {
   if (!isCiv(unit.seat)) return 0;
   const def = UNITS[unit.type];
@@ -393,7 +484,9 @@ export function governmentXpPct(state: GameState, seat: number): number {
 /** The gold per turn one unit of this type costs a seat carrying `mods` —
  *  Conscription and Levée en Masse take it down, never below free. */
 export function unitUpkeep(mods: Modifiers, unitType: string): number {
-  return Math.max(0, (UNITS[unitType]?.maintenance ?? 0) - mods.unitMaintenanceCut);
+  // CIV6 (Elite Forces): "+2 Gold to maintain each military unit."
+  const mil = (UNITS[unitType]?.combat ?? 0) > 0 ? mods.militaryMaintenanceAdd : 0;
+  return Math.max(0, (UNITS[unitType]?.maintenance ?? 0) - mods.unitMaintenanceCut + mil);
 }
 
 function applyBeliefEffects(
@@ -489,8 +582,14 @@ export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKin
 
 /** `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
  *  when nothing stands. A blocked card is simply never slotted. */
+/** CIV6 (Dark Age policy card): "they can only be adopted by civilizations
+ *  that are experiencing a Dark Age" — the flag every adoption read needs. */
+export function inDarkAge(state: GameState, seat: number): boolean {
+  return (seatOf(state, seat)?.age ?? 1) === 0;
+}
+
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
-                                blocked = -1): {
+                                blocked = -1, dark = false): {
   government: string | null;
   policies: (string | null)[];
 } {
@@ -507,8 +606,14 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   for (const k of SLOT_KINDS) for (let i = 0; i < (extra?.[k] ?? 0); i++) slots.push(k);
   const policies: (string | null)[] = slots.map(() => null);
   const banned = blocked >= 0 ? POLICY_LIST[blocked]?.id : undefined;
+  // CIV6 (Dark Age policy card): a Dark Age card needs no civic — the seat's
+  // AGE and the card's own era window are the whole gate.
+  const era = civEraIndex(research.techs, research.civics);
   for (const card of Object.values(POLICIES)) {
-    if (!u.policies.has(card.id) || card.id === banned) continue;
+    if (card.id === banned) continue;
+    if (card.dark
+      ? !(dark && era >= card.dark.firstEra && era <= card.dark.lastEra)
+      : !u.policies.has(card.id)) continue;
     const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
     if (slot >= 0) policies[slot] = card.id;
   }
@@ -516,8 +621,8 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
 }
 
 function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
-                         blocked = -1): void {
-  const { government, policies } = computeAdoption(research, extra, blocked);
+                         blocked = -1, dark = false): void {
+  const { government, policies } = computeAdoption(research, extra, blocked, dark);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   applyPolicyEffects(mods, gov.effects);
@@ -533,6 +638,66 @@ export function followerBeliefForReligion(state: GameState, g: number): BeliefDe
   if (g < 0) return undefined;
   const rel = seatOf(state, g)?.religion;
   return rel?.founded && rel.follower ? FOLLOWER_BELIEFS[rel.follower] : undefined;
+}
+
+/**
+ * The city's own view of its seat modifiers, with its GOVERNOR folded in.
+ * CIV6 (Governor): the abilities apply only once the governor is
+ * ESTABLISHED, while the seat channels that merely ask for "cities with
+ * Governors" — the Audience Chamber's amenities and housing, Theocracy's and
+ * Communism's per-citizen yields — read the seating alone. Merchant
+ * Republic's gold names the ESTABLISHED governor and gets it.
+ */
+export function withGovernor(state: GameState, base: Modifiers, city: City): Modifiers {
+  const seated = cityHasGovernor(state, city);
+  if (!seated) return base;
+  const established = cityGovernorEstablished(state, city);
+  const fx = established ? cityGovernorEffects(state, city) : [];
+  const m: Modifiers = {
+    ...base,
+    cityYields: { ...base.cityYields },
+    yieldMult: { ...base.yieldMult },
+    adjacencyMult: { ...base.adjacencyMult },
+    perCitizen: { ...base.perCitizen },
+  };
+  for (const k of Object.keys(base.governorPerCitizen) as YieldKey[]) {
+    m.perCitizen[k] = (m.perCitizen[k] ?? 0) + (base.governorPerCitizen[k] ?? 0);
+  }
+  m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
+  m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
+  if (established) {
+    for (const k of Object.keys(base.governorYieldMult) as YieldKey[]) {
+      m.yieldMult[k] = (m.yieldMult[k] ?? 1) * (base.governorYieldMult[k] ?? 1);
+    }
+  }
+  for (const e of fx) {
+    for (const k of Object.keys(e.cityYields ?? {}) as YieldKey[]) {
+      m.cityYields[k] = (m.cityYields[k] ?? 0) + (e.cityYields![k] ?? 0);
+    }
+    for (const k of Object.keys(e.perCitizen ?? {}) as YieldKey[]) {
+      m.perCitizen[k] = (m.perCitizen[k] ?? 0) + (e.perCitizen![k] ?? 0);
+    }
+    for (const k of Object.keys(e.yieldMult ?? {}) as YieldKey[]) {
+      m.yieldMult[k] = (m.yieldMult[k] ?? 1) * (e.yieldMult![k] ?? 1);
+    }
+    for (const d of Object.keys(e.adjacencyMult ?? {}) as DistrictId[]) {
+      m.adjacencyMult[d] = (m.adjacencyMult[d] ?? 1) * (e.adjacencyMult![d] ?? 1);
+    }
+    m.faithPerSpecialty += e.faithPerSpecialty ?? 0;
+    m.growthMult *= e.growthMult ?? 1;
+    if (e.waterWorks) m.waterWorks = true;
+  }
+  if (m.waterWorks) {
+    let housing = 0;
+    let amenities = 0;
+    for (const d of city.districts) {
+      if (d.type === 'NEIGHBORHOOD' || d.type === 'AQUEDUCT') housing += WATER_WORKS_HOUSING;
+      if (d.type === 'CANAL' || d.type === 'DAM') amenities += WATER_WORKS_AMENITIES;
+    }
+    m.housingAll += housing;
+    m.amenitiesAll += amenities;
+  }
+  return m;
 }
 
 export function withFollowerBelief(

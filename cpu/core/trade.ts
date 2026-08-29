@@ -22,6 +22,7 @@ import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpPermOf } from '../data/greatPeople';
+import { getModifiers } from './effects';
 /**
  * CIV6: "The base range for land trade routes is 15 tiles ... The base range
  * for sea trade routes is 30 tiles." A route counts as a sea route when BOTH
@@ -248,6 +249,8 @@ export function routeYields(state: GameState, dest: City): Yields {
   addYields(out, { food: 1, production: 1 }); // city center
   const bonus = Math.floor(specialtyDistricts(state, dest) / 2);
   addYields(out, { food: bonus, production: bonus });
+  // CIV6 (Isolationism): "Domestic routes provide +2 Food, +2 Production."
+  addYields(out, getModifiers(state, dest.seat).domesticRouteYield);
   return out;
 }
 
@@ -331,6 +334,9 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       }
     }
   }
+  // CIV6 (Letters of Marque): "Trade Route yields -50%."
+  const cut = getModifiers(state, seat).routeYieldMult;
+  if (cut !== 1) for (const k of Object.keys(out) as (keyof Yields)[]) out[k] = Math.floor(out[k] * cut);
   return out;
 }
 

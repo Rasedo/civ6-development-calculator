@@ -6,7 +6,7 @@ import type { GameState, ResearchState } from './types';
 import { neighbors } from '../../world/hex';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
-import { computeAdoption, wonderExtraSlots } from './effects';
+import { computeAdoption, inDarkAge, wonderExtraSlots } from './effects';
 import { congressPolicyBlocked } from './congress';
 import { DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
@@ -85,7 +85,7 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       // driven game, so counting it would make this boost unreachable.
       const rsr = seatOf(state, seat)?.research;
       if (!GOVERNMENTS_ADOPTION_LIVE || !rsr) return false;
-      return computeAdoption(rsr, wonderExtraSlots(state, seat), congressPolicyBlocked(state))
+      return computeAdoption(rsr, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat))
         .policies.filter((p) => p !== null).length >= check.count;
     }
     case 'cities':

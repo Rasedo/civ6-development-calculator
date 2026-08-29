@@ -16,8 +16,9 @@ import { GP_CLASSES } from '../data/greatPeople';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
+import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
-import { tileSeat, unitsOf } from './seats';
+import { seatOf, tileSeat, unitsOf } from './seats';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
@@ -31,9 +32,11 @@ import {
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
-  CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR,
+  CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
 } from '../data/seats';
 import { POWER_PLANT_IDS } from '../data/buildings';
+import { GOVERNOR_NEUTRALIZE_TURNS } from '../data/governors';
+import { neutralizeGovernor } from './governors';
 import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
 
 const CLEARABLE_FEATURES = clearableFeatures();
@@ -113,6 +116,14 @@ export function preference(state: GameState, res: number, seat: number,
     case CONGRESS_BORDER_CONTROL:
       // A is the gift (culture bombs), B the attack — a seat votes itself the gift.
       return { outcome: 0, target: seat };
+    case CONGRESS_GOVERNANCE: {
+      // A pays favor for appointing and promoting the named type, B
+      // neutralizes it — a seat names the governor its own next title will
+      // buy, which is the first it has not appointed yet.
+      const roster = seatOf(state, seat)?.governors ?? [];
+      const want = roster.findIndex((g) => !g.appointed);
+      return { outcome: 0, target: want >= 0 ? want : 0 };
+    }
     case CONGRESS_PUBLIC_RELATIONS:
       // A DOUBLES the target's grievance flow — the self-serving ballot is B
       // on yourself, halving your own.
@@ -257,6 +268,7 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'feature': return CLEARABLE_FEATURES.length;
     case 'building': return POWER_PLANT_IDS.length;
     case 'promoClass': return PROMO_CLASSES.length;
+    case 'governor': return GOVERNORS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;
     default: return state.seats.length;
@@ -287,6 +299,15 @@ function runResolution(state: GameState, res: number, slot: number,
   const win = tally(votes, space, spent);
   settle(state, votes, spent, win);
   state.congress!.push({ res, outcome: win.outcome, target: win.target });
+  // CIV6 (Governance Doctrine, B): "All active Governors of this type are
+  // neutralized for 6 Turns." The clock starts AT the session, so this is the
+  // one resolution outcome that fires once instead of standing.
+  if (res === CONGRESS_GOVERNANCE && win.outcome === 1) {
+    for (const sx of state.seats) {
+      const g = (sx.governors ?? [])[win.target];
+      if (g?.appointed) neutralizeGovernor(g, GOVERNOR_NEUTRALIZE_TURNS);
+    }
+  }
 }
 
 /** The Diplomatic Victory resolution. Without an intent a seat votes the AI
@@ -491,6 +512,13 @@ export function congressWildcardDelta(state: GameState, government: number): num
   const e = congressEffect(state, CONGRESS_IDEOLOGY);
   if (!e || e.target !== government) return 0;
   return e.outcome === 0 ? CONGRESS_IDEOLOGY_SLOTS : -CONGRESS_IDEOLOGY_SLOTS;
+}
+
+/** Governance Doctrine outcome A: the governor TYPE whose appointment and
+ *  promotion pays Diplomatic Favor; -1 when not standing. */
+export function congressGovernorFavorType(state: GameState): number {
+  const e = congressEffect(state, CONGRESS_GOVERNANCE);
+  return e && e.outcome === 0 ? e.target : -1;
 }
 
 /** Border Control Treaty outcome A: the seat whose new districts act as

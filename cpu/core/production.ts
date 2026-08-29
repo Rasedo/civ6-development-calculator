@@ -1,4 +1,4 @@
-import type { City, GameState, Seat } from './types';
+import type { City, GameState, Seat, Unit } from './types';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat } from './seats';
 import { NO_SEAT } from '../../world/types';
@@ -9,6 +9,7 @@ import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
 import { isEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
+import { governorFlag, governorSum } from './governors';
 import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
 import { emitCarbon, repairBehindBarrier } from './climate';
@@ -21,7 +22,7 @@ import { grantFreeProphet } from './greatPeople';
 import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
 import { trainXpPct } from './combat';
-import { promoClassOf } from './promotions';
+import { promoClassOf, unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -47,6 +48,15 @@ function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic'
       if (rsr.civic === next.id) rsr.civic = null;
     }
   }
+}
+
+/** CIV6 (Embrasure): "Military units trained in this city start with a free
+ *  promotion that do not already start with a free promotion." No unit in this
+ *  model starts with one, so every promotion class qualifies; the grant is the
+ *  XP its first level costs, which `takePromotion` then zeroes. */
+function grantFreePromotion(unit: Unit, free: boolean): void {
+  if (!free || unitPromoRows(unit).length === 0) return;
+  unit.xp = Math.max(unit.xp ?? 0, xpToNextLevel(unit));
 }
 
 export function completeProject(state: GameState, city: City, projectId: string, cost: number, sciPerTurn = 0): void {
@@ -127,6 +137,13 @@ export function completeQueueItem(
 ): void {
   const owner = seatOf(state, city.seat);
   if (!owner) return;
+  // CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction cost
+  // when finishing buildings." Districts are construction too and the page
+  // groups them with the buildings; wonders are not.
+  if (item.kind === 'building' || item.kind === 'district') {
+    const pct = governorSum(state, city, (e) => e.faithOnBuildPct);
+    if (pct) owner.faith = (owner.faith ?? 0) + Math.floor((cost * pct) / 100);
+  }
   switch (item.kind) {
     case 'district': {
       const dt = state.map.tiles[item.tileIndex];
@@ -200,8 +217,12 @@ export function completeQueueItem(
     case 'settler':
       // Real Civ 6: a completed Settler costs the city 1 pop and SPAWNS at
       // the city — a unit like any other, moved and founded by orders.
+      // CIV6 (Provision): "Settlers trained in the city do not consume a
+      // Population."
       spawnUnit(state, 'SETTLER', city.centerIndex, city.seat);
-      city.population = Math.max(1, city.population - 1);
+      if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
+        city.population = Math.max(1, city.population - 1);
+      }
       break;
     case 'unit': {
       // CIV6: "Newly built aircraft will spawn in the Aerodrome, as long as it
@@ -209,14 +230,21 @@ export function completeQueueItem(
       const where = UNITS[item.unit]?.air
         ? airTrainTile(state, city.seat, city) ?? city.centerIndex
         : city.centerIndex;
+      const freePromo = governorFlag(state, city, (e) => e.freePromoOnTrain);
       const trained = spawnUnit(state, item.unit, where, city.seat);
-      if (trained) trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
+      if (trained) {
+        trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
+        grantFreePromotion(trained, freePromo);
+      }
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
       // are excluded in the real game and take a different path here.
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
         const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
-        if (twin) twin.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
+        if (twin) {
+          twin.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
+          grantFreePromotion(twin, freePromo);
+        }
       }
       break;
     }

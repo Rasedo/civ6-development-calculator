@@ -19,6 +19,7 @@ import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
+import { governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
@@ -658,7 +659,9 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   if (unit.embarked && !def?.naval) {
     return EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo;
   }
-  return (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + goldenMoveBonus(state, unit)
+  // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
+  const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
+  return (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
     // an emergency member marches faster on its target's ground
     + emergencyMoveBonus(state, unit.seat,
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex]));
@@ -1130,6 +1133,16 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   if (band && lump > 0) {
     band.tourismTo ??= [];
     band.tourismTo[owner] = (band.tourismTo[owner] ?? 0) + lump;
+    // CIV6 (Flower Power): "All civilizations not currently at war receive
+    // +100% of the Tourism from your Concerts."
+    const share = getModifiers(state, seat).concertShare;
+    if (share > 0) {
+      for (const other of state.seats) {
+        if (other.seat === seat || other.seat === owner) continue;
+        if (civsAtWar(state, seat, other.seat)) continue;
+        band.tourismTo[other.seat] = (band.tourismTo[other.seat] ?? 0) + Math.floor(lump * share);
+      }
+    }
   }
   unit.bandAlbum = album + row.album;
   if (row.promote) unit.bandLevel = Math.min(ROCK_BAND_MAX_LEVEL, level + 1);
@@ -1161,9 +1174,10 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
  *  Public Works give it two more, and the Hagia Sophia gives every Missionary
  *  and Apostle an extra spread. All are paid at CREATION, so a unit that
  *  predates the wonder or the card keeps its own count. */
-function extraCharges(state: GameState, seat: number, unitType: string): number {
+function extraCharges(state: GameState, seat: number, unitType: string, at: Tile): number {
   if (unitType === 'BUILDER') {
-    return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges;
+    return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges
+      + governorTileSum(state, at, (e) => e.builderCharges);
   }
   if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
   if (isEngineer(unitType)) return seatWonderSum(state, seat, 'engineerCharges');
@@ -1197,9 +1211,10 @@ export function spawnUnit(
     type: unitType,
     seat,
     tileIndex: spot.index,
-    movesLeft: def.moves + goldenMoveBonus(state, { type: unitType, seat }),
+    movesLeft: def.moves + (def.raider ? getModifiers(state, seat).navalRaiderMoves : 0)
+      + goldenMoveBonus(state, { type: unitType, seat }),
     hp: UNIT_HP,
-    charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType),
+    charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
     path: null,
   };
   // FORTIFY: military units carry a fortify counter (civilians never do).
@@ -1326,7 +1341,9 @@ export function refreshUnits(state: GameState): void {
     const need = UNITS[unit.type]?.requiresResource;
     const starved = !!need && isCiv(unit.seat)
       && !civHasStrategic(state, unit.seat, need);
-    if (unit.movesLeft >= grantedLast && !starved) {
+    // CIV6 (Twilight Valor): "Cannot heal outside your territory."
+    const homeOnly = getModifiers(state, unit.seat).healOnlyHome;
+    if (unit.movesLeft >= grantedLast && !starved && !(homeOnly && tileSeat(tile) !== unit.seat)) {
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
@@ -1343,7 +1360,11 @@ export function refreshUnits(state: GameState): void {
           + emergencyHeal(state, unit.seat, tileSeat(tile))
           + chaplainHeal(state, unit)
           + gpPermOf(seatOf(state, unit.seat), 'healBonus');
-      unit.hp = Math.min(UNIT_HP, unit.hp + heal);
+      // CIV6 (Laying On Of Hands): "All Governor's units heal fully in one
+      // turn in tiles of this city."
+      unit.hp = governorTileFlag(state, tile, (e) => e.fullHeal) && home
+        ? UNIT_HP
+        : Math.min(UNIT_HP, unit.hp + heal);
     }
     // FORTIFY: the EXACT heal gate (movesLeft >= full = spent
     // no MP since the last refresh). A military unit that stayed put digs in

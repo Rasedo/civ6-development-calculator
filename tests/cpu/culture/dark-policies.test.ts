@@ -1,0 +1,127 @@
+import { describe, it, expect } from 'vitest';
+import { computeAdoption, getModifiers, withGovernor } from '../../../cpu/core/effects';
+import { POLICIES, POLICY_LIST, GOVERNMENTS, type PolicyDef, type SlotKind } from '../../../cpu/data/policies';
+import { CIVICS } from '../../../cpu/data/civics';
+import { civEraIndex } from '../../../cpu/core/city';
+import { governorsOf } from '../../../cpu/core/governors';
+import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../../../cpu/data/governors';
+import { seatOf } from '../../../cpu/core/seats';
+import { makeState } from '../helpers';
+import type { City, ResearchState } from '../../../cpu/core/types';
+
+/** every civic in the catalog — the newest government, every ordinary card. */
+function omniscient(): ResearchState {
+  return {
+    tech: null, techProgress: 0, civic: null, civicProgress: 0,
+    techs: [], civics: Object.keys(CIVICS), boosted: [], techRetained: {}, civicRetained: {},
+  };
+}
+
+const DARK: readonly PolicyDef[] = POLICY_LIST.filter((p) => !!p.dark);
+const bench = (n: number): Record<SlotKind, number> =>
+  ({ military: 0, economic: 0, diplomatic: 0, wildcard: n });
+const promo = (id: string): number => GOVERNOR_PROMOTION_INDEX[id] ?? -1;
+
+describe('dark-age policy cards', () => {
+  it('the catalog publishes dark cards, each with an era window and a WILDCARD slot', () => {
+    expect(DARK.length).toBeGreaterThan(0);
+    for (const card of DARK) {
+      expect(card.dark!.firstEra).toBeLessThanOrEqual(card.dark!.lastEra);
+      // CIV6: dark cards "must be placed in Wildcard slots".
+      expect(card.kind).toBe('wildcard');
+    }
+  });
+
+  it('a dark card is offered only in a DARK AGE and only inside its era window', () => {
+    const research = omniscient();
+    const era = civEraIndex(research.techs, research.civics);
+    const wide = bench(POLICY_LIST.length);
+    const normal = new Set(computeAdoption(research, wide, -1, false).policies.filter(Boolean) as string[]);
+    const dark = new Set(computeAdoption(research, wide, -1, true).policies.filter(Boolean) as string[]);
+
+    for (const card of DARK) {
+      expect(normal.has(card.id)).toBe(false); // never outside a Dark Age
+      expect(dark.has(card.id)).toBe(era >= card.dark!.firstEra && era <= card.dark!.lastEra);
+    }
+    // the ORDINARY rows do not read the age at all
+    const ordinary = (s: Set<string>) => [...s].filter((id) => !POLICIES[id]?.dark).sort();
+    expect(ordinary(dark)).toEqual(ordinary(normal));
+  });
+
+  it('the whole window is a real gate — some era offers a card another era does not', () => {
+    const firsts = new Set(DARK.map((c) => c.dark!.firstEra));
+    const lasts = new Set(DARK.map((c) => c.dark!.lastEra));
+    // a single window shared by every card would make the era test vacuous
+    expect(firsts.size + lasts.size).toBeGreaterThan(2);
+  });
+
+  it('a dark card never takes a typed slot, however wide the typed bench', () => {
+    const research = omniscient();
+    const era = civEraIndex(research.techs, research.civics);
+    const live = DARK.filter((c) => era >= c.dark!.firstEra && era <= c.dark!.lastEra);
+    if (live.length === 0) return; // this era carries no dark card — nothing to place
+    const adopted = computeAdoption(research, { military: 8, economic: 8, diplomatic: 8, wildcard: 0 }, -1, true);
+    const gov = GOVERNMENTS[adopted.government!]!;
+    const baseWild = gov.slots.filter((k) => k === 'wildcard').length;
+    const placedDark = (adopted.policies.filter(Boolean) as string[]).filter((id) => POLICIES[id]?.dark);
+    expect(placedDark.length).toBeLessThanOrEqual(baseWild);
+  });
+});
+
+describe('the governor overlay on a seat modifier', () => {
+  const cityWith = (seat: number, id: number): City => ({
+    id, name: 'Ostia', seat, centerIndex: 0, population: 4, foodBox: 0, cultureBox: 0,
+    tilesAcquired: 0, focus: 'balanced', queue: [], isCapital: false, buildings: [],
+    districts: [], wonders: [], hp: 200, foundedTurn: 1, loyalty: 60,
+  });
+
+  it('an ESTABLISHED governor folds its promotion channels; an assigned one folds nothing', () => {
+    const state = makeState();
+    const s = seatOf(state, 0)!;
+    const city = cityWith(0, 0);
+    s.cities.push(city);
+    const gi = GOVERNOR_INDEX.PINGALA;
+    const roster = governorsOf(s);
+    roster[gi]!.appointed = true;
+    roster[gi]!.cityId = city.id;
+    roster[gi]!.establishTurns = GOVERNORS[gi]!.establishTurns; // assigned, NOT established
+
+    const sci = getModifiers(state, 0).yieldMult.science ?? 1;
+    const cul = getModifiers(state, 0).yieldMult.culture ?? 1;
+    const waiting = withGovernor(state, getModifiers(state, 0), city);
+    expect(waiting.yieldMult.science ?? 1).toBeCloseTo(sci, 12);
+
+    roster[gi]!.establishTurns = 0;
+    const live = withGovernor(state, getModifiers(state, 0), city);
+    // CIV6 (Librarian, Pingala's DEFAULT): "15% increase in Science and Culture
+    // generated by the city" — it rides the appointment, bought by no title.
+    expect(live.yieldMult.science ?? 1).toBeCloseTo(sci * 1.15, 12);
+    expect(live.yieldMult.culture ?? 1).toBeCloseTo(cul * 1.15, 12);
+    expect(live.perCitizen.culture ?? 0).toBeCloseTo(0, 12);
+
+    // CIV6 (Connoisseur): "+1 Culture per turn for each Citizen in the city."
+    roster[gi]!.promotions |= 1 << promo('CONNOISSEUR');
+    const promoted = withGovernor(state, getModifiers(state, 0), city);
+    expect(promoted.perCitizen.culture ?? 0).toBeCloseTo(1, 12);
+    expect(promoted.yieldMult.science ?? 1).toBeCloseTo(sci * 1.15, 12); // the default is not paid twice
+  });
+
+  it('the overlay is per CITY — a second ungoverned city keeps the seat values', () => {
+    const state = makeState();
+    const s = seatOf(state, 0)!;
+    const a = cityWith(0, 0);
+    const b = cityWith(0, 1);
+    s.cities.push(a, b);
+    const gi = GOVERNOR_INDEX.PINGALA;
+    const roster = governorsOf(s);
+    roster[gi]!.appointed = true;
+    roster[gi]!.cityId = a.id;
+    roster[gi]!.establishTurns = 0;
+
+    const sci = getModifiers(state, 0).yieldMult.science ?? 1;
+    expect(withGovernor(state, getModifiers(state, 0), a).yieldMult.science ?? 1)
+      .toBeCloseTo(sci * 1.15, 12);
+    expect(withGovernor(state, getModifiers(state, 0), b).yieldMult.science ?? 1)
+      .toBeCloseTo(sci, 12);
+  });
+});

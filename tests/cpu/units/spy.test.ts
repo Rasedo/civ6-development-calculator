@@ -14,8 +14,10 @@ import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/
 import {
   canTrainSpy, spyCapacity, spiesOf, spyDestinations, spyTravelTurns,
   beginTravel, beginMission, missionOffered, spyMissionMask, missionTurns,
-  tickSpies, tickSpyEffects, governorSuppressed, spyIsCounterspy, isSpy,
+  tickSpies, tickSpyEffects, spyIsCounterspy, isSpy,
 } from '../../../cpu/core/espionage';
+import { governorAt, governorPhase, governorsOf, neutralizeGovernor } from '../../../cpu/core/governors';
+import { GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
 import {
   SPY_UNIT, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_MISSION_TURNS,
   SPY_SOURCES_TURNS, SPY_GOVERNOR_TURNS, SPY_GOVERNOR_PER_LEVEL,
@@ -252,17 +254,24 @@ describe('what a finished mission does', () => {
     expect(mine.centerIndex).toBeGreaterThanOrEqual(0);
   });
 
-  it('Neutralize Governor takes the governor off duty and the pick skips it', () => {
+  it('Neutralize Governor sends the PERSON home and the mission stops offering', () => {
     const { state, theirs, them } = spyState();
     const spy = spyAt(state, 0, theirs);
-    them.research.civics.push('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J');
+    them.research.civics.push(GOVERNOR_TITLE_CIVICS[0]); // one title → one appointment
+    governorPhase(state, them.seat);
+    const gi = governorAt(state, theirs);
+    expect(gi).toBeGreaterThanOrEqual(0);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(true);
-    theirs.governorOutTurns = SPY_GOVERNOR_TURNS + SPY_GOVERNOR_PER_LEVEL * 0;
-    expect(governorSuppressed(theirs)).toBe(true);
-    // a suppressed city is no longer a candidate, so the mission stops offering
+
+    const g = governorsOf(them)[gi];
+    neutralizeGovernor(g, SPY_GOVERNOR_TURNS + SPY_GOVERNOR_PER_LEVEL * 0);
+    // the clock is the PERSON's: he leaves the city, so the city has none
+    expect(governorAt(state, theirs)).toBe(-1);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(false);
-    tickSpyEffects(state, 1);
-    expect(theirs.governorOutTurns).toBe(SPY_GOVERNOR_TURNS - 1);
+
+    governorPhase(state, them.seat); // the clock ticks in his own phase, not the spy's
+    expect(g.outTurns).toBe(SPY_GOVERNOR_TURNS - 1);
+    expect(governorAt(state, theirs)).toBe(-1); // and he cannot be re-seated while it runs
   });
 
   it('Foment Unrest drops loyalty by the level-scaled amount', () => {

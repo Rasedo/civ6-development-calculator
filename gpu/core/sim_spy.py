@@ -188,8 +188,7 @@ class SimSpy:
 
     def _city_has_governor(self, hrow: torch.Tensor, hcol: torch.Tensor) -> torch.Tensor:
         """CIV6 (Neutralize Governor): "can only be performed in a city with a
-        Governor" — the holder's own stateless greedy pick, the twin of the one
-        `_seat_phase` takes."""
+        Governor" — the holder's roster answers directly now."""
         out = torch.zeros_like(hrow, dtype=torch.bool)
         idx = hcol.clamp(min=0).reshape(self.B, -1)
         for g in range(self.n_majors):
@@ -255,7 +254,7 @@ class SimSpy:
 
     def _tick_spy_effects(self, row: int) -> None:
         """the per-turn decay of the two clocks a mission leaves behind."""
-        for plane in (self.city_gov_out[:, row], self.city_spy_sources[:, row]):
+        for plane in (self.city_spy_sources[:, row],):
             plane.copy_((plane - (plane > 0).long()).clamp(min=0))
 
     def _spy_roll(self, b: int, pct: int) -> bool:
@@ -356,8 +355,12 @@ class SimSpy:
             self.city_loyalty[b, hr, hc] = max(
                 0.0, float(self.city_loyalty[b, hr, hc]) - drop)
         elif m == self._spy_m_governor:
-            self.city_gov_out[b, hr, hc] = (
-                self._spy_gov_turns + self._spy_gov_per_level * lvl)
+            # the clock follows the PERSON: they leave the city and cannot be
+            # assigned again until it runs out.
+            gi = int(self._governor_at(int(hr))[b, hc].item())
+            if gi >= 0:
+                self.neutralize_governor(b, int(hr), gi,
+                                         self._spy_gov_turns + self._spy_gov_per_level * lvl)
         elif m == self._spy_m_breach:
             # CIV6 (Breach Dam): "damage (i.e., pillage) the district, causing a
             # Flood and leaving the city vulnerable to damage from Floods until
@@ -393,6 +396,10 @@ class SimSpy:
         if bool((self._b_spy_pen > 0).any()):
             stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
             n += int((stand.long() * self._b_spy_pen).sum())
+        # CIV6 (Local Informants): "Enemy Spies operate at 3 levels below
+        # normal in this city."
+        if self.n_governors and hr < self.n_majors:
+            n += int(self._governor_sum(int(hr), "spyLevelPenalty")[b, hc])
         return n
 
     def _partisan_chassis(self) -> torch.Tensor:

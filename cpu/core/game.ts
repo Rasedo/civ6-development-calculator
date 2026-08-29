@@ -33,6 +33,7 @@ import { isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
+import { governorFlag, governorTileMult } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -173,6 +174,7 @@ export function settlerCost(state: GameState, seat: number): number {
 export function queueSettler(state: GameState, cityId: number, seat: number): RuleResult {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
+  if (getModifiers(state, seat).noSettlers) return { ok: false, reason: 'Isolationism forbids Settlers.' };
   if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot train a settler.' };
   commitProduction(state, city.seat, city, { kind: 'settler', progress: 0, cost: settlerCost(state, seat) });
   return { ok: true };
@@ -496,6 +498,14 @@ export function unitFaithCost(unitType: string): number {
   return (UNITS[unitType]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
+/** CIV6 (Flower Power): "The cost of producing and purchasing land units
+ *  other than Rock Bands is increased by +100%." */
+export function landUnitPriceMult(state: GameState, seat: number, unitType: string): number {
+  const def = UNITS[unitType];
+  if (!def || def.naval || def.air || unitType === 'ROCK_BAND') return 1;
+  return getModifiers(state, seat).landUnitCostMult;
+}
+
 export function goldAffordable(treasury: number, cost: number): boolean {
   return Math.round(treasury * 1000) >= Math.round(cost * 1000);
 }
@@ -506,7 +516,7 @@ export function unitPurchaseCost(state: GameState, unitType: string, seat: numbe
   // Mercenary Companies names a CURRENCY and moves the price of a MILITARY
   // unit bought with it.
   const merc = (UNITS[unitType]?.combat ?? 0) > 0 ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
-  return base * GOLD_PURCHASE_MULT * m * merc;
+  return base * GOLD_PURCHASE_MULT * m * merc * landUnitPriceMult(state, seat, unitType);
 }
 
 /**
@@ -580,6 +590,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
 export function purchaseSettler(state: GameState, cityId: number, seat: number): RuleResult {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
+  if (getModifiers(state, seat).noSettlers) return { ok: false, reason: 'Isolationism forbids Settlers.' };
   if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
@@ -917,6 +928,9 @@ export function purchaseCivilianWithFaith(
   }
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
+  if (unitType === 'SETTLER' && getModifiers(state, seat).noSettlers) {
+    return { ok: false, reason: 'Isolationism forbids Settlers.' };
+  }
   if (unitType === 'SETTLER' && city.population < 2) {
     return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   }
@@ -1569,12 +1583,17 @@ function spreadReligiousPressure(state: GameState): void {
       city.religionPressure = pres;
     }
     const cc = tiles[city.centerIndex];
+    // CIV6 (Citadel of God): "City ignores pressure ... from Religions not
+    // founded by the Governor's player."
+    const deaf = governorFlag(state, city as City, (e) => e.ignoreForeignPressure);
     for (let g = 0; g < nRel; g++) {
+      if (deaf && g !== city.seat) continue;
       for (const src of sources[g]) {
         const h = tiles[src];
-        if (hexDistance(cc.col, cc.row, h.col, h.row) <= range[g]) {
-          pres[g] += RELIGION_PRESSURE_PER_TURN;
-        }
+        if (hexDistance(cc.col, cc.row, h.col, h.row) > range[g]) continue;
+        // CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
+        // stronger from this city."
+        pres[g] += RELIGION_PRESSURE_PER_TURN * governorTileMult(state, h, (e) => e.pressureMult);
       }
     }
     let best = -1;

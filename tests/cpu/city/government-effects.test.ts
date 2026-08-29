@@ -51,13 +51,15 @@ describe('the sourced government rows', () => {
     expect(GOVERNMENTS.CLASSICAL_REPUBLIC.effects).toEqual(
       { cityWithDistrict: { housing: 1, amenities: 1 }, gppMult: 1.15 });
     // the unsourced magnitudes are GONE: Monarchy's flat housing, the three
-    // ungated yield multipliers. Theocracy keeps its sourced purchase verb,
-    // Communism its sourced science multiplier.
+    // ungated yield multipliers. What survives is what each page states —
+    // including the three terms that name a GOVERNED city.
     expect(GOVERNMENTS.MONARCHY.effects).toEqual({});
-    expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({});
     expect(GOVERNMENTS.DEMOCRACY.effects).toEqual({});
-    expect(GOVERNMENTS.THEOCRACY.effects).toEqual({ faithBuyLandUnits: true });
-    expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ yieldMult: { science: 1.1 } });
+    expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
+    expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
+      { faithBuyLandUnits: true, governorPerCitizen: { faith: 0.5 } });
+    expect(GOVERNMENTS.COMMUNISM.effects).toEqual(
+      { yieldMult: { science: 1.1 }, governorPerCitizen: { production: 0.6 } });
   });
 });
 

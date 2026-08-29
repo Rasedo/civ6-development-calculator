@@ -512,7 +512,3 @@ class SimGp:
         slot = getattr(self, self.POOL_NEXT["major"])[r] - 1
         self.unit_xp[r, slot] = self._xp_to_next(self.unit_level[r, slot])
 
-    def _xp_to_next(self, level: torch.Tensor) -> torch.Tensor:
-        """`xpToNextLevel` — 0 once the unit is maxed."""
-        mx, per = self._promo_max_level, self._promo_xp_per_level
-        return torch.where(level >= mx, torch.zeros_like(level), per * level)

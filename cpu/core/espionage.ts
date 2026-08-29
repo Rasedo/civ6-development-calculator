@@ -26,12 +26,13 @@ import {
 } from '../data/espionage';
 import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
-import { goldenDedication, dedicationEvent, governorPicks, governorTitles, grantedGovernorTitles, worldEraIndex } from './eras';
+import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
+import { cityHasGovernor, governorAt, governorsOf, neutralizeGovernor } from './governors';
 import { seatBuildingSum } from './city';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
+import { governorSum } from './governors';
 import { floodRiver } from './disasters';
-import { LOYALTY_MAX } from '../data/seats';
 import { nextRandom } from './rand';
 import { disbandUnit, spawnUnit } from './units';
 import type { City, GameState, Seat, Unit } from './types';
@@ -205,20 +206,15 @@ export function cityCounterLevels(state: GameState, city: City): number {
     if (!def || !live.has(def.district)) continue;
     n += def.spyLevelPenalty ?? 0;
   }
-  return n;
+  // CIV6 (Local Informants): "Enemy Spies operate at 3 levels below normal in
+  // this city."
+  return n + governorSum(state, city, (e) => e.spyLevelPenalty);
 }
 
 /** CIV6 (Neutralize Governor): "can only be performed in a city with a
- *  Governor" — the holder's own stateless greedy pick, the twin of the one
- *  `seatPhase` takes. */
+ *  Governor" — the holder's roster answers directly now. */
 function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
-  const picks = governorPicks(
-    holder.cities.map((c) => Math.round((c.loyalty ?? LOYALTY_MAX) * 1000)),
-    governorTitles(holder.research.civics.length, grantedGovernorTitles(state, holder.seat)),
-    new Set(holder.cities.map((c, i) => (governorSuppressed(c) ? i : -1)).filter((i) => i >= 0)),
-  );
-  const i = holder.cities.indexOf(city);
-  return i >= 0 && picks.has(i);
+  return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
 
 function counterspiesAt(state: GameState, holder: number, tileIndex: number): number {
@@ -272,10 +268,10 @@ export function tickSpies(state: GameState, seat: number): void {
   }
 }
 
-/** the per-turn decay of the two clocks a mission leaves behind. */
+/** the per-turn decay of the clock a mission leaves behind. The governor's
+ *  own neutralize clock ticks with the roster, in `governorPhase`. */
 export function tickSpyEffects(state: GameState, seat: number): void {
   for (const city of citiesOf(state, seat)) {
-    if ((city.governorOutTurns ?? 0) > 0) city.governorOutTurns = (city.governorOutTurns ?? 0) - 1;
     const src = city.spySources;
     if (src) for (let i = 0; i < src.length; i++) if (src[i] > 0) src[i] -= 1;
   }
@@ -391,9 +387,16 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
     case SPY_M_FOMENT_UNREST:
       city.loyalty = Math.max(0, (city.loyalty ?? 100) - (SPY_UNREST_LOYALTY + SPY_UNREST_PER_LEVEL * lvl));
       return;
-    case SPY_M_NEUTRALIZE_GOVERNOR:
-      city.governorOutTurns = SPY_GOVERNOR_TURNS + SPY_GOVERNOR_PER_LEVEL * lvl;
+    case SPY_M_NEUTRALIZE_GOVERNOR: {
+      // the clock follows the PERSON: they leave the city and cannot be
+      // assigned again until it runs out.
+      const gi = governorAt(state, city);
+      const owner = seatOf(state, city.seat);
+      if (gi >= 0 && owner) {
+        neutralizeGovernor(governorsOf(owner)[gi], SPY_GOVERNOR_TURNS + SPY_GOVERNOR_PER_LEVEL * lvl);
+      }
       return;
+    }
     default:
       return;
   }
@@ -439,10 +442,6 @@ function partisanChassis(state: GameState): string | undefined {
 
 export function spyIsCounterspy(unit: Unit): boolean {
   return isSpy(unit.type) && unit.spyMission === SPY_M_COUNTERSPY;
-}
-
-export function governorSuppressed(city: City): boolean {
-  return (city.governorOutTurns ?? 0) > 0;
 }
 
 export { isCiv };

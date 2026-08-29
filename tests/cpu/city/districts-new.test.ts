@@ -4,7 +4,7 @@ import { canPlaceDistrictIn, canalPassageOk, riverSideCount, buildingCompletable
 import { computeHousing, districtMaintenance, seatBuildingSum } from '../../../cpu/core/city';
 import { cityDistrictSum, cityPower, localAmenities } from '../../../cpu/core/yields';
 import { standingLoyalty, ungovernedLoyalty } from '../../../cpu/core/phase';
-import { grantedGovernorTitles } from '../../../cpu/core/eras';
+import { governorTitlesEarned } from '../../../cpu/core/governors';
 import { cityCounterLevels, spyCapacity } from '../../../cpu/core/espionage';
 import { PRESERVE_APPEAL_HOUSING, appealBand, tileAppeal } from '../../../cpu/core/appeal';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -266,13 +266,13 @@ describe('the Government Plaza and the Diplomatic Quarter', () => {
     // CIV6 (Government Plaza): "+8 Loyalty to this city", "Awards +1 Governor
     // Title", and every building in it awards one more.
     expect(standingLoyalty(state, city)).toBe(8);
-    expect(grantedGovernorTitles(state, 0)).toBe(1);
+    expect(governorTitlesEarned(state, 0)).toBe(1);
     city.buildings.push('ANCESTRAL_HALL');
-    expect(grantedGovernorTitles(state, 0)).toBe(2);
+    expect(governorTitlesEarned(state, 0)).toBe(2);
 
     gp.districtPillaged = true;
     expect(standingLoyalty(state, city)).toBe(0);
-    expect(grantedGovernorTitles(state, 0)).toBe(0);
+    expect(governorTitlesEarned(state, 0)).toBe(0);
   });
 
   it('gate their buildings on the tier of the government running', () => {

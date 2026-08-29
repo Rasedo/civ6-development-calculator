@@ -79,7 +79,9 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
         "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
-        "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
+        "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
+        "darkAge", "darkCard") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -170,6 +172,31 @@ def main() -> None:
             slotted_max = max(slotted_max, int(sl.sum(dim=1).max()))
             for i in sl.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                 slotted_seen.add(pol_ids[i])
+
+        # THE GOVERNOR, end to end: a title earned, an appointment made, a
+        # city seated, the establishment clock run out, a promotion taken —
+        # and the DARK AGE that opens the dark-card pool.
+        if sim.n_governors:
+            _ttl = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            _pro = torch.zeros_like(_ttl)
+            _seat = torch.zeros_like(_ttl)
+            _est = torch.zeros_like(_ttl)
+            for _row in seats:
+                _ttl |= sim._governor_titles_earned(_row) > 0
+                _pro |= (sim.civ_gov_appointed[:, _row] & (sim.civ_gov_promos[:, _row] != 0)).any(dim=1)
+                _seat |= (sim._governor_at(_row) >= 0).any(dim=1)
+                _est |= sim._governor_established(_row).any(dim=1)
+            mark("govTitle", _ttl, t)
+            mark("govAppointed", sim.civ_gov_appointed[:, seats].any(dim=2).any(dim=1), t)
+            mark("govSeated", _seat, t)
+            mark("govEstablished", _est, t)
+            mark("govPromoted", _pro, t)
+        mark("darkAge", (sim.civ_age[:, seats] == 0).any(dim=1), t)
+        if int(sim._pol_dark_lo.numel()):
+            _dk = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            for _row in seats:
+                _dk |= (sim._seat_slotted(_row) & (sim._pol_dark_lo >= 0).unsqueeze(0)).any(dim=1)
+            mark("darkCard", _dk, t)
 
         _eidx = getattr(sim, "_eng_idx", -1)
         if _eidx >= 0:

@@ -15,6 +15,7 @@ import type { GameState } from './types';
 import { citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
+import { getModifiers } from './effects';
 import {
   GRIEVANCE_ALLY_SHARE,
   GRIEVANCE_CITY_RAZED,
@@ -117,6 +118,9 @@ export function decayGrievances(state: GameState, seat: number): void {
     if (bal === 0) continue;
     const victim = bal > 0 ? seat : other.seat;
     const transgressor = bal > 0 ? other.seat : seat;
+    // CIV6 (Cyber Warfare): "Grievances against you do not decay" — the
+    // TRANSGRESSOR's card holds what it is owed for.
+    if (getModifiers(state, transgressor).grievanceNoDecay) continue;
     const rate = base - occupationOf(state, transgressor, victim) + occupationOf(state, victim, transgressor);
     const step = Math.min(Math.abs(bal), Math.max(0, rate));
     if (step > 0) addGrievance(state, victim, transgressor, -step);

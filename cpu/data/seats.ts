@@ -183,8 +183,6 @@ export const ERA_SCORE_MOMENT_MIN = 2;
 export const ERA_DARK_T = 3;
 export const ERA_GOLDEN_T = 10;
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
-export const GOV_CIVICS_PER_TITLE = 10;
-export const GOV_MAX_TITLES = 5;
 /**
  * The CULTURE VICTORY constants, verified against the Gathering
  * Storm rules (civilization.fandom.com "Tourism (Civ6)"):
@@ -244,14 +242,14 @@ export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
-  | 'building' | 'promoClass' | 'religion';
+  | 'building' | 'promoClass' | 'religion' | 'governor';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
-  'building', 'promoClass', 'religion',
+  'building', 'promoClass', 'religion', 'governor',
 ];
 
 export interface CongressResolutionDef {
@@ -339,6 +337,10 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // (Industrial+) A religion IS its founder's seat here, so the target space
   // is the seat roster.
   { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 4, maxEra: 99, target: 'religion' },
+  // CIV6: "A: Appointing and promoting a Governor of this type yields 15
+  // Diplomatic Favor. / B: All active Governors of this type are neutralized
+  // for 6 Turns." The published table gives it no era window.
+  { id: 'GOVERNANCE_DOCTRINE', name: 'Governance Doctrine', minEra: 0, maxEra: 99, target: 'governor' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -357,6 +359,7 @@ export const CONGRESS_GLOBAL_ENERGY = 13;
 export const CONGRESS_PUBLIC_RELATIONS = 14;
 export const CONGRESS_MILITARY_ADVISORY = 15;
 export const CONGRESS_WORLD_RELIGION = 16;
+export const CONGRESS_GOVERNANCE = 17;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = 200;
 export const CONGRESS_PR_MULT_B = 50;

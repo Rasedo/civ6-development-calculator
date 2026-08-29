@@ -1,7 +1,6 @@
 import type { GameState } from './types';
-import { civEraIndex, seatBuildingSum } from './city';
-import { cityDistrictSum } from './yields';
-import { seatOf, isBarbSeat, isCiv, citiesOf } from './seats';
+import { civEraIndex } from './city';
+import { seatOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, SKY_EUREKAS } from '../data/seats';
@@ -10,7 +9,7 @@ import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
 import { GW_BUILDINGS } from '../data/greatPeople';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
-import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
 /** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
@@ -244,33 +243,5 @@ export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
 }
 
-export function governorTitles(nCivics: number, bonus = 0): number {
-  return Math.min(GOV_MAX_TITLES, Math.floor(nCivics / GOV_CIVICS_PER_TITLE) + bonus);
-}
 
-/** CIV6 (Government Plaza, and every building in it): "Awards +1 Governor
- *  Title." Titles beyond the civics ladder, over every city this seat holds —
- *  a pillaged Plaza pays none of them. */
-export function grantedGovernorTitles(state: GameState, seat: number): number {
-  let n = seatBuildingSum(state, seat, 'govTitle');
-  for (const city of citiesOf(state, seat)) n += cityDistrictSum(state, city, 'governorTitle');
-  return n;
-}
-
-/** The STATELESS greedy pick — the `titles` LOWEST-loyalty cities.
- *  CIV6 (R&F, sourced): a governor's +8 Loyalty applies the moment they are
- *  ASSIGNED — the 5-turn establishment clock gates only their PROMOTIONS,
- *  which this model does not carry. A per-turn reassignment therefore moves
- *  the loyalty bonus instantly, exactly as reassignment does in the real
- *  game; no establishment state is needed until promotions exist.
- *  `qLoys` are QUANTIZED milli loyalties (Math.round(loy·1000) — ranking on
- *  raw f64 would be float-association-fragile across engines; the
- *  quantization lesson), ties broken by ARRAY position (the GPU mirrors
- *  with the slot index — slot order IS array order). Returns picked
- *  indices. */
-export function governorPicks(qLoys: number[], titles: number, blocked?: ReadonlySet<number>): Set<number> {
-  const idx = qLoys.map((q, i) => [q, i] as const).filter(([, i]) => !blocked?.has(i));
-  idx.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  return new Set(idx.slice(0, titles).map(([, i]) => i));
-}
 

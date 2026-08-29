@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type DistrictId, type GameState, typ
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
-import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
+import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, gpAppealResolver, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -15,6 +15,7 @@ import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
+import { governorMult } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -85,7 +86,8 @@ export function districtMaintenance(type: DistrictId): number {
 export function seatBuildingSum(
   state: GameState,
   seat: number,
-  key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor',
+  key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor'
+    | 'amenitiesWithGovernor' | 'housingWithGovernor',
 ): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {
@@ -452,6 +454,18 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
  * era in which that wonder was first available", so wonder era and civ era
  * must be measured on the SAME scale. 0 (Ancient) when nothing is done.
  */
+/** CIV6 (Disinformation Campaign): "+3 Diplomatic Favor per turn for each
+ *  Broadcast Center" — the card names a building and pays per copy standing. */
+export function cardFavorPerBuilding(state: GameState, seat: number): number {
+  const rows = getModifiers(state, seat).favorPerBuilding;
+  if (rows.length === 0) return 0;
+  let n = 0;
+  for (const c of citiesOf(state, seat)) {
+    for (const r of rows) if (c.buildings.includes(r.building)) n += r.favor;
+  }
+  return n;
+}
+
 export function civEraIndex(techIds: readonly string[], civicIds: readonly string[]): number {
   let e = 0;
   for (const id of techIds) {
@@ -595,7 +609,9 @@ export function seatTourism(
   const km = congressGwMult(state);
   const cities = citiesOf(state, seat);
   for (const c of cities) {
-    t += greatWorkTourism(c, printing, km) + artifactTourism(c);
+    // CIV6 (Curator): "+100% Tourism from Great Works in this city."
+    t += (greatWorkTourism(c, printing, km) + artifactTourism(c))
+      * governorMult(state, c, (e) => e.gwTourismMult);
   }
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
@@ -662,7 +678,8 @@ export function computeCityStats(
   mods?: Modifiers,
 ): CityStats {
   const base = mods ?? getModifiers(state, city.seat);
-  const m = withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, city.seat));
+  const m = withGovernor(state,
+    withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, city.seat)), city);
   const ctx = makeYieldCtx(state, city.seat, m);
   const map = state.map;
   const center = map.tiles[city.centerIndex];
@@ -799,6 +816,15 @@ export function computeCityStats(
   const bonuses = emptyYields();
   addYields(bonuses, m.cityYields);
   if (city.isCapital) addYields(bonuses, m.capitalYields);
+  // per-CITIZEN yields: a governor's Tax Collector, Connoisseur and
+  // Researcher, and the two governments that pay by citizen in a governed
+  // city. Flat adds, so they ride the multipliers below like every bonus.
+  for (const k of Object.keys(m.perCitizen) as YieldKey[]) {
+    bonuses[k] = (bonuses[k] ?? 0) + city.population * (m.perCitizen[k] ?? 0);
+  }
+  if (m.faithPerSpecialty) {
+    bonuses.faith += m.faithPerSpecialty * completedDistrictCount(state, city, true);
+  }
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')
     + gpCityPermOf(city, 'housing');
@@ -840,6 +866,18 @@ export function computeCityStats(
   }
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
     total[k] *= m.yieldMult[k] ?? 1;
+    // CIV6 (Monasticism): "+75% Science in cities with a Holy Site";
+    // (Robber Barons): "+50% Gold in cities with a Stock Exchange. +25%
+    // Production in cities with a Factory." Each names one city FACT, so the
+    // multiplier pays only where that fact stands.
+    for (const r of m.districtYieldMult) {
+      if (r.yield === k && city.districts.some((d) => d.type === r.district
+        && state.map.tiles[d.tileIndex].districtComplete
+        && !state.map.tiles[d.tileIndex].districtPillaged)) total[k] *= r.mult;
+    }
+    for (const r of m.buildingYieldMult) {
+      if (r.yield === k && city.buildings.includes(r.building)) total[k] *= r.mult;
+    }
   }
   for (const w of wonders) {
     const mult = w.def.effects?.cityYieldMult;

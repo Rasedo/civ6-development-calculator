@@ -5,9 +5,11 @@ import { dedicationEvent } from '../../../cpu/core/eras';
 import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../../../cpu/data/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { addEraScore, eraBoundary, agePressureFactor, governorTitles, governorPicks } from '../../../cpu/core/eras';
+import { addEraScore, eraBoundary, agePressureFactor } from '../../../cpu/core/eras';
+import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent } from '../../../cpu/core/governors';
+import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
 import type { GameState, City, Seat } from '../../../cpu/core/types';
 
 // -- local builders (the geopolitics.test.ts / the other civs.test.ts pattern) --------
@@ -102,26 +104,70 @@ function addCity(state: GameState, civ: Seat, col: number, row: number, loyalty:
   return city;
 }
 
+/** a research block holding exactly the first `n` title-granting civics. */
+function titledResearch(n: number) {
+  return {
+    tech: null,
+    techProgress: 0,
+    civic: null,
+    civicProgress: 0,
+    techs: [] as string[],
+    civics: GOVERNOR_TITLE_CIVICS.slice(0, n),
+    boosted: [] as string[],
+    techRetained: {},
+    civicRetained: {},
+  };
+}
+
 describe('governors / era score', () => {
-  // ---- governorTitles: floor division + cap -----------------------------------
-  it('governorTitles floors civics / perTitle and caps at govMax', () => {
-    expect(governorTitles(0)).toBe(0);
-    expect(governorTitles(GOV_CIVICS_PER_TITLE - 1)).toBe(0); // floor
-    expect(governorTitles(GOV_CIVICS_PER_TITLE)).toBe(1);
-    expect(governorTitles(2 * GOV_CIVICS_PER_TITLE + GOV_CIVICS_PER_TITLE - 1)).toBe(2); // floor
-    expect(governorTitles(GOV_MAX_TITLES * GOV_CIVICS_PER_TITLE)).toBe(GOV_MAX_TITLES);
-    expect(governorTitles((GOV_MAX_TITLES + 3) * GOV_CIVICS_PER_TITLE)).toBe(GOV_MAX_TITLES); // cap
+  // ---- titles: earned per named civic, spent per appointment + promotion ------
+  it('a title is earned by each named civic and spent on an appointment or a promotion', () => {
+    const state = makeState();
+    const civ = addCiv(state, 5, 5, { research: titledResearch(3) });
+    expect(governorTitlesEarned(state, civ.seat)).toBe(3);
+    expect(governorTitlesAvailable(state, civ.seat)).toBe(3);
+
+    const roster = governorsOf(civ);
+    roster[0].appointed = true; // the appointment costs one, its default ability nothing
+    expect(governorTitlesSpent(civ)).toBe(1);
+    const promo = GOVERNOR_PROMOTIONS.findIndex((p) => p.governor === GOVERNORS[0].id && p.tier > 0);
+    roster[0].promotions |= 1 << promo;
+    expect(governorTitlesSpent(civ)).toBe(2);
+    expect(governorTitlesAvailable(state, civ.seat)).toBe(1);
+
+    // an UNAPPOINTED governor's promotion bits are not a spend
+    roster[1].promotions |= 1 << promo;
+    expect(governorTitlesSpent(civ)).toBe(2);
   });
 
-  // ---- governorPicks: lowest loyalty, ties by index ---------------------------
-  it('governorPicks seats the lowest-loyalty cities, ties broken by lower index', () => {
-    expect([...governorPicks([50000, 30000, 70000], 1)]).toEqual([1]); // the 30 city
-    expect([...governorPicks([50000, 30000, 70000], 2)].sort((a, b) => a - b)).toEqual([0, 1]);
-    expect(governorPicks([50000, 30000, 70000], 0).size).toBe(0); // no titles → nobody
-    // an exact tie resolves to the LOWER slot index (array/acquisition order)
-    expect([...governorPicks([30000, 30000, 70000], 1)]).toEqual([0]);
-    // titles beyond the city count just seats everyone
-    expect(governorPicks([10000, 20000], 5).size).toBe(2);
+  // ---- the phase: appoint in catalog order, seat the lowest loyalty -----------
+  it('governorPhase appoints in catalog order and seats the lowest-loyalty cities, ties by array position', () => {
+    const state = makeState();
+    const civ = addCiv(state, 5, 5, { research: titledResearch(2) });
+    addCity(state, civ, 3, 5, 30);   // index 1 — the tie's WINNER (lower position)
+    addCity(state, civ, 7, 5, 30);   // index 2 — the tie's loser
+    addCity(state, civ, 10, 10, 20); // index 3 — outright lowest
+    governorPhase(state, civ.seat);
+
+    const roster = governorsOf(civ);
+    expect(roster.filter((g) => g.appointed).length).toBe(2);
+    expect(roster[0].cityId).toBe(civ.cities[3].id);
+    expect(roster[1].cityId).toBe(civ.cities[1].id);
+    expect(governorAt(state, civ.cities[2])).toBe(-1);
+    expect(governorAt(state, civ.cities[0])).toBe(-1); // the capital pins at LOYALTY_MAX and ranks last
+    // the establishment clock has already ticked one turn of its own phase
+    expect(roster[0].establishTurns).toBe(GOVERNORS[0].establishTurns - 1);
+    expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
+  });
+
+  it('governorPhase promotes once the whole roster is appointed', () => {
+    const state = makeState();
+    const civ = addCiv(state, 5, 5, { research: titledResearch(GOVERNORS.length + 1) });
+    governorPhase(state, civ.seat);
+    const roster = governorsOf(civ);
+    expect(roster.every((g) => g.appointed)).toBe(true);
+    expect(roster.reduce((n, g) => n + (g.promotions ? 1 : 0), 0)).toBe(1);
+    expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
   });
 
   // ---- eraBoundary: threshold ages + reset ------------------------------------
@@ -182,19 +228,7 @@ describe('governors / era score', () => {
   it('seatPhase seats a governor (+GOVERNOR_LOYALTY) on the weakest city when titles ≥ 1', () => {
     function scenario(nCivics: number): { weak: number; strong: number } {
       const state = makeState();
-      const r0 = addCiv(state, 5, 5, {
-        research: {
-          tech: null,
-          techProgress: 0,
-          civic: null,
-          civicProgress: 0,
-          techs: [],
-          civics: Array.from({ length: nCivics }, (_, i) => `CIVIC_${i}`),
-          boosted: [],
-          techRetained: {},
-          civicRetained: {},
-        },
-      });
+      const r0 = addCiv(state, 5, 5, { research: titledResearch(nCivics) });
       addCity(state, r0, 3, 5, 40); // weakest non-capital
       addCity(state, r0, 7, 5, 60); // stronger non-capital
       addCiv(state, 10, 10); // a second civ so r0's cities feel foreign pressure (loyalty runs)
@@ -202,7 +236,7 @@ describe('governors / era score', () => {
       return { weak: r0.cities[1].loyalty!, strong: r0.cities[2].loyalty! };
     }
     const control = scenario(0); // titles 0
-    const titled = scenario(GOV_CIVICS_PER_TITLE); // titles 1
+    const titled = scenario(1); // titles 1
     // the +8 lands on exactly the weakest city; the stronger one is unchanged
     expect(titled.weak - control.weak).toBeCloseTo(GOVERNOR_LOYALTY, 9);
     expect(titled.strong - control.strong).toBeCloseTo(0, 9);

@@ -12,6 +12,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
 import { BUILDINGS } from '../data/buildings';
+import { governorSum, governorTileSum } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
@@ -30,7 +31,7 @@ import {
   bankXp, battleXp, cityXp, holdTheLineCS, promoCS, promoFlag,
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
 } from './promotions';
-import { getModifiers, governmentUnitCS, governmentXpPct } from './effects';
+import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS } from '../data/promotions';
 import { transferCity } from './phase';
@@ -389,12 +390,19 @@ export function theoSupportCount(state: GameState, defTileIndex: number, defende
  *  wound penalty, DEBATER's "+20 Religious Strength in Theological Combat",
  *  and the Inquisitor's "+35 Religious Strength when in friendly territory". */
 export function theoStrength(state: GameState, unit: Unit): number {
-  const base = (UNITS[unit.type]?.religiousStrength ?? 0) - woundPenalty(unit)
-    + promoValue(unit, 'RELIG_CS') + congressReligiousCs(state, unitSeat(unit));
   const here = state.map.tiles[unit.tileIndex];
+  // CIV6 (Inquisition): "All religious units are +15 Religious Combat
+  // Strength in friendly territory."
+  const card = here && tileSeat(here) === unitSeat(unit)
+    ? getModifiers(state, unitSeat(unit)).religiousCsHome : 0;
+  const base = (UNITS[unit.type]?.religiousStrength ?? 0) - woundPenalty(unit)
+    + promoValue(unit, 'RELIG_CS') + congressReligiousCs(state, unitSeat(unit)) + card;
+  // CIV6 (Grand Inquisitor): "+10 Religious Strength in theological combat in
+  // tiles of this city."
+  const gov = here ? governorTileSum(state, here, (e) => e.theologyCS) : 0;
   return unit.type === 'INQUISITOR' && here && tileSeat(here) === unitSeat(unit)
-    ? base + INQUISITOR_HOME_STRENGTH
-    : base;
+    ? base + gov + INQUISITOR_HOME_STRENGTH
+    : base + gov;
 }
 
 /**
@@ -516,6 +524,10 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
   const tile = state.map.tiles[defTileIndex];
   return (
     (UNITS[defender.type]?.combat ?? 0) +
+    // CIV6 (Garrison Commander): "Units defending within the city's territory
+    // get +5 Combat Strength" — the GOVERNED city's own tiles, whoever stands
+    // on them, so a foreign attacker's target gets it and the attacker does not.
+    (tileSeat(tile) === defender.seat ? governorTileSum(state, tile, (e) => e.territoryCS) : 0) +
     terrainDefense(tile) +
     fortifyBonus(defender) -
     woundPenalty(defender) +
@@ -534,6 +546,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
     generalAuraCS(state, defender, defTileIndex) + // Great General/Admiral aura
     (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0) +
+    (vs ? eraMatchupCS(state, defender, vs.attacker.type) : 0) +
     congressUnitCS(state, defender) + governmentUnitCS(state, defender)
   );
 }
@@ -685,14 +698,16 @@ function cityBaseStrength(state: GameState, city: City): number {
 /** What an attacker measures itself against — Bastions' "+6 City Defense
  *  Strength" half. */
 export function cityDefenseStrength(state: GameState, city: City): number {
-  return cityBaseStrength(state, city) + getModifiers(state, city.seat).cityDefense;
+  return cityBaseStrength(state, city) + getModifiers(state, city.seat).cityDefense
+    + governorSum(state, city, (e) => e.cityDefense);
 }
 
 /** What the city FIRES at — Bastions' "+5 City Ranged Strength" half. This
  *  model has no separate ranged stat for a city, so a strike leaves from the
  *  same base the defence does and takes the ranged half instead. */
 export function cityStrikeStrength(state: GameState, city: City): number {
-  return cityBaseStrength(state, city) + getModifiers(state, city.seat).cityRanged;
+  return cityBaseStrength(state, city) + getModifiers(state, city.seat).cityRanged
+    + governorSum(state, city, (e) => e.cityDefense);
 }
 
 /** CIV6 (Discipline): "+5 Combat Strength when fighting Barbarians." A

@@ -32,6 +32,23 @@ export type GreatPersonClass =
   | 'WRITER'
   | 'MUSICIAN';
 
+/**
+ * One appointed GOVERNOR. `cityId` is the city they sit in and `minorId` the
+ * city-state (Amani alone), -1 for neither; `establishTurns` counts down to
+ * the turn their ABILITIES start paying, while the loyalty channel runs from
+ * the moment they are seated; `outTurns` is the neutralize clock, which
+ * follows the PERSON and not the city.
+ */
+export interface Governor {
+  appointed: boolean;
+  cityId: number;
+  minorId: number;
+  establishTurns: number;
+  outTurns: number;
+  /** bitmask over the GOVERNOR_PROMOTIONS catalog. */
+  promotions: number;
+}
+
 export interface City {
   /** Completed Terrestrial Laser Stations here: each draws LASER_POWER_LOAD
    *  and speeds the craft by 1 LY/turn only while this city is powered. */
@@ -71,9 +88,6 @@ export interface City {
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
   loyalty?: number;
-  /** CIV6 (Neutralize Governor): turns this city's governor is "removed from
-   *  duty" for. The seat's stateless greedy pick skips a city while it runs. */
-  governorOutTurns?: number;
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */
   spySources?: number[];
@@ -455,6 +469,8 @@ export interface Seat {
   gpEarned: string[];
   eraScore?: number;
   age?: number;
+  /** the seven GOVERNORS, one slot per catalog row; see `governors.ts`. */
+  governors?: Governor[];
   /** The Age this seat held in the PREVIOUS era — the substrate for a HEROIC
    *  age (Dark -> Golden), which the current age alone cannot detect. */
   prevAge?: number;

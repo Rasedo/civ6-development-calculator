@@ -11,13 +11,14 @@ import { UNITS } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
+import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
 import { citiesOf, seatOf, tileOwnedByCiv } from './seats';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
 import { emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
-import type { GameState, Seat } from './types';
+import type { City, GameState, Seat } from './types';
 
 export function strategicSlot(resourceId: string | undefined): number {
   return resourceId ? STRATEGIC_IDS.indexOf(resourceId) : -1;
@@ -78,7 +79,10 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     const k = strategicSlot(t.resource);
     if (k < 0 || t.improvement !== RESOURCES[t.resource]?.improvement) continue;
     if (!tileOwnedByCiv(t, seat)) continue;
-    bk[k] += STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource);
+    // CIV6 (Defense Logistics): "Accumulating Strategic resources gain an
+    // additional +1 per turn" — per accruing tile of the governed city.
+    bk[k] += STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource)
+      + governorTileSum(state, t, (e) => e.stockpilePerTurn);
   }
   // CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" — a
   // standing grant, owed whether or not the seat mines any.
@@ -184,9 +188,12 @@ export function canTrainWithStockpile(state: GameState, seat: number, unitType: 
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
 
-export function chargeUnitResource(state: GameState, seat: number, unitType: string): void {
+export function chargeUnitResource(state: GameState, seat: number, unitType: string, city?: City): void {
   const c = unitResourceCost(unitType);
-  if (c) spendStockpile(state, seat, c.id, c.n);
+  if (!c) return;
+  // CIV6 (Black Marketeer): "Strategic resources for units are discounted 80%."
+  const off = city ? governorSum(state, city, (e) => e.resourceDiscountPct) : 0;
+  spendStockpile(state, seat, c.id, Math.round(c.n * (100 - Math.min(100, off)) / 100));
 }
 
 /** The same charge for a PROJECT — the Lagrange station's one-time Aluminum. */

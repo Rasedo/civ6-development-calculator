@@ -45,8 +45,8 @@ from the list below.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 2 | the observation renders the standing slate, four resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
-| B-24r Ages/governors | 1 | governor identity/promotions, dark-age policies, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
+| B-22r World Congress | 2 | the observation renders the standing slate, three resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
+| B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
@@ -62,13 +62,13 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
-| **B. Fidelity vs real Civ 6** | **22** | |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
-| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body, the Preserve table is a stylization |
+| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body beyond their title, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
@@ -78,7 +78,7 @@ from the list below.
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **52** | |
+| **OPEN, TOTAL** | **53** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -140,11 +140,10 @@ Civ 6 source or is recorded as unverifiable.
     A ballot addresses the session about to run; `_congress_upcoming` can
     compute its slate but nothing renders it, so a net votes on the
     previous session's resolutions.
-  - **FOUR resolutions have no carrier**: Arms Control (weapons of mass
+  - **THREE resolutions have no carrier**: Arms Control (weapons of mass
     destruction, C-31); Espionage Pact — the old blocker ("no spies") is
     gone since the Spy shipped, so the row needs its own sourcing pass,
-    and its payload may read diplomatic VISIBILITY (C-2); Governance
-    Doctrine (a governor roster with appointment and promotion, B-24r);
+    and its payload may read diplomatic VISIBILITY (C-2);
     Luxury Policy — SOURCED: "A: Duplicates of this Luxury resource grant
     additional Amenities. / B: This Luxury resource grants no Amenities."
     B is fully specified, A publishes no number, and nothing here counts
@@ -167,13 +166,79 @@ Civ 6 source or is recorded as unverifiable.
     trade screen — cities, gold, resources and favor on one deal. Blocked
     on C-2's negotiated deal, not on the treaty system.
 - **B-24r. Ages/governors tails.** Twelve dedications ship, both faces,
-  over the published era windows (`DEDICATION_ERAS` / `_ded_eras`). OPEN:
-  - **GOVERNOR PROMOTIONS, blocked on governor IDENTITY.** A promotion
-    attaches to a NAMED governor persisted in one city — assignment state
-    plus the establishment clock — where titles here are anonymous
-    per-turn seats (the stateless greedy ranking is faithful for the one
-    +8 loyalty channel modeled, sourced by-assignment in R&F).
-  - **DARK-AGE POLICIES** — the dark-age card pool does not exist.
+  over the published era windows (`DEDICATION_ERAS` / `_ded_eras`).
+
+  THE GOVERNOR IS A PERSON. Seven named agents per seat (`Seat.governors`
+  / the `civ_gov_*` planes), each appointed with a Governor Title, seated
+  in one city and promoted with further titles. Titles are earned one per
+  each of thirteen NAMED civics plus the Government Plaza and every
+  building in it, and spent one per appointment and one per promotion
+  (`governorTitlesEarned` / `_governor_titles_earned`). Forty-two
+  promotion rows carry their governor, tier and prerequisite mask; the
+  DEFAULT ability rides the appointment and costs nothing. An
+  establishment clock (3 turns for Victor, 5 for the rest) gates every
+  ABILITY while the +8 Loyalty transfers on ASSIGNMENT, sourced; a
+  neutralize clock follows the PERSON, so a neutralized governor leaves
+  his city and can be seated nowhere for six turns. Thirteen DARK AGE
+  cards ship with their era windows, wildcard-only, adoptable only by a
+  seat actually in a Dark Age (`computeAdoption(.., dark)` /
+  `_slotted_policies(.., dark, era)`). Ibrahim is Ottoman-exclusive and
+  therefore C-26, parked by owner decision, not an omission. OPEN:
+  - **NO GOVERNOR CAN BE ASSIGNED TO A CITY-STATE.** `Governor.minorId`
+    exists on TS, has no GPU plane, no statecompare field and no writer.
+    Amani's Messenger is her DEFAULT, so this is the mechanic three
+    sourced channels wait on: `envoysAtMinor` ("acts as 2 Envoys"),
+    `envoyDoubleAtMinor` (Puppeteer) and `minorLuxuries` (Affluence) are
+    declared, loaded and read by nothing. The second half is the read:
+    `envoysOf` / `seat_citystate_envoys` is the RAW store behind ~70
+    sites, and only some of them (the suzerain contest, the bonus tier,
+    the influence-tier walk, the levy gate) want the EFFECTIVE count.
+    Foreign Investor's "accumulate its Strategic resources" waits on the
+    same mechanic.
+  - **FIVE PROMOTION CLAUSES WAIT ON NO MECHANIC AT ALL** and ship as an
+    empty payload: Land Acquisition's "acquire new tiles faster" (the
+    border-growth cost has a per-city site), Forestry Management's gold
+    per unimproved feature and its appeal term, Reinforced Materials'
+    immunity to Environmental Effects (the flood and storm damage sites
+    ship), Vertical Integration's every-Industrial-Zone production, and
+    Patron Saint's extra first promotion for Apostles. Surplus Logistics'
+    "+2 Food to the starting city of Trade Routes ending here" is the
+    same shape.
+  - **NINE PROMOTION CLAUSES WAIT ON A NAMED ABSENT SYSTEM**: Contractor
+    and Divine Architect (no district PURCHASE verb, gold or faith);
+    Renewable Subsidizer and Industrialist (the power plants and
+    renewables of C-1); Air Defense Initiative (anti-air units, C-34, and
+    the ICBM, C-31); Arms Race Proponent (nuclear armament projects,
+    C-31); Aquaculture and Parks and Recreation (the Fishery and City
+    Park improvements, which the improvement catalog does not carry);
+    Foreign Investor (the city-state posting above). Land Acquisition's
+    "+3 Gold from each foreign Trade Route passing through" is blocked on
+    the stored route PATH, exactly as B-31r's pass-through gold is.
+  - **GRANTS' "+100% Great People points" HAS NO PER-CITY READER.** GPP
+    accrues on the SEAT (`greatPeople.ts` reads
+    `getModifiers(state, seat).gppMult`), so a per-CITY governor
+    multiplier has nowhere to land and the channel is deliberately not
+    folded into `withGovernor`. Closing it needs the GPP walk to become
+    per-city on both engines.
+  - **THE GREEDY SLOT FILL NEVER REACHES A DARK AGE CARD.** Both engines
+    fill slots by walking the card table in order, so a government's
+    WILDCARD slots are spent on ordinary overflow before the dark rows —
+    which the append-last discipline puts at the end of the table — are
+    ever considered. MEASURED on a forced Dark Age with every civic
+    researched: 8 cards slotted, 0 of them dark; widening the wildcard
+    bench to 40 slots the same seat takes all 13. The two engines agree
+    exactly, so this is REACHABILITY, not a divergence: the pool is
+    proven only by `governor_roster_test.py` poke f and the TS
+    `dark-policies` lane. Which card fills a slot is a player decision
+    both engines stand in for, and making the stand-in prefer a dark card
+    is an invention no source settles — it belongs to the P8 decision
+    surface with the rest of `computeAdoption`'s greedy fill.
+  - **WHO TO HIRE AND WHERE TO SEAT HIM IS A HEURISTIC, NOT A RULE.**
+    Appoint in catalog order, promote the first legal row, seat every
+    idle governor in the lowest-loyalty ungoverned city (quantized-milli
+    key, ties by array position). Real Civ 6 leaves all three to the
+    player; the two engines mirror the heuristic exactly, and it is
+    P8-surface work to make them decisions.
   - **To Arms!'s special Casus Belli.** The denouncement it rides on
     ships now (C-2); what is missing is the casus-belli KIND itself — a
     war declaration variant the war table does not carry.
@@ -299,11 +364,7 @@ Civ 6 source or is recorded as unverifiable.
     per-city WALLS-LEVEL count), its "+2 Diplomatic Favor for every
     Renaissance Walls" (a favor-per-building term) and "+50% Influence
     Points" (an influence MULTIPLIER — `influencePerTurn` is flat);
-    Merchant Republic's "+10% Gold in all cities with an established
-    Governor", Theocracy's "+0.5 Faith per Citizen in cities with
-    Governors" and Communism's "+0.6 Production per Citizen in cities
-    with Governors" (a per-city GOVERNOR gate on a yield term — B-24r's
-    governor identity); Merchant Republic's "+15% Production toward
+    Merchant Republic's "+15% Production toward
     Districts" (a DISTRICT prodBoost target); Theocracy's "+5 Religious
     Strength in Theological Combat" (a government channel into the
     theological roll) and its "15% Discount on Purchases with Faith" with
@@ -538,15 +599,14 @@ under their blocker so the dependency is readable, and both halves count.
     War Department's combat bonus each need a channel this model does not
     have. (The Grand Master's Chapel's faith purchase ships —
     `unitFaithCost` / `_seat_faith_unit_candidate`.) The Audience
-    Chamber's "-2 Loyalty in Cities without Governors" ships; its
-    governor-CONDITIONAL amenities and housing do not, because the
-    governor pick is decided from loyalty, which reads the amenity tier —
-    a circle that needs the pick hoisted before the city walk.
+    Chamber ships whole — "-2 Loyalty in Cities without Governors" and
+    the governor-CONDITIONAL amenities and housing both. The circle that
+    blocked the conditional (the governor pick was decided from loyalty,
+    which reads the amenity tier, which reads the city walk) is gone:
+    the roster is STATE carried into the turn, so the walk can read it.
   - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
     `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; no source can close the middle.
-  - **THE DAM'S AND CANAL'S "+1 Amenity with Water Works"** is a Liang
-    governor TITLE — B-24r's governor promotions.
   - **THE CONSULATE'S "or cities with Encampments" half** — the widening
     clause reads a district count the influence body never asks for.
 - **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
@@ -583,6 +643,9 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 |---|---|---|
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
 | a PRESERVE placed | 12/12 | t27 |
+| a GOVERNOR TITLE earned | 12/12 | t28 |
+| a GOVERNOR APPOINTED, and SEATED in a city | 12/12 | t29 |
+| a governor ESTABLISHED (every ability opens) | 12/12 | t33 |
 | a GOVERNMENT PLAZA placed | 12/12 | t43 |
 | a GREAT PERSON standing on the map as a unit | 12/12 | t53 |
 | the ACTIVATE_GP column offered to one | 12/12 | t54 |
@@ -590,8 +653,10 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 | faith-buy kind 6 (APOSTLE purchase) | 12/12 | t70 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
 | a SPECIALIST pinned into a slot | 12/12 | t116 |
+| a governor PROMOTION taken | 11/12 | t135 |
 | an OPEN BORDERS grant standing | 11/12 | t34 |
 | a second HULL on any seat | 11/12 | t122 |
+| a seat entering a DARK AGE (the card pool's own gate) | 10/12 | t49 |
 | NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t172 |
 | a DECLARATION OF FRIENDSHIP | 9/12 | t19 |
 | an ALLIANCE | 9/12 | t105 |
@@ -618,6 +683,7 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 | a Valletta-shaped SUZERAIN, and the class purchase it sells | 0/12 | NEVER |
 | a seat that may buy LAND COMBAT UNITS with faith | 0/12 | NEVER |
 | PROFESSIONAL_SPORTS (the Rock Band's civic, and so the concert) | 0/12 | NEVER |
+| a DARK AGE CARD slotted (the greedy fill spends the wildcards first) | 0/12 | NEVER |
 
 - THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) — a DECISION the
   applier re-validates, widening coverage without changing legality.
@@ -639,7 +705,11 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
   Warrior Monk and its tree (whether AKKAD lands is a seeder draw), the
   climate arc (CO2 never leaves zero), the Military Engineer (0/12), the
   space race (Information-era techs), the emergencies' CITY_STATE trigger,
-  the ROCK BAND and its concert (Professional Sports is Information-era).
+  the ROCK BAND and its concert (Professional Sports is Information-era),
+  and the DARK AGE CARD POOL — the age is reached on 10/12 seeds but the
+  greedy slot fill spends every wildcard on ordinary overflow first, so
+  `governor_roster_test` poke f and the TS `dark-policies` lane are the
+  only proof the pool works.
 - THE POLICY CARDS ARE MOSTLY UNREACHED: 16 of 49 ever slot (greedy fill,
   table order within a kind); THIRTEEN effect channels ride the digest,
   the other nine are `policy_cards_test` + the TS `policy-cards` suite

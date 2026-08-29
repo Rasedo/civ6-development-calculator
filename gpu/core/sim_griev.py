@@ -74,6 +74,10 @@ class SimGriev:
             # the victim's side of the pair, per game
             v_is_row = bal > 0
             rate = base.clone()
+            # CIV6 (Cyber Warfare): "Grievances against you do not decay" —
+            # the TRANSGRESSOR's card holds what it is owed for.
+            hold = self._fx_by_row("grievhold").bool()
+            live = live & ~torch.where(v_is_row, hold[:, other], hold[:, row])
             for v, t in ((row, other), (other, row)):
                 side = v_is_row if v == row else ~v_is_row
                 rate = torch.where(side, base - self._occupation_of(t, v) + self._occupation_of(v, t), rate)

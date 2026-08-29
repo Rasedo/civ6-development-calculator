@@ -11,20 +11,20 @@ import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
 import { cityStrikeStrength, airStrike } from './combat';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled, stackDefender, unitAttackRange } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { computeAdoption, wonderExtraSlots } from './effects';
+import { computeAdoption, inDarkAge, wonderExtraSlots } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -53,11 +53,11 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
+import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
-import { beginMission, beginTravel, governorSuppressed, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
+import { beginMission, beginTravel, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
@@ -82,7 +82,8 @@ const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
-import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
+import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
+import { governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -369,7 +370,8 @@ export function standingLoyalty(state: GameState, city: City): number {
     if (!def || dark.has(def.district)) continue;
     n += def.loyalty ?? 0;
   }
-  return n;
+  // CIV6 (Automated Workforce): "-5 Loyalty per turn in your cities."
+  return n + governorLoyaltyAura(state, city) + getModifiers(state, city.seat).loyaltyAll;
 }
 
 /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors." The
@@ -564,7 +566,7 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
  *  adoption (which reads the standing slate back) and the envoy spread. */
 function congressVoter(state: GameState, seat: number): CongressVoterCtx {
   const sx = seatOf(state, seat)!;
-  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state));
+  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat));
   const policies: number[] = [];
   for (const id of adoption.policies) {
     const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
@@ -1442,6 +1444,10 @@ export function seatPhase(state: GameState): void {
     accrueStockpiles(state, actor.seat);
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
+    // THE GOVERNORS, before anything reads the roster: earned titles are
+    // spent, idle governors take a city, and both clocks tick. Every
+    // ability the city walk reads is settled here.
+    governorPhase(state, actor.seat);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
     tickSpies(state, actor.seat);
@@ -1479,9 +1485,12 @@ export function seatPhase(state: GameState): void {
       if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(actor.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
-        actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
-          + getModifiers(state, actor.seat).influencePerTurn
-          + seatBuildingSum(state, actor.seat, 'influencePerTurn');
+        // CIV6 (Rogue State): "Earn no influence toward new Envoys."
+        if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
+          actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
+            + getModifiers(state, actor.seat).influencePerTurn
+            + seatBuildingSum(state, actor.seat, 'influencePerTurn');
+        }
         // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
         // envoy the moment the meter fills, assigned or not. WHERE it is spent
         // is the decision, and that arrives on the wire.
@@ -1824,15 +1833,11 @@ export function seatPhase(state: GameState): void {
     // walk columns in slot order, so the f64 association agrees.
     let sciPerTurnSeat = 0;
     for (const civCity of actor.cities) sciPerTurnSeat += cityStats.get(civCity.id)!.total.science;
-    // this seat's governor seats for THIS turn — same stateless
-    // greedy as the seat 0 (quantized milli loyalty snapshot at the loop top,
-    // ties by array position == the GPU's civCity slot order).
-    const rGovPicks = governorPicks(
-      actor.cities.map((civCity) => Math.round((civCity.loyalty ?? LOYALTY_MAX) * 1000)),
-      governorTitles(actor.research.civics.length, grantedGovernorTitles(state, actor.seat)),
-      new Set(actor.cities.map((c, i) => (governorSuppressed(c) ? i : -1)).filter((i) => i >= 0)),
-    );
-    const rGovIds = new Set([...rGovPicks].map((i) => actor.cities[i].id));
+    // this seat's governor seats for THIS turn — persistent assignments the
+    // roster already carries, read once before the walk moves any loyalty.
+    const rGovIds = new Set(governorsOf(actor)
+      .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0)
+      .map((g) => g.cityId));
     const civCityDefectors: City[] = [];
     for (const civCity of [...actor.cities]) {
       const stats = cityStats.get(civCity.id) ?? computeCityStats(state, civCity, luxMap, seatMods);
@@ -1871,6 +1876,16 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
+        // CIV6 (Zoning Commissioner): "+20% Production towards constructing
+        // Districts in the city"; (Grants): "+30% Production towards City
+        // Projects."
+        // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
+        // (Flower Power): land units other than Rock Bands cost double, which
+        // this model pays as a slower fill rather than a moved queue cost.
+        if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
+        if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
+        if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
+        if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm);
         const progressBefore = q.progress;
         q.progress += production * _em;
@@ -1935,7 +1950,11 @@ export function seatPhase(state: GameState): void {
       // a city or defensible district has been completely destroyed, its ranged
       // strike again becomes unavailable".
       const perimeter = outerPool(state, civCity) > 0;
-      if (perimeter) {
+      // CIV6 (Embrasure): "City gains an additional Ranged Strike per turn" —
+      // it reaches every district of the city that has one, so the centre and
+      // the Encampment each fire the extra shot, re-scanning for a target.
+      const strikes = 1 + governorSum(state, civCity, (e) => e.extraStrikes);
+      for (let sk = 0; perimeter && sk < strikes; sk++) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
@@ -1958,7 +1977,11 @@ export function seatPhase(state: GameState): void {
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
               + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt }); // the promotions it chose (embarked → flat override, none)
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile);
+          // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder
+          // is the unit's own strength wherever it fights, a city's shot
+          // included.
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile)
+            + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
           const atkCS = cityStrikeStrength(state, civCity)
@@ -1978,10 +2001,10 @@ export function seatPhase(state: GameState): void {
       // CIV6: "building any level of Walls in the city will supply both" the
       // centre and the Encampment — each with its OWN pool — and the district
       // strikes on its own only "while its Wall defenses are still up".
-      if (civCity.districts.some((dd) => {
+      for (let sk = 0; sk < strikes && civCity.districts.some((dd) => {
         const edt = state.map.tiles[dd.tileIndex];
         return encampmentIntact(edt) && encampOuterPool(state, civCity, edt) > 0;
-      })) {
+      }); sk++) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
@@ -2004,7 +2027,8 @@ export function seatPhase(state: GameState): void {
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
               + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt });
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // the cstk mirror
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile)
+            + congressUnitCS(state, defender) + governmentUnitCS(state, defender); // the cstk mirror
           const atkCS = cityStrikeStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
           awardDefenseXp(state, defender);
@@ -2024,7 +2048,10 @@ export function seatPhase(state: GameState): void {
       // this gate: "once damaged, the outer defenses of a City Center or
       // defensible district will not regenerate on their own", and come back
       // only through the Repair Outer Defenses project.
-      if (!encircled(state, civCityCenter, actor.seat)) {
+      // CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
+      // may close and the heal still runs.
+      if (governorFlag(state, civCity, (e) => e.noSiege)
+          || !encircled(state, civCityCenter, actor.seat)) {
         civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;

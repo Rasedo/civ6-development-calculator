@@ -257,6 +257,14 @@ GAME = {
 }
 
 
+def _gov_row(plane: str):
+    """One governor-roster plane, per seat row, in catalog order."""
+    def get(sim, b, rows):
+        t = getattr(sim, plane)[b]
+        return [[int(t[c, g]) for g in range(sim.n_governors)] for c in rows]
+    return get
+
+
 def _civ_scalar(plane: str):
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
@@ -425,6 +433,13 @@ SEAT = {
     "tourismReligiousTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_rel_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
     "rockBandsBought": _civ_scalar("civ_rock_bands"),
+    "governorAppointed": _gov_row("civ_gov_appointed"),
+    "governorCity": lambda sim, b, rows: [
+        [int(sim.civ_gov_city[b, c, g]) if bool(sim.civ_gov_appointed[b, c, g]) else -1
+         for g in range(sim.n_governors)] for c in rows],
+    "governorEstablish": _gov_row("civ_gov_establish"),
+    "governorOut": _gov_row("civ_gov_out"),
+    "governorPromotions": _gov_row("civ_gov_promos"),
     "grievances": _grievance_line,
     "diplomaticFavor": _civ_scalar("civ_diplo_favor"),
     "diplomaticPoints": _civ_scalar("civ_diplo_points"),
@@ -610,7 +625,6 @@ CITY = {
     "origCapitalSeat": _cty("city_orig_cap"),
     "founderSeat": _cty("city_founder"),
     "loyalty": _cty("city_loyalty"),
-    "governorOutTurns": _cty("city_gov_out"),
     "spySources": lambda sim, b, rows: [
         int(sim.city_spy_sources[b, c, s].sum()) for c, s in rows
     ],

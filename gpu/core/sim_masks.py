@@ -757,8 +757,9 @@ class SimMasks:
     # and no float ever touches the result.
 
     def _xp_to_next(self, level: torch.Tensor) -> torch.Tensor:
-        """[..] the XP this unit still owes; 0 once it is maxed."""
-        return torch.where(level >= MAX_LEVEL, torch.zeros_like(level), XP_PER_LEVEL * level)
+        """`xpToNextLevel` — the XP this unit still owes; 0 once it is maxed."""
+        mx, per = self._promo_max_level, self._promo_xp_per_level
+        return torch.where(level >= mx, torch.zeros_like(level), per * level)
 
     def _bank_xp(self, xp: torch.Tensor, level: torch.Tensor, gain: torch.Tensor) -> torch.Tensor:
         """the new xp pool: it clamps at the level's requirement and stops."""
@@ -871,6 +872,43 @@ class SimMasks:
         s0 = seat.clamp(min=0, max=self.n_majors - 1)
         v = tab[torch.arange(self.B, device=self.device), s0, t]
         return torch.where(ok & (utype >= 0), v.long(), z)
+
+    def _era_matchup_cs(self, seat: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
+        """[B] long — CIV6 (Cyber Warfare): "+10 Combat Strength against units
+        from Information and Future Eras." The card is the ASKER's; the era is
+        the FOE's chassis."""
+        z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
+        if not self._gov_has_effects:
+            return z
+        out = z.clone()
+        era = self._type_era[foe_type.clamp(min=0, max=self.NU - 1)]
+        for _r in range(self.n_majors):
+            fx = self._gov_mods(_r)[12]["eracs"]
+            if not fx:
+                continue
+            hit = (seat == _r) & (foe_type >= 0)
+            for _on, _min, _cs in fx:
+                add = hit & _on.reshape(*([-1] + [1] * (seat.dim() - 1))) & (era >= _min)
+                out = out + add.long() * int(_cs)
+        return out
+
+    def _governor_territory_cs(self, seat: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """[B] long — CIV6 (Garrison Commander): "Units defending within the
+        city's territory get +5 Combat Strength" — the GOVERNED city's own
+        tiles, and only for a defender that owns them."""
+        z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
+        if not self.n_governors:
+            return z
+        tc = tile.clamp(min=0)
+        own = self.tile_seat.gather(1, tc.reshape(self.B, -1)).reshape(tc.shape) == seat
+        out = z.clone()
+        for _r in range(self.n_majors):
+            per = self._governor_tile_sum(_r, "territoryCS")
+            if not bool((per != 0).any()):
+                continue
+            v = per.gather(1, tc.reshape(self.B, -1)).reshape(tc.shape)
+            out = out + ((seat == _r) & own).long() * v.long()
+        return out
 
     def _class_matchup_cs(self, own_type: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
         """[B] long `classMatchupCS` — CIV6 (Combat, "Unit class modifiers"):
@@ -1105,13 +1143,26 @@ class SimMasks:
         duel: its chassis stat, the wound penalty, DEBATER's "+20 Religious
         Strength in Theological Combat", and the Inquisitor's "+35 Religious
         Strength when in friendly territory"."""
+        _t1 = tile.clamp(min=0).unsqueeze(1)
+        _home_t = self.tile_seat.gather(1, _t1).squeeze(1) == seat
+        # CIV6 (Inquisition): "All religious units are +15 Religious Combat
+        # Strength in friendly territory."
+        _card = torch.zeros_like(hp, dtype=torch.float64)
+        if self._gov_has_effects:
+            _card = self._fx_at_seat("relighome", seat).double() * _home_t.double()
+        # CIV6 (Grand Inquisitor): "+10 Religious Strength in theological
+        # combat in tiles of this city."
+        _gov = torch.zeros_like(_card)
+        if self.n_governors:
+            for _g in range(self.n_majors):
+                _gov = _gov + (seat == _g).double() * self._governor_tile_sum(_g, "theologyCS").gather(1, _t1).squeeze(1)
         base = (self._rel_strength[utype.clamp(min=0)] - self._wound(hp)
                 + self._promo_val(utype, promos, "RELIG_CS")
-                + self._congress_relig_cs(seat))
+                + self._congress_relig_cs(seat)
+                + (_card + _gov).to(self._rel_strength.dtype))
         if getattr(self, "_inquisitor_idx", -1) < 0:
             return base
-        home = ((utype == self._inquisitor_idx)
-                & (self.tile_seat.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) == seat))
+        home = (utype == self._inquisitor_idx) & _home_t
         return base + home.long() * self._inquisitor_home_strength
 
     def _trade_water_level(self, row: int) -> torch.Tensor:
@@ -1543,7 +1594,7 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None) -> torch.Tensor:
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -1577,7 +1628,16 @@ class SimMasks:
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
-        getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
+        # CIV6 (Embrasure): "Military units trained in this city start with a
+        # free promotion" — a unit that owes no XP for its first level, which
+        # `takePromotion` then zeroes, so nothing carries into the second.
+        if free_promo is None:
+            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
+        else:
+            _cls = self.rules_dev.u_promo_class[type_idx[rows].clamp(min=0)]
+            getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(
+                free_promo[rows] & (_cls >= 0),
+                self._xp_to_next(torch.ones_like(slot)), torch.zeros_like(slot))
         getattr(self, f"{pre}_unit_level")[rows, slot] = 1
         getattr(self, f"{pre}_unit_promos")[rows, slot] = 0
         getattr(self, f"{pre}_unit_promo_offer")[rows, slot] = 0
@@ -1615,7 +1675,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_spy_target")[rows, slot] = -1
         getattr(self, f"{pre}_unit_spy_level")[rows, slot] = 0
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
-        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx)[rows]
+        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
         off = self.POOL_LO[pre]
         cu_rows = is_civ_u[rows]
         ar_rows = no_hold[rows]

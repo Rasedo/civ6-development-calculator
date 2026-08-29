@@ -5,6 +5,7 @@ import type { City, GameState, PlunderRow, ResearchState, Tile, Unit, YieldKey }
 import { getModifiers } from './effects';
 import { UNIT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
+import { governorTileMult } from './governors';
 import { computeUnlocksIn } from './effects';
 import { repairDrip } from './rules';
 import { FEATURES } from '../../world/features';
@@ -49,9 +50,12 @@ export function progressScale(r: ResearchState | undefined): number {
   return 1 + 9 * Math.max((r?.techs.length ?? 0) / 67, (r?.civics.length ?? 0) / 50);
 }
 
-/** CIV6: the base 20 of a feature chop, on the progression above. */
-export function chopValue(state: GameState, seat: number): number {
-  return Math.round(20 * progressScale(seatOf(state, seat)?.research));
+/** CIV6: the base 20 of a feature chop, on the progression above, times the
+ *  Groundbreaker's "+50% yields from plot harvests and feature removals in
+ *  city" where the worked tile belongs to a city that holds it. */
+export function chopValue(state: GameState, seat: number, at?: Tile): number {
+  const mult = at ? governorTileMult(state, at, (e) => e.harvestMult) : 1;
+  return Math.round(20 * progressScale(seatOf(state, seat)?.research) * mult);
 }
 
 /**
@@ -102,7 +106,7 @@ export function chopGrant(state: GameState, tile: Tile, seat: number): LumpGrant
   const key = FEATURES[tile.feature]?.chopYield;
   if (!key) return null;
   if (tileSeat(tile) !== seat) return null;
-  return { key, amount: chopValue(state, seat) };
+  return { key, amount: chopValue(state, seat, tile) };
 }
 
 export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
@@ -115,7 +119,7 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   const rs = seatOf(state, seat)?.research;
   if (!rs) return null;
   if (!state.sandbox && !computeUnlocksIn(rs).improvements.has(res.improvement)) return null;
-  return { key: res.harvestYield, amount: chopValue(state, seat) };
+  return { key: res.harvestYield, amount: chopValue(state, seat, tile) };
 }
 
 export function applyLumpYield(

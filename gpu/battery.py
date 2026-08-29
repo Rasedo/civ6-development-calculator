@@ -265,6 +265,7 @@ def main() -> int:
                 ("parks", [py, "tests/gpu/parks_test.py"], 4),  # national parks, shipwrecks, museum theming
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
+                ("governor_roster", [py, "tests/gpu/governor_roster_test.py"], 4),  # titles/appointment/promotion order, the establishment and neutralize clocks, the Dark Age card pool
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
                 ("districts_new", [py, "tests/gpu/districts_new_test.py"], 4),  # Dam/Canal/Water Park/Preserve/Government Plaza/Diplomatic Quarter
                 ("sourced_rows", [py, "tests/gpu/sourced_rows_test.py"], 4),  # the Monument's loyalty clause, the Lighthouse's Coast/Lake food, the Engineer's Armory

@@ -228,17 +228,18 @@ def main() -> None:
     sim._tick_spy_effects(foe)
     assert int(sim.city_spy_sources[0, foe, theirs, row]) == sim._spy_sources_turns - 1
 
-    # -- 10: a suppressed governor drops out of the holder's pick ------------
+    # -- 10: a neutralized governor leaves the city, and the clock is HIS ----
     sim.civ_civics[0, foe] = True  # every title the ladder can hand out
-    seated = sim._seat_governor_seats(foe)[0]
-    assert bool(seated[theirs]), "the holder's only city is governor-seated"
-    sim.city_gov_out[0, foe, theirs] = sim._spy_gov_turns
-    assert not bool(sim._seat_governor_seats(foe)[0][theirs])
+    sim._governor_phase(foe)
+    gi = int(sim._governor_at(foe)[0, theirs])
+    assert gi >= 0, "the holder's only city is governor-seated"
+    sim.neutralize_governor(0, foe, gi, sim._spy_gov_turns)
+    assert int(sim._governor_at(foe)[0, theirs]) < 0, "a neutralized governor holds no city"
     mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert not bool(mm[sim._spy_m_governor]), "no governor, no Neutralize Governor"
-    sim._tick_spy_effects(foe)
-    assert int(sim.city_gov_out[0, foe, theirs]) == sim._spy_gov_turns - 1
-    sim.city_gov_out[0, foe, theirs] = 0
+    sim._governor_tick(foe)
+    assert int(sim.civ_gov_out[0, foe, gi]) == sim._spy_gov_turns - 1
+    sim.civ_gov_out[0, foe, gi] = 0
 
     # -- 11: Sabotage darkens the district it names -------------------------
     sim.unit_spy_mission[0, v] = sim._spy_idle

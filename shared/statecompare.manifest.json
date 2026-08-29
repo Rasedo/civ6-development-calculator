@@ -356,6 +356,61 @@
           "note": "how many Rock Bands this seat has bought — the progressive faith price reads it."
         },
         {
+          "name": "governorAppointed",
+          "compare": "exact",
+          "covers": [
+            "Governor.appointed"
+          ],
+          "planes": [
+            "civ_gov_appointed"
+          ],
+          "note": "one flag per catalog governor: has this seat spent a title hiring them."
+        },
+        {
+          "name": "governorCity",
+          "compare": "exact",
+          "covers": [
+            "Governor.cityId"
+          ],
+          "planes": [
+            "civ_gov_city"
+          ],
+          "note": "the CITY ID each appointed governor sits in, -1 idle in the Palace."
+        },
+        {
+          "name": "governorEstablish",
+          "compare": "exact",
+          "covers": [
+            "Governor.establishTurns"
+          ],
+          "planes": [
+            "civ_gov_establish"
+          ],
+          "note": "turns left before a newly assigned governor's abilities apply; the loyalty channel does not wait."
+        },
+        {
+          "name": "governorOut",
+          "compare": "exact",
+          "covers": [
+            "Governor.outTurns"
+          ],
+          "planes": [
+            "civ_gov_out"
+          ],
+          "note": "the neutralize clock, which follows the PERSON and not the city."
+        },
+        {
+          "name": "governorPromotions",
+          "compare": "exact",
+          "covers": [
+            "Governor.promotions"
+          ],
+          "planes": [
+            "civ_gov_promos"
+          ],
+          "note": "a bitmask over the promotion catalog; the default ability rides the appointment."
+        },
+        {
           "name": "tourismReligious",
           "compare": "exact",
           "covers": [
@@ -1536,17 +1591,6 @@
             "city_gwart_artist"
           ],
           "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot — the other theming rule's inputs"
-        },
-        {
-          "name": "governorOutTurns",
-          "compare": "exact",
-          "covers": [
-            "City.governorOutTurns"
-          ],
-          "planes": [
-            "city_gov_out"
-          ],
-          "note": "CIV6 (Neutralize Governor): turns the city's governor is off duty; the seat's greedy pick skips it meanwhile."
         },
         {
           "name": "spySources",

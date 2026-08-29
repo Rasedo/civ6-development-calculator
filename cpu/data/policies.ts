@@ -16,7 +16,7 @@
  * single Modifiers object by `getModifiers` (core/effects.ts).
  */
 
-import type { DistrictId, GreatPersonClass, Yields } from '../core/types';
+import type { DistrictId, GreatPersonClass, ImprovementId, Yields } from '../core/types';
 import type { UnitClass } from './units';
 import type { PromoClass } from './promotions';
 
@@ -126,6 +126,54 @@ export interface PolicyEffects {
   /** housing and amenities in every city with ANY completed district */
   cityWithDistrict?: { housing: number; amenities: number };
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
+  /** yield multipliers that apply ONLY in a city with an ESTABLISHED governor
+   *  (Merchant Republic's gold). */
+  governorYieldMult?: Partial<Yields>;
+  /** yields per CITIZEN, only in a city with a governor (Theocracy's faith,
+   *  Communism's production). */
+  governorPerCitizen?: Partial<Yields>;
+
+  // ---- the DARK-AGE channels ----
+  /** improvement yield adders (Collectivism's Farms). */
+  improvementYields?: Partial<Record<ImprovementId, Partial<Yields>>>;
+  /** a yield multiplied in every city that holds the named DISTRICT
+   *  (Monasticism's Holy Site science). */
+  districtYieldMult?: { district: DistrictId; yield: keyof Yields; mult: number }[];
+  /** a yield multiplied in every city that holds the named BUILDING (Robber
+   *  Barons' Stock Exchange gold and Factory production). */
+  buildingYieldMult?: { building: string; yield: keyof Yields; mult: number }[];
+  /** flat yields added to each DOMESTIC trade route (Isolationism). */
+  domesticRouteYield?: Partial<Yields>;
+  /** every trade route's yields, multiplied (Letters of Marque). */
+  routeYieldMult?: number;
+  /** Isolationism: no Settler may be trained, bought, or founded with. */
+  noSettlers?: boolean;
+  /** Twilight Valor: a unit heals only inside its own territory. */
+  healOnlyHome?: boolean;
+  /** Inquisition: religious combat strength inside your own territory. */
+  religiousCsHome?: number;
+  /** Letters of Marque: the Naval Raider class's production and movement. */
+  navalRaiderProdMult?: number;
+  navalRaiderMoves?: number;
+  /** Cyber Warfare: grievances against you never decay. */
+  grievanceNoDecay?: boolean;
+  /** Automated Workforce: production toward city PROJECTS. */
+  projectProdMult?: number;
+  /** Automated Workforce: loyalty per turn in every city. */
+  loyaltyAll?: number;
+  /** Disinformation Campaign: diplomatic favor per copy of a building. */
+  favorPerBuilding?: { building: string; favor: number };
+  /** Rogue State: envoy influence stops accruing. */
+  noEnvoyInfluence?: boolean;
+  /** Cyber Warfare: combat strength against units of `minEra` and later. */
+  unitCsVsEra?: { minEra: number; cs: number };
+  /** Flower Power: the cost multiplier on land units that are not Rock Bands. */
+  landUnitCostMult?: number;
+  /** Flower Power: every civ not at war with you takes this share of each
+   *  concert's tourism, on top of the host's own. */
+  concertShare?: number;
+  /** Elite Forces: extra gold per MILITARY unit maintained. */
+  militaryMaintenanceAdd?: number;
 }
 
 export interface PolicyDef {
@@ -137,12 +185,22 @@ export interface PolicyDef {
    *  the pool for good. The enabling civic is the `unlockPolicy` effect in
    *  `civics.ts`; a card with no retiring civic stays adoptable forever. */
   obsoleteCivic?: string;
+  /** CIV6 (Dark Age policy card): "they can only be adopted by civilizations
+   *  that are experiencing a Dark Age. They must be placed in Wildcard slots."
+   *  No civic unlocks one; the era window is its whole availability. */
+  dark?: { firstEra: number; lastEra: number };
   effects: PolicyEffects;
 }
 
 const P = (id: string, name: string, kind: SlotKind, description: string,
            obsoleteCivic: string | undefined, effects: PolicyEffects): PolicyDef =>
   ({ id, name, kind, description, obsoleteCivic, effects });
+
+/** A Dark Age card: no unlocking civic, no retiring one — an era window and a
+ *  Dark Age are its whole gate, and it fits a Wildcard slot only. */
+const DK = (id: string, name: string, firstEra: number, lastEra: number,
+            description: string, effects: PolicyEffects): PolicyDef =>
+  ({ id, name, kind: 'wildcard', description, dark: { firstEra, lastEra }, effects });
 
 /** era indices, for the production cards' `eraMax` */
 const CLASSICAL = 1;
@@ -308,6 +366,81 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('LITERARY_TRADITION', 'Literary Tradition', 'wildcard', '+2 Great Writer points per turn.', undefined, {
       gppFlat: { WRITER: 2 },
     }),
+
+    // ---- DARK AGE cards. Each description is the catalog's own text, benefit
+    // then price; the era window is the catalog's first/last availability.
+    DK('MONASTICISM', 'Monasticism', 1, 2,
+      '+75% Science in cities with a Holy Site. BUT: -25% Culture in all cities.', {
+      districtYieldMult: [{ district: 'HOLY_SITE', yield: 'science', mult: 1.75 }],
+      yieldMult: { culture: 0.75 },
+    }),
+    DK('TWILIGHT_VALOR', 'Twilight Valor', 1, 3,
+      'All units +5 Combat Strength for all melee attack units. BUT: Cannot heal outside your territory.', {
+      unitCombatCS: { classes: ['MELEE'], cs: 5 },
+      healOnlyHome: true,
+    }),
+    DK('INQUISITION', 'Inquisition', 1, 3,
+      'Start Inquisition with 1 Apostle charge. All religious units are +15 Religious Combat Strength in friendly territory. BUT: -25% Science in all cities.', {
+      religiousCsHome: 15,
+      yieldMult: { science: 0.75 },
+    }),
+    DK('ISOLATIONISM', 'Isolationism', 1, 4,
+      "Domestic routes provide +2 Food, +2 Production. BUT: Can't train or buy Settlers nor settle new cities.", {
+      domesticRouteYield: { food: 2, production: 2 },
+      noSettlers: true,
+    }),
+    DK('LETTERS_OF_MARQUE', 'Letters of Marque', 3, 5,
+      'Naval Raiders: +100% Production, +2 Movement. Yields doubled from plundering Trade Routes. BUT: Trade Route yields -50%.', {
+      navalRaiderProdMult: 2,
+      navalRaiderMoves: 2,
+      routePlunderMult: 2,
+      routeYieldMult: 0.5,
+    }),
+    DK('ROBBER_BARONS', 'Robber Barons', 4, 6,
+      '+50% Gold in cities with a Stock Exchange. +25% Production in cities with a Factory. BUT: -2 Amenities in all cities.', {
+      buildingYieldMult: [
+        { building: 'STOCK_EXCHANGE', yield: 'gold', mult: 1.5 },
+        { building: 'FACTORY', yield: 'production', mult: 1.25 },
+      ],
+      amenitiesAll: -2,
+    }),
+    DK('ELITE_FORCES', 'Elite Forces', 4, 8,
+      '+100% combat experience for all units. BUT: +2 Gold to maintain each military unit.', {
+      xpPct: 100,
+      militaryMaintenanceAdd: 2,
+    }),
+    DK('COLLECTIVISM', 'Collectivism', 5, 6,
+      'Farms +1 Food. All cities +2 Housing. +100% Industrial Zone adjacency bonuses. BUT: Great People Points earned 50% slower.', {
+      improvementYields: { FARM: { food: 1 } },
+      housingAll: 2,
+      adjacencyMult: { INDUSTRIAL_ZONE: 2 },
+      gppMult: 0.5,
+    }),
+    DK('ROGUE_STATE', 'Rogue State', 6, 8,
+      '+50% Production to nuclear program projects and WMDs. BUT: Earn no influence toward new Envoys.', {
+      noEnvoyInfluence: true,
+    }),
+    DK('FLOWER_POWER', 'Flower Power', 6, 8,
+      'All civilizations not currently at war receive +100% of the Tourism from your Concerts. BUT: The cost of producing and purchasing land units other than Rock Bands is increased by +100%.', {
+      concertShare: 1,
+      landUnitCostMult: 2,
+    }),
+    DK('CYBER_WARFARE', 'Cyber Warfare', 7, 8,
+      '+10 Combat Strength against units from Information and Future Eras. BUT: Grievances against you do not decay.', {
+      unitCsVsEra: { minEra: 7, cs: 10 },
+      grievanceNoDecay: true,
+    }),
+    DK('AUTOMATED_WORKFORCE', 'Automated Workforce', 7, 8,
+      'Your cities get +20% Production towards city projects. BUT: -1 Amenity and -5 Loyalty per turn in your cities.', {
+      projectProdMult: 1.2,
+      amenitiesAll: -1,
+      loyaltyAll: -5,
+    }),
+    DK('DISINFORMATION_CAMPAIGN', 'Disinformation Campaign', 7, 8,
+      '+3 Diplomatic Favor per turn for each Broadcast Center. BUT: -10% Science and Culture in all cities.', {
+      favorPerBuilding: { building: 'BROADCAST_CENTER', favor: 3 },
+      yieldMult: { science: 0.9, culture: 0.9 },
+    }),
   ].map((p) => [p.id, p]),
 );
 
@@ -375,8 +508,8 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // GOVERNOR gate on a yield multiplier, the production term a DISTRICT
     // prodBoost target; the ungated gold multiplier that stood here was
     // unsourced.
-    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], {},
-      'No modeled bonus yet.'),
+    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { governorYieldMult: { gold: 1.1 } },
+      '+10% gold in cities with an established governor.'),
     // CIV6: "Can buy land combat units with Faith. All units +5 Religious
     // Strength in theological combat." CIV6 (GS): "+5 Religious Strength in
     // Theological Combat. +0.5 Faith per Citizen in cities with Governors.
@@ -385,8 +518,8 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // roll, the faith term a per-city GOVERNOR gate, the discount a
     // faith-price multiplier; the flat faith multiplier that stood here was
     // unsourced.
-    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { faithBuyLandUnits: true },
-      'Can buy land combat units with Faith.'),
+    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { faithBuyLandUnits: true, governorPerCitizen: { faith: 0.5 } },
+      'Can buy land combat units with Faith; +0.5 faith per citizen in cities with governors.'),
     // CIV6 (GS): "Your Trade Routes to an Ally's city or a city-state that
     // you are the Suzerain of provide +4 Gold and +4 Production for both
     // cities. Alliance Points with all allies increase by an additional .25
@@ -399,8 +532,8 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // CIV6 (GS): "+0.6 Production per Citizen in cities with Governors.
     // +10% Science." The production term wants a per-city GOVERNOR gate and
     // a per-citizen yield; only the science half ships.
-    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { science: 1.1 } },
-      '+10% science in all cities.'),
+    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { science: 1.1 }, governorPerCitizen: { production: 0.6 } },
+      '+10% science in all cities; +0.6 production per citizen in cities with governors.'),
     // CIV6: "All units gain +5 Combat Strength. War Weariness reduced by
     // 15%. +50% Production toward Units." The production arm is class-FREE:
     // it reaches every unit the queue can hold, the class-less ones too.
