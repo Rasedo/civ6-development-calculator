@@ -1894,7 +1894,7 @@ class SimInit:
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
-        self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
+        self._gov_pol_cache = None       # {row: (_eff_version, civ, slots, dark, era, mods)}
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
         self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
         self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})

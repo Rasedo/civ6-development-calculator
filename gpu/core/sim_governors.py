@@ -198,25 +198,27 @@ class SimGovernors:
 
     def _governor_at(self, row: int) -> torch.Tensor:
         """[B, RC] long — the governor index seated in each city slot, -1 where
-        none is. A neutralized governor holds no city."""
-        dev, NG, RC = self.device, self.n_governors, self.RC
-        out = torch.full((self.B, RC), -1, dtype=torch.long, device=dev)
-        if NG == 0:
-            return out
-        ap = self.civ_gov_appointed[:, row]
-        city = self.civ_gov_city[:, row]
-        off = self.civ_gov_out[:, row]
-        ids = self.city_id[:, row]
-        alive = self.city_alive[:, row]
-        for g in range(NG - 1, -1, -1):
-            hit = (ap[:, g] & (off[:, g] <= 0)).unsqueeze(1) & alive & (ids == city[:, g].unsqueeze(1))
-            out = torch.where(hit, torch.full_like(out, g), out)
-        return out
+        none is. A neutralized governor holds no city, and the LOWEST index
+        wins a slot two of them somehow claim.
 
-    def _governor_established(self, row: int) -> torch.Tensor:
+        One [B, NG, RC] test rather than a walk of the roster: this is the
+        widest-called read in the seat phase, and every ability channel is
+        derived from it."""
+        dev, NG, RC = self.device, self.n_governors, self.RC
+        if NG == 0:
+            return torch.full((self.B, RC), -1, dtype=torch.long, device=dev)
+        live = (self.civ_gov_appointed[:, row] & (self.civ_gov_out[:, row] <= 0)).unsqueeze(2)
+        holds = (live & self.city_alive[:, row].unsqueeze(1)
+                 & (self.city_id[:, row].unsqueeze(1) == self.civ_gov_city[:, row].unsqueeze(2)))
+        g = torch.arange(NG, device=dev).reshape(1, NG, 1).expand_as(holds)
+        best = torch.where(holds, g, torch.full_like(g, NG)).amin(dim=1)
+        return torch.where(best < NG, best, torch.full_like(best, -1))
+
+    def _governor_established(self, row: int, at: torch.Tensor | None = None) -> torch.Tensor:
         """[B, RC] bool — the city slots whose governor has finished
-        establishing; the channel every ABILITY rides."""
-        at = self._governor_at(row)
+        establishing; the channel every ABILITY rides. Pass `at` where the
+        caller already holds it — the derivation is not free."""
+        at = self._governor_at(row) if at is None else at
         if self.n_governors == 0:
             return torch.zeros_like(at, dtype=torch.bool)
         est = self.civ_gov_establish[:, row].gather(1, at.clamp(min=0))
@@ -227,7 +229,7 @@ class SimGovernors:
         in each city slot, its DEFAULT ability included."""
         dev, NP, RC = self.device, self.n_gov_promos, self.RC
         at = self._governor_at(row)
-        est = self._governor_established(row)
+        est = self._governor_established(row, at)
         out = torch.zeros(self.B, RC, NP, dtype=torch.bool, device=dev)
         if NP == 0:
             return out

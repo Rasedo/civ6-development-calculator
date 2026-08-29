@@ -1573,17 +1573,31 @@ class SimEconomy:
         return house, amen
 
     def _gov_mods(self, row: int):
-        if self._gov_pol_cache is None or self._gov_pol_cache[0] != self._eff_version:
-            self._gov_pol_cache = (self._eff_version, {})
-        d = self._gov_pol_cache[1]
-        v = d.get(row)
-        if v is None:
-            v = self._gov_policy_mods(
-                self._seat_civics(row), self._wonder_extra_slots(row),
-                self.civ_age[:, row] == 0,
-                self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
-            d[row] = v
-        return v
+        """The seat's government + policy channels, memoised twice over.
+
+        `_eff_version` is the cheap gate; when it moves, the four INPUTS are
+        re-derived (under a millisecond) and the standing answer kept if they
+        match, because `_gov_policy_mods` reads nothing else. A building
+        completing anywhere moves the version many times a turn and changes
+        none of them."""
+        if self._gov_pol_cache is None:
+            self._gov_pol_cache = {}
+        ent = self._gov_pol_cache.get(row)
+        if ent is not None and ent[0] == self._eff_version:
+            return ent[5]
+        # `_seat_civics` hands back a VIEW of the live plane; a key that is not
+        # a copy compares equal to itself forever and freezes the answer.
+        civ = self._seat_civics(row).clone()
+        slots = self._wonder_extra_slots(row)
+        dark = self.civ_age[:, row] == 0
+        era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+        if ent is not None and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
+                and torch.equal(ent[3], dark) and torch.equal(ent[4], era):
+            val = ent[5]
+        else:
+            val = self._gov_policy_mods(civ, slots, dark, era)
+        self._gov_pol_cache[row] = (self._eff_version, civ, slots, dark, era, val)
+        return val
 
     def _seat_slotted(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` actually holds, its AGE and era
