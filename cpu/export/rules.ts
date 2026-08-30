@@ -1138,6 +1138,7 @@ export function buildRules() {
       // the chassis this one upgrades INTO, as a roster index
       upTo: u.upgradesTo ? Object.keys(UNITS).indexOf(u.upgradesTo) : -1,
       antiAir: u.antiAir ?? 0,
+      antiAirRange: u.antiAirRange ?? -1,   // -1 = this chassis covers nothing
       gdr: u.gdr ? 1 : 0,
       spy: u.spy ? 1 : 0,
       noGold: u.noGold ? 1 : 0,

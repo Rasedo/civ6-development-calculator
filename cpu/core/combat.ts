@@ -19,7 +19,7 @@ import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from 
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
-import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
+import { isAirUnit, airCoverAgainst, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -1343,15 +1343,22 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   // the answer. CIV6 (Air combat): a plane "doesn't suffer damage in return
   // unless it gets Intercepted", and "the only exceptions to this rule are
   // SHIPS with the Anti-Air Strength stat - they have additional close-range
-  // defenses, which activate when they are attacked by an aircraft". A land
-  // anti-air unit answers by intercepting, which no engine here can do.
-  if (antiAirOf(defender.type) > 0 && UNITS[defender.type]?.naval) {
+  // defenses, which activate when they are attacked by an aircraft" — beside
+  // which a parked weapon "provides cover from air attacks up to 1 hex away".
+  // `airCoverAgainst` folds both into the one answer that fires.
+  const cover = airCoverAgainst(state, attacker, targetIndex);
+  if (cover) {
+    const covE = airDefenseOf(cover.type) - woundPenalty(cover)
+      + promoCS(cover, {
+        attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
+        tile: state.map.tiles[cover.tileIndex],
+      });
     // the burst answers the AIRCRAFT, which is the defender of this roll
     const airD = atk - woundPenalty(attacker)
       + promoCS(attacker, {
-        attacking: false, vsAntiAir: true, foeType: defender.type, tile: fromTile,
+        attacking: false, vsAntiAir: true, foeType: cover.type, tile: fromTile,
       });
-    attacker.hp -= damageRoll(state, defE - airD, 'airc', targetIndex);
+    attacker.hp -= damageRoll(state, covE - airD, 'airc', targetIndex);
     if (attacker.hp <= 0) disbandUnit(state, attacker.id);
   }
   awardBattleXp(state, attacker, defender,

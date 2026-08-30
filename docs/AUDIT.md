@@ -75,7 +75,7 @@ from the list below.
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
 | C-32 the classes with no promotion tree | 1 | the AIRCRAFT CARRIER and the SPY are offered no promotion; the air and naval-raider trees ship |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
-| C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist; the promotion term in the sortie ships |
+| C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
@@ -654,17 +654,25 @@ under their blocker so the dependency is readable, and both halves count.
   sortie, the carrier and the scatter ship — and the sortie now rolls
   the promotion term on both sides (`promoCS` / `_promo_cs` with `vsAir`
   and `vsAntiAir`), pays both sides' XP, and reads the operational range
-  through `RANGE`. OPEN:
-  - **INTERCEPTION** — fighters "automatically attack incoming aircraft
-    within their operational range"; there is no reactive attack anywhere
-    in either engine.
-  - **PATROL** — a deployed standing interceptor; waits on the row above.
-  - **PRIORITY TARGET** — a bomber reaching the SUPPORT unit under a
-    stack ("sustains 65 damage"); a strike here answers the tile's
-    military occupant first.
-  - **LAND AA IS INERT BY THE SOURCE'S OWN MODEL** — the ANTI_AIR_GUN and
-    MOBILE_SAM never damage an attacker, because the channel they would
-    damage it through is Interception.
+  through `RANGE`. The PARKED ANTI-AIR WEAPON answers too — CIV6 (Anti-Air
+  Gun, Mobile SAM): "Provides cover from air attacks up to 1 hex away from
+  the weapon", Range 1 — which `airCoverAgainst` / `_air_cover_scan` fold
+  into the same one answer the anti-air hull already fired, strongest first
+  and ties by tile then by the tile's own occupancy order. OPEN:
+  - **INTERCEPTION BY A FIGHTER** has no published roll. The wiki says
+    only that "every Interception does damage to the unit being
+    intercepted", that a shot-down plane never lands its attack and a
+    surviving one still does, and that a fighter "takes damage for each
+    attempt" — no strength, no formula, no cap on attempts. Three invented
+    numbers is what building it would cost, so it waits on a source rather
+    than on a mechanic. PATROL waits on it in turn: a deployed fighter's
+    whole point is the interception it then makes, and B-56r's
+    GROUND_CREWS waits on the PATROL state.
+  - **PRIORITY TARGET** — the Jet Bomber's reach past a stack's military
+    occupant to the SUPPORT unit under it. The Civilopedia's Jet Bomber
+    page does not carry the ability at all, and the flat "sustains 65
+    damage" is wiki text this session could not fetch to quote. Unsourced
+    magnitude, so unbuilt.
   - **THE NUCLEAR DELIVERY**'s interception half (devices are C-31, the
     silo C-20).
   - **AIR PILLAGE.** The Superfortress promotion reads "no minimum health

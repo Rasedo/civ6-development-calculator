@@ -8,14 +8,17 @@ import {
   airSlotsAt, airBaseFree, airBasesOf, airTrainTile, canTrainAir,
   rebaseRange, canRebaseTo, rebaseAir, displaceAirFrom, carryAirWith,
   airStrikeTargets, rebaseTargets, airStrikeOffers, airDefenseOf, antiAirOf,
+  antiAirCover, airCoverAgainst, AIR_COVER_MAX,
 } from '../../../cpu/core/air';
 import { airStrike } from '../../../cpu/core/combat';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
+import type { Unit } from '../../../cpu/core/types';
 
 const FIGHTER = 'BIPLANE';
 const BOMBER = 'BOMBER';
 const CARRIER = 'AIRCRAFT_CARRIER';
 const GUNNER = 'ANTI_AIR_GUN';
+const SAM = 'MOBILE_SAM';
 const HULL = 'BATTLESHIP';
 
 /** A units-mode game with the capital at (8,8) and an Aerodrome beside it. */
@@ -132,7 +135,7 @@ describe('the strike head', () => {
 });
 
 describe('the sortie', () => {
-  it('matches Ranged Strength against Anti-Air Strength, and only a SHIP answers', () => {
+  it('matches Ranged Strength against Anti-Air Strength', () => {
     // CIV6: "the attacking unit's Ranged Strength will be matched against the
     // defending unit's Anti-Air Strength (even if its Combat Strength is
     // higher) or Combat Strength if it doesn't have any Anti-Air Strength."
@@ -148,13 +151,9 @@ describe('the sortie', () => {
     const r = airStrike(state, fighter.id, land.index, 0);
     expect(r.ok).toBe(true);
     expect(gun.hp).toBeLessThan(100);
-    // CIV6: a plane "doesn't suffer damage in return unless it gets
-    // Intercepted", which no engine here can do — a LAND gunner's Anti-Air
-    // Strength defends the tile and nothing more.
-    expect(fighter.hp).toBe(100);
     expect(fighter.movesLeft).toBe(0);
 
-    // a target with no Anti-Air Strength never answers either
+    // a target with no Anti-Air Strength answers nothing
     const s2 = airState();
     setWar(s2.state, 0, 1, true);
     const f2 = spawnUnit(s2.state, FIGHTER, s2.pad.index, 0)!;
@@ -162,6 +161,53 @@ describe('the sortie', () => {
     spawnUnit(s2.state, 'WARRIOR', soft.index, 1);
     expect(airStrike(s2.state, f2.id, soft.index, 0).ok).toBe(true);
     expect(f2.hp).toBe(100);
+  });
+
+  it('a parked weapon covers its own hex and the ring around it', () => {
+    // CIV6 (Anti-Air Gun, Mobile SAM): "Provides cover from air attacks up to
+    // 1 hex away from the weapon", Range 1.
+    expect(antiAirCover(GUNNER)).toBe(1);
+    expect(antiAirCover(SAM)).toBe(1);
+    expect(AIR_COVER_MAX).toBe(1);
+    // a hull covers nothing: its Anti-Air Strength is its own close-range
+    // defence, which is a different sentence of the same page
+    expect(antiAirCover(HULL)).toBeLessThan(0);
+
+    /** strike (8,11); `gunAt` says where the weapon stands, or none, and
+     *  `covers` what the scan is expected to answer with. */
+    function strike(gunAt: [number, number] | null, covers: boolean) {
+      const { state, pad } = airState();
+      setWar(state, 0, 1, true);
+      const fighter = spawnUnit(state, FIGHTER, pad.index, 0)!;
+      const land = tileAtCoords(state.map, 8, 11);
+      spawnUnit(state, 'WARRIOR', land.index, 1);
+      let gun: Unit | undefined;
+      if (gunAt) {
+        const at = tileAtCoords(state.map, gunAt[0], gunAt[1]);
+        gun = spawnUnit(state, GUNNER, at.index, 1)!;
+        gun.tileIndex = at.index;
+      }
+      expect(airCoverAgainst(state, fighter, land.index)).toBe(covers ? gun : undefined);
+      expect(airStrike(state, fighter.id, land.index, 0).ok).toBe(true);
+      return 100 - fighter.hp;
+    }
+    expect(strike(null, false)).toBe(0);
+    expect(strike([8, 11], true)).toBeGreaterThan(0);   // the struck hex itself
+    expect(strike([8, 12], true)).toBeGreaterThan(0);   // one hex away
+    expect(strike([8, 14], false)).toBe(0);             // out of cover
+
+    // the STRONGEST weapon in reach is the one that answers
+    const { state, pad } = airState();
+    setWar(state, 0, 1, true);
+    const fighter = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const land = tileAtCoords(state.map, 8, 11);
+    spawnUnit(state, 'WARRIOR', land.index, 1);
+    const weak = spawnUnit(state, GUNNER, land.index, 1)!;
+    const strong = spawnUnit(state, SAM, tileAtCoords(state.map, 8, 12).index, 1)!;
+    strong.tileIndex = tileAtCoords(state.map, 8, 12).index;
+    expect(UNITS[SAM].antiAir!).toBeGreaterThan(UNITS[GUNNER].antiAir!);
+    expect(airCoverAgainst(state, fighter, land.index)).toBe(strong);
+    expect(weak).toBeTruthy();
   });
 
   it('the one exception the source names: an anti-air SHIP answers', () => {

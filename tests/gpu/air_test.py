@@ -242,14 +242,52 @@ def main() -> None:
     order(sim, row, fs, sim._A_AIR_STRIKE + k)
     assert int(sim.major_unit_hp[0, es]) < hp0, (
         f"DISPATCH DEAD: the strike left the target at {int(sim.major_unit_hp[0, es])} hp")
-    # CIV6: a plane "doesn't suffer damage in return unless it gets
-    # Intercepted", and interception is a verb neither engine has — a LAND
-    # gunner's Anti-Air Strength defends the tile and nothing more.
-    assert int(sim.major_unit_hp[0, fs]) == ahp0, (
-        "CIV6: only a SHIP with Anti-Air Strength answers a direct strike")
+    # CIV6 (Anti-Air Gun): "Provides cover from air attacks up to 1 hex away
+    # from the weapon" — the hex it stands on is inside that.
+    assert int(sim.major_unit_hp[0, fs]) < ahp0, (
+        "the parked weapon did not answer over its own hex")
     assert float(sim.major_unit_mp[0, fs]) == 0.0, "and the sortie is the turn"
     print(f"  4 AIR_STRIKE OK ({hp0} -> {int(sim.major_unit_hp[0, es])} hp, "
-          "and the land gunner does not answer)")
+          f"the weapon answers for {ahp0 - int(sim.major_unit_hp[0, fs])})")
+
+    # -- 4c: how far that cover reaches --------------------------------------
+    def cover_at(gun_dist):
+        """a strike at `mark` with the weapon `gun_dist` hexes off it; None
+        parks no weapon at all. Returns the damage the aircraft took."""
+        s = fresh(rules, path)
+        jj = a_city(s, row)
+        ae = aerodrome(s, row, jj)
+        s.war[0, row, foe] = True
+        s.war[0, foe, row] = True
+        f2, _ = retype(s, row, FIGHTER, ae)
+        ring2 = [tt for tt in range(s.T)
+                 if 0 < int(s.pair_dist[ae, tt]) <= int(s._type_ranged_range[FIGHTER])
+                 and int(s.district[0, tt]) < 0 and bool(s.passable[0, tt])
+                 and not bool(s.water[0, tt])]
+        m2 = ring2[0]
+        soft = a_type(s, lambda i: float(s._type_combat[i]) > 0 and int(s._type_anti_air[i]) == 0
+                      and not bool(s.unit_naval[i]) and int(s._type_air[i]) == 0)
+        e2 = spawn(s, foe, soft, m2)
+        s.unit_tile[0, e2] = m2
+        s.military_at[0, m2] = e2 + s.POOL_LO["major"]
+        if gun_dist is not None:
+            at = next(tt for tt in range(s.T) if int(s.pair_dist[m2, tt]) == gun_dist
+                      and int(s.civilian_at[0, tt]) < 0)
+            gn = spawn(s, foe, gunner, at)
+            s.unit_tile[0, gn] = at
+            s.civilian_at[0, at] = gn + s.POOL_LO["major"]
+        s._gen_ver += 1
+        c2 = s._air_strike_targets(row, torch.tensor([[f2]]), torch.tensor([[ae]]),
+                                   torch.tensor([[FIGHTER]]))[0, 0].tolist()
+        assert m2 in c2, "the soft target left the strike head"
+        before = int(s.major_unit_hp[0, f2])
+        order(s, row, f2, s._A_AIR_STRIKE + c2.index(m2))
+        return before - int(s.major_unit_hp[0, f2])
+
+    assert cover_at(None) == 0, "nothing answers a strike no weapon covers"
+    assert cover_at(1) > 0, "CIV6: cover reaches 'up to 1 hex away from the weapon'"
+    assert cover_at(3) == 0, "and no further"
+    print("  4c cover OK (none 0, one hex answers, three hexes silent)")
 
     # -- 4b: the one exception the source names — an anti-air SHIP ----------
     sim = fresh(rules, path)

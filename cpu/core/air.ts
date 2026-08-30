@@ -11,9 +11,9 @@
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
-import { hexDistance } from '../../world/hex';
+import { hexDistance, tilesWithin } from '../../world/hex';
 import { citiesOf, seatOf, tileSeat } from './seats';
-import { cityAtIndex, unitsAt, unitsHostile, unitVisibleTo } from './units';
+import { cityAtIndex, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
@@ -252,6 +252,56 @@ export function rebaseTargets(state: GameState, unit: Unit, width: number): numb
 
 export function antiAirOf(type: string): number {
   return UNITS[type]?.antiAir ?? 0;
+}
+
+/** CIV6 (Anti-Air Gun, Mobile SAM): "Provides cover from air attacks up to 1
+ *  hex away from the weapon." -1 for a chassis that covers nothing, so a hull
+ *  is admitted by the naval clause below and by nothing else. */
+export function antiAirCover(type: string): number {
+  return UNITS[type]?.antiAirRange ?? -1;
+}
+
+/** how far the widest weapon in the catalog reaches, so the scan below asks
+ *  the data rather than a constant. */
+export const AIR_COVER_MAX = Object.values(UNITS)
+  .reduce((m, u) => Math.max(m, u.antiAirRange ?? 0), 0);
+
+/** the STACK order a tile answers in, and the tie-break both engines share. */
+const COVER_SLOTS = ['military', 'civilian', 'embarked'] as const;
+
+/**
+ * The anti-air weapon that answers a strike at `tileIndex`, or none.
+ *
+ * Two CIV6 sentences meet here. A parked weapon "provides cover from air
+ * attacks up to 1 hex away"; and separately, "the only exceptions to this rule
+ * are SHIPS with the Anti-Air Strength stat - they have additional close-range
+ * defenses, which activate when they are attacked by an aircraft", which is a
+ * hull answering for its own hex alone. The strongest answer fires, ties going
+ * to the lowest tile index and then to the tile's own occupancy order.
+ */
+export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: number): Unit | undefined {
+  const at = state.map.tiles[tileIndex];
+  if (!at) return undefined;
+  let best: Unit | undefined;
+  let bestKey = [0, 0, 0];
+  for (const t of tilesWithin(state.map, at.col, at.row, AIR_COVER_MAX)) {
+    const d = hexDistance(at.col, at.row, t.col, t.row);
+    for (const u of unitsAt(state, t.index)) {
+      const aa = antiAirOf(u.type);
+      if (aa <= 0 || !unitsHostile(state, striker, u)) continue;
+      if (d > antiAirCover(u.type) && !(d === 0 && UNITS[u.type]?.naval)) continue;
+      const slot = COVER_SLOTS.indexOf(unitStackSlot(u) as (typeof COVER_SLOTS)[number]);
+      if (slot < 0) continue;
+      const key = [aa, -t.index, -slot];
+      if (!best || key[0] > bestKey[0]
+        || (key[0] === bestKey[0] && (key[1] > bestKey[1]
+          || (key[1] === bestKey[1] && key[2] > bestKey[2])))) {
+        best = u;
+        bestKey = key;
+      }
+    }
+  }
+  return best;
 }
 
 export function airDefenseOf(type: string): number {

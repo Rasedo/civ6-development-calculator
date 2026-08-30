@@ -52,6 +52,11 @@ export interface UnitDef {
   upgradesTo?: string;
   /** the ANTI-AIR strength — the stat an air strike is answered with. */
   antiAir?: number;
+  /** how far a parked anti-air WEAPON answers over. CIV6 (Anti-Air Gun):
+   *  "Provides cover from air attacks up to 1 hex away from the weapon",
+   *  Range 1. A hull carries no such range: its Anti-Air Strength is its own
+   *  close-range defence and covers nothing but the hex it floats on. */
+  antiAirRange?: number;
   /** the GIANT DEATH ROBOT: its own class in every rule that names one. */
   gdr?: boolean;
   /**
@@ -931,6 +936,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 0,
       antiAir: 90,
+      antiAirRange: 1,
       requiresTech: 'ADVANCED_BALLISTICS',
       upgradesTo: 'MOBILE_SAM',
       description: 'Atomic support chassis that answers air strikes.',
@@ -1052,6 +1058,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 0,
       antiAir: 100,
+      antiAirRange: 1,
       requiresTech: 'GUIDANCE_SYSTEMS',
       description: 'Information support chassis that answers air strikes.',
     }),

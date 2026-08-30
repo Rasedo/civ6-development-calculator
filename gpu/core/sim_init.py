@@ -2244,6 +2244,15 @@ class SimInit:
         self._type_stealth = torch.tensor([bool(u.get("stealth", 0)) for u in ru], dtype=torch.bool, device=device)
         # CIV6: the NAVAL RAIDER class — "Can perform Coastal Raids."
         self._type_raider = torch.tensor([bool(u.get("raider", 0)) for u in ru], dtype=torch.bool, device=device)
+        # CIV6 (Anti-Air Gun, Mobile SAM): "Provides cover from air attacks up
+        # to 1 hex away from the weapon"; -1 covers nothing. `_air_cover_scan`
+        # walks the target hex and its own ring, so a wider weapon would need a
+        # wider walk — the assert is the tripwire for that.
+        self._type_anti_air_range = torch.tensor(
+            [int(u.get("antiAirRange", -1)) for u in ru], dtype=torch.long, device=device)
+        self._air_cover_max = int(self._type_anti_air_range.max().item()) if len(ru) else -1
+        assert self._air_cover_max <= 1, (
+            f"a chassis covers {self._air_cover_max} hexes; _air_cover_scan walks one ring")
         self._type_reveal = torch.tensor([bool(u.get("revealStealth", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_zoc_ignore = torch.tensor([bool(u.get("ignoresZoc", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_zoc_none = torch.tensor([bool(u.get("exertsNoZoc", 0)) for u in ru], dtype=torch.bool, device=device)
