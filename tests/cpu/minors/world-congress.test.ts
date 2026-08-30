@@ -19,7 +19,7 @@ import { UNITS } from '../../../cpu/data/units';
 import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
-import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
+import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL } from '../../../cpu/data/seats';
 import { congressPactBanned, congressPactLevels, targetSpaceSize } from '../../../cpu/core/congress';
 import { competitionOf } from '../../../cpu/core/competition';
 import { CONGRESS_COMPETITION, COMPETITION_CLIMATE, COMPETITION_TURNS } from '../../../cpu/data/seats';
@@ -621,5 +621,51 @@ describe('the three unwritten resolutions', () => {
     // the HIGHER target index wins the tie, which the lower-index rule alone
     // could never produce
     expect(state.congress!.map((a) => a.target)).toEqual([1, 1]);
+  });
+});
+
+// CIV6 (Arms Control): "A: All players have their weapons of Mass Destruction
+// set equal to the target player. / B: The target player loses all of their
+// Weapons of Mass Destruction." Era 6, so no gate seed ever draws it.
+describe('arms control', () => {
+  function session(wmd: readonly (readonly number[])[], vote: readonly [number, number]) {
+    const state = newGame(2);
+    medieval(state);
+    for (let s = 1; s < 3; s++) settleFirstCity(state, s);
+    state.turn = CONGRESS_INTERVAL;
+    state.congressSlate = [CONGRESS_ARMS_CONTROL, CONGRESS_HERITAGE];
+    state.seats.forEach((sx, c) => { sx.wmd = [...wmd[c]]; });
+    for (const sx of state.seats) sx.congressVote = [[vote[0], vote[1], 0], [0, 0, 0]];
+    worldCongress(state);
+    expect(state.congress![0]).toEqual({ res: CONGRESS_ARMS_CONTROL, outcome: vote[0], target: vote[1] });
+    return state.seats.map((sx) => [...(sx.wmd ?? [])]);
+  }
+
+  it('A sets every arsenal equal to the named seat, per device row', () => {
+    expect(session([[3, 1], [0, 0], [5, 2]], [0, 1])).toEqual([[0, 0], [0, 0], [0, 0]]);
+    // ...and it LEVELS UP as readily as down — the clause names no direction
+    expect(session([[3, 1], [0, 0], [5, 2]], [0, 2])).toEqual([[5, 2], [5, 2], [5, 2]]);
+  });
+
+  it('B empties the named seat alone', () => {
+    expect(session([[3, 1], [0, 0], [5, 2]], [1, 2])).toEqual([[3, 1], [0, 0], [0, 0]]);
+    expect(session([[3, 1], [0, 0], [5, 2]], [1, 0])).toEqual([[0, 0], [0, 0], [5, 2]]);
+  });
+
+  it('the AI line strips the nearest rival when it leads, and disarms the world when it does not', () => {
+    const state = newGame(2);
+    const ctx = { government: 0, policies: [], envoysByType: [] };
+    state.seats[0].wmd = [3, 0];
+    state.seats[1].wmd = [0, 0];
+    state.seats[2].wmd = [1, 0];
+    // the leader can only lose by levelling, so it empties the runner-up
+    expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 0, ctx)).toEqual({ outcome: 1, target: 2 });
+    // everyone else names the emptiest seat and takes the whole world down to it
+    expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 1, ctx)).toEqual({ outcome: 0, target: 1 });
+    expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 2, ctx)).toEqual({ outcome: 0, target: 1 });
+    // with nobody armed the ballot is a no-op either way, and stays total
+    for (const sx of state.seats) sx.wmd = [0, 0];
+    expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 0, ctx)).toEqual({ outcome: 1, target: 1 });
+    expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 1, ctx)).toEqual({ outcome: 1, target: 0 });
   });
 });

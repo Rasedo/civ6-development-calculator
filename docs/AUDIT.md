@@ -45,7 +45,7 @@ from the list below.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 1 | two resolutions have no carrier; the scored-competition catalog holds one row |
+| B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
@@ -181,13 +181,25 @@ Civ 6 source or is recorded as unverifiable.
   free vote's line — the highest polluter refuses what it cannot score in
   — is this model's own self-interest heuristic, like every other AI line
   in the catalog. OPEN:
-  - **TWO resolutions have no carrier**: Arms Control (weapons of mass
-    destruction, C-31); and
-    Luxury Policy — SOURCED: "A: Duplicates of this Luxury resource grant
-    additional Amenities. / B: This Luxury resource grants no Amenities."
-    B is fully specified, A publishes no number, and nothing here counts
-    DUPLICATE copies of a luxury. A resolution whose two outcomes cannot
-    both act eats a rotation slot and passes a no-op, so it waits whole.
+  - **ONE resolution has no carrier**: Luxury Policy — SOURCED: "A:
+    Duplicates of this Luxury resource grant additional Amenities. / B:
+    This Luxury resource grants no Amenities." B is fully specified, A
+    publishes no number, and nothing here counts DUPLICATE copies of a
+    luxury. A resolution whose two outcomes cannot both act eats a
+    rotation slot and passes a no-op, so it waits whole.
+    (ARMS CONTROL now acts — SOURCED: "A: All players have their weapons
+    of Mass Destruction set equal to the target player. / B: The target
+    player loses all of their Weapons of Mass Destruction." An inventory
+    is state rather than a standing modifier, so `armsControl` /
+    `_arms_control` enforce the winning outcome at the session, per device
+    row. Its free vote is this model's own self-interest line, like every
+    other in the catalog: a seat holding the largest arsenal can only lose
+    by levelling, so it empties its nearest rival, and everyone else names
+    the emptiest seat and takes the world down to it. It was also the ONE
+    resolution with no AI arm on either engine, so the two fell through to
+    defaults that disagreed — TS picked a seat off the great-works counts
+    where the GPU named the voter itself. Era 6 makes that unreachable in
+    the gate, so it went unseen.)
   - **THE ESPIONAGE PACT'S ERA WINDOW IS THIS MODEL'S OWN.** The row
     itself now ships — "A: All Spies function +2 levels higher for the
     Target Operation. / B: Target Operation is unavailable", carried by

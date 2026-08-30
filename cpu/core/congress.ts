@@ -19,6 +19,7 @@ import { PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
 import { isCiv, seatOf, tileSeat, unitsOf } from './seats';
+import { NUCLEAR_DEVICES } from '../data/nuclear';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
@@ -31,7 +32,7 @@ import {
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
-  CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS,
+  CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
   CONGRESS_COMPETITION, COMPETITIONS,
@@ -72,6 +73,31 @@ export const CONGRESS_DV_SLOT = 2;
 
 /** Argmax with ties to the LOWER index — the shared tie rule of every
  * congress scan on both engines. */
+/** every device a seat holds, across the catalog — what Arms Control compares
+ *  when it names a target. */
+function wmdTotal(sx: Seat): number {
+  let n = 0;
+  for (let k = 0; k < NUCLEAR_DEVICES.length; k++) n += sx.wmd?.[k] ?? 0;
+  return n;
+}
+
+/**
+ * CIV6 (Arms Control): "A: All players have their weapons of Mass Destruction
+ * set equal to the target player. / B: The target player loses all of their
+ * Weapons of Mass Destruction." An inventory is state rather than a standing
+ * modifier, so the Congress enforces the winning outcome on the spot — per
+ * device row, since a seat holds each kind separately.
+ */
+function armsControl(state: GameState, outcome: number, target: number): void {
+  const t = seatOf(state, target);
+  if (!t) return;
+  const level = NUCLEAR_DEVICES.map((_d, k) => t.wmd?.[k] ?? 0);
+  for (const s of state.seats) {
+    if (outcome === 0) s.wmd = [...level];
+    else if (s.seat === target) s.wmd = NUCLEAR_DEVICES.map(() => 0);
+  }
+}
+
 function argmaxLow(counts: readonly number[]): number {
   let best = -Infinity, at = 0;
   for (let i = 0; i < counts.length; i++) if (counts[i] > best) { best = counts[i]; at = i; }
@@ -132,6 +158,19 @@ export function preference(state: GameState, res: number, seat: number,
       // A DOUBLES the target's grievance flow — the self-serving ballot is B
       // on yourself, halving your own.
       return { outcome: 1, target: seat };
+    case CONGRESS_ARMS_CONTROL: {
+      // A LEVELS every arsenal to the named seat's, B empties the named
+      // seat's alone. A seat that already holds the most can only lose by
+      // levelling, so it strips its nearest rival; anyone else names the
+      // emptiest seat and disarms the world down to it.
+      const totals = state.seats.map(wmdTotal);
+      let top = -1, rival = seat;
+      for (let c = 0; c < totals.length; c++) {
+        if (c !== seat && totals[c] > top) { top = totals[c]; rival = c; }
+      }
+      if ((totals[seat] ?? 0) >= top) return { outcome: 1, target: rival };
+      return { outcome: 0, target: argmaxLow(totals.map((n) => -n)) };
+    }
     case CONGRESS_MILITARY_ADVISORY: {
       // A pays +5 Combat Strength to ONE promotion class — a seat names the
       // class it fields the most units of; with none it names the first row.
@@ -332,6 +371,9 @@ function runResolution(state: GameState, res: number, slot: number,
   if (res === CONGRESS_COMPETITION && win.outcome === 0) {
     startCompetition(state, win.target, votes.filter((v) => v.outcome === 0).map((v) => v.seat));
   }
+  // CIV6 (Arms Control): an inventory is state rather than a standing
+  // modifier, so this one is enforced at the session too.
+  if (res === CONGRESS_ARMS_CONTROL) armsControl(state, win.outcome, win.target);
   if (res === CONGRESS_GOVERNANCE && win.outcome === 1) {
     for (const sx of state.seats) {
       const g = (sx.governors ?? [])[win.target];

@@ -562,6 +562,56 @@ def main() -> None:
     assert int(simC.civ_diplo_favor[0, 2]) == int(defn["bronze"]), "the tied runner-up missed bronze"
     print("  the competition runs its 30 turns, scores the CO2 gap and pays all three tiers")
 
+    # --- ARMS CONTROL: the Congress reaches into the arsenal ----------------
+    # CIV6 (Arms Control): "A: All players have their weapons of Mass
+    # Destruction set equal to the target player. / B: The target player loses
+    # all of their Weapons of Mass Destruction." Era 6, so no gate seed draws
+    # it; the TS twin is tests/cpu/minors/world-congress.test.ts.
+    ai = simC._congress_at["ARMS_CONTROL"]
+    ND = simC._n_devices
+    assert ND > 0, "no device catalog — every check below would be vacuous"
+    START = [[r * ND + k for k in range(ND)] for r in range(nrow)]
+
+    def arms(outcome: int, target: int):
+        s = build()
+        s._congress_dv_min = 99
+        s.congress_slate[:, 0] = ai
+        s.congress_slate[:, 1] = -1
+        s.turn = iv
+        for r in range(nrow):
+            s.civ_diplo_favor[:, r] = 0
+            s.civ_congress_vote[0, r, 0] = torch.tensor([outcome, target, 0])
+            for k in range(ND):
+                s.civ_wmd[0, r, k] = START[r][k]
+        s._world_congress()
+        got = [int(s.congress_active[0, 0, f]) for f in range(3)]
+        assert got == [ai, outcome, target], f"the ballot did not carry: {got}"
+        return [[int(s.civ_wmd[0, r, k]) for k in range(ND)] for r in range(nrow)]
+
+    for tgt in range(min(3, nrow)):
+        assert arms(0, tgt) == [START[tgt] for _ in range(nrow)], (
+            f"A must level every arsenal to seat {tgt}'s, per device row")
+        assert arms(1, tgt) == [[0] * ND if r == tgt else START[r] for r in range(nrow)], (
+            f"B must empty seat {tgt}'s alone")
+    print(f"  ARMS_CONTROL OK — A levels all {nrow} arsenals, B empties the named seat")
+
+    # the free vote: the leader can only lose by levelling, so it strips the
+    # runner-up; anyone else names the emptiest seat and disarms the world
+    sA = build()
+    sA.civ_wmd[0] = 0
+    sA.civ_wmd[0, 0, 0] = 3
+    sA.civ_wmd[0, 2, 0] = 1
+    for row, want in ((0, (1, 2)), (1, (0, 1)), (2, (0, 1))):
+        o, tg = sA._congress_pref(ai, row)
+        assert (int(o[0]), int(tg[0])) == want, (
+            f"row {row} voted {(int(o[0]), int(tg[0]))}, wanted {want}")
+    sA.civ_wmd[0] = 0
+    for row, want in ((0, (1, 1)), (1, (1, 0))):
+        o, tg = sA._congress_pref(ai, row)
+        assert (int(o[0]), int(tg[0])) == want, (
+            f"with nobody armed, row {row} voted {(int(o[0]), int(tg[0]))}")
+    print("  the free vote strips the runner-up when it leads, and levels down when it does not")
+
     # --- EVERY resolution's free vote lands inside its OWN target space ------
     # A kind with no arm falls through to a default that sizes and picks off a
     # different catalog, and the reader then indexes past its own rows.
@@ -579,7 +629,8 @@ def main() -> None:
 
     print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
           "the wider slate, the route ban, the culture bomb, the feature target, "
-          "the three late resolutions, the favor tie-break and the scored competition")
+          "the three late resolutions, the favor tie-break, the scored competition "
+          "and Arms Control")
 
 
 if __name__ == "__main__":

@@ -3767,6 +3767,18 @@ class SimSeats:
             # The target is which competition to run.
             top = self.civ_co2[:, : self.n_majors].max(dim=1).values
             return (self.civ_co2[:, row] >= top).long(), a
+        if name == "ARMS_CONTROL":
+            # A LEVELS every arsenal to the named seat's, B empties the named
+            # seat's alone. A seat that already holds the most can only lose by
+            # levelling, so it strips its nearest rival; anyone else names the
+            # emptiest seat and disarms the world down to it.
+            tot = self.civ_wmd.sum(dim=2).double()
+            other = tot.clone()
+            other[:, row] = -1.0
+            rival = self._argmax_low(other)
+            hold = tot[:, row] >= other.max(dim=1).values
+            return (torch.where(hold, a + 1, a),
+                    torch.where(hold, rival, self._argmax_low(-tot)))
         if name == "ESPIONAGE_PACT":
             # A lifts every Spy on ONE operation and B bans it outright — a
             # seat takes the gift, and names the operation its own spies are
@@ -3894,6 +3906,10 @@ class SimSeats:
         # CIV6 (Governance Doctrine, B): "All active Governors of this type are
         # neutralized for 6 Turns." The clock starts AT the session, so this is
         # the one resolution outcome that fires once instead of standing.
+        # CIV6 (Arms Control): an inventory is state rather than a standing
+        # modifier, so this one is enforced at the session too.
+        if self._congress_res[r]["id"] == "ARMS_CONTROL":
+            self._arms_control(voted, win_out, win_t)
         if self._congress_res[r]["id"] == "GOVERNANCE_DOCTRINE" and self.n_governors:
             fire = voted & (win_out == 1)
             for b in fire.nonzero(as_tuple=True)[0].tolist():
@@ -3901,6 +3917,24 @@ class SimSeats:
                 for nrow in range(self.n_majors):
                     if bool(self.civ_gov_appointed[b, nrow, g]):
                         self.neutralize_governor(b, nrow, g, self._gov_neutralize)
+
+    def _arms_control(self, fire: torch.Tensor, out: torch.Tensor,
+                      tgt: torch.Tensor) -> None:
+        """`armsControl`'s twin. CIV6 (Arms Control): "A: All players have their
+        weapons of Mass Destruction set equal to the target player. / B: The
+        target player loses all of their Weapons of Mass Destruction." Per
+        device row, since a seat holds each kind separately."""
+        if self._n_devices == 0 or not bool(fire.any()):
+            return
+        t = tgt.clamp(min=0, max=self.n_majors - 1)
+        held = self.civ_wmd.gather(
+            1, t.reshape(-1, 1, 1).expand(-1, 1, self._n_devices))[:, 0]
+        level = (fire & (out == 0)).unsqueeze(1)
+        for r in range(self.n_majors):
+            strip = (fire & (out == 1) & (t == r)).unsqueeze(1)
+            self.civ_wmd[:, r] = torch.where(
+                level, held, torch.where(strip, torch.zeros_like(held),
+                                         self.civ_wmd[:, r]))
 
     def _start_competition(self, fire: torch.Tensor, kind: torch.Tensor,
                            field: torch.Tensor) -> None:
