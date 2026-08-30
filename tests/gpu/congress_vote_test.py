@@ -303,6 +303,33 @@ def main() -> None:
     assert int(sim2.city_dist_tile[0, other, ocol, 0]) == -1, "the registry kept the plot"
     assert int(sim2.city_current[0, other, ocol]) == -1, "the item stayed in production"
     assert float(sim2.city_prod_bank[0, other, ocol]) == 40.0, "the hammers burned"
+    # ...and the build is named by its SITE, not by what the tile's own plane
+    # says is going up: a re-queue moves the two independently, so a plane that
+    # names district X while the city is producing district Y must still go.
+    dead = [c for c in range(sim2.RC) if not bool(sim2.city_alive[0, other, c])]
+    assert dead, "every column of this seat is a live city — the guard is untestable"
+    dcol, other_d = dead[-1], 7 % sim2.city_dist_tile.shape[3]
+    sim2.district[0, paved] = other_d
+    sim2.district_complete[0, paved] = False
+    sim2.tile_seat[0, paved] = other
+    sim2.tile_city[0, paved] = int(sim2.city_id[0, other, ocol])
+    sim2.city_qtile[0, other, ocol] = paved
+    sim2.city_dist_tile[0, other, ocol, other_d] = paved
+    sim2.city_current[0, other, ocol] = sim2.DISTRICT_BASE + (other_d + 1) % sim2.city_dist_tile.shape[3]
+    sim2.city_progress[0, other, ocol] = 55
+    sim2.city_prod_bank[0, other, ocol] = 0
+    # a DEAD column shares the id plane's zero fill, and must never be written
+    sim2.city_qtile[0, other, dcol] = paved
+    sim2._culture_bomb(row, rows, torch.tensor([spot], dtype=torch.long),
+                       torch.zeros(1, dtype=torch.long))
+    assert int(sim2.city_current[0, other, ocol]) == -1, (
+        "the item survived because the tile's plane named a different district"
+    )
+    assert float(sim2.city_prod_bank[0, other, ocol]) == 55.0, "the hammers burned"
+    assert int(sim2.city_dist_tile[0, other, ocol, other_d]) == -1, "the registry kept the plot"
+    assert int(sim2.city_qtile[0, other, dcol]) == paved, (
+        "a DEAD city column was written — the id plane's zero fill matched it"
+    )
     print("  the bomb claims a foreign plot, spares a finished district and wipes an unfinished one")
 
     # --- 9. the Deforestation Treaty, which addresses a FEATURE ------------

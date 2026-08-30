@@ -5691,43 +5691,49 @@ class SimSeats:
             return
         rr, tt = rows[live], tiles[live]
         oseat, ocity = self.tile_seat[rr, tt], self.tile_city[rr, tt]
-        di, wi = self.district[rr, tt], self.built_wonder[rr, tt]
+        dg = (self.district[rr, tt] >= 0) & ~self.district_complete[rr, tt]
+        rz = (self.built_wonder[rr, tt] >= 0) & ~self.built_wonder_complete[rr, tt]
+        nD, nW = self.city_dist_tile.shape[3], self.city_wonder.shape[3]
         for orow in range(self.n_majors):
             for col in range(self.RC):
-                hit = (oseat == orow) & (ocity >= 0) & (self.city_id[rr, orow, col] == ocity)
+                hit = (self.city_alive[rr, orow, col] & (oseat == orow) & (ocity >= 0)
+                       & (self.city_id[rr, orow, col] == ocity))
                 if not bool(hit.any()):
                     continue
                 h = hit.nonzero(as_tuple=True)[0]
-                hr, ht, hd, hw = rr[h], tt[h], di[h], wi[h]
+                hr, ht, hdg, hrz = rr[h], tt[h], dg[h], rz[h]
                 cur = self.city_current[hr, orow, col]
-                dig = (hd >= 0) & (self.city_qtile[hr, orow, col] == ht)
-                creg = self.city_wonder[hr, orow, col]
-                at_w = creg.gather(1, hw.clamp(min=0).unsqueeze(1)).squeeze(1)
-                rai = (hw >= 0) & (at_w == ht)
-                # THE PRODUCTION SLOT, only where it is this very build: the
-                # registries below outlive the item that filled them.
-                gone = ((dig & (cur == self.DISTRICT_BASE + hd))
-                        | (rai & (cur == self.WONDER_BASE + hw)))
+                dreg = self.city_dist_tile[hr, orow, col]        # [m, nD]
+                wreg = self.city_wonder[hr, orow, col]           # [m, nW]
+                # A BUILD IS NAMED BY ITS SITE, never by what the tile's own
+                # plane says is going up there: a re-queue moves the plane and
+                # the item independently, and the `wipeConstruction` twin
+                # matches the queue item on its OWN tile and nothing else.
+                site = (self.city_qtile[hr, orow, col] == ht) & hdg
+                is_d = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + nD)
+                wc = (cur - self.WONDER_BASE).clamp(min=0, max=max(nW - 1, 0))
+                at_w = (wreg == ht.unsqueeze(1)).gather(1, wc.unsqueeze(1)).squeeze(1)
+                rai = hrz & at_w & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nW)
+                gone = (site & is_d) | rai
                 if bool(gone.any()):
                     g = hr[gone]
                     self.city_prod_bank[g, orow, col] += self.city_progress[g, orow, col]
                     self.city_progress[g, orow, col] = 0
                     self.city_cost[g, orow, col] = 0
                     self.city_current[g, orow, col] = -1
-                if bool(dig.any()):
-                    d = dig.nonzero(as_tuple=True)[0]
-                    self.city_qtile[hr[d], orow, col] = -1
-                    named = self.city_dist_tile[hr[d], orow, col, hd[d]] == ht[d]
-                    if bool(named.any()):
-                        n = d[named]
-                        self.city_dist_tile[hr[n], orow, col, hd[n]] = -1
-                if bool(rai.any()):
-                    r2 = rai.nonzero(as_tuple=True)[0]
-                    self.city_wonder[hr[r2], orow, col, hw[r2]] = -1
-        self.district[rr, tt] = torch.where(self.district_complete[rr, tt],
-                                            self.district[rr, tt], torch.full_like(di, -1))
-        self.built_wonder[rr, tt] = torch.where(self.built_wonder_complete[rr, tt],
-                                                self.built_wonder[rr, tt], torch.full_like(wi, -1))
+                if bool(site.any()):
+                    self.city_qtile[hr[site], orow, col] = -1
+                # ...and the city's registries drop EVERY entry naming the
+                # plot, the `city.districts` / `city.wonders` filters' twin.
+                drop_d = (dreg == ht.unsqueeze(1)) & hdg.unsqueeze(1)
+                self.city_dist_tile[hr, orow, col] = torch.where(
+                    drop_d, torch.full_like(dreg, -1), dreg)
+                drop_w = (wreg == ht.unsqueeze(1)) & hrz.unsqueeze(1)
+                self.city_wonder[hr, orow, col] = torch.where(
+                    drop_w, torch.full_like(wreg, -1), wreg)
+        was_d, was_w = self.district[rr, tt], self.built_wonder[rr, tt]
+        self.district[rr, tt] = torch.where(dg, torch.full_like(was_d, -1), was_d)
+        self.built_wonder[rr, tt] = torch.where(rz, torch.full_like(was_w, -1), was_w)
         self._claim_version += 1
         self._eff_version += 1
 
