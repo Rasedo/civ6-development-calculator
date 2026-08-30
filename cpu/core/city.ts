@@ -4,7 +4,7 @@ import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
-import { tileAppeal, appealTier, appealBand, gpAppealResolver, PRESERVE_APPEAL_HOUSING } from './appeal';
+import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
@@ -17,7 +17,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { governorMult, minorGovernorEffects } from './governors';
+import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -302,7 +302,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
 
   const pillaged = pillagedDistrictTypes(map, city.districts);
   const camps = campTiles(state);
-  const gpa = gpAppealResolver(state);
+  const gpa = cityAppealResolver(state);
   let total = water;
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
@@ -388,7 +388,8 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   const baseHave = new Map<number, number>();
   for (const c of cities) {
-    baseHave.set(c.id, localAmenities(state, c) + parkAmenities(state, c) + regionalEffects(state, c).amenities);
+    baseHave.set(c.id, localAmenities(state, c) + parkAmenities(state, c)
+      + regionalEffects(state, c, governorFlag(state, c, (e) => e.industryAllSources)).amenities);
   }
 
   // CIV6 (John Spilsbury, Helena Rubinstein, Levi Strauss, Estee Lauder): an
@@ -595,7 +596,7 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
 function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   const camps = campTiles(state);
-  const gpa = gpAppealResolver(state);
+  const gpa = cityAppealResolver(state);
   for (const tile of state.map.tiles) {
     if (tile.improvement !== 'SEASIDE_RESORT' || tile.pillaged || !owns(tile)) continue;
     t += Math.max(0, tileAppeal(state.map, tile, camps, gpa));
@@ -652,7 +653,7 @@ function hexDistance2(state: GameState, a: number, b: number): number {
 function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   const camps = campTiles(state);
-  const gpa = gpAppealResolver(state);
+  const gpa = cityAppealResolver(state);
   for (const tile of state.map.tiles) {
     if ((tile.park ?? -1) < 0 || !owns(tile)) continue;
     t += tileAppeal(state.map, tile, camps, gpa);
@@ -825,7 +826,8 @@ export function computeCityStats(
     if (y) addYields(districts, y, n);
   }
   const buildings = cityBuildingYields(ctx, city, city.powered ?? false);
-  const regional = regionalEffects(state, city);
+  const regional = regionalEffects(
+    state, city, governorFlag(state, city, (e) => e.industryAllSources));
   addYields(buildings, regional.yields);
   for (const w of wonders) {
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
@@ -893,6 +895,16 @@ export function computeCityStats(
   }
   if (m.faithPerSpecialty) {
     bonuses.faith += m.faithPerSpecialty * completedDistrictCount(state, city, true);
+  }
+  // CIV6 (Forestry Management): "This city receives +2 Gold for each
+  // unimproved feature" — the tiles this city OWNS that still carry one.
+  const perFeature = governorSum(state, city, (e) => e.goldPerFeature);
+  if (perFeature) {
+    let n = 0;
+    for (const t of map.tiles) {
+      if (tileBelongsTo(t, city) && t.feature && !t.improvement) n += 1;
+    }
+    bonuses.gold += perFeature * n;
   }
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')

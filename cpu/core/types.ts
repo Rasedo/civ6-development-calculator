@@ -449,6 +449,9 @@ export interface Unit {
   /** the ONCE-ONLY promotions this unit has already collected, by the same
    *  column bit `promos` uses. */
   promoUsed?: number;
+  /** extra promotions the TRAINING city banked on this unit (Patron Saint),
+   *  each spent by re-arming it the moment it takes one. */
+  promoBonus?: number;
   /** a GREAT PERSON unit's QUEUE POSITION in its class's roster — which
    *  person this chassis is carrying, and so which ability its charge spends.
    *  Undefined on every other unit. */

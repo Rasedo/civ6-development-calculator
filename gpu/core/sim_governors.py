@@ -392,6 +392,56 @@ class SimGovernors:
         per = self._governor_flag(row, channel)
         return (slot >= 0) & per.gather(1, slot.clamp(min=0))
 
+    def _unimproved_feature(self) -> torch.Tensor:
+        """[B, T] bool — a tile still carrying a FEATURE and no improvement,
+        which is what Forestry Management counts and stands beside."""
+        return (self.feat_id >= 0) & ~self.feat_stripped & (self.improvement < 0)
+
+    def _gov_appeal_plane(self) -> torch.Tensor:
+        """[B, T] long — CIV6 (Forestry Management): "Tiles adjacent to
+        unimproved features receive +1 Appeal in this city." Summed over the
+        majors, a tile belonging to at most one of them."""
+        out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        if not self.n_governors:
+            return out
+        nb = self.neigh
+        beside = None
+        for r in range(self.n_majors):
+            per = self._governor_tile_sum(r, "appealNearFeature")
+            if not bool((per != 0).any()):
+                continue
+            if beside is None:
+                _f = self._unimproved_feature()
+                beside = (_f[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
+            out = out + torch.where(beside, per.long(), torch.zeros_like(out))
+        return out
+
+    def _governor_feature_gold(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — CIV6 (Forestry Management): "This city receives +2
+        Gold for each unimproved feature", counted over the tiles it OWNS."""
+        per = self._governor_sum(row, "goldPerFeature")
+        if not bool((per != 0).any()):
+            return per
+        slot = self.city_slot_at(row)
+        live = self._unimproved_feature() & (slot >= 0)
+        cnt = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        cnt.scatter_add_(1, slot.clamp(min=0), live.long())
+        return per * cnt.double()
+
+    def _patron_saint(self, row: int, landed: torch.Tensor, col: torch.Tensor) -> None:
+        """CIV6 (Patron Saint): "Apostles and Warrior Monks trained in the
+        city receive 1 extra Promotion when receiving their first promotion" —
+        banked on the unit at the buy, `col` being the city column it came
+        from."""
+        if not self.n_governors or not bool(landed.any()):
+            return
+        n = self._governor_sum(row, "firstPromoBonus")
+        if not bool((n != 0).any()):
+            return
+        rows = landed.nonzero(as_tuple=True)[0]
+        slot = getattr(self, self.POOL_NEXT["major"])[rows] - 1
+        self.major_unit_promo_bonus[rows, slot] = n[rows, col[rows].clamp(min=0, max=self.RC - 1)].long()
+
     def _governor_loyalty_aura(self, row: int) -> torch.Tensor:
         """[B, RC] f64 — CIV6 (Garrison Commander): "Your other cities within 9
         tiles gain +4 Loyalty per turn towards your civilization"; (Emissary):
@@ -448,6 +498,7 @@ class SimGovernors:
         out = out + (self._governor_vec(row, "perCitizen")
                      + gov_percit.double().unsqueeze(1) * seated) * pop.double().unsqueeze(2)
         out[:, :, 5] = out[:, :, 5] + self._governor_sum(row, "faithPerSpecialty") * spec.double()
+        out[:, :, 2] = out[:, :, 2] + self._governor_feature_gold(row)
         return out
 
     def _governor_ymult(self, row: int, gov_ymult: torch.Tensor) -> torch.Tensor:

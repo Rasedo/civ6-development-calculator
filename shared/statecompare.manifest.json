@@ -1858,6 +1858,17 @@
           "note": "the ONCE-ONLY promotion columns this unit has already collected — Pilgrim's charges and the Indulgence Vendor's gold each pay a unit once."
         },
         {
+          "name": "promoBonus",
+          "compare": "exact",
+          "covers": [
+            "Unit.promoBonus"
+          ],
+          "planes": [
+            "unit_promo_bonus"
+          ],
+          "note": "extra promotions the TRAINING city banked (Patron Saint), spent by re-arming the unit as it takes one."
+        },
+        {
           "name": "xpPct",
           "compare": "exact",
           "covers": [

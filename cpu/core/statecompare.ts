@@ -673,6 +673,7 @@ const UNIT_G: Record<string, Extractor> = {
   promos: overUnits((u) => u.promos ?? 0),
   promoOffer: overUnits((u) => u.promoOffer ?? 0),
   promoUsed: overUnits((u) => u.promoUsed ?? 0),
+  promoBonus: overUnits((u) => u.promoBonus ?? 0),
   xpPct: overUnits((u) => u.xpPct ?? 0),
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),

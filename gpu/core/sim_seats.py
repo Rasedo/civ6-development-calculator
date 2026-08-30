@@ -1289,6 +1289,7 @@ class SimSeats:
                     landed_a = self._spawn_unit(row, buy_a, at_r, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(B) + exo_chg)
                     self.civ_faith[:, row] = torch.where(landed_a, self.civ_faith[:, row] - acost, self.civ_faith[:, row])
                     self._offer_apostle_promos(row, landed_a)
+                    self._patron_saint(row, landed_a, jr)
                     bought_relig = bought_relig | landed_a
             if getattr(self, "_inquisitor_idx", -1) >= 0:
                 n_live_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
@@ -4813,6 +4814,13 @@ class SimSeats:
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        if self.n_governors and row < self.n_majors:
+            # CIV6 (Surplus Logistics): "Your Trade Routes ending here provide
+            # +2 Food to their starting city" — the DESTINATION's governor
+            # pays the ORIGIN column.
+            _sl = self._governor_sum(row, "routeStartFood")
+            if bool((_sl != 0).any()):
+                inc.scatter_add_(1, from_j * 6 + 0, _sl.gather(1, dest_j) * pd)
         if self._gov_has_effects:
             # CIV6 (Isolationism): "Domestic routes provide +2 Food, +2
             # Production."
@@ -5284,6 +5292,13 @@ class SimSeats:
             return None
         B = self.B
         cols = self.RC
+        # CIV6 (Vertical Integration): "This city receives Production from any
+        # number of Industrial Zones within 6 tiles, not just the first." The
+        # promotion names ONE district, so no other regional line stacks.
+        every = (self._governor_flag(row, "industryAllSources")
+                 if self.n_governors and row < self.n_majors else None)
+        if every is not None and not bool(every.any()):
+            every = None
         alive = self.city_alive[:, row, :cols]
         dt_all = self.city_dist_tile[:, row, :cols]  # [B, cols, nD]
         ctrs = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receiver centers
@@ -5308,8 +5323,11 @@ class SimSeats:
             # shared one, the suzerain bonus included.
             _rr = int(self._b_regional_range[n])
             reach_n = torch.full_like(reach, _rr) if _rr > 0 else reach
-            has = (ok.unsqueeze(2) & (dd <= reach_n)).any(dim=1) & alive  # [B, cols recv]
+            _in = ok.unsqueeze(2) & (dd <= reach_n)
+            has = _in.any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
+            if every is not None and int(self._b_req_district[n]) == self._iz_idx:
+                hf = torch.where(every, (_in.sum(dim=1) * alive).double(), hf)
             if y6 is None:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
@@ -5319,8 +5337,11 @@ class SimSeats:
                 continue
             if lit is None:
                 lit = self.city_powered[:, row, :cols]
-            hp = (ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach_n)).any(dim=1) & alive
+            _lin = ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach_n)
+            hp = _lin.any(dim=1) & alive
             hpf = hp.double()
+            if every is not None and int(self._b_req_district[n]) == self._iz_idx:
+                hpf = torch.where(every, (_lin.sum(dim=1) * alive).double(), hpf)
             y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
             am = am + hpf * float(self._b_pow_am[n])
         return None if y6 is None else (y6, am)

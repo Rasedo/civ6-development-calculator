@@ -116,6 +116,23 @@ export interface GovernorEffects {
   envoyDoubleAtMinor?: boolean;
   /** while established in a CITY-STATE: a copy of its luxuries (Affluence). */
   minorLuxuries?: boolean;
+  /** Food onto the STARTING city of every route this seat sends here
+   *  (Surplus Logistics). */
+  routeStartFood?: number;
+  /** every in-range INDUSTRIAL ZONE pays, not just the first (Vertical
+   *  Integration). */
+  industryAllSources?: boolean;
+  /** nothing this city owns is damaged by an Environmental Effect
+   *  (Reinforced Materials). */
+  envDamageImmune?: boolean;
+  /** Gold per UNIMPROVED FEATURE the city owns (Forestry Management). */
+  goldPerFeature?: number;
+  /** Appeal onto every tile of this city adjacent to an unimproved feature
+   *  (Forestry Management). */
+  appealNearFeature?: number;
+  /** extra promotions banked on a religious unit bought here, taken with its
+   *  first (Patron Saint). */
+  firstPromoBonus?: number;
 }
 
 /** The promotion catalog is longer than 32 rows and JavaScript's bitwise
@@ -153,13 +170,13 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
   // ---- REYNA, the Financier ----
   G('LAND_ACQUISITION', 'REYNA', 0, 'Land Acquisition',
     'Acquire new tiles in the city faster. +3 Gold per turn from each foreign Trade Route passing through the city.',
-    {}),
+    {}),   // both halves unsourced here: no figure for "faster", no stored route PATH
   G('HARBORMASTER', 'REYNA', 1, 'Harbormaster',
     'Double adjacency bonuses from Commercial Hubs and Harbors in the city.',
     { adjacencyMult: { COMMERCIAL_HUB: 2, HARBOR: 2 } }),
   G('FORESTRY_MANAGEMENT', 'REYNA', 1, 'Forestry Management',
     'This city receives +2 Gold for each unimproved feature. Tiles adjacent to unimproved features receive +1 Appeal in this city.',
-    {}),
+    { goldPerFeature: 2, appealNearFeature: 1 }),
   G('TAX_COLLECTOR', 'REYNA', 2, 'Tax Collector',
     '+2 Gold per turn for each Citizen in the city.',
     { perCitizen: { gold: 2 } }, ['HARBORMASTER', 'FORESTRY_MANAGEMENT']),
@@ -216,7 +233,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { harvestMult: 1.5 }),
   G('SURPLUS_LOGISTICS', 'MAGNUS', 1, 'Surplus Logistics',
     '+20% Growth in the city. Your Trade Routes ending here provide +2 Food to their starting city.',
-    { growthMult: 1.2 }),
+    { growthMult: 1.2, routeStartFood: 2 }),
   G('PROVISION', 'MAGNUS', 1, 'Provision',
     'Settlers trained in the city do not consume a Population.',
     { settlerFreePop: true }),
@@ -228,7 +245,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { resourceDiscountPct: 80 }, ['PROVISION']),
   G('VERTICAL_INTEGRATION', 'MAGNUS', 3, 'Vertical Integration',
     'This city receives Production from any number of Industrial Zones within 6 tiles, not just the first.',
-    {}, ['INDUSTRIALIST', 'BLACK_MARKETEER']),
+    { industryAllSources: true }, ['INDUSTRIALIST', 'BLACK_MARKETEER']),
 
   // ---- MOKSHA, the Cardinal ----
   G('BISHOP', 'MOKSHA', 0, 'Bishop',
@@ -245,7 +262,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { ignoreForeignPressure: true, faithOnBuildPct: 25 }, ['GRAND_INQUISITOR', 'LAYING_ON_OF_HANDS']),
   G('PATRON_SAINT', 'MOKSHA', 3, 'Patron Saint',
     'Apostles and Warrior Monks trained in the city receive 1 extra Promotion when receiving their first promotion.',
-    {}, ['CITADEL_OF_GOD']),
+    { firstPromoBonus: 1 }, ['CITADEL_OF_GOD']),
   G('DIVINE_ARCHITECT', 'MOKSHA', 3, 'Divine Architect',
     'Allows city to purchase Districts with Faith.',
     {}, ['CITADEL_OF_GOD']),
@@ -262,7 +279,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     {}),
   G('REINFORCED_MATERIALS', 'LIANG', 2, 'Reinforced Materials',
     "This city's improvements, buildings and Districts cannot be damaged by Environmental Effects.",
-    {}, ['ZONING_COMMISSIONER']),
+    { envDamageImmune: true }, ['ZONING_COMMISSIONER']),
   G('WATER_WORKS', 'LIANG', 2, 'Water Works',
     '+2 Housing for every Neighborhood and Aqueduct district in this city. +1 Amenity for every Canal and Dam district in this city.',
     { waterWorks: true }, ['AQUACULTURE']),

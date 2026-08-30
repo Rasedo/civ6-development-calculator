@@ -23,12 +23,12 @@ import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from 
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
-import { tileAppeal, gpAppealResolver } from './appeal';
+import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
-import { governorTileFlag, governorTileSum } from './governors';
+import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
@@ -1250,7 +1250,7 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
     if (tileSeat(t) !== seat) return false;
     if (city < 0) city = t.ownerCity;
     else if (t.ownerCity !== city) return false;
-    if (tileAppeal(state.map, t, camps, gpAppealResolver(state)) < PARK_MIN_APPEAL) return false;
+    if (tileAppeal(state.map, t, camps, cityAppealResolver(state)) < PARK_MIN_APPEAL) return false;
   }
   return city >= 0;
 }

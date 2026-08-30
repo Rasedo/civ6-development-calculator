@@ -34,7 +34,7 @@ import { isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
-import { governorFlag, governorTileMult } from './governors';
+import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -968,7 +968,10 @@ export function purchaseReligiousUnit(
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
   if (unitType === 'MISSIONARY' && eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
-  if (unitType === 'APOSTLE') offerApostlePromotions(state, u, seat);
+  if (unitType === 'APOSTLE') {
+    offerApostlePromotions(state, u, seat);
+    patronSaint(state, city, u);
+  }
   // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
   // trained ones get +2 Charges" — Missionaries and Apostles alike.
   if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
@@ -992,7 +995,16 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
+  patronSaint(state, city, u);
   return { ok: true };
+}
+
+/** CIV6 (Patron Saint): "Apostles and Warrior Monks trained in the city
+ *  receive 1 extra Promotion when receiving their first promotion." Both are
+ *  faith purchases, so this is every site that can train one. */
+function patronSaint(state: GameState, city: City, unit: Unit): void {
+  const n = governorSum(state, city, (e) => e.firstPromoBonus);
+  if (n > 0) unit.promoBonus = n;
 }
 
 /** CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian

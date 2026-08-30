@@ -342,6 +342,14 @@ export function takePromotion(unit: Unit, k: number): boolean {
   // the charges arrive with the choice rather than with the buy.
   const extra = promoValue(unit, 'SPREAD_CHARGES');
   if (extra > 0) unit.charges = (unit.charges ?? 0) + extra;
+  // CIV6 (Patron Saint): "Apostles and Warrior Monks trained in the city
+  // receive 1 extra Promotion when receiving their first promotion" — the
+  // training city's grant, spent by re-arming the unit as it takes one.
+  const banked = unit.promoBonus ?? 0;
+  if (banked > 0) {
+    unit.promoBonus = banked - 1;
+    unit.xp = xpToNextLevel(unit);
+  }
   return true;
 }
 

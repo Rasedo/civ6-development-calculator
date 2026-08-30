@@ -9,7 +9,7 @@ import { seatOf, citiesOf, campTiles, isCiv } from './seats';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
-import { tileAppeal, appealBand, gpAppealResolver, type GpAppeal } from './appeal';
+import { tileAppeal, appealBand, type GpAppeal } from './appeal';
 import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
@@ -19,7 +19,7 @@ import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain, suzer
 import { GP_PERM } from '../data/greatPeople';
 import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
-import { cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
+import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 export interface Unlocks {
   improvements: Set<string>;
@@ -766,7 +766,7 @@ export function preserveTileYields(
   camps?: ReadonlySet<number>,
 ): Map<number, Yields> {
   const out = new Map<number, Yields>();
-  const gpa = gpAppealResolver(state);
+  const gpa = cityAppealResolver(state);
   for (const city of citiesOf(state, seat)) {
     for (const d of city.districts) {
       const dt = state.map.tiles[d.tileIndex];
@@ -809,7 +809,7 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
     mods: mods ?? getModifiers(state, seat),
     camps,
     preserve: preserveTileYields(state, seat, camps),
-    gpAppeal: gpAppealResolver(state),
+    gpAppeal: cityAppealResolver(state),
   };
 }
 

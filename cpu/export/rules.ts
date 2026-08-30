@@ -127,6 +127,12 @@ const governorEffectRow = (fx: GovernorEffects) => ({
   envoysAtMinor: fx.envoysAtMinor ?? 0,
   envoyDoubleAtMinor: fx.envoyDoubleAtMinor ? 1 : 0,
   minorLuxuries: fx.minorLuxuries ? 1 : 0,
+  routeStartFood: fx.routeStartFood ?? 0,
+  industryAllSources: fx.industryAllSources ? 1 : 0,
+  envDamageImmune: fx.envDamageImmune ? 1 : 0,
+  goldPerFeature: fx.goldPerFeature ?? 0,
+  appealNearFeature: fx.appealNearFeature ?? 0,
+  firstPromoBonus: fx.firstPromoBonus ?? 0,
 });
 
 const effectRow = (fx: PolicyEffects) => ({

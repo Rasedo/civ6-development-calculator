@@ -346,6 +346,7 @@ def main() -> int:
                 ("robot", [py, "tests/gpu/robot_test.py"], 4),  # the Giant Death Robot chassis and its four Future-era upgrades
                 ("nuke", [py, "tests/gpu/nuke_test.py"], 4),  # the blast, the two carriers and the silo: no seed reaches Nuclear Fission
                 ("amani", [py, "tests/gpu/amani_test.py"], 4),  # the governor posted to a city-state, her envoys and Affluence
+                ("gov_clauses", [py, "tests/gpu/gov_clauses_test.py"], 4),  # the five promotion clauses no seed reaches: no governed city ever holds one
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

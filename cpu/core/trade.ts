@@ -23,6 +23,7 @@ import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpPermOf } from '../data/greatPeople';
 import { getModifiers } from './effects';
+import { governorSum } from './governors';
 /**
  * CIV6: "The base range for land trade routes is 15 tiles ... The base range
  * for sea trade routes is 30 tiles." A route counts as a sea route when BOTH
@@ -327,6 +328,10 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest) {
       addYields(out, routeYields(state, dest));
+      // CIV6 (Surplus Logistics): "Your Trade Routes ending here provide +2
+      // Food to their starting city" — the DESTINATION's governor pays the
+      // ORIGIN, which is the city this walk is computing.
+      out.food += governorSum(state, dest, (e) => e.routeStartFood);
       const relT = seatOf(state, seat)!.religion;
       if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
         const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;

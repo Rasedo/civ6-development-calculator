@@ -6,7 +6,8 @@ import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from '.
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
-import { tileAppeal, gpAppealResolver, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
+import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
+import { cityAppealResolver } from './governors';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
@@ -228,7 +229,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     ownsTile: (t) => tileSeat(t) === seat,
     map: state.map, // SEASIDE_RESORT needs coast adjacency + appeal
     camps: campTiles(state),
-    gpAppeal: gpAppealResolver(state),
+    gpAppeal: cityAppealResolver(state),
     suzerain: suzerainNames(state, seat),
   });
 }

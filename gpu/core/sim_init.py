@@ -610,7 +610,9 @@ class SimInit:
                        "extraStrikes", "freePromoOnTrain", "theologyCS", "fullHeal",
                        "ignoreForeignPressure", "faithOnBuildPct", "waterWorks",
                        "spyLevelPenalty", "noSiege", "stockpilePerTurn", "resourceDiscountPct",
-                       "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries"):
+                       "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries",
+                       "routeStartFood", "industryAllSources", "envDamageImmune",
+                       "goldPerFeature", "appealNearFeature", "firstPromoBonus"):
                 self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
         self._water_works_housing = int(_er.get("waterWorksHousing", 2))
         self._water_works_amenities = int(_er.get("waterWorksAmenities", 1))
@@ -795,6 +797,9 @@ class SimInit:
             ("promos", torch.long),     # bitmask over the rows of this chassis's class list
             ("promo_offer", torch.long),  # the columns this unit may take (0 = every legal one)
             ("promo_used", torch.long),  # the ONCE-ONLY columns already collected
+            # extra promotions the TRAINING city banked on this unit (Patron
+            # Saint), each spent by re-arming it as it takes one
+            ("promo_bonus", torch.long),
             ("xp_pct", torch.long),     # the training city's percentage XP modifier, for life
             ("charges", torch.long),    # builder/missionary charges
             # The general/admiral aura's +MP, FROZEN at the refreshUnits site

@@ -16,6 +16,7 @@ import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD
 import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, STORM_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
 import { disasterRateMult, severitySplit } from '../data/climate';
 import { defertilize, desertificationLive, fertilityLive } from './climate';
+import { governorTileFlag } from './governors';
 
 export const FERTILITY_CAP = 3;
 
@@ -29,15 +30,22 @@ function pick<T>(state: GameState, arr: T[]): T | undefined {
   return arr[Math.floor(nextRandom(state) * arr.length)];
 }
 
-function scorch(tile: Tile): void {
-  if (tile.improvement && !tile.pillaged) tile.pillaged = true;
+/** CIV6 (Reinforced Materials): "This city's improvements, buildings and
+ *  Districts cannot be damaged by Environmental Effects." */
+function envImmune(state: GameState, tile: Tile): boolean {
+  return governorTileFlag(state, tile, (e) => e.envDamageImmune);
+}
+
+function scorch(state: GameState, tile: Tile): void {
+  if (tile.improvement && !tile.pillaged && !envImmune(state, tile)) tile.pillaged = true;
 }
 
 /** CIV6 (Gathering Storm): a flood damages the DISTRICT on the floodplain, not
  *  just the improvement — the buildings inside it go dark with it, which is
  *  what a Dam is built to prevent. A city CENTER is never pillaged. */
-function floodDistrict(tile: Tile): void {
-  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete && !tile.districtPillaged) {
+function floodDistrict(state: GameState, tile: Tile): void {
+  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete
+      && !tile.districtPillaged && !envImmune(state, tile)) {
     tile.districtPillaged = true;
   }
 }
@@ -142,12 +150,12 @@ function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean
   const col = floodTerrainColumn(tile.terrain);
 
   if (!mitigated) {
-    scorch(tile);
-    if (rDestroy < FLOOD_DESTROY_P[sev] && tile.improvement) {
+    scorch(state, tile);
+    if (rDestroy < FLOOD_DESTROY_P[sev] && tile.improvement && !envImmune(state, tile)) {
       tile.improvement = null;
       tile.pillaged = false;
     }
-    if (rDistrict < FLOOD_DISTRICT_P[sev]) floodDistrict(tile);
+    if (rDistrict < FLOOD_DISTRICT_P[sev]) floodDistrict(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
     if (dmg > 0) {
@@ -210,7 +218,7 @@ export function disasterPhase(state: GameState): void {
     if (!volcano.volcano) continue;
     if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO * rate) continue;
     for (const n of neighbors(map, volcano)) {
-      scorch(n);
+      scorch(state, n);
       fertilize(state, n);
     }
     log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
@@ -238,7 +246,7 @@ export function disasterPhase(state: GameState): void {
     if (center) {
       const area = tilesWithin(map, center.col, center.row, 1);
       for (const t of area) {
-        scorch(t);
+        scorch(state, t);
         // sandstorms deposit silt — until the world warms past Phase IV, from
         // where the same storms take fertility off instead of laying it down.
         if (strip) defertilize(t);

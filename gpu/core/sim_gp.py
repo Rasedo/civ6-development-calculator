@@ -69,8 +69,9 @@ class SimGp:
         return self.city_gp_perm[:, row, :, k]
 
     def _gp_tile_appeal(self, row: int) -> torch.Tensor:
-        """[B, T] — what each of this row's tiles gets from the city that owns
-        it, the `gpAppealResolver` twin."""
+        """[B, T] — the GREAT PERSON half of what each of this row's tiles gets
+        from the city that owns it; `_gov_appeal_plane` carries the governor's,
+        and TS folds both into `cityAppealResolver`."""
         per = self._gp_city_perm(row, "appeal")
         if not bool((per != 0).any()):
             return torch.zeros(self.B, self.T, dtype=per.dtype, device=self.device)

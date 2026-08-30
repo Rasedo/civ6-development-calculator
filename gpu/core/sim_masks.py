@@ -1641,6 +1641,7 @@ class SimMasks:
         self.barb_unit_level[rows, slot] = 1
         self.barb_unit_promos[rows, slot] = 0
         self.barb_unit_promo_offer[rows, slot] = 0
+        self.barb_unit_promo_bonus[rows, slot] = 0
         self.barb_unit_xp_pct[rows, slot] = 0
         # TS spawnUnit writes `movesLeft: def.moves` plus the seat's golden
         # dedication and leaves movesFull undefined — a unit trained mid-turn
@@ -1752,6 +1753,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_promos")[rows, slot] = 0
         getattr(self, f"{pre}_unit_promo_offer")[rows, slot] = 0
         getattr(self, f"{pre}_unit_promo_used")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_promo_bonus")[rows, slot] = 0
         # CIV6: the training city's Encampment and Harbor experience lines are a
         # PERCENTAGE the unit carries for life, not a lump of starting XP.
         getattr(self, f"{pre}_unit_xp_pct")[rows, slot] = (

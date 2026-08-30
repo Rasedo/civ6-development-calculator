@@ -1,6 +1,8 @@
 import type { City, GameState, Governor, Seat, Tile } from './types';
 import { cityAtTile, citiesOf, seatOf } from './seats';
-import { hexDistance } from '../../world/hex';
+import { hexDistance, neighbors } from '../../world/hex';
+import { GP_CITY_PERM } from '../data/greatPeople';
+import type { GpAppeal } from './appeal';
 import { seatBuildingSum } from './city';
 import { cityDistrictSum } from './yields';
 import { congressGovernorFavorType } from './congress';
@@ -277,6 +279,41 @@ export function governorTileSum(state: GameState, tile: Tile, pick: (e: Governor
 export function governorTileMult(state: GameState, tile: Tile, pick: (e: GovernorEffects) => number | undefined): number {
   const c = cityAtTile(state, tile);
   return c ? governorMult(state, c, pick) : 1;
+}
+
+/** the (seat, city id) key's stride — wider than any city id a seat can reach. */
+const APPEAL_SEAT_STRIDE = 1 << 20;
+
+/**
+ * What the tile's OWNER CITY adds to its appeal — one closure over the seats'
+ * cities, built once per walk.
+ *
+ * CIV6 (Alvar Aalto, Charles Correa): "This city provides +N Appeal to any
+ * tile it owns"; (Forestry Management): "Tiles adjacent to unimproved features
+ * receive +1 Appeal in this city."
+ */
+export function cityAppealResolver(state: GameState): GpAppeal {
+  const k = GP_CITY_PERM.indexOf('appeal');
+  const flat = new Map<number, number>();
+  const near = new Map<number, number>();
+  for (const s of state.seats) {
+    for (const c of s.cities) {
+      const key = c.seat * APPEAL_SEAT_STRIDE + c.id;
+      const n = c.gpPerm?.[k] ?? 0;
+      if (n) flat.set(key, n);
+      const f = governorSum(state, c, (e) => e.appealNearFeature);
+      if (f) near.set(key, f);
+    }
+  }
+  if (flat.size === 0 && near.size === 0) return undefined;
+  const map = state.map;
+  return (t: Tile) => {
+    if (t.ownerCity < 0) return 0;
+    const key = t.ownerSeat * APPEAL_SEAT_STRIDE + t.ownerCity;
+    const f = near.get(key) ?? 0;
+    const beside = f > 0 && neighbors(map, t).some((n) => !!n.feature && !n.improvement);
+    return (flat.get(key) ?? 0) + (beside ? f : 0);
+  };
 }
 
 /** Is a flag set by the established governor of `tile`'s city? */

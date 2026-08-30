@@ -46,7 +46,7 @@ from the list below.
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
-| B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
+| B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
@@ -291,15 +291,51 @@ Civ 6 source or is recorded as unverifiable.
       needs a minor that ACCUMULATES strategic resources, and a minor here
       has no production, no improvement and no stockpile of its own
       (C-38). No source publishes a rate to stand in for one.
-  - **FIVE PROMOTION CLAUSES WAIT ON NO MECHANIC AT ALL** and ship as an
-    empty payload: Land Acquisition's "acquire new tiles faster" (the
-    border-growth cost has a per-city site), Forestry Management's gold
-    per unimproved feature and its appeal term, Reinforced Materials'
-    immunity to Environmental Effects (the flood and storm damage sites
-    ship), Vertical Integration's every-Industrial-Zone production, and
-    Patron Saint's extra first promotion for Apostles. Surplus Logistics'
-    "+2 Food to the starting city of Trade Routes ending here" is the
-    same shape.
+  - ~~Five promotion clauses wait on no mechanic at all.~~ CLOSED for
+    five of the six, each transcribed from its own sourced sentence:
+    - **SURPLUS LOGISTICS** ("Your Trade Routes ending here provide +2
+      Food to their starting city") is `routeStartFood`, read in the
+      DOMESTIC arm of `cityTradeYields` / `_seat_route_income` off the
+      DESTINATION's governor and paid to the ORIGIN column.
+    - **VERTICAL INTEGRATION** ("Production from any number of Industrial
+      Zones within 6 tiles, not just the first") is `industryAllSources`,
+      passed INTO `regionalEffects` by its caller because the governor
+      read lives a module above the yield walk. It lifts the `seen` dedup
+      for INDUSTRIAL_ZONE rows only — the promotion names one district, so
+      an Entertainment Complex still pays once.
+    - **REINFORCED MATERIALS** ("improvements, buildings and Districts
+      cannot be damaged by Environmental Effects") is `envDamageImmune`,
+      gating `scorch`, the flood's improvement DESTRUCTION and
+      `floodDistrict` on both engines. Every draw stays where it was, so
+      the immunity moves no RNG stream. The GPU's `_env_immune` is the OR
+      over the majors: a disaster reaches every seat at once.
+    - **FORESTRY MANAGEMENT** ("+2 Gold for each unimproved feature.
+      Tiles adjacent to unimproved features receive +1 Appeal in this
+      city") is `goldPerFeature` in the BONUSES bucket over the tiles the
+      city OWNS, and `appealNearFeature` through the owner-city appeal
+      closure. That closure now carries BOTH channels — the Great
+      Person's flat grant and this one — and moved from `appeal.ts` to
+      `governors.ts` as `cityAppealResolver`, so the Seaside Resort gate,
+      the Preserve, the National Park and the yield walk cannot answer
+      differently. An unimproved feature is a tile carrying a live
+      feature and no improvement, on both engines.
+    - **PATRON SAINT** ("Apostles and Warrior Monks trained in the city
+      receive 1 extra Promotion when receiving their first promotion") is
+      `firstPromoBonus`, banked on the unit at the FAITH BUY — the only
+      way either unit is trained — and spent by `takePromotion` /the
+      PROMOTE applier, which re-arms the unit to `xpToNextLevel`. The
+      AUDIT's own claim that this clause needed no mechanic was WRONG:
+      the grant outlives the city, so it needs a carried per-unit field,
+      `Unit.promoBonus` / `unit_promo_bonus`, compared as `promoBonus`.
+    No seed reaches a governed city holding any of the six, so
+    `tests/gpu/gov_clauses_test.py` and
+    `tests/cpu/city/governor-clauses.test.ts` are the bar. STILL OPEN:
+    - **LAND ACQUISITION'S BORDER GROWTH HAS NO PUBLISHED FIGURE.**
+      "Acquire new tiles in the city faster" is the whole Civilopedia
+      text; two secondary summaries say 20% and no fetchable primary
+      source carries a number. The per-city border-cost site exists and
+      would take a multiplier the moment one is sourced. UNSOURCED
+      MAGNITUDE, so unbuilt — the owner's call, not this model's.
   - **NINE PROMOTION CLAUSES WAIT ON A NAMED ABSENT SYSTEM**: Contractor
     and Divine Architect (no district PURCHASE verb, gold or faith);
     Renewable Subsidizer and Industrialist (the power plants and

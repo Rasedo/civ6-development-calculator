@@ -485,7 +485,8 @@ class SimEconomy:
         flat[touched] = (flat[touched] + cnt[touched]).clamp(max=3)
 
     def _scorch(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        ok = (self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
+        ok = ((self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
+              & ~self._env_immune()[rows, tiles])
         self.pillaged[rows[ok], tiles[ok]] = True
 
     def _flood_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -494,7 +495,7 @@ class SimEconomy:
         it, which is what a Dam is built to prevent. The `district` plane never
         encodes a city CENTRE, so centres are outside this by construction."""
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
-              & ~self.district_pillaged[rows, tiles])
+              & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self.district_pillaged[rows[ok], tiles[ok]] = True
 
     def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -3099,6 +3100,18 @@ class SimEconomy:
             & (self._tile_appeal() >= self._seaside_min_appeal)
         )
 
+    def _env_immune(self) -> torch.Tensor:
+        """[B, T] bool — CIV6 (Reinforced Materials): "This city's
+        improvements, buildings and Districts cannot be damaged by
+        Environmental Effects." A disaster reaches every seat at once, so the
+        plane is the OR over the majors — a tile belongs to at most one."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        if not self.n_governors:
+            return out
+        for r in range(self.n_majors):
+            out = out | self._governor_tile_flag(r, "envDamageImmune")
+        return out
+
     def _tile_appeal(self) -> torch.Tensor:
         """[B, T] tile appeal, the `tileAppeal` (core/appeal.ts) mirror. TS
         sums each NEIGHBOUR's contribution, so build a per-tile contribution
@@ -3143,7 +3156,7 @@ class SimEconomy:
         # CIV6 (Alvar Aalto, Charles Correa): "+N Appeal to any tile it owns".
         # It sits BEFORE the wonder/mountain override, which the TS twin takes
         # as an early return.
-        out = out + self._gp_appeal_plane().long()
+        out = out + self._gp_appeal_plane().long() + self._gov_appeal_plane()
         out = torch.where(self.appeal_over > -999, self.appeal_over, out)
         self._appeal_cache = (self._eff_version, out)
         return out

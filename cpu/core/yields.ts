@@ -369,7 +369,11 @@ export function completedDistrictCount(state: GameState, city: City, specialtyOn
   }).length;
 }
 
-export function regionalEffects(state: GameState, city: City): RegionalEffects {
+/** `allIndustry` is Vertical Integration, passed in because the governor read
+ *  lives a module above this one. */
+export function regionalEffects(
+  state: GameState, city: City, allIndustry = false,
+): RegionalEffects {
   const center = state.map.tiles[city.centerIndex];
   const reach = regionalReach(state, city.seat); // a Mexico City suzerain reaches 3 farther
   const seen = new Set<string>();
@@ -387,12 +391,16 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
         const def = BUILDINGS[id];
         if (!def || !def.regional || def.district !== inst.type) continue;
         if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach)) continue;
-        if (!seen.has(id)) {
+        // CIV6 (Vertical Integration): "This city receives Production from any
+        // number of Industrial Zones within 6 tiles, not just the first." The
+        // promotion names ONE district, so no other regional line stacks.
+        const every = allIndustry && def.district === 'INDUSTRIAL_ZONE';
+        if (every || !seen.has(id)) {
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
           if (def.amenities) out.amenities += def.amenities;
         }
-        if ((!def.poweredYields && !def.poweredAmenities) || seenPowered.has(id)) continue;
+        if ((!def.poweredYields && !def.poweredAmenities) || (!every && seenPowered.has(id))) continue;
         if (!other.powered) continue;
         seenPowered.add(id);
         if (def.poweredYields) addYields(out.yields, def.poweredYields);

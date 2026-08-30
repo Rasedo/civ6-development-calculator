@@ -212,6 +212,13 @@ class SimOrders:
                         # this roster's Apostle picks its promotion.
                         self.unit_charges[pr, ps] += self._promo_val(
                             utp[pr], self.unit_promos[pr, ps], "SPREAD_CHARGES")
+                        # CIV6 (Patron Saint): the training city's banked
+                        # promotion, spent by re-arming the unit.
+                        _pb = self.unit_promo_bonus[pr, ps]
+                        self.unit_promo_bonus[pr, ps] = (_pb - 1).clamp(min=0)
+                        self.unit_xp[pr, ps] = torch.where(
+                            _pb > 0, self._xp_to_next(self.unit_level[pr, ps]),
+                            self.unit_xp[pr, ps])
 
             if _rk_escort[n] and _ecc >= 0:
                 # CIV6 (Formations): the civilian joins the military unit

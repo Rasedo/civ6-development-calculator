@@ -724,6 +724,7 @@ UNIT = {
     "promos": _unit("unit_promos"),
     "promoOffer": _unit("unit_promo_offer"),
     "promoUsed": _unit("unit_promo_used"),
+    "promoBonus": _unit("unit_promo_bonus"),
     "xpPct": _unit("unit_xp_pct"),
     "embarked": _unit("unit_emb"),
     "movesLeft": _unit("unit_mp"),
