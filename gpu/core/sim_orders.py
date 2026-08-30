@@ -260,6 +260,8 @@ class SimOrders:
                             continue
                         civ_ok = civ_ok | ((tier == _k) & self.civ_civics[:, row, _ci])
                     okf = (fum & (ftg >= 0) & _live & (h_seat == row) & (h_type == utp)
+                           # CIV6: "Cannot form Corps or Armies by any means"
+                           & (utp != self._gdr_idx) & (h_type != self._gdr_idx)
                            & (self._type_combat[utp.clamp(min=0)] > 0)
                            & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0) & civ_ok)
                     if bool(okf.any()):
@@ -499,6 +501,11 @@ class SimOrders:
                 if bool(_wlk.any()):
                     terr = torch.where(
                         _wlk, self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) | _wet, terr)
+                # CIV6 (Enhanced Mobility): the robot "can perform a Jump action
+                # to cross over mountain terrain".
+                _jmp = (ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves)
+                if bool(_jmp.any()):
+                    terr = terr | (_jmp & self.tile_mountain.gather(1, tc.unsqueeze(1)).squeeze(1))
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
                 clf = self._cliff_block_dirs(
                     hc.unsqueeze(1), nb.unsqueeze(1), own_tile,

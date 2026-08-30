@@ -1927,9 +1927,9 @@ class SimSeats:
                 sl = getattr(self, plane).gather(1, ac.unsqueeze(1)).squeeze(1)
                 sc = sl.clamp(min=0)
                 ty = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-                aa = self._type_anti_air[ty]
                 cov = self._type_anti_air_range[ty]
                 seat = torch.where(sl >= 0, self.unit_seat.gather(1, sc.unsqueeze(1)).squeeze(1), neg)
+                aa = self._anti_air_at(ty, seat)
                 ok = (live_t & (sl >= 0) & (aa > 0) & self._seats_hostile(row, seat)
                       & ((cov >= dist) | ((dist == 0) & self.unit_naval[ty])))
                 key = aa * (4 * self.T) - (at.clamp(min=0) * 4 + prank)
@@ -1962,7 +1962,8 @@ class SimSeats:
         a_base = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u])
         cs0 = c_slot.clamp(min=0)
         c_type = self.unit_type.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        c_aa = self._type_anti_air[c_type]
+        c_seat = self.unit_seat.gather(1, cs0.unsqueeze(1)).squeeze(1)
+        c_aa = self._anti_air_at(c_type, c_seat)
         c_cs = torch.where(c_aa > 0, c_aa, self._type_combat[c_type])
         c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1))
         c_e = c_e + self._promo_cs(
@@ -2046,7 +2047,7 @@ class SimSeats:
         d_seat = torch.where(elig_m, m_seat, c_seat)
         d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
         d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
-        aa = self._type_anti_air[d_type]
+        aa = self._anti_air_at(d_type, d_seat)
         def_cs = torch.where(aa > 0, aa, self._type_combat[d_type])
         # CIV6 (Air combat): "all air attacks are ranged", so the sortie is a
         # ranged roll and both trees speak into it — the striker's class terms,
@@ -2513,7 +2514,7 @@ class SimSeats:
         fr = live.nonzero(as_tuple=True)[0]
         if fr.numel() == 0:
             return
-        h, a = host[fr], sc[fr]
+        h, a = host[fr], sc[fr]  # CIV6: the robot never reaches here — `_no_form`
         take = ((self.unit_level[fr, a] > self.unit_level[fr, h])
                 | ((self.unit_level[fr, a] == self.unit_level[fr, h])
                    & (self.unit_xp[fr, a] > self.unit_xp[fr, h])))
@@ -6258,6 +6259,7 @@ class SimSeats:
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, a_type[:, u])
+                             + self._gdr_armor_cs(d_type, def_civ_u, a_type[:, u])
                              + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = d_seat_m
@@ -7088,7 +7090,7 @@ class SimSeats:
         outer = torch.where(held,
                             torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
-        atk_e = (self._city_ranged_strength(at0, outer) + self._form_cs_pool(atk_kind, u)
+        atk_e = (self._city_ranged_strength(at0, a_seat[:, u], outer) + self._form_cs_pool(atk_kind, u)
                  + self._convoy_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
@@ -7124,6 +7126,7 @@ class SimSeats:
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
                   + self._convoy_cs_pool(atk_kind, u)
+                  + self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                   + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
         major = POOL_CLASS[atk_kind] == "major"
@@ -7237,13 +7240,26 @@ class SimSeats:
         mp[:, u] = torch.where(fired & ~keep, torch.zeros_like(mp[:, u]), mp[:, u])
         self._spend_one_attack(pre, u, fired)
 
+    def _anti_air_at(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """long — `antiAirAt`. CIV6 (Drone Air Defense): "Anti-Air Defense
+        Strength increased to 130" — an increase TO a figure, so the upgrade
+        replaces the chassis stat."""
+        base = self._type_anti_air[utype.clamp(min=0, max=self.NU - 1)]
+        up = self._gdr_has(utype, seat, self._gdr_u_drone)
+        if not bool(up.any()):
+            return base
+        return torch.where(up, torch.full_like(base, int(self._gdr_drone_aa)), base)
+
     def _xp_eligible(self, utype: torch.Tensor) -> torch.Tensor:
-        """`xpEligible`'s chassis half: a civilian never fights, and a Spy earns
-        its levels through its missions rather than through a roll."""
+        """`xpEligible`'s chassis half: a civilian never fights, a Spy earns its
+        levels through its missions rather than through a roll, and CIV6 (Giant
+        Death Robot) "cannot earn experience or Promotions"."""
         t = utype.clamp(min=0, max=self.NU - 1)
         out = ~self._type_civilian[t]
         if self._spy_idx >= 0:
             out = out & (t != self._spy_idx)
+        if self._gdr_idx >= 0:
+            out = out & (t != self._gdr_idx)
         return out
 
     def _seat_xp_pct(self, utype: torch.Tensor, seat: torch.Tensor,
@@ -7416,7 +7432,8 @@ class SimSeats:
                                torch.full_like(hrow, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
-        atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
+        atk_e = atk_e + (self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
+                             + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
         if getattr(self, "_battle_probe", False) and bool(att.any()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
@@ -7563,7 +7580,8 @@ class SimSeats:
                                torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
-        atk_e = atk_e + (self._congress_unit_cs(at0, a_seat[:, u])
+        atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
+                         + self._congress_unit_cs(at0, a_seat[:, u])
                          + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
@@ -7750,7 +7768,7 @@ class SimSeats:
             if self.n_governors:
                 def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
-            atk_e = (self._city_ranged_strength(ut0, outer_all)
+            atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
                      - self._wound(a_hp)
                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
@@ -7845,7 +7863,7 @@ class SimSeats:
             ).to(def_e.dtype))
             # "Ranged attacks ignore any Support received by the defender."
             _cls = self._class_matchup_cs(ut0, d_type)
-            atk_e = atk_e + _cls.to(atk_e.dtype)
+            atk_e = atk_e + (_cls + self._gdr_naval_cs(ut0, d_type)).to(atk_e.dtype)
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
@@ -7865,6 +7883,7 @@ class SimSeats:
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, ut0)
+                             + self._gdr_armor_cs(d_type, def_civ_u, ut0)
                              + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                              + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
@@ -7980,7 +7999,7 @@ class SimSeats:
             if self.n_governors:
                 def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
             outer_all = self.city_outer_hp[bidx, hrow, slot]
-            _rs = self._city_ranged_strength(at0, outer_all)
+            _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_city = self._damage_roll(city_att,
                                        atk_base - atk_rs0 + _rs + _cpromo + rel_city - def_cs,
@@ -8007,7 +8026,7 @@ class SimSeats:
                 15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
                 + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
             )
-            _cs_rs = self._city_ranged_strength(at0, torch.zeros_like(def_cs))
+            _cs_rs = self._city_ranged_strength(at0, aseat, torch.zeros_like(def_cs))
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_cs = self._damage_roll(cs_att,
                                      atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city - def_cs,
@@ -8058,7 +8077,8 @@ class SimSeats:
                 foe_damaged=self._damaged(def_hp), foe_fortified=d_fort_t > 0,
                 foe_in_district=self._on_district(ttc), tile=a_tile[:, u])
             atk_e = atk_e + self._rel_atk_cs(aseat, tgt).to(atk_e.dtype)  # unit-vs-unit: never gated
-            atk_e = atk_e + self._class_matchup_cs(at0, d_type).to(atk_e.dtype)
+            atk_e = atk_e + (self._class_matchup_cs(at0, d_type)
+                             + self._gdr_naval_cs(at0, d_type)).to(atk_e.dtype)
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
@@ -8072,7 +8092,10 @@ class SimSeats:
             atk_e = atk_e + self._vis_cs(aseat, d_seat).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
-                             + self._gov_unit_cs(d_type, _ucs_seat)).to(def_e.dtype)
+                             + self._gov_unit_cs(d_type, _ucs_seat)
+                             + self._era_matchup_cs(_ucs_seat, at0)
+                             + self._gdr_armor_cs(d_type, _ucs_seat, at0)
+                             + self._governor_territory_cs(_ucs_seat, tgt)).to(def_e.dtype)
             def_hp0 = self.unit_hp[bidx, ds0]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]

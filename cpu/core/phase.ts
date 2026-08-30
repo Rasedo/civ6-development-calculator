@@ -10,7 +10,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
-import { cityStrikeStrength, airPillage, airStrike } from './combat';
+import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike } from './combat';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
@@ -2104,6 +2104,7 @@ export function seatPhase(state: GameState): void {
           // is the unit's own strength wherever it fights, a city's shot
           // included.
           const defCSa = defCS + generalAuraCS(state, defender, bestTile)
+            + gdrBeamCS(state, defender) // the beam "applies ... when defending"
             + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
@@ -2151,6 +2152,7 @@ export function seatPhase(state: GameState): void {
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
               + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt });
           const defCSa = defCS + generalAuraCS(state, defender, bestTile)
+            + gdrBeamCS(state, defender)
             + congressUnitCS(state, defender) + governmentUnitCS(state, defender); // the cstk mirror
           const atkCS = cityStrikeStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);

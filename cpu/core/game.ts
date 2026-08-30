@@ -45,6 +45,7 @@ import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
 import { irradiated } from './nuclear';
+import { formationBanned } from './units';
 
 export const TURN_LIMIT = 250;
 
@@ -759,6 +760,8 @@ function veteranOf(a: Unit, b: Unit): Unit {
 export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleResult {
   const seat = unitSeat(unit);
   if (unitDomain(unit.type) !== 'military') return { ok: false, reason: 'Not a military unit.' };
+  // CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any means."
+  if (formationBanned(unit.type)) return { ok: false, reason: 'This chassis forms nothing.' };
   if (unit.movesLeft <= 0) return { ok: false, reason: 'No movement left.' };
   const host = state.units.find(
     (u) => u.tileIndex === tileIndex && u.id !== unit.id && u.type === unit.type

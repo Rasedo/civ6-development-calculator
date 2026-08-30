@@ -499,18 +499,25 @@ class SimMasks:
             out = out | torch.where(hit, torch.full_like(out, bit), torch.zeros_like(out))
         return torch.where(helped, out, torch.zeros_like(out))
 
-    def _city_ranged_strength(self, type_idx: torch.Tensor, outer: torch.Tensor) -> torch.Tensor:
+    def _city_ranged_strength(self, type_idx: torch.Tensor, seat: torch.Tensor,
+                              outer: torch.Tensor) -> torch.Tensor:
         """`cityRangedStrength` — what a RANGED order brings against a city or
         district. A siege unit fires at its Bombard Strength and pays no city
         penalty; the -17 it carries is "against land units", which its ranged
         strength already holds. Everything else pays the ranged city penalty,
-        which naval ranged owe only while a perimeter stands."""
+        which naval ranged owe only while a perimeter stands.
+
+        CIV6 (Particle Beam Siege Cannon): "Ranged attacks against Cities and
+        Encampments are 100% effective" — the penalty waived, and the +30 rides
+        in beside it."""
         t = type_idx.clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval[t]
         pen = torch.full(outer.shape, self._ranged_city_pen,
                          dtype=torch.float64, device=outer.device)
         pen = torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
-        base = self._type_ranged_strength[t].double() - pen
+        beam = self._gdr_beam_cs(t, seat).double()
+        pen = torch.where(beam > 0, torch.zeros_like(pen), pen)
+        base = self._type_ranged_strength[t].double() + beam - pen
         return torch.where(self._type_bombard[t] > 0, self._type_bombard[t].double(), base)
 
     def _wound(self, hp: torch.Tensor) -> torch.Tensor:
@@ -1534,6 +1541,59 @@ class SimMasks:
         bidx = torch.arange(self.B, device=self.device)
         return (seat >= 0) & (seat < self.n_majors) & self.civ_techs[bidx, rows, tech]
 
+    def _gdr_has(self, utype: torch.Tensor, seat: torch.Tensor, k: int) -> torch.Tensor:
+        """bool — `gdrHas`: the chassis is the robot AND its seat holds the
+        Future-Era tech behind upgrade `k`. CIV6 (Giant Death Robot): the
+        chassis "gains additional abilities and upgrades via Future Era
+        technology research", so the upgrade is empire-wide and no per-unit
+        state stands behind it."""
+        z = torch.zeros(utype.shape, dtype=torch.bool, device=self.device)
+        tech = self._gdr_upgrade_tech[k]
+        if self._gdr_idx < 0 or tech < 0:
+            return z
+        col = self.civ_techs[:, :, tech]
+        s0 = seat.clamp(min=0, max=self.n_majors - 1)
+        v = col.gather(1, s0.reshape(self.B, -1)).reshape(seat.shape)
+        return (utype == self._gdr_idx) & (seat >= 0) & (seat < self.n_majors) & v
+
+    def _gdr_row_up(self, row: int, k: int) -> torch.Tensor:
+        """[B] bool — the same question asked of a seat ROW rather than of a
+        seat plane."""
+        tech = self._gdr_upgrade_tech[k]
+        if self._gdr_idx < 0 or tech < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.civ_techs[:, row, tech]
+
+    def _gdr_beam_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """long — `gdrBeamCS`. CIV6 (Particle Beam Siege Cannon): "Ranged
+        attacks against Cities and Encampments are 100% effective and gain +30
+        Ranged Strength. (Applies to both melee and ranged attacks and when
+        defending.)" This is the adder, wherever the robot meets a city; the
+        effectiveness half is the -17 `_city_ranged_strength` stops taking."""
+        z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
+        return z + self._gdr_has(utype, seat, self._gdr_u_beam).long() * int(self._gdr_particle_cs)
+
+    def _gdr_armor_cs(self, utype: torch.Tensor, seat: torch.Tensor,
+                      foe_type: torch.Tensor) -> torch.Tensor:
+        """long — `gdrArmorCS`. CIV6 (Reinforced Armor Plating): "+10 Combat
+        Strength when defending against land and naval units" — an air strike
+        is neither, and a city's own shot is neither."""
+        z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
+        ok = (self._gdr_has(utype, seat, self._gdr_u_armor) & (foe_type >= 0)
+              & (self._type_air[foe_type.clamp(min=0, max=self.NU - 1)] == 0))
+        return z + ok.long() * int(self._gdr_plate_cs)
+
+    def _gdr_naval_cs(self, utype: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
+        """long — `gdrNavalCS`. CIV6 (Giant Death Robot): "-17 Ranged Strength
+        against District defenses and naval units" — a clause of the chassis
+        itself, no upgrade behind it. The district half of that sentence is
+        `_ranged_city_pen`, which every land ranged unit already pays."""
+        z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
+        if self._gdr_idx < 0:
+            return z
+        hit = (utype == self._gdr_idx) & (foe_type >= 0) & self.unit_naval[foe_type.clamp(min=0, max=self.NU - 1)]
+        return z - hit.long() * int(self._gdr_naval_penalty)
+
     def _advance_terrain(self, u_type: torch.Tensor, u_seat: torch.Tensor,
                          dest: torch.Tensor) -> torch.Tensor:
         """`tileFreeForUnit`'s TERRAIN half for a post-battle ADVANCE — the
@@ -2266,6 +2326,11 @@ class SimMasks:
         if bool(_walk.any()):
             terr = torch.where(
                 _walk, passable | self.wpass.gather(1, nbc).reshape(B, N, 6), terr)
+        # CIV6 (Enhanced Mobility): the robot "can perform a Jump action to
+        # cross over mountain terrain" — one hex of mountain, simply enterable.
+        _jmp = ((ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves).unsqueeze(1)).unsqueeze(2)
+        if bool(_jmp.any()):
+            terr = terr | (_jmp & self.tile_mountain.gather(1, nbc).reshape(B, N, 6))
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
         _blk = torch.where(
             is_civ,
@@ -2546,7 +2611,11 @@ class SimMasks:
                 if _ci < 0:
                     continue
                 _civ_ok = _civ_ok | ((_tier == _k) & civics[:, _ci].view(B, 1, 1))
-            _fu = [can_fight & has_mp & alive & on_map
+            # CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any
+            # means" — neither as the actor nor as the host.
+            _no_form = ((utype == self._gdr_idx).unsqueeze(2)
+                        | (_h_type.reshape(B, N, 6) == self._gdr_idx))
+            _fu = [can_fight & has_mp & alive & on_map & ~_no_form
                    & _hok.reshape(B, N, 6) & (_h_seat.reshape(B, N, 6) == row)
                    & (_h_type.reshape(B, N, 6) == utype.unsqueeze(2))
                    & _civ_ok]

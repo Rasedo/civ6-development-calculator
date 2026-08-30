@@ -951,6 +951,7 @@ export function buildRules() {
     },
     // THE GIANT DEATH ROBOT'S FUTURE-ERA UPGRADES, each a seat TECH.
     gdr: {
+      upgradeId: GDR_UPGRADES.map((g) => g.id),
       upgradeTech: GDR_UPGRADES.map((g) => techIdx.get(g.tech) ?? -1),
       droneAA: GDR_DRONE_AA,
       particleBeamCS: GDR_PARTICLE_BEAM_CS,

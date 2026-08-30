@@ -50,10 +50,13 @@ describe('the siege roster', () => {
   });
 
   it('CIV6: a siege unit pays no city penalty — the -17 it owes is against land units', () => {
-    expect(cityRangedStrength('CATAPULT', WALLS_TIER_HP[1])).toBe(35);
-    expect(cityRangedStrength('CATAPULT', 0)).toBe(35);
+    const { state } = war();
+    const cat = { type: 'CATAPULT', seat: ATK };
+    const arc = { type: 'ARCHER', seat: ATK };
+    expect(cityRangedStrength(state, cat, WALLS_TIER_HP[1])).toBe(35);
+    expect(cityRangedStrength(state, cat, 0)).toBe(35);
     // an ordinary land ranged unit still pays it
-    expect(cityRangedStrength('ARCHER', WALLS_TIER_HP[1])).toBe(25 - 17);
+    expect(cityRangedStrength(state, arc, WALLS_TIER_HP[1])).toBe(25 - 17);
     expect(cityHitClass('CATAPULT', true)).toBe('bombard');
     expect(cityHitClass('CATAPULT', false)).toBe('bombard');
     expect(cityHitClass('ARCHER', true)).toBe('ranged');

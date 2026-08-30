@@ -133,7 +133,8 @@ class SimPhase:
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
         # CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is
         # the unit's own strength wherever it fights, a city's shot included.
-        def_e = def_e + (self._congress_unit_cs(d_type, _def_seat)
+        def_e = def_e + (self._gdr_beam_cs(d_type, d_seat)  # "...and when defending"
+                         + self._congress_unit_cs(d_type, _def_seat)
                          + self._gov_unit_cs(d_type, _def_seat)).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)

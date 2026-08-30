@@ -140,10 +140,10 @@ describe('the sortie', () => {
     // defending unit's Anti-Air Strength (even if its Combat Strength is
     // higher) or Combat Strength if it doesn't have any Anti-Air Strength."
     expect(antiAirOf(GUNNER)).toBeGreaterThan(0);
-    expect(airDefenseOf(GUNNER)).toBe(UNITS[GUNNER].antiAir);
-    expect(airDefenseOf('WARRIOR')).toBe(UNITS.WARRIOR.combat);
 
     const { state, pad } = airState();
+    expect(airDefenseOf(state, { type: GUNNER, seat: 1 })).toBe(UNITS[GUNNER].antiAir);
+    expect(airDefenseOf(state, { type: 'WARRIOR', seat: 1 })).toBe(UNITS.WARRIOR.combat);
     setWar(state, 0, 1, true);
     const fighter = spawnUnit(state, FIGHTER, pad.index, 0)!;
     const land = tileAtCoords(state.map, 8, 11);

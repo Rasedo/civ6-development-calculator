@@ -8,12 +8,12 @@
  * "has 2 slots initially, and can reach 4 slots after constructing the Hangar
  * and the Airport", and an Aircraft Carrier "starts with 2".
  */
-import { UNITS, UNIT_HP } from '../data/units';
+import { UNITS, UNIT_HP, GDR_DRONE_AA } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { citiesOf, civsAtWar, isTerritorial, seatOf, tileSeat, unitSeat } from './seats';
-import { cityAtIndex, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
+import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
@@ -286,6 +286,12 @@ export function antiAirOf(type: string): number {
   return UNITS[type]?.antiAir ?? 0;
 }
 
+/** CIV6 (Drone Air Defense): "Anti-Air Defense Strength increased to 130" —
+ *  an increase TO a figure, so the upgrade replaces the chassis stat. */
+export function antiAirAt(state: GameState, unit: { type: string; seat: number }): number {
+  return gdrHas(state, unit, 'DRONE_AIR_DEFENSE') ? GDR_DRONE_AA : antiAirOf(unit.type);
+}
+
 /** CIV6 (Anti-Air Gun, Mobile SAM): "Provides cover from air attacks up to 1
  *  hex away from the weapon." -1 for a chassis that covers nothing, so a hull
  *  is admitted by the naval clause below and by nothing else. */
@@ -319,7 +325,7 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   for (const t of tilesWithin(state.map, at.col, at.row, AIR_COVER_MAX)) {
     const d = hexDistance(at.col, at.row, t.col, t.row);
     for (const u of unitsAt(state, t.index)) {
-      const aa = antiAirOf(u.type);
+      const aa = antiAirAt(state, u);
       if (aa <= 0 || !unitsHostile(state, striker, u)) continue;
       if (d > antiAirCover(u.type) && !(d === 0 && UNITS[u.type]?.naval)) continue;
       const slot = COVER_SLOTS.indexOf(unitStackSlot(u) as (typeof COVER_SLOTS)[number]);
@@ -336,8 +342,8 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   return best;
 }
 
-export function airDefenseOf(type: string): number {
-  return antiAirOf(type) || (UNITS[type]?.combat ?? 0);
+export function airDefenseOf(state: GameState, unit: { type: string; seat: number }): number {
+  return antiAirAt(state, unit) || (UNITS[unit.type]?.combat ?? 0);
 }
 
 /** the seat's own count of based aircraft, for the training gate's message. */

@@ -68,13 +68,13 @@ from the list below.
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
-| C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), the Mountain Tunnel's clauses are unsourced here, clean-fallout and remove-improvement verbs |
+| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here; no unit removes a tile improvement |
 | C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization, the Consulate's Encampment half |
 | C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
-| C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
+| C-31 the nuclear device has no system behind it | 1 | the arsenal and the contaminated ground ship; nothing DETONATES — no launch verb, no blast walk, no interception, no diplomatic reaction |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
-| C-33 the Giant Death Robot's remaining abilities | 1 | its heal gate, district penalty and Future-era upgrades have no carrier |
+| C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
@@ -773,8 +773,10 @@ under their blocker so the dependency is readable, and both halves count.
 - **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1. The Fort, the
   Airstrip, both routes and the 20% charge ship; gate reachability is ZERO
   (no seed trains the chassis) and `engineer_test.py` pokes every rule.
-  OPEN, each blocked on a system:
-  - **THE MISSILE SILO** bases nuclear devices — C-31.
+  The MISSILE SILO ships (Rocketry, flat land, no plunder) and so does
+  **"Can clean Nuclear Fallout"** — `CLEAN_FALLOUT` / `_rk_clean`, offered
+  to any chassis holding a build charge, because the charge is the whole
+  gate the page states. What the silo is FOR is C-31's item. OPEN:
   - **THE MOUNTAIN TUNNEL.** No longer blocked on a plane: `passable` is
     state now (C-35's family), so a tile can start impassable and stop
     being so. What blocks it is the SOURCE — this repo has no reading of
@@ -782,16 +784,35 @@ under their blocker so the dependency is readable, and both halves count.
     what a step through it costs, and whether it makes the mountain itself
     passable or joins two tunnels) that is safe to build on. ASK THE OWNER
     before any of it is written; no branch ships on a guess.
-  - **"Can clean Nuclear Fallout"** waits on C-31; **"Can Remove Tile
-    Improvements"** is a verb neither engine has for any unit.
+  - **"Can Remove Tile Improvements"** is a verb neither engine has for
+    any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
     C-26.)
-- **C-31. THE NUCLEAR DEVICE HAS NO SYSTEM BEHIND IT.** Weight 1.
-  - **THE NUCLEAR AND THERMONUCLEAR DEVICE** — a one-shot weapon
-    delivered by a bomber, a silo or a submarine, with a blast radius,
-    persistent fallout tiles, and a diplomatic reaction. Neither engine
-    has an area-effect attack, a fallout tile state, or the Missile Silo
-    (C-20).
+- **C-31. THE NUCLEAR DEVICE HAS NO SYSTEM BEHIND IT.** Weight 1. The
+  ARSENAL and the GROUND ship. CIV6 (Nuclear weapons): both devices are
+  catalog rows (radius 1 / fallout 10 / range 12 / 14 Gold / 10 Uranium,
+  and 2 / 20 / 15 / 16 / 20); the Manhattan Project and Operation Ivy
+  unlock the two repeatable City Center builds; a finished device "is
+  added to the player's inventory", so it is a per-seat count
+  (`Seat.wmd` / `civ_wmd`) billing its Gold beside the seat's units, and
+  Second Strike Capability halves that bill. The Missile Silo is an
+  improvement (C-20). Contaminated ground is `Tile.falloutTurns` /
+  `tile_fallout` and every clause it carries — the countdown, the 50 HP a
+  turn that spares a Giant Death Robot, the unworkable tile, the district
+  and building and unit and purchase block, the heal and repair refusal —
+  with `CLEAN_FALLOUT` to take it back. Reach is ZERO: a device needs
+  Nuclear Fission, which no seed reaches in 250 turns, so the proof is
+  `tests/gpu/fallout_test.py` and `tests/cpu/map/fallout.test.ts`.
+  OPEN: **nothing DETONATES.** What is missing is the blow itself — a
+  per-device target head and the silo's own launch verb, the blast walk
+  that damages units and cities and paints the fallout ring, interception
+  by a Destroyer/Battleship/Missile Cruiser/Mobile SAM within a hex, the
+  bomber and submarine as delivery chassis, and the reaction: the
+  declaration on every seat caught in the blast, the war weariness a
+  launch costs, and the Nuclear Emergency. The catalog those need —
+  `NUCLEAR_INTERCEPTORS`, `NUCLEAR_CARRIERS`, `WW_WMD_LAUNCHED`, the
+  emergency row and its magnitudes — is already exported and read by
+  nothing.
 - **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
   AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER hold seven sourced rows
   each and ESPIONAGE seventeen (C-16), and with them: the chassis map
@@ -822,16 +843,43 @@ under their blocker so the dependency is readable, and both halves count.
   serve lane runs. The Espionage pool's reach is unmeasured for the same
   reason C-16's is: a level needs a spy fielded, sent, and carried through
   a successful offensive operation.
-- **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1. The
-  chassis, its fuel bill, Automaton Warfare's hooks and the water walk
-  ship — it moves and fights on Coast and Ocean "as it would on land"
-  (`waterWalks` / `unit_water_walk`: no embark, no seafaring tech, no
-  cliff, and its own pool and strength throughout), poke-proven on both
-  engines and reached by no seed. OPEN: it heals only in friendly
-  territory; it takes -17 Ranged Strength against district defenses and
-  naval units; and its four Future-era upgrades need per-unit upgrade
-  state keyed on a FUTURE-era tech, where the era ladder stops at
-  Information.
+- **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1. Every
+  published clause on the chassis now ships. The water walk — it moves
+  and fights on Coast and Ocean "as it would on land" (`waterWalks` /
+  `unit_water_walk`: no embark, no seafaring tech, no cliff, and its own
+  pool and strength throughout). "Can only heal in friendly territory" —
+  its own ground or an ally's, a WIDER bar than Twilight Valor's "outside
+  your territory", so the two are two predicates. "Cannot earn experience
+  or Promotions" (`xpEligible` / `_xp_eligible`) and "Cannot form Corps or
+  Armies by any means" (`formationBanned`, and the FORM_UP column refuses
+  the chassis as actor and as host). "-17 Ranged Strength against District
+  defenses and naval units" — the district half is `rangedCityPenalty`,
+  which every land ranged unit already pays, so `gdrNavalCS` /
+  `_gdr_naval_cs` carries the naval half alone.
+
+  THE FOUR FUTURE-ERA UPGRADES need no per-unit state after all: the page
+  says the chassis "gains additional abilities and upgrades via Future Era
+  technology research", so an upgrade is the SEAT's tech, empire-wide, and
+  `GDR_UPGRADES` / `_gdr_upgrade_tech` reads it off the research plane.
+  Drone Air Defense raises Anti-Air Defense Strength to 130 (`antiAirAt` /
+  `_anti_air_at`); the Particle Beam Siege Cannon waives the city penalty
+  and pays +30 against Cities and Encampments attacking and defending
+  (`gdrBeamCS` / `_gdr_beam_cs`); Enhanced Mobility pays +3 Moves; and
+  Reinforced Armor Plating pays +10 defending against land and naval units
+  (`gdrArmorCS` / `_gdr_armor_cs`). Advanced AI and Cybernetics joined the
+  Future tree to carry two of them.
+
+  Reach is ZERO — the chassis needs Robotics and the upgrades a Future-era
+  tech, which no seed reaches in 250 turns — so the proof is
+  `tests/gpu/robot_test.py` and `tests/cpu/units/robot.test.ts`.
+
+  OPEN: **what the Jump COSTS.** Enhanced Mobility "can perform a Jump
+  action to cross over mountain terrain"; a mountain hex is enterable to
+  the upgraded chassis here (`gdrJump`, and the same term on the GPU move
+  mask), at the tile's ordinary movement cost and with no head of its own.
+  Whether the real action spends the whole turn, costs a fixed pool, or
+  reaches further than one hex is not published anywhere this repo has.
+  ASK THE OWNER before any of it is written; no branch ships on a guess.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2. Bases, both heads, the
   sortie, the carrier and the scatter ship — and the sortie now rolls
   the promotion term on both sides (`promoCS` / `_promo_cs` with `vsAir`

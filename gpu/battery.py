@@ -342,6 +342,8 @@ def main() -> int:
                 ("engineer", [py, "tests/gpu/engineer_test.py"], 4),  # the Military Engineer: fort, airstrip, road, the 20% charge
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
+                ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT
+                ("robot", [py, "tests/gpu/robot_test.py"], 4),  # the Giant Death Robot chassis and its four Future-era upgrades
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

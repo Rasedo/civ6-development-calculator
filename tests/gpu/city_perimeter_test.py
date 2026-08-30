@@ -119,7 +119,7 @@ def test_siege_tables(sim) -> None:
         # "-17 Bombard Strength against land units" — the ranged column IS that
         assert int(sim._type_ranged_strength[i]) == v - int(sim._ranged_city_pen), \
             f"unit {i}: bombard {v} but ranged {int(sim._type_ranged_strength[i])}"
-        assert float(sim._city_ranged_strength(L(sim, i), L(sim, sim._walls_hp))[0]) == float(v), \
+        assert float(sim._city_ranged_strength(L(sim, i), L(sim, 0), L(sim, sim._walls_hp))[0]) == float(v), \
             "a siege unit pays no city penalty"
     chassis = [(i, int(sim._type_siege_support[i]), int(sim._type_siege_max_walls[i]))
                for i in range(sim.NU) if int(sim._type_siege_support[i]) > 0]
@@ -141,11 +141,11 @@ def test_ranged_strength(sim) -> None:
     assert naval >= 0, "no naval ranged unit in the roster"
     base = float(sim._type_ranged_strength[land])
     for outer in (sim._walls_hp, 0):
-        got = float(sim._city_ranged_strength(L(sim, land), L(sim, outer))[0])
+        got = float(sim._city_ranged_strength(L(sim, land), L(sim, 0), L(sim, outer))[0])
         assert got == base - sim._ranged_city_pen, f"land ranged owes the full penalty at outer {outer}: {got}"
     nb = float(sim._type_ranged_strength[naval])
-    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, sim._walls_hp))[0]) == nb - sim._ranged_city_pen
-    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, 0))[0]) == nb
+    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, 0), L(sim, sim._walls_hp))[0]) == nb - sim._ranged_city_pen
+    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, 0), L(sim, 0))[0]) == nb
     print(f"  penalty OK: land ranged always -{int(sim._ranged_city_pen)}, naval ranged only against Walls")
 
 

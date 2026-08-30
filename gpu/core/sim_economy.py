@@ -2810,6 +2810,12 @@ class SimEconomy:
             _rm = self._fx_by_row("raidermove").gather(1, _s0) \
                 * ((_sd >= 0) & (_sd < self.n_majors)).long()
             base = base + _rm * self._type_raider[typ].long()
+        # CIV6 (Enhanced Mobility): "+3 Moves." It rides the LAND arm only, as
+        # `unitFullMoves` does — the embarked arm below returns its own pool.
+        if self._gdr_idx >= 0:
+            base = base + self._gdr_has(
+                typ, getattr(self, f"{pre}_unit_seat"), self._gdr_u_moves
+            ).long() * self._gdr_enhanced_moves
         naval = self.unit_naval[typ]
         emb = getattr(self, f"{pre}_unit_emb") if self._embark_live else torch.zeros_like(naval)
         if self._embark_live:

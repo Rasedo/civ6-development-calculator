@@ -20,7 +20,7 @@ export function formationCS(unit: Unit): number {
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
-import { isWater, isImpassable, isCoastalLand, canalPassage, hullTile } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal, gpAppealResolver } from './appeal';
@@ -33,7 +33,7 @@ import { nextRandom } from './rand';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
+import { GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
@@ -586,7 +586,7 @@ export function tileFreeForUnit(
   allowEmbark = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
-  if (isImpassable(tile)) return false;
+  if (isImpassable(tile) && !gdrJump(state, unit, tile)) return false;
   // An AIRCRAFT is BASED, not stationed: several of them share one plot, none
   // of them holds it, and what gates the landing is the base's slot count
   // (`airBaseFree`), never the tile. CIV6 (Espionage): a Spy likewise
@@ -632,7 +632,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     !borderClosedTo(state, unit.seat, t, unit.type) &&
     (naval
       ? hullTile(t) && !isImpassable(t) && (canalPassage(t) || waterEnterable(state, t, unit))
-      : unitPassable(t, unit));
+      : unitPassable(t, unit) || gdrJump(state, unit, t));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
@@ -798,6 +798,30 @@ export function breakEscort(unit: Unit): RuleResult {
   return ok;
 }
 
+/** CIV6 (Giant Death Robot): the chassis "gains additional abilities and
+ *  upgrades via Future Era technology research" — an upgrade is the SEAT's
+ *  tech, empire-wide, with no per-unit state behind it. */
+export function gdrUpgrade(state: GameState, seat: number, id: string): boolean {
+  const def = GDR_UPGRADES.find((g) => g.id === id);
+  return !!def && isTechComplete(state, def.tech, seat);
+}
+
+/** the upgrade that reaches a UNIT: its chassis has to be the robot. */
+export function gdrHas(state: GameState, unit: { type: string; seat: number }, id: string): boolean {
+  return !!UNITS[unit.type]?.gdr && gdrUpgrade(state, unit.seat, id);
+}
+
+/** CIV6 (Enhanced Mobility): the robot "can perform a Jump action to cross
+ *  over mountain terrain" — one hex of mountain is simply enterable to this
+ *  chassis, which is what the action does over one hex. Ice and an impassable
+ *  wonder are not mountains and stay shut.
+ *
+ *  `unitPassable` stays the pure terrain predicate the GPU's `passable` plane
+ *  mirrors; a gate that knows the seat's research composes this beside it. */
+export function gdrJump(state: GameState, unit: { type: string; seat: number } | undefined, tile: Tile): boolean {
+  return !!unit && isMountain(tile) && gdrHas(state, unit, 'ENHANCED_MOBILITY');
+}
+
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
@@ -811,6 +835,8 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
   return MP_SCALE * (
     (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
+    // CIV6 (Enhanced Mobility): "+3 Moves."
+    + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)
     // an emergency member marches faster on its target's ground
     + emergencyMoveBonus(state, unit.seat,
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex])));
@@ -1419,6 +1445,11 @@ export function cityAtIndex(
     if (city) return { holder: actor, city };
   }
   return undefined;
+}
+
+/** CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any means." */
+export function formationBanned(type: string): boolean {
+  return !!UNITS[type]?.gdr;
 }
 
 export function disbandUnit(state: GameState, unitId: number): void {

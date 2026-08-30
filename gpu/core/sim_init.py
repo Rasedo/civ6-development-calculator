@@ -2175,10 +2175,17 @@ class SimInit:
         self._emg_nuke_loyalty_cut = float(_nuc["emergencyNukeLoyaltyCut"])
         _gdr = rules.gdr
         self._gdr_upgrade_tech = [int(x) for x in _gdr["upgradeTech"]]
+        # the upgrades address BY NAME: the catalog is the wire order, and a
+        # row appended to it must not move what a clause reads.
+        _gdr_ids = [str(x) for x in _gdr["upgradeId"]]
+        self._gdr_u_drone = _gdr_ids.index("DRONE_AIR_DEFENSE")
+        self._gdr_u_beam = _gdr_ids.index("PARTICLE_BEAM")
+        self._gdr_u_moves = _gdr_ids.index("ENHANCED_MOBILITY")
+        self._gdr_u_armor = _gdr_ids.index("REINFORCED_ARMOR")
         self._gdr_drone_aa = float(_gdr["droneAA"])
         self._gdr_particle_cs = float(_gdr["particleBeamCS"])
         self._gdr_enhanced_moves = int(_gdr["enhancedMoves"])
-        self._gdr_armor_cs = float(_gdr["armorPlatingCS"])
+        self._gdr_plate_cs = float(_gdr["armorPlatingCS"])
         self._gdr_naval_penalty = float(_gdr["navalPenalty"])
         _st = rules.strategic
         self._strat_rid = [int(x) for x in _st["rid"]]
