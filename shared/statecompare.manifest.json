@@ -1053,6 +1053,17 @@
           "note": "DIRECTED: the row is what that seat GRANTS, never what it holds."
         },
         {
+          "name": "delegations",
+          "compare": "exact",
+          "covers": [
+            "GameState.delegations"
+          ],
+          "planes": [
+            "seat_delegation"
+          ],
+          "note": "DIRECTED and indefinite: the row is the missions that seat SENDS, carried as a 1 so the pair-clock reader serves it."
+        },
+        {
           "name": "co2",
           "compare": "milli",
           "covers": [

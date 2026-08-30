@@ -41,7 +41,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { allyTurnsWith, borderTurnsFrom, citiesOf, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
@@ -496,6 +496,7 @@ const SEAT: Record<string, Extractor> = {
   allyTurns: overSeats((s, state) => agreementClockLine(state, s.seat, allyTurnsWith)),
   // DIRECTED: what this seat GRANTS, never what it was granted.
   borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
+  delegations: overSeats((s, state) => agreementClockLine(state, s.seat, delegationWith)),
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 

@@ -85,11 +85,11 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -290,6 +290,7 @@ function defensivePact(state: GameState, aggressor: number, victim: number): voi
     cancelRoutesBetween(state, ally.seat, aggressor);
     setBorderTurnsFrom(state, ally.seat, aggressor, 0);
     setBorderTurnsFrom(state, aggressor, ally.seat, 0);
+    clearDelegations(state, ally.seat, aggressor);
     state.eventLog.push(`${ally.name} honours its alliance and joins the war.`);
   }
 }
@@ -977,6 +978,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // war opens the border it was lifting.
         setBorderTurnsFrom(state, actor.seat, foe, 0);
         setBorderTurnsFrom(state, foe, actor.seat, 0);
+        // CIV6: "when war is declared, delegations and ambassadors are kicked
+        // out" — the pair loses both halves, not the declarer's.
+        clearDelegations(state, actor.seat, foe);
         const formal = denounceCasusBelli(state, actor.seat, foe);
         setWarFormal(state, actor.seat, foe, formal);
         grievanceWarDeclared(state, actor.seat, foe, formal);
@@ -1418,6 +1422,30 @@ export function seatPhase(state: GameState): void {
       if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
       setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
       state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
+    }
+  }
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const tj of recG?.delegation ?? []) {
+      const target = seatOf(state, tj);
+      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+      if (delegationWith(state, actor.seat, target.seat) > 0) continue;
+      // CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
+      // the Delegation once Diplomatic Service is in, so the mission is one
+      // fact and the sender's own civics say what it costs.
+      const cost = actor.research.civics.includes(EMBASSY_CIVIC) ? EMBASSY_COST : DELEGATION_COST;
+      if ((actor.treasury ?? 0) < cost) continue;
+      // A rival worse than Neutral turns the mission away, and this model
+      // reads that as the two states it can name: a war, or a denouncement
+      // either way.
+      if (civsAtWar(state, actor.seat, target.seat)) continue;
+      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+      // "...which is paid to the other leader."
+      actor.treasury = (actor.treasury ?? 0) - cost;
+      target.treasury = (target.treasury ?? 0) + cost;
+      setDelegationWith(state, actor.seat, target.seat, 1);
+      state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
     }
   }
   for (const actor of state.seats) {

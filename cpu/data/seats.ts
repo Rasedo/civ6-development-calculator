@@ -669,6 +669,15 @@ export const AGREEMENT_TURNS = 30;
  *  worth one level, and the ceiling is the last of them. */
 export const VISIBILITY_LEVELS = ['NONE', 'LIMITED', 'OPEN', 'SECRET', 'TOP_SECRET'] as const;
 export const VISIBILITY_MAX = VISIBILITY_LEVELS.length - 1;
+/** CIV6 (Delegations and Embassies): "Delegations cost 10 Gold and Embassies
+ *  cost 25 Gold, which is paid to the other leader", each worth "1 level of
+ *  Diplomatic Visibility". The Resident Embassy "replaces" the Delegation once
+ *  its civic is in, so a seat holds ONE mission with another and pays whatever
+ *  its own civics make that mission cost. */
+export const DELEGATION_COST = 10;
+export const EMBASSY_COST = 25;
+export const EMBASSY_CIVIC = 'DIPLOMATIC_SERVICE';
+
 /** the technology whose research "will increase your visibility with ALL
  *  civilizations by one level". */
 export const VISIBILITY_TECH = 'PRINTING';

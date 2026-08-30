@@ -339,6 +339,9 @@ class SimSeats:
                 self.seat_borders_turns[:, _g, _h] = torch.where(
                     join, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
                     self.seat_borders_turns[:, _g, _h])
+                self.seat_delegation[:, _g, _h] = torch.where(
+                    join, torch.zeros_like(self.seat_delegation[:, _g, _h]),
+                    self.seat_delegation[:, _g, _h])
 
     def _apply_war_column(self, row: int, war: torch.Tensor) -> None:
         targets = self.war_targets(row)
@@ -375,6 +378,11 @@ class SimSeats:
                     self.seat_borders_turns[:, _g, _h] = torch.where(
                         declare, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
                         self.seat_borders_turns[:, _g, _h])
+                    # CIV6: "when war is declared, delegations and ambassadors
+                    # are kicked out" — the pair loses both halves.
+                    self.seat_delegation[:, _g, _h] = torch.where(
+                        declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
+                        self.seat_delegation[:, _g, _h])
                 _formal = declare & self._denounce_casus_belli(row, tgt)
                 self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
                 self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
@@ -8744,6 +8752,30 @@ class SimSeats:
                     self.seat_ally_turns[:, _x, _y] = torch.where(
                         form, torch.full_like(self.seat_ally_turns[:, _x, _y], term),
                         self.seat_ally_turns[:, _x, _y])
+
+        for a, b, ok in pairs("delegation"):
+            # CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
+            # the Delegation once Diplomatic Service is in, so the mission is
+            # one fact and the sender's own civics say what it costs. A rival
+            # worse than Neutral turns it away, which this model reads as the
+            # two states it can name: a war, or a denouncement either way.
+            emb = (self.civ_civics[:, a, self._embassy_civic]
+                   if 0 <= self._embassy_civic < self.civ_civics.shape[2]
+                   else torch.zeros_like(ok))
+            cost = torch.where(emb, torch.full_like(self.civ_treasury[:, a], self._embassy_cost),
+                               torch.full_like(self.civ_treasury[:, a], self._deleg_cost))
+            send = (ok & (self.seat_delegation[:, a, b] == 0) & ~self.war[:, a, b]
+                    & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
+                    & (self.civ_treasury[:, a] >= cost))
+            if bool(send.any()):
+                z = torch.zeros_like(cost)
+                paid = torch.where(send, cost, z)
+                # "...which is paid to the other leader."
+                self.civ_treasury[:, a] = self.civ_treasury[:, a] - paid
+                self.civ_treasury[:, b] = self.civ_treasury[:, b] + paid
+                self.seat_delegation[:, a, b] = torch.where(
+                    send, torch.ones_like(self.seat_delegation[:, a, b]),
+                    self.seat_delegation[:, a, b])
 
         for a, b, ok in pairs("borders"):
             # CIV6 (Open Borders): the agreement "becomes available" once the

@@ -65,7 +65,7 @@ from the list below.
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
-| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the delegation and the embassy, the negotiated two-sided deal, and the agreements that need one |
+| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
@@ -531,17 +531,22 @@ under their blocker so the dependency is readable, and both halves count.
     the Recommission project that resets it — has no clock.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. The 30-turn agreement clock,
   friendship, the alliance with its defensive pact, the denouncement, open
-  and CLOSED borders, the Great Work gift and DIPLOMATIC VISIBILITY all
-  ship on the wire and in the observation. Visibility is five levels —
-  "None, Limited, Open, Secret, and Top Secret" — one per source, DERIVED
-  rather than stored (`diploVisibility` / `_diplo_vis`), because every
-  input is state both engines already compare: a trade route to that civ,
+  and CLOSED borders, the Great Work gift, the DELEGATION and Resident
+  Embassy, and DIPLOMATIC VISIBILITY all ship on the wire, and the
+  opponent block renders visibility BOTH ways, because the GAP is what
+  the combat term reads. Visibility is five levels — "None, Limited,
+  Open, Secret, and Top Secret" — one per source, DERIVED rather than
+  stored (`diploVisibility` / `_diplo_vis`), because every input is state
+  both engines already compare: a trade route to that civ, a mission,
   the Printing tech's level with everyone, and the Listening Post or the
   alliance, which "do not add separate Diplomatic Visibility levels".
   What it buys is "Intel on enemy movements", +3 Combat Strength per level
   of the gap to the side that is ahead (`visibilityCS` / `_vis_cs`), at
   every site the barbarian pair-term already rides plus theological
-  combat. OPEN:
+  combat. REACH, over the driven 12x250 probe: a mission in 12/12 seeds
+  from t4, and every level of the ladder is entered — Limited 12/12 from
+  t4, Open 12/12 from t105, Secret 9/12 from t115, Top Secret 2/12 from
+  t187. OPEN:
   - **ALLIANCE TYPES AND LEVELS.** The Alliances page names five types —
     Research, Cultural, Military, Religious, Economic — says "the effects
     of these levels are cumulative", and that points accrue "every turn"
@@ -556,14 +561,18 @@ under their blocker so the dependency is readable, and both halves count.
     share the Suzerain bonus of all city-states of which they are
     Suzerain") — but all four are gated on the type-and-level machinery,
     which cannot be built without the thresholds.
-  - **THE DELEGATION AND THE EMBASSY** are not modelled, and they are a
-    published visibility source: "Delegations cost 10 Gold and Embassies
-    cost 25 Gold, which is paid to the other leader", each worth "1 level
-    of Diplomatic Visibility" plus "a small positive bonus in your
-    relationship", with the Embassy replacing the Delegation at Diplomatic
-    Service and the two never stacking. Unlike the other three sources
-    this one is a VERB — a new wire column, an applier and a mask arm —
-    so a seat here can reach 4 levels only through the sources it has.
+  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP.** The delegation
+    itself ships — "Delegations cost 10 Gold and Embassies cost 25 Gold,
+    which is paid to the other leader", one directed mission per pair,
+    indefinite, the Embassy's price once Diplomatic Service is in, and war
+    kicking both halves out — but the page also gives it "a small positive
+    bonus in your relationship with that leader", and no source puts a
+    number on that bonus. Nothing here carries it. Two clauses around it
+    are this model's own and say so in the code: the refusal reads "a
+    rival worse than Neutral will not accept" as the two states the
+    engines can name (a war, or a denouncement either way), because there
+    is no opinion scale to compare; and the AI's own send is the driver's
+    scan, not a published rule.
   - **WHETHER THE INTEL BONUS APPLIES TO A CITY ATTACK IS UNSOURCED.** The
     bonus is stated for "every military encounter"; nothing published says
     whether a unit attacking a city or an encampment carries it. Both

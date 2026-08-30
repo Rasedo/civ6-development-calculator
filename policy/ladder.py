@@ -15,7 +15,7 @@ PER_CS = 5    # met, envoys/6, hasQuest, atWar, warTurns/14
 # everything measured from the asker's own point of view. The last four are
 # RAW and unscaled for the same reason the ctx block is: the DoW policy
 # compares them exactly.
-PER_CIV = 13
+PER_CIV = 15
 PER_CIV_FIELDS = (
     "atWar",          # 0/1: this seat is at war with that opponent
     "warTurns",       # THAT war's own clock / 14
@@ -34,6 +34,10 @@ PER_CIV_FIELDS = (
     "bordersOut",     # this seat's grant to them / 30
     "denounceOut",    # this seat's denouncement of them / 30
     "denounceIn",     # theirs of this seat / 30
+    # ...and how much of each other the two can SEE, both ways: the gap is
+    # a combat term, so a policy that cannot read it cannot price a fight.
+    "visOut",         # this seat's diplomatic visibility of them / 4
+    "visIn",          # theirs of this seat / 4
 )
 ESCALATORS = 3  # district, settler, builder — the only NON-static prices
 # The CTX block: the decide-time counters no mask can express, carried IN

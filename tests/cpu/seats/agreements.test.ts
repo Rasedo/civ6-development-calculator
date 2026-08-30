@@ -24,12 +24,13 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import {
-  allyTurnsWith, borderTurnsFrom, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
+  allyTurnsWith, borderTurnsFrom, delegationWith, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
   friendTurnsWith, seatsAllied, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith,
   setTileOwner, setWar, tileSeat, visibilityCS, warIsFormal,
 } from '../../../cpu/core/seats';
 import {
   VISIBILITY_CS_PER_LEVEL, VISIBILITY_LEVELS, VISIBILITY_MAX, VISIBILITY_TECH,
+  DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC,
 } from '../../../cpu/data/seats';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL, SPY_UNIT } from '../../../cpu/data/espionage';
 import { defenderCS } from '../../../cpu/core/combat';
@@ -195,6 +196,78 @@ describe('the agreements run on one 30-turn clock', () => {
     play(s2, { 1: { war: 1 } });
     expect(s2.seats[1].wars).toContain(2);
     expect(s2.seats[0].wars).not.toContain(2);
+  });
+});
+
+describe('the delegation and the resident embassy', () => {
+  const rich = (state: GameState) => {
+    for (const s of state.seats) s.treasury = 1000;
+  };
+
+  it('costs the sender, pays the target, and buys a level of visibility', () => {
+    // CIV6 (Delegations and Embassies): "Delegations cost 10 Gold and
+    // Embassies cost 25 Gold, which is paid to the other leader", each worth
+    // "1 level of Diplomatic Visibility".
+    const state = table();
+    rich(state);
+    play(state, { 1: { delegation: [2] } });
+    expect(delegationWith(state, 1, 2)).toBe(1);
+    expect(delegationWith(state, 2, 1)).toBe(0);
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
+    expect(state.seats[2].treasury).toBe(1000 + DELEGATION_COST);
+    expect(diploVisibility(state, 1, 2)).toBe(1);
+    expect(diploVisibility(state, 2, 1)).toBe(0);
+  });
+
+  it('is one mission per pair, and the embassy is what replaces it', () => {
+    const state = table();
+    rich(state);
+    play(state, { 1: { delegation: [2] } });
+    play(state, { 1: { delegation: [2] } });
+    // "Once Embassies are available, establishing an Embassy will replace
+    // this" — one fact, so a second send buys nothing and costs nothing.
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
+    expect(diploVisibility(state, 1, 2)).toBe(1);
+    // ...and the sender's own civics are what price a NEW mission
+    state.seats[1].research.civics.push(EMBASSY_CIVIC);
+    play(state, { 1: { delegation: [0] } });
+    expect(delegationWith(state, 1, 0)).toBe(1);
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - EMBASSY_COST);
+  });
+
+  it('a denounced rival turns it away, and an empty purse cannot send', () => {
+    const state = table();
+    rich(state);
+    play(state, { 1: { denounce: [2] } });
+    expect(denounceActive(state, 1, 2)).toBe(true);
+    play(state, { 1: { delegation: [2] } });
+    expect(delegationWith(state, 1, 2)).toBe(0);
+    expect(state.seats[1].treasury).toBe(1000);
+    // ...and the same refusal reads the other direction
+    const other = table();
+    rich(other);
+    play(other, { 2: { denounce: [1] } });
+    play(other, { 1: { delegation: [2] } });
+    expect(delegationWith(other, 1, 2)).toBe(0);
+
+    const broke = table();
+    for (const s of broke.seats) s.treasury = DELEGATION_COST - 1;
+    play(broke, { 1: { delegation: [2] } });
+    expect(delegationWith(broke, 1, 2)).toBe(0);
+  });
+
+  it('war kicks both missions out', () => {
+    // CIV6: "when war is declared, delegations and ambassadors are kicked
+    // out, so you lose that level of diplomatic visibility."
+    const state = table();
+    rich(state);
+    play(state, { 1: { delegation: [2] }, 2: { delegation: [1] } });
+    expect(delegationWith(state, 1, 2)).toBe(1);
+    expect(delegationWith(state, 2, 1)).toBe(1);
+    play(state, { 1: { war: 1 } });
+    expect(delegationWith(state, 1, 2)).toBe(0);
+    expect(delegationWith(state, 2, 1)).toBe(0);
+    expect(diploVisibility(state, 1, 2)).toBe(0);
   });
 });
 

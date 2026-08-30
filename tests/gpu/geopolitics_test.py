@@ -112,7 +112,8 @@ def clear_pairs(sim):
     sim.war_turns[:, :nrow, :nrow] = 0
     sim.seat_warkind[:, :nrow, :nrow] = False
     sim.seat_denounced[:, :nrow, :nrow] = -1
-    for _p in (sim.seat_friend_turns, sim.seat_ally_turns, sim.seat_borders_turns):
+    for _p in (sim.seat_friend_turns, sim.seat_ally_turns, sim.seat_borders_turns,
+               sim.seat_delegation):
         _p[:, :nrow, :nrow] = 0
     sim.ww[:] = 0
 
@@ -704,6 +705,55 @@ def _round_trips(name: str, mut) -> bool:
     base = name[2:] if name.startswith("r_") else name
     return f"civ_{base}" in mut
 
+def poke_delegation(rules, path):
+    """i4. THE DELEGATION and the RESIDENT EMBASSY: the sender pays, the target
+    is paid, the mission is one per pair and indefinite, a denouncement turns
+    it away and a war kicks both halves out."""
+    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
+    a, b = 1, 2
+    sim.civ_treasury[:] = 1000.0
+    sim.civ_civics[0, a, sim._embassy_civic] = False
+    want(sim, a, "delegation", b)
+    assert int(sim.seat_delegation[0, a, b]) == 1
+    assert int(sim.seat_delegation[0, b, a]) == 0, "the mission is DIRECTED"
+    # "...which is paid to the other leader."
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost
+    assert float(sim.civ_treasury[0, b]) == 1000.0 + sim._deleg_cost
+    assert int(sim._diplo_vis()[0, a, b]) == 1 and int(sim._diplo_vis()[0, b, a]) == 0
+
+    # one per pair: a second send buys nothing and costs nothing
+    want(sim, a, "delegation", b)
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost
+    # ...and the sender's own civics price a NEW mission
+    sim.civ_civics[0, a, sim._embassy_civic] = True
+    want(sim, a, "delegation", 0)
+    assert int(sim.seat_delegation[0, a, 0]) == 1
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost - sim._embassy_cost
+
+    # a denouncement either way turns it away, and so does an empty purse
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    sim.seat_denounced[0, b, a] = int(sim.turn)
+    want(sim, a, "delegation", b)
+    assert int(sim.seat_delegation[0, a, b]) == 0, "a denouncer accepted a mission"
+    assert float(sim.civ_treasury[0, a]) == 1000.0
+    clear_pairs(sim)
+    sim.civ_treasury[:] = sim._deleg_cost - 1.0
+    want(sim, a, "delegation", b)
+    assert int(sim.seat_delegation[0, a, b]) == 0, "an empty purse sent a mission"
+
+    # CIV6: "when war is declared, delegations and ambassadors are kicked out"
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    sim.seat_delegation[0, a, b] = sim.seat_delegation[0, b, a] = 1
+    head_war(sim, a, b)
+    assert bool(sim.war[0, a, b]), "the declaration must land for the rest of this check"
+    assert int(sim.seat_delegation[0, a, b]) == 0 and int(sim.seat_delegation[0, b, a]) == 0, (
+        "war left a mission standing"
+    )
+    print("  i4 mission OK (paid to the other leader, one per pair, denounce-gated, war clears)")
+
+
 def poke_visibility(rules, path):
     """j. DIPLOMATIC VISIBILITY: five levels, one per source, the post and the
     alliance as alternatives, and the Combat Strength the leading side keeps.
@@ -779,6 +829,7 @@ def main() -> None:
     poke_ww_differential(rules, path)
     poke_transfer(rules, path)
     poke_float32(rules, path)
+    poke_delegation(rules, path)
     poke_visibility(rules, path)
     print("GEOPOLITICS POKES OK")
 

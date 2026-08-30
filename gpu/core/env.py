@@ -225,6 +225,7 @@ class BatchEnv:
         # opponent to declare on. RAW and unscaled, like the ctx block and for
         # the same reason. The AGREEMENT clocks close the block: every one of
         # them is the precondition of a verb this seat can play here.
+        vis = s._diplo_vis()
         opp_cols = []
         for o in range(s.n_majors):
             if o == row:
@@ -253,12 +254,14 @@ class BatchEnv:
                         s.seat_borders_turns[:, row, o].to(d) / s._agreement_turns,
                         s._denounce_left(row, o).to(d) / s._agreement_turns,
                         s._denounce_left(o, row).to(d) / s._agreement_turns,
+                        vis[:, row, o].to(d) / s._vis_max,
+                        vis[:, o, row].to(d) / s._vis_max,
                     ],
                     dim=1,
                 )
             )
         cv = (torch.stack(opp_cols, dim=1) if opp_cols
-              else torch.zeros(B, 0, 7, dtype=d, device=dev))
+              else torch.zeros(B, 0, 0, dtype=d, device=dev))
         return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
                           torch.stack(self._escalators(s.civ_techs[:, row], s.civ_civics[:, row],
                                                        s.civ_builders_trained[:, row],

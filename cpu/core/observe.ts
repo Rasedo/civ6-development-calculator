@@ -11,9 +11,9 @@
  * every seat.
  */
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
-import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
+import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, diploVisibility, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG } from '../data/seats';
+import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
 import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn } from './boosts';
@@ -75,7 +75,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   // The DoW terms are rendered PER OPPONENT so the policy can choose WHICH
   // one to declare on. RAW and unscaled, like the ctx block and for the same
   // reason. The AGREEMENT clocks close the block: every one of them is the
-  // precondition of a verb this seat can play against this opponent.
+  // precondition of a verb this seat can play against this opponent, and
+  // the two visibility levels close it: their GAP is a combat term.
   //
   // `gpu/core/env.py:BatchEnv.observe` renders the identical layout — the two
   // engines must move together here, and the gate compares them field for
@@ -97,6 +98,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       borderTurnsFrom(state, seat, o.seat) / AGREEMENT_TURNS,
       denounceLeft(state, seat, o.seat) / AGREEMENT_TURNS,
       denounceLeft(state, o.seat, seat) / AGREEMENT_TURNS,
+      diploVisibility(state, seat, o.seat) / VISIBILITY_MAX,
+      diploVisibility(state, o.seat, seat) / VISIBILITY_MAX,
     );
   }
   const per: number[] = [];

@@ -305,6 +305,9 @@ export function diploVisibility(state: GameState, viewer: number, target: number
   // "Establish a Trade Route to a civilization to increase visibility by one
   // level."
   if ((sx.tradeRoutes ?? []).some((r) => r.toSeat === target)) n += 1;
+  // "Send a Delegation to a civilization to increase visibility by one level.
+  // Once Embassies are available, establishing an Embassy will replace this."
+  if (delegationWith(state, viewer, target) > 0) n += 1;
   // "...researching the Printing Press technology. This will increase your
   // visibility with ALL civilizations by one level."
   if (sx.research.techs.includes(VISIBILITY_TECH)) n += 1;
@@ -334,6 +337,25 @@ export function setBorderTurnsFrom(state: GameState, grantor: number, guest: num
   if (grantor === guest) return;
   if (!state.borderTurns) state.borderTurns = {};
   state.borderTurns[grantKey(grantor, guest)] = v;
+}
+
+/** Does `sender` hold a Delegation or Resident Embassy with `target`? */
+export function delegationWith(state: GameState, sender: number, target: number): number {
+  if (sender === target) return 0;
+  return state.delegations?.[grantKey(sender, target)] ?? 0;
+}
+
+export function setDelegationWith(state: GameState, sender: number, target: number, v: number): void {
+  if (sender === target) return;
+  if (!state.delegations) state.delegations = {};
+  state.delegations[grantKey(sender, target)] = v;
+}
+
+/** CIV6: war "kicks out" the missions both ways, so the pair is cleared, not
+ *  the sender's half. */
+export function clearDelegations(state: GameState, a: number, b: number): void {
+  setDelegationWith(state, a, b, 0);
+  setDelegationWith(state, b, a, 0);
 }
 
 /** Is `a`'s denouncement of `b` still running? CIV6: "A Denunciation lasts for

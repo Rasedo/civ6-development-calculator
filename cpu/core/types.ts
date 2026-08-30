@@ -193,6 +193,9 @@ export interface SeatActionRecord {
   friend?: number[];
   /** OPEN BORDERS: the seats this one GRANTS passage to. Directed. */
   borders?: number[];
+  /** DELEGATION / RESIDENT EMBASSY: the seats this one sends a mission to.
+   *  Directed, one per pair, and the sender pays for it. */
+  delegation?: number[];
   /** GREAT WORKS given away: [work kind, recipient seat] each. The kind
    *  indexes GW_KINDS. WHICH city gives and WHICH receives is not a decision —
    *  the works are counts, not identities, so both engines take the giver's
@@ -266,6 +269,9 @@ export interface GameState {
    *  DIRECTED, because granting is one-way: "Granting open borders to a rival
    *  doesn't mean that rival also grants open borders to you." */
   borderTurns?: Record<string, number>;
+  /** DIRECTED, 1 where this seat holds a mission with that one. Indefinite:
+   *  a war is what ends it, never a clock. */
+  delegations?: Record<string, number>;
   /** the CLIMATE PHASE the world has reached, 0 = Phase I; absent or -1 =
    *  no climate change yet. Monotone: it never steps back. */
   climateIdx?: number;

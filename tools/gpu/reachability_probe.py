@@ -85,6 +85,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "csWar", "csPeace", "specPin", "tileLock", "ballot",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
+        "mission", "visibility1", "visibility2", "visibility3", "visibility4",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
         "royalSociety", "boostOffer",
@@ -318,6 +319,10 @@ def main() -> None:
         mark("friendship", (sim.seat_friend_turns > 0).any(dim=2).any(dim=1), t)
         mark("alliance", (sim.seat_ally_turns > 0).any(dim=2).any(dim=1), t)
         mark("openBorders", (sim.seat_borders_turns > 0).any(dim=2).any(dim=1), t)
+        mark("mission", (sim.seat_delegation > 0).any(dim=2).any(dim=1), t)
+        _v = sim._diplo_vis()
+        for _lv in range(1, sim._vis_max + 1):
+            mark(f"visibility{_lv}", (_v >= _lv).any(dim=2).any(dim=1), t)
         # A CLOSED border is only a rule where a unit actually stands against
         # one: the refusal, not the civic.
         _ut = sim.unit_type.clamp(min=0)

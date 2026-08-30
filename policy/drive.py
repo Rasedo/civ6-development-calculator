@@ -821,8 +821,9 @@ def _geo_turn(sim, seeds=None):
     frd = torch.zeros_like(den)
     bord = torch.zeros_like(den)
     gift = torch.zeros(B, ladder.GW_KINDS, nrow, nrow, dtype=torch.bool, device=dev)
+    deleg = torch.zeros_like(den)
     if sim.n_majors < 2:
-        return den, frd, ally, bord, gift
+        return den, frd, ally, bord, gift, deleg
     rr = sim.rules.seats
     n_c = sim.city_alive[:, :nrow].sum(dim=2)
     alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)
@@ -877,28 +878,38 @@ def _geo_turn(sim, seeds=None):
             )
             # A gift goes to a FRIEND, and only down the gradient: the richer
             # holder of that kind gives, which settles rather than ping-pongs.
+            # A mission is cheap, permanent and pays visibility, so a seat
+            # sends one to every quiet rival it has none with and can afford.
+            _emb = (sim.civ_civics[:, a, sim._embassy_civic]
+                    if 0 <= sim._embassy_civic < sim.civ_civics.shape[2]
+                    else torch.zeros_like(quiet))
+            _cost = torch.where(_emb, torch.full_like(sim.civ_treasury[:, a], sim._embassy_cost),
+                                torch.full_like(sim.civ_treasury[:, a], sim._deleg_cost))
+            deleg[:, a, b] = (quiet & (sim.seat_delegation[:, a, b] == 0)
+                              & (sim.civ_treasury[:, a] >= _cost))
             trusted = (sim.seat_friend_turns[:, a, b] > 0) | (sim.seat_ally_turns[:, a, b] > 0)
             for kind in range(ladder.GW_KINDS):
                 held = gw_planes[kind]
                 mine = (held[:, a] * sim.city_alive[:, a].long()).sum(dim=1)
                 theirs = (held[:, b] * sim.city_alive[:, b].long()).sum(dim=1)
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (mine > theirs)
-    return den, frd, ally, bord, gift
+    return den, frd, ally, bord, gift, deleg
 
 
 def geo_decide_and_apply(sim, seeds=None):
     geo = _geo_turn(sim, seeds)
-    den, frd, ally, bord, gift = geo
+    den, frd, ally, bord, gift, deleg = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
-                      borders=bord[:, row], gift=gift[:, :, row])
+                      borders=bord[:, row], gift=gift[:, :, row], delegation=deleg[:, row])
     return geo
 
 
 def _extract_geo(geo, row: int, b: int) -> dict:
-    den, frd, ally, bord, gift = geo
+    den, frd, ally, bord, gift, deleg = geo
     out = {}
-    for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord)):
+    for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord),
+                       ("delegation", deleg)):
         tl = want[b, row].nonzero(as_tuple=True)[0].tolist()
         if tl:
             out[name] = tl
@@ -1290,7 +1301,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         return m
 
     geo_kwargs = {}
-    for _name in ("denounce", "friend", "ally", "borders"):
+    for _name in ("denounce", "friend", "ally", "borders", "delegation"):
         if rec.get(_name):
             geo_kwargs[_name] = _geo_mask(rec[_name])
     if rec.get("gift"):

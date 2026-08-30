@@ -519,6 +519,7 @@ SEAT = {
     "allyTurns": _seat_pair_clock("seat_ally_turns"),
     # DIRECTED: the row is what that seat GRANTS, never what it holds.
     "borderTurns": _seat_pair_clock("seat_borders_turns"),
+    "delegations": _seat_pair_clock("seat_delegation"),
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 

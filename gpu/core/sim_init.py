@@ -378,6 +378,9 @@ class SimInit:
         self.seat_friend_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.seat_ally_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.seat_borders_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # DIRECTED, 1 where the row seat holds a Delegation or Resident Embassy
+        # with the column seat. Indefinite: a war ends it, never a clock.
+        self.seat_delegation = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # the ANNOUNCED slate for the next Regular Session (resolution
         # indices; -1 = empty slot), drawn at the previous session's close.
@@ -487,6 +490,9 @@ class SimInit:
         self._vis_max = int(_er2["visibilityMax"])
         self._vis_cs_per_level = int(_er2["visibilityCsPerLevel"])
         self._vis_tech = int(_er2["visibilityTech"])
+        self._deleg_cost = float(_er2["delegationCost"])
+        self._embassy_cost = float(_er2["embassyCost"])
+        self._embassy_civic = int(_er2["embassyCivic"])
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])

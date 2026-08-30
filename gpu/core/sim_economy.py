@@ -1707,6 +1707,10 @@ class SimEconomy:
         # one level."
         ds = self.seat_route_dseat[:, :NM]                       # [B, NM, K]
         out = (ds.unsqueeze(3) == tgt.view(1, 1, 1, NM)).any(dim=2).long()
+        # "Send a Delegation to a civilization to increase visibility by one
+        # level. Once Embassies are available, establishing an Embassy will
+        # replace this."
+        out = out + (self.seat_delegation[:, :NM, :NM] > 0).long()
         # "...researching the Printing Press technology. This will increase
         # your visibility with ALL civilizations by one level."
         if 0 <= self._vis_tech < self.civ_techs.shape[2]:
