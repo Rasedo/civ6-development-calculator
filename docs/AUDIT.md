@@ -64,7 +64,7 @@ from the list below.
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **23** | |
-| C-1 POWER | 1 | two of the four renewables are blocked (C-39, C-40); the accident roll and the decommission projects' score are unpublished |
+| C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
@@ -79,10 +79,11 @@ from the list below.
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
-| C-39 no water improvement has a carrier | 1 | `validImprovementsIn` refuses every water plot and no unit can stand there; Fishing Boats and the Offshore Wind Farm both wait on it |
-| C-40 the feature roster is seven rows | 2 | no Geothermal Fissure, Ley Line, Volcanic Soil or Cataract — three shipped clauses read features that cannot exist |
-| **C. Absent systems** | **28** | |
-| **OPEN, TOTAL** | **52** | |
+| C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
+| C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
+| C-42 no improvement's yields scale with a technology | 2 | eight improvement families carry published per-tech raises; only the Mine has a channel, hardwired to itself |
+| **C. Absent systems** | **30** | |
+| **OPEN, TOTAL** | **54** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -661,13 +662,12 @@ under their blocker so the dependency is readable, and both halves count.
     says 100 and no first-party page reached states any figure, so the
     window (B-22r) counts the emission gap alone until the owner rules on
     the magnitude.
-  - **THE GEOTHERMAL PLANT** (+4 Power, Synthetic Materials) stands on a
-    Geothermal Fissure, and this world model has no feature row for one —
-    blocked on C-40.
   - **THE OFFSHORE WIND FARM** (+2 Power, Predictive Systems) stands on
-    Coast or Lake, and no unit can build on water here — blocked on C-39.
-    Its unlock is a Future-era technology whose prerequisites the game
-    randomizes, so it has no canonical edge to transcribe either.
+    Coast or Lake. A Builder reaches a water plot now, so the carrier is no
+    longer what stops it: its unlock is a FUTURE-ERA technology this tech
+    tree does not hold, and one whose prerequisites the game RANDOMIZES per
+    match, so there is no canonical edge to transcribe. The row waits on a
+    Future era, not on a rule.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
     `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous
     while it stands: a minor holds no building that asks for Power and no
@@ -1113,24 +1113,47 @@ under their blocker so the dependency is readable, and both halves count.
   because no minor Harbor exists (B-31r), and FABRICATE SCANDAL has no
   district registry to target (C-16). Real Civ 6 grows a city-state's
   city, gives it walls and districts, and lets a suzerain see them.
-- **C-39. NO WATER IMPROVEMENT HAS A CARRIER.** Weight 1.
-  `validImprovementsIn` returns nothing for a water plot and the builder
-  must stand where it builds, so no unit on either engine can improve one; FISHING_BOATS is
-  deliberately outside the exported roster for exactly that reason. What
-  waits on it: the Fishing Boats themselves and their sea-resource yields,
-  the CELESTIAL_NAVIGATION eureka that asks for two improved sea
-  resources, and the OFFSHORE WIND FARM (C-1). The fix is a carrier — a
-  naval builder, or a land builder allowed to work an adjacent water plot
-  — not another improvement row.
-- **C-40. THE FEATURE ROSTER IS SEVEN ROWS.** Weight 2. `FeatureId` holds
-  Woods, Rainforest, Marsh, Floodplains, Oasis, Reef and Ice. Real Civ 6
-  adds the Geothermal Fissure, the Ley Line, Volcanic Soil, the Cataract,
-  Sand Dunes and every natural wonder. Three shipped clauses already name
-  a feature that cannot exist and are inert on that alone: the CAMPUS's
-  published +2 adjacency for one, the FIRE_GODDESS pantheon (a row whose
-  effect block is deliberately empty), and the GEOTHERMAL PLANT that must
-  stand on one (C-1). The district table's own header lists what it drops
-  for the same reason — the Ley Line, the Bath, the Lumber Mill.
+- **C-40. THE FEATURE ROSTER.** Weight 1. Woods, Rainforest, Marsh,
+  Floodplains, Oasis, Reef, Ice, the GEOTHERMAL FISSURE and VOLCANIC SOIL.
+  This entry once also named the Cataract, Sand Dunes and the Ley Line: the
+  Gathering Storm feature index carries NONE of the three — the Ley Line is
+  Secret Societies and the Impact Zone and the Burning/Burnt rows are
+  Apocalypse mode — so they are corrections to this entry, not gaps.
+  WHAT REMAINS: a NATURAL WONDER is a tile flag (`Tile.wonder`), not a
+  feature row, so each one's own clauses have nowhere to hang. The
+  Fissure's own are all live — the tile's +1 Science, the CAMPUS's +2, the
+  Aqueduct's Amenity, and the ground the GEOTHERMAL PLANT stands on — and
+  the generator places 3-7 per fixture beside mountains. Volcanic Soil is
+  a row nothing places (C-41).
+- **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 2. The row ships with the
+  name its page gives ("This land adjacent to a volcano has suffered from a
+  previous eruption ... Can receive additional yields from environmental
+  effects" — the `fertility` channel, which the eruption already lays
+  down) and no yields of its own. NEITHER ENGINE CAN PLACE IT. Two ways
+  in, both shut:
+  - AT RUNTIME, off the eruption. No engine adds a feature after t0: the
+    GPU keeps the feature id in a STATIC plane and records only removal
+    (`feat_stripped`), and `statecompare` compares feature PRESENCE for the
+    same reason. A paint needs a mutable id plane on the GPU and a
+    which-feature comparison on both sides.
+  - AT MAP GENERATION, on volcano-adjacent land. Every improvement clause
+    in this engine reads a featured tile as occupied — a Farm, a Mine and a
+    Seaside Resort each ask for `tile.feature === null` — so placing the
+    row would refuse those three on every tile beside a volcano. No source
+    reached says Volcanic Soil refuses an improvement, and inventing either
+    answer is what this file exists to stop. ASK THE OWNER.
+  Waiting on it: FIRE_GODDESS pays "+2 Faith from Geothermal Fissures and
+  Volcanic Soil" and only the Fissure half can ever be paid.
+- **C-42. NO IMPROVEMENT'S YIELDS SCALE WITH A TECHNOLOGY.** Weight 2. Real
+  Civ 6 raises an improvement's own yields as the tree advances, and eight
+  families carry a published raise: FISHING BOATS (+2 Gold at Cartography,
+  +1 Food at Plastics), the CAMP, PLANTATION, QUARRY, PASTURE and LUMBER
+  MILL, and the FARM's civic-borne raises. `ImprovementDef` has no
+  `techYields` channel at all; the MINE alone has one, and it is hardwired
+  to the Mine (`mineBoostTechs` / `_mine_boost_tech`) rather than being a
+  column any row can fill. Every unlisted raise is silently absent, so an
+  improved tile's late-game yield is short on both engines equally — which
+  is why no parity gate can see it.
 
 ## Reachability — what the green gate does NOT prove
 

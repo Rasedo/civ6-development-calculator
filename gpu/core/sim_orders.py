@@ -780,6 +780,13 @@ class SimOrders:
                         elif self._imp_eng[_k]:
                             _valid = _unl & self._imp_ground_ok(_k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
+                        elif self._imp_ground[_k]:
+                            _valid = (
+                                _unl & (_rq == -1)
+                                & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & self._imp_ground_ok(_k).gather(1, hc.unsqueeze(1)).squeeze(1)
+                            )
                         else:
                             _valid = (_rq == _k) & _unl
                     _base = eng_ok if self._imp_eng[_k] else here_ok

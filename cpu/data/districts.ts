@@ -8,7 +8,7 @@
  * without a locked cost.
  *
  * Sources the real game has and this map cannot express are simply absent:
- * the Ley Line, the Geothermal Fissure, the Bath, and the Lumber Mill and
+ * the Ley Line, the Bath, and the Lumber Mill and
  * strategic resources the Industrial Zone also reads.
  */
 
@@ -34,7 +34,13 @@ export type AdjacencySource =
   | 'DAM'
   | 'CANAL'
   // CIV6 (Government Plaza): "+1 adjacency bonus to all adjacent districts."
-  | 'GOV_PLAZA';
+  | 'GOV_PLAZA'
+  // CIV6 (Campus, Aqueduct): per adjacent Geothermal Fissure.
+  | 'GEOTHERMAL_FISSURE'
+  // The two TERRAIN sources no district row names for itself — Dance of the
+  // Aurora and Desert Folklore each hand one to the Holy Site.
+  | 'TUNDRA'
+  | 'DESERT';
 
 export interface AdjacencyRule {
   source: AdjacencySource;
@@ -43,6 +49,9 @@ export interface AdjacencyRule {
 
 export interface DistrictDef {
   id: DistrictId;
+  /** an AMENITY this district pays per adjacent tile of one kind, which no
+   *  other channel carries (the Aqueduct's Geothermal Fissure). */
+  amenityAdjacent?: AdjacencyRule;
   name: string;
   code: string;
   color: string;
@@ -151,13 +160,14 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     cost: 54,
     countsTowardLimit: true,
     adjacencyYield: 'science',
-    // GS Civilopedia: +1 per adjacent Mountain, +2 per adjacent Reef (and
-    // Geothermal Fissure, which this map has no feature for), +1 per TWO
-    // adjacent Rainforest tiles, +1 per TWO adjacent districts.
+    // GS Civilopedia: +1 per adjacent Mountain, +2 per adjacent Reef and per
+    // adjacent Geothermal Fissure, +1 per TWO adjacent Rainforest tiles, +1
+    // per TWO adjacent districts.
     adjacency: [
       { source: 'MOUNTAIN', amount: 1 },
       { source: 'RAINFOREST', amount: 0.5 },
       { source: 'REEF', amount: 2 },
+      { source: 'GEOTHERMAL_FISSURE', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
@@ -306,6 +316,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     maintenance: 0,
     appealAdjacent: 0,
     placement: { requiresAdjacentCityCenter: true, requiresWaterSourceOrMountain: true },
+    // CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity.
+    amenityAdjacent: { source: 'GEOTHERMAL_FISSURE', amount: 1 },
     description: 'Adjacent to City Center and a river/lake/oasis/mountain. +2 housing (fresh-water city) or +6 (otherwise).',
   }),
   ENTERTAINMENT_COMPLEX: D({

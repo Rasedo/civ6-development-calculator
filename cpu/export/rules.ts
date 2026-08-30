@@ -248,6 +248,14 @@ const SETTLER_POP_GATE = 2;
 
 const beliefRow = (def: { effects: BeliefEffects }) => ({
   featY: FEAT_IDS.map((f) => YIELD_KEYS.map((k) => def.effects.featureYields?.[f]?.[k] ?? 0)),  // [nFeat, 6]
+  // the extra ADJACENCY sources a belief hands a district type, [nDistrict,
+  // nSource] so the pools sum: a pad row is zero, not a sentinel.
+  distAdj: PLACEABLE_DISTRICTS.map((d) => ADJ_SRC.map((s) => {
+    const r = def.effects.districtAdjacency;
+    return r && r.district === d
+      ? r.rules.filter((x) => x.source === s).reduce((acc, x) => acc + x.amount, 0)
+      : 0;
+  })),
   bldgY: centerBuildings.map((b) => YIELD_KEYS.map((k) => def.effects.buildingYields?.[b.id]?.[k] ?? 0)),  // [NB, 6]
   bldgH: centerBuildings.map((b) => def.effects.buildingHousing?.[b.id] ?? 0),  // [NB]
   border: def.effects.borderCostMult ?? 1,
@@ -350,6 +358,7 @@ const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
   'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE',
   'MINE', 'QUARRY', 'AQUEDUCT', 'DAM', 'CANAL', 'GOV_PLAZA',
+  'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',
 ];
 
 const SCRIPTED_CAMPUS = true;
@@ -816,6 +825,11 @@ export function buildRules() {
       launchInquisitionCharges: LAUNCH_INQUISITION_CHARGES,
       condemnPressureRange: CONDEMN_PRESSURE_RANGE,
       condemnPressureSwing: CONDEMN_PRESSURE_SWING,
+      // Each ADJ_SRC entry as the FEATURE / the TERRAIN it names, -1 where it
+      // is neither. A belief hands a district a source the district's own row
+      // never names, so the static adjacency export cannot have counted it.
+      adjSrcFeat: ADJ_SRC.map((s) => FEAT_IDS.indexOf(s as never)),
+      adjSrcTerr: ADJ_SRC.map((s) => TERRAIN_IDS.indexOf(s)),
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
       founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
@@ -1297,6 +1311,8 @@ export function buildRules() {
           // takes off its neighbours.
           eng: def.engineer ? 1 : 0,
           noFeat: def.noFeature ? 1 : 0,
+          // the ONE feature a row may stand on (the Geothermal Plant), -1 free
+          reqFeat: def.requiresFeature ? FEAT_IDS.indexOf(def.requiresFeature) : -1,
           air: def.airSlots ?? 0,
           appeal: def.appealAdjacent ?? 0,
           plun: plunRow(def.plunder),
@@ -1355,6 +1371,10 @@ export function buildRules() {
         cost: d.cost,
         adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
         adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
+        // an AMENITY per adjacent tile of one kind (the Aqueduct's fissure)
+        amenAdj: d.amenityAdjacent
+          ? [ADJ_SRC.indexOf(d.amenityAdjacent.source), d.amenityAdjacent.amount]
+          : [-1, 0],
         housing: d.housing,
         maintenance: d.maintenance,
         amenities: d.amenities ?? 0,

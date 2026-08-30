@@ -21,6 +21,7 @@ import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
 import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
+import type { AdjacencyRule } from '../data/districts';
 export interface Unlocks {
   improvements: Set<string>;
   districts: Set<string>;
@@ -144,6 +145,10 @@ export interface Modifiers {
   encampHarborProdMult: number;
   yieldMult: Partial<Yields>;
   featureYields: Partial<Record<string, Partial<Yields>>>;
+  /** extra ADJACENCY rules a district type reads, by type — the three
+   *  pantheons that pay a Holy Site per adjacent tile of a kind its own
+   *  catalog row does not name. */
+  districtAdjacencyAdd: Partial<Record<DistrictId, AdjacencyRule[]>>;
   improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
   borderCostMult: number;
   growthMult: number;
@@ -231,6 +236,7 @@ export function defaultModifiers(): Modifiers {
     encampHarborProdMult: 1,
     yieldMult: {},
     featureYields: {},
+    districtAdjacencyAdd: {},
     improvementOnResource: [],
     borderCostMult: 1,
     growthMult: 1,
@@ -511,6 +517,10 @@ function applyBeliefEffects(
   for (const [imp, y] of Object.entries(fx.improvementYields ?? {})) {
     const cur = (mods.improvementYields[imp as ImprovementId] ??= {});
     addPartial(cur, y);
+  }
+  if (fx.districtAdjacency) {
+    const d = fx.districtAdjacency;
+    (mods.districtAdjacencyAdd[d.district] ??= []).push(...d.rules);
   }
   for (const [feat, y] of Object.entries(fx.featureYields ?? {})) {
     const cur = (mods.featureYields[feat] ??= {});

@@ -2298,6 +2298,9 @@ class SimSeats:
         the Military Engineer's alike."""
         B, dev = self.B, self.device
         ok = torch.ones(B, self.T, dtype=torch.bool, device=dev)
+        _rf = self._imp_req_feat[k]
+        if _rf >= 0:
+            ok &= (self.feat_id == _rf) & ~self.feat_stripped
         terr = self._imp_terr[k]
         if terr:
             allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -5541,6 +5544,18 @@ class SimSeats:
         have = have + torch.einsum("bjn,n->bj",
                                    self._dist_counts(row)[:, :cols].double(),
                                    self._d_amenity.double())
+        # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
+        # per adjacent tile, and dark while the district stands pillaged.
+        if self._d_amen_adj_any:
+            for _di, (_src, _amt) in enumerate(self._d_amen_adj):
+                if _src < 0 or _amt == 0:
+                    continue
+                _tile = dreg[:, :, _di]
+                _at = _tile.clamp(min=0)
+                _lit = ((_tile >= 0) & self.district_complete.gather(1, _at)
+                        & ~self.district_pillaged.gather(1, _at))
+                _cnt = self._adj_src_count(_src).gather(1, _at).double()
+                have = have + _amt * torch.where(_lit, _cnt, torch.zeros_like(_cnt))
         if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
             _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
             have = have + _powam * self.city_powered[:, row, :cols].double()

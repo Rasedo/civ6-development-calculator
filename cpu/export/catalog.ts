@@ -75,6 +75,7 @@ const wonderStaticOk = (w: (typeof BUILT_WONDER_LIST)[number], t: Tile, m: GameS
   wonderTerrainOk(w, t, m);
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
+  'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',
 ]);
 
 
@@ -97,6 +98,9 @@ function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number
         : rule.source === 'REEF' ? n.feature === 'REEF'
         : rule.source === 'NATURAL_WONDER' ? n.wonder !== null
         : rule.source === 'SEA_RESOURCE' ? isWater(n) && n.resource !== null
+        : rule.source === 'GEOTHERMAL_FISSURE' ? n.feature === 'GEOTHERMAL_FISSURE'
+        : rule.source === 'TUNDRA' ? n.terrain === 'TUNDRA'
+        : rule.source === 'DESERT' ? n.terrain === 'DESERT'
         : false;
       if (m) sum += rule.amount;
     }
@@ -115,6 +119,7 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
       rule.source === 'RAINFOREST' ? f === 'RAINFOREST'
       : rule.source === 'WOODS' ? f === 'WOODS'
       : rule.source === 'REEF' ? f === 'REEF'
+      : rule.source === 'GEOTHERMAL_FISSURE' ? f === 'GEOTHERMAL_FISSURE'
       : false;
     if (m) sum += rule.amount;
   }

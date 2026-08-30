@@ -217,8 +217,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       cm: t.cliffMask ?? 0, // CLIFF edge mask — blocks embark/disembark
       // the resource's own-improvement roster index — resource
       // tiles accept exactly this improvement (validImprovements' resource
-      // branch). -1 = no resource; -9 = out of roster (FISHING_BOATS on sea
-      // resources: water tiles a land builder can never reach, both engines).
+      // branch). -1 = no resource; -9 = a resource whose improvement the
+      // action head carries no BUILD verb for, which no engine can place.
       rq: (() => {
         if (!t.resource) return -1;
         const i = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement);

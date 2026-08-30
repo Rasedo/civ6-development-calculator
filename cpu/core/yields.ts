@@ -132,6 +132,12 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return neighbor.feature === 'WOODS';
     case 'REEF':
       return neighbor.feature === 'REEF';
+    case 'GEOTHERMAL_FISSURE':
+      return neighbor.feature === 'GEOTHERMAL_FISSURE';
+    case 'TUNDRA':
+      return neighbor.terrain === 'TUNDRA';
+    case 'DESERT':
+      return neighbor.terrain === 'DESERT';
     case 'NATURAL_WONDER':
       return neighbor.wonder !== null;
     case 'BUILT_WONDER':
@@ -166,12 +172,14 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
  * in the district's adjacency yield. Result floored like Civ 6 (policy
  * multipliers are applied on top of this by the city computation).
  */
-export function districtAdjacency(map: GameState['map'], tile: Tile, type: DistrictId): number {
+export function districtAdjacency(
+  map: GameState['map'], tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [],
+): number {
   const def = DISTRICTS[type];
-  if (!def.adjacencyYield || def.adjacency.length === 0) return 0;
+  if (!def.adjacencyYield || (def.adjacency.length === 0 && extra.length === 0)) return 0;
   let sum = 0;
   const around = neighbors(map, tile);
-  for (const rule of def.adjacency) {
+  for (const rule of [...def.adjacency, ...extra]) {
     if (rule.source === 'RIVER') {
       if (hasRiver(tile)) sum += rule.amount;
       continue;
@@ -184,7 +192,8 @@ export function districtAdjacency(map: GameState['map'], tile: Tile, type: Distr
 }
 
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId): number {
-  return districtAdjacency(ctx.map, tile, type) * (ctx.mods.adjacencyMult[type] ?? 1);
+  return districtAdjacency(ctx.map, tile, type, ctx.mods.districtAdjacencyAdd?.[type] ?? [])
+    * (ctx.mods.adjacencyMult[type] ?? 1);
 }
 
 /**
@@ -425,6 +434,12 @@ export function cityDistrictSum(
     const t = state.map.tiles[d.tileIndex];
     if (!t.districtComplete || t.districtPillaged) continue;
     n += DISTRICTS[d.type][key] ?? 0;
+    // The Aqueduct's Geothermal Fissure — an AMENITY the district pays per
+    // adjacent tile, which no yield channel carries.
+    const near = key === 'amenities' ? DISTRICTS[d.type].amenityAdjacent : undefined;
+    if (near) {
+      for (const nb of neighbors(state.map, t)) if (matchesAdjacency(near, nb)) n += near.amount;
+    }
   }
   return n;
 }

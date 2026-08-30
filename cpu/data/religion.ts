@@ -16,9 +16,14 @@
  * engines, and religious predominance is a victory condition.
  */
 
-import type { GreatPersonClass, ResourceCategory, Yields } from '../core/types';
+import type { DistrictId, GreatPersonClass, ResourceCategory, Yields } from '../core/types';
+import type { AdjacencyRule } from './districts';
 
 export interface BeliefEffects {
+  /** extra ADJACENCY rules one district type reads while this belief is held
+   *  — the three pantheons that pay a Holy Site per adjacent tile of a kind
+   *  the district's own catalog row does not name. */
+  districtAdjacency?: { district: DistrictId; rules: AdjacencyRule[] };
   improvementYields?: Partial<Record<string, Partial<Yields>>>;
   featureYields?: Partial<Record<string, Partial<Yields>>>;
   improvementOnResource?: { category: ResourceCategory; yields: Partial<Yields> };
@@ -95,17 +100,25 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
       improvementOnResource: { category: 'bonus', yields: { faith: 2 } },
     }),
     B('CITY_PATRON_GODDESS', 'City Patron Goddess', '+25% production toward districts in cities without one.', {}),
-    B('DANCE_OF_THE_AURORA', 'Dance of the Aurora', 'Holy Sites gain +1 faith from adjacent Tundra tiles.', {}),
-    B('DESERT_FOLKLORE', 'Desert Folklore', 'Holy Sites gain +1 faith from adjacent Desert tiles.', {}),
+    B('DANCE_OF_THE_AURORA', 'Dance of the Aurora', 'Holy Site districts get +1 Faith from adjacent Tundra tiles.', {
+      districtAdjacency: { district: 'HOLY_SITE', rules: [{ source: 'TUNDRA', amount: 1 }] },
+    }),
+    B('DESERT_FOLKLORE', 'Desert Folklore', 'Holy Site districts get +1 Faith from adjacent Desert tiles.', {
+      districtAdjacency: { district: 'HOLY_SITE', rules: [{ source: 'DESERT', amount: 1 }] },
+    }),
     B('EARTH_GODDESS', 'Earth Goddess', '+1 faith from tiles with Charming or Breathtaking appeal.', {}),
-    B('FIRE_GODDESS', 'Fire Goddess', 'Holy Sites gain +1 faith from adjacent Geothermal Fissures.', {}),
+    B('FIRE_GODDESS', 'Fire Goddess', '+2 Faith from Geothermal Fissures and Volcanic Soil.', {
+      featureYields: { GEOTHERMAL_FISSURE: { faith: 2 }, VOLCANIC_SOIL: { faith: 2 } },
+    }),
     B('GOD_OF_HEALING', 'God of Healing', 'Units heal +30 HP in or next to a Holy Site.', {}),
     B('GOD_OF_THE_FORGE', 'God of the Forge', '+25% production toward ancient and classical military units.', {}),
     B('GOD_OF_WAR', 'God of War', 'Bonus combat strength near friendly Holy Sites; faith from kills.', {}),
     B('GODDESS_OF_THE_HARVEST', 'Goddess of the Harvest', 'Harvesting resources or removing features yields faith.', {}),
     B('INITIATION_RITES', 'Initiation Rites', '+50 faith for each barbarian outpost cleared.', {}),
     B('MONUMENT_TO_THE_GODS', 'Monument to the Gods', '+15% production toward ancient and classical wonders.', {}),
-    B('SACRED_PATH', 'Sacred Path', 'Holy Sites gain +1 culture and +1 faith from adjacent Rainforest tiles.', {}),
+    B('SACRED_PATH', 'Sacred Path', 'Holy Site districts get +1 Faith from adjacent Rainforest tiles.', {
+      districtAdjacency: { district: 'HOLY_SITE', rules: [{ source: 'RAINFOREST', amount: 1 }] },
+    }),
   ].map((b) => [b.id, b]),
 );
 

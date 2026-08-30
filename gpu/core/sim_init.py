@@ -927,6 +927,8 @@ class SimInit:
             _nb = len(_rows[0]["bldgY"]) if _rows else 1
             _ng = len(_rows[0]["gpp"]) if _rows else 1
             _ni = len(_rows[0]["impY"]) if _rows and "impY" in _rows[0] else 1
+            _nad = len(_rows[0]["distAdj"]) if _rows else 1
+            _nas = len(_rows[0]["distAdj"][0]) if _rows else 1
             self._bel[_pool] = {
                 "featY": torch.tensor([[[0.0] * 6] * _nf] + [x["featY"] for x in _rows], dtype=torch.float64, device=device),
                 "bldgY": torch.tensor([[[0.0] * 6] * _nb] + [x["bldgY"] for x in _rows], dtype=torch.float64, device=device),
@@ -945,8 +947,31 @@ class SimInit:
                     [[[0.0] * 6] * _ni] + [x.get("impY", [[0.0] * 6] * _ni) for x in _rows],
                     dtype=torch.float64, device=device,
                 ),
+                # the ADJACENCY a belief hands a district type, [district,
+                # source] — additive, so the pad row is zeros
+                "distAdj": torch.tensor(
+                    [[[0.0] * _nas] * _nad] + [x["distAdj"] for x in _rows],
+                    dtype=torch.float64, device=device,
+                ),
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
+        # Each adjacency source as the FEATURE / the TERRAIN it names, -1 where
+        # it is neither. `_district_adj_raw` reads the district catalog's own
+        # sources off the static export; a BELIEF names one the export never
+        # counted, so those are counted live from these two tables.
+        self._adj_src_feat = [int(x) for x in _bl.get("adjSrcFeat", [])]
+        self._adj_src_terr = [int(x) for x in _bl.get("adjSrcTerr", [])]
+        # ...and the sources any belief row actually names, per district type.
+        self._bel_adj_srcs: dict[int, list[int]] = {}
+        if self._bel_any:
+            _tot = sum(self._bel[_p]["distAdj"].abs().sum(dim=0) for _p in ("pan", "fol", "fou"))
+            for _di, _src in (_tot > 0).nonzero(as_tuple=False).tolist():
+                self._bel_adj_srcs.setdefault(int(_di), []).append(int(_src))
+        for _di, _srcs in self._bel_adj_srcs.items():
+            for _s in _srcs:
+                assert self._adj_src_feat[_s] >= 0 or self._adj_src_terr[_s] >= 0, (
+                    f"a belief hands district {_di} adjacency source {_s}, which names "
+                    "neither a feature nor a terrain — _adj_src_count cannot count it")
         _erows = _bl.get("enhancers", [])
         # The missionary chassis anchors + per-enhancer channels. The exporter
         # pre-rounds mcost/mlump to INTEGERS (Math.round on the TS side), so
@@ -1476,6 +1501,8 @@ class SimInit:
         # neighbours, the `DistrictDef.appealAdjacent` twin.
         self._imp_eng = [bool(r.get("eng", 0)) for r in imp["rows"]]
         self._imp_no_feat = [bool(r.get("noFeat", 0)) for r in imp["rows"]]
+        # the ONE feature a row may stand on (-1 = free) — the Geothermal Plant
+        self._imp_req_feat = [int(r.get("reqFeat", -1)) for r in imp["rows"]]
         self._imp_air_slots = torch.tensor(
             [int(r.get("air", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_adj = torch.tensor(
@@ -1642,6 +1669,11 @@ class SimInit:
         self._dyn_dam = torch.tensor([_src_amt(d, 14) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._dyn_canal = torch.tensor([_src_amt(d, 15) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._dyn_govplaza = torch.tensor([_src_amt(d, 16) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
+        # an AMENITY per adjacent tile of one kind, which no yield row carries.
+        self._d_amen_adj = [(int(d.get("amenAdj", (-1, 0))[0]), float(d.get("amenAdj", (-1, 0))[1]))
+                            for d in self.districts_cat]
+        self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
         _govs = rules.governments or []

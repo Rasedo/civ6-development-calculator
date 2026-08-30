@@ -1910,6 +1910,42 @@ class SimEconomy:
         mil = (self._type_combat[types.clamp(min=0, max=self.NU - 1)] > 0).to(base.dtype)
         return (base - cut + add * mil).clamp(min=0)
 
+    def _adj_src_count(self, src: int) -> torch.Tensor:
+        """[B, T] — how many NEIGHBOURS answer adjacency source `src`, for the
+        sources that name a FEATURE or a TERRAIN. Read off the live map, so a
+        chopped Rainforest stops counting the turn it goes."""
+        key = ("adjsrc", src)
+        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
+            self._dadj_cache = (self._eff_version, {})
+        hit = self._dadj_cache[1].get(key)
+        if hit is None:
+            fid = self._adj_src_feat[src] if src < len(self._adj_src_feat) else -1
+            tid = self._adj_src_terr[src] if src < len(self._adj_src_terr) else -1
+            if fid >= 0:
+                on = (self.feat_id == fid) & ~self.feat_stripped
+            elif tid >= 0:
+                on = (self.terrain == tid).expand(self.B, self.T)
+            else:
+                on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+            nb = self.neigh
+            hit = ((on[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)).to(self.dtype)
+            self._dadj_cache[1][key] = hit
+        return hit
+
+    def _belief_adj(self, row: int, di: int) -> torch.Tensor | None:
+        """[B, T] — the adjacency this seat's BELIEFS hand district `di`, or
+        None where they hand it none. It joins the sum INSIDE the floor,
+        exactly where `districtAdjacency`'s `extra` list does."""
+        srcs = self._bel_adj_srcs.get(di) if row < self.n_majors else None
+        if not srcs:
+            return None
+        tab = self._bel_add("distAdj", row)[:, di]  # [B, nSrc]
+        out = None
+        for src in srcs:
+            add = tab[:, src].to(self.dtype).unsqueeze(1) * self._adj_src_count(src)
+            out = add if out is None else out + add
+        return out
+
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc
         if float(self._dyn_bwonder[di]) != 0:
@@ -1956,12 +1992,30 @@ class SimEconomy:
             d[di] = v
         return v
 
+    def _district_adj_belief_floor(self, row: int, di: int) -> torch.Tensor:
+        """`_district_adj_floor` for a district type some belief pays extra
+        adjacency on — the belief's sources join the SUM, so the floor closes
+        over them, and the result is this seat's alone."""
+        key = ("bel", self._bel_version, row, di)
+        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
+            self._dadj_cache = (self._eff_version, {})
+        v = self._dadj_cache[1].get(key)
+        if v is None:
+            raw = self._district_adj_raw(di, self._adj_district_count().to(self.dtype))
+            bel = self._belief_adj(row, di)
+            v = torch.floor(raw if bel is None else raw + bel)
+            self._dadj_cache[1][key] = v
+        return v
+
     def _district_adj_seat(self, row: int, di: int) -> torch.Tensor:
         """[B, T] — `effectiveAdjacency`: the FLOORED adjacency of a district
         of type `di`, times this seat's adjacencyMult for that type. TS floors
         the raw sum first and multiplies after, so a doubled +3 is +6, never
         floor(3.5 * 2)."""
-        base = self._district_adj_floor(di)
+        if di in self._bel_adj_srcs and row < self.n_majors:
+            base = self._district_adj_belief_floor(row, di)
+        else:
+            base = self._district_adj_floor(di)
         out = base * self._gov_mods(row)[10][:, di].unsqueeze(1)
         if self.n_governors and row < self.n_majors:
             out = out * self._governor_tile_adj(row, di).to(out.dtype)

@@ -231,6 +231,25 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
+  // GEOTHERMAL FISSURES. CIV6 says only that they "are quite rare, and are
+  // usually found next to Mountains, Volcanoes, and near continent splits" —
+  // no density is published, so the count is THIS GENERATOR'S OWN LINE, taken
+  // from the same share of its candidates the volcano pass takes of its own.
+  // Its stream is derived separately so the feature pass above is untouched.
+  {
+    const rngGf = mulberry32(deriveSeed(seed, 'fissures'));
+    const near = map.tiles.filter(
+      (t) => isLandIdx(t.index) && t.elevation !== 'MOUNTAIN'
+        && t.feature === null && t.resource === null
+        && neighbors(map, t).some((n) => n.elevation === 'MOUNTAIN'),
+    );
+    const spots = shuffle(rngGf, near);
+    const count = Math.round(spots.length * 0.18);
+    for (let i = 0; i < count && i < spots.length; i++) {
+      spots[i].feature = 'GEOTHERMAL_FISSURE';
+    }
+  }
+
   if (opts.withVillages ?? true) {
     const rngV = mulberry32(deriveSeed(seed, 'villages'));
     let quota = Math.round(

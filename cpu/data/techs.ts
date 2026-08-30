@@ -239,7 +239,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1480, ['RADIO']),
     T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 1480, ['STEEL', 'COMBUSTION']),
     T('ADVANCED_BALLISTICS', 'Advanced Ballistics', 'Atomic', 1480, ['REPLACEABLE_PARTS', 'STEEL']),
-    T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS']),
+    T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS'], [
+      { kind: 'unlockImprovement', improvement: 'GEOTHERMAL_PLANT' },
+    ]),
     T('COMPOSITES', 'Composites', 'Information', 1850, ['SYNTHETIC_MATERIALS'], [
       { kind: 'unlockImprovement', improvement: 'WIND_FARM' },
     ]),

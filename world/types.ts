@@ -43,7 +43,9 @@ export type FeatureId =
   | 'FLOODPLAINS'
   | 'OASIS'
   | 'REEF'
-  | 'ICE';
+  | 'ICE'
+  | 'GEOTHERMAL_FISSURE'
+  | 'VOLCANIC_SOIL';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -68,7 +70,8 @@ export type ImprovementId =
   | 'AIRSTRIP'
   | 'SOLAR_FARM'
   | 'WIND_FARM'
-  | 'MISSILE_SILO';
+  | 'MISSILE_SILO'
+  | 'GEOTHERMAL_PLANT';
 
 export type DistrictId =
   | 'CITY_CENTER'

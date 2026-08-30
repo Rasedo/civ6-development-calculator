@@ -206,6 +206,7 @@ export function validImprovementsIn(
   // answered for every tile that has an opinion of its own.
   for (const def of Object.values(IMPROVEMENTS)) {
     if (!def.groundOnly || !unlocked(def.id)) continue;
+    if (def.requiresFeature && tile.feature !== def.requiresFeature) continue;
     if (def.noFeature && tile.feature) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;

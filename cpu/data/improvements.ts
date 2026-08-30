@@ -71,6 +71,8 @@ export interface ImprovementDef {
   engineer?: boolean;
   /** refuses a tile that still carries a feature. */
   noFeature?: boolean;
+  /** the row may stand ONLY on this feature (the Geothermal Plant). */
+  requiresFeature?: FeatureId;
   /** a Builder places this row on its own catalog GROUND alone — no resource
    *  under it, no suzerainty, no appeal bar, and not the Engineer's list. */
   groundOnly?: boolean;
@@ -244,6 +246,22 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     power: 2,
     elevations: ['HILLS'],
     description: 'Hills. Supplies 2 Power to its city from the wind.',
+  },
+  // CIV6 (Geothermal Plant): "+1 Science", "+2 Production" and "Provides 4
+  // Power per turn"; it "may only be constructed on a special terrain
+  // feature: the Geothermal Fissure".
+  GEOTHERMAL_PLANT: {
+    id: 'GEOTHERMAL_PLANT',
+    name: 'Geothermal Plant',
+    code: 'Gp',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { science: 1, production: 2 },
+    housing: 0,
+    resourceOnly: false,
+    groundOnly: true,
+    power: 4,
+    requiresFeature: 'GEOTHERMAL_FISSURE',
+    description: 'A Geothermal Fissure. Supplies 4 Power to its city from the ground.',
   },
   // THE MILITARY ENGINEER'S OWN TWO. Both pages read "in your own or neutral
   // territory", which is the engineer branch's rule rather than a column.

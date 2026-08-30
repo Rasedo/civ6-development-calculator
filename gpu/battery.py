@@ -347,6 +347,7 @@ def main() -> int:
                 ("nuke", [py, "tests/gpu/nuke_test.py"], 4),  # the blast, the two carriers and the silo: no seed reaches Nuclear Fission
                 ("amani", [py, "tests/gpu/amani_test.py"], 4),  # the governor posted to a city-state, her envoys and Affluence
                 ("gov_clauses", [py, "tests/gpu/gov_clauses_test.py"], 4),  # the five promotion clauses no seed reaches: no governed city ever holds one
+                ("geothermal", [py, "tests/gpu/geothermal_test.py"], 4),  # the map's new rows: no scripted seed places a Geothermal Plant or claims a Holy Site pantheon
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane
