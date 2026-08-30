@@ -625,11 +625,9 @@ class SimInit:
         self._spy_m_governor = _mid.index("NEUTRALIZE_GOVERNOR")
         self._spy_m_counterspy = _mid.index("COUNTERSPY")
         self._spy_m_breach = _mid.index("BREACH_DAM") if "BREACH_DAM" in _mid else -1
-        self._spy_mission_turns_base = int(_sp["missionTurns"])
         self._spy_travel_min = int(_sp["travelMin"])
         self._spy_travel_per = int(_sp["travelTilesPerTurn"])
         self._spy_travel_max = int(_sp["travelMax"])
-        self._spy_success_base = int(_sp["successBase"])
         self._spy_success_per_level = int(_sp["successPerLevel"])
         self._spy_capture_pct = int(_sp["capturePct"])
         self._spy_counterspy_pct = int(_sp["counterspyPct"])

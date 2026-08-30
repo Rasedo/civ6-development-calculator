@@ -51,6 +51,11 @@ export interface SpyMissionDef {
   certain?: boolean;
   /** run in the spy's OWN city rather than a rival's. */
   athome?: boolean;
+  /** CIV6 (Spy): the mission's own duration, from the chassis' mission table. */
+  turns: number;
+  /** CIV6 (Spy): the same table's success rate, at the Recruit level. A
+   *  `certain` mission publishes none and rolls for nothing. */
+  successPct?: number;
 }
 
 /**
@@ -62,18 +67,18 @@ export interface SpyMissionDef {
  * Outbreak (a game mode).
  */
 export const SPY_MISSIONS: readonly SpyMissionDef[] = [
-  { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true },
-  { id: 'LISTENING_POST', district: 'CITY_CENTER', offensive: false, certain: true },
-  { id: 'SIPHON_FUNDS', district: 'COMMERCIAL_HUB', offensive: true },
-  { id: 'GREAT_WORK_HEIST', district: 'THEATER_SQUARE', offensive: true },
-  { id: 'SABOTAGE_PRODUCTION', district: 'INDUSTRIAL_ZONE', offensive: true },
-  { id: 'STEAL_TECH_BOOST', district: 'CAMPUS', offensive: true },
-  { id: 'RECRUIT_PARTISANS', district: 'NEIGHBORHOOD', offensive: true },
-  { id: 'DISRUPT_ROCKETRY', district: 'SPACEPORT', offensive: true },
-  { id: 'FOMENT_UNREST', district: 'CITY_CENTER', offensive: true },
-  { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true },
-  { id: 'BREACH_DAM', district: 'DAM', offensive: true },
-  { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true },
+  { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
+  { id: 'LISTENING_POST', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
+  { id: 'SIPHON_FUNDS', district: 'COMMERCIAL_HUB', offensive: true, turns: 8, successPct: 56 },
+  { id: 'GREAT_WORK_HEIST', district: 'THEATER_SQUARE', offensive: true, turns: 8, successPct: 20 },
+  { id: 'SABOTAGE_PRODUCTION', district: 'INDUSTRIAL_ZONE', offensive: true, turns: 8, successPct: 35 },
+  { id: 'STEAL_TECH_BOOST', district: 'CAMPUS', offensive: true, turns: 8, successPct: 35 },
+  { id: 'RECRUIT_PARTISANS', district: 'NEIGHBORHOOD', offensive: true, turns: 8, successPct: 10 },
+  { id: 'DISRUPT_ROCKETRY', district: 'SPACEPORT', offensive: true, turns: 8, successPct: 20 },
+  { id: 'FOMENT_UNREST', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 56 },
+  { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 35 },
+  { id: 'BREACH_DAM', district: 'DAM', offensive: true, turns: 8, successPct: 20 },
+  { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true, turns: 16 },
 ];
 const mi = (id: string): number => SPY_MISSIONS.findIndex((m) => m.id === id);
 export const SPY_M_GAIN_SOURCES = mi('GAIN_SOURCES');
@@ -93,19 +98,16 @@ export const SPY_M_COUNTERSPY = mi('COUNTERSPY');
 export const SPY_TRAVEL_COLS = 8;
 
 // ---------------------------------------------------------------------------
-// THE MODEL. The source publishes every mission's location and result but not
-// its clock or its odds: "all missions have a uniform, fixed duration of
-// turns" without naming it, and the briefing screen's success/capture chances
-// are numbers the wiki does not carry. The four constants below are this
-// model's own, chosen to make the published modifiers (-25% duration, level
-// bonuses) express something; everything they feed is sourced.
+// THE MODEL. Each mission's DURATION and its base success RATE are the Spy
+// chassis' own published table (above). What the source does not publish is
+// how a LEVEL moves that rate — only that it does, since nine promotions read
+// "as if 2 levels more experienced" — nor what a failure costs. Those two are
+// this model's own; everything else here is sourced.
 // ---------------------------------------------------------------------------
-export const SPY_MISSION_TURNS = 8;
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;
-/** the success chance in percent at Recruit, and what each level adds. */
-export const SPY_SUCCESS_BASE_PCT = 50;
+/** what each level above Recruit adds to the mission's own published rate. */
 export const SPY_SUCCESS_PER_LEVEL_PCT = 10;
 /** on a failure, the chance the spy is caught rather than merely turned back. */
 export const SPY_CAPTURE_PCT = 50;

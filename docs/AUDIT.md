@@ -565,11 +565,11 @@ under their blocker so the dependency is readable, and both halves count.
     capacity, tradeable back. A prisoner store plus a two-sided deal
     (C-2).
   - **THE SPY PROMOTION POOL** — the Civilopedia's Espionage class lists
-    SEVENTEEN promotions, three offered at random per level; the chassis
-    has no promotion class (C-32), and the random offer needs a
+    SEVENTEEN promotions, three offered at random per level, and the Spy
+    page caps the chassis at three taken. The chassis has no promotion
+    class (C-32); nine of the seventeen are one shape ("<mission> as if
+    2 levels more experienced"), and the random offer needs a
     shared-stream draw at a fixed position (the `ensureGpOffer` pattern).
-  - **LEVELS FROM COUNTER-ESPIONAGE** — a counterspy that catches earns
-    nothing here.
   - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
     the mission mask asks nothing about other spies on the tile.
   - **"TO ARMS!" PAYS FOR A SPY.** The golden-age dedication is "+15%
@@ -585,10 +585,18 @@ under their blocker so the dependency is readable, and both halves count.
     no district registry to hang it on.
   - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not
     the district; a per-building pillage flag is the difference.
-  - **THE CLOCK AND THE ODDS ARE THIS MODEL'S OWN** — `SPY_MISSION_TURNS`
-    and the five odds constants are stated model values; the published
-    modifiers they feed are sourced. The Intelligence Agency's success
-    bonus has no published figure either.
+  - **WHAT A LEVEL IS WORTH IS THIS MODEL'S OWN.** The Spy chassis'
+    own mission table publishes each operation's DURATION (8 turns, 16
+    for the Counterspy post) and its base success RATE (10% Recruit
+    Partisans; 20% Great Work Heist, Disrupt Rocketry, Breach Dam; 35%
+    Sabotage Production, Steal Tech Boost, Neutralize Governor; 56%
+    Siphon Funds, Foment Unrest), and both engines now carry that table
+    per mission. What it does NOT publish is how a LEVEL moves that rate
+    — only that it does, since nine promotions read "as if 2 levels more
+    experienced" — nor what a failure costs. `SPY_SUCCESS_PER_LEVEL_PCT`
+    and `SPY_CAPTURE_PCT` are those two, and they are stated model
+    values. The Intelligence Agency's success bonus has no published
+    figure either.
 - **C-20. THE MILITARY ENGINEER'S LAST THREE VERBS.** Weight 1. The Fort,
   the Airstrip, the road and the 20% charge ship; gate reachability is
   ZERO (no seed trains the chassis) and `engineer_test.py` pokes every

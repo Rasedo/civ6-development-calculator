@@ -211,7 +211,7 @@ class SimSpy:
     def _spy_mission_turns(self, row: int, m: int) -> torch.Tensor:
         """CIV6 (Bodyguard of Lies, Golden face): "Time to complete all
         offensive spy operations reduced by 25%"."""
-        base = torch.full((self.B,), self._spy_mission_turns_base,
+        base = torch.full((self.B,), self._spy_missions[m]["turns"],
                           dtype=torch.long, device=self.device)
         if not self._spy_missions[m]["offensive"]:
             return base
@@ -282,7 +282,7 @@ class SimSpy:
             if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
         lvl = max(0, lvl - self._counter_levels(b, hr, hc))
         ok = bool(mdef["certain"]) or self._spy_roll(
-            b, self._spy_success_base + self._spy_success_per_level * lvl)
+            b, mdef["successPct"] + self._spy_success_per_level * lvl)
         if ok:
             self._apply_mission(row, b, v, m, hr, hc, lvl)
             if mdef["offensive"]:
@@ -298,12 +298,22 @@ class SimSpy:
             return
         # CIV6: "when enemy Spies are performing missions in those districts,
         # there is a much higher chance than normal that they will be caught."
-        guard = bool((self._spies_of(hr)[b]
-                      & (self.unit_tile[b] == int(tile[0, 0]))
-                      & (self.unit_spy_mission[b] == self._spy_m_counterspy)).any())
-        caught = self._spy_capture_pct + (self._spy_counterspy_pct if guard else 0)
+        posted = (self._spies_of(hr)[b]
+                  & (self.unit_tile[b] == int(tile[0, 0]))
+                  & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(
+                      as_tuple=True)[0]
+        caught = self._spy_capture_pct + (
+            self._spy_counterspy_pct if posted.numel() else 0)
         if not ok and self._spy_roll(b, caught):
             self.unit_alive[b, v] = False
+            # CIV6 (Spies and Espionage): a spy "may gain levels from successful
+            # offensive operations, or capturing an enemy Spy" — the post that
+            # made the catch likelier is the one that earns it, and the first of
+            # them by slot is the captor on both engines.
+            if posted.numel():
+                _c = int(posted[0])
+                self.unit_spy_level[b, _c] = min(
+                    self._spy_max_level, int(self.unit_spy_level[b, _c]) + 1)
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,
                        lvl: int) -> None:
@@ -314,7 +324,9 @@ class SimSpy:
             # accumulated for the duration of the mission."
             live = self._district_live(
                 self.city_dist_tile[b, hr, hc, self._commhub_idx].reshape(1, 1))
-            take = float(int(live[0, 0]) * self._spy_mission_turns_base)
+            # the take is the hub's income over the mission's own duration,
+            # which the modifiers on the CLOCK do not shorten.
+            take = float(int(live[0, 0]) * self._spy_missions[self._spy_m_siphon]["turns"])
             self.civ_treasury[b, hr] = max(0.0, float(self.civ_treasury[b, hr]) - take)
             self.civ_treasury[b, row] += take
         elif m == self._spy_m_heist:

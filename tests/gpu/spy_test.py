@@ -195,13 +195,23 @@ def main() -> None:
     sim.civ_tech_boosted[0, row, gap] = False
 
     # -- 7: the clock and the Bodyguard cut ---------------------------------
-    base = sim._spy_mission_turns_base
+    # CIV6 (Spy): the chassis' mission table — 8 turns for an operation, 16 for
+    # the counterspy post, and each rolling mission names its own success rate.
+    base = sim._spy_missions[sim._spy_m_unrest]["turns"]
+    post = sim._spy_missions[sim._spy_m_counterspy]["turns"]
+    assert (base, post) == (8, 16), f"the table reads {base}/{post}, not 8/16"
+    for _mi, _md in enumerate(sim._spy_missions):
+        _rolls = not _md["certain"] and _mi != sim._spy_m_counterspy
+        assert (_md["successPct"] > 0) == _rolls, (
+            f"mission {_mi} publishes {_md['successPct']}% and rolls={_rolls}")
+    assert sim._spy_missions[sim._spy_m_partisans]["successPct"] == 10
+    assert sim._spy_missions[sim._spy_m_siphon]["successPct"] == 56
     assert int(sim._spy_mission_turns(row, sim._spy_m_unrest)[0]) == base
     sim.civ_age[0, row] = 2
     sim.ded_picks[0, row, 0] = sim._ded_bodyguard
     cut = max(1, (base * sim._bodyguard_num) // sim._bodyguard_den)
     assert int(sim._spy_mission_turns(row, sim._spy_m_unrest)[0]) == cut
-    assert int(sim._spy_mission_turns(row, sim._spy_m_counterspy)[0]) == base, \
+    assert int(sim._spy_mission_turns(row, sim._spy_m_counterspy)[0]) == post, \
         "a defensive post keeps the full clock"
     sim.civ_age[0, row] = 0
     sim.ded_picks[0, row, 0] = -1
@@ -211,10 +221,10 @@ def main() -> None:
     sim._gen_ver += 1
     order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_counterspy)
     assert int(sim.unit_spy_mission[0, v]) == sim._spy_m_counterspy
-    for _ in range(base):
+    for _ in range(post):
         sim._tick_spies(row)
     assert int(sim.unit_spy_mission[0, v]) == sim._spy_m_counterspy, "it re-arms"
-    assert int(sim.unit_spy_turns[0, v]) == base
+    assert int(sim.unit_spy_turns[0, v]) == post
 
     # -- 9: Gain Sources arms the seat-keyed clock, and it decays ------------
     sim.unit_tile[0, v] = ctr_t
@@ -256,6 +266,33 @@ def main() -> None:
     ch = sim._partisan_chassis()
     assert int(ch[0]) >= 0 and bool(sim._type_anticav[int(ch[0])])
     assert int(sim._type_era[int(ch[0])]) <= int(sim._world_era()[0])
+
+    # -- 13: the counterspy that makes the catch earns the level -------------
+    # CIV6 (Spies and Espionage): a spy "may gain levels from successful
+    # offensive operations, or capturing an enemy Spy". Both odds are PINNED
+    # rather than rolled — the mission cannot succeed and the catch cannot
+    # miss — so the poke reads the award, not the dice.
+    _pct0, _cap0 = sim._spy_missions[sim._spy_m_sabotage]["successPct"], sim._spy_capture_pct
+    _per0 = sim._spy_success_per_level
+    sim._spy_missions[sim._spy_m_sabotage]["successPct"] = 0
+    sim._spy_success_per_level = 0   # ...so no LEVEL can lift the pinned rate
+    sim._spy_capture_pct = 100
+    w = spawn_spy(sim, row, ctr_t)
+    guard = spawn_spy(sim, foe, ctr_t)
+    sim.unit_spy_mission[0, guard] = sim._spy_m_counterspy
+    sim.unit_spy_level[0, guard] = 0
+    sim.district_pillaged[0, iz] = False
+    sim._gen_ver += 1
+    order(sim, row, w, sim._A_SPY_MISSION + sim._spy_m_sabotage)
+    assert int(sim.unit_spy_mission[0, w]) == sim._spy_m_sabotage
+    for _ in range(int(sim.unit_spy_turns[0, w])):
+        sim._tick_spies(row)
+    assert not bool(sim.unit_alive[0, w]), "the pinned catch did not fire"
+    assert not bool(sim.district_pillaged[0, iz]), "a pinned FAILURE wrecked the Zone"
+    assert int(sim.unit_spy_level[0, guard]) == 1, "the captor earned nothing"
+    sim._spy_missions[sim._spy_m_sabotage]["successPct"] = _pct0
+    sim._spy_success_per_level = _per0
+    sim._spy_capture_pct = _cap0
 
     print("BATTERY spy OK")
 

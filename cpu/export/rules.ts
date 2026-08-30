@@ -70,9 +70,9 @@ import { ENGINEER_FINISH_FRACTION } from '../core/game';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL,
-  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_MISSION_TURNS,
+  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN, SPY_TRAVEL_TURNS_MAX,
-  SPY_SUCCESS_BASE_PCT, SPY_SUCCESS_PER_LEVEL_PCT, SPY_CAPTURE_PCT,
+  SPY_SUCCESS_PER_LEVEL_PCT, SPY_CAPTURE_PCT,
   SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
@@ -509,12 +509,13 @@ export function buildRules() {
           offensive: m.offensive ? 1 : 0,
           certain: m.certain ? 1 : 0,
           athome: m.athome ? 1 : 0,
+          turns: m.turns,
+          // 0 where the chassis' table publishes none — `certain` decides those
+          successPct: m.successPct ?? 0,
         })),
-        missionTurns: SPY_MISSION_TURNS,
         travelMin: SPY_TRAVEL_TURNS_MIN,
         travelTilesPerTurn: SPY_TRAVEL_TILES_PER_TURN,
         travelMax: SPY_TRAVEL_TURNS_MAX,
-        successBase: SPY_SUCCESS_BASE_PCT,
         successPerLevel: SPY_SUCCESS_PER_LEVEL_PCT,
         capturePct: SPY_CAPTURE_PCT,
         counterspyPct: SPY_COUNTERSPY_CATCH_PCT,

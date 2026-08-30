@@ -13,8 +13,8 @@ import { TECHS } from '../data/techs';
 import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
   SPY_MAX_LEVEL, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_TRAVEL_COLS,
-  SPY_MISSION_TURNS, SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
-  SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_BASE_PCT, SPY_SUCCESS_PER_LEVEL_PCT,
+  SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
+  SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT,
   SPY_CAPTURE_PCT, SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
@@ -161,7 +161,7 @@ export function spyMissionMask(state: GameState, unit: Unit): boolean[] {
 /** CIV6 (Bodyguard of Lies, Golden face): "Time to complete all offensive spy
  *  operations reduced by 25%." */
 export function missionTurns(state: GameState, seat: number, m: number): number {
-  const base = SPY_MISSION_TURNS;
+  const base = SPY_MISSIONS[m]?.turns ?? 0;
   if (!SPY_MISSIONS[m]?.offensive || !goldenDedication(state, seat, DED_BODYGUARD)) return base;
   return Math.max(1, Math.floor((base * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
 }
@@ -217,11 +217,11 @@ function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
 
-function counterspiesAt(state: GameState, holder: number, tileIndex: number): number {
+function counterspiesAt(state: GameState, holder: number, tileIndex: number): Unit[] {
   return state.units.filter(
     (u) => u.seat === holder && isSpy(u.type)
       && u.tileIndex === tileIndex && u.spyMission === SPY_M_COUNTERSPY,
-  ).length;
+  );
 }
 
 /** CIV6 (Great Work Heist): "Great Works of Writing will be displayed first,
@@ -295,7 +295,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   }
   const lvl = effectiveLevel(state, unit, here.city);
   const ok = def.certain
-    || roll(state, SPY_SUCCESS_BASE_PCT + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
+    || roll(state, (def.successPct ?? 0) + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
   if (ok) {
     applyMission(state, unit, m, here.city, here.seat.seat, lvl);
     if (def.offensive) {
@@ -309,9 +309,17 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   if (def.certain) return;
   // CIV6: "when enemy Spies are performing missions in those districts, there
   // is a much higher chance than normal that they will be caught."
-  const guard = counterspiesAt(state, here.seat.seat, unit.tileIndex) > 0;
-  const caught = SPY_CAPTURE_PCT + (guard ? SPY_COUNTERSPY_CATCH_PCT : 0);
-  if (!ok && roll(state, caught)) disbandUnit(state, unit.id);
+  const posted = counterspiesAt(state, here.seat.seat, unit.tileIndex);
+  const caught = SPY_CAPTURE_PCT + (posted.length > 0 ? SPY_COUNTERSPY_CATCH_PCT : 0);
+  if (!ok && roll(state, caught)) {
+    // CIV6 (Spies and Espionage): a spy "may gain levels from successful
+    // offensive operations, or capturing an enemy Spy" — the post that made
+    // the catch likelier is the one that earns it, and the first of them by
+    // slot is the captor on both engines.
+    const captor = posted[0];
+    if (captor) captor.spyLevel = Math.min(SPY_MAX_LEVEL, spyLevel(captor) + 1);
+    disbandUnit(state, unit.id);
+  }
 }
 
 function applyMission(state: GameState, unit: Unit, m: number, city: City, holder: number, lvl: number): void {
@@ -343,7 +351,9 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       // CIV6: "The Spy will steal the Gold income this district has
       // accumulated for the duration of the mission" — the Commercial Hub's
       // own gold, over the turns it ran.
-      const take = commercialGold(state, city) * SPY_MISSION_TURNS;
+      // the take is the hub's income over the mission's own duration, which
+      // the modifiers on the CLOCK do not shorten.
+      const take = commercialGold(state, city) * (SPY_MISSIONS[SPY_M_SIPHON_FUNDS]?.turns ?? 0);
       victim.treasury = Math.max(0, victim.treasury - take);
       owner.treasury += take;
       return;

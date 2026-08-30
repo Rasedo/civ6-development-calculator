@@ -19,7 +19,7 @@ import {
 import { governorAt, governorPhase, governorsOf, neutralizeGovernor } from '../../../cpu/core/governors';
 import { GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
 import {
-  SPY_UNIT, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_MISSION_TURNS,
+  SPY_UNIT, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS,
   SPY_SOURCES_TURNS, SPY_GOVERNOR_TURNS, SPY_GOVERNOR_PER_LEVEL,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_PARTISANS_MIN,
   SPY_PARTISANS_MAX, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
@@ -36,6 +36,8 @@ import type { City, GameState } from '../../../cpu/core/types';
  *  first two draws are fail-then-caught. Picked so no lane has to guard its
  *  own assertions behind an `if`. */
 const WINS = 7;
+/** the mission's own published duration. */
+const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 const LOSES = 1;
 
 /** Two majors, a city each, both spy-capable. */
@@ -207,13 +209,36 @@ describe('what a city offers', () => {
 describe('the clock', () => {
   it("Bodyguard of Lies' golden face shortens an offensive operation only", () => {
     const { state, me } = spyState();
-    expect(missionTurns(state, 0, SPY_M_FOMENT_UNREST)).toBe(SPY_MISSION_TURNS);
+    expect(missionTurns(state, 0, SPY_M_FOMENT_UNREST)).toBe(turnsOf(SPY_M_FOMENT_UNREST));
     me.age = 2;
     me.dedicationPicks = [DED_BODYGUARD];
     expect(missionTurns(state, 0, SPY_M_FOMENT_UNREST))
-      .toBe(Math.floor((SPY_MISSION_TURNS * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
+      .toBe(Math.floor((turnsOf(SPY_M_FOMENT_UNREST) * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
     // ...a defensive post keeps the full clock
-    expect(missionTurns(state, 0, SPY_M_COUNTERSPY)).toBe(SPY_MISSION_TURNS);
+    expect(missionTurns(state, 0, SPY_M_COUNTERSPY)).toBe(turnsOf(SPY_M_COUNTERSPY));
+  });
+
+  it('each mission carries the duration and the odds its own table publishes', () => {
+    // CIV6 (Spy): the chassis' mission table — every operation is 8 turns
+    // except the two 16-turn posts, and each names its own success rate.
+    expect(turnsOf(SPY_M_COUNTERSPY)).toBe(16);
+    for (const m of SPY_MISSIONS) {
+      expect(m.turns).toBe(m.id === 'COUNTERSPY' ? 16 : 8);
+      // the table publishes a rate for exactly the missions that ROLL: a
+      // `certain` one succeeds outright, and the counterspy post never resolves
+      const rolls = !m.certain && m.id !== 'COUNTERSPY';
+      expect(m.successPct !== undefined).toBe(rolls);
+    }
+    const pct = (id: string) => SPY_MISSIONS.find((m) => m.id === id)!.successPct;
+    expect(pct('RECRUIT_PARTISANS')).toBe(10);
+    expect(pct('GREAT_WORK_HEIST')).toBe(20);
+    expect(pct('DISRUPT_ROCKETRY')).toBe(20);
+    expect(pct('BREACH_DAM')).toBe(20);
+    expect(pct('SABOTAGE_PRODUCTION')).toBe(35);
+    expect(pct('STEAL_TECH_BOOST')).toBe(35);
+    expect(pct('NEUTRALIZE_GOVERNOR')).toBe(35);
+    expect(pct('SIPHON_FUNDS')).toBe(56);
+    expect(pct('FOMENT_UNREST')).toBe(56);
   });
 
   it('counter-espionage stands its post rather than ending', () => {
@@ -221,9 +246,9 @@ describe('the clock', () => {
     const spy = spyAt(state, 0, mine);
     expect(beginMission(state, spy, SPY_M_COUNTERSPY)).toBe(true);
     expect(spyIsCounterspy(spy)).toBe(true);
-    for (let i = 0; i < SPY_MISSION_TURNS; i++) tickSpies(state, 0);
+    for (let i = 0; i < turnsOf(SPY_M_COUNTERSPY); i++) tickSpies(state, 0);
     expect(spy.spyMission).toBe(SPY_M_COUNTERSPY);
-    expect(spy.spyTurns).toBe(SPY_MISSION_TURNS);
+    expect(spy.spyTurns).toBe(turnsOf(SPY_M_COUNTERSPY));
   });
 });
 
@@ -231,7 +256,7 @@ describe('what a finished mission does', () => {
   /** run `m` to completion for seat 0's spy standing in `city`. */
   function run(state: GameState, spy: { spyMission?: number }, m: number) {
     expect(beginMission(state, spy as never, m)).toBe(true);
-    for (let i = 0; i < SPY_MISSION_TURNS; i++) tickSpies(state, 0);
+    for (let i = 0; i < turnsOf(m); i++) tickSpies(state, 0);
   }
 
   it('Gain Sources arms the seat-keyed clock, and it decays', () => {
@@ -251,8 +276,8 @@ describe('what a finished mission does', () => {
     const before = { mine: me.treasury, theirs: them.treasury };
     state.rngState = WINS;
     run(state, spy, SPY_M_SIPHON_FUNDS);
-    expect(me.treasury - before.mine).toBe(SPY_MISSION_TURNS);
-    expect(before.theirs - them.treasury).toBe(SPY_MISSION_TURNS);
+    expect(me.treasury - before.mine).toBe(turnsOf(SPY_M_SIPHON_FUNDS));
+    expect(before.theirs - them.treasury).toBe(turnsOf(SPY_M_SIPHON_FUNDS));
     // CIV6: a spy "gains levels by successfully completing offensive missions"
     expect(spy.spyLevel).toBe(1);
   });
@@ -268,6 +293,29 @@ describe('what a finished mission does', () => {
     // ...and the seat may field a replacement, the dead one no longer counting
     expect(canTrainSpy(state, 0)).toBe(true);
     expect(mine.centerIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('the counterspy that makes the catch earns the level', () => {
+    // CIV6 (Spies and Espionage): a spy "may gain levels from successful
+    // offensive operations, or capturing an enemy Spy".
+    const { state, theirs } = spyState();
+    district(state, theirs, 'COMMERCIAL_HUB');
+    const guard = spyAt(state, 1, theirs);
+    expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
+    const spy = spyAt(state, 0, theirs);
+    state.rngState = LOSES;
+    run(state, spy, SPY_M_SIPHON_FUNDS);
+    expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+    expect(guard.spyLevel).toBe(1);
+  });
+
+  it('a catch with nobody posted pays nobody', () => {
+    const { state, theirs } = spyState();
+    district(state, theirs, 'COMMERCIAL_HUB');
+    const spy = spyAt(state, 0, theirs);
+    state.rngState = LOSES;
+    run(state, spy, SPY_M_SIPHON_FUNDS);
+    expect(spiesOf(state, 1)).toHaveLength(0);
   });
 
   it('Neutralize Governor sends the PERSON home and the mission stops offering', () => {
