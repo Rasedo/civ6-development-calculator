@@ -52,7 +52,7 @@ def main() -> None:
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
-    # +1 CONVERT_HEATHEN, +1 UPGRADE, the four VARIABLE-width heads, the
+    # +1 CONVERT_HEATHEN, +1 UPGRADE, the five VARIABLE-width heads, the
     # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT, the Great Person's
     # +1 ACTIVATE_GP, the Rock Band's +1 PERFORM_CONCERT, then the Royal
     # Society's +1 BOOST_PROJECT, then the 6-wide FORM_UP head.
@@ -60,6 +60,7 @@ def main() -> None:
     esp = rj["eras"]["espionage"]
     heads = [
         ("AIR_STRIKE_", sum(1 for n in acts if n.startswith("AIR_STRIKE_"))),
+        ("AIR_PILLAGE_", sum(1 for n in acts if n.startswith("AIR_PILLAGE_"))),
         ("REBASE_", sum(1 for n in acts if n.startswith("REBASE_"))),
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
@@ -77,14 +78,19 @@ def main() -> None:
              + [f"SNIPE3_{k}" for k in range(18)]  # the distance-3 ring
              + ["PERFORM_CONCERT", "BOOST_PROJECT"]
              + [f"FORM_UP_{d}" for d in range(6)]
-             + ["ESCORT", "BREAK_ESCORT"])  # the newest last-append
+             + ["ESCORT", "BREAK_ESCORT"]
+             # the newest last-append: the bomber's second head
+             + [f"AIR_PILLAGE_{k}" for k in range(dict(heads)["AIR_PILLAGE_"])])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
-    _tailstart = len(acts) - len(_last) - sum(w for _p, w in heads)
+    # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
+    # `_last` is what proves its contiguity and the walk below skips it.
+    _mid = [h for h in heads if h[0] != "AIR_PILLAGE_"]
+    _tailstart = len(acts) - len(_last) - sum(w for _p, w in _mid)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \
         "verb tail misplaced"
     _at_h = _tailstart
-    for _pre, _w in heads:
+    for _pre, _w in _mid:
         assert _w > 0, f"{_pre} head is empty"
         assert acts[_at_h:_at_h + _w] == [f"{_pre}{k}" for k in range(_w)], \
             f"{_pre} head is not one contiguous run at {_at_h}"
@@ -129,6 +135,7 @@ def main() -> None:
     assert sim._A_REPAIR == acts.index("REPAIR"), "REPAIR dispatch column"
     assert sim._A_FOUND == acts.index("FOUND_CITY"), "FOUND_CITY dispatch column"
     assert sim._A_AIR_STRIKE == acts.index("AIR_STRIKE_0"), "AIR_STRIKE dispatch column"
+    assert sim._A_AIR_PILLAGE == acts.index("AIR_PILLAGE_0"), "AIR_PILLAGE dispatch column"
     assert sim._A_REBASE == acts.index("REBASE_0"), "REBASE dispatch column"
     assert sim._A_SPY_TRAVEL == acts.index("SPY_TRAVEL_0"), "SPY_TRAVEL dispatch column"
     assert sim._A_SPY_MISSION == acts.index("SPY_MISSION_0"), "SPY_MISSION dispatch column"
