@@ -23,6 +23,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -165,6 +166,22 @@ def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> s
     return f"ctx.{ladder.CTX_FIELDS[i]}"
 
 
+def _crash_text(ch, ef) -> str:
+    """What a dead TS child has to say for itself. `read_msg` sees only the
+    closed stdout, so without this the gate reports the symptom and never the
+    cause — which is what a battery lane hands back when a child dies."""
+    rc = ch.poll()
+    tail = ""
+    if ef is not None:
+        try:
+            ef.seek(0)
+            tail = ef.read()[-4000:].strip()
+        except (OSError, ValueError):
+            tail = ""
+    head = f"a TS child closed its stdout (exit {rc})"
+    return f"{head}:\n{tail}" if tail else f"{head} and wrote nothing to stderr"
+
+
 def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 ckpt_dir: Path | None = None, resume: int = 0,
                 profile: bool = False, cprofile: str = "",
@@ -222,6 +239,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         t0 = int(ck["turn"])
 
     children = []
+    # A crashed child used to close its stdout and say nothing: its stderr went
+    # to DEVNULL, so the gate could report the SYMPTOM and never the cause. A
+    # real file rather than a PIPE, because nothing drains a pipe until the
+    # read that discovers the crash — which is exactly when it would deadlock.
+    errs: dict[int, object] = {}
     for sd in seeds:
         child_env = dict(os.environ)
         child_env.update({
@@ -231,17 +253,20 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         if resume:
             assert ckpt_dir is not None
             child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"b_seed{sd}_t{resume}.json")
-        children.append(subprocess.Popen(
+        ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
+        ch = subprocess.Popen(
             ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(turns), str(FIXTURES)],
             cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, text=True, encoding="utf-8", shell=True,
-        ))
+            stderr=ef, text=True, encoding="utf-8", shell=True,
+        )
+        errs[id(ch)] = ef
+        children.append(ch)
 
     def read_msg(ch) -> dict:
         while True:
             line = ch.stdout.readline()
             if not line:
-                raise RuntimeError("a TS child closed its stdout (crashed?)")
+                raise RuntimeError(_crash_text(ch, errs.get(id(ch))))
             if line.startswith("@@"):
                 return json.loads(line[2:])
 
@@ -527,17 +552,18 @@ def main() -> None:
     })
     if args.resume:
         child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"s{args.seed}_t{args.resume}.json")
+    _ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
     child = subprocess.Popen(
         ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(args.turns), str(FIXTURES)],
         cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL, text=True, encoding="utf-8", shell=True,
+        stderr=_ef, text=True, encoding="utf-8", shell=True,
     )
 
     def read_msg() -> dict:
         while True:
             line = child.stdout.readline()
             if not line:
-                raise RuntimeError("TS child closed its stdout (crashed?)")
+                raise RuntimeError(_crash_text(child, _ef))
             if line.startswith("@@"):
                 return json.loads(line[2:])
 

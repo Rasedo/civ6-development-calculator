@@ -79,6 +79,12 @@ that many parallel TS children (`cpu/driver/serve.ts` under
    engine; a name without an extractor is a hard error). Any digest
    mismatch is fatal that turn.
 
+A TS child that DIES rather than disagreeing is a different failure:
+`read_msg` sees only a closed stdout, so the gate keeps each child's
+stderr in a temp file and `_crash_text` reports the exit code and that
+tail. A crash with an empty tail and no exit code of its own is the box
+refusing to spawn, not the engines disagreeing.
+
 Integer state must match exactly; float accumulators may differ by
 ≤2 milli-units (IEEE addition is not associative; real bugs drift and
 still fail). The world's RNG is the TS `mulberry32` mirrored draw for
