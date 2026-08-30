@@ -2607,8 +2607,9 @@ class SimSeats:
             _fl, _sp = self._theo_flank_support(
                 torch.where(hit, d_tile, torch.full_like(d_tile, -1)),
                 d_seat, torch.full_like(a_seat, u + self.POOL_LO["major"]), a_seat)
-            a_eff = a_eff + FLANKING_CS * _fl
-            d_eff = d_eff + SUPPORT_CS * _sp + self._theo_def_strength(d_seat, d_tile)
+            a_eff = a_eff + FLANKING_CS * _fl + self._vis_cs(a_seat, d_seat)
+            d_eff = (d_eff + SUPPORT_CS * _sp + self._theo_def_strength(d_seat, d_tile)
+                     + self._vis_cs(d_seat, a_seat))
             to_def = self._damage_roll(hit, a_eff - d_eff, k="theo", tile=d_tile)
             to_atk = self._damage_roll(hit, d_eff - a_eff, k="theoc", tile=self.major_unit_tile[:, u])
             hp = self.major_unit_hp
@@ -6008,12 +6009,14 @@ class SimSeats:
                 # an emergency MEMBER hits its target harder
                 atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
+                atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
+            def_e = def_e + self._vis_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, a_type[:, u])
@@ -7611,6 +7614,8 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
+            def_e = def_e + self._vis_cs(d_seat, a_seat).to(def_e.dtype)
+            atk_e = atk_e + self._vis_cs(a_seat, d_seat).to(atk_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, ut0)
@@ -7817,6 +7822,8 @@ class SimSeats:
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
+            def_e = def_e + self._vis_cs(d_seat, aseat).to(def_e.dtype)
+            atk_e = atk_e + self._vis_cs(aseat, d_seat).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
                              + self._gov_unit_cs(d_type, _ucs_seat)).to(def_e.dtype)

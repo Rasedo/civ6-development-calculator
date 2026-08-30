@@ -58,14 +58,14 @@ from the list below.
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
-| B-61r the Great Person clauses with no carrier | 2 | 12 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
+| B-61r the Great Person clauses with no carrier | 2 | 12 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, a diplomatic-visibility grant whose mechanic ships now, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
-| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
+| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the delegation and the embassy, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
@@ -531,16 +531,50 @@ under their blocker so the dependency is readable, and both halves count.
     the Recommission project that resets it — has no clock.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. The 30-turn agreement clock,
   friendship, the alliance with its defensive pact, the denouncement, open
-  and CLOSED borders and the Great Work gift all ship on the wire and in
-  the observation. OPEN:
-  - **ALLIANCE TYPES AND LEVELS.** R&F's five alliance types, levelling
-    1->3 on Alliance Points (80, then 160 more). The point sources are
-    published and computable here (1/turn, 0.25 per route direction,
-    Democracy's 0.25); the fifteen level effects are fifteen channels,
-    several needing systems this engine lacks (shared visibility,
-    suzerain-bonus sharing, a free promotion).
-  - **DIPLOMATIC VISIBILITY** — no visibility levels exist; Listening
-    Post (C-16) and a Great Person clause (B-61r) read them.
+  and CLOSED borders, the Great Work gift and DIPLOMATIC VISIBILITY all
+  ship on the wire and in the observation. Visibility is five levels —
+  "None, Limited, Open, Secret, and Top Secret" — one per source, DERIVED
+  rather than stored (`diploVisibility` / `_diplo_vis`), because every
+  input is state both engines already compare: a trade route to that civ,
+  the Printing tech's level with everyone, and the Listening Post or the
+  alliance, which "do not add separate Diplomatic Visibility levels".
+  What it buys is "Intel on enemy movements", +3 Combat Strength per level
+  of the gap to the side that is ahead (`visibilityCS` / `_vis_cs`), at
+  every site the barbarian pair-term already rides plus theological
+  combat. OPEN:
+  - **ALLIANCE TYPES AND LEVELS.** The Alliances page names five types —
+    Research, Cultural, Military, Religious, Economic — says "the effects
+    of these levels are cumulative", and that points accrue "every turn"
+    at a rate trading with the ally raises. It publishes NO number: not a
+    level threshold, not a per-turn rate, and not a magnitude for most of
+    the fifteen effects, which read "additional Science", "additional
+    Culture", "additional Gold", "a portion of your ally's Tourism".
+    Four of the fifteen are fully specified and would need no magnitude —
+    Cultural 1 ("Allies do not exert Loyalty pressure on each other"),
+    Religious 1 (the same for Religious pressure), Military 2 ("Allies
+    share visibility", which has a mechanic now) and Economic 3 ("Allies
+    share the Suzerain bonus of all city-states of which they are
+    Suzerain") — but all four are gated on the type-and-level machinery,
+    which cannot be built without the thresholds.
+  - **THE DELEGATION AND THE EMBASSY** are not modelled, and they are a
+    published visibility source: "Delegations cost 10 Gold and Embassies
+    cost 25 Gold, which is paid to the other leader", each worth "1 level
+    of Diplomatic Visibility" plus "a small positive bonus in your
+    relationship", with the Embassy replacing the Delegation at Diplomatic
+    Service and the two never stacking. Unlike the other three sources
+    this one is a VERB — a new wire column, an applier and a mask arm —
+    so a seat here can reach 4 levels only through the sources it has.
+  - **WHETHER THE INTEL BONUS APPLIES TO A CITY ATTACK IS UNSOURCED.** The
+    bonus is stated for "every military encounter"; nothing published says
+    whether a unit attacking a city or an encampment carries it. Both
+    engines apply it unit-against-unit only, which is where the barbarian
+    pair-term already lives, so the two agree by construction — but the
+    choice is this model's.
+  - **WHAT SECRET AND TOP SECRET UNLOCK IS AN INTERFACE.** "When you have
+    Secret or Top Secret level visibility on a foreign civilization you can
+    click on one of that civilization's city banners and view the City
+    Details screen" — an affordance for a human player, with no rule
+    behind it for either engine to run.
   - **THE NEGOTIATED TWO-SIDED DEAL.** Gold, resources, cities, favor and
     agreements traded FOR each other. The wire has no offer/accept
     protocol — a record is one seat's unilateral intent — and no source
@@ -562,8 +596,8 @@ under their blocker so the dependency is readable, and both halves count.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the twelve-mission catalog, the counterspy post, the capture roll,
-  the ESPIONAGE promotion class and the Espionage Pact's two outcomes
-  (B-22r) ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured —
+  the ESPIONAGE promotion class, the Espionage Pact's two outcomes (B-22r)
+  and the Listening Post's payload (C-2's visibility) ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured —
   treat as poke-proven). The chassis is a CIVILIAN — its own page types it
   "Civilian/Espionage" — so `unitIsMilitary` / `_type_military` is what To
   Arms! pays now, and the Spy is outside it. The class is a flat pool
@@ -606,7 +640,7 @@ under their blocker so the dependency is readable, and both halves count.
     ships INERT on that: its first half is already true here and its
     second has no geometry to measure. A spy that occupies the district
     it works out of is the missing mechanic.
-  - **LISTENING POST** — its payload is diplomatic VISIBILITY (C-2).
+
   - **FABRICATE SCANDAL** targets a city-state — R&F's ruleset; the
     majors-only scan is vanilla-faithful and the minor city block carries
     no district registry to hang it on. SMEAR_CAMPAIGN, which runs that

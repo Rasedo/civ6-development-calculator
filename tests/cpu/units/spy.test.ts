@@ -31,6 +31,7 @@ import {
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_COUNTERSPY,
+  SPY_M_LISTENING_POST,
 } from '../../../cpu/data/espionage';
 import { DED_BODYGUARD, CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS } from '../../../cpu/data/espionage';
@@ -262,6 +263,23 @@ describe('the clock', () => {
     for (let i = 0; i < turnsOf(SPY_M_COUNTERSPY); i++) tickSpies(state, 0);
     expect(spy.spyMission).toBe(SPY_M_COUNTERSPY);
     expect(spy.spyTurns).toBe(turnsOf(SPY_M_COUNTERSPY));
+  });
+});
+
+describe('the listening post stands', () => {
+  it('re-posts on its own clock instead of going idle', () => {
+    // CIV6 (Diplomatic Visibility): the level is live only "while the mission
+    // is running", so the post renews the way the counterspy does.
+    const { state, theirs } = spyState();
+    const spy = spyAt(state, 0, theirs);
+    expect(beginMission(state, spy, SPY_M_LISTENING_POST)).toBe(true);
+    for (let i = 0; i < turnsOf(SPY_M_LISTENING_POST); i++) tickSpies(state, 0);
+    expect(spy.spyMission).toBe(SPY_M_LISTENING_POST);
+    expect(spy.spyTurns).toBe(turnsOf(SPY_M_LISTENING_POST));
+    // ...and the promotion that shortens every mission shortens the re-post
+    spy.promos = spyBit('LINGUIST');
+    for (let i = 0; i < turnsOf(SPY_M_LISTENING_POST); i++) tickSpies(state, 0);
+    expect(spy.spyTurns).toBe(Math.floor((turnsOf(SPY_M_LISTENING_POST) * 75) / 100));
   });
 });
 

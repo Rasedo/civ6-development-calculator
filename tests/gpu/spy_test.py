@@ -401,6 +401,26 @@ def main() -> None:
     o_p, t_p = sim._congress_pref(ri, row)
     assert int(o_p[0]) == 0 and int(t_p[0]) == other, "the ballot did not name the live op"
 
+    # -- 16: the listening post stands its own post -------------------------
+    # CIV6 (Diplomatic Visibility): the level is live only while the mission
+    # runs, so the post renews the way the counterspy does — on a clock the
+    # promotion that shortens every mission also shortens.
+    sim.unit_tile[0, x] = ctr_t
+    sim.unit_spy_mission[0, x] = sim._spy_idle
+    sim.unit_promos[0, x] = 0
+    sim._gen_ver += 1
+    order(sim, row, x, sim._A_SPY_MISSION + sim._spy_m_listening)
+    assert int(sim.unit_spy_mission[0, x]) == sim._spy_m_listening
+    for _ in range(int(sim.unit_spy_turns[0, x])):
+        sim._tick_spies(row)
+    assert int(sim.unit_spy_mission[0, x]) == sim._spy_m_listening, "the post went idle"
+    full = int(sim._spy_mission_turns(row, sim._spy_m_listening)[0])
+    assert int(sim.unit_spy_turns[0, x]) == full
+    sim.unit_promos[0, x] = 1 << pcol("SPY_OP_SPEED")
+    for _ in range(int(sim.unit_spy_turns[0, x])):
+        sim._tick_spies(row)
+    assert int(sim.unit_spy_turns[0, x]) == (full * 75) // 100, "the re-post ignored the promotion"
+
     print("BATTERY spy OK")
 
 

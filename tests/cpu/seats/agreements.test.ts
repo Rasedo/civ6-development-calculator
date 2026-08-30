@@ -24,10 +24,15 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import {
-  allyTurnsWith, borderTurnsFrom, denounceActive, denounceCasusBelli, emptySeat,
+  allyTurnsWith, borderTurnsFrom, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
   friendTurnsWith, seatsAllied, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith,
-  setTileOwner, setWar, tileSeat, warIsFormal,
+  setTileOwner, setWar, tileSeat, visibilityCS, warIsFormal,
 } from '../../../cpu/core/seats';
+import {
+  VISIBILITY_CS_PER_LEVEL, VISIBILITY_LEVELS, VISIBILITY_MAX, VISIBILITY_TECH,
+} from '../../../cpu/data/seats';
+import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL, SPY_UNIT } from '../../../cpu/data/espionage';
+import { defenderCS } from '../../../cpu/core/combat';
 import { borderClosedTo, spawnUnit, tileFreeForUnit } from '../../../cpu/core/units';
 import { diplomaticFavorPerTurn, allianceCount } from '../../../cpu/core/seatTurn';
 import { gwCount } from '../../../cpu/data/greatPeople';
@@ -190,6 +195,98 @@ describe('the agreements run on one 30-turn clock', () => {
     play(s2, { 1: { war: 1 } });
     expect(s2.seats[1].wars).toContain(2);
     expect(s2.seats[0].wars).not.toContain(2);
+  });
+});
+
+describe('diplomatic visibility', () => {
+  /** put a Listening Post spy of `seat` on `target`'s capital centre. */
+  const post = (state: GameState, seat: number, target: number, level = 0) => {
+    const u = spawnUnit(state, SPY_UNIT, state.seats[target].cities[0].centerIndex, seat)!;
+    u.tileIndex = state.seats[target].cities[0].centerIndex;
+    u.spyMission = SPY_M_LISTENING_POST;
+    u.spyLevel = level;
+    return u;
+  };
+
+  it('is five levels, and every source is worth one', () => {
+    // CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of
+    // diplomatic visibility: None, Limited, Open, Secret, and Top Secret."
+    expect(VISIBILITY_LEVELS).toHaveLength(5);
+    expect(VISIBILITY_MAX).toBe(4);
+    const state = table();
+    expect(diploVisibility(state, 0, 1)).toBe(0);
+    // "Establish a Trade Route to a civilization to increase visibility by one
+    // level."
+    state.seats[0].tradeRoutes = [{ fromCity: 0, toCity: 0, toSeat: 1, turnsLeft: 10 } as never];
+    expect(diploVisibility(state, 0, 1)).toBe(1);
+    expect(diploVisibility(state, 0, 2)).toBe(0);
+    expect(diploVisibility(state, 1, 0)).toBe(0);
+    // "...researching the Printing Press technology. This will increase your
+    // visibility with ALL civilizations by one level."
+    state.seats[0].research.techs.push(VISIBILITY_TECH);
+    expect(diploVisibility(state, 0, 1)).toBe(2);
+    expect(diploVisibility(state, 0, 2)).toBe(1);
+  });
+
+  it('the post is worth one level, and two for a Secret Agent', () => {
+    // CIV6: "Performing the Listening Post mission in another civilization's
+    // city increases visibility by one level", two at Secret Agent.
+    const state = table();
+    const spy = post(state, 0, 1);
+    expect(diploVisibility(state, 0, 1)).toBe(1);
+    spy.spyLevel = SPY_SECRET_AGENT_LEVEL;
+    expect(diploVisibility(state, 0, 1)).toBe(2);
+    // ...and it reads only the civ whose city the spy stands in
+    expect(diploVisibility(state, 0, 2)).toBe(0);
+  });
+
+  it('the post and the alliance are alternatives, never a sum', () => {
+    // CIV6: "These two actions do not add separate Diplomatic Visibility
+    // levels - it does no good to spy on your allies!"
+    const state = table();
+    setAllyTurnsWith(state, 0, 1, 20);
+    expect(diploVisibility(state, 0, 1)).toBe(1);
+    expect(diploVisibility(state, 1, 0)).toBe(1);
+    post(state, 0, 1);
+    expect(diploVisibility(state, 0, 1)).toBe(1);
+    // a Secret Agent's post is the larger of the two, so IT is what stands
+    post(state, 0, 1, SPY_SECRET_AGENT_LEVEL);
+    expect(diploVisibility(state, 0, 1)).toBe(2);
+  });
+
+  it('never reads past Top Secret, and never reads itself or a minor', () => {
+    const state = table();
+    state.seats[0].tradeRoutes = [{ fromCity: 0, toCity: 0, toSeat: 1, turnsLeft: 10 } as never];
+    state.seats[0].research.techs.push(VISIBILITY_TECH);
+    setAllyTurnsWith(state, 0, 1, 20);
+    post(state, 0, 1, SPY_SECRET_AGENT_LEVEL);
+    expect(diploVisibility(state, 0, 1)).toBe(VISIBILITY_MAX);
+    expect(diploVisibility(state, 0, 0)).toBe(0);
+    expect(diploVisibility(state, 0, 100)).toBe(0);
+    expect(diploVisibility(state, 200, 0)).toBe(0);
+  });
+
+  it('pays the side that is AHEAD, and reaches a real defence', () => {
+    // CIV6 ("Intel on enemy movements"): "if one party's level is higher, they
+    // will receive a permanent bonus in every military encounter" — +3 Combat
+    // Strength per level of the gap.
+    const state = table();
+    state.unitsMode = true;
+    expect(visibilityCS(state, 0, 1)).toBe(0);
+    state.seats[0].research.techs.push(VISIBILITY_TECH);
+    expect(visibilityCS(state, 0, 1)).toBe(VISIBILITY_CS_PER_LEVEL);
+    expect(visibilityCS(state, 1, 0)).toBe(0);
+    post(state, 0, 1, SPY_SECRET_AGENT_LEVEL);
+    expect(visibilityCS(state, 0, 1)).toBe(3 * VISIBILITY_CS_PER_LEVEL);
+    // the same read is inside the defence, not merely beside it
+    const ground = tileAtCoords(state.map, 6, 6);
+    const att = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 6).index, 1)!;
+    const def = spawnUnit(state, 'WARRIOR', ground.index, 0)!;
+    const withVis = defenderCS(state, def, ground.index, { attacker: att, melee: true });
+    state.seats[0].research.techs.pop();
+    for (const u of state.units) if (u.type === SPY_UNIT) u.spyMission = undefined;
+    const plain = defenderCS(state, def, ground.index, { attacker: att, melee: true });
+    expect(withVis - plain).toBe(3 * VISIBILITY_CS_PER_LEVEL);
   });
 });
 

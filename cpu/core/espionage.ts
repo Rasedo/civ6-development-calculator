@@ -22,7 +22,7 @@ import {
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
-  SPY_M_COUNTERSPY,
+  SPY_M_COUNTERSPY, SPY_M_LISTENING_POST,
 } from '../data/espionage';
 import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
@@ -357,10 +357,11 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   const here = spyCity(state, unit);
   unit.spyMission = SPY_IDLE;
   if (!def || !here) return;
-  if (m === SPY_M_COUNTERSPY) {
-    // counter-espionage stands its post rather than ending: the source has it
-    // running until the spy is sent elsewhere.
-    unit.spyMission = SPY_M_COUNTERSPY;
+  if (m === SPY_M_COUNTERSPY || m === SPY_M_LISTENING_POST) {
+    // Both stand their posts rather than ending: counter-espionage runs until
+    // the spy is sent elsewhere, and CIV6 (Diplomatic Visibility) has the
+    // Listening Post's level live only while the mission is being performed.
+    unit.spyMission = m;
     unit.spyTurns = missionTurns(state, unit, m);
     return;
   }

@@ -704,6 +704,63 @@ def _round_trips(name: str, mut) -> bool:
     base = name[2:] if name.startswith("r_") else name
     return f"civ_{base}" in mut
 
+def poke_visibility(rules, path):
+    """j. DIPLOMATIC VISIBILITY: five levels, one per source, the post and the
+    alliance as alternatives, and the Combat Strength the leading side keeps.
+    CIV6 (Diplomatic Visibility and Gossip)."""
+    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
+    a, b = 1, 2
+    assert sim._vis_max == 4, f"{sim._vis_max} levels, expected the published five"
+    sim.seat_route_dseat[:] = -1
+    vis = sim._diplo_vis()
+    assert int(vis[0, a, b]) == 0 and int(vis[0, a, a]) == 0, "a blank table reads something"
+
+    # "Establish a Trade Route to a civilization to increase visibility by one
+    # level."
+    sim.seat_route_dseat[0, a, 0] = b
+    assert int(sim._diplo_vis()[0, a, b]) == 1
+    assert int(sim._diplo_vis()[0, b, a]) == 0, "the route read back the other way"
+
+    # "...researching the Printing Press technology. This will increase your
+    # visibility with ALL civilizations by one level."
+    sim.civ_techs[0, a, sim._vis_tech] = True
+    v = sim._diplo_vis()
+    assert int(v[0, a, b]) == 2 and int(v[0, a, 0]) == 1, "the tech pays one column only"
+
+    # The post and the alliance do not stack.
+    sim.seat_ally_turns[0, a, b] = sim.seat_ally_turns[0, b, a] = 20
+    assert int(sim._diplo_vis()[0, a, b]) == 3
+    ctr_b = int(sim.city_center[0, b, int(sim.city_alive[0, b].nonzero(as_tuple=True)[0][0])])
+    sim._spawn_unit(a, torch.ones(1, dtype=torch.bool), torch.tensor([ctr_b]),
+                    torch.tensor([sim._spy_idx]))
+    slot = int((sim.unit_alive[0] & (sim.unit_type[0] == sim._spy_idx)).nonzero(
+        as_tuple=True)[0][0])
+    sim.unit_spy_mission[0, slot] = sim._spy_m_listening
+    sim.unit_spy_level[0, slot] = 0
+    sim._gen_ver += 1
+    assert int(sim._diplo_vis()[0, a, b]) == 3, "the post added a level on top of the alliance"
+    # ...a Secret Agent's post is the larger of the pair, so IT stands
+    sim.unit_spy_level[0, slot] = sim._spy_secret_level
+    assert int(sim._diplo_vis()[0, a, b]) == 4
+    assert int(sim._listening_levels()[0, a, b]) == 2
+    # and nothing reads past Top Secret
+    sim.seat_route_dseat[0, a, 1] = b
+    assert int(sim._diplo_vis()[0, a, b]) == sim._vis_max
+
+    # CIV6 ("Intel on enemy movements"): +3 per level of the gap, to the side
+    # that is ahead and to nobody else.
+    _a = torch.full((sim.B,), a, dtype=torch.long, device=sim.device)
+    _b = torch.full((sim.B,), b, dtype=torch.long, device=sim.device)
+    gap = int(sim._diplo_vis()[0, a, b]) - int(sim._diplo_vis()[0, b, a])
+    assert float(sim._vis_cs(_a, _b)[0]) == gap * sim._vis_cs_per_level
+    assert float(sim._vis_cs(_b, _a)[0]) == 0.0, "the side behind was paid too"
+    # a barbarian is not a civilization and reads nothing either way
+    _barb = torch.full((sim.B,), BARB_SEAT, dtype=torch.long, device=sim.device)
+    assert float(sim._vis_cs(_a, _barb)[0]) == 0.0
+    assert float(sim._vis_cs(_barb, _a)[0]) == 0.0
+    print("  j visibility OK (five levels, one per source, post-or-alliance, the intel bonus)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -722,6 +779,7 @@ def main() -> None:
     poke_ww_differential(rules, path)
     poke_transfer(rules, path)
     poke_float32(rules, path)
+    poke_visibility(rules, path)
     print("GEOPOLITICS POKES OK")
 
 

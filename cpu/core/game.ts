@@ -43,7 +43,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
 
 export const TURN_LIMIT = 250;
 
@@ -1590,10 +1590,12 @@ function theologicalCombatPhase(state: GameState): void {
     // theological combat "follows the same rules of engagement as melee
     // combat". The location bonuses are the DEFENDER's alone.
     const atkStr = theoStrength(state, att)
-      + FLANKING_CS * theoFlankCount(state, def.tileIndex, att);
+      + FLANKING_CS * theoFlankCount(state, def.tileIndex, att)
+      + visibilityCS(state, g, unitSeat(def));
     const defStr = theoStrength(state, def)
       + theoDefenseStrength(state, def, state.map.tiles[def.tileIndex])
-      + SUPPORT_CS * theoSupportCount(state, def.tileIndex, def);
+      + SUPPORT_CS * theoSupportCount(state, def.tileIndex, def)
+      + visibilityCS(state, unitSeat(def), g);
     def.hp -= damageRoll(state, atkStr - defStr, 'theo', def.tileIndex);
     att.hp -= damageRoll(state, defStr - atkStr, 'theoc', att.tileIndex);
     att.movesLeft = 0;

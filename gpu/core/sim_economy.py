@@ -1672,6 +1672,70 @@ class SimEconomy:
         return self._suz_live_mask(row) & (
             peace.unsqueeze(1) | ~self.citystate_suz_peace[:, : self.S])
 
+    def _listening_levels(self) -> torch.Tensor:
+        """[B, NM, NM] long — the best Listening Post row v has running in a
+        city of column t. CIV6 (Diplomatic Visibility and Gossip): the mission
+        "increases visibility by one level", two once the spy is a Secret
+        Agent, and only while it RUNS."""
+        B, NM, dev = self.B, self.n_majors, self.device
+        out = torch.zeros(B, NM * NM, dtype=torch.long, device=dev)
+        if NM == 0 or self._spy_idx < 0:
+            return out.reshape(B, NM, NM)
+        live = (self.unit_alive & (self.unit_type == self._spy_idx)
+                & (self.unit_spy_mission == self._spy_m_listening))
+        if not bool(live.any()):
+            return out.reshape(B, NM, NM)
+        hrow, _hcol = self._spy_here(self.unit_tile)
+        seat = self.unit_seat
+        ok = live & (hrow >= 0) & (hrow < NM) & (seat >= 0) & (seat < NM)
+        lvl = torch.where(self.unit_spy_level >= self._spy_secret_level,
+                          torch.full_like(self.unit_spy_level, 2),
+                          torch.ones_like(self.unit_spy_level))
+        idx = (seat.clamp(min=0, max=NM - 1) * NM + hrow.clamp(min=0, max=NM - 1))
+        val = torch.where(ok, lvl, torch.zeros_like(lvl))
+        return out.scatter_reduce(1, idx, val, reduce="amax").reshape(B, NM, NM)
+
+    def _diplo_vis(self) -> torch.Tensor:
+        """[B, NM, NM] long — `diploVisibility`: how much of column t row v can
+        see. CIV6: "There are 5 levels of diplomatic visibility: None, Limited,
+        Open, Secret, and Top Secret", one per source."""
+        B, NM, dev = self.B, self.n_majors, self.device
+        if NM == 0:
+            return torch.zeros(B, 0, 0, dtype=torch.long, device=dev)
+        tgt = torch.arange(NM, device=dev)
+        # "Establish a Trade Route to a civilization to increase visibility by
+        # one level."
+        ds = self.seat_route_dseat[:, :NM]                       # [B, NM, K]
+        out = (ds.unsqueeze(3) == tgt.view(1, 1, 1, NM)).any(dim=2).long()
+        # "...researching the Printing Press technology. This will increase
+        # your visibility with ALL civilizations by one level."
+        if 0 <= self._vis_tech < self.civ_techs.shape[2]:
+            out = out + self.civ_techs[:, :NM, self._vis_tech].long().unsqueeze(2)
+        # The post and the alliance are ALTERNATIVES: "These two actions do not
+        # add separate Diplomatic Visibility levels".
+        ally = (self.seat_ally_turns[:, :NM, :NM] > 0).long()
+        out = out + torch.maximum(ally, self._listening_levels())
+        off = (tgt.view(NM, 1) != tgt.view(1, NM)).unsqueeze(0)
+        return torch.where(off, out.clamp(max=self._vis_max), torch.zeros_like(out))
+
+    def _vis_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """CIV6 ("Intel on enemy movements"): when two civs read each other at
+        different levels, "if one party's level is higher, they will receive a
+        permanent bonus in every military encounter" — +3 Combat Strength per
+        level of the gap, and nothing for the side that is behind."""
+        z = torch.zeros_like(own, dtype=self.dtype)
+        NM = self.n_majors
+        if NM == 0 or self._vis_cs_per_level == 0:
+            return z
+        vis = self._diplo_vis()
+        a = own.clamp(min=0, max=NM - 1)
+        f = foe.clamp(min=0, max=NM - 1)
+        bi = torch.arange(self.B, device=self.device)
+        bi = bi.reshape((-1,) + (1,) * (own.dim() - 1)).expand_as(own)
+        d = vis[bi, a, f] - vis[bi, f, a]
+        ok = (own >= 0) & (own < NM) & (foe >= 0) & (foe < NM) & (d > 0)
+        return torch.where(ok, (d * self._vis_cs_per_level).to(self.dtype), z)
+
     def _barb_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """[B] — CIV6 (Discipline): "+5 Combat Strength when fighting
         Barbarians". A barbarian adopts no government, so the bonus only ever

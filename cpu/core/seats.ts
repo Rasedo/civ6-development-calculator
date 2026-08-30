@@ -1,7 +1,9 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { SeatCaps, SeatClass } from '../data/seats';
-import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS } from '../data/seats';
+import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
+  VISIBILITY_CS_PER_LEVEL } from '../data/seats';
+import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
@@ -274,6 +276,52 @@ export function setAllyTurnsWith(state: GameState, a: number, b: number, v: numb
 
 export function seatsAllied(state: GameState, a: number, b: number): boolean {
   return allyTurnsWith(state, a, b) > 0;
+}
+
+/** CIV6 (Diplomatic Visibility and Gossip): "Performing the Listening Post
+ *  mission in another civilization's city increases visibility by one level",
+ *  two once the spy is a Secret Agent — and only while the mission RUNS, which
+ *  is why the post stands rather than ending. */
+function listeningPostLevels(state: GameState, viewer: number, target: number): number {
+  let best = 0;
+  for (const u of state.units) {
+    if (u.seat !== viewer || u.spyMission !== SPY_M_LISTENING_POST) continue;
+    if (!seatOf(state, target)?.cities.some((c) => c.centerIndex === u.tileIndex)) continue;
+    best = Math.max(best, (u.spyLevel ?? 0) >= SPY_SECRET_AGENT_LEVEL ? 2 : 1);
+  }
+  return best;
+}
+
+/**
+ * How much of `target` this seat can see. DERIVED rather than stored: every
+ * source the page names is already state both engines compare, so there is no
+ * plane to keep in step.
+ */
+export function diploVisibility(state: GameState, viewer: number, target: number): number {
+  if (viewer === target || !isCiv(viewer) || !isCiv(target)) return 0;
+  const sx = seatOf(state, viewer);
+  if (!sx) return 0;
+  let n = 0;
+  // "Establish a Trade Route to a civilization to increase visibility by one
+  // level."
+  if ((sx.tradeRoutes ?? []).some((r) => r.toSeat === target)) n += 1;
+  // "...researching the Printing Press technology. This will increase your
+  // visibility with ALL civilizations by one level."
+  if (sx.research.techs.includes(VISIBILITY_TECH)) n += 1;
+  // The post and the alliance are ALTERNATIVES: "These two actions do not add
+  // separate Diplomatic Visibility levels - it does no good to spy on your
+  // allies!"
+  n += Math.max(listeningPostLevels(state, viewer, target), seatsAllied(state, viewer, target) ? 1 : 0);
+  return Math.min(VISIBILITY_MAX, n);
+}
+
+/** CIV6 ("Intel on enemy movements"): when two civs' visibility levels differ,
+ *  "if one party's level is higher, they will receive a permanent bonus in
+ *  every military encounter" — +3 Combat Strength per level of the gap, and
+ *  nothing at all for the side that is behind. */
+export function visibilityCS(state: GameState, own: number, foe: number): number {
+  const d = diploVisibility(state, own, foe) - diploVisibility(state, foe, own);
+  return d > 0 ? d * VISIBILITY_CS_PER_LEVEL : 0;
 }
 
 /** Turns `grantor`'s OPEN BORDERS grant to `guest` still runs. Directed. */

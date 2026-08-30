@@ -484,6 +484,9 @@ class SimInit:
         self._c_pr_b = int(_er2["congressPrMultB"])
         self._c_advisory_cs = int(_er2["congressAdvisoryCs"])
         self._c_pact_levels = int(_er2["congressPactLevels"])
+        self._vis_max = int(_er2["visibilityMax"])
+        self._vis_cs_per_level = int(_er2["visibilityCsPerLevel"])
+        self._vis_tech = int(_er2["visibilityTech"])
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
@@ -626,6 +629,8 @@ class SimInit:
         self._spy_m_unrest = _mid.index("FOMENT_UNREST")
         self._spy_m_governor = _mid.index("NEUTRALIZE_GOVERNOR")
         self._spy_m_counterspy = _mid.index("COUNTERSPY")
+        self._spy_m_listening = _mid.index("LISTENING_POST")
+        self._spy_secret_level = int(_sp["secretAgentLevel"])
         self._spy_m_breach = _mid.index("BREACH_DAM") if "BREACH_DAM" in _mid else -1
         self._spy_travel_min = int(_sp["travelMin"])
         self._spy_travel_per = int(_sp["travelTilesPerTurn"])

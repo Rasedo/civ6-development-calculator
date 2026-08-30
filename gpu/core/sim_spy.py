@@ -299,11 +299,13 @@ class SimSpy:
         hr, hc = int(hrow[0, 0]), int(hcol[0, 0])
         if hr < 0:
             return
-        if m == self._spy_m_counterspy:
-            # counter-espionage stands its post rather than ending: the source
-            # has it running until the spy is sent elsewhere.
+        if m in (self._spy_m_counterspy, self._spy_m_listening):
+            # Both stand their posts rather than ending: counter-espionage runs
+            # until the spy is sent elsewhere, and CIV6 (Diplomatic Visibility)
+            # has the Listening Post's level live only while it is performed.
+            _sc = torch.full((self.B,), v, dtype=torch.long, device=self.device)
             self.unit_spy_mission[b, v] = m
-            self.unit_spy_turns[b, v] = int(self._spy_mission_turns(row, m)[b])
+            self.unit_spy_turns[b, v] = int(self._spy_mission_turns(row, m, _sc)[b])
             return
         lvl = int(self.unit_spy_level[b, v]) + (
             self._spy_sources_levels

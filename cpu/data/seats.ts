@@ -664,6 +664,19 @@ export const FORMAL_WAR_MIN_TURNS = 5;
  */
 export const AGREEMENT_TURNS = 30;
 
+/** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic
+ *  visibility: None, Limited, Open, Secret, and Top Secret." Each source is
+ *  worth one level, and the ceiling is the last of them. */
+export const VISIBILITY_LEVELS = ['NONE', 'LIMITED', 'OPEN', 'SECRET', 'TOP_SECRET'] as const;
+export const VISIBILITY_MAX = VISIBILITY_LEVELS.length - 1;
+/** the technology whose research "will increase your visibility with ALL
+ *  civilizations by one level". */
+export const VISIBILITY_TECH = 'PRINTING';
+/** CIV6 ("Intel on enemy movements"): the Combat Strength the side with the
+ *  higher visibility carries, per level of the difference — so a Top Secret
+ *  reading of a civ that has None on you is worth four of these. */
+export const VISIBILITY_CS_PER_LEVEL = 3;
+
 /**
  * The civic that opens each agreement.
  * CIV6: "After developing the Early Empire civic, civilizations no longer

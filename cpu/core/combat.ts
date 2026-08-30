@@ -36,7 +36,7 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -544,7 +544,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
       - woundPenalty(defender) + escort
       + generalAuraCS(state, defender, defTileIndex)
       + congressUnitCS(state, defender) + governmentUnitCS(state, defender)
-      + (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0);
+      + (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat)
+        + visibilityCS(state, defender.seat, vs.attacker.seat) : 0);
   }
   const tile = state.map.tiles[defTileIndex];
   return (
@@ -570,7 +571,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
     cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
     generalAuraCS(state, defender, defTileIndex) + // Great General/Admiral aura
-    (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0) +
+    (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat)
+      + visibilityCS(state, defender.seat, vs.attacker.seat) : 0) +
     (vs ? eraMatchupCS(state, defender, vs.attacker.type) : 0) +
     congressUnitCS(state, defender) + governmentUnitCS(state, defender)
   );
@@ -1244,6 +1246,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       + classMatchupCS(attacker.type, defender.type)
       + emergencyAttackCS(state, attacker.seat, defender.seat) // an emergency MEMBER hits its target harder
       + barbarianCombatCS(state, attacker.seat, defender.seat)
+      + visibilityCS(state, attacker.seat, defender.seat)
       + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
     const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
@@ -1494,7 +1497,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rng', targetIndex);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
@@ -1584,7 +1587,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemies.length === 0) return false; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
