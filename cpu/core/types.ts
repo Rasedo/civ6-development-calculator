@@ -190,6 +190,11 @@ export interface SeatActionRecord {
    * tile (an own or another major's city) or -(2+csIndex) for a city-state.
    * Establishing spends a free Trader; both engines only re-validate. */
   route?: [number, number] | null;
+  /** THE MISSILE SILO'S LAUNCH: [device row, target tile]. The silo is an
+   * improvement, not a unit, so its blow is the SEAT's order and rides here
+   * beside the levy; a device thrown by a bomber or a submarine is that
+   * unit's own column instead. Both engines re-validate the named pair. */
+  nuke?: [number, number] | null;
   denounce?: number[];
   ally?: number[];
   /** DECLARATION OF FRIENDSHIP: the seats this one offers friendship to.

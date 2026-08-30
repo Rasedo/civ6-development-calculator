@@ -72,7 +72,7 @@ from the list below.
 | C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization, the Consulate's Encampment half |
 | C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
-| C-31 the nuclear device has no system behind it | 1 | the arsenal and the contaminated ground ship; nothing DETONATES — no launch verb, no blast walk, no interception, no diplomatic reaction |
+| C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
@@ -788,8 +788,8 @@ under their blocker so the dependency is readable, and both halves count.
     any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
     C-26.)
-- **C-31. THE NUCLEAR DEVICE HAS NO SYSTEM BEHIND IT.** Weight 1. The
-  ARSENAL and the GROUND ship. CIV6 (Nuclear weapons): both devices are
+- **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1. The ARSENAL,
+  the GROUND and the BLAST all ship. CIV6 (Nuclear weapons): both devices are
   catalog rows (radius 1 / fallout 10 / range 12 / 14 Gold / 10 Uranium,
   and 2 / 20 / 15 / 16 / 20); the Manhattan Project and Operation Ivy
   unlock the two repeatable City Center builds; a finished device "is
@@ -803,16 +803,43 @@ under their blocker so the dependency is readable, and both halves count.
   with `CLEAN_FALLOUT` to take it back. Reach is ZERO: a device needs
   Nuclear Fission, which no seed reaches in 250 turns, so the proof is
   `tests/gpu/fallout_test.py` and `tests/cpu/map/fallout.test.ts`.
-  OPEN: **nothing DETONATES.** What is missing is the blow itself — a
-  per-device target head and the silo's own launch verb, the blast walk
-  that damages units and cities and paints the fallout ring, interception
-  by a Destroyer/Battleship/Missile Cruiser/Mobile SAM within a hex, the
-  bomber and submarine as delivery chassis, and the reaction: the
-  declaration on every seat caught in the blast, the war weariness a
-  launch costs, and the Nuclear Emergency. The catalog those need —
-  `NUCLEAR_INTERCEPTORS`, `NUCLEAR_CARRIERS`, `WW_WMD_LAUNCHED`, the
-  emergency row and its magnitudes — is already exported and read by
-  nothing.
+  THE BLOW itself now ships: `detonate` / `_detonate` walks the device's
+  own radius in tile-index order and runs the page's clauses in the order
+  it states them — the declaration on every civilization or city-state
+  whose territory or units are in the blast FIRST, then the units
+  destroyed (a Giant Death Robot instead takes `NUKE_ROBOT_DAMAGE` and
+  lives), the improvements and Districts pillaged, the fallout painted for
+  the device's own count of turns, and the City Center and Encampment left
+  with both pools empty, floored where every non-melee blow floors them
+  because a nuke never CAPTURES. A launch bills the LAUNCHER
+  `warWearinessLaunch` / `_ww_launch` per victim and raises the Nuclear
+  Emergency over the launcher's own capital. Three chassis throw it —
+  `nukeCarrier` is the bombers and the Nuclear Submarine, a bomber at its
+  own operational range and a submarine at the device's Range — and the
+  MISSILE SILO throws for the SEAT, since it is an improvement and not a
+  unit. So there are two verbs: the `NUKE_{k}_{c}` head per carrier, and
+  the seat-level launch beside the levy, both re-validating the named
+  (device, tile) pair at the apply. Reach stays ZERO; the proof is
+  `tests/gpu/nuke_test.py` and `tests/cpu/units/nuke.test.ts`. OPEN:
+  - **INTERCEPTION.** CIV6: "Destroyers, Battleships, Missile Cruisers,
+    and Mobile SAMs can protect adjacent tiles from nuclear strikes", and
+    the Mobile SAM is the only one that stops a submarine's. What no
+    source publishes is the ROLL — the chance itself, whether the escort
+    must be undamaged, and what a stopped device costs its owner.
+    `NUKE_INTERCEPTORS` and `NUKE_COVER_RANGE` are exported and read by
+    nothing until that is sourced. ASK THE OWNER.
+  - **THE CITIZENS THE BLAST KILLS.** CIV6: "Citizens 'working' the
+    affected tiles are eliminated." BLOCKED on a mechanic, not on a
+    source: neither engine exposes a worked-tile SELECTION outside its own
+    yield walk (TS derives `CityStats.workedTiles` inside
+    `assignWorkedTiles`; the GPU's pick lives inside `_seat_city_walk`'s
+    own ranking), so there is no assignment both could read the same way.
+    Extracting one is its own task; the clause is recorded rather than
+    approximated on either engine.
+  - **THE WONDER IN THE BLAST.** The pillage clause names improvements,
+    Districts and buildings and says nothing about a wonder, so neither
+    engine touches `built_wonder` / `city_wonder`. That is UNSOURCED
+    rather than decided. ASK THE OWNER.
 - **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
   AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER hold seven sourced rows
   each and ESPIONAGE seventeen (C-16), and with them: the chassis map
@@ -915,8 +942,8 @@ under their blocker so the dependency is readable, and both halves count.
     page does not carry the ability at all, and the flat "sustains 65
     damage" is wiki text this session could not fetch to quote. Unsourced
     magnitude, so unbuilt.
-  - **THE NUCLEAR DELIVERY**'s interception half (devices are C-31, the
-    silo C-20).
+  - **THE NUCLEAR DELIVERY**'s interception half (the strike itself is
+    C-31, the silo C-20).
   - **THE AERODROME'S SLOT COUNT HAS TWO SOURCES THAT DISAGREE.** The Air
     Combat page says an Aerodrome "has 2 slots initially, and can reach 4
     slots after constructing the Hangar and the Airport"; each building's

@@ -203,6 +203,32 @@ class SimEconomy:
             flat_turn.scatter_(1, idx, torch.where(
                 score, turn, flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
 
+    def _ww_launch(self, hit: torch.Tensor, row: int, foe_row) -> None:
+        """`warWearinessLaunch`'s twin. CIV6 (War weariness): "every time you
+        drop a nuke, the war weariness it will incur is equal to 12 times the
+        Era Base value" — the launch's own count plus the abroad multiplier,
+        billed to the LAUNCHER alone."""
+        zeros = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        foe = zeros + foe_row if isinstance(foe_row, int) else foe_row.long()
+        self_row = zeros + row
+        if row < 0 or row >= self.n_majors or row == self.BARB_ROW:
+            return
+        live = hit & (foe >= 0) & (foe != self_row) & (foe != self.BARB_ROW)
+        if not bool(live.any()):
+            return
+        NS = self.NS
+        flat_ww = self.ww.view(self.B, NS * NS)
+        flat_turn = self.ww_turn.view(self.B, NS * NS)
+        mult = int(self._ww_wmd_launched) + int(self.rules.war_weariness.get("abroad", 2))
+        gain = self._ww_era_base(self_row, foe) * mult
+        _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
+                + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
+        gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
+        idx = (self_row * NS + foe.clamp(min=0)).unsqueeze(1)
+        flat_ww.scatter_add_(1, idx, torch.where(live, gain, zeros).unsqueeze(1))
+        flat_turn.scatter_(1, idx, torch.where(
+            live, zeros + int(self.turn), flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
+
     def _ww_decay(self, row: int, mask: torch.Tensor | None = None) -> None:
         """The end-of-turn decay for ONE seat - the `warWearinessTurn` twin,
         called from that seat's own block top.

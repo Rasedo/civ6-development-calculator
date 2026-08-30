@@ -1317,6 +1317,7 @@ class SimInit:
             self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
             self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
             self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
+            self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
             self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
             self._A_REBASE = self._act.get("REBASE_0", -1)
             self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
@@ -1336,6 +1337,10 @@ class SimInit:
             assert _apc in (0, self._air_strike_cols), (
                 f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
+            self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
+            _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
+            assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
+                f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
             _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
             assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
@@ -1358,7 +1363,7 @@ class SimInit:
                 + (6 if self._A_FORM_UP >= 0 else 0) \
                 + (1 if self._A_ESCORT >= 0 else 0) \
                 + (1 if self._A_UNESCORT >= 0 else 0) \
-                + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc
+                + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -1386,6 +1391,8 @@ class SimInit:
             self._A_HEATHEN = -1
             self._A_UPGRADE = -1
             self._A_AIR_STRIKE = -1
+            self._A_NUKE = -1
+            self._nuke_cols = 0
             self._A_AIR_PILLAGE = -1
             self._A_REBASE = -1
             self._A_SPY_TRAVEL = -1
@@ -2504,6 +2511,7 @@ class SimInit:
         self._driven_buy_relig: dict = {}
         self._driven_buy_monu: dict = {}
         self._driven_levy: dict = {}
+        self._driven_nuke: dict = {}
         self._driven_route: dict = {}
         self._driven_citizens: dict = {}
         self._driven_vote: dict = {}

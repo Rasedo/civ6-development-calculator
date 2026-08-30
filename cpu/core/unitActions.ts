@@ -1,5 +1,6 @@
 
 import { PROMO_COLS } from '../data/promotions';
+import { NUCLEAR_DEVICES } from '../data/nuclear';
 
 export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO'];
 
@@ -11,6 +12,10 @@ export const AIR_STRIKE_COLS = 12;
 import { SPY_TRAVEL_COLS, SPY_MISSIONS } from '../data/espionage';
 export { SPY_TRAVEL_COLS, SPY_MISSIONS };
 export const AIR_REBASE_COLS = 6;
+
+/** how many legal nuclear targets a CARRIER's head offers, ordered by tile
+ *  index ascending — the AIR_STRIKE head's contract, one head per device. */
+export const NUKE_COLS = 12;
 
 
 export function unitActionNames(improvementIds: readonly string[]): string[] {
@@ -99,6 +104,15 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // Engineers, or any other unit that has at least 1 remaining build charge",
   // and doing so "takes 1 build charge". One column, where the unit stands.
   names.push('CLEAN_FALLOUT');
+  // THE NUCLEAR STRIKE: one head per device row, `NUKE_COLS` wide, ordered by
+  // TILE INDEX ascending. CIV6: a finished device "can then be used by any
+  // unit or improvement capable of deploying it on the map" — this is the
+  // UNIT half (a bomber carries it out to its own operational range; a
+  // Nuclear Submarine throws it the device's own Range). The Missile Silo is
+  // an improvement and launches for the SEAT, so it has no column here.
+  for (let k = 0; k < NUCLEAR_DEVICES.length; k++) {
+    for (let c = 0; c < NUKE_COLS; c++) names.push(`NUKE_${k}_${c}`);
+  }
   return names;
 }
 

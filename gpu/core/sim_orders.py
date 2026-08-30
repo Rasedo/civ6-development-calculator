@@ -61,6 +61,8 @@ class SimOrders:
         _rdc = getattr(self, "_A_ROAD", -1)
         _rrc = getattr(self, "_A_RAIL", -1)
         _cfc = getattr(self, "_A_CLEAN", -1)
+        _nkc = getattr(self, "_A_NUKE", -1)
+        _nkw = self._nuke_cols * self._n_devices
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
         _pfc = getattr(self, "_A_PERFORM", -1)
@@ -109,6 +111,7 @@ class SimOrders:
             (((_ab >= _apc) & (_ab < _apc + _asw)) if _apc >= 0 else _no).any(dim=0),  # air pillage
             ((_ab == _rrc) if _rrc >= 0 else _no).any(dim=0),                     # lay a railroad
             ((_ab == _cfc) if _cfc >= 0 else _no).any(dim=0),                     # clean fallout
+            (((_ab >= _nkc) & (_ab < _nkc + _nkw)) if _nkc >= 0 else _no).any(dim=0),  # a nuclear strike
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -116,7 +119,7 @@ class SimOrders:
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
-         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean) = _tab
+         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -404,6 +407,23 @@ class SimOrders:
                     self._gp_apply(row, _gpm, sc, hc)
                     _r = _gpm.nonzero(as_tuple=True)[0]
                     self._spend_build_charge(_r, sc, hc)
+
+            if _rk_nuke[n] and _nkc >= 0:
+                nkm = act & (a >= _nkc) & (a < _nkc + _nkw)
+                if bool(nkm.any()):
+                    _cols = self._nuke_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _kk = (a - _nkc).clamp(min=0, max=_nkw - 1)
+                    _tg = _cols.gather(1, _kk.unsqueeze(1)).squeeze(1)
+                    _okN = nkm & (_tg >= 0)
+                    for _d in range(self._n_devices):
+                        _dm = _okN & (torch.div(_kk, self._nuke_cols, rounding_mode="floor") == _d)
+                        if bool(_dm.any()):
+                            self._detonate(_dm, row, _d, _tg)
+                    # the carrier spends its whole turn on the delivery
+                    _mp = self.unit_mp
+                    _mp[_okN.nonzero(as_tuple=True)[0], sc[_okN]] = 0
+                    self.unit_attacks[_okN.nonzero(as_tuple=True)[0], sc[_okN]] = 0
 
             if _rk_air[n] and _ar >= 0:
                 asm = act & (a >= _ar) & (a < _ar + _asw)

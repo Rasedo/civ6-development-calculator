@@ -10,7 +10,9 @@ import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
-import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike } from './combat';
+import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
+import { nukeOffers } from './nuclear';
+import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
@@ -56,7 +58,7 @@ import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, trader
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
-import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
+import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
 import { beginMission, beginTravel, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
@@ -64,6 +66,7 @@ const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_UPGRADE = unitActionIndex(IMPROVEMENT_IDS).UPGRADE;
 const A_AIR_STRIKE = unitActionIndex(IMPROVEMENT_IDS).AIR_STRIKE_0;
+const A_NUKE = unitActionIndex(IMPROVEMENT_IDS).NUKE_0_0;
 const A_REBASE = unitActionIndex(IMPROVEMENT_IDS).REBASE_0;
 const A_AIR_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).AIR_PILLAGE_0;
 const A_SPY_TRAVEL = unitActionIndex(IMPROVEMENT_IDS).SPY_TRAVEL_0;
@@ -1196,6 +1199,18 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         activateGreatPerson(state, unit);
         return;
       }
+      if (a >= A_NUKE && a < A_NUKE + NUCLEAR_DEVICES.length * NUKE_COLS) {
+        const off = a - A_NUKE;
+        const k = Math.floor(off / NUKE_COLS);
+        const tgt = nukeTargets(state, unit, k, NUKE_COLS)[off % NUKE_COLS];
+        if (tgt !== undefined) {
+          detonate(state, actor.seat, k, tgt);
+          // the carrier spends its whole turn on the delivery
+          unit.movesLeft = 0;
+          unit.attacksLeft = 0;
+        }
+        return;
+      }
       if (a >= A_AIR_STRIKE && a < A_AIR_STRIKE + AIR_STRIKE_COLS) {
         const t = airStrikeTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_STRIKE];
         if (t !== undefined) airStrike(state, unit.id, t, actor.seat);
@@ -1808,6 +1823,17 @@ export function seatPhase(state: GameState): void {
           // no dedication), one per turn like the other faith civilians.
           boughtNaturalist = purchaseNaturalist(state, civCityF.id, actor.seat).ok;
         }
+      }
+    }
+
+    // THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order is
+    // the SEAT's; both engines re-validate the named (device, tile) pair.
+    {
+      const nk = rec?.nuke;
+      if (nk && nk[0] >= 0 && nk[1] >= 0
+          && siloReaches(state, actor.seat, nk[0], nk[1])
+          && nukeOffers(state, actor.seat, nk[0], nk[1])) {
+        detonate(state, actor.seat, nk[0], nk[1]);
       }
     }
 

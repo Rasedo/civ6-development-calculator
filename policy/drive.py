@@ -1099,6 +1099,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         env_seq = _seat_envoys(sim, row)
     buy, worship, relig, levy, monu, nat, cls, ucls, pat, band = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
     route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
+    # THE SILO LAUNCH: take the candidate whenever one exists, exactly as the
+    # route verb does — the engine's own scan answers, so the driver's twin
+    # cannot drift from the clause it mirrors.
+    nuke = sim._seat_nuke_candidate(row)
     spec, lock = _decide_citizens(sim, row)
     vote = _decide_vote(sim, row)
     # production_tile rides along or the drive and its own record diverge: a
@@ -1106,7 +1110,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -1175,10 +1179,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, spec, lock, vote
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, spec, lock, vote, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -1204,6 +1208,8 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
+    if nuke is not None and int(nuke[0][b]) >= 0 and int(nuke[1][b]) >= 0:
+        rec["nuke"] = [int(nuke[0][b]), int(nuke[1][b])]
     if spec is not None:
         pins = [[int(_ctr[j]), di, int(spec[b, j, di])]
                 for j in range(int(spec.shape[1])) if bool(_alive_c[j])
@@ -1388,6 +1394,11 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     if _rv is not None:
         route = (torch.full((sim.B,), int(_rv[0]), dtype=torch.long, device=dev),
                  torch.full((sim.B,), int(_rv[1]), dtype=torch.long, device=dev))
+    _nv = rec.get("nuke")
+    nuke = None
+    if _nv is not None:
+        nuke = (torch.full((sim.B,), int(_nv[0]), dtype=torch.long, device=dev),
+                torch.full((sim.B,), int(_nv[1]), dtype=torch.long, device=dev))
     _sp = rec.get("specialists") or []
     spec = None
     if _sp:
@@ -1413,7 +1424,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 vote[:, _k, _f] = int(_ent[_f])
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote)
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)

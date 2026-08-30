@@ -12,9 +12,10 @@
  */
 import type { GameState } from './types';
 import type { Tile } from '../../world/types';
-import { seatOf } from './seats';
+import { tilesWithin } from '../../world/hex';
+import { NO_SEAT, seatOf, seatsAllied, tileSeat, unitSeat } from './seats';
 import { getModifiers } from './effects';
-import { NUCLEAR_DEVICES } from '../data/nuclear';
+import { NUCLEAR_DEVICES, NUKE_CARRIERS } from '../data/nuclear';
 
 /** how many of device `k` this seat holds. */
 export function wmdHeld(state: GameState, seat: number, k: number): number {
@@ -46,4 +47,60 @@ export function wmdUpkeep(state: GameState, seat: number): number {
  *  built, repaired or bought on it, and whoever ends a turn there is hurt. */
 export function irradiated(tile: Tile | undefined): boolean {
   return (tile?.falloutTurns ?? 0) > 0;
+}
+
+/** CIV6: "a blast radius of 1 (i.e., the target tile and all adjacent tiles)"
+ *  — the ground one device covers, in TILE INDEX order, which is the order
+ *  both engines walk it in. */
+export function nukeBlast(state: GameState, tileIndex: number, k: number): Tile[] {
+  const at = state.map.tiles[tileIndex];
+  const def = NUCLEAR_DEVICES[k];
+  if (!at || !def) return [];
+  return tilesWithin(state.map, at.col, at.row, def.radius).sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Does a blast centred here reach anyone this seat would fight? A device
+ * poisons its own ground as readily as a rival's, so the column is offered
+ * only where the blast touches a seat that is neither this one nor its ally —
+ * territory or a unit on one of the tiles.
+ */
+export function nukeOffers(state: GameState, seat: number, k: number, tileIndex: number): boolean {
+  const tiles = nukeBlast(state, tileIndex, k);
+  if (!tiles.length) return false;
+  for (const t of tiles) {
+    const owner = tileSeat(t);
+    if (owner !== NO_SEAT && owner !== seat && !seatsAllied(state, seat, owner)) return true;
+  }
+  const hit = new Set(tiles.map((t) => t.index));
+  for (const u of state.units) {
+    if (!hit.has(u.tileIndex)) continue;
+    const s = unitSeat(u);
+    if (s !== seat && !seatsAllied(state, seat, s)) return true;
+  }
+  return false;
+}
+
+/** the seats a blast here lands on — CIV6: "any civilization or city-state
+ *  whose territory or units are in the blast radius". Ascending, and never the
+ *  launcher's own. */
+export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile[]): number[] {
+  const out = new Set<number>();
+  const hit = new Set(tiles.map((t) => t.index));
+  for (const t of tiles) {
+    const owner = tileSeat(t);
+    if (owner !== NO_SEAT && owner !== seat) out.add(owner);
+  }
+  for (const u of state.units) {
+    if (!hit.has(u.tileIndex)) continue;
+    const s = unitSeat(u);
+    if (s !== seat) out.add(s);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/** CIV6: a device is deployed by "bomber aircraft, Nuclear Submarines, and the
+ *  Missile Silo" — this is the chassis half of that list. */
+export function nukeCarrier(type: string): boolean {
+  return NUKE_CARRIERS.includes(type);
 }

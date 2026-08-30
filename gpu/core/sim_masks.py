@@ -2680,6 +2680,10 @@ class SimMasks:
         _as: list[torch.Tensor] = []
         if getattr(self, "_A_AIR_STRIKE", -1) >= 0:
             _as = [present.unsqueeze(2) & self._air_target_mask(row, sc, tc, utype)]
+        _nk: list[torch.Tensor] = []
+        if getattr(self, "_A_NUKE", -1) >= 0:
+            _nk = [present.unsqueeze(2) & self._nuke_mask(row, sc, tc, utype)]
+
         _ap: list[torch.Tensor] = []
         if getattr(self, "_A_AIR_PILLAGE", -1) >= 0:
             _ap = [present.unsqueeze(2) & self._air_pillage_mask(row, sc, tc, utype)]
@@ -2773,7 +2777,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf,
+            + _ec + _ue + _ap + _rr + _cf + _nk,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:
@@ -2865,6 +2869,102 @@ class SimMasks:
     def _air_pillage_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                           utype: torch.Tensor) -> torch.Tensor:
         return self._air_pillage_targets(row, sc, tc, utype) >= 0
+
+    def _allied_with(self, row: int, seat: torch.Tensor) -> torch.Tensor:
+        """bool in `seat`'s shape — `seatsAllied`: an alliance clock still
+        running between `row` and the seat named per cell. Only majors keep
+        one, so a minor, a barbarian and NO_SEAT are all False."""
+        ns = self.seat_ally_turns.shape[2]
+        s0 = seat.clamp(min=0, max=ns - 1)
+        v = self.seat_ally_turns[:, row].gather(1, s0.reshape(self.B, -1)).reshape(seat.shape)
+        return (seat >= 0) & (seat < self.n_majors) & (v > 0)
+
+    def _nuke_hostile(self, row: int) -> torch.Tensor:
+        """[B, T] bool — a tile that belongs to, or holds a unit of, a seat
+        that is neither `row` nor its ally. `_nuke_offer` asks it of every tile
+        in the blast: a device poisons its own ground as readily as a rival's,
+        so a target is only offered where the blast reaches somebody else."""
+        out = ((self.tile_seat >= 0) & (self.tile_seat != row)
+               & ~self._allied_with(row, self.tile_seat))
+        for plane in ("military_at", "civilian_at", "embarked_at"):
+            sl = getattr(self, plane)
+            s = torch.where(sl >= 0, self.unit_seat.gather(1, sl.clamp(min=0)),
+                            torch.full_like(sl, -1))
+            out = out | ((sl >= 0) & (s != row) & ~self._allied_with(row, s))
+        return out
+
+    def _nuke_offer(self, row: int, k: int) -> torch.Tensor:
+        """[B, T] bool — `nukeOffers`: a blast of device `k` centred on this
+        tile reaches a seat this one would fight."""
+        near = (self.pair_dist <= int(self._nuke_radius[k])).to(torch.float32)
+        return (self._nuke_hostile(row).to(torch.float32) @ near) > 0
+
+    def _silo_reach(self, row: int, k: int) -> torch.Tensor:
+        """[B, T] bool — `siloReaches`: an unpillaged MISSILE SILO this seat
+        owns stands within the device's own Range of the tile. CIV6: "When
+        deployed from a Missile Silo or a Nuclear Submarine, they have a Range
+        of 12" / "of 15"."""
+        if self._silo_iid < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        silo = ((self.improvement == self._silo_iid) & ~self.pillaged
+                & (self.tile_seat == row)).to(torch.float32)
+        near = (self.pair_dist <= int(self._nuke_range[k])).to(torch.float32)
+        return (silo @ near) > 0
+
+    def _nuke_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                      utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, D*W] TILE INDEX, -1 on a dead column — `nukeTargets`, one
+        head per device row and `_nuke_cols` wide, in TILE-INDEX order.
+
+        CIV6: a device is deployed by "bomber aircraft, Nuclear Submarines, and
+        the Missile Silo" — a BOMBER carries it out to its own operational
+        range, a submarine throws it the device's own Range, and the silo is an
+        improvement with no column here at all."""
+        B, N = tc.shape
+        W, D = self._nuke_cols, self._n_devices
+        out = torch.full((B, N, W * D), -1, dtype=torch.long, device=self.device)
+        if W == 0 or D == 0 or getattr(self, "_A_NUKE", -1) < 0:
+            return out
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        carry = (utype >= 0) & (self._type_nuke_carry[ti] > 0)
+        cols = carry.any(dim=0).nonzero(as_tuple=True)[0]
+        if cols.numel() == 0:
+            return out
+        t2 = tc[:, cols]
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        air = self._type_air[ti[:, cols]] > 0
+        promos = self.unit_promos.gather(1, sc[:, cols])
+        arng = (self._type_ranged_range[ti[:, cols]]
+                + self._promo_val(ti[:, cols], promos, "RANGE"))
+        live = carry[:, cols] & (self.unit_mp.gather(1, sc[:, cols]) > 0)
+        for k in range(D):
+            rng = torch.where(air, arng, torch.full_like(arng, int(self._nuke_range[k])))
+            cand = ((dist <= rng.unsqueeze(2)) & self._nuke_offer(row, k).unsqueeze(1)
+                    & live.unsqueeze(2) & (self.civ_wmd[:, row, k] > 0).reshape(B, 1, 1))
+            out[:, cols, k * W:(k + 1) * W] = self._air_first_k(cand, W)
+        return out
+
+    def _seat_nuke_candidate(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(device [B], tile [B]) — the SILO launch a driver would take: the
+        first device this seat holds whose silo reaches an offered target, and
+        the lowest such tile index. -1 where there is none. The engine
+        re-validates both halves at the apply; this only picks."""
+        B, dev = self.B, self.device
+        kd = torch.full((B,), -1, dtype=torch.long, device=dev)
+        tl = torch.full((B,), -1, dtype=torch.long, device=dev)
+        for k in range(self._n_devices):
+            room = (self.civ_wmd[:, row, k] > 0) & (kd < 0)
+            if not bool(room.any()):
+                continue
+            cand = self._silo_reach(row, k) & self._nuke_offer(row, k) & room.unsqueeze(1)
+            has = cand.any(dim=1)
+            kd = torch.where(has, torch.full_like(kd, k), kd)
+            tl = torch.where(has, cand.long().argmax(dim=1), tl)
+        return kd, tl
+
+    def _nuke_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                   utype: torch.Tensor) -> torch.Tensor:
+        return self._nuke_targets(row, sc, tc, utype) >= 0
 
     def _air_cols(self, kind: torch.Tensor) -> torch.Tensor:
         """the N-columns holding an aircraft in ANY batch row — every air body

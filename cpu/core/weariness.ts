@@ -1,5 +1,5 @@
 import type { GameState, Seat } from './types';
-import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY } from '../data/seats';
+import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED } from '../data/seats';
 import { atWarWithAny, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
 import { civEraIndex } from './city';
 
@@ -107,6 +107,19 @@ export function warWearinessBattle(
   };
   score(aSeat, dSeat, opts.aDied ?? false);
   score(dSeat, aSeat, opts.dDied ?? false);
+}
+
+/**
+ * CIV6 (War weariness): "every time you drop a nuke, the war weariness it will
+ * incur is equal to 12 times the Era Base value. There is no difference
+ * between dropping a Nuclear Device or a Thermonuclear Device" — the launch's
+ * own `WW_WMD_LAUNCHED` plus the abroad multiplier, a blast never landing on
+ * the launcher's own ground. The bill is the LAUNCHER's alone.
+ */
+export function warWearinessLaunch(state: GameState, seat: number, other: number): void {
+  if (!scores(seat) || !scores(other) || seat === other) return;
+  if (!holdsWeariness(seat)) return;
+  addWw(state, seat, other, (WW_WMD_LAUNCHED + WW_ABROAD_MULT) * wwEraBase(state, seat, other));
 }
 
 export function warWearinessTurn(state: GameState, seat: number): void {

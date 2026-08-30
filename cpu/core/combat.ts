@@ -6,6 +6,11 @@ import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
+import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE } from '../data/nuclear';
+import { EMERGENCY_NUCLEAR } from '../data/seats';
+import { addWmd, nukeBlast, nukeCarrier, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
+import { declareWar } from './phase';
+import { declareWarOnCityState } from './cityStates';
 import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -19,7 +24,7 @@ import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from 
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
-import { isAirUnit, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -43,7 +48,7 @@ import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } fro
 // closes a cycle — both directions are called at RUN time, never at module
 // init, which is what makes that safe.
 import { gdrHas, unitFullMoves, waterWalks } from './units';
-import { warWearinessBattle } from './weariness';
+import { warWearinessBattle, warWearinessLaunch } from './weariness';
 import { unitKillEvent } from './eras';
 
 import { gpPermOf } from '../data/greatPeople';
@@ -1687,6 +1692,142 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   return out;
 }
 
+
+/** how far device `k` flies from this carrier. CIV6: "When deployed from a
+ *  Missile Silo or a Nuclear Submarine, they have a Range of 12" / "of 15" —
+ *  a BOMBER instead carries the device and drops it, so its own operational
+ *  range is the reach. */
+export function nukeReach(unit: Unit, k: number): number {
+  const def = NUCLEAR_DEVICES[k];
+  if (!def || !nukeCarrier(unit.type)) return -1;
+  return isAirUnit(unit.type) ? airRange(unit) : def.range;
+}
+
+/** the k-th legal target for this carrier, tile index ascending and cut to
+ *  `width` — the AIR_STRIKE head's contract. */
+export function nukeTargets(state: GameState, unit: Unit, k: number, width: number): number[] {
+  const out: number[] = [];
+  const here = state.map.tiles[unit.tileIndex];
+  const reach = nukeReach(unit, k);
+  if (!here || reach < 0 || wmdHeld(state, unitSeat(unit), k) <= 0) return out;
+  for (const t of state.map.tiles) {
+    if (hexDistance(here.col, here.row, t.col, t.row) > reach) continue;
+    if (!nukeOffers(state, unitSeat(unit), k, t.index)) continue;
+    out.push(t.index);
+    if (out.length >= width) break;
+  }
+  return out;
+}
+
+/** the seat's own MISSILE SILOS — an unpillaged silo on ground it holds.
+ *  CIV6: the silo is an improvement, so it launches for the SEAT rather than
+ *  for anyone standing on it. */
+export function siloTiles(state: GameState, seat: number): Tile[] {
+  return state.map.tiles.filter(
+    (t) => t.improvement === 'MISSILE_SILO' && !t.pillaged && tileSeat(t) === seat);
+}
+
+/** CIV6: "When deployed from a Missile Silo ... they have a Range of 12" /
+ *  "of 15", measured from whichever silo is nearest. */
+export function siloReaches(state: GameState, seat: number, k: number, tileIndex: number): boolean {
+  const def = NUCLEAR_DEVICES[k];
+  const at = state.map.tiles[tileIndex];
+  if (!def || !at) return false;
+  return siloTiles(state, seat).some(
+    (s) => hexDistance(s.col, s.row, at.col, at.row) <= def.range);
+}
+
+/** the k-th legal silo target, tile index ascending and cut to `width`. */
+export function siloTargets(state: GameState, seat: number, k: number, width: number): number[] {
+  const out: number[] = [];
+  if (wmdHeld(state, seat, k) <= 0 || !siloTiles(state, seat).length) return out;
+  for (const t of state.map.tiles) {
+    if (!siloReaches(state, seat, k, t.index)) continue;
+    if (!nukeOffers(state, seat, k, t.index)) continue;
+    out.push(t.index);
+    if (out.length >= width) break;
+  }
+  return out;
+}
+
+/**
+ * THE BLAST. CIV6 (Nuclear weapons), clause by clause, in the order both
+ * engines walk it:
+ *
+ *   * "Using nuclear weapons counts as a declaration of war against any
+ *     civilization or city-state whose territory or units are in the blast
+ *     radius" — the declarations run FIRST, so nothing below is a blow struck
+ *     in peacetime;
+ *   * "Units occupying the affected tiles are destroyed, including Great
+ *     People", except that CIV6 (Giant Death Robot) "is the only unit that
+ *     can survive a nuclear strike. A Nuclear Device or Thermonuclear Device
+ *     does 50 damage to it";
+ *   * "all tile improvements are pillaged ... and any Districts and buildings
+ *     in the affected tiles are also pillaged";
+ *   * "all tiles affected are contaminated with radioactive fallout" for the
+ *     device's own count of turns;
+ *   * "Any City Centers or Encampments caught in the blast radius will have
+ *     their HP and Defense Strength reduced to 0" — a nuke never CAPTURES, so
+ *     the centre floors at 1 where every other non-melee blow floors it, and
+ *     the perimeter pool empties;
+ *
+ * NOT here: "Citizens 'working' the affected tiles are eliminated". Neither
+ * engine exposes a worked-tile SELECTION outside its own yield walk, so there
+ * is no assignment both could read the same way; the loss is recorded rather
+ * than approximated.
+ *
+ * The device is spent whether or not it found anything.
+ */
+export function detonate(state: GameState, seat: number, k: number, targetIndex: number): void {
+  const def = NUCLEAR_DEVICES[k];
+  const tiles = nukeBlast(state, targetIndex, k);
+  if (!def || !tiles.length || wmdHeld(state, seat, k) <= 0) return;
+  addWmd(state, seat, k, -1);
+  const victims = nukeVictims(state, seat, tiles);
+  for (const v of victims) {
+    if (isCiv(v)) { declareWar(state, seat, v); continue; }
+    const minor = (state.cityStates ?? []).find((c) => c.seat === v);
+    if (minor) declareWarOnCityState(state, minor.id, seat);
+  }
+  const hit = new Set(tiles.map((x) => x.index));
+  for (const tile of tiles) {
+    for (const u of unitsAt(state, tile.index)) {
+      if (UNITS[u.type]?.gdr) {
+        u.hp -= NUKE_ROBOT_DAMAGE;
+        if (u.hp > 0) continue;
+      }
+      unitKillEvent(state, seat, undefined, u);
+      killUnit(state, u);
+    }
+    if (tile.improvement) tile.pillaged = true;
+    if (tile.district) tile.districtPillaged = true;
+    tile.falloutTurns = def.fallout;
+    if (tile.district === 'ENCAMPMENT') {
+      tile.encampHp = Math.min(tile.encampHp ?? ENCAMPMENT_HP, 1);
+      tile.encampOuterHp = 0;
+    }
+  }
+  for (const city of allCities(state)) {
+    if (!hit.has(city.centerIndex)) continue;
+    city.hp = Math.min(city.hp, 1);
+    city.outerHp = 0;
+    city.lastHitTurn = state.turn;
+  }
+  for (const minor of state.cityStates ?? []) {
+    if (!hit.has(minor.centerIndex)) continue;
+    minor.hp = Math.min(minor.hp ?? CITY_STATE_MAX_HP, 1);
+  }
+  for (const v of victims) warWearinessLaunch(state, seat, v);
+  // CIV6 (Nuclear Emergency): "The Target has used a nuclear device; capture
+  // their Capital in 60 turns!" — the contested city is the LAUNCHER's own
+  // capital, and every other major may join.
+  const cap = seatOf(state, seat)?.cities.find((c) => c.isCapital) ?? seatOf(state, seat)?.cities[0];
+  if (cap) {
+    raiseEmergency(state, EMERGENCY_NUCLEAR, seat, cap.id,
+      state.seats.filter((s) => s.seat !== seat).map((s) => s.seat));
+  }
+  state.eventLog.push(`${def.name} detonated — the ground burns for ${def.fallout} turns.`);
+}
 
 function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc');

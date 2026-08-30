@@ -65,6 +65,7 @@ def main() -> None:
         ("REBASE_", sum(1 for n in acts if n.startswith("REBASE_"))),
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
+        ("NUKE_", rj["nuclear"]["nukeCols"] * len(rj["nuclear"]["devices"])),
     ]
     want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30
     assert len(acts) == want, (
@@ -83,11 +84,14 @@ def main() -> None:
              + [f"AIR_PILLAGE_{k}" for k in range(dict(heads)["AIR_PILLAGE_"])]
              # the newest last-appends: the engineer's second route, and
              # the charge that clears radioactive fallout
-             + ["BUILD_RAILROAD", "CLEAN_FALLOUT"])
+             + ["BUILD_RAILROAD", "CLEAN_FALLOUT"]
+             # ...and the nuclear head, one per device row
+             + [f"NUKE_{k}_{c}" for k in range(len(rj["nuclear"]["devices"]))
+                for c in range(rj["nuclear"]["nukeCols"])])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.
-    _mid = [h for h in heads if h[0] != "AIR_PILLAGE_"]
+    _mid = [h for h in heads if h[0] not in ("AIR_PILLAGE_", "NUKE_")]
     _tailstart = len(acts) - len(_last) - sum(w for _p, w in _mid)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \

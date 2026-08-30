@@ -194,6 +194,7 @@ class SimSeats:
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
         vote: torch.Tensor | None = None,  # [B, 3, 3] the congress ballot: [outcome, target, extra votes] per slate slot
+        nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -223,6 +224,8 @@ class SimSeats:
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band)
         if route is not None:
             self._driven_route[row] = route
+        if nuke is not None:
+            self._driven_nuke[row] = nuke
         if spec is not None or lock is not None:
             self._driven_citizens[row] = (spec, lock)
         if vote is not None:
@@ -269,14 +272,7 @@ class SimSeats:
             live = mine & self.citystate_alive[:, s] & self.seat_citystate_met[:, row, s]
             at_war = self.war[:, row, crow]
             declare = (w == n_opp + s) & ext & live & ~at_war & (self.treaty_turns[:, row, crow] == 0)
-            if bool(declare.any()):
-                self.war[:, row, crow] |= declare
-                self.war[:, crow, row] |= declare
-                self._reset_war_clock(row, crow, declare)
-                # CIV6: war cancels the routes with the new enemy; the Traders return.
-                self._cancel_routes_cs(row, s, declare)
-                # ...and it pays the minor's patrons, suzerain and envoy holder alike.
-                self._grievance_cs_war(row, s, declare)
+            self._declare_war_minor(row, s, declare)
             peace = (
                 (w == n_tgt + n_opp + s) & ext & self.war[:, row, crow]
                 & (self.war_turns[:, row, crow] >= min_turns) & ~suz_war[:, s]
@@ -316,6 +312,52 @@ class SimSeats:
 
     def _denounce_active(self, a: int, b: int) -> torch.Tensor:
         return self._denounce_left(a, b) > 0
+
+    def _declare_war_major(self, row: int, tgt: int, declare: torch.Tensor) -> None:
+        """`declareWar`'s body — every path that opens a war between two majors
+        runs exactly this: the war axis and both clocks, the routes the war
+        cancels, the border grant and the missions it ends, the casus belli
+        that decides the war's KIND, the grievance it opens and the pacts it
+        drags in. The CALLER owns the gates (already at war, a treaty still
+        binding, a friendship the head refuses to break)."""
+        if not bool(declare.any()):
+            return
+        self.war[:, row, tgt] |= declare
+        self.war[:, tgt, row] |= declare
+        self._reset_war_clock(row, tgt, declare)
+        # CIV6: war cancels every route between the two civs; the Traders
+        # return.
+        self._cancel_routes_pair(row, tgt, declare)
+        # An OPEN BORDERS grant cannot outlive the peace it was signed in; war
+        # opens the border it was lifting.
+        for _g, _h in ((row, tgt), (tgt, row)):
+            self.seat_borders_turns[:, _g, _h] = torch.where(
+                declare, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
+                self.seat_borders_turns[:, _g, _h])
+            # CIV6: "when war is declared, delegations and ambassadors are
+            # kicked out" — the pair loses both halves.
+            self.seat_delegation[:, _g, _h] = torch.where(
+                declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
+                self.seat_delegation[:, _g, _h])
+        _formal = declare & self._denounce_casus_belli(row, tgt)
+        self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
+        self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
+        self._grievance_war_declared(row, tgt, declare, _formal)
+        self._defensive_pact(row, tgt, declare)
+
+    def _declare_war_minor(self, row: int, s: int, declare: torch.Tensor) -> None:
+        """`declareWarOnCityState`'s body — the war axis, the routes to that
+        minor, and the grievance its patrons take."""
+        if not bool(declare.any()):
+            return
+        crow = self.n_majors + s
+        self.war[:, row, crow] |= declare
+        self.war[:, crow, row] |= declare
+        self._reset_war_clock(row, crow, declare)
+        # CIV6: war cancels the routes with the new enemy; the Traders return.
+        self._cancel_routes_cs(row, s, declare)
+        # ...and it pays the minor's patrons, suzerain and envoy holder alike.
+        self._grievance_cs_war(row, s, declare)
 
     def _denounce_casus_belli(self, a: int, b: int) -> torch.Tensor:
         """CIV6: "Five turns after denouncing a rival, you gain a Formal War
@@ -389,29 +431,7 @@ class SimSeats:
                        & (self.seat_ally_turns[:, row, tgt] == 0)
                        & (self.seat_friend_turns[:, row, tgt] == 0)
                        & (self.treaty_turns[:, row, tgt] == 0))
-            if bool(declare.any()):
-                self.war[:, row, tgt] |= declare
-                self.war[:, tgt, row] |= declare
-                self._reset_war_clock(row, tgt, declare)
-                # CIV6: war cancels every route between the two civs; the
-                # Traders return.
-                self._cancel_routes_pair(row, tgt, declare)
-                # An OPEN BORDERS grant cannot outlive the peace it was signed
-                # in; war opens the border it was lifting.
-                for _g, _h in ((row, tgt), (tgt, row)):
-                    self.seat_borders_turns[:, _g, _h] = torch.where(
-                        declare, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
-                        self.seat_borders_turns[:, _g, _h])
-                    # CIV6: "when war is declared, delegations and ambassadors
-                    # are kicked out" — the pair loses both halves.
-                    self.seat_delegation[:, _g, _h] = torch.where(
-                        declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
-                        self.seat_delegation[:, _g, _h])
-                _formal = declare & self._denounce_casus_belli(row, tgt)
-                self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
-                self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
-                self._grievance_war_declared(row, tgt, declare, _formal)
-                self._defensive_pact(row, tgt, declare)
+            self._declare_war_major(row, tgt, declare)
             wt = self.war_turns[:, row, tgt]
             pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
             peace = (
@@ -1416,6 +1436,19 @@ class SimSeats:
                     self.civ_tiles_purchased[_rows, row] += 1
                     self._eff_version += 1
                     bought = bought | ok_t
+        # THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order
+        # is the SEAT's; both engines re-validate the named (device, tile) pair.
+        if row in self._driven_nuke:
+            nk, ntile = self._driven_nuke.pop(row)
+            nt = ntile.clamp(min=0)
+            want_n = active & ext & (nk >= 0) & (ntile >= 0)
+            for _d in range(self._n_devices):
+                sel = want_n & (nk == _d)
+                if not bool(sel.any()):
+                    continue
+                sel = (sel & self._silo_reach(row, _d).gather(1, nt.unsqueeze(1)).squeeze(1)
+                       & self._nuke_offer(row, _d).gather(1, nt.unsqueeze(1)).squeeze(1))
+                self._detonate(sel, row, _d, nt)
         if row in self._driven_levy and self.S > 0:
             lv = self._driven_levy.pop(row)
             Sl = self.S
@@ -7169,6 +7202,123 @@ class SimSeats:
             a_alive[:, u] = a_alive[:, u] & ~died
             self._dig_at(dr, a_tile[dr, u], _as)
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
+
+    def _detonate(self, fire: torch.Tensor, row: int, k: int, tile: torch.Tensor) -> None:
+        """`detonate` — the blast. CIV6 (Nuclear weapons), in the order both
+        engines walk it: the declarations first, then the units, then what the
+        tiles carry, the fallout, and the two defensive pools a City Center or
+        an Encampment is left with. The device is spent whether or not it
+        found anything.
+
+        NOT here, and recorded rather than approximated: "Citizens 'working'
+        the affected tiles are eliminated" — neither engine exposes a
+        worked-tile SELECTION outside its own yield walk."""
+        fire = fire & (self.civ_wmd[:, row, k] > 0)
+        if not bool(fire.any()):
+            return
+        B, dev = self.B, self.device
+        tt = tile.clamp(min=0)
+        blast = (self.pair_dist[tt] <= int(self._nuke_radius[k])) & fire.unsqueeze(1)
+        self.civ_wmd[:, row, k] = (self.civ_wmd[:, row, k] - fire.long()).clamp(min=0)
+        u_live = self.unit_alive & (self.unit_tile >= 0)
+        u_here = u_live & blast.gather(1, self.unit_tile.clamp(min=0))
+        # CIV6: "Using nuclear weapons counts as a declaration of war against
+        # any civilization or city-state whose territory or units are in the
+        # blast radius." Ascending seat order, majors then minors, and each
+        # declaration owns the gates its own verb owns.
+        for tgt in range(self.n_majors):
+            if tgt == row:
+                continue
+            land = (blast & (self.tile_seat == tgt)).any(dim=1)
+            here = (u_here & (self.unit_seat == tgt)).any(dim=1)
+            self._declare_war_major(
+                row, tgt, fire & (land | here) & ~self.war[:, row, tgt]
+                & (self.treaty_turns[:, row, tgt] == 0))
+        for s in range(self.S):
+            crow, cseat = self.n_majors + s, 100 + s
+            land = (blast & (self.tile_seat == cseat)).any(dim=1)
+            here = (u_here & (self.unit_seat == cseat)).any(dim=1)
+            self._declare_war_minor(
+                row, s, fire & (land | here) & self.citystate_alive[:, s]
+                & self.seat_citystate_met[:, row, s] & ~self.war[:, row, crow]
+                & (self.treaty_turns[:, row, crow] == 0))
+        # CIV6: "Units occupying the affected tiles are destroyed, including
+        # Great People", except that CIV6 (Giant Death Robot) "is the only unit
+        # that can survive a nuclear strike. A Nuclear Device or Thermonuclear
+        # Device does 50 damage to it".
+        bot = u_here & (self.unit_type == self._gdr_idx) if self._gdr_idx >= 0 else torch.zeros_like(u_here)
+        if bool(bot.any()):
+            self.unit_hp[bot] = self.unit_hp[bot] - int(self._nuke_robot_damage)
+        dead = u_here & (~bot | (self.unit_hp <= 0))
+        idx = dead.nonzero(as_tuple=False)
+        if idx.numel():
+            b_, u_ = idx[:, 0], idx[:, 1]
+            dt, ds = self.unit_tile[b_, u_], self.unit_seat[b_, u_]
+            for j in range(b_.numel()):
+                one = torch.zeros(B, dtype=torch.bool, device=dev)
+                one[int(b_[j])] = True
+                self._unit_kill_event(row, self.unit_type[b_[j], u_[j]].reshape(1).expand(B),
+                                      (ds[j] == BARB_SEAT).reshape(1).expand(B), one)
+            self._dig_at(b_, dt, ds)
+            self._occ_clear(b_, dt, u_)
+            self.unit_alive[b_, u_] = False
+            self._rp_kill_version += 1
+        # CIV6: "all tile improvements are pillaged ... and any Districts and
+        # buildings in the affected tiles are also pillaged", and "all tiles
+        # affected are contaminated with radioactive fallout".
+        self.pillaged |= blast & (self.improvement >= 0)
+        self.district_pillaged |= blast & (self.district >= 0)
+        self.tile_fallout[:] = torch.where(
+            blast, torch.full_like(self.tile_fallout, int(self._nuke_fallout[k])),
+            self.tile_fallout)
+        # CIV6: "Any City Centers or Encampments caught in the blast radius
+        # will have their HP and Defense Strength reduced to 0" — a nuke never
+        # CAPTURES, so each floors at 1 where every non-melee blow floors it.
+        if self._encampment_didx >= 0:
+            enc = blast & (self.district == self._encampment_didx)
+            self.encamp_hp[:] = torch.where(enc, self.encamp_hp.clamp(max=1), self.encamp_hp)
+            self.encamp_outer_hp[:] = torch.where(
+                enc, torch.zeros_like(self.encamp_outer_hp), self.encamp_outer_hp)
+        for r in range(self.n_majors):
+            ctr = self.city_center[:, r]
+            inb = (ctr >= 0) & self.city_alive[:, r] & blast.gather(1, ctr.clamp(min=0))
+            if not bool(inb.any()):
+                continue
+            self.city_hp[:, r] = torch.where(inb, self.city_hp[:, r].clamp(max=1), self.city_hp[:, r])
+            self.city_outer_hp[:, r] = torch.where(
+                inb, torch.zeros_like(self.city_outer_hp[:, r]), self.city_outer_hp[:, r])
+            self.city_last_hit[:, r] = torch.where(
+                inb, torch.full_like(self.city_last_hit[:, r], int(self.turn)),
+                self.city_last_hit[:, r])
+        if self.S > 0:
+            cc = self.citystate_center[:, :self.S]
+            inb = (cc >= 0) & self.citystate_alive[:, :self.S] & blast.gather(1, cc.clamp(min=0))
+            self.citystate_hp[:, :self.S] = torch.where(
+                inb, self.citystate_hp[:, :self.S].clamp(max=1), self.citystate_hp[:, :self.S])
+        for tgt in range(self.n_majors):
+            if tgt == row:
+                continue
+            land = (blast & (self.tile_seat == tgt)).any(dim=1)
+            here = (u_here & (self.unit_seat == tgt)).any(dim=1)
+            self._ww_launch(fire & (land | here), row, tgt)
+        for s in range(self.S):
+            cseat = 100 + s
+            land = (blast & (self.tile_seat == cseat)).any(dim=1)
+            here = (u_here & (self.unit_seat == cseat)).any(dim=1)
+            self._ww_launch(fire & (land | here), row, self.n_majors + s)
+        # CIV6 (Nuclear Emergency): "The Target has used a nuclear device;
+        # capture their Capital in 60 turns!" — the contested city is the
+        # LAUNCHER's own capital, and every other major may join.
+        alive_c = self.city_alive[:, row]
+        is_cap = alive_c & self.city_is_cap[:, row]
+        col = torch.where(is_cap.any(dim=1), is_cap.long().argmax(dim=1),
+                          alive_c.long().argmax(dim=1))
+        cid = self.city_id[:, row].gather(1, col.unsqueeze(1)).squeeze(1)
+        aff = torch.ones(B, self.n_majors, dtype=torch.bool, device=dev)
+        aff[:, row] = False
+        self._raise_emergency(self._emg_nuclear,
+                              torch.full((B,), row, dtype=torch.long, device=dev),
+                              cid, aff, fire & alive_c.any(dim=1))
 
     def _capture_unit(self, rows: torch.Tensor, src: torch.Tensor, pool: str,
                       dst_seat: torch.Tensor, tile: torch.Tensor) -> None:
