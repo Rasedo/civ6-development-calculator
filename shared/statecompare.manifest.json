@@ -1064,6 +1064,42 @@
           "note": "DIRECTED and indefinite: the row is the missions that seat SENDS, carried as a 1 so the pair-clock reader serves it."
         },
         {
+          "name": "spyHeld",
+          "compare": "exact",
+          "covers": [
+            "GameState.spyHeld"
+          ],
+          "planes": [
+            "seat_spy_held"
+          ],
+          "note": "DIRECTED owner -> captor: how many of that seat's spies are in someone's cell, imprisoned and still counted against its capacity."
+        },
+        {
+          "name": "dealOffers",
+          "compare": "exact",
+          "covers": [
+            "GameState.dealOffers"
+          ],
+          "planes": [
+            "deal_offer_left",
+            "deal_offer_give",
+            "deal_offer_ask"
+          ],
+          "note": "The table, keyed from -> to: the turns the offer still stands and both bundles, padded to dealItems slots of [kind, a, b]."
+        },
+        {
+          "name": "dealTerms",
+          "compare": "exact",
+          "covers": [
+            "GameState.dealTerms"
+          ],
+          "planes": [
+            "deal_term_left",
+            "deal_term_item"
+          ],
+          "note": "DIRECTED giver -> receiver: what a running deal still owes, and the turns left on its 30."
+        },
+        {
           "name": "co2",
           "compare": "milli",
           "covers": [

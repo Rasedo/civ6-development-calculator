@@ -11,6 +11,9 @@ class SimPhase:
             self._refresh_aura_mp()
             self._reset_mp("major")
         if self.n_majors > 1:
+            # What the standing deals owe each other, before any new one is
+            # struck: the per-turn payments, the clock, and the stale offer.
+            self._deal_phase()
             self._geo_agreements()
         for row in range(self.n_majors):
             self._seat_turn(row)

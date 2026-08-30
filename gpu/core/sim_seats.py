@@ -225,6 +225,23 @@ class SimSeats:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
         self.war_turns[:, j, i] = self.war_turns[:, i, j]
 
+    def _make_peace(self, row: int, tgt: int, peace: torch.Tensor) -> None:
+        """`makePeace`'s twin, for every way two majors stop fighting: the sue
+        at the war head and the peace deal at the table."""
+        self.war[:, row, tgt] &= ~peace
+        self.war[:, tgt, row] &= ~peace  # the MIRROR cell
+        # the ended war's KIND clears; the grudge stamp is permanent
+        self.seat_warkind[:, row, tgt] &= ~peace
+        self.seat_warkind[:, tgt, row] &= ~peace
+        self._ww_peace(peace, row, tgt)  # -2000 on the treaty
+        # both sides shed the city-states the other dragged in
+        self._citystate_suzerain_release(row, tgt, peace)
+        self._citystate_suzerain_release(tgt, row, peace)
+        self._reset_war_clock(row, tgt, peace)
+        self._stamp_treaty(row, tgt, peace)
+        for _pr in (row, tgt):
+            self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
+
     def _stamp_treaty(self, i: int, j: int, mask: torch.Tensor) -> None:
         """Bind the pair to a PEACE TREATY — the makePeace twin. The term is
         one number for every pairing, majors and city-states alike."""
@@ -397,19 +414,7 @@ class SimSeats:
             )
             if bool(peace.any()):
                 self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost, self.civ_treasury[:, row])
-                self.war[:, row, tgt] &= ~peace
-                self.war[:, tgt, row] &= ~peace  # the MIRROR cell
-                # the ended war's KIND clears; the grudge stamp is permanent
-                self.seat_warkind[:, row, tgt] &= ~peace
-                self.seat_warkind[:, tgt, row] &= ~peace
-                self._ww_peace(peace, row, tgt)  # -2000 on the treaty (the makePeace twin)
-                # both sides shed the city-states the other dragged in
-                self._citystate_suzerain_release(row, tgt, peace)
-                self._citystate_suzerain_release(tgt, row, peace)
-                self._reset_war_clock(row, tgt, peace)
-                self._stamp_treaty(row, tgt, peace)
-                for _pr in (row, tgt):
-                    self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
+                self._make_peace(row, tgt, peace)
 
     def _stash_record(self, row: int, tech=None, civic=None, envoys=None, war=None,
                       production=None, pref=None, dtile=None) -> None:
@@ -8802,4 +8807,32 @@ class SimSeats:
                         self._gift_work(a, b, kind,
                                         want[:, kind, b] & alive_row[:, a] & alive_row[:, b]
                                         & ~self.war[:, a, b])
+
+        # THE TABLE. Every offer goes down first and every answer comes second,
+        # so a pair that agrees within one turn settles within it.
+        ostash = stashes["offer"]
+        if ostash:
+            _di = self._deal_items
+            for a in sorted(ostash.keys()):
+                blob = ostash.pop(a)
+                tgt = blob[:, 0]
+                give = blob[:, 1:1 + _di * 3].reshape(-1, _di, 3)
+                ask = blob[:, 1 + _di * 3:].reshape(-1, _di, 3)
+                for b in range(nrow):
+                    if b == a or not bool((tgt == b).any()):
+                        continue
+                    self._deal_offer(a, b, tgt == b, give, ask,
+                                     alive_row[:, a] & alive_row[:, b])
+
+        for a, b, ok in pairs("accept"):
+            # `a` pressed the button; the offer on the table is `b`'s.
+            was_war = self.war[:, b, a].clone()
+            go = self._accept_deal(b, a, ok)
+            if bool(go.any()):
+                # CIV6 (Ending a War): "the peaceful resolution of a war
+                # involves diplomatic negotiations" — the table that clears
+                # between two seats at war IS the peace deal.
+                peace = go & was_war
+                if bool(peace.any()):
+                    self._make_peace(b, a, peace)
 

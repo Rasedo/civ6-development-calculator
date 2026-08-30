@@ -39,7 +39,7 @@ class SimSpy:
         empire's development allows"."""
         if self._spy_idx < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return self._spies_of(row).sum(dim=1) < self._spy_capacity(row)
+        return self._spies_of(row).sum(dim=1) + self._spies_held_of(row) < self._spy_capacity(row)
 
     # ---- the narrowing every spy body starts from -------------------------
     def _spy_cols(self, utype: torch.Tensor) -> torch.Tensor:
@@ -343,6 +343,12 @@ class SimSpy:
             # them by slot is the captor on both engines.
             if posted.numel():
                 self._level_up_spy(b, int(posted[0]))
+            # CIV6: captured spies "are imprisoned, but not killed", and the
+            # owner "can then attempt to trade with the civilization who
+            # captured the Spy, securing their release". It leaves the map
+            # either way; a cell holds a COUNT, so the spy that comes home is a
+            # new one at level 1.
+            self.seat_spy_held[b, row, hr] += 1
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,
                        lvl: int) -> None:

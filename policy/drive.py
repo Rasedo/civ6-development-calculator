@@ -822,8 +822,11 @@ def _geo_turn(sim, seeds=None):
     bord = torch.zeros_like(den)
     gift = torch.zeros(B, ladder.GW_KINDS, nrow, nrow, dtype=torch.bool, device=dev)
     deleg = torch.zeros_like(den)
+    _di = sim._deal_items
+    off = torch.full((B, nrow, 1 + 2 * _di * 3), -1, dtype=torch.long, device=dev)
+    acc = torch.zeros_like(den)
     if sim.n_majors < 2:
-        return den, frd, ally, bord, gift, deleg
+        return den, frd, ally, bord, gift, deleg, off, acc
     rr = sim.rules.seats
     n_c = sim.city_alive[:, :nrow].sum(dim=2)
     alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)
@@ -893,20 +896,121 @@ def _geo_turn(sim, seeds=None):
                 mine = (held[:, a] * sim.city_alive[:, a].long()).sum(dim=1)
                 theirs = (held[:, b] * sim.city_alive[:, b].long()).sum(dim=1)
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (mine > theirs)
-    return den, frd, ally, bord, gift, deleg
+    _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max)
+    return den, frd, ally, bord, gift, deleg, off, acc
+
+
+# The driver's own PRICES. No source publishes what the AI thinks a deal is
+# worth, so a valuation belongs here and nowhere near the engine: the applier
+# validates every item, and these numbers only decide what gets proposed.
+DEAL_TRIBUTE = 50      # gold a losing side puts on a peace table
+DEAL_SPY_PRICE = 100   # what a captor asks to let a prisoner go
+DEAL_RES_LOT = 10      # the lot size of a strategic surplus
+DEAL_RES_PRICE = 50
+DEAL_RES_SPARE = 20    # a stockpile is SURPLUS above this
+DEAL_FAVOR_LOT = 5
+DEAL_FAVOR_PRICE = 20
+DEAL_FAVOR_SPARE = 10
+DEAL_BORDERS_PRICE = 20
+
+
+def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
+    """WHAT EACH SEAT PUTS ON THE TABLE, and what it takes off one.
+
+    One offer per seat per turn, to the lowest-numbered rival that qualifies,
+    and one rule behind it: sell what you have most of and ask gold for it —
+    except at war, where the only thing worth proposing is peace."""
+    B, dev, nrow = sim.B, sim.device, sim.n_majors
+    _di = sim._deal_items
+    ns = sim.civ_stockpile.shape[2]
+    war_min = int(sim.rules.seats["warMinTurns"])
+    taken = torch.zeros(B, nrow, dtype=torch.bool, device=dev)
+
+    def _put(a: int, b: int, live, give, ask) -> None:
+        """Write one seat's offer, first qualifying rival wins."""
+        sel = live & ~taken[:, a]
+        if not bool(sel.any()):
+            return
+        taken[:, a] |= sel
+        off[:, a, 0] = torch.where(sel, torch.full_like(off[:, a, 0], b), off[:, a, 0])
+        for s, it in enumerate(give):
+            for c in range(3):
+                off[:, a, 1 + s * 3 + c] = torch.where(sel, it[c], off[:, a, 1 + s * 3 + c])
+        for s, it in enumerate(ask):
+            for c in range(3):
+                off[:, a, 1 + _di * 3 + s * 3 + c] = torch.where(
+                    sel, it[c], off[:, a, 1 + _di * 3 + s * 3 + c])
+
+    def _lit(v) -> torch.Tensor:
+        return v if torch.is_tensor(v) else torch.full((B,), int(v), dtype=torch.long, device=dev)
+
+    def _item(kind: int, a=0, b=0):
+        return (_lit(kind), _lit(a), _lit(b))
+
+    for a in range(nrow):
+        for b in range(nrow):
+            if a == b:
+                continue
+            pair = alive_row[:, a] & alive_row[:, b]
+            gold = sim.civ_treasury[:, a]
+            # AT WAR: the only table worth setting is the one that ends it, and
+            # the weaker side is the one that pays to end it.
+            losing = (pair & sim.war[:, a, b] & (sim.war_turns[:, a, b] >= war_min)
+                      & (rstr[:, a] < rstr[:, b]) & (gold >= DEAL_TRIBUTE))
+            _put(a, b, losing, [_item(sim._deal_k_gold, DEAL_TRIBUTE)], [])
+            quiet = (pair & ~sim.war[:, a, b] & ~sim._denounce_active(a, b)
+                     & ~sim._denounce_active(b, a) & (sim.deal_offer_left[:, a, b] == 0))
+            # A PRISONER goes home for a price.
+            _put(a, b, quiet & (sim.seat_spy_held[:, b, a] > 0),
+                 [_item(sim._deal_k_spy)], [_item(sim._deal_k_gold, DEAL_SPY_PRICE)])
+            # A STRATEGIC SURPLUS is a lot with a price on it.
+            if ns > 0:
+                stock = sim.civ_stockpile[:, a]
+                spare = stock > DEAL_RES_SPARE
+                best = stock.argmax(dim=1)
+                _put(a, b, quiet & spare.any(dim=1),
+                     [(_lit(sim._deal_k_res), best, _lit(DEAL_RES_LOT))],
+                     [_item(sim._deal_k_gold, DEAL_RES_PRICE)])
+            # SPARE FAVOR, and finally the passage a diplomat sells cheap.
+            _put(a, b, quiet & (sim.civ_diplo_favor[:, a] > DEAL_FAVOR_SPARE),
+                 [_item(sim._deal_k_favor, DEAL_FAVOR_LOT)],
+                 [_item(sim._deal_k_gold, DEAL_FAVOR_PRICE)])
+            _ob = (sim.civ_civics[:, a, sim._open_borders_civic]
+                   if sim._open_borders_civic >= 0 else torch.zeros_like(quiet))
+            _put(a, b, quiet & _ob & (sim.seat_borders_turns[:, a, b] == 0)
+                 & (prox[a, b] <= prox_max),
+                 [_item(sim._deal_k_borders)], [_item(sim._deal_k_gold, DEAL_BORDERS_PRICE)])
+
+    # ...and what a seat takes off the table. A peace deal is always worth
+    # answering; anything else has to cost less than half the purse.
+    for a in range(nrow):
+        for b in range(nrow):
+            if a == b:
+                continue
+            standing = alive_row[:, a] & alive_row[:, b] & (sim.deal_offer_left[:, b, a] > 0)
+            if not bool(standing.any()):
+                continue
+            ask = sim.deal_offer_ask[:, b, a]
+            owed = torch.zeros(B, dtype=torch.long, device=dev)
+            for s in range(_di):
+                owed = owed + torch.where(ask[:, s, 0] == sim._deal_k_gold,
+                                          ask[:, s, 1].clamp(min=0), torch.zeros_like(owed))
+            afford = sim.civ_treasury[:, a] >= (owed * 2).to(sim.civ_treasury.dtype)
+            acc[:, a, b] = standing & (sim.war[:, a, b] | afford)
 
 
 def geo_decide_and_apply(sim, seeds=None):
     geo = _geo_turn(sim, seeds)
-    den, frd, ally, bord, gift, deleg = geo
+    den, frd, ally, bord, gift, deleg, off, acc = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
-                      borders=bord[:, row], gift=gift[:, :, row], delegation=deleg[:, row])
+                      borders=bord[:, row], gift=gift[:, :, row], delegation=deleg[:, row],
+                      offer=off[:, row], accept=acc[:, row])
     return geo
 
 
 def _extract_geo(geo, row: int, b: int) -> dict:
-    den, frd, ally, bord, gift, deleg = geo
+    den, frd, ally, bord, gift, deleg, off, acc = geo
     out = {}
     for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord),
                        ("delegation", deleg)):
@@ -916,6 +1020,23 @@ def _extract_geo(geo, row: int, b: int) -> dict:
     gl = [[int(k), int(j)] for k, j in gift[b, :, row].nonzero(as_tuple=False).tolist()]
     if gl:
         out["gift"] = gl
+    al = acc[b, row].nonzero(as_tuple=True)[0].tolist()
+    if al:
+        out["accept"] = [int(j) for j in al]
+    to = int(off[b, row, 0])
+    if to >= 0:
+        di = (off.shape[2] - 1) // 6
+
+        def _bundle(base: int) -> list:
+            r = []
+            for s in range(di):
+                k = int(off[b, row, base + s * 3])
+                if k >= 0:
+                    r.append([k, int(off[b, row, base + s * 3 + 1]),
+                              int(off[b, row, base + s * 3 + 2])])
+            return r
+
+        out["offer"] = [to, _bundle(1), _bundle(1 + di * 3)]
     return out
 
 
@@ -1301,9 +1422,19 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         return m
 
     geo_kwargs = {}
-    for _name in ("denounce", "friend", "ally", "borders", "delegation"):
+    for _name in ("denounce", "friend", "ally", "delegation", "borders", "accept"):
         if rec.get(_name):
             geo_kwargs[_name] = _geo_mask(rec[_name])
+    if rec.get("offer"):
+        _to, _give, _ask = rec["offer"]
+        _di = sim._deal_items
+        _blob = torch.full((sim.B, 1 + 2 * _di * 3), -1, dtype=torch.long, device=dev)
+        _blob[:, 0] = int(_to)
+        for _base, _bun in ((1, _give), (1 + _di * 3, _ask)):
+            for _s, _it in enumerate(_bun[:_di]):
+                for _c in range(3):
+                    _blob[:, _base + _s * 3 + _c] = int(_it[_c])
+        geo_kwargs["offer"] = _blob
     if rec.get("gift"):
         _g = torch.zeros(sim.B, ladder.GW_KINDS, sim.n_majors, dtype=torch.bool, device=dev)
         for _k, _j in rec["gift"]:

@@ -678,6 +678,53 @@ export const DELEGATION_COST = 10;
 export const EMBASSY_COST = 25;
 export const EMBASSY_CIVIC = 'DIPLOMATIC_SERVICE';
 
+/**
+ * THE NEGOTIATED DEAL — what one side may put on the table.
+ * CIV6 (Trade, Demand, and Discuss): "You can trade anything from Gold to
+ * resources to cities!", and the Diplomacy screen's own list is "Gold (either
+ * lump sums or payments per turn), Diplomatic Favor ..., Strategic and Luxury
+ * Resources, Great Works, cities ..., and diplomatic agreements".
+ *
+ * APPEND-ONLY: the index is the wire.
+ */
+export const DEAL_ITEM_KINDS = [
+  'GOLD', 'GOLD_PER_TURN', 'FAVOR', 'RESOURCE', 'GREAT_WORK', 'CITY', 'SPY', 'OPEN_BORDERS',
+] as const;
+export type DealItemKind = typeof DEAL_ITEM_KINDS[number];
+export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
+export const DEAL_GOLD_PER_TURN = DEAL_ITEM_KINDS.indexOf('GOLD_PER_TURN');
+export const DEAL_FAVOR = DEAL_ITEM_KINDS.indexOf('FAVOR');
+export const DEAL_RESOURCE = DEAL_ITEM_KINDS.indexOf('RESOURCE');
+export const DEAL_GREAT_WORK = DEAL_ITEM_KINDS.indexOf('GREAT_WORK');
+export const DEAL_CITY = DEAL_ITEM_KINDS.indexOf('CITY');
+export const DEAL_SPY = DEAL_ITEM_KINDS.indexOf('SPY');
+export const DEAL_OPEN_BORDERS = DEAL_ITEM_KINDS.indexOf('OPEN_BORDERS');
+
+/**
+ * CIV6: "Sums of Gold, Great Works, Relics, Artifacts, and captured Spies are
+ * all permanent trades—once you give those items away, you have to trade again
+ * to get them back. Resources and gold per turn, however, are temporary, and
+ * once the deal has run its course you will get them back." A city changes
+ * hands for good, and an agreement runs on the same 30-turn clock every other
+ * agreement here does.
+ */
+export const DEAL_PERMANENT: readonly boolean[] = DEAL_ITEM_KINDS.map(
+  (k) => k !== 'GOLD_PER_TURN' && k !== 'RESOURCE' && k !== 'OPEN_BORDERS');
+
+/** CIV6: "All Deals, Demands, and Promises last for 30 turns, at which point
+ *  they need to be renewed" — the clock every other agreement runs on. */
+export const DEAL_TURNS = AGREEMENT_TURNS;
+
+/** How many items ONE side of a deal may carry. A representation bound: real
+ *  Civ 6 bounds neither the table nor the number of deals a pair may run, and
+ *  this engine carries one running deal per ORDERED pair. */
+export const DEAL_ITEMS = 4;
+
+/** An offer sits on the table for the one turn after it is made: the record is
+ *  a turn's decision, so an offer nobody answers lapses rather than outliving
+ *  the state it was priced against. */
+export const DEAL_OFFER_TURNS = 1;
+
 /** the technology whose research "will increase your visibility with ALL
  *  civilizations by one level". */
 export const VISIBILITY_TECH = 'PRINTING';

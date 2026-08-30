@@ -113,8 +113,11 @@ def clear_pairs(sim):
     sim.seat_warkind[:, :nrow, :nrow] = False
     sim.seat_denounced[:, :nrow, :nrow] = -1
     for _p in (sim.seat_friend_turns, sim.seat_ally_turns, sim.seat_borders_turns,
-               sim.seat_delegation):
+               sim.seat_delegation, sim.deal_offer_left, sim.deal_term_left,
+               sim.seat_spy_held):
         _p[:, :nrow, :nrow] = 0
+    for _p in (sim.deal_offer_give, sim.deal_offer_ask, sim.deal_term_item):
+        _p[:, :nrow, :nrow] = -1
     sim.ww[:] = 0
 
 
@@ -705,6 +708,152 @@ def _round_trips(name: str, mut) -> bool:
     base = name[2:] if name.startswith("r_") else name
     return f"civ_{base}" in mut
 
+def deal(sim, a: int, b: int, give, ask, accept: bool = True):
+    """`a` puts a table to `b`, and `b` answers it — both in ONE drain, the way
+    a turn's records arrive. Each item is [kind, x, y]."""
+    di = sim._deal_items
+    assert len(give) <= di and len(ask) <= di
+    blob = torch.full((sim.B, 1 + 2 * di * 3), -1, dtype=torch.long, device=sim.device)
+    blob[:, 0] = b
+    for base, bundle in ((1, give), (1 + di * 3, ask)):
+        for s, it in enumerate(bundle):
+            for c in range(3):
+                blob[:, base + s * 3 + c] = int(it[c])
+    sim.apply_geo(a, offer=blob)
+    if accept:
+        m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
+        m[:, a] = True
+        sim.apply_geo(b, accept=m)
+    sim._geo_agreements()
+
+
+def poke_deal(rules, path):
+    """m. THE NEGOTIATED DEAL: an offer moves nothing, the answer confirms the
+    whole table or none of it, the permanent kinds stay put and the temporary
+    ones come home, and a table between two seats at war is the peace deal."""
+    sim, ja, jb = controlled_pair(rules, path, extra_for_a=False)
+    a, b = 1, 2
+    K = sim
+    sim.civ_treasury[:] = 1000.0
+
+    # "an 'Accept Deal' button will appear, which will confirm the trade that
+    # is on the table" — until then nothing crosses.
+    deal(sim, a, b, [[K._deal_k_gold, 100, 0]], [], accept=False)
+    assert float(sim.civ_treasury[0, a]) == 1000.0
+    assert int(sim.deal_offer_left[0, a, b]) > 0
+    sim.civ_diplo_favor[0, b] = 9
+    m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
+    m[:, a] = True
+    sim.apply_geo(b, accept=m)
+    sim._geo_agreements()
+    assert float(sim.civ_treasury[0, a]) == 900.0
+    assert float(sim.civ_treasury[0, b]) == 1100.0
+    assert int(sim.deal_offer_left[0, a, b]) == 0
+
+    # a pair that agrees within one turn settles within it
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    deal(sim, a, b, [[K._deal_k_gold, 250, 0]], [])
+    assert float(sim.civ_treasury[0, a]) == 750.0
+    assert float(sim.civ_treasury[0, b]) == 1250.0
+
+    # ...and confirms WHOLE or not at all
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 10.0
+    deal(sim, a, b, [[K._deal_k_gold, 5, 0], [K._deal_k_gold, 500, 0]], [])
+    assert float(sim.civ_treasury[0, a]) == 10.0, "half a table crossed"
+
+    # an offer nobody answers lapses
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    deal(sim, a, b, [[K._deal_k_gold, 100, 0]], [], accept=False)
+    sim._deal_phase()
+    assert int(sim.deal_offer_left[0, a, b]) > 0, "gone before its second turn"
+    sim._deal_phase()
+    assert int(sim.deal_offer_left[0, a, b]) == 0
+
+    # GOLD PER TURN: "temporary, and once the deal has run its course you will
+    # get them back" — the flow returns, so the payments simply stop.
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    deal(sim, a, b, [[K._deal_k_gpt, 3, 0]], [])
+    term = int(sim._deal_turns)
+    assert int(sim.deal_term_left[0, a, b]) == term
+    assert float(sim.civ_treasury[0, a]) == 1000.0, "accepting must not pay a turn early"
+    for _ in range(term):
+        sim._deal_phase()
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - 3 * term
+    assert float(sim.civ_treasury[0, b]) == 1000.0 + 3 * term
+    assert int(sim.deal_term_left[0, a, b]) == 0
+    sim._deal_phase()
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - 3 * term, "the term outlived its clock"
+
+    # A RESOURCE lump goes over and comes home at the term.
+    if sim._n_strategic > 0:
+        clear_pairs(sim)
+        sim.civ_stockpile[:] = 0
+        sim.civ_stockpile[0, a, 0] = 30
+        deal(sim, a, b, [[K._deal_k_res, 0, 12]], [])
+        assert int(sim.civ_stockpile[0, a, 0]) == 18
+        assert int(sim.civ_stockpile[0, b, 0]) == 12
+        for _ in range(term):
+            sim._deal_phase()
+        assert int(sim.civ_stockpile[0, b, 0]) == 0
+        assert int(sim.civ_stockpile[0, a, 0]) == 30, "the lump never came home"
+
+    # An OPEN BORDERS grant rides the border clock, never a deal term.
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    deal(sim, a, b, [[K._deal_k_borders, 0, 0]], [[K._deal_k_gold, 20, 0]])
+    assert int(sim.seat_borders_turns[0, a, b]) == int(sim._agreement_turns)
+    assert int(sim.seat_borders_turns[0, b, a]) == 0, "the grant is DIRECTED"
+    assert int(sim.deal_term_left[0, a, b]) == 0
+    assert float(sim.civ_treasury[0, b]) == 980.0
+
+    # A CAPTURED SPY goes home: "immediately returned to the original owner's
+    # Capital", and the captor is paid for it.
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    sim.seat_spy_held[0, a, b] = 1
+    before = int(sim._spies_of(a).sum())
+    assert int(sim._spies_held_of(a)) == 1
+    deal(sim, b, a, [[K._deal_k_spy, 0, 0]], [[K._deal_k_gold, 100, 0]])
+    assert int(sim.seat_spy_held[0, a, b]) == 0
+    assert int(sim._spies_of(a).sum()) == before + 1, "no spy came home"
+    assert float(sim.civ_treasury[0, b]) == 1100.0
+
+    # A CITY changes hands only at full HP, walls and all.
+    clear_pairs(sim)
+    sim.civ_treasury[:] = 1000.0
+    ctr = int(sim.city_center[0, a, ja])
+    sim.city_hp[0, a, ja] = int(sim.rules.combat["cityMaxHp"]) - 1
+    deal(sim, a, b, [[K._deal_k_city, ctr, 0]], [])
+    assert bool(sim.city_alive[0, a, ja]), "a wounded city was traded"
+    sim.city_hp[0, a, ja] = int(sim.rules.combat["cityMaxHp"])
+    deal(sim, a, b, [[K._deal_k_city, ctr, 0]], [])
+    assert not bool(sim.city_alive[0, a, ja]), "the city never left"
+    assert int(sim.city_alive[0, b].sum()) >= 2
+
+    # THE PEACE DEAL. "The peaceful resolution of a war involves diplomatic
+    # negotiations" — and never before the war has run its minimum.
+    sim2, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
+    sim2.civ_treasury[:] = 1000.0
+    wmin = int(sim2.rules.seats["warMinTurns"])
+    for wt, want_peace in ((wmin - 1, False), (wmin, True)):
+        clear_pairs(sim2)
+        sim2.civ_treasury[:] = 1000.0
+        sim2.war[:, a, b] = True
+        sim2.war[:, b, a] = True
+        sim2.war_turns[:, a, b] = wt
+        sim2.war_turns[:, b, a] = wt
+        deal(sim2, a, b, [[sim2._deal_k_gold, 200, 0]], [])
+        assert bool(sim2.war[0, a, b]) != want_peace, f"war at {wt} turns read wrong"
+        assert float(sim2.civ_treasury[0, a]) == (800.0 if want_peace else 1000.0)
+        if want_peace:
+            assert int(sim2.treaty_turns[0, a, b]) > 0, "peace left no treaty"
+    print("  m deal OK (offer/accept, atomic, lapse, gpt+resource terms, borders, spy, city, peace)")
+
+
 def poke_delegation(rules, path):
     """i4. THE DELEGATION and the RESIDENT EMBASSY: the sender pays, the target
     is paid, the mission is one per pair and indefinite, a denouncement turns
@@ -830,6 +979,7 @@ def main() -> None:
     poke_transfer(rules, path)
     poke_float32(rules, path)
     poke_delegation(rules, path)
+    poke_deal(rules, path)
     poke_visibility(rules, path)
     print("GEOPOLITICS POKES OK")
 

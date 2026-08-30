@@ -86,6 +86,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
         "mission", "visibility1", "visibility2", "visibility3", "visibility4",
+        "dealOffered", "dealTerm", "spyHeld",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
         "royalSociety", "boostOffer",
@@ -323,6 +324,9 @@ def main() -> None:
         _v = sim._diplo_vis()
         for _lv in range(1, sim._vis_max + 1):
             mark(f"visibility{_lv}", (_v >= _lv).any(dim=2).any(dim=1), t)
+        mark("dealOffered", (sim.deal_offer_left > 0).any(dim=2).any(dim=1), t)
+        mark("dealTerm", (sim.deal_term_left > 0).any(dim=2).any(dim=1), t)
+        mark("spyHeld", (sim.seat_spy_held > 0).any(dim=2).any(dim=1), t)
         # A CLOSED border is only a rule where a unit actually stands against
         # one: the refusal, not the civic.
         _ut = sim.unit_type.clamp(min=0)

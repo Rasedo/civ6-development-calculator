@@ -17,6 +17,7 @@ import {
   tickSpies, tickSpyEffects, spyIsCounterspy, isSpy, cityCounterLevels,
   effectiveLevel, levelUpSpy, quartermasterLevels, spyNoEstablish,
 } from '../../../cpu/core/espionage';
+import { spiesHeldOf, spyHeldWith } from '../../../cpu/core/deals';
 import { promoValueFor, takePromotion, promoAvailable, promoReady } from '../../../cpu/core/promotions';
 import {
   PROMO_COLS, SPY_OP_PROMO_LEVELS, UNIT_PROMO_CLASS, promoRows,
@@ -458,16 +459,23 @@ describe('what a finished mission does', () => {
     expect(spy.spyLevel).toBe(1);
   });
 
-  it('a failed offensive mission can cost the spy, and a counterspy makes it likelier', () => {
+  it('a failed offensive mission puts the spy in a cell, and it still counts', () => {
     const { state, theirs, mine } = spyState();
     district(state, theirs, 'COMMERCIAL_HUB');
     const spy = spyAt(state, 0, theirs);
+    const cap = spyCapacity(state, 0);
     state.rngState = LOSES;
     run(state, spy, SPY_M_SIPHON_FUNDS);
+    // CIV6: captured spies "are imprisoned, but not killed" — off the map, and
+    // held by the seat whose city made the catch.
     expect(state.units.some((u) => u.id === spy.id)).toBe(false);
     expect(spiesOf(state, 0)).toHaveLength(0);
-    // ...and the seat may field a replacement, the dead one no longer counting
-    expect(canTrainSpy(state, 0)).toBe(true);
+    expect(spyHeldWith(state, 0, theirs.seat)).toBe(1);
+    expect(spiesHeldOf(state, 0)).toBe(1);
+    // "if you've trained the maximum number of Spies possible, you cannot train
+    // a new Spy to replace one that gets captured."
+    expect(cap).toBe(1);
+    expect(canTrainSpy(state, 0)).toBe(false);
     expect(mine.centerIndex).toBeGreaterThanOrEqual(0);
   });
 

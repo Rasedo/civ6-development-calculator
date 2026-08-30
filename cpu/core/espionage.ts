@@ -9,6 +9,7 @@
  */
 import { hexDistance } from '../../world/hex';
 import { UNITS, UNIT_ERA_INDEX } from '../data/units';
+import { setSpyHeld, spiesHeldOf, spyHeldWith } from './deals';
 import { TECHS } from '../data/techs';
 import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
@@ -60,9 +61,11 @@ export function spiesOf(state: GameState, seat: number): Unit[] {
 }
 
 /** CIV6: "you can never have more Spies than your current empire's development
- *  allows" — the training gate, the Trader capacity's twin. */
+ *  allows" — the training gate, the Trader capacity's twin. A spy sitting in
+ *  someone's cell still counts: "if you've trained the maximum number of Spies
+ *  possible, you cannot train a new Spy to replace one that gets captured." */
 export function canTrainSpy(state: GameState, seat: number): boolean {
-  return spiesOf(state, seat).length < spyCapacity(state, seat);
+  return spiesOf(state, seat).length + spiesHeldOf(state, seat) < spyCapacity(state, seat);
 }
 
 /** the city whose CENTRE this spy stands on, whoever holds it. */
@@ -390,6 +393,12 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     // slot is the captor on both engines.
     const captor = posted[0];
     if (captor) levelUpSpy(state, captor);
+    // CIV6: captured spies "are imprisoned, but not killed", and the owner "can
+    // then attempt to trade with the civilization who captured the Spy,
+    // securing their release". It leaves the map either way; what a cell holds
+    // is a COUNT, so the spy that comes home is a new one at level 1.
+    const jailer = here.seat.seat;
+    setSpyHeld(state, unit.seat, jailer, spyHeldWith(state, unit.seat, jailer) + 1);
     disbandUnit(state, unit.id);
   }
 }

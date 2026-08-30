@@ -381,6 +381,22 @@ class SimInit:
         # DIRECTED, 1 where the row seat holds a Delegation or Resident Embassy
         # with the column seat. Indefinite: a war ends it, never a clock.
         self.seat_delegation = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # THE NEGOTIATED DEAL. An offer sits on the table keyed from -> to: the
+        # turns it still stands (0 = none) and the two bundles, each
+        # `dealItems` slots of [kind, a, b] with kind -1 for an empty slot. A
+        # term is what the giver still owes for the rest of the deal's 30.
+        self._deal_items = int(rules.eras["dealItems"])
+        self._deal_turns = int(rules.eras["dealTurns"])
+        self._deal_offer_turns = int(rules.eras["dealOfferTurns"])
+        _di = self._deal_items
+        self.deal_offer_left = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        self.deal_offer_give = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
+        self.deal_offer_ask = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
+        self.deal_term_left = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        self.deal_term_item = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
+        # CIV6: a captured spy is "imprisoned, but not killed" — keyed
+        # owner -> captor, and still counted against the owner's capacity.
+        self.seat_spy_held = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # the ANNOUNCED slate for the next Regular Session (resolution
         # indices; -1 = empty slot), drawn at the previous session's close.
@@ -493,6 +509,16 @@ class SimInit:
         self._deleg_cost = float(_er2["delegationCost"])
         self._embassy_cost = float(_er2["embassyCost"])
         self._embassy_civic = int(_er2["embassyCivic"])
+        self._deal_kinds = [str(k) for k in _er2["dealItemKinds"]]
+        self._deal_permanent = [bool(v) for v in _er2["dealPermanent"]]
+        self._deal_k_gold = self._deal_kinds.index("GOLD")
+        self._deal_k_gpt = self._deal_kinds.index("GOLD_PER_TURN")
+        self._deal_k_favor = self._deal_kinds.index("FAVOR")
+        self._deal_k_res = self._deal_kinds.index("RESOURCE")
+        self._deal_k_gw = self._deal_kinds.index("GREAT_WORK")
+        self._deal_k_city = self._deal_kinds.index("CITY")
+        self._deal_k_spy = self._deal_kinds.index("SPY")
+        self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])

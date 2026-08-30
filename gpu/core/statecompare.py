@@ -357,6 +357,26 @@ def _seat_pair_relation(plane: str, live):
 
 
 
+def _deal_line(clock: str, planes: tuple):
+    """A DEAL's table, flat: [otherRow, clock, ...slots...] for every row this
+    one has one with, in ascending row order. `dealOfferLine` /
+    `dealTermLine`'s twin — the bundles are already padded to `_deal_items`
+    slots, so both engines emit the same width."""
+    def get(sim, b, rows):
+        out = []
+        for c in rows:
+            line: list[int] = []
+            for j in range(sim.n_majors):
+                if j == c or int(getattr(sim, clock)[b, c, j]) <= 0:
+                    continue
+                line += [j, int(getattr(sim, clock)[b, c, j])]
+                for p in planes:
+                    line += [int(x) for x in getattr(sim, p)[b, c, j].reshape(-1).tolist()]
+            out.append(line)
+        return out
+    return get
+
+
 def _seat_pair_clock(plane: str):
     """A DIPLOMATIC AGREEMENT clock read the flat way the war and treaty clocks
     are: [opponentSeat, turnsLeft, ...] over the majors it still runs with, in
@@ -520,6 +540,9 @@ SEAT = {
     # DIRECTED: the row is what that seat GRANTS, never what it holds.
     "borderTurns": _seat_pair_clock("seat_borders_turns"),
     "delegations": _seat_pair_clock("seat_delegation"),
+    "spyHeld": _seat_pair_clock("seat_spy_held"),
+    "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),
+    "dealTerms": _deal_line("deal_term_left", ("deal_term_item",)),
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 

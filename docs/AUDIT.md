@@ -45,7 +45,7 @@ from the list below.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 2 | the observation renders the standing slate, two resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
+| B-22r World Congress | 2 | the observation renders the standing slate, two resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions are absent |
 | B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
@@ -65,9 +65,9 @@ from the list below.
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
-| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, the negotiated two-sided deal, and the agreements that need one |
-| C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
-| C-16 the spy's second half | 2 | the escape sequence, captured spies, the same-mission gate, two carrier-less missions, three inert promotions |
+| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
+| C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
+| C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
@@ -79,8 +79,8 @@ from the list below.
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
-| **C. Absent systems** | **30** | |
-| **OPEN, TOTAL** | **55** | |
+| **C. Absent systems** | **29** | |
+| **OPEN, TOTAL** | **54** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -172,9 +172,12 @@ Civ 6 source or is recorded as unverifiable.
     over a window and pay the podium — the other real DVP faucet. Floods
     already fire, so an Aid-Request-shaped competition has a trigger;
     what is missing is the per-seat scoring window and the podium payout.
-  - **Peace deals carry no terms.** Real Civ 6 brokers peace through the
-    trade screen — cities, gold, resources and favor on one deal. Blocked
-    on C-2's negotiated deal, not on the treaty system.
+  - ~~Peace deals carry no terms.~~ CLOSED: "the peaceful resolution of a
+    war involves diplomatic negotiations ... You or your opponent may
+    initiate a Peace Deal", so a table between two seats at war IS the
+    peace deal and confirming it ends the war (`acceptDeal` /
+    `_accept_deal`, both calling the one `makePeace` body). The unilateral
+    sue at the war head stays as the no-terms case.
 - **B-24r. Ages/governors tails.** Twelve dedications ship, both faces,
   over the published era windows (`DEDICATION_ERAS` / `_ded_eras`).
 
@@ -543,7 +546,21 @@ under their blocker so the dependency is readable, and both halves count.
   What it buys is "Intel on enemy movements", +3 Combat Strength per level
   of the gap to the side that is ahead (`visibilityCS` / `_vis_cs`), at
   every site the barbarian pair-term already rides plus theological
-  combat. REACH, over the driven 12x250 probe: a mission in 12/12 seeds
+  combat. THE NEGOTIATED DEAL ships too: "an 'Accept Deal' button will
+  appear, which will confirm the trade that is on the table", so an
+  `offer` parks two bundles and the other seat's `accept` moves them
+  both, whole or not at all, with every item re-validated at that moment
+  (`acceptDeal` / `_accept_deal`). Eight things may be named — gold as a
+  lump or per turn, Diplomatic Favor, a lump of a consumable resource, a
+  Great Work, a city, a captured spy, and Open Borders — split the way
+  the page splits them: "Sums of Gold, Great Works, Relics, Artifacts,
+  and captured Spies are all permanent trades ... Resources and gold per
+  turn, however, are temporary, and once the deal has run its course you
+  will get them back", on the same 30 turns every agreement here runs.
+  Its REACH is unmeasured — `geopolitics_test.py`'s poke m is what
+  exercises every item kind, and the round's smoke serve is what proves
+  the two engines walk the protocol together.
+  REACH, over the driven 12x250 probe: a mission in 12/12 seeds
   from t4, and every level of the ladder is entered — Limited 12/12 from
   t4, Open 12/12 from t105, Secret 9/12 from t115, Top Secret 2/12 from
   t187. OPEN:
@@ -584,15 +601,33 @@ under their blocker so the dependency is readable, and both halves count.
     click on one of that civilization's city banners and view the City
     Details screen" — an affordance for a human player, with no rule
     behind it for either engine to run.
-  - **THE NEGOTIATED TWO-SIDED DEAL.** Gold, resources, cities, favor and
-    agreements traded FOR each other. The wire has no offer/accept
-    protocol — a record is one seat's unilateral intent — and no source
-    publishes the AI's valuation (the valuation can be a driver
-    heuristic; the transfer bodies and protocol are engine work). Peace
-    terms (B-22r), resource trading (C-5) and the captured-spy trade
-    (C-16) wait on this.
+  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS.** A demand is the
+    table run one-way under hostility — "select items from their side of
+    the table to demand as tribute" — and Discuss asks a leader to
+    "promise to stop doing" something: settling nearby, spreading
+    religion, spying, attacking your allied city-states. Both run on the
+    same 30 turns as a deal. Neither ships: a demand needs the
+    relationship scale this model does not have (see the mission's bonus
+    above), and a promise needs a per-subject breach test.
+  - **A LUXURY HAS NO LUMP TO TRADE.** The screen lists "Strategic and
+    Luxury Resources"; C-5's stockpile gives a consumable a quantity, but
+    a luxury here is a pure boolean access gate with no amount to hand
+    over. The RESOURCE item therefore names a strategic only.
+  - **WHAT A TABLE MAY HOLD IS BOUNDED HERE AND NOWHERE IN THE GAME.**
+    One running deal per ORDERED pair, `DEAL_ITEMS` items a side, and an
+    offer that stands for the turn it was made and the one after. Real
+    Civ 6 bounds none of the three. The AI's VALUATION is unpublished, so
+    it lives in the driver, where the engine never reads it.
+  - **WHETHER A WAR ENDS A STANDING DEAL IS UNSOURCED.** A war kicks out
+    delegations and it forbids opening a new table, but no source says
+    what happens to a gold-per-turn or resource term already running.
+    Both engines let it run, so they agree by construction; the choice is
+    this model's.
   - **JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT and
-    ASK-FOR-PROMISE** — each a two-sided deal by construction.
+    ASK-FOR-PROMISE** — four agreements the deal protocol can now carry,
+    each still needing its own effect: a war declared by two seats at
+    once, a seat joining one already running, the Research Agreement's
+    unpublished science, and the promise above.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; two tails.**
   Weight 2. The bank, the ceiling, the charges, the plant fuel and the
   heal denial all ship. OPEN:
@@ -600,8 +635,6 @@ under their blocker so the dependency is readable, and both halves count.
     "proportional to the amount you're short"; the consumption is live
     (`chargeUnitUpkeep` / `_seat_charge_upkeep`), the magnitude is
     unpublished.
-  - **RESOURCE TRADING** — "lump quantities of Consumable resources", a
-    two-sided deal; blocked on C-2.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the twelve-mission catalog, the counterspy post, the capture roll,
@@ -625,9 +658,17 @@ under their blocker so the dependency is readable, and both halves count.
     reappearing in the CAPITAL. Here a discovered spy dies on one roll,
     so ACE_DRIVER ("a much higher chance of escape") ships INERT — there
     is no escape roll for it to move.
-  - **CAPTURED SPIES** — "imprisoned, but not killed", counting against
-    capacity, tradeable back. A prisoner store plus a two-sided deal
-    (C-2).
+  - **A RELEASED SPY IS A NEW SPY.** The cell itself ships: a caught spy
+    is now "imprisoned, but not killed", held by the seat whose city made
+    the catch, still counted against its owner's capacity ("if you've
+    trained the maximum number of Spies possible, you cannot train a new
+    Spy to replace one that gets captured"), and traded back through C-2's
+    table to arrive "immediately returned to the original owner's
+    Capital". What a cell holds is a COUNT, keyed owner -> captor, so the
+    spy that comes home has no level and no promotions. No source says
+    whether the real one keeps them; carrying them would need an
+    off-the-map LIVING unit, which is a new unit state every units walk on
+    both engines would have to tolerate.
   - **THE SPY PROMOTION POOL** — the Civilopedia's Espionage class lists
     SEVENTEEN promotions, three offered at random per level, and the Spy
     page caps the chassis at three taken. The chassis has no promotion

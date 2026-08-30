@@ -85,7 +85,8 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
@@ -1370,6 +1371,10 @@ export function seatPhase(state: GameState): void {
     u.movesFull = u.movesLeft;
   }
 
+  // What the standing deals owe each other, before any new one is struck: the
+  // per-turn payments, the 30-turn clock, and the offer nobody answered.
+  dealPhase(state);
+
   // THE DIPLOMATIC AGREEMENTS, in the GPU's arm order: denounce, then
   // friendship, then the alliance friendship unlocks, then the border grant.
   // Every one is re-validated here — the record only names the target.
@@ -1489,6 +1494,33 @@ export function seatPhase(state: GameState): void {
       if (!from || !home) continue;
       gwGive(home, kind, gwTake(from, kind));
       state.eventLog.push(`${actor.name} gifts a Great Work to ${target.name}.`);
+    }
+  }
+  // THE TABLE. Every offer goes down first and every answer comes second, so a
+  // pair that agrees within one turn settles within it — and an offer nobody
+  // takes stands one more turn before `dealPhase` sweeps it.
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recD = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    if (!recD?.offer) continue;
+    const [tj, give, ask] = recD.offer;
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(tj) || tj === actor.seat || target.cities.length === 0) continue;
+    if (give.length > DEAL_ITEMS || ask.length > DEAL_ITEMS) continue;
+    setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
+  }
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recD = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const fj of recD?.accept ?? []) {
+      // CIV6 (Ending a War): "the peaceful resolution of a war involves
+      // diplomatic negotiations" — a table between two seats at war IS the
+      // peace deal, so confirming it is what ends the war.
+      const wasWar = civsAtWar(state, fj, actor.seat);
+      const from = seatOf(state, fj);
+      if (!from || !acceptDeal(state, fj, actor.seat)) continue;
+      if (wasWar) makePeace(state, from, actor.seat);
+      state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
     }
   }
   for (const actor of state.seats) {

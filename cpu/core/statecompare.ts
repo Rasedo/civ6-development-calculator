@@ -40,7 +40,9 @@ imports this.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
+import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
+import { DEAL_ITEMS } from '../data/seats';
+import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
@@ -289,6 +291,40 @@ const treatyClockLine = (state: GameState, seat: number): Val => {
 /** The same FLAT shape for a DIPLOMATIC AGREEMENT clock: every major this
  *  seat still holds one with, in ascending seat order, with the turns left.
  *  `read` is the directed or symmetric accessor. */
+/** A DEAL's table, flat: [otherSeat, clock, ...GIVE slots, ...ASK slots] for
+ *  every seat this one has one with, in ascending seat order. Both bundles are
+ *  padded to `DEAL_ITEMS` slots of [kind, a, b] so the two engines emit the
+ *  same width whatever the table actually holds. */
+const dealSlots = (out: number[], items: DealItem[] | undefined): void => {
+  for (let s = 0; s < DEAL_ITEMS; s++) {
+    const it = items?.[s];
+    out.push(it?.[0] ?? -1, it?.[1] ?? -1, it?.[2] ?? -1);
+  }
+};
+
+const dealOfferLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const o = dealOfferOf(state, seat, other);
+    if (!o) continue;
+    out.push(other, o.left);
+    dealSlots(out, o.give);
+    dealSlots(out, o.ask);
+  }
+  return out;
+};
+
+const dealTermLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const d = dealTermOf(state, seat, other);
+    if (!d || d.left <= 0) continue;
+    out.push(other, d.left);
+    dealSlots(out, d.items);
+  }
+  return out;
+};
+
 const agreementClockLine = (
   state: GameState,
   seat: number,
@@ -497,6 +533,9 @@ const SEAT: Record<string, Extractor> = {
   // DIRECTED: what this seat GRANTS, never what it was granted.
   borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
   delegations: overSeats((s, state) => agreementClockLine(state, s.seat, delegationWith)),
+  spyHeld: overSeats((s, state) => agreementClockLine(state, s.seat, spyHeldWith)),
+  dealOffers: overSeats((s, state) => dealOfferLine(state, s.seat)),
+  dealTerms: overSeats((s, state) => dealTermLine(state, s.seat)),
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 

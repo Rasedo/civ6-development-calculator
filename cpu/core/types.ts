@@ -196,6 +196,13 @@ export interface SeatActionRecord {
   /** DELEGATION / RESIDENT EMBASSY: the seats this one sends a mission to.
    *  Directed, one per pair, and the sender pays for it. */
   delegation?: number[];
+  /** THE DEAL PUT ON THE TABLE this turn: [the other seat, what this seat
+   *  GIVES, what it ASKS]. An offer alone moves nothing — the other seat's
+   *  `accept` is the "Accept Deal" button, and both engines re-validate every
+   *  item then. */
+  offer?: [number, DealItem[], DealItem[]];
+  /** THE SEATS whose standing offer this one accepts. */
+  accept?: number[];
   /** GREAT WORKS given away: [work kind, recipient seat] each. The kind
    *  indexes GW_KINDS. WHICH city gives and WHICH receives is not a decision —
    *  the works are counts, not identities, so both engines take the giver's
@@ -221,6 +228,29 @@ export interface SeatActionRecord {
 export type CongressVote = ([number, number, number] | null)[];
 
 export type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
+
+/** One thing on the table: [kind, a, b], where the kind indexes
+ *  `DEAL_ITEM_KINDS` and what a and b mean is the kind's own business — an
+ *  amount for gold and favor, a resource index and quantity, a Great Work
+ *  kind, a city's CENTRE tile. */
+export type DealItem = [number, number, number];
+
+/** An offer waiting for its answer. `give` moves from the offering seat, `ask`
+ *  moves the other way, and both only on acceptance. `left` is a countdown
+ *  like every other agreement here, not a turn stamp. */
+export interface DealOffer {
+  left: number;
+  give: DealItem[];
+  ask: DealItem[];
+}
+
+/** What one seat owes another for the rest of a deal's 30 turns. Only the
+ *  TEMPORARY kinds live here: "Resources and gold per turn ... are temporary,
+ *  and once the deal has run its course you will get them back." */
+export interface DealTerm {
+  left: number;
+  items: DealItem[];
+}
 
 /** One emergency's record; `cpu/core/emergency.ts` owns the phases. */
 export interface Emergency {
@@ -272,6 +302,17 @@ export interface GameState {
   /** DIRECTED, 1 where this seat holds a mission with that one. Indefinite:
    *  a war is what ends it, never a clock. */
   delegations?: Record<string, number>;
+  /** THE OFFER ON THE TABLE, keyed from -> to. One per ordered pair; it stands
+   *  for the turn it was made and the one after, then lapses. */
+  dealOffers?: Record<string, DealOffer>;
+  /** THE RUNNING TERM of an accepted deal, keyed giver -> receiver: what that
+   *  seat is handing over for the rest of the 30 turns, and what comes back
+   *  when the clock runs out. */
+  dealTerms?: Record<string, DealTerm>;
+  /** CAPTURED SPIES, keyed owner -> captor: how many of the owner's spies that
+   *  captor is holding. They are "imprisoned, but not killed" and still count
+   *  against the owner's capacity. */
+  spyHeld?: Record<string, number>;
   /** the CLIMATE PHASE the world has reached, 0 = Phase I; absent or -1 =
    *  no climate change yet. Monotone: it never steps back. */
   climateIdx?: number;
