@@ -19,6 +19,9 @@ import { UNITS } from '../../../cpu/data/units';
 import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
+import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
+import { congressPactBanned, congressPactLevels } from '../../../cpu/core/congress';
+import { SPY_OFFENSIVE_MISSIONS, SPY_UNIT, SPY_M_SIPHON_FUNDS, SPY_M_FOMENT_UNREST, SPY_M_GAIN_SOURCES } from '../../../cpu/data/espionage';
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
 import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
 import { condemnHeretic } from '../../../cpu/core/game';
@@ -334,6 +337,34 @@ describe('world congress: the wider slate', () => {
     expect(congressProjectMult(state, 0)).toBe(1);
     state.congress = [{ res: CONGRESS_PUBLIC_WORKS, outcome: 1, target: 1 }];
     expect(congressProjectMult(state, 1)).toBe(0.5);
+  });
+
+  it('ESPIONAGE PACT lifts the named operation, or takes it off the board', () => {
+    // CIV6: "A: All Spies function +2 levels higher for the Target Operation.
+    // / B: Target Operation is unavailable."
+    const state = newGame(1);
+    const k = SPY_OFFENSIVE_MISSIONS.indexOf(SPY_M_SIPHON_FUNDS);
+    expect(k).toBeGreaterThanOrEqual(0);
+    state.congress = [{ res: CONGRESS_ESPIONAGE, outcome: 0, target: k }];
+    expect(congressPactLevels(state, SPY_M_SIPHON_FUNDS)).toBe(CONGRESS_PACT_LEVELS);
+    expect(congressPactLevels(state, SPY_M_FOMENT_UNREST)).toBe(0);
+    expect(congressPactBanned(state)).toBe(-1);
+    state.congress = [{ res: CONGRESS_ESPIONAGE, outcome: 1, target: k }];
+    expect(congressPactLevels(state, SPY_M_SIPHON_FUNDS)).toBe(0);
+    expect(congressPactBanned(state)).toBe(SPY_M_SIPHON_FUNDS);
+    // ...and the passive posts are outside the target space entirely
+    expect(SPY_OFFENSIVE_MISSIONS).not.toContain(SPY_M_GAIN_SOURCES);
+  });
+
+  it('the AI line takes the gift, on the operation its own spies are running', () => {
+    const state = newGame(1);
+    const ctx = { government: 0, policies: [], envoysByType: [] };
+    const first = congressPreference(state, CONGRESS_ESPIONAGE, 0, ctx);
+    expect(first).toEqual({ outcome: 0, target: 0 });
+    const spy = spawnUnit(state, SPY_UNIT, seatOf(state, 0)!.cities[0].centerIndex, 0)!;
+    spy.spyMission = SPY_M_FOMENT_UNREST;
+    expect(congressPreference(state, CONGRESS_ESPIONAGE, 0, ctx))
+      .toEqual({ outcome: 0, target: SPY_OFFENSIVE_MISSIONS.indexOf(SPY_M_FOMENT_UNREST) });
   });
 
   it('every resolution names a target space the vote can address', () => {

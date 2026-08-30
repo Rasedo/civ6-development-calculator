@@ -275,6 +275,14 @@ export function unitDomain(type: string): 'civilian' | 'military' | 'air' | 'spy
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
+/** CIV6 (To Arms!, Golden face): "+15% Production towards military units."
+ *  The Spy's own chassis page types it "Civilian/Espionage", so the espionage
+ *  domain sits outside that set as squarely as a Settler does. */
+export function unitIsMilitary(type: string): boolean {
+  const d = unitDomain(type);
+  return d === 'military' || d === 'air';
+}
+
 /**
  * The STACKING slot a unit holds on its tile. CIV6 (Movement, "Stacking"): "At
  * sea, there are no support units, so there can only be one ship per tile.

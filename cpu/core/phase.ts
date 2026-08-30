@@ -9,7 +9,7 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
 import { cityStrikeStrength, airPillage, airStrike } from './combat';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
@@ -1899,7 +1899,7 @@ export function seatPhase(state: GameState): void {
         // units." (Heartbeat of Steam, Golden face): "+10% Production toward
         // Industrial era and later wonders." The three item classes are
         // disjoint, so the multiplier order is association-free.
-        if (q.kind === 'unit' && unitDomain(q.unit) !== 'civilian' && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
+        if (q.kind === 'unit' && unitIsMilitary(q.unit) && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
         if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
         // CIV6 (Urban Development Treaty, outcome A): "+100% Production
         // towards buildings in this district."

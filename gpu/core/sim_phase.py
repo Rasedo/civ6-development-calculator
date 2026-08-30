@@ -442,7 +442,7 @@ class SimPhase:
         ta = self._golden_ded(row, self._ded_to_arms)
         if bool(ta.any()):
             mil_i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
-                & ~self._type_civilian[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+                & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
             _emall = torch.where(ta & mil_i, _emall * self._to_arms_prod, _emall)
         stm = self._golden_ded(row, self._ded_steam)
         if bool(stm.any()):

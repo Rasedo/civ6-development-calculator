@@ -483,6 +483,7 @@ class SimInit:
         self._c_pr_a = int(_er2["congressPrMultA"])
         self._c_pr_b = int(_er2["congressPrMultB"])
         self._c_advisory_cs = int(_er2["congressAdvisoryCs"])
+        self._c_pact_levels = int(_er2["congressPactLevels"])
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
@@ -643,6 +644,8 @@ class SimInit:
         self._spy_partisans_min = int(_sp["partisansMin"])
         self._spy_partisans_max = int(_sp["partisansMax"])
         self._n_spy_missions = len(self._spy_missions)
+        # the operations the Espionage Pact can name — `SPY_OFFENSIVE_MISSIONS`
+        self._spy_offensive = [i for i, m in enumerate(self._spy_missions) if m["offensive"]]
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         # The per-seat RESEARCH vectors, merged like the scalars. Placed here
         # because their width is only known once the rules tables are read.
@@ -2208,6 +2211,7 @@ class SimInit:
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         self._type_civilian = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_military = torch.tensor([bool(u["military"]) for u in ru], dtype=torch.bool, device=device)
         self._type_ranged_strength = torch.tensor([u.get("rangedStrength", 0) for u in ru], dtype=torch.long, device=device)  # 0 = melee-only
         self._type_ranged_range = torch.tensor([u.get("rangedRange", 0) for u in ru], dtype=torch.long, device=device)  # strike range
         self._type_moves = torch.tensor([u.get("moves", 2) for u in ru], dtype=torch.long, device=device)  # full MP per turn

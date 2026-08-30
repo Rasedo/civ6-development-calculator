@@ -142,13 +142,16 @@ class SimSpy:
         hrow, hcol = self._spy_here(tc[:, cols])
         base = base & (hrow >= 0)
         mine = hrow == row
+        ban = self._congress_pact_ban().unsqueeze(1)
         for m, mdef in enumerate(self._spy_missions):
             ok = base & (mine if mdef["athome"] else ~mine)
             di = mdef["district"]
             if di >= 0:
                 ok = ok & self._district_live(self._city_district_tile(hrow, hcol, di))
             ok = ok & self._spy_mission_extra(row, m, hrow, hcol)
-            out[:, cols, m] = ok
+            # CIV6 (Espionage Pact, outcome B): "Target Operation is
+            # unavailable."
+            out[:, cols, m] = ok & (ban != m)
         return out
 
     def _spy_mission_extra(self, row: int, m: int, hrow: torch.Tensor,
@@ -305,7 +308,8 @@ class SimSpy:
         lvl = int(self.unit_spy_level[b, v]) + (
             self._spy_sources_levels
             if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
-        lvl += self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
+        lvl += (self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
+                + self._congress_pact_levels(b, m))
         lvl = max(0, lvl - self._counter_levels(b, hr, hc))
         ok = bool(mdef["certain"]) or self._spy_roll(
             b, mdef["successPct"] + self._spy_success_per_level * lvl)
@@ -416,6 +420,24 @@ class SimSpy:
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
             self._flood_river(one, torch.full((self.B,), dt, dtype=torch.long, device=self.device))
+
+    def _congress_pact_ban(self) -> torch.Tensor:
+        """[B] long — CIV6 (Espionage Pact, outcome B): "Target Operation is
+        unavailable"; the banned mission index, -1 where nothing stands."""
+        out, tgt = self._congress_by_id("ESPIONAGE_PACT")
+        ops = torch.tensor(self._spy_offensive or [-1], dtype=torch.long,
+                           device=self.device)
+        return torch.where(out == 1, ops[tgt.clamp(min=0, max=ops.numel() - 1)],
+                           torch.full_like(out, -1))
+
+    def _congress_pact_levels(self, b: int, m: int) -> int:
+        """CIV6 (Espionage Pact, outcome A): "All Spies function +2 levels
+        higher for the Target Operation" — every seat's spies, one operation."""
+        out, tgt = self._congress_by_id("ESPIONAGE_PACT")
+        if int(out[b]) != 0 or not self._spy_offensive:
+            return 0
+        k = min(max(int(tgt[b]), 0), len(self._spy_offensive) - 1)
+        return self._c_pact_levels if self._spy_offensive[k] == m else 0
 
     def _spy_op_levels(self, b: int, v: int, m: int) -> int:
         """CIV6 (nine Espionage promotions): "<mission> as if 2 levels more

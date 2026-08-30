@@ -31,10 +31,12 @@ import {
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
+  CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
 } from '../data/seats';
 import { POWER_PLANT_IDS } from '../data/buildings';
+import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import { GOVERNOR_NEUTRALIZE_TURNS } from '../data/governors';
 import { neutralizeGovernor } from './governors';
 import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
@@ -142,6 +144,16 @@ export function preference(state: GameState, res: number, seat: number,
       // A pays +10 religious strength to one religion, and a religion IS its
       // founder's seat here — every ballot names its own.
       return { outcome: 0, target: seat };
+    case CONGRESS_ESPIONAGE: {
+      // A lifts every Spy on ONE operation and B bans it outright — a seat
+      // takes the gift, and names the operation its own spies are running.
+      const counts = SPY_OFFENSIVE_MISSIONS.map(() => 0);
+      for (const u of unitsOf(state, seat)) {
+        const i = SPY_OFFENSIVE_MISSIONS.indexOf(u.spyMission ?? -1);
+        if (i >= 0) counts[i]++;
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
     case CONGRESS_TREATY_ORG:
     case CONGRESS_SOVEREIGNTY: {
       // Both name a CITY-STATE TYPE and both pay the patron, so both read the
@@ -269,6 +281,7 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'building': return POWER_PLANT_IDS.length;
     case 'promoClass': return PROMO_CLASSES.length;
     case 'governor': return GOVERNORS.length;
+    case 'spyMission': return SPY_OFFENSIVE_MISSIONS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;
     default: return state.seats.length;
@@ -395,6 +408,21 @@ export function congressUdtProdDistrict(state: GameState): DistrictId | null {
 export function congressUdtBlockedDistrict(state: GameState): DistrictId | null {
   const e = congressEffect(state, CONGRESS_UDT);
   return e && e.outcome === 1 ? PLACEABLE_DISTRICTS[e.target] ?? null : null;
+}
+
+/** CIV6 (Espionage Pact, outcome A): "All Spies function +2 levels higher for
+ *  the Target Operation" — every seat's spies, on the one operation. */
+export function congressPactLevels(state: GameState, m: number): number {
+  const e = congressEffect(state, CONGRESS_ESPIONAGE);
+  return e && e.outcome === 0 && SPY_OFFENSIVE_MISSIONS[e.target] === m
+    ? CONGRESS_PACT_LEVELS : 0;
+}
+
+/** CIV6 (Espionage Pact, outcome B): "Target Operation is unavailable" — the
+ *  banned mission index, or -1 when the pact does not stand that way. */
+export function congressPactBanned(state: GameState): number {
+  const e = congressEffect(state, CONGRESS_ESPIONAGE);
+  return e && e.outcome === 1 ? SPY_OFFENSIVE_MISSIONS[e.target] ?? -1 : -1;
 }
 
 /** Patronage factor for a Great Person class: x2 (A), x0 (B) or 1. Applies

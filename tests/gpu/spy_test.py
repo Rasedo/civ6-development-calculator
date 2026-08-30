@@ -368,6 +368,39 @@ def main() -> None:
     assert off >> int(rd.promo_rows[ec]) == 0, "the draw offered a column the pool lacks"
     assert int(sim.unit_xp[0, x]) == int(sim._xp_to_next(sim.unit_level[0, x:x + 1])[0])
 
+    # -- 15: the Espionage Pact reaches the spy -----------------------------
+    # CIV6: "A: All Spies function +2 levels higher for the Target Operation. /
+    # B: Target Operation is unavailable."
+    ri = sim._congress_at["ESPIONAGE_PACT"]
+    ki = sim._spy_offensive.index(sim._spy_m_siphon)
+    other = sim._spy_offensive.index(sim._spy_m_unrest)
+    sim.congress_active[:] = -1
+    sim.congress_active[0, 0] = torch.tensor([ri, 0, ki])
+    assert sim._congress_pact_levels(0, sim._spy_m_siphon) == sim._c_pact_levels
+    assert sim._congress_pact_levels(0, sim._spy_m_unrest) == 0
+    assert int(sim._congress_pact_ban()[0]) == -1
+    sim.congress_active[0, 0, 1] = 1
+    assert sim._congress_pact_levels(0, sim._spy_m_siphon) == 0
+    assert int(sim._congress_pact_ban()[0]) == sim._spy_m_siphon
+    # the ban reaches the mask the applier reads
+    sim.unit_tile[0, x] = ctr_t
+    sim.unit_spy_mission[0, x] = sim._spy_idle
+    sim.unit_promos[0, x] = 0
+    sim._gen_ver += 1
+    give_district(sim, foe, theirs, sim._spy_missions[sim._spy_m_siphon]["district"])
+    mm = mask_row(sim, row, x)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
+    assert not bool(mm[sim._spy_m_siphon]), "the banned operation is still offered"
+    sim.congress_active[0, 0, 2] = other
+    mm = mask_row(sim, row, x)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
+    assert bool(mm[sim._spy_m_siphon]), "the ban reached an operation it did not name"
+    # the AI line takes the gift, on the operation its own spies are running
+    sim.congress_active[:] = -1
+    o_p, t_p = sim._congress_pref(ri, row)
+    assert int(o_p[0]) == 0 and int(t_p[0]) == 0, "a seat with no working spy names row 0"
+    sim.unit_spy_mission[0, x] = sim._spy_m_unrest
+    o_p, t_p = sim._congress_pref(ri, row)
+    assert int(o_p[0]) == 0 and int(t_p[0]) == other, "the ballot did not name the live op"
+
     print("BATTERY spy OK")
 
 

@@ -242,14 +242,14 @@ export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
-  | 'building' | 'promoClass' | 'religion' | 'governor';
+  | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
-  'building', 'promoClass', 'religion', 'governor',
+  'building', 'promoClass', 'religion', 'governor', 'spyMission',
 ];
 
 export interface CongressResolutionDef {
@@ -341,6 +341,12 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // Diplomatic Favor. / B: All active Governors of this type are neutralized
   // for 6 Turns." The published table gives it no era window.
   { id: 'GOVERNANCE_DOCTRINE', name: 'Governance Doctrine', minEra: 0, maxEra: 99, target: 'governor' },
+  // CIV6: "A: All Spies function +2 levels higher for the Target Operation. /
+  // B: Target Operation is unavailable." The published table gives it no era
+  // window; the floor here is where the chassis page puts the unit —
+  // "Starting in the Renaissance era, Spies will become available" — because
+  // neither outcome can act before a Spy can run an operation.
+  { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 3, maxEra: 99, target: 'spyMission' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -360,11 +366,15 @@ export const CONGRESS_PUBLIC_RELATIONS = 14;
 export const CONGRESS_MILITARY_ADVISORY = 15;
 export const CONGRESS_WORLD_RELIGION = 16;
 export const CONGRESS_GOVERNANCE = 17;
+export const CONGRESS_ESPIONAGE = 18;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = 200;
 export const CONGRESS_PR_MULT_B = 50;
 /** Military Advisory pays its promotion class +/- this much Combat Strength. */
 export const CONGRESS_ADVISORY_CS = 5;
+/** Espionage Pact outcome A: the levels every Spy gains on the named
+ *  operation — the same magnitude nine Espionage promotions pay for one. */
+export const CONGRESS_PACT_LEVELS = 2;
 /** World Religion outcome A's Religious Combat Strength, and outcome B's
  *  favor for condemning a unit of the named religion. */
 export const CONGRESS_WORLD_RELIGION_RS = 10;

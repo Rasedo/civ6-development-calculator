@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
-import { archaeologistExcavate, spawnUnit } from '../../../cpu/core/units';
+import { archaeologistExcavate, spawnUnit, unitIsMilitary } from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -189,6 +189,28 @@ describe('the four new dedications', () => {
     const golden = run(true);
     expect(normal).toBeGreaterThan(0);
     expect(golden).toBeCloseTo(normal * 1.15, 9);
+  });
+
+  it('To Arms! pays no Spy — the chassis is a civilian', () => {
+    // CIV6 (Spy): the chassis page types the unit "Civilian/Espionage", so
+    // "+15% Production towards military units" is not about it.
+    expect(unitIsMilitary('WARRIOR')).toBe(true);
+    expect(unitIsMilitary('SPY')).toBe(false);
+    expect(unitIsMilitary('SETTLER')).toBe(false);
+    const state = makeState(makeMap(20, 20));
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    commit(state, 0, DED_TO_ARMS, true);
+    city.queue = [{ kind: 'unit', unit: 'SPY', progress: 0, cost: 100000 }];
+    endTurn(state);
+    const withDed = city.queue[0]?.kind === 'unit' ? city.queue[0].progress : -1;
+    const plain = makeState(makeMap(20, 20));
+    const pcity = settleAt(plain, tileAtCoords(plain.map, 9, 9).index);
+    commit(plain, 0, DED_TO_ARMS, false);
+    pcity.queue = [{ kind: 'unit', unit: 'SPY', progress: 0, cost: 100000 }];
+    endTurn(plain);
+    const without = pcity.queue[0]?.kind === 'unit' ? pcity.queue[0].progress : -1;
+    expect(without).toBeGreaterThan(0);
+    expect(withDed).toBeCloseTo(without, 9);
   });
 
   it('a world era offers a WINDOW, and every pick comes out of it', () => {

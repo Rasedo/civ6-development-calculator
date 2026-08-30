@@ -3547,6 +3547,8 @@ class SimSeats:
             return max(1, len(self.rules.promo_classes))
         if kind == 13:
             return max(1, self.n_governors)
+        if kind == 14:
+            return max(1, len(self._spy_offensive))
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -3656,6 +3658,16 @@ class SimSeats:
             # A pays +10 religious strength to one religion, and a religion IS
             # its founder's seat here — every ballot names its own.
             return a, me
+        if name == "ESPIONAGE_PACT":
+            # A lifts every Spy on ONE operation and B bans it outright — a
+            # seat takes the gift, and names the operation its own spies are
+            # running.
+            nM = max(1, len(self._spy_offensive))
+            mine = self._spies_of(row)
+            counts = torch.zeros(B, nM, dtype=torch.float64, device=dev)
+            for t, mi in enumerate(self._spy_offensive):
+                counts[:, t] = (mine & (self.unit_spy_mission == mi)).sum(dim=1).double()
+            return a, self._argmax_low(counts)
         if kind == 3:
             return a, me
         if kind == 0:

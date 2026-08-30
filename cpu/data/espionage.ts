@@ -85,6 +85,11 @@ export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'BREACH_DAM', district: 'DAM', offensive: true, turns: 8, successPct: 20 },
   { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true, turns: 16 },
 ];
+/** The operations the Espionage Pact can name: the OFFENSIVE ones, in catalog
+ *  order — the only rows either of its outcomes can act on. */
+export const SPY_OFFENSIVE_MISSIONS: readonly number[] = SPY_MISSIONS
+  .map((m, i) => (m.offensive ? i : -1)).filter((i) => i >= 0);
+
 const mi = (id: string): number => SPY_MISSIONS.findIndex((m) => m.id === id);
 export const SPY_M_GAIN_SOURCES = mi('GAIN_SOURCES');
 export const SPY_M_LISTENING_POST = mi('LISTENING_POST');

@@ -32,7 +32,8 @@ import {
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_COUNTERSPY,
 } from '../../../cpu/data/espionage';
-import { DED_BODYGUARD } from '../../../cpu/data/seats';
+import { DED_BODYGUARD, CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
+import { SPY_OFFENSIVE_MISSIONS } from '../../../cpu/data/espionage';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import type { City, GameState } from '../../../cpu/core/types';
@@ -261,6 +262,41 @@ describe('the clock', () => {
     for (let i = 0; i < turnsOf(SPY_M_COUNTERSPY); i++) tickSpies(state, 0);
     expect(spy.spyMission).toBe(SPY_M_COUNTERSPY);
     expect(spy.spyTurns).toBe(turnsOf(SPY_M_COUNTERSPY));
+  });
+});
+
+describe('the Espionage Pact reaches the spy', () => {
+  const pactOn = (state: GameState, m: number, outcome: number): void => {
+    const k = SPY_OFFENSIVE_MISSIONS.indexOf(m);
+    expect(k).toBeGreaterThanOrEqual(0);
+    state.congress = [{ res: CONGRESS_ESPIONAGE, outcome, target: k }];
+  };
+
+  it('outcome A pays every seat two levels on the named operation', () => {
+    const { state, theirs } = spyState();
+    const spy = spyAt(state, 0, theirs);
+    expect(effectiveLevel(state, spy, theirs, SPY_M_SIPHON_FUNDS)).toBe(0);
+    pactOn(state, SPY_M_SIPHON_FUNDS, 0);
+    expect(effectiveLevel(state, spy, theirs, SPY_M_SIPHON_FUNDS)).toBe(CONGRESS_PACT_LEVELS);
+    expect(effectiveLevel(state, spy, theirs, SPY_M_FOMENT_UNREST)).toBe(0);
+    // ...and the rival's spy in MY city is lifted by the same standing pact
+    const theirSpy = spyAt(state, 1, theirs);
+    expect(effectiveLevel(state, theirSpy, theirs, SPY_M_SIPHON_FUNDS)).toBe(CONGRESS_PACT_LEVELS);
+  });
+
+  it('outcome B takes the operation off every mask', () => {
+    const { state, theirs } = spyState();
+    const spy = spyAt(state, 0, theirs);
+    district(state, theirs, 'COMMERCIAL_HUB');
+    expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
+    pactOn(state, SPY_M_SIPHON_FUNDS, 1);
+    expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(false);
+    expect(spyMissionMask(state, spy)[SPY_M_SIPHON_FUNDS]).toBe(false);
+    // the applier is the mask's own reader, so the banned order is refused
+    expect(beginMission(state, spy, SPY_M_SIPHON_FUNDS)).toBe(false);
+    // ...and a mission the pact did not name is untouched
+    pactOn(state, SPY_M_FOMENT_UNREST, 1);
+    expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
   });
 });
 

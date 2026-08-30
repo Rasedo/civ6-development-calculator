@@ -45,7 +45,7 @@ from the list below.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 2 | the observation renders the standing slate, three resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
+| B-22r World Congress | 2 | the observation renders the standing slate, two resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
 | B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
@@ -129,7 +129,7 @@ Civ 6 source or is recorded as unverifiable.
   (`cityStateSuzerainCapitalBonus` / `_suz_capital_mask`, peace with every
   MAJOR); what survives of its row is the magnitude alone — +15% of the
   city's Science against a flat +3.
-- **B-22r. World Congress residuals.** Seventeen regular resolutions, the
+- **B-22r. World Congress residuals.** Eighteen regular resolutions, the
   DV resolution, emergencies as special sessions, the favor tie-break,
   refund tiers and the ballot wire all ship (`congressSession` /
   `_world_congress`; emergencies in `cpu/core/emergency.ts` /
@@ -142,15 +142,23 @@ Civ 6 source or is recorded as unverifiable.
     A ballot addresses the session about to run; `_congress_upcoming` can
     compute its slate but nothing renders it, so a net votes on the
     previous session's resolutions.
-  - **THREE resolutions have no carrier**: Arms Control (weapons of mass
-    destruction, C-31); Espionage Pact — the old blocker ("no spies") is
-    gone since the Spy shipped, so the row needs its own sourcing pass,
-    and its payload may read diplomatic VISIBILITY (C-2);
+  - **TWO resolutions have no carrier**: Arms Control (weapons of mass
+    destruction, C-31); and
     Luxury Policy — SOURCED: "A: Duplicates of this Luxury resource grant
     additional Amenities. / B: This Luxury resource grants no Amenities."
     B is fully specified, A publishes no number, and nothing here counts
     DUPLICATE copies of a luxury. A resolution whose two outcomes cannot
     both act eats a rotation slot and passes a no-op, so it waits whole.
+  - **THE ESPIONAGE PACT'S ERA WINDOW IS THIS MODEL'S OWN.** The row
+    itself now ships — "A: All Spies function +2 levels higher for the
+    Target Operation. / B: Target Operation is unavailable", carried by
+    `congressPactLevels` / `congressPactBanned` and their `_congress_pact_*`
+    twins, on the `SPY_OP_LEVEL` channel nine Espionage promotions already
+    use. Two things about it are decisions, not transcriptions: the
+    published table gives the resolution no era window, so the floor here
+    is the Renaissance, where the chassis page puts the unit; and the
+    target space is `SPY_OFFENSIVE_MISSIONS`, the operations either
+    outcome can act on, since no source lists what the game offers.
   - **THE CULTURE BOMB DOES NOT WIPE UNFINISHED CONSTRUCTION.** SOURCED
     (Culture Bomb): a bombed tile carrying a district or wonder under
     construction is flipped anyway, "wiping out any unfinished
@@ -553,9 +561,12 @@ under their blocker so the dependency is readable, and both halves count.
     two-sided deal; blocked on C-2.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
-  jump, the eleven-mission catalog, the counterspy post, the capture roll
-  and the ESPIONAGE promotion class ship (`spy_test.py`, `spy.test.ts`;
-  gate reach unmeasured — treat as poke-proven). The class is a flat pool
+  jump, the twelve-mission catalog, the counterspy post, the capture roll,
+  the ESPIONAGE promotion class and the Espionage Pact's two outcomes
+  (B-22r) ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured —
+  treat as poke-proven). The chassis is a CIVILIAN — its own page types it
+  "Civilian/Espionage" — so `unitIsMilitary` / `_type_military` is what To
+  Arms! pays now, and the Spy is outside it. The class is a flat pool
   of seventeen rows with no prerequisites, three drawn without replacement
   at each level (`levelUpSpy` / `_level_up_spy` over the `promoOffer`
   channel the Apostle already had). Nine are one shape — "<mission> as if
@@ -581,14 +592,12 @@ under their blocker so the dependency is readable, and both halves count.
     2 levels more experienced"), and the random offer needs a
     shared-stream draw at a fixed position (the `ensureGpOffer` pattern).
   - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
-    the mission mask asks nothing about other spies on the tile.
-  - **"TO ARMS!" PAYS FOR A SPY.** The golden-age dedication is "+15%
-    Production towards military units", and both engines spend it on
-    every queued unit that is not a CIVILIAN — a set the Spy is outside,
-    since it carries no charges and no `civilian` flag. The published
-    chassis is a civilian unit in its own promotion class ("Espionage")
-    with no Combat Strength: the Combat-Strength readers refuse it on
-    both engines, the production one does not.
+    the mission mask asks nothing about other spies on the tile. NOT
+    SOURCED: neither the Spy chassis page nor the Spies and Espionage
+    concept page says anything about it, and the reachable statements are
+    community readings of the UI. It stays open as a suspected rule, not
+    as a transcription — implementing it either way would be an
+    invention.
   - **A SPY STANDS ON THE CITY CENTRE AND NOWHERE ELSE.** The jump
     targets `city_center`, and the mission reads the district registry
     rather than the plot the spy holds, so a counterspy already defends

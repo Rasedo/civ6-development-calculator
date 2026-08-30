@@ -36,6 +36,7 @@ import { floodRiver } from './disasters';
 import { nextRandom } from './rand';
 import { promoFlag, promoValue, promoValueFor, unitPromoRows, xpToNextLevel } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
+import { congressPactBanned, congressPactLevels } from './congress';
 import type { City, GameState, Seat, Unit } from './types';
 
 export function isSpy(type: string): boolean {
@@ -159,7 +160,8 @@ export function missionOffered(state: GameState, unit: Unit, m: number): boolean
   if (m === SPY_M_GREAT_WORK_HEIST && heistTarget(here.city) === null) return false;
   if (m === SPY_M_STEAL_TECH_BOOST && stealableTech(state, unit.seat, here.seat.seat) === null) return false;
   if (m === SPY_M_NEUTRALIZE_GOVERNOR && !hasGovernor(state, here.seat, here.city)) return false;
-  return true;
+  // CIV6 (Espionage Pact, outcome B): "Target Operation is unavailable."
+  return m !== congressPactBanned(state);
 }
 
 export function spyMissionMask(state: GameState, unit: Unit): boolean[] {
@@ -250,7 +252,8 @@ export function effectiveLevel(
   // experienced" — the row names the one operation it lifts.
   const lvl = spyLevel(unit) + (boost > 0 ? SPY_SOURCES_LEVELS : 0)
     + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
-    + quartermasterLevels(state, unit.seat);
+    + quartermasterLevels(state, unit.seat)
+    + congressPactLevels(state, m);
   return Math.max(0, lvl - (city ? cityCounterLevels(state, city) : 0));
 }
 
