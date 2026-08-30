@@ -70,6 +70,10 @@ class SimGovernors:
         self._governor_post_minor(row, live)
         self._governor_seat(row, live)
         self._governor_tick(row)
+        # A posting is an envoy count, so the minors' stored answer moves with
+        # it — `resolveSuzerains`' position.
+        if self.S:
+            self._cs_resolve_suzerain()
 
     def _governor_spend(self, row: int, titles: torch.Tensor) -> None:
         """Spend every available title: a title buys an appointment while one

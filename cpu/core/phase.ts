@@ -22,7 +22,7 @@ import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
-import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
+import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -1582,6 +1582,8 @@ export function seatPhase(state: GameState): void {
     // spent, idle governors take a city, and both clocks tick. Every
     // ability the city walk reads is settled here.
     governorPhase(state, actor.seat);
+    // A posting is an envoy count, so the minors' stored answer moves with it.
+    resolveSuzerains(state);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
     tickSpies(state, actor.seat);

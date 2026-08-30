@@ -189,7 +189,17 @@ export function setMet(cityState: CityState, seat: number): void {
 
 export function addEnvoys(state: GameState, cityState: CityState, seat: number, n = 1): void {
   cityState.envoys[seat] = (cityState.envoys[seat] ?? 0) + n;
-  resolveSuzerain(state, cityState);
+  resolveSuzerains(state);
+}
+
+/**
+ * Refresh EVERY minor's stored answer. The contest reads a governor posting as
+ * well as the ledger, and a posting moves without touching any one minor's
+ * envoys, so the fixed point is taken for the whole roster wherever any of it
+ * can have shifted.
+ */
+export function resolveSuzerains(state: GameState): void {
+  for (const cityState of state.cityStates ?? []) resolveSuzerain(state, cityState);
 }
 
 /** The stored contest answer, -1 while nobody holds it. */

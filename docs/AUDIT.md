@@ -272,8 +272,14 @@ Civ 6 source or is recorded as unverifiable.
     driver's own next-envoy preview. What still asks the STORE is what
     asks about the act of SENDING one — the emergency's "must have met and
     sent an Envoy", the first-envoy double, and the Congress's envoy
-    context. Reach is unmeasured; `tests/gpu/amani_test.py` and
-    `tests/cpu/minors/amani.test.ts` are the bar. STILL OPEN:
+    context. The stored answer (`CityState.suzerain` / `citystate_suzerain`)
+    is refreshed for the WHOLE roster at every position now, on both
+    engines: a posting moves the contest without touching any one minor's
+    ledger, so a per-minor refresh goes stale where a global one does not
+    — which is what the gate caught at seed 9131 turn 119. She IS reached:
+    that same seed posts her and she decides a suzerainty inside 250
+    turns. `tests/gpu/amani_test.py` and `tests/cpu/minors/amani.test.ts`
+    pin the clauses. STILL OPEN:
     - **AFFLUENCE COPIES THE GROUND, NOT THE WORKED TILE.** A minor
       improves nothing on this engine, so requiring the improvement the
       seat's own luxuries require would make the promotion a permanent
