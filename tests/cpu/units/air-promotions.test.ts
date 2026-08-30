@@ -1,6 +1,6 @@
 /**
- * THE AIR FIGHTER, AIR BOMBER AND NAVAL RAIDER TREES, and the air roll they
- * finally speak into.
+ * THE AIR FIGHTER, AIR BOMBER, NAVAL RAIDER AND NAVAL CARRIER TREES, and the
+ * air roll they finally speak into.
  *
  * CIV6 (Experience): "every time a unit enters and survives combat (whether it
  * attacks an enemy or itself suffers an attack), it will gain XP", and the
@@ -14,7 +14,7 @@ import { BUILDINGS } from '../../../cpu/data/buildings';
 import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { RESOURCES } from '../../../world/resources';
-import { airRange, airStrikeTargets } from '../../../cpu/core/air';
+import { airRange, airSlotsAt, airStrikeTargets } from '../../../cpu/core/air';
 import { airStrike, awardCityXp } from '../../../cpu/core/combat';
 import { promoCS, promoValue, promoFlag, promoAvailable, promoReady } from '../../../cpu/core/promotions';
 import {
@@ -30,6 +30,7 @@ const FIGHTER = 'BIPLANE';
 const BOMBER = 'BOMBER';
 const SHIP = 'BATTLESHIP';   // NAVAL_RANGED, and the one hull that answers a plane
 const RAIDER = 'PRIVATEER';
+const CARRIER = 'AIRCRAFT_CARRIER';
 
 /** the bit a promotion holds in its own class list. */
 function bit(cls: string, id: string): number {
@@ -72,9 +73,9 @@ function airState() {
   return { state, city, seat, pad, sea };
 }
 
-describe('the three new promotion classes', () => {
+describe('the four new promotion classes', () => {
   it('every chassis of the class holds its tree, and no bit collides', () => {
-    for (const c of ['AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER'] as const) {
+    for (const c of ['AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER'] as const) {
       expect(PROMO_CLASSES).toContain(c);
       expect(promoRows(c).length).toBe(7);
       // every prerequisite names a row of the SAME list, and an EARLIER one:
@@ -91,6 +92,7 @@ describe('the three new promotion classes', () => {
     expect(UNIT_PROMO_CLASS[FIGHTER]).toBe('AIR_FIGHTER');
     expect(UNIT_PROMO_CLASS[BOMBER]).toBe('AIR_BOMBER');
     expect(UNIT_PROMO_CLASS[RAIDER]).toBe('NAVAL_RAIDER');
+    expect(UNIT_PROMO_CLASS[CARRIER]).toBe('NAVAL_CARRIER');
     // a target-class bit is a distinct power of two, and JS masks stay inside 32
     const bits = Object.values(CLASS_BIT);
     expect(new Set(bits).size).toBe(bits.length);
@@ -100,6 +102,7 @@ describe('the three new promotion classes', () => {
 
   it('CIV6 groups every hull under "naval units", the raider included', () => {
     expect(MASK_NAVAL & classBitOf(RAIDER)).not.toBe(0);
+    expect(MASK_NAVAL & classBitOf(CARRIER)).not.toBe(0);
     expect(MASK_NAVAL & classBitOf('BATTLESHIP')).not.toBe(0);
     expect(MASK_AIR & classBitOf(FIGHTER)).not.toBe(0);
     expect(MASK_AIR & classBitOf(BOMBER)).not.toBe(0);
@@ -287,6 +290,34 @@ describe('the naval raider tree', () => {
     expect(promoCS(dd, { attacking: true, foeType: RAIDER })).toBe(14);
     expect(promoCS(dd, { attacking: true, foeType: 'SUBMARINE' })).toBe(14);
     expect(promoCS(dd, { attacking: true, foeType: SHIP })).toBe(0);
+  });
+});
+
+describe('the naval carrier tree', () => {
+  it('each deck row bases one more aircraft, and they stack', () => {
+    const { state, sea } = airState();
+    const hull = spawnUnit(state, CARRIER, sea.index, 0)!;
+    const base = UNITS[CARRIER].airSlots!;
+    expect(airSlotsAt(state, 0, sea.index)).toBe(base);
+    // CIV6 (Flight Deck, Hangar Deck, Folding Wings): "+1 additional aircraft
+    // slot" apiece — three rows saying one thing, so the hull that takes the
+    // whole branch bases three more planes than it was launched with.
+    const decks = ['FLIGHT_DECK', 'HANGAR_DECK', 'FOLDING_WINGS'];
+    decks.forEach((id, k) => {
+      hull.promos = (hull.promos ?? 0) | bit('NAVAL_CARRIER', id);
+      expect(airSlotsAt(state, 0, sea.index)).toBe(base + k + 1);
+    });
+    expect(airSlotsAt(state, 1, sea.index)).toBe(0); // a hull bases its OWN seat alone
+  });
+
+  it('the carrier rows carry the effects the source names, and none is inert', () => {
+    const u = (id: string) => ({ type: CARRIER, promos: bit('NAVAL_CARRIER', id) });
+    expect(promoValue(u('SCOUT_PLANES'), 'SIGHT')).toBe(1);
+    expect(promoValue(u('ADVANCED_ENGINES'), 'MOVES')).toBe(1);
+    expect(promoValue(u('FLIGHT_DECK'), 'AIR_SLOTS')).toBe(1);
+    expect(promoFlag(u('DECK_CREWS'), 'HEAL_AFTER_ATTACK')).toBe(true);
+    expect(promoFlag(u('SUPERCARRIER'), 'HEAL_ANYWHERE')).toBe(true);
+    for (const r of promoRows('NAVAL_CARRIER')) expect(r.effects).not.toEqual([{ kind: 'NONE' }]);
   });
 });
 

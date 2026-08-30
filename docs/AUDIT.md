@@ -611,12 +611,15 @@ under their blocker so the dependency is readable, and both halves count.
     has an area-effect attack, a fallout tile state, or the Missile Silo
     (C-20).
 - **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
-  AIR BOMBER and NAVAL RAIDER now hold seven sourced rows each, and with
-  them: the chassis map (`UNIT_PROMO_CLASS` / `u_promo_class`), the two
-  new roll conditions `CS_DEF_VS_AIR` and `CS_DEF_VS_AA`, the Hangar's
-  "+25%" and the Airport's "+50%" experience lines, the Shipyard's and
-  Seaport's "for all naval units" widened to the raider, an aircraft that
-  banks XP at all (`xpEligible` / `_xp_eligible`), and Sky and Stars'
+  AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER now hold seven sourced rows
+  each, and with them: the chassis map (`UNIT_PROMO_CLASS` /
+  `u_promo_class`), the two new roll conditions `CS_DEF_VS_AIR` and
+  `CS_DEF_VS_AA`, the carrier deck's `AIR_SLOTS` — three rows saying
+  "+1 additional aircraft slot", summed into `airSlotsAt` /
+  `_air_slots_at` — the Hangar's "+25%" and the Airport's "+50%"
+  experience lines, the Shipyard's and Seaport's "for all naval units"
+  widened to the raider, an aircraft that banks XP at all
+  (`xpEligible` / `_xp_eligible`), and Sky and Stars'
   "+100% XP earned for all Air Units". `PROMO_COLS` did NOT widen — the
   APOSTLE's nine still sets it, so no wire width moved. TWO CORRECTIONS
   to this row's own earlier text: the Civilopedia's promotion index lists
@@ -624,22 +627,15 @@ under their blocker so the dependency is readable, and both halves count.
   the GDR's four rows (Drone Air Defense, Enhanced Mobility, Particle Beam
   Siege Cannon, Reinforced Armor Plating) are its Future-era upgrades,
   which is C-33's item, not this one. What is left:
-  - **THE NAVAL CARRIER TREE** — the Civilopedia lists a seventh naval
-    class with seven rows (Advanced Engines, Deck Crews, Flight Deck,
-    Folding Wings, Hangar Deck, Scout Planes, Supercarrier). The
-    AIRCRAFT_CARRIER chassis holds no `UNIT_PROMO_CLASS` entry here and
-    none of the seven effects is sourced yet. Several of them read on
-    C-34's missing half (a carrier's own air slots and sorties), so the
-    tree wants sourcing and gap-splitting in one pass.
   - **THE SPY PROMOTION POOL** (C-16), whose random offer needs the
     same shared-stream draw as its entry describes.
   - **THE ROCK BAND's twelve promotions** — the chassis carries its own
     level and album state instead (C-28); no `PROMO_CLASSES` entry, and
     the twelve rows are unsourced here.
 
-  GATE REACHABILITY IS ZERO for all three new trees: no seed trains an
-  aircraft, a Privateer or a Submarine inside 250 turns, so the whole pass
-  is proved by `tests/gpu/air_promo_test.py` and
+  GATE REACHABILITY IS ZERO for all four new trees: no seed trains an
+  aircraft, a Privateer, a Submarine or a carrier inside 250 turns, so the
+  whole pass is proved by `tests/gpu/air_promo_test.py` and
   `tests/cpu/units/air-promotions.test.ts` and by nothing the battery's
   serve lane runs.
 - **C-33. THE GIANT DEATH ROBOT IS ONLY ITS STATS.** Weight 2. The

@@ -1110,13 +1110,15 @@ class SimEconomy:
                 # unit slots" rides the aerodrome's own arm
                 out.scatter_add_(1, atc, good.long() * (self._aerodrome_air_slots + extra
                                                         + self.tile_air_bonus.gather(1, atc)))
-        # a CARRIER is a base wherever it floats
+        # a CARRIER is a base wherever it floats. CIV6 (Flight Deck, Hangar
+        # Deck, Folding Wings): "+1 additional aircraft slot".
         alive_u = self.major_unit_alive & (self.major_unit_seat == row)
         typ = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         hull = alive_u & (self._type_air_slots[typ] > 0)
         if bool(hull.any()):
+            deck = self._type_air_slots[typ] + self._promo_pool_val("major", "AIR_SLOTS")
             out.scatter_add_(1, self.major_unit_tile.clamp(min=0),
-                             torch.where(hull, self._type_air_slots[typ], torch.zeros_like(typ)))
+                             torch.where(hull, deck, torch.zeros_like(typ)))
         return out
 
     def _air_free_at(self, row: int) -> torch.Tensor:

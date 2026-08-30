@@ -1,12 +1,14 @@
-"""THE AIR FIGHTER, AIR BOMBER AND NAVAL RAIDER TREES on the GPU side.
+"""THE AIR FIGHTER, AIR BOMBER, NAVAL RAIDER AND NAVAL CARRIER TREES on the
+GPU side.
 
-Three classes arrive at once, and with them two new combat conditions
+Four classes arrive at once, and with them two new combat conditions
 (`CS_DEF_VS_AIR`, `CS_DEF_VS_AA`), the promotion term inside the sortie, an
 aircraft that finally banks XP, and two channels that pay outside a roll —
 Loot's coastal gold and Tactical Maintenance's heal.
 
 Every check below is poked into the same bodies `policy/drive.py` drives:
-`_promo_cs`, `_air_strike_targets`, `_apply_seat_unit_actions`, `_heal_blocked`.
+`_promo_cs`, `_air_strike_targets`, `_apply_seat_unit_actions`, `_heal_blocked`,
+`_air_slots_at`.
 """
 
 from __future__ import annotations
@@ -139,19 +141,23 @@ def main() -> None:
     HULL = a_type(sim, lambda i: int(sim._type_anti_air[i]) > 0 and bool(sim.unit_naval[i]))
     assert FIGHTER >= 0 and BOMBER >= 0 and RAIDER >= 0 and HULL >= 0
 
-    # -- 1: the three classes reached the wire -------------------------------
-    for cls in ("AIR_FIGHTER", "AIR_BOMBER", "NAVAL_RAIDER"):
+    CARRIER = a_type(sim, lambda i: int(sim._type_air_slots[i]) > 0 and bool(sim.unit_naval[i]))
+    assert CARRIER >= 0, "the roster fields no carrier hull"
+
+    # -- 1: the four classes reached the wire --------------------------------
+    for cls in ("AIR_FIGHTER", "AIR_BOMBER", "NAVAL_RAIDER", "NAVAL_CARRIER"):
         c = rules.promo_classes.index(cls)
         assert int(rules.promo_rows[c]) == 7, f"{cls} holds {int(rules.promo_rows[c])} rows, not 7"
         for j in range(7):
             req = int(rules.promo_req[c, j])
             assert req < (1 << j), (
                 f"{cls} column {j} requires a LATER column ({req:b}) — the branch is unreachable")
-    for ty, cls in ((FIGHTER, "AIR_FIGHTER"), (BOMBER, "AIR_BOMBER"), (RAIDER, "NAVAL_RAIDER")):
+    for ty, cls in ((FIGHTER, "AIR_FIGHTER"), (BOMBER, "AIR_BOMBER"), (RAIDER, "NAVAL_RAIDER"),
+                    (CARRIER, "NAVAL_CARRIER")):
         got = int(rules.u_promo_class[ty])
         assert got == rules.promo_classes.index(cls), (
             f"chassis {ty} promotes from {rules.promo_classes[got]}, not {cls}")
-    print(f"  1 three trees on the wire OK ({len(rules.promo_classes)} classes, 7 rows each)")
+    print(f"  1 four trees on the wire OK ({len(rules.promo_classes)} classes, 7 rows each)")
 
     # -- 2: the two new conditions fire in their OWN roll and no other -------
     # CIV6 (Proximity Fuses): "+7 Combat Strength when defending vs. air
@@ -317,8 +323,36 @@ def main() -> None:
     assert paid - bare == 50, f"Loot paid {paid - bare} gold, not 50"
     print(f"  8 Loot OK (+{paid - bare} gold on a coastal raid)")
 
-    print("AIR PROMO OK — three trees, both new conditions, the sortie's XP, "
-          "Sky and Stars, Tactical Maintenance and Loot")
+    # -- 9: THE CARRIER DECK --------------------------------------------------
+    # CIV6 (Flight Deck, Hangar Deck, Folding Wings): "+1 additional aircraft
+    # slot" apiece, on the hull that floats them.
+    s = fresh(rules, path)
+    wet = [t for t in range(s.T) if bool(s.water[0, t]) and int(s.military_at[0, t]) < 0]
+    assert wet, "the map offers no free water tile"
+    here = wet[0]
+    hs, _ = retype(s, row, CARRIER, here)
+    s.military_at[0, here] = hs + s.POOL_LO["major"]
+    s.major_unit_promos[0, hs] = 0
+    s._gen_ver += 1
+    deck0 = int(s._air_slots_at(row)[0, here])
+    assert deck0 == int(s._type_air_slots[CARRIER]), (
+        f"the bare hull bases {deck0}, not its chassis' {int(s._type_air_slots[CARRIER])}")
+    cc = rules.promo_classes.index("NAVAL_CARRIER")
+    kk = rules.promo_kinds.index("AIR_SLOTS")
+    decks = [j for j in range(int(rules.promo_rows[cc]))
+             if any(int(rules.promo_kind[cc, j, sx]) == kk
+                    for sx in range(rules.promo_kind.shape[2]))]
+    assert len(decks) == 3, f"the carrier tree holds {len(decks)} slot rows, not 3"
+    for n, j in enumerate(decks, start=1):
+        s.major_unit_promos[0, hs] |= 1 << j
+        s._gen_ver += 1
+        got = int(s._air_slots_at(row)[0, here])
+        assert got == deck0 + n, f"{n} deck rows based {got}, not {deck0 + n}"
+    assert int(s._air_slots_at(foe)[0, here]) == 0, "a hull bases its OWN seat alone"
+    print(f"  9 the carrier deck OK ({deck0} -> {deck0 + 3} slots over three rows)")
+
+    print("AIR PROMO OK — four trees, both new conditions, the sortie's XP, "
+          "Sky and Stars, Tactical Maintenance, Loot and the carrier deck")
 
 
 if __name__ == "__main__":

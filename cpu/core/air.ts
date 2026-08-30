@@ -41,9 +41,10 @@ export function airUnitsAt(state: GameState, tileIndex: number): Unit[] {
 export function airSlotsAt(state: GameState, seat: number, tileIndex: number): number {
   const tile: Tile | undefined = state.map.tiles[tileIndex];
   if (!tile) return 0;
-  // a CARRIER is a base wherever it floats, its own seat's alone
+  // a CARRIER is a base wherever it floats, its own seat's alone. CIV6
+  // (Flight Deck, Hangar Deck, Folding Wings): "+1 additional aircraft slot".
   const hull = unitsAt(state, tileIndex).find((u) => u.seat === seat && (UNITS[u.type]?.airSlots ?? 0) > 0);
-  if (hull) return UNITS[hull.type]!.airSlots!;
+  if (hull) return UNITS[hull.type]!.airSlots! + promoValue(hull, 'AIR_SLOTS');
   if (tileSeat(tile) !== seat) return 0;
   // CIV6 (Airstrip): "+3 aircraft slots". A pillaged one bases nothing, the
   // same rule a wrecked Aerodrome answers to.

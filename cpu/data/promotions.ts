@@ -16,7 +16,7 @@
 export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE', 'MONK',
-  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER',
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
@@ -26,7 +26,7 @@ export type PromoClass = (typeof PROMO_CLASSES)[number];
 const TARGET_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED',
-  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER',
 ] as const;
 export const CLASS_BIT: Readonly<Record<string, number>> = Object.fromEntries(
   TARGET_CLASSES.map((c, i) => [c, 1 << i]),
@@ -35,7 +35,7 @@ export const MASK_LAND = CLASS_BIT.RECON | CLASS_BIT.MELEE | CLASS_BIT.RANGED
   | CLASS_BIT.ANTICAV | CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV | CLASS_BIT.SIEGE;
 /** CIV6 groups every hull under "naval units", the raider included. */
 export const MASK_NAVAL = CLASS_BIT.NAVAL_MELEE | CLASS_BIT.NAVAL_RANGED
-  | CLASS_BIT.NAVAL_RAIDER;
+  | CLASS_BIT.NAVAL_RAIDER | CLASS_BIT.NAVAL_CARRIER;
 export const MASK_CAVALRY = CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV;
 export const MASK_AIR = CLASS_BIT.AIR_FIGHTER | CLASS_BIT.AIR_BOMBER;
 
@@ -69,6 +69,7 @@ export const PROMO_KINDS = [
   'HEAL_ANYWHERE',       // heals outside friendly territory
   'HEAL_AFTER_ATTACK',   // attacking does not silence this turn's heal
   'RAID_GOLD',           // +v gold on top of a coastal raid's own take
+  'AIR_SLOTS',           // +v aircraft this hull bases
   'PILLAGE_CHEAP',       // pillaging costs v movement
   'HOLD_THE_LINE',       // adjacent OWN units of another class get +v vs cavalry
   'TERRAIN_MOVE_WOODS',  // woods and rainforest cost 1
@@ -281,6 +282,22 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('OBSERVATION', 'NAVAL_RAIDER', 3, ['SWIFT_KEEL'], cs('SIGHT', 1)),
   P('SILENT_RUNNING', 'NAVAL_RAIDER', 3, ['HOMING_TORPEDOES'], { kind: 'MOVE_AFTER_ATTACK' }),
   P('WOLFPACK', 'NAVAL_RAIDER', 4, ['OBSERVATION', 'SILENT_RUNNING'], cs('EXTRA_ATTACK', 1)),
+
+  // ---- NAVAL CARRIER --------------------------------------------------
+  // Three of the seven rows say the same thing — "+1 additional aircraft
+  // slot" — so the hull that takes the whole left branch bases three more
+  // planes than it was launched with. Each row's `requires` is the list its
+  // own Civilopedia page names, read as the OR this catalog's prerequisites
+  // already are.
+  P('FLIGHT_DECK', 'NAVAL_CARRIER', 1, [], cs('AIR_SLOTS', 1)),
+  P('SCOUT_PLANES', 'NAVAL_CARRIER', 1, [], cs('SIGHT', 1)),
+  P('HANGAR_DECK', 'NAVAL_CARRIER', 2, ['FLIGHT_DECK'], cs('AIR_SLOTS', 1)),
+  P('ADVANCED_ENGINES', 'NAVAL_CARRIER', 2, ['SCOUT_PLANES', 'HANGAR_DECK'], cs('MOVES', 1)),
+  P('FOLDING_WINGS', 'NAVAL_CARRIER', 3, ['HANGAR_DECK'], cs('AIR_SLOTS', 1)),
+  P('DECK_CREWS', 'NAVAL_CARRIER', 3, ['ADVANCED_ENGINES', 'FOLDING_WINGS'],
+    { kind: 'HEAL_AFTER_ATTACK' }),
+  P('SUPERCARRIER', 'NAVAL_CARRIER', 4, ['FOLDING_WINGS', 'DECK_CREWS'],
+    { kind: 'HEAL_ANYWHERE' }),
 ];
 
 /** the promotions of one class, in catalog order — the ORDER IS THE WIRE:
@@ -319,6 +336,7 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   BOMBER: 'AIR_BOMBER', JET_BOMBER: 'AIR_BOMBER',
   PRIVATEER: 'NAVAL_RAIDER', SUBMARINE: 'NAVAL_RAIDER',
   NUCLEAR_SUBMARINE: 'NAVAL_RAIDER',
+  AIRCRAFT_CARRIER: 'NAVAL_CARRIER',
 };
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
