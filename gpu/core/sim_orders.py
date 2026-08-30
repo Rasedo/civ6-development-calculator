@@ -52,6 +52,7 @@ class SimOrders:
         _hn = getattr(self, "_A_HEATHEN", -1)
         _ug = getattr(self, "_A_UPGRADE", -1)
         _ar = getattr(self, "_A_AIR_STRIKE", -1)
+        _apc = getattr(self, "_A_AIR_PILLAGE", -1)
         _rbc = getattr(self, "_A_REBASE", -1)
         _asw = self._air_strike_cols
         _rbw = self._air_rebase_cols
@@ -103,6 +104,7 @@ class SimOrders:
             (((_ab >= _fuc) & (_ab < _fuc + 6)) if _fuc >= 0 else _no).any(dim=0),  # form up
             ((_ab == _ecc) if _ecc >= 0 else _no).any(dim=0),   # join an escort
             ((_ab == _uec) if _uec >= 0 else _no).any(dim=0),   # and leave it
+            (((_ab >= _apc) & (_ab < _apc + _asw)) if _apc >= 0 else _no).any(dim=0),  # air pillage
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -110,7 +112,7 @@ class SimOrders:
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
-         _rk_escort, _rk_unescort) = _tab
+         _rk_escort, _rk_unescort, _rk_airpil) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -376,6 +378,20 @@ class SimOrders:
                         one = torch.zeros(B, dtype=torch.bool, device=dev)
                         one[b_] = True
                         self._air_strike(one, _tg, "major", v, row)
+
+            if _rk_airpil[n] and _apc >= 0:
+                apm = act & (a >= _apc) & (a < _apc + _asw)
+                if bool(apm.any()):
+                    _cols = self._air_pillage_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _apc).clamp(min=0, max=_asw - 1)
+                    _tg = _cols.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    _okP = apm & (_tg >= 0)
+                    for b_ in _okP.nonzero(as_tuple=True)[0].tolist():
+                        v = int(sc[b_])
+                        one = torch.zeros(B, dtype=torch.bool, device=dev)
+                        one[b_] = True
+                        self._air_pillage(one, _tg, "major", v, row)
 
             if _rk_rebase[n] and _rbc >= 0:
                 rbm = act & (a >= _rbc) & (a < _rbc + _rbw)

@@ -8,13 +8,13 @@
  * "has 2 slots initially, and can reach 4 slots after constructing the Hangar
  * and the Airport", and an Aircraft Carrier "starts with 2".
  */
-import { UNITS } from '../data/units';
+import { UNITS, UNIT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { citiesOf, seatOf, tileSeat } from './seats';
+import { citiesOf, civsAtWar, isTerritorial, seatOf, tileSeat, unitSeat } from './seats';
 import { cityAtIndex, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
-import { promoValue } from './promotions';
+import { promoFlag, promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
@@ -209,6 +209,37 @@ export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number
  * and cut to the head's width — the same rule the ring heads use, so both
  * engines agree on what column k means without shipping a list.
  */
+/** CIV6 (Bomber): a bomber "may attack tile improvements and districts",
+ *  and what it wrecks is what the ground verb wrecks — the Encampment and a
+ *  city centre are the two districts a pillage never reaches. */
+export function airPillageOffers(state: GameState, unit: Unit, tileIndex: number): boolean {
+  const t = state.map.tiles[tileIndex];
+  if (!t || UNITS[unit.type]?.air !== 'BOMBER') return false;
+  if (!isTerritorial(tileSeat(t)) || !civsAtWar(state, unitSeat(unit), tileSeat(t))) return false;
+  if (t.improvement && !t.pillaged) return true;
+  return t.district !== null && t.district !== 'CITY_CENTER' && t.district !== 'ENCAMPMENT'
+    && !!t.districtComplete && !t.districtPillaged;
+}
+
+/** CIV6 (Bomber): a bomber needs "more than 50% health" to wreck a tile;
+ *  (Superfortress): "No minimum health requirement to air pillage." */
+export function airPillageFit(unit: Unit): boolean {
+  return unit.hp * 2 > UNIT_HP || promoFlag(unit, 'AIR_PILLAGE_ANY_HP');
+}
+
+export function airPillageTargets(state: GameState, unit: Unit, width: number): number[] {
+  const out: number[] = [];
+  const here = state.map.tiles[unit.tileIndex];
+  if (!here || !isAirUnit(unit.type) || !airPillageFit(unit)) return out;
+  for (const t of state.map.tiles) {
+    if (t.index === unit.tileIndex) continue;
+    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
+    if (airPillageOffers(state, unit, t.index)) out.push(t.index);
+    if (out.length >= width) break;
+  }
+  return out;
+}
+
 export function airStrikeTargets(state: GameState, unit: Unit, width: number): number[] {
   const out: number[] = [];
   const here = state.map.tiles[unit.tileIndex];

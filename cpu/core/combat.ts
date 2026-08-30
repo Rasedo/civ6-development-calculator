@@ -19,7 +19,7 @@ import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from 
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
-import { isAirUnit, airCoverAgainst, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
+import { isAirUnit, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -1300,6 +1300,56 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
  * fighter INTERCEPTION, which needs an air unit to hold a map tile it is not
  * based on.
  */
+/** the answer a sortie takes. CIV6 (Air combat): a plane "doesn't suffer
+ *  damage in return unless it gets Intercepted", and "the only exceptions to
+ *  this rule are SHIPS with the Anti-Air Strength stat - they have additional
+ *  close-range defenses, which activate when they are attacked by an
+ *  aircraft" — beside which a parked weapon "provides cover from air attacks
+ *  up to 1 hex away". `airCoverAgainst` folds both into the one that fires. */
+function airCoverAnswer(state: GameState, attacker: Unit, targetIndex: number): void {
+  const cover = airCoverAgainst(state, attacker, targetIndex);
+  if (!cover) return;
+  const fromTile = state.map.tiles[attacker.tileIndex];
+  const covE = airDefenseOf(cover.type) - woundPenalty(cover)
+    + promoCS(cover, {
+      attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
+      tile: state.map.tiles[cover.tileIndex],
+    });
+  // the burst answers the AIRCRAFT, which is the defender of this roll
+  const airD = (UNITS[attacker.type]?.ranged?.strength ?? 0) - woundPenalty(attacker)
+    + promoCS(attacker, {
+      attacking: false, vsAntiAir: true, foeType: cover.type, tile: fromTile,
+    });
+  attacker.hp -= damageRoll(state, covE - airD, 'airc', targetIndex);
+  if (attacker.hp <= 0) disbandUnit(state, attacker.id);
+}
+
+/** CIV6 (Bomber): a bomber "may attack tile improvements and districts...
+ *  With these attacks they destroy the targets, which is equivalent to
+ *  Pillaging but does not yield any spoils." The sortie goes with it, and the
+ *  cover over the wrecked hex answers as it would any air attack. */
+export function airPillage(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
+  const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
+  if (!attacker) return { ok: false, reason: 'No such unit.' };
+  if (UNITS[attacker.type]?.air !== 'BOMBER') return { ok: false, reason: 'Not a bomber.' };
+  if (attacker.movesLeft <= 0 || attacksLeftOf(attacker) <= 0) {
+    return { ok: false, reason: 'The sortie is spent.' };
+  }
+  if (!airStrikeReaches(state, attacker, targetIndex)) return { ok: false, reason: 'Out of operational range.' };
+  if (!airPillageFit(attacker)) return { ok: false, reason: 'Too wounded to pillage from the air.' };
+  if (!airPillageOffers(state, attacker, targetIndex)) return { ok: false, reason: 'Nothing there to wreck.' };
+  const t = state.map.tiles[targetIndex]!;
+  if (t.improvement && !t.pillaged) t.pillaged = true;
+  else {
+    t.districtPillaged = true;
+    displaceAirFrom(state, targetIndex);
+  }
+  spendAttack(attacker, true);
+  airCoverAnswer(state, attacker, targetIndex);
+  logUnitOrder(state, seat, attackerId, 'pillage', targetIndex);
+  return { ok: true };
+}
+
 export function airStrike(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
   if (!attacker) return { ok: false, reason: 'No such unit.' };
@@ -1346,21 +1396,7 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   // defenses, which activate when they are attacked by an aircraft" — beside
   // which a parked weapon "provides cover from air attacks up to 1 hex away".
   // `airCoverAgainst` folds both into the one answer that fires.
-  const cover = airCoverAgainst(state, attacker, targetIndex);
-  if (cover) {
-    const covE = airDefenseOf(cover.type) - woundPenalty(cover)
-      + promoCS(cover, {
-        attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
-        tile: state.map.tiles[cover.tileIndex],
-      });
-    // the burst answers the AIRCRAFT, which is the defender of this roll
-    const airD = atk - woundPenalty(attacker)
-      + promoCS(attacker, {
-        attacking: false, vsAntiAir: true, foeType: cover.type, tile: fromTile,
-      });
-    attacker.hp -= damageRoll(state, covE - airD, 'airc', targetIndex);
-    if (attacker.hp <= 0) disbandUnit(state, attacker.id);
-  }
+  airCoverAnswer(state, attacker, targetIndex);
   awardBattleXp(state, attacker, defender,
     { ranged: true, aDied: attacker.hp <= 0, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {

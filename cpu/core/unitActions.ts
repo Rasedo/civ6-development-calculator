@@ -85,6 +85,11 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // toggle would tell the mask nothing about which one is legal.
   names.push('ESCORT');
   names.push('BREAK_ESCORT');
+  // AIR PILLAGE: the bomber's blow against what a tile CARRIES rather than
+  // what stands on it. Its own head, the strike head's width, and the same
+  // TILE-INDEX column order — a tile can hold both a defender and an
+  // improvement, and the game lets the bomber choose.
+  for (let k = 0; k < AIR_STRIKE_COLS; k++) names.push(`AIR_PILLAGE_${k}`);
   return names;
 }
 

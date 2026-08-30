@@ -1884,6 +1884,68 @@ class SimSeats:
         return torch.where(has, S.gather(1, pick.unsqueeze(1)).squeeze(1),
                            torch.full((B,), -1, dtype=torch.long, device=dev)), has
 
+    def _air_cover_answer(self, fire: torch.Tensor, atk_kind: str, u: int, row: int,
+                          tgt: torch.Tensor) -> torch.Tensor:
+        """the answer a sortie takes, and who dies of it — `airCoverAnswer`.
+
+        CIV6 (Air combat): a plane "doesn't suffer damage in return unless it
+        gets Intercepted", and the two sentences `_air_cover_scan` folds are
+        the whole of what answers here."""
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
+        ttc = tgt.clamp(min=0)
+        c_slot, c_has = self._air_cover_scan(row, ttc)
+        ret = fire & c_has
+        a_died = torch.zeros_like(fire)
+        if not bool(ret.any()):
+            return a_died
+        _t = torch.ones_like(fire)
+        at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+        a_promos = self._promo_pool(atk_kind)[0][:, u]
+        a_base = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u])
+        cs0 = c_slot.clamp(min=0)
+        c_type = self.unit_type.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        c_aa = self._type_anti_air[c_type]
+        c_cs = torch.where(c_aa > 0, c_aa, self._type_combat[c_type])
+        c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1))
+        c_e = c_e + self._promo_cs(
+            c_type, self.unit_promos.gather(1, cs0.unsqueeze(1)).squeeze(1),
+            attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0,
+            tile=self.unit_tile.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0),
+        ).to(c_e.dtype)
+        # the burst answers the AIRCRAFT, which is the defender of this roll
+        air_d = a_base + self._promo_cs(
+            at0, a_promos, attacking=~_t, vs_anti_air=_t, foe_type=c_type,
+            tile=_tile_p[:, u]).to(a_base.dtype)
+        a_dmg = self._damage_roll(ret, c_e - air_d, k="airc", tile=tgt)
+        _hp_p[:, u] = torch.where(ret, _hp_p[:, u] - a_dmg, _hp_p[:, u])
+        a_died = ret & (_hp_p[:, u] <= 0)
+        if bool(a_died.any()):
+            _alive_p[:, u] = _alive_p[:, u] & ~a_died
+        return a_died
+
+    def _air_pillage(self, act: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
+                     u: int, row: int) -> None:
+        """`airPillage` — the bomber wrecks what the tile CARRIES.
+
+        CIV6 (Bomber): a bomber "may attack tile improvements and districts...
+        With these attacks they destroy the targets, which is equivalent to
+        Pillaging but does not yield any spoils."""
+        if not bool(act.any()):
+            return
+        ttc = tgt.clamp(min=0)
+        _r = act.nonzero(as_tuple=True)[0]
+        _tt = ttc[_r]
+        _pi = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
+        _pd = ~_pi
+        self.pillaged[_r[_pi], _tt[_pi]] = True
+        self.district_pillaged[_r[_pd], _tt[_pd]] = True
+        self._air_scatter_from(_r[_pd], _tt[_pd])
+        _mp = getattr(self, f"{atk_kind}_unit_mp")
+        _mp[:, u] = torch.where(act, torch.zeros_like(_mp[:, u]), _mp[:, u])
+        self._spend_one_attack(atk_kind, u, act)
+        self._air_cover_answer(act, atk_kind, u, row, tgt)
+        self._eff_version += 1
+
     def _air_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
                     u: int, row: int) -> None:
         """`airStrike` — one sortie, and the turn goes with it.
@@ -1951,32 +2013,7 @@ class SimSeats:
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, unit_att)
-        # the answer. CIV6 (Air combat): a plane "doesn't suffer damage in
-        # return unless it gets Intercepted", and the two sentences
-        # `_air_cover_scan` folds are the whole of what answers here.
-        c_slot, c_has = self._air_cover_scan(row, ttc)
-        ret = unit_att & c_has
-        a_died = torch.zeros_like(unit_att)
-        if bool(ret.any()):
-            cs0 = c_slot.clamp(min=0)
-            c_type = self.unit_type.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-            c_aa = self._type_anti_air[c_type]
-            c_cs = torch.where(c_aa > 0, c_aa, self._type_combat[c_type])
-            c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1))
-            c_e = c_e + self._promo_cs(
-                c_type, self.unit_promos.gather(1, cs0.unsqueeze(1)).squeeze(1),
-                attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0,
-                tile=self.unit_tile.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0),
-            ).to(c_e.dtype)
-            # the burst answers the AIRCRAFT, which is the defender of this roll
-            air_d = a_base + self._promo_cs(
-                at0, a_promos, attacking=~_t, vs_anti_air=_t, foe_type=c_type,
-                tile=a_tile).to(a_base.dtype)
-            a_dmg = self._damage_roll(ret, c_e - air_d, k="airc", tile=tgt)
-            _hp_p[:, u] = torch.where(ret, _hp_p[:, u] - a_dmg, _hp_p[:, u])
-            a_died = ret & (_hp_p[:, u] <= 0)
-            if bool(a_died.any()):
-                _alive_p[:, u] = _alive_p[:, u] & ~a_died
+        a_died = self._air_cover_answer(unit_att, atk_kind, u, row, tgt)
         d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
         self._award_pair_xp(
             unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,

@@ -14,14 +14,14 @@ import { BUILDINGS } from '../../../cpu/data/buildings';
 import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { RESOURCES } from '../../../world/resources';
-import { airRange, airSlotsAt, airStrikeTargets } from '../../../cpu/core/air';
+import { airPillageTargets, airRange, airSlotsAt, airStrikeTargets } from '../../../cpu/core/air';
 import { airStrike, awardCityXp } from '../../../cpu/core/combat';
 import { promoCS, promoValue, promoFlag, promoAvailable, promoReady } from '../../../cpu/core/promotions';
 import {
   CLASS_BIT, MASK_AIR, MASK_NAVAL, PROMO_CLASSES, UNIT_PROMO_CLASS, classBitOf, promoRows,
 } from '../../../cpu/data/promotions';
 import { applySeatUnitOrders } from '../../../cpu/core/phase';
-import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
+import { AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import { DED_SKY, SKY_AIR_XP_PCT } from '../../../cpu/data/seats';
 import type { GameState, Unit } from '../../../cpu/core/types';
@@ -393,18 +393,88 @@ describe('TACTICAL MAINTENANCE', () => {
   });
 });
 
+describe('the bomber wrecks what a tile carries', () => {
+  const A_AIR_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).AIR_PILLAGE_0;
+
+  /** a bomber over one enemy tile carrying `what`, ordered to wreck it.
+   *  `hp` and `promo` are the two sides of the health gate; `offered` says
+   *  whether the head ever named the tile. */
+  function bomb(what: 'FARM' | 'CAMPUS', hp = 100, promo = 0) {
+    const { state, pad } = airState();
+    setWar(state, 0, 1, true);
+    const plane = spawnUnit(state, BOMBER, pad.index, 0)!;
+    plane.hp = hp;
+    plane.promos = promo;
+    const t = tileAtCoords(state.map, 8, 12);
+    setTileOwner(t, 1, 1);
+    if (what === 'FARM') { t.improvement = 'FARM'; t.pillaged = false; } else {
+      t.district = 'CAMPUS';
+      t.districtComplete = true;
+      t.districtPillaged = false;
+    }
+    const seat = seatOf(state, 0)!;
+    seat.treasury = 0;
+    const k = airPillageTargets(state, plane, AIR_STRIKE_COLS).indexOf(t.index);
+    if (k >= 0) {
+      const units = state.units.filter((x) => x.seat === 0);
+      applySeatUnitOrders(state, seat, [units.map((x) => (x === plane ? A_AIR_PILLAGE + k : -1))]);
+    }
+    return { state, plane, t, seat, offered: k >= 0 };
+  }
+
+  it('an improvement is wrecked, and pays the bomber nothing', () => {
+    // CIV6 (Bomber): the attacks "destroy the targets, which is equivalent to
+    // Pillaging but does not yield any spoils".
+    const { plane, t, seat, offered } = bomb('FARM');
+    expect(offered).toBe(true);
+    expect(t.pillaged).toBe(true);
+    expect(seat.treasury).toBe(0);
+    expect(plane.movesLeft).toBe(0);
+  });
+
+  it('and so is a district', () => {
+    const { t, seat, offered } = bomb('CAMPUS');
+    expect(offered).toBe(true);
+    expect(t.districtPillaged).toBe(true);
+    expect(seat.treasury).toBe(0);
+  });
+
+  it('half health is not more than half, and SUPERFORTRESS says so', () => {
+    // CIV6 (Bomber): a bomber needs "more than 50% health to do so (or the
+    // Superfortress Promotion, which removes the minimum health requirement)".
+    expect(bomb('FARM', 51).t.pillaged).toBe(true);
+    const hurt = bomb('FARM', 50);
+    expect(hurt.offered).toBe(false);
+    expect(hurt.t.pillaged).toBe(false);
+    expect(bomb('FARM', 50, bit('AIR_BOMBER', 'SUPERFORTRESS')).t.pillaged).toBe(true);
+  });
+
+  it('a fighter is offered nothing to wreck', () => {
+    const { state, pad } = airState();
+    setWar(state, 0, 1, true);
+    const fighter = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const t = tileAtCoords(state.map, 8, 12);
+    setTileOwner(t, 1, 1);
+    t.improvement = 'FARM';
+    expect(airPillageTargets(state, fighter, AIR_STRIKE_COLS)).toEqual([]);
+  });
+});
+
 describe('the rows that ship inert, and say so', () => {
-  it('GROUND CREWS, SUPERFORTRESS and BOARDING carry no effect yet', () => {
+  it('GROUND CREWS and BOARDING carry no effect yet', () => {
     // Each waits on a mechanic neither engine has: a PATROL order, an air
     // pillage, and a published magnitude for "obtain Gold from naval
     // victories". They exist so the tree's shape and its prerequisites are
     // the source's, not so they do anything.
     for (const [cls, id] of [
-      ['AIR_FIGHTER', 'GROUND_CREWS'], ['AIR_BOMBER', 'SUPERFORTRESS'],
-      ['NAVAL_RAIDER', 'BOARDING'],
+      ['AIR_FIGHTER', 'GROUND_CREWS'], ['NAVAL_RAIDER', 'BOARDING'],
     ] as const) {
       const row = promoRows(cls).find((p) => p.id === id)!;
       expect(row.effects).toEqual([{ kind: 'NONE' }]);
     }
+    // SUPERFORTRESS left this list with the verb it waits on.
+    expect(promoFlag(
+      { type: BOMBER, promos: bit('AIR_BOMBER', 'SUPERFORTRESS') }, 'AIR_PILLAGE_ANY_HP',
+    )).toBe(true);
   });
 });

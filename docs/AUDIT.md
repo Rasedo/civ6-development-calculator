@@ -54,7 +54,7 @@ from the list below.
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-56r the inert promotions | 1 | four of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, an air pillage, and one magnitude the source never published |
+| B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
@@ -368,18 +368,14 @@ Civ 6 source or is recorded as unverifiable.
     poke-only; `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
     are their whole bar.
 
-- **B-56r. The inert promotions.** 96 of the 100 catalog rows in
+- **B-56r. The inert promotions.** 104 of the 107 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
   `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py` +
-  `tests/gpu/air_promo_test.py`. FOUR carry `none`, each with its blocker:
+  `tests/gpu/air_promo_test.py`. THREE carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
   - **GROUND_CREWS** ("heal while patrolling or deployed") — PATROL is
     C-34's own gap, and without it there is no state to heal in.
-  - **SUPERFORTRESS** ("no minimum health requirement to air pillage") —
-    the AIR PILLAGE it relaxes does not exist here at all (C-34):
-    `_A_PILLAGE` reads the tile UNDERFOOT or a NAVAL RAIDER's adjacent
-    hex, and a plane is based rather than standing.
   - **BOARDING** ("obtain Gold from naval victories") — the Civilopedia
     publishes no magnitude, and no other row prices a kill in gold. An
     invented number is worse than an empty row; this one waits on a
@@ -654,7 +650,19 @@ under their blocker so the dependency is readable, and both halves count.
   Gun, Mobile SAM): "Provides cover from air attacks up to 1 hex away from
   the weapon", Range 1 — which `airCoverAgainst` / `_air_cover_scan` fold
   into the same one answer the anti-air hull already fired, strongest first
-  and ties by tile then by the tile's own occupancy order. OPEN:
+  and ties by tile then by the tile's own occupancy order. AIR PILLAGE is
+  its own head (`AIR_PILLAGE_k`, the strike head's width and column order):
+  CIV6 (Bomber) — a bomber "may attack tile improvements and districts,
+  though they need more than 50% health to do so (or the Superfortress
+  Promotion, which removes the minimum health requirement)", and the wreck
+  "is equivalent to Pillaging but does not yield any spoils", so
+  `airPillage` / `_air_pillage` wreck what the ground verb wrecks, pay
+  nothing, spend the sortie, and take the covering weapon's answer.
+  GATE REACHABILITY IS ZERO for the whole chapter — no seed trains an
+  aircraft inside 250 turns — so every clause above is proved by
+  `tests/gpu/air_test.py`, `tests/gpu/air_promo_test.py` and
+  `tests/cpu/units/air.test.ts` + `tests/cpu/units/air-promotions.test.ts`,
+  and by nothing the battery's serve lane runs. OPEN:
   - **INTERCEPTION BY A FIGHTER** has no published roll. The wiki says
     only that "every Interception does damage to the unit being
     intercepted", that a shot-down plane never lands its attack and a
@@ -671,11 +679,6 @@ under their blocker so the dependency is readable, and both halves count.
     magnitude, so unbuilt.
   - **THE NUCLEAR DELIVERY**'s interception half (devices are C-31, the
     silo C-20).
-  - **AIR PILLAGE.** The Superfortress promotion reads "no minimum health
-    requirement to air pillage", so a healthy aircraft can wreck a tile
-    improvement from its base — a strike whose target is the TILE and
-    whose gate is the striker's own HP. Neither engine has it, and
-    B-56r's SUPERFORTRESS is the row that waits on it.
   - **THE AERODROME'S SLOT COUNT HAS TWO SOURCES THAT DISAGREE.** The Air
     Combat page says an Aerodrome "has 2 slots initially, and can reach 4
     slots after constructing the Hangar and the Airport"; each building's

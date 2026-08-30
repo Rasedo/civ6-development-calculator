@@ -10,7 +10,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
-import { cityStrikeStrength, airStrike } from './combat';
+import { cityStrikeStrength, airPillage, airStrike } from './combat';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
@@ -56,7 +56,7 @@ import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
-import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
+import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
 import { beginMission, beginTravel, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
@@ -64,6 +64,7 @@ const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_UPGRADE = unitActionIndex(IMPROVEMENT_IDS).UPGRADE;
 const A_AIR_STRIKE = unitActionIndex(IMPROVEMENT_IDS).AIR_STRIKE_0;
 const A_REBASE = unitActionIndex(IMPROVEMENT_IDS).REBASE_0;
+const A_AIR_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).AIR_PILLAGE_0;
 const A_SPY_TRAVEL = unitActionIndex(IMPROVEMENT_IDS).SPY_TRAVEL_0;
 const A_SPY_MISSION = unitActionIndex(IMPROVEMENT_IDS).SPY_MISSION_0;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
@@ -1171,6 +1172,11 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       if (a >= A_AIR_STRIKE && a < A_AIR_STRIKE + AIR_STRIKE_COLS) {
         const t = airStrikeTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_STRIKE];
         if (t !== undefined) airStrike(state, unit.id, t, actor.seat);
+        return;
+      }
+      if (a >= A_AIR_PILLAGE && a < A_AIR_PILLAGE + AIR_STRIKE_COLS) {
+        const t = airPillageTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_PILLAGE];
+        if (t !== undefined) airPillage(state, unit.id, t, actor.seat);
         return;
       }
       if (a >= A_REBASE && a < A_REBASE + AIR_REBASE_COLS) {

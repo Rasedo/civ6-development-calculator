@@ -70,6 +70,7 @@ export const PROMO_KINDS = [
   'HEAL_AFTER_ATTACK',   // attacking does not silence this turn's heal
   'RAID_GOLD',           // +v gold on top of a coastal raid's own take
   'AIR_SLOTS',           // +v aircraft this hull bases
+  'AIR_PILLAGE_ANY_HP',  // may air pillage at any health
   'PILLAGE_CHEAP',       // pillaging costs v movement
   'HOLD_THE_LINE',       // adjacent OWN units of another class get +v vs cavalry
   'TERRAIN_MOVE_WOODS',  // woods and rainforest cost 1
@@ -268,7 +269,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('LONG_RANGE', 'AIR_BOMBER', 3, ['CLOSE_AIR_SUPPORT'], cs('RANGE', 2)),
   P('TACTICAL_MAINTENANCE', 'AIR_BOMBER', 3, ['TORPEDO_BOMBER'],
     { kind: 'HEAL_AFTER_ATTACK' }),
-  P('SUPERFORTRESS', 'AIR_BOMBER', 4, ['LONG_RANGE', 'TACTICAL_MAINTENANCE'], none),
+  P('SUPERFORTRESS', 'AIR_BOMBER', 4, ['LONG_RANGE', 'TACTICAL_MAINTENANCE'],
+    { kind: 'AIR_PILLAGE_ANY_HP' }),
 
   // ---- NAVAL RAIDER ---------------------------------------------------
   // The raider's tree is money first and the hunt second, which is what the

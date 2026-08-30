@@ -142,7 +142,8 @@ def poke_wire(rules, path):
     sim = fresh(rules, path, turns=1)
     assert sim._A_ESCORT >= 0 and sim._A_UNESCORT >= 0, "the escort verbs have no columns"
     assert sim._A_UNESCORT == sim._A_ESCORT + 1, "the two columns are one pair"
-    assert sim._A_UNESCORT == len(sim._act_names) - 1, "the newest verbs close the enum"
+    assert sim._act_names[sim._A_UNESCORT + 1].startswith("AIR_PILLAGE_"), (
+        "the escort pair no longer sits where the enum put it")
     assert "ESCORT_SPEED" in sim._pk, "the promotion kind never reached the wire"
     ci = PRO["classes"].index("LIGHT_CAV")
     col = PRO["ids"][ci].index("ESCORT_MOBILITY")

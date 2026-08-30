@@ -2568,6 +2568,9 @@ class SimMasks:
         _as: list[torch.Tensor] = []
         if getattr(self, "_A_AIR_STRIKE", -1) >= 0:
             _as = [present.unsqueeze(2) & self._air_target_mask(row, sc, tc, utype)]
+        _ap: list[torch.Tensor] = []
+        if getattr(self, "_A_AIR_PILLAGE", -1) >= 0:
+            _ap = [present.unsqueeze(2) & self._air_pillage_mask(row, sc, tc, utype)]
         _rb: list[torch.Tensor] = []
         if getattr(self, "_A_REBASE", -1) >= 0:
             _rb = [present.unsqueeze(2) & self._rebase_mask(row, sc, tc, utype)]
@@ -2630,7 +2633,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue,
+            + _ec + _ue + _ap,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:
@@ -2673,6 +2676,55 @@ class SimMasks:
         cs = self._centre_seat_plane()
         ctr = self._seats_hostile(row, torch.where((cs >= 0) & (cs < 100), cs, neg))
         return land, sea, ctr
+
+    def _air_wreckable(self, row: int) -> torch.Tensor:
+        """[B, T] — a tile an air pillage may wreck: at war with its owner,
+        carrying an unpillaged improvement or a complete district that is
+        neither a centre nor an Encampment (`airPillageOffers`)."""
+        ts = self.tile_seat
+        own = (ts >= 0) & (ts < BARB_SEAT)
+        war = own & self.war[:, row].gather(1, self._seat_row[ts.clamp(min=0)])
+        imp = (self.improvement >= 0) & ~self.pillaged
+        dis = ((self.district >= 0) & (self.district != self._encamp_didx)
+               & self.district_complete & ~self.district_pillaged
+               & (self.centre_slot_at < 0))
+        return war & (imp | dis)
+
+    def _air_pillage_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                             utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, W] TILE INDEX, -1 on a dead column — `airPillageTargets`.
+
+        CIV6 (Bomber): a bomber "may attack tile improvements and districts,
+        though they need more than 50% health to do so (or the Superfortress
+        Promotion, which removes the minimum health requirement)"."""
+        B, N = tc.shape
+        W, dev = self._air_strike_cols, self.device
+        out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        cols = self._air_cols(kind)
+        if W == 0 or cols.numel() == 0:
+            return out
+        k, t2 = kind[:, cols], tc[:, cols]
+        pr = self.unit_promos.gather(1, sc[:, cols])
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        rngv = (self._type_ranged_range[ti[:, cols]]
+                + self._promo_val(ti[:, cols], pr, "RANGE")).unsqueeze(2)
+        fit = ((self.unit_hp.gather(1, sc[:, cols]) * 2
+                > int(self.rules.combat.get("unitHp", 100)))
+               | self._promo_flag(ti[:, cols], pr, "AIR_PILLAGE_ANY_HP"))
+        cand = (
+            (dist > 0) & (dist <= rngv) & self._air_wreckable(row).unsqueeze(1)
+            & (k == 2).unsqueeze(2) & fit.unsqueeze(2)
+            & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+            & (self.unit_attacks.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+        )
+        out[:, cols] = self._air_first_k(cand, W)
+        return out
+
+    def _air_pillage_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                          utype: torch.Tensor) -> torch.Tensor:
+        return self._air_pillage_targets(row, sc, tc, utype) >= 0
 
     def _air_cols(self, kind: torch.Tensor) -> torch.Tensor:
         """the N-columns holding an aircraft in ANY batch row — every air body

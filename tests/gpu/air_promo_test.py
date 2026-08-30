@@ -351,8 +351,51 @@ def main() -> None:
     assert int(s._air_slots_at(foe)[0, here]) == 0, "a hull bases its OWN seat alone"
     print(f"  9 the carrier deck OK ({deck0} -> {deck0 + 3} slots over three rows)")
 
-    print("AIR PROMO OK — four trees, both new conditions, the sortie's XP, "
-          "Sky and Stars, Tactical Maintenance, Loot and the carrier deck")
+    # -- 10: AIR PILLAGE ------------------------------------------------------
+    # CIV6 (Bomber): a bomber "may attack tile improvements and districts,
+    # though they need more than 50% health to do so (or the Superfortress
+    # Promotion, which removes the minimum health requirement)", and the wreck
+    # "does not yield any spoils".
+    def bomb(hp: int, fortress: bool):
+        """None when the head never offered the tile; else (wrecked, paid, mp)."""
+        s = fresh(rules, path)
+        jj = a_city(s, row)
+        ae = aerodrome(s, row, jj)
+        s.war[0, row, foe] = True
+        s.war[0, foe, row] = True
+        bo, _ = retype(s, row, BOMBER, ae)
+        s.major_unit_hp[0, bo] = hp
+        s.major_unit_promos[0, bo] = (
+            1 << col_with(rules, "AIR_BOMBER", "AIR_PILLAGE_ANY_HP") if fortress else 0)
+        rr = int(s._type_ranged_range[BOMBER])
+        wreck = [tt for tt in range(s.T)
+                 if 0 < int(s.pair_dist[ae, tt]) <= rr and not bool(s.water[0, tt])
+                 and int(s.district[0, tt]) < 0 and bool(s.passable[0, tt])]
+        assert wreck, "no land tile inside the bomber's reach"
+        tg = wreck[0]
+        s.tile_seat[0, tg] = foe
+        s.improvement[0, tg] = 0
+        s.pillaged[0, tg] = False
+        s._tile_owner_ver += 1
+        s._eff_version += 1
+        s._gen_ver += 1
+        cols = s._air_pillage_targets(row, torch.tensor([[bo]]), torch.tensor([[ae]]),
+                                      torch.tensor([[BOMBER]]))[0, 0].tolist()
+        if tg not in cols:
+            return None
+        purse = int(s.civ_treasury[0, row])
+        order(s, row, bo, s._A_AIR_PILLAGE + cols.index(tg))
+        return (bool(s.pillaged[0, tg]), int(s.civ_treasury[0, row]) - purse,
+                float(s.major_unit_mp[0, bo]))
+
+    assert bomb(100, False) == (True, 0, 0.0), f"a healthy bomber wrecked {bomb(100, False)}"
+    assert bomb(50, False) is None, "CIV6: a bomber needs MORE than 50% health"
+    assert bomb(50, True) == (True, 0, 0.0), "Superfortress waives the health gate"
+    print("  10 air pillage OK (wrecked, no spoils, the sortie spent; "
+          "half health refused, Superfortress waives it)")
+
+    print("AIR PROMO OK — four trees, both new conditions, the sortie's XP, Sky "
+          "and Stars, Tactical Maintenance, Loot, the carrier deck and air pillage")
 
 
 if __name__ == "__main__":

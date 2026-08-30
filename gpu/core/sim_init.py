@@ -1248,6 +1248,7 @@ class SimInit:
             self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
             self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
             self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
+            self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
             self._A_REBASE = self._act.get("REBASE_0", -1)
             self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
             self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
@@ -1260,6 +1261,9 @@ class SimInit:
             self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
             self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
+            _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
+            assert _apc in (0, self._air_strike_cols), (
+                f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
             _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
@@ -1281,7 +1285,7 @@ class SimInit:
                 + (6 if self._A_FORM_UP >= 0 else 0) \
                 + (1 if self._A_ESCORT >= 0 else 0) \
                 + (1 if self._A_UNESCORT >= 0 else 0) \
-                + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
+                + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -1309,6 +1313,7 @@ class SimInit:
             self._A_HEATHEN = -1
             self._A_UPGRADE = -1
             self._A_AIR_STRIKE = -1
+            self._A_AIR_PILLAGE = -1
             self._A_REBASE = -1
             self._A_SPY_TRAVEL = -1
             self._A_SPY_MISSION = -1
