@@ -218,7 +218,7 @@ export function validImprovementsIn(
  *  suzerain improvement's row in `validImprovementsIn`. */
 export function suzerainNames(state: GameState, seat: number): ReadonlySet<string> {
   const out = new Set<string>();
-  for (const cs of state.cityStates) if (isSuzerain(cs, seat)) out.add(cs.name);
+  for (const cs of state.cityStates) if (isSuzerain(state, cs, seat)) out.add(cs.name);
   return out;
 }
 

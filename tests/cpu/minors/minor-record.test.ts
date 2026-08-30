@@ -29,7 +29,7 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
   };
   for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
   state.cityStates.push(cityState);
-  resolveSuzerain(cityState);
+  resolveSuzerain(state, cityState);
   return cityState;
 }
 
@@ -47,22 +47,22 @@ describe('the RESOLVED suzerain', () => {
     const cs = addCs(state, 12, 12);
     expect(suzerainOf(cs)).toBe(-1);            // nobody yet
 
-    addEnvoys(cs, 0, SUZERAIN_ENVOYS - 1);      // one short of the bar
+    addEnvoys(state, cs, 0, SUZERAIN_ENVOYS - 1);      // one short of the bar
     expect(suzerainOf(cs)).toBe(-1);
-    expect(isSuzerain(cs, 0)).toBe(false);
+    expect(isSuzerain(state, cs, 0)).toBe(false);
 
-    addEnvoys(cs, 0, 1);                        // exactly the bar, uncontested
+    addEnvoys(state, cs, 0, 1);                        // exactly the bar, uncontested
     expect(suzerainOf(cs)).toBe(0);
-    expect(isSuzerain(cs, 0)).toBe(true);
+    expect(isSuzerain(state, cs, 0)).toBe(true);
 
-    addEnvoys(cs, 1, SUZERAIN_ENVOYS);          // a TIE leaves nobody
+    addEnvoys(state, cs, 1, SUZERAIN_ENVOYS);          // a TIE leaves nobody
     expect(suzerainOf(cs)).toBe(-1);
-    expect(isSuzerain(cs, 0)).toBe(false);
-    expect(isSuzerain(cs, 1)).toBe(false);
+    expect(isSuzerain(state, cs, 0)).toBe(false);
+    expect(isSuzerain(state, cs, 1)).toBe(false);
 
-    addEnvoys(cs, 1, 1);                        // seat 1 pulls ahead
+    addEnvoys(state, cs, 1, 1);                        // seat 1 pulls ahead
     expect(suzerainOf(cs)).toBe(1);
-    expect(isSuzerain(cs, 1)).toBe(true);
+    expect(isSuzerain(state, cs, 1)).toBe(true);
   });
 });
 
@@ -73,7 +73,7 @@ describe('Containment', () => {
     const sender = state.seats[0];
     const suz = addSeat(state, 1);
     const cs = addCs(state, 12, 12);
-    addEnvoys(cs, suz.seat, SUZERAIN_ENVOYS);   // seat 1 holds it
+    addEnvoys(state, cs, suz.seat, SUZERAIN_ENVOYS);   // seat 1 holds it
     return { state, cs, sender, suz };
   }
 
@@ -97,9 +97,9 @@ describe('Containment', () => {
     const { state, cs, sender } = scenario();
     sender.research.civics = Object.keys(CIVICS);
     cs.envoys = {};
-    resolveSuzerain(cs);
+    resolveSuzerain(state, cs);
     expect(containmentBonus(state, cs, sender)).toBe(0);
-    addEnvoys(cs, sender.seat, SUZERAIN_ENVOYS);
+    addEnvoys(state, cs, sender.seat, SUZERAIN_ENVOYS);
     expect(suzerainOf(cs)).toBe(sender.seat);
     expect(containmentBonus(state, cs, sender)).toBe(0);
   });
@@ -135,7 +135,7 @@ describe("the minor's research record", () => {
 
     // CIV6 (Borders): "For city-states, Open Borders is granted to players
     // that have reached Suzerain status."
-    addEnvoys(cs, 0, SUZERAIN_ENVOYS);
+    addEnvoys(state, cs, 0, SUZERAIN_ENVOYS);
     expect(borderClosedTo(state, 0, tile, 'WARRIOR')).toBe(false);
 
     // a rival without the suzerainty still refuses — and a war opens it

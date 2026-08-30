@@ -1129,7 +1129,7 @@ export function cityStateAttackable(state: GameState, cityState: CityState, seat
   return (
     capsOf(seat).alwaysHostile ||
     civsAtWar(state, cityState.seat, seat) ||
-    state.seats.some((sx) => isSuzerain(cityState, sx.seat) && civsAtWar(state, sx.seat, seat))
+    state.seats.some((sx) => isSuzerain(state, cityState, sx.seat) && civsAtWar(state, sx.seat, seat))
   );
 }
 

@@ -1239,6 +1239,17 @@
           "note": "a vector over civ seats in seat order — one store for every seat, which is what makes the suzerain contest one comparison."
         },
         {
+          "name": "governorAtMinor",
+          "compare": "exact",
+          "covers": [
+            "Governor.minorId"
+          ],
+          "planes": [
+            "civ_gov_minor"
+          ],
+          "note": "a vector over civ seats: which governor that seat has posted here, -1 for none. Addressed by the CITY-STATE rather than by the posting, so neither engine has to name a minor the same way."
+        },
+        {
           "name": "met",
           "compare": "exact",
           "covers": [
@@ -2351,10 +2362,6 @@
       {
         "path": "GameState.map",
         "why": "the map's dynamic surface is the `tile` group; the container itself holds nothing else."
-      },
-      {
-        "path": "Governor.minorId",
-        "why": "the city-state posting has no GPU plane and no writer on either engine; the mechanic it waits on is a governor assigned to a city-state."
       },
       {
         "path": "GameState.seatActions",

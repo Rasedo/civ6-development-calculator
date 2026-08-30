@@ -21,7 +21,7 @@ import { wonderExtraSlots } from './effects';
  *  stands. Unweighted this is a plain count. */
 export function suzerainCount(state: GameState, seat: number): number {
   return state.cityStates.reduce(
-    (n, cityState) => n + (isSuzerain(cityState, seat)
+    (n, cityState) => n + (isSuzerain(state, cityState, seat)
       ? congressSuzFavorMult(state, CITY_STATE_TYPES.indexOf(cityState.type)) : 0), 0);
 }
 

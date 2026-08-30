@@ -46,7 +46,7 @@ from the list below.
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
-| B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
+| B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
@@ -250,17 +250,41 @@ Civ 6 source or is recorded as unverifiable.
   seat actually in a Dark Age (`computeAdoption(.., dark)` /
   `_slotted_policies(.., dark, era)`). Ibrahim is Ottoman-exclusive and
   therefore C-26, parked by owner decision, not an omission. OPEN:
-  - **NO GOVERNOR CAN BE ASSIGNED TO A CITY-STATE.** `Governor.minorId`
-    exists on TS, has no GPU plane, no statecompare field and no writer.
-    Amani's Messenger is her DEFAULT, so this is the mechanic three
-    sourced channels wait on: `envoysAtMinor` ("acts as 2 Envoys"),
-    `envoyDoubleAtMinor` (Puppeteer) and `minorLuxuries` (Affluence) are
-    declared, loaded and read by nothing. The second half is the read:
-    `envoysOf` / `seat_citystate_envoys` is the RAW store behind ~70
-    sites, and only some of them (the suzerain contest, the bonus tier,
-    the influence-tier walk, the levy gate) want the EFFECTIVE count.
-    Foreign Investor's "accumulate its Strategic resources" waits on the
-    same mechanic.
+  - ~~No governor can be assigned to a city-state.~~ CLOSED: CIV6 (Amani)
+    "Can be assigned to a City-state, where she acts as 2 Envoys", and the
+    catalog's `cityStates` flag says she is the only one. She is posted at
+    the governor phase, BEFORE the cities are handed out, and takes none
+    while abroad; the establishment clock runs there exactly as it does in
+    a city, and a neutralize or a conquest sends her home.
+    `Governor.minorId` / `civ_gov_minor` are the posting, compared as
+    `governorAtMinor` — addressed by the CITY-STATE rather than by the
+    posting, so neither engine has to name a minor the way the other
+    does. WHICH minor is this model's own line, like every other governor
+    choice here: the met, live one where the seat already holds the most
+    envoys, ties to the first in the roster. Her three sourced channels
+    act: `envoysHere` / `_envoys_here` is the store plus Messenger's two,
+    doubled by Puppeteer — she is part of the number she doubles — and
+    Affluence copies the minor's own luxuries into `luxuryAmenities` /
+    `_luxury_amenities`. What asks the EFFECTIVE count is what asks who
+    LEADS and what a seat has EARNED here: both halves of the suzerain
+    contest (`resolveSuzerain` and `isSuzerain`, and with them the levy
+    gate, which is a suzerain question), the 1/3/6 bonus tiers, and the
+    driver's own next-envoy preview. What still asks the STORE is what
+    asks about the act of SENDING one — the emergency's "must have met and
+    sent an Envoy", the first-envoy double, and the Congress's envoy
+    context. Reach is unmeasured; `tests/gpu/amani_test.py` and
+    `tests/cpu/minors/amani.test.ts` are the bar. STILL OPEN:
+    - **AFFLUENCE COPIES THE GROUND, NOT THE WORKED TILE.** A minor
+      improves nothing on this engine, so requiring the improvement the
+      seat's own luxuries require would make the promotion a permanent
+      no-op. Both engines copy every distinct luxury RESOURCE in the
+      minor's territory. That is a reading, not a transcription.
+    - **FOREIGN INVESTOR still has no carrier**, and its blocker moved
+      rather than closed: "While established in a city-state, accumulate
+      its Strategic resources. When suzerain, receive double the amount"
+      needs a minor that ACCUMULATES strategic resources, and a minor here
+      has no production, no improvement and no stockpile of its own
+      (C-38). No source publishes a rate to stand in for one.
   - **FIVE PROMOTION CLAUSES WAIT ON NO MECHANIC AT ALL** and ship as an
     empty payload: Land Acquisition's "acquire new tiles faster" (the
     border-growth cost has a per-city site), Forestry Management's gold
@@ -277,7 +301,8 @@ Civ 6 source or is recorded as unverifiable.
     the ICBM, C-31); Arms Race Proponent (nuclear armament projects,
     C-31); Aquaculture and Parks and Recreation (the Fishery and City
     Park improvements, which the improvement catalog does not carry);
-    Foreign Investor (the city-state posting above). Land Acquisition's
+    Foreign Investor (a minor that accumulates strategic resources,
+    above). Land Acquisition's
     "+3 Gold from each foreign Trade Route passing through" is blocked on
     the stored route PATH, exactly as B-31r's pass-through gold is.
   - **GRANTS' "+100% Great People points" HAS NO PER-CITY READER.** GPP

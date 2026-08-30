@@ -17,14 +17,14 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { governorMult } from './governors';
+import { governorMult, minorGovernorEffects } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { congressGrowthMult, congressGwMult } from './congress';
-import { suzerainEffect } from './cityStates';
+import { suzerainEffect, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
@@ -377,6 +377,13 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     if (!t.resource || tileSeat(t) !== seat) continue;
     const def = RESOURCES[t.resource];
     if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
+  }
+  // CIV6 (Affluence): "While established in a city-state, provides a copy of
+  // its Luxury resources to you." A copy of one already worked is no second
+  // amenity, which the set answers by itself.
+  for (const cityState of state.cityStates ?? []) {
+    if (!minorGovernorEffects(state, seat, cityState.id).some((e) => e.minorLuxuries)) continue;
+    for (const r of minorLuxuries(state, cityState)) luxuries.add(r);
   }
 
   const baseHave = new Map<number, number>();

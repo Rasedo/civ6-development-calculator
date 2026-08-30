@@ -67,6 +67,7 @@ class SimGovernors:
         titles = (self._governor_titles_earned(row) - self._governor_titles_spent(row)).clamp(min=0)
         titles = torch.where(live, titles, torch.zeros_like(titles))
         self._governor_spend(row, titles)
+        self._governor_post_minor(row, live)
         self._governor_seat(row, live)
         self._governor_tick(row)
 
@@ -129,6 +130,81 @@ class SimGovernors:
             hit = rows[pay]
             self.civ_diplo_favor[hit, row] = self.civ_diplo_favor[hit, row] + self._gov_doctrine_favor
 
+    def _minor_gov_row(self, row: int, key: str) -> torch.Tensor:
+        """[B, S] f64 — one governor channel, summed over whatever this seat has
+        ESTABLISHED at each city-state. `minorGovernorEffects`' twin: the
+        DEFAULT ability rides the appointment and a posting still establishing
+        pays nothing."""
+        B, S, dev = self.B, self.S, self.device
+        out = torch.zeros(B, max(S, 1), dtype=torch.float64, device=dev)
+        if S == 0 or self.n_governors == 0 or key not in self._gpromo:
+            return out
+        tab = self._gpromo[key]
+        pidx = torch.arange(self.n_gov_promos, device=dev)
+        cols = torch.arange(S, device=dev).reshape(1, -1)
+        for g in range(self.n_governors):
+            if not bool(self._gov_minor_ok[g]):
+                continue
+            at = self.civ_gov_minor[:, row, g]
+            on = (self.civ_gov_appointed[:, row, g] & (at >= 0)
+                  & (self.civ_gov_establish[:, row, g] <= 0))
+            if not bool(on.any()):
+                continue
+            held = ((self.civ_gov_promos[:, row, g].unsqueeze(1) >> pidx.reshape(1, -1)) & 1).bool()
+            val = (tab.reshape(1, -1) * held.double()).sum(dim=1) + tab[int(self._gov_base_promo[g])]
+            out = out + (on.unsqueeze(1) & (cols == at.unsqueeze(1))).double() * val.unsqueeze(1)
+        return out
+
+    def _envoys_with(self, row: int, raw: torch.Tensor) -> torch.Tensor:
+        """[B, S] long — `envoysWith`'s twin: a raw envoy count plus whatever a
+        posted governor is worth. CIV6 (Messenger): she "acts as 2 Envoys";
+        (Puppeteer) "doubles the number of Envoys you have there" — she is part
+        of the number she doubles."""
+        if self.S == 0 or self.n_governors == 0:
+            return raw
+        n = raw + self._minor_gov_row(row, "envoysAtMinor").long()
+        return torch.where(self._minor_gov_row(row, "envoyDoubleAtMinor") > 0, n * 2, n)
+
+    def _envoys_here(self, row: int) -> torch.Tensor:
+        """[B, S] long — `envoysHere`'s twin, the count every question about who
+        LEADS and what a seat has EARNED here asks."""
+        return self._envoys_with(row, self.seat_citystate_envoys[:, row].to(torch.long))
+
+    def _envoys_here_all(self) -> torch.Tensor:
+        """[B, majors, S] long — the effective count for every seat at once,
+        which is what both halves of the suzerain contest weigh."""
+        env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
+        if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
+            return env
+        return torch.stack([self._envoys_here(r) for r in range(self.n_majors)], dim=1)
+
+    def _governor_post_minor(self, row: int, live: torch.Tensor) -> None:
+        """CIV6 (Amani, Messenger): "Can be assigned to a City-state" — she is
+        the only governor the catalog sends abroad, and she goes before the
+        cities are handed out. WHICH minor is this model's own line, like every
+        other governor choice here: the one where the seat already holds the
+        most envoys, since that is where her two and Puppeteer's doubling decide
+        a suzerainty. Ties take the lowest roster index."""
+        S, dev = self.S, self.device
+        if S == 0 or self.n_governors == 0:
+            return
+        env = self.seat_citystate_envoys[:, row, :S].to(torch.long)
+        ok = self.citystate_alive[:, :S] & self.seat_citystate_met[:, row, :S]
+        key = torch.where(ok, env * S - torch.arange(S, device=dev).reshape(1, -1),
+                          torch.full_like(env, -(1 << 40)))
+        pick = key.argmax(dim=1)
+        for g in range(self.n_governors):
+            if not bool(self._gov_minor_ok[g]):
+                continue
+            idle = (live & self.civ_gov_appointed[:, row, g] & (self.civ_gov_city[:, row, g] < 0)
+                    & (self.civ_gov_minor[:, row, g] < 0) & (self.civ_gov_out[:, row, g] <= 0)
+                    & ok.any(dim=1))
+            if not bool(idle.any()):
+                continue
+            rows = idle.nonzero(as_tuple=True)[0]
+            self.civ_gov_minor[rows, row, g] = pick[rows]
+            self.civ_gov_establish[rows, row, g] = self._gov_establish[g]
+
     def _governor_seat(self, row: int, live: torch.Tensor) -> None:
         """Seat every idle governor in the lowest-loyalty ungoverned city. A
         city already holding one is not a candidate, and a neutralized governor
@@ -149,7 +225,8 @@ class SimGovernors:
 
         q = js_round(self.city_loyalty[:, row] * 1000).long()
         for g in range(NG):
-            idle = live & ap[:, g] & (city[:, g] < 0) & (out[:, g] <= 0)
+            idle = (live & ap[:, g] & (city[:, g] < 0) & (out[:, g] <= 0)
+                    & (self.civ_gov_minor[:, row, g] < 0))
             if not bool(idle.any()):
                 continue
             free = alive & ~taken
@@ -175,6 +252,8 @@ class SimGovernors:
         out = self.civ_gov_out[:, row]
         alive = self.city_alive[:, row]
         ids = self.city_id[:, row]
+        minor = self.civ_gov_minor[:, row]
+        S = self.S
         for g in range(NG):
             live_g = ap[:, g]
             out[:, g] = torch.where(live_g & (out[:, g] > 0), out[:, g] - 1, out[:, g])
@@ -183,7 +262,18 @@ class SimGovernors:
             gone = seated & ~still
             city[:, g] = torch.where(gone, torch.full_like(city[:, g], -1), city[:, g])
             est[:, g] = torch.where(gone, torch.zeros_like(est[:, g]), est[:, g])
-            ticking = seated & still & (est[:, g] > 0)
+            # ...and a governor whose MINOR is gone comes home too: a conquered
+            # city-state leaves the roster entirely.
+            posted = live_g & (minor[:, g] >= 0)
+            if S > 0:
+                mstill = self.citystate_alive[:, :S].gather(
+                    1, minor[:, g].clamp(min=0, max=S - 1).unsqueeze(1)).squeeze(1)
+            else:
+                mstill = torch.zeros_like(posted)
+            mgone = posted & ~mstill
+            minor[:, g] = torch.where(mgone, torch.full_like(minor[:, g], -1), minor[:, g])
+            est[:, g] = torch.where(mgone, torch.zeros_like(est[:, g]), est[:, g])
+            ticking = ((seated & still) | (posted & mstill)) & (est[:, g] > 0)
             est[:, g] = torch.where(ticking, est[:, g] - 1, est[:, g])
 
     def neutralize_governor(self, b: int, row: int, g: int, turns: int) -> None:
@@ -191,6 +281,7 @@ class SimGovernors:
         leaves the city and cannot be assigned again until the clock runs
         out."""
         self.civ_gov_city[b, row, g] = -1
+        self.civ_gov_minor[b, row, g] = -1
         self.civ_gov_establish[b, row, g] = 0
         self.civ_gov_out[b, row, g] = max(int(self.civ_gov_out[b, row, g].item()), turns)
 

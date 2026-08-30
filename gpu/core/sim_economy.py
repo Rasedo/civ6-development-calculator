@@ -22,6 +22,18 @@ class SimEconomy:
         improved = (self.lux_id >= 0) & (self.tile_seat == row) & (self.improvement == self.lux_req)
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        # CIV6 (Affluence): "While established in a city-state, provides a copy
+        # of its Luxury resources to you." A minor improves nothing here, so the
+        # copy is the ground's own resource; a copy of one already worked is no
+        # second amenity, which the distinct count answers by itself.
+        if self.S > 0 and self.n_governors:
+            aff = self._minor_gov_row(row, "minorLuxuries") > 0
+            for s in range(self.S):
+                if not bool(aff[:, s].any()):
+                    continue
+                mine = ((self.lux_id >= 0) & (self.tile_seat == 100 + s)
+                        & aff[:, s].unsqueeze(1))
+                counts.scatter_add_(1, self.lux_id.clamp(min=0), mine.long())
         rounds = (counts > 0).long().sum(dim=1)
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how

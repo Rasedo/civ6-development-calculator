@@ -2991,7 +2991,7 @@ class SimSeats:
         if self.S == 0:
             return
         suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        env = self.seat_citystate_envoys[:, : self.n_majors, : self.S].to(torch.long)
+        env = self._envoys_here_all()[:, :, : self.S]
         best, arg = env.max(dim=1)
         tied = ((env == best.unsqueeze(1)) & (best.unsqueeze(1) > 0)).sum(dim=1) > 1
         ok = (best >= suz_min) & ~tied
@@ -3002,7 +3002,7 @@ class SimSeats:
         twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
         other seat row (a tie leaves no suzerain)."""
         suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        env = self.seat_citystate_envoys
+        env = self._envoys_here_all()
         mine = env[:, row]
         m = (mine >= suz_min) & self.citystate_alive
         for o in range(self.n_majors):
@@ -4490,7 +4490,9 @@ class SimSeats:
         return self.civ_techs[:, row]
 
     def _seat_envoys(self, row: int) -> torch.Tensor:
-        return self.seat_citystate_envoys[:, row]
+        """[B, S] long — what the 1/3/6 bonus tiers weigh, which is the
+        EFFECTIVE count (`envoysHere`), not the store."""
+        return self._envoys_here(row)
 
     def _seat_has_beliefs(self, row: int) -> bool:
         return self._bel_any and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)).any())

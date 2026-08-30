@@ -130,7 +130,7 @@ describe('civ levy', () => {
 
   it('a recorded levy on a militaristic CS spawns LEVY_UNITS at its center', () => {
     const { state, civ, cityState } = scenario();
-    expect(isSuzerain(cityState, civ.seat)).toBe(true);
+    expect(isSuzerain(state, cityState, civ.seat)).toBe(true);
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST; // exactly the price — nothing else spends gold without a record
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));

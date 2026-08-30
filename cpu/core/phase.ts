@@ -314,7 +314,7 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
   if (foeSeat && 'peaceTurns' in foeSeat) (foeSeat as Seat).peaceTurns = 0;
   for (const cityState of state.cityStates ?? []) {
     for (const [patron, opponent] of [[actor.seat, foe], [foe, actor.seat]] as const) {
-      if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(cityState, patron)) {
+      if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(state, cityState, patron)) {
         setWar(state, cityState.seat, opponent, false);
         setWarTurnsWith(state, cityState.seat, opponent, 0);
         setTreatyTurnsWith(state, cityState.seat, opponent, PEACE_TREATY_TURNS);
@@ -330,7 +330,7 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!cityState) return no('No such city-state.');
   if (cityState.type !== 'militaristic') return no('Only militaristic city-states levy troops.');
-  if (!isSuzerain(cityState, seat)) return no('You must be suzerain (3+ envoys).');
+  if (!isSuzerain(state, cityState, seat)) return no('You must be suzerain (3+ envoys).');
   const since = state.turn - (cityState.lastLevyTurn ?? -LEVY_COOLDOWN);
   if (since < LEVY_COOLDOWN) {
     return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
@@ -955,7 +955,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
     const first = envoysOf(cityState, actor.seat) === 0
       && getModifiers(state, actor.seat).firstEnvoyDouble;
-    addEnvoys(cityState, actor.seat, (first ? 2 : 1) + containmentBonus(state, cityState, actor));
+    addEnvoys(state, cityState, actor.seat, (first ? 2 : 1) + containmentBonus(state, cityState, actor));
   }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
@@ -1646,7 +1646,7 @@ export function seatPhase(state: GameState): void {
           if (questSatisfied(state, cityState, cur, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
             rq[actor.seat] = null;
             rqi[actor.seat] = state.turn;
-            addEnvoys(cityState, actor.seat, QUEST_ENVOYS);
+            addEnvoys(state, cityState, actor.seat, QUEST_ENVOYS);
             state.eventLog.push(`${cityState.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
           }
         } else if (state.turn - (rqi[actor.seat] ?? 0) >= QUEST_COOLDOWN) {

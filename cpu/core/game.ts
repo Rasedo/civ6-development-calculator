@@ -1789,7 +1789,7 @@ export function deserialize(json: string): GameState {
   state.barbSeat.camps ??= legacyCamps ?? [];
   for (const cityState of state.cityStates ?? []) {
     Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
-    resolveSuzerain(cityState);
+    resolveSuzerain(state, cityState);
   }
   for (const s of allSeats(state)) {
     s.wars ??= [];

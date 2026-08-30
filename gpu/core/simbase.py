@@ -720,7 +720,7 @@ _MUTABLE = [
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
-    "civ_gov_appointed", "civ_gov_city", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
+    "civ_gov_appointed", "civ_gov_city", "civ_gov_minor", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
     "antiquity_era", "antiquity_seat",  # ...and what a dug Artifact remembers
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig

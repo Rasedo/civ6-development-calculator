@@ -126,6 +126,28 @@ export function cityGovernorEffects(state: GameState, city: City): GovernorEffec
   return out;
 }
 
+/**
+ * The merged effects of the governor this seat has ESTABLISHED at this minor.
+ * CIV6 (Amani): she is "the only Governor who can be assigned to a
+ * City-state"; the catalog's `cityStates` flag is which. A posting still
+ * establishing pays nothing, exactly as a city's does.
+ */
+export function minorGovernorEffects(state: GameState, seat: number, minorId: number): GovernorEffects[] {
+  const s = seatOf(state, seat);
+  if (!s || minorId < 0) return [];
+  const roster = governorsOf(s);
+  for (let i = 0; i < roster.length; i++) {
+    const g = roster[i];
+    if (!g.appointed || g.minorId !== minorId || (g.establishTurns ?? 0) > 0) continue;
+    const out: GovernorEffects[] = [GOVERNOR_PROMOTIONS[GOVERNOR_DEFAULT_PROMOTION[i]].effects];
+    for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+      if (hasPromotion(g, p)) out.push(GOVERNOR_PROMOTIONS[p].effects);
+    }
+    return out;
+  }
+  return [];
+}
+
 /** Sum one numeric channel over the city's established governor effects. */
 export function governorSum(state: GameState, city: City, pick: (e: GovernorEffects) => number | undefined): number {
   let n = 0;
@@ -184,6 +206,29 @@ export function governorPhase(state: GameState, seat: number): void {
     titles -= 1;
   }
 
+  // CIV6 (Amani, Messenger): "Can be assigned to a City-state" — she is the
+  // only governor the catalog sends abroad, and she goes before the cities are
+  // handed out. WHICH minor is this model's own line, like every other
+  // governor choice here: the one where the seat already holds the most
+  // envoys, since that is where her two and Puppeteer's doubling decide a
+  // suzerainty. Ties take the first in the roster.
+  // the ledger is read inline here: `cityStates` reads the roster back for the
+  // effective envoy count, so this module must not import it.
+  const met = (state.cityStates ?? []).filter((m) => m.met.includes(seat));
+  for (let i = 0; i < roster.length; i++) {
+    const g = roster[i];
+    if (!GOVERNORS[i].cityStates || !g.appointed) continue;
+    if (g.cityId >= 0 || g.minorId >= 0 || g.outTurns > 0) continue;
+    let best = -1, bestN = -1;
+    for (const m of met) {
+      const n = m.envoys[seat] ?? 0;
+      if (n > bestN) { bestN = n; best = m.id; }
+    }
+    if (best < 0) continue;
+    g.minorId = best;
+    g.establishTurns = GOVERNORS[i].establishTurns;
+  }
+
   // Seat every idle governor. A city already holding one is not a candidate,
   // and a neutralized governor "cannot be assigned to any city".
   const cities = citiesOf(state, seat);
@@ -196,7 +241,7 @@ export function governorPhase(state: GameState, seat: number): void {
   let at = 0;
   for (let i = 0; i < roster.length; i++) {
     const g = roster[i];
-    if (!g.appointed || g.cityId >= 0 || g.outTurns > 0) continue;
+    if (!g.appointed || g.cityId >= 0 || g.minorId >= 0 || g.outTurns > 0) continue;
     if (at >= free.length) break;
     g.cityId = free[at].c.id;
     g.establishTurns = GOVERNORS[i].establishTurns;
@@ -212,7 +257,13 @@ export function governorPhase(state: GameState, seat: number): void {
       g.cityId = -1;
       g.establishTurns = 0;
     }
-    if (g.cityId >= 0 && g.establishTurns > 0) g.establishTurns -= 1;
+    // ...and so does one whose MINOR is gone: a conquered city-state leaves
+    // the roster entirely.
+    if (g.minorId >= 0 && !(state.cityStates ?? []).some((m) => m.id === g.minorId)) {
+      g.minorId = -1;
+      g.establishTurns = 0;
+    }
+    if ((g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
   }
 }
 

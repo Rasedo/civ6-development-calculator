@@ -280,7 +280,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       for (const s of Object.keys(cs.envoys)) {
         if (Number(s) !== unit.seat) cs.envoys[Number(s)] = 0;
       }
-      resolveSuzerain(cs);
+      resolveSuzerain(state, cs);
     }
   }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;

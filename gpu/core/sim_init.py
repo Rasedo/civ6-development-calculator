@@ -907,6 +907,9 @@ class SimInit:
         _ng = max(1, self.n_governors)
         self.civ_gov_appointed = torch.zeros(B, self.n_majors, _ng, dtype=torch.bool, device=device)
         self.civ_gov_city = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
+        # the CITY-STATE this governor is posted to, by roster index (-1 =
+        # none). Only the catalog's `_gov_minor_ok` rows ever hold one.
+        self.civ_gov_minor = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
         self.civ_gov_establish = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
         self.civ_gov_out = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
         self.civ_gov_promos = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)

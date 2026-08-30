@@ -4,6 +4,7 @@ import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSe
 import { cancelRoutes } from './trade';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
+import { minorGovernorEffects } from './governors';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
@@ -126,6 +127,58 @@ export function envoysOf(cityState: CityState, seat: number): number {
   return cityState.envoys[seat] ?? 0;
 }
 
+/**
+ * The envoys `seat` effectively holds here — the store plus whatever governor
+ * it has posted at this minor. CIV6 (Amani, Messenger): "Can be assigned to a
+ * City-state, where she acts as 2 Envoys"; (Puppeteer) "While established in a
+ * city-state, doubles the number of Envoys you have there" — she is part of
+ * the number she doubles.
+ *
+ * `envoysOf` stays the STORE. This is the count every question about who
+ * LEADS and what a seat has EARNED here asks: the suzerain contest both ways,
+ * the 1/3/6 bonus tiers and the driver's own next-envoy preview. What still
+ * asks the store is what asks about the act of sending one — the emergency's
+ * "must have met and sent an Envoy", the first-envoy double, and the
+ * Congress's own envoy-count context.
+ */
+export function envoysWith(state: GameState, cityState: CityState, seat: number, raw: number): number {
+  let n = raw;
+  let dbl = false;
+  for (const e of minorGovernorEffects(state, seat, cityState.id)) {
+    n += e.envoysAtMinor ?? 0;
+    dbl = dbl || e.envoyDoubleAtMinor === true;
+  }
+  return dbl ? n * 2 : n;
+}
+
+export function envoysHere(state: GameState, cityState: CityState, seat: number): number {
+  return envoysWith(state, cityState, seat, envoysOf(cityState, seat));
+}
+
+/** Everyone the contest has to weigh: every seat in the world, since a posted
+ *  governor counts here without an envoy in the ledger, plus every ledger
+ *  entry, since that is the store the contest was always over. */
+function contenders(state: GameState, cityState: CityState): number[] {
+  const out = new Set<number>(Object.keys(cityState.envoys).map(Number));
+  for (const sx of state.seats) out.add(sx.seat);
+  return [...out].sort((a, b) => a - b);
+}
+
+/** Every distinct LUXURY resource in this minor's territory. CIV6 (Affluence):
+ *  "While established in a city-state, provides a copy of its Luxury resources
+ *  to you." A minor improves nothing here, so the copy is the ground's own
+ *  resource — asking for the improvement would make the promotion a permanent
+ *  no-op. */
+export function minorLuxuries(state: GameState, cityState: CityState): string[] {
+  const out = new Set<string>();
+  const owner = seatOfCityState(cityState.id);
+  for (const t of state.map.tiles) {
+    if (!t.resource || tileSeat(t) !== owner) continue;
+    if (RESOURCES[t.resource]?.category === 'luxury') out.add(t.resource);
+  }
+  return [...out].sort();
+}
+
 export function hasMet(cityState: CityState, seat: number): boolean {
   return cityState.met.includes(seat);
 }
@@ -134,9 +187,9 @@ export function setMet(cityState: CityState, seat: number): void {
   if (!cityState.met.includes(seat)) cityState.met.push(seat);
 }
 
-export function addEnvoys(cityState: CityState, seat: number, n = 1): void {
+export function addEnvoys(state: GameState, cityState: CityState, seat: number, n = 1): void {
   cityState.envoys[seat] = (cityState.envoys[seat] ?? 0) + n;
-  resolveSuzerain(cityState);
+  resolveSuzerain(state, cityState);
 }
 
 /** The stored contest answer, -1 while nobody holds it. */
@@ -150,15 +203,15 @@ export function suzerainOf(cityState: CityState): number {
  * fixed point instead of re-running the contest mid-mutation. `isSuzerain`
  * stays the live contest; the two agree at every write boundary.
  */
-export function resolveSuzerain(cityState: CityState): void {
+export function resolveSuzerain(state: GameState, cityState: CityState): void {
   let best = -1;
   let bestN = 0;
   let tied = false;
-  for (const [k, e] of Object.entries(cityState.envoys)) {
-    const n = e ?? 0;
+  for (const seat of contenders(state, cityState)) {
+    const n = envoysHere(state, cityState, seat);
     if (n > bestN) {
       bestN = n;
-      best = Number(k);
+      best = seat;
       tied = false;
     } else if (n === bestN && n > 0) {
       tied = true;
@@ -173,10 +226,10 @@ export function resolveSuzerain(cityState: CityState): void {
  *
  * Whoever asks is "mine"; every other entry in the store is the field.
  */
-export function isSuzerain(cityState: CityState, seat: number): boolean {
-  const mine = envoysOf(cityState, seat);
+export function isSuzerain(state: GameState, cityState: CityState, seat: number): boolean {
+  const mine = envoysHere(state, cityState, seat);
   if (mine < SUZERAIN_ENVOYS) return false;
-  return Object.entries(cityState.envoys).every(([k, e]) => Number(k) === seat || mine > (e ?? 0));
+  return contenders(state, cityState).every((c) => c === seat || mine > envoysHere(state, cityState, c));
 }
 
 /**
@@ -186,7 +239,7 @@ export function isSuzerain(cityState: CityState, seat: number): boolean {
  */
 export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect): boolean {
   for (const cityState of state.cityStates ?? []) {
-    if (!isSuzerain(cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
+    if (!isSuzerain(state, cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
     if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz === effect) return true;
   }
   return false;
@@ -205,7 +258,7 @@ export function regionalReach(state: GameState, seat: number): number {
 }
 
 export function cityStateTradeCapacityBonus(state: GameState, seat: number): number {
-  return state.cityStates.filter((cityState) => cityState.type === 'trade' && isSuzerain(cityState, seat)).length;
+  return state.cityStates.filter((cityState) => cityState.type === 'trade' && isSuzerain(state, cityState, seat)).length;
 }
 
 export interface CsBonuses {
@@ -230,7 +283,7 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
   const capital: Partial<Yields> = {};
   const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cityState of state.cityStates) {
-    const mine = envoysOf(cityState, seat);
+    const mine = envoysHere(state, cityState, seat);
     const key = CITY_STATE_TYPE_YIELD[cityState.type];
     if (mine >= 1) capital[key] = (capital[key] ?? 0) + CITY_STATE_CAPITAL_BONUS;
     const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
@@ -250,7 +303,7 @@ export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): P
   const out: Partial<Yields> = {};
   const atWar = state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat));
   for (const cityState of state.cityStates) {
-    if (!isSuzerain(cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
+    if (!isSuzerain(state, cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
     if (atWar && CITY_STATE_SUZERAIN_PEACE_ONLY.includes(cityState.name)) continue;
     const key = CITY_STATE_SUZERAIN_LIVE[cityState.name];
     if (!key) continue; // descoped row
@@ -262,15 +315,15 @@ export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): P
 export function envoyBonusDelta(state: GameState, cityState: CityState, seat: number): Yields {
   const delta = emptyYields();
   const key = CITY_STATE_TYPE_YIELD[cityState.type];
-  const next = envoysOf(cityState, seat) + 1;
-  if (next === 1) delta[key] += CITY_STATE_CAPITAL_BONUS;
-  if (next === 3 || next === 6) {
-    const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-    const bld = next === 3 ? tier1 : tier2;
+  const now = envoysHere(state, cityState, seat);
+  const next = envoysWith(state, cityState, seat, envoysOf(cityState, seat) + 1);
+  if (now < 1 && next >= 1) delta[key] += CITY_STATE_CAPITAL_BONUS;
+  // a doubled posting can cross BOTH building tiers on one envoy
+  const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
+  for (const [bar, bld] of [[3, tier1], [6, tier2]] as const) {
+    if (now >= bar || next < bar || !bld) continue;
     let count = 0;
-    if (bld) {
-      for (const c of citiesOf(state, seat)) if (c.buildings.includes(bld)) count += 1;
-    }
+    for (const c of citiesOf(state, seat)) if (c.buildings.includes(bld)) count += 1;
     delta[key] += CITY_STATE_DISTRICT_BONUS * count;
   }
   return delta;
@@ -284,7 +337,7 @@ export function assignEnvoy(state: GameState, cityStateId: number, seat: number)
   const s = seatOf(state, seat);
   if (!s || s.envoysAvailable <= 0) return no('No envoys available.');
   s.envoysAvailable -= 1;
-  addEnvoys(cityState, seat, 1);
+  addEnvoys(state, cityState, seat, 1);
   return ok;
 }
 
@@ -377,7 +430,7 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   cancelRoutes(state, seat, (r) => r.toCs === cityStateId);
   grievanceCityStateWar(
     state, seat,
-    state.seats.find((s) => isSuzerain(cityState, s.seat))?.seat ?? -1,
+    state.seats.find((s) => isSuzerain(state, cityState, s.seat))?.seat ?? -1,
     state.seats.filter((s) => (cityState.envoys[s.seat] ?? 0) > 0).map((s) => s.seat),
   );
   state.eventLog.push(`You have declared war on ${cityState.name}!`);
@@ -395,7 +448,7 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
   if (!cityState) return { ok: false, reason: 'No such city-state.' };
   if (!civsAtWar(state, cityState.seat, seat)) return { ok: false, reason: 'Not at war.' };
-  const suz = state.seats.find((civSeat) => civsAtWar(state, civSeat.seat, seat) && isSuzerain(cityState, civSeat.seat));
+  const suz = state.seats.find((civSeat) => civsAtWar(state, civSeat.seat, seat) && isSuzerain(state, cityState, civSeat.seat));
   if (suz) {
     return { ok: false, reason: `${cityState.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
   }

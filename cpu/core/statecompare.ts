@@ -560,6 +560,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
   population: overCityStates((cityState) => cityState.population),
   hp: overCityStates((cityState) => cityState.hp ?? CITY_STATE_MAX_HP),
   envoys: overCityStates((cityState, st) => perCiv(st, (seat) => envoysOf(cityState, seat))),
+  governorAtMinor: overCityStates((cityState, st) => perCiv(st, (seat) => {
+    const roster = seatOf(st, seat)?.governors ?? [];
+    return roster.findIndex((g) => g.appointed && g.minorId === cityState.id);
+  })),
   met: overCityStates((cityState, st) => perCiv(st, (seat) => (cityState.met.includes(seat) ? 1 : 0))),
   questKind: overCityStates((cityState, st) =>
     perCiv(st, (seat) => {

@@ -241,7 +241,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       for (let ci = 0; ci < state.cityStates.length; ci++) {
         const csl = state.cityStates[ci];
         if (csl.type !== 'militaristic') continue;
-        if (!isSuzerain(csl, actor.seat)) continue;
+        if (!isSuzerain(state, csl, actor.seat)) continue;
         if (state.turn - (csl.lastLevyTurn ?? -LEVY_COOLDOWN) < LEVY_COOLDOWN) continue;
         levyIdx = ci;
         break;

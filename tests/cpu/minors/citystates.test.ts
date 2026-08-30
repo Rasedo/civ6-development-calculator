@@ -111,7 +111,7 @@ describe('envoys', () => {
     const withThree = computeCityStats(state, city).total.science;
     expect(withThree - campusBase).toBeGreaterThanOrEqual(2);
     expect(withThree - campusBase).toBeLessThan(2.5);
-    expect(isSuzerain(cityState, 0)).toBe(true);
+    expect(isSuzerain(state, cityState, 0)).toBe(true);
     cityState.envoys = { [0]: 6 };
     const withSix = computeCityStats(state, city).total.science;
     expect(withSix - campusBase).toBeGreaterThanOrEqual(4);
@@ -236,19 +236,19 @@ describe('civ envoys and the suzerain contest', () => {
   it('suzerainty needs strictly more envoys than every civ', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
-    expect(isSuzerain(cityState, 0)).toBe(true); // uncontested
+    expect(isSuzerain(state, cityState, 0)).toBe(true); // uncontested
     cityState.envoys = { [0]: 3, [1]: 3 }; // ONE envoy map for every seat: a tie rules nobody
-    expect(isSuzerain(cityState, 0)).toBe(false);
-    expect(isSuzerain(cityState, 1)).toBe(false);
+    expect(isSuzerain(state, cityState, 0)).toBe(false);
+    expect(isSuzerain(state, cityState, 1)).toBe(false);
     cityState.envoys = { [1]: 3 };
-    expect(isSuzerain(cityState, 0)).toBe(false);
-    expect(isSuzerain(cityState, 1)).toBe(true); // any seat rules uncontested at the minimum
+    expect(isSuzerain(state, cityState, 0)).toBe(false);
+    expect(isSuzerain(state, cityState, 1)).toBe(true); // any seat rules uncontested at the minimum
     cityState.envoys = { [0]: 3, [1]: 4 };
-    expect(isSuzerain(cityState, 0)).toBe(false);
-    expect(isSuzerain(cityState, 1)).toBe(true); // strictly more
+    expect(isSuzerain(state, cityState, 0)).toBe(false);
+    expect(isSuzerain(state, cityState, 1)).toBe(true); // strictly more
     cityState.envoys = { [0]: 5 };
-    expect(isSuzerain(cityState, 0)).toBe(true);
-    expect(isSuzerain(cityState, 1)).toBe(false);
+    expect(isSuzerain(state, cityState, 0)).toBe(true);
+    expect(isSuzerain(state, cityState, 1)).toBe(false);
   });
 
   it('the envoy bonuses apply the 1/3/6 thresholds off that civ only', () => {
@@ -272,7 +272,7 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     const state = makeState();
     // Geneva (scientific) is a SHIPPED row -> science channel.
     const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    expect(isSuzerain(cityState, 0)).toBe(true);
+    expect(isSuzerain(state, cityState, 0)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
   });
 
@@ -280,11 +280,11 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     const state = makeState();
     // Kumasi (cultural) pays a RULE, not a channel -> no live channel yield.
     const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Kumasi', envoys: { [0]: 4 } });
-    expect(isSuzerain(desc, 0)).toBe(true);
+    expect(isSuzerain(state, desc, 0)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
     // A shipped row but only 2 envoys -> not suzerain -> no perk.
     const weak = addCs(state, 4, 4, { type: 'scientific', name: 'Geneva', envoys: { [0]: 2 } });
-    expect(isSuzerain(weak, 0)).toBe(false);
+    expect(isSuzerain(state, weak, 0)).toBe(false);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
   });
 
@@ -292,7 +292,7 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
     cityState.envoys = { [1]: 4 }; // civ 0 out-envoys seat 0
-    expect(isSuzerain(cityState, 0)).toBe(false);
+    expect(isSuzerain(state, cityState, 0)).toBe(false);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
   });
 
@@ -302,7 +302,7 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     state.seats.push(emptySeat(1));
     const geneva = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
     const bologna = addCs(state, 4, 4, { type: 'scientific', name: 'Bologna', envoys: { [0]: 3 } });
-    expect(isSuzerain(geneva, 0) && isSuzerain(bologna, 0)).toBe(true);
+    expect(isSuzerain(state, geneva, 0) && isSuzerain(state, bologna, 0)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(2 * CITY_STATE_SUZERAIN_YIELD);
     setWar(state, 0, 1, true);
     expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
@@ -315,7 +315,7 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     // Nan Madol (cultural) is SHIPPED -> culture channel.
     const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Nan Madol', envoys: { [0]: 0 } });
     cityState.envoys = { [1]: 3 };
-    expect(isSuzerain(cityState, 1)).toBe(true);
+    expect(isSuzerain(state, cityState, 1)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 1).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
     // no perk for a civ that is not the suzerain
     expect(cityStateSuzerainCapitalBonus(state, 2)).toEqual({});

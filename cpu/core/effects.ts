@@ -424,7 +424,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
     }
     addPartial(mods.capitalYields, cityStateSuzerainCapitalBonus(state, seat));
     if (mods.culturePerSuzerain) {
-      const n = state.cityStates.filter((cs) => isSuzerain(cs, seat)).length;
+      const n = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;
       if (n) mods.yieldMult.culture = (mods.yieldMult.culture ?? 1) * (1 + mods.culturePerSuzerain * n);
     }
   }

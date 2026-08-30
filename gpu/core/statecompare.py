@@ -576,6 +576,10 @@ CITY_STATE = {
     "population": _citystate_plane("city_pop", True),
     "hp": _citystate_plane("city_hp", True),
     "envoys": _csr("seat_citystate_envoys"),
+    "governorAtMinor": lambda sim, b, rows: [
+        [next((g for g in range(sim.n_governors)
+               if bool(sim.civ_gov_appointed[b, c, g]) and int(sim.civ_gov_minor[b, c, g]) == s), -1)
+         for c in _civ_seats(sim)] for s in rows],
     "met": _csr("seat_citystate_met"),
     "questKind": _csr("seat_citystate_quest"),
     "questIssued": _csr("seat_citystate_quest_issued"),
