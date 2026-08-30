@@ -6,7 +6,7 @@
  *
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
-import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, emptyStockpile } from '../data/constants';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, RAILROAD_COST, emptyStockpile } from '../data/constants';
 import { UNITS } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
@@ -17,8 +17,8 @@ import { citiesOf, seatOf, tileOwnedByCiv } from './seats';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
-import { emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
-import type { City, GameState, Seat } from './types';
+import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
+import type { City, GameState, Seat, Tile } from './types';
 
 export function strategicSlot(resourceId: string | undefined): number {
   return resourceId ? STRATEGIC_IDS.indexOf(resourceId) : -1;
@@ -209,6 +209,23 @@ export function chargeProjectResource(state: GameState, seat: number, projectId:
 
 /** Draw `n` down. The caller has already asked `canPayStockpile`; this clamps
  *  at zero rather than going negative, because nothing here models debt. */
+/**
+ * CIV6 (Railroad): "Does not cost a charge, but does cost 1 Iron and 1 Coal."
+ * Lay one tile if the bank can pay for it — the Coal it burns discharges the
+ * same per-resource carbon a plant's does, the page publishing no
+ * railroad-specific rate and its halving being a UNIT-only clause.
+ */
+export function layRailroad(state: GameState, seat: number, tile: Tile): boolean {
+  for (const [id, n] of RAILROAD_COST) if (stockOf(state, seat, id) < n) return false;
+  for (const [id, n] of RAILROAD_COST) {
+    spendStockpile(state, seat, id, n);
+    const k = strategicSlot(id);
+    if (k >= 0) emitCarbon(state, seat, n * (CARBON_PER_RESOURCE[k] ?? 0));
+  }
+  tile.railroad = true;
+  return true;
+}
+
 export function spendStockpile(state: GameState, seat: number, resourceId: string | undefined, n: number): void {
   if (!resourceId || n <= 0) return;
   const k = strategicSlot(resourceId);

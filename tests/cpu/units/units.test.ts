@@ -4,6 +4,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity, placeImprovement, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { nextRandom, moveCostInto, crossesRiver, findPath, orderMove, spawnUnit, queueUnit, builderImprove, builderRemoveFeature, unitMaintenance, tileFreeForUnit, walkPath } from '../../../cpu/core/units';
 import { DIR_E } from '../../../world/hex';
+import { MP_SCALE, RAILROAD_MP } from '../../../cpu/data/constants';
 
 function unitsState() {
   const state = makeState(makeMap(16, 16));
@@ -30,24 +31,37 @@ describe('in-state RNG', () => {
 });
 
 describe('movement', () => {
-  it('terrain movement costs stack', () => {
+  it('terrain movement costs stack, and a route pays its own tier', () => {
     const map = makeMap();
+    const state = makeState(map);
     const t = tileAtCoords(map, 5, 5);
     // MoveCostInto now takes the tile being LEFT as well. Passing
     // the same tile keeps these terrain assertions (no road on either end).
-    expect(moveCostInto(t, t)).toBe(1);
+    expect(moveCostInto(state, t, t)).toBe(MP_SCALE);
     t.elevation = 'HILLS';
-    expect(moveCostInto(t, t)).toBe(2);
+    expect(moveCostInto(state, t, t)).toBe(2 * MP_SCALE);
     t.feature = 'WOODS';
-    expect(moveCostInto(t, t)).toBe(3);
-    // A ROAD-to-ROAD step ignores the terrain penalty entirely.
+    expect(moveCostInto(state, t, t)).toBe(3 * MP_SCALE);
+    // A ROUTE-to-ROUTE step ignores the terrain penalty entirely and pays the
+    // world's road tier: CIV6 gives the Ancient and Classical road 1.0.
     const from = tileAtCoords(map, 5, 6);
     from.road = true;
     t.road = true;
-    expect(moveCostInto(from, t)).toBe(1);
+    expect(moveCostInto(state, from, t)).toBe(MP_SCALE);
     // ...but a road on only ONE end does nothing (real Civ 6).
     from.road = false;
-    expect(moveCostInto(from, t)).toBe(3);
+    expect(moveCostInto(state, from, t)).toBe(3 * MP_SCALE);
+    from.road = true;
+    // CIV6: Industrial Road 0.75, Modern Road 0.5.
+    state.roadTier = 2;
+    expect(moveCostInto(state, from, t)).toBe(3);
+    state.roadTier = 3;
+    expect(moveCostInto(state, from, t)).toBe(2);
+    // CIV6 (Railroad): 0.25, and only where BOTH ends carry one.
+    t.railroad = true;
+    expect(moveCostInto(state, from, t)).toBe(2);
+    from.railroad = true;
+    expect(moveCostInto(state, from, t)).toBe(RAILROAD_MP);
   });
 
   it('river crossings end the turn; pathfinding avoids blockers', () => {
@@ -96,12 +110,13 @@ describe('movement', () => {
     unit.tileIndex = start.index; // force exact tile
     unit.path = [mid.index, hills.index];
     walkPath(state, unit);
-    // 2 MP: flat costs 1 (1 left); hills costs 2 > 1 and not at full — stop.
+    // 2 points: the flat step costs one (one left); the hills step costs two,
+    // more than the one left and the unit is no longer at full — stop.
     expect(unit.tileIndex).toBe(mid.index);
-    expect(unit.movesLeft).toBe(1);
+    expect(unit.movesLeft).toBe(MP_SCALE);
     expect(unit.path).toEqual([hills.index]); // path survives for next turn
 
-    unit.movesLeft = 2; // fresh turn
+    unit.movesLeft = 2 * MP_SCALE; // fresh turn
     walkPath(state, unit);
     expect(unit.tileIndex).toBe(hills.index);
     expect(unit.path).toBeNull();

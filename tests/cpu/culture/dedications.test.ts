@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
@@ -76,7 +77,7 @@ describe('the four new dedications', () => {
     commit(state, 0, DED_DRACONES);
     const barb = spawnUnit(state, 'GALLEY', sea.index, BARB_SEAT)!;
     barb.hp = 1;
-    atk.movesLeft = 2;
+    atk.movesLeft = 2 * MP_SCALE;
     atk.attacksLeft = 1;
     expect(meleeAttack(state, atk.id, sea.index, 0).ok).toBe(true);
     expect(seatOf(state, 0)!.eraScore).toBe(0);
@@ -372,7 +373,7 @@ describe('the three late-era dedications', () => {
     commit(state, 0, DED_AUTOMATON);
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 9).index, BARB_SEAT)!;
     barb.hp = 1;
-    robot.movesLeft = 4;
+    robot.movesLeft = 4 * MP_SCALE;
     robot.attacksLeft = 1;
     expect(meleeAttack(state, robot.id, barb.tileIndex, 0).ok).toBe(true);
     expect(seatOf(state, 0)!.eraScore).toBe(0);

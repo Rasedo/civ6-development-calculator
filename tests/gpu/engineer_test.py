@@ -5,9 +5,11 @@
 CIV6 (Military Engineer): "Can construct Roads, Forts, Airstrips, and Missile
 Silos (uses 1 charge)" and "Can spend a charge to complete 20% of an
 engineering type of district (Aqueduct, Bath, Canal, Dam) and Flood Barrier
-building." Of that list the Missile Silo waits on nuclear devices and the
-Mountain Tunnel on a passability bit that can move; the Fort, the Airstrip, the
-road and the 20% charge all ship.
+building." CIV6 (Railroad): "Can only be constructed by Military Engineers.
+Does not cost a charge, but does cost 1 Iron and 1 Coal." Of that list the
+Missile Silo waits on nuclear devices and the Mountain Tunnel on a passability
+bit that can move; the Fort, the Airstrip, both routes and the 20% charge all
+ship.
 
 Both engineer improvements go "in your own or NEUTRAL territory", which is the
 one place a build reaches outside its own borders — the Builder's whole
@@ -285,7 +287,71 @@ def main() -> None:
         "an engineer always has SOMEWHERE to lay road, so the column is offerable")
     print("  9 job mask OK (the road alone keeps the column live)")
 
-    print("engineer_test OK — fort, airstrip, road and the 20% charge, on own and neutral ground")
+    # -- 10: the RAILROAD asks a tech and a BANK, and no charge ------------
+    sim = fresh(rules, path)
+    assert sim._A_RAIL >= 0, "the action enum carries no BUILD_RAILROAD column"
+    assert sim._railroad_cost, "the Railroad names no resource cost, so nothing below bites"
+    t = own_flat(sim, row)
+    clear_tile(sim, t)
+    sim.railroad[0, t] = False
+    v = retype(sim, row, ENG, t)
+    sim.major_unit_charges[0, v] = 2
+    if sim._railroad_tech >= 0:
+        sim.civ_techs[0, row, sim._railroad_tech] = False
+    for _sl, _n in sim._railroad_cost:
+        sim.civ_stockpile[0, row, _sl] = 0
+    assert not bool(mask_of(sim, row, v)[sim._A_RAIL]), (
+        "no Steam Power and an empty bank: there is nothing to offer")
+    if sim._railroad_tech >= 0:
+        sim.civ_techs[0, row, sim._railroad_tech] = True
+        assert not bool(mask_of(sim, row, v)[sim._A_RAIL]), (
+            "the tech alone does not pay for the tile")
+    for _sl, _n in sim._railroad_cost:
+        sim.civ_stockpile[0, row, _sl] = _n + 3
+    assert bool(mask_of(sim, row, v)[sim._A_RAIL]), "the tech and a payable bank offer it"
+
+    co2 = float(sim.civ_co2[0, row])
+    burn = sum(float(_n * sim._carbon_per_resource[_sl]) for _sl, _n in sim._railroad_cost)
+    order(sim, row, v, sim._A_RAIL)
+    assert bool(sim.railroad[0, t]), "the railroad was not laid"
+    assert int(sim.major_unit_charges[0, v]) == 2, "CIV6 (Railroad): 'does not cost a charge'"
+    assert float(sim.major_unit_mp[0, v]) == 0, "laying one spends the turn"
+    for _sl, _n in sim._railroad_cost:
+        assert int(sim.civ_stockpile[0, row, _sl]) == 3, "one tile spends its named units"
+    assert abs(float(sim.civ_co2[0, row]) - (co2 + burn)) < 1e-6, (
+        "the Coal it burns discharges the same per-resource carbon a plant's does")
+    assert not bool(mask_of(sim, row, v)[sim._A_RAIL]), (
+        "a rail already laid is nothing to lay")
+    print("  10 railroad OK (its tech, 1 Iron + 1 Coal, no charge, and its carbon)")
+
+    # -- 11: what a route STEP costs, up the ladder ------------------------
+    nb = next(int(n) for n in sim.neigh[t].tolist()
+              if n >= 0 and not bool(sim.water[0, n]) and bool(sim.passable[0, n]))
+    frm = torch.tensor([t]), torch.tensor([nb])
+    dry = torch.zeros(1, dtype=torch.long)
+    sim.road[0, t] = sim.road[0, nb] = True
+    sim.railroad[0, t] = sim.railroad[0, nb] = False
+    for tier, mp in enumerate(sim._road_tier_mp):
+        sim.road_tier = tier
+        terr, _ = sim._road_terms(frm[0], frm[1], dry)
+        assert int(terr[0]) + sim._mp_scale == int(mp), (
+            f"CIV6: a tier-{tier} road step costs {mp} quarter points")
+    sim.railroad[0, t] = sim.railroad[0, nb] = True
+    terr, _ = sim._road_terms(frm[0], frm[1], dry)
+    assert int(terr[0]) + sim._mp_scale == sim._railroad_mp, (
+        "CIV6 (Railroad): 'Movement Cost 0.25' — a quarter of a point")
+    # the Ancient road fords; every tier above it bridges
+    wet = torch.full((1,), 3 * sim._mp_scale, dtype=torch.long)
+    sim.railroad[0, t] = sim.railroad[0, nb] = False
+    for tier, bridged in enumerate(sim._road_tier_bridges):
+        sim.road_tier = tier
+        _, riv = sim._road_terms(frm[0], frm[1], wet)
+        assert (int(riv[0]) == 0) == bool(bridged), (
+            f"a tier-{tier} route {'bridges' if bridged else 'fords'} a river")
+    print("  11 route step OK (the four tiers, the railroad's quarter, and the bridge)")
+
+    print("engineer_test OK — fort, airstrip, both routes and the 20% charge, "
+          "on own and neutral ground")
 
 
 if __name__ == "__main__":

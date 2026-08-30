@@ -1,4 +1,5 @@
 import { seatOf } from '../../../cpu/core/seats';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
@@ -57,8 +58,8 @@ describe('golden movement dedications', () => {
     const state = newGame();
     const b = place(state, 'BUILDER', 0);
     const m = place(state, 'MISSIONARY', 1);
-    expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
-    expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves);
+    expect(unitFullMoves(state, b)).toBe(MP_SCALE * UNITS.BUILDER.moves);
+    expect(unitFullMoves(state, m)).toBe(MP_SCALE * UNITS.MISSIONARY.moves);
   });
 
   it('MONUMENTALITY lifts Builders — for a civ seat exactly as for seat 0', () => {
@@ -69,10 +70,10 @@ describe('golden movement dedications', () => {
     const rb = place(state, 'BUILDER', 1);
     const rw = place(state, 'WARRIOR', 1);
     const rm = place(state, 'MISSIONARY', 1);
-    expect(unitFullMoves(state, pb)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
-    expect(unitFullMoves(state, rb)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
-    expect(unitFullMoves(state, rw)).toBe(UNITS.WARRIOR.moves);
-    expect(unitFullMoves(state, rm)).toBe(UNITS.MISSIONARY.moves);
+    expect(unitFullMoves(state, pb)).toBe(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
+    expect(unitFullMoves(state, rb)).toBe(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
+    expect(unitFullMoves(state, rw)).toBe(MP_SCALE * UNITS.WARRIOR.moves);
+    expect(unitFullMoves(state, rm)).toBe(MP_SCALE * UNITS.MISSIONARY.moves);
   });
 
   it('EXODUS lifts Missionaries and Apostles, not Builders', () => {
@@ -81,42 +82,42 @@ describe('golden movement dedications', () => {
     const m = place(state, 'MISSIONARY', 1);
     const a = place(state, 'APOSTLE', 1);
     const b = place(state, 'BUILDER', 1);
-    expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS);
-    expect(unitFullMoves(state, a)).toBe(UNITS.APOSTLE.moves + GOLDEN_MOVE_BONUS);
-    expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
+    expect(unitFullMoves(state, m)).toBe(MP_SCALE * (UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS));
+    expect(unitFullMoves(state, a)).toBe(MP_SCALE * (UNITS.APOSTLE.moves + GOLDEN_MOVE_BONUS));
+    expect(unitFullMoves(state, b)).toBe(MP_SCALE * UNITS.BUILDER.moves);
   });
 
   it('a NORMAL age holding the same dedication pays nothing', () => {
     const state = newGame();
     golden(state, 1, DED_EXODUS);
     const m = place(state, 'MISSIONARY', 1);
-    expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS);
+    expect(unitFullMoves(state, m)).toBe(MP_SCALE * (UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS));
     seatOf(state, 1)!.age = 1;
-    expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves);
+    expect(unitFullMoves(state, m)).toBe(MP_SCALE * UNITS.MISSIONARY.moves);
   });
 
   it('barbarians hold no dedications', () => {
     const state = newGame();
     for (const s of state.seats) golden(state, s.seat, DED_MONUMENTALITY); // every MAJOR golden
     const b = place(state, 'BUILDER', BARB_SEAT);
-    expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
+    expect(unitFullMoves(state, b)).toBe(MP_SCALE * UNITS.BUILDER.moves);
   });
 
   it('an embarked unit keeps the flat embark pool', () => {
     const state = newGame();
     golden(state, 1, DED_MONUMENTALITY);
     const b = place(state, 'BUILDER', 1);
-    expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
+    expect(unitFullMoves(state, b)).toBe(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
     b.embarked = true;
     // embarkation speed is not a unit's own movement, so the dedication drops
-    expect(unitFullMoves(state, b)).toBeLessThan(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
+    expect(unitFullMoves(state, b)).toBeLessThan(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
   });
 
   it('a unit trained during the Golden age starts on the raised pool', () => {
     const state = newGame();
     golden(state, 0, DED_MONUMENTALITY);
     const b = place(state, 'BUILDER', 0);
-    expect(b.movesLeft).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
+    expect(b.movesLeft).toBe(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
   });
 
   it('refreshUnits grants the raised pool and records it as movesFull', () => {
@@ -125,7 +126,7 @@ describe('golden movement dedications', () => {
     const b = place(state, 'BUILDER', 0);
     b.movesLeft = 0;
     refreshUnits(state);
-    expect(b.movesLeft).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
+    expect(b.movesLeft).toBe(MP_SCALE * (UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS));
     expect(b.movesFull).toBe(b.movesLeft);
   });
 });

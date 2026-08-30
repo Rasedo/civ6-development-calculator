@@ -210,7 +210,7 @@ const effectRow = (fx: PolicyEffects) => ({
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST } from '../data/constants';
-import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
+import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
 // the roster grew — indices 0-2 stay stable (every existing
@@ -425,6 +425,16 @@ export function buildRules() {
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
     districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
+    // THE MOVEMENT UNIT and the route ladder over it (`MP_SCALE`).
+    mpScale: MP_SCALE,
+    roadTierMp: ROAD_TIER_MP,
+    roadTierBridges: ROAD_TIER_BRIDGES.map((b) => (b ? 1 : 0)),
+    roadTierEra: ROAD_TIER_ERA,
+    railroadMp: RAILROAD_MP,
+    // CIV6 (Railroad): the tech, and the stockpile slots one tile spends
+    railroadTech: techIdx.get(RAILROAD_TECH) ?? -1,
+    railroadCost: RAILROAD_COST.map(([id, n]: readonly [string, number]) => [STRATEGIC_IDS.indexOf(id), n]),
+    embarkTransitionMp: EMBARK_TRANSITION_MP,
     shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
     nuclearPlantBidx: buildingIdx.get('NUCLEAR_POWER_PLANT') ?? -1,
     ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,

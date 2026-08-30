@@ -21,7 +21,7 @@ import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
-import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
@@ -680,7 +680,7 @@ export function siegeMayShoot(state: GameState, unit: Unit): boolean {
   // CIV6 (Expert Crew): "Can attack after moving."
   if (promoFlag(unit, 'SIEGE_MOVE_SHOOT')) return true;
   if (unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit))) return true;
-  return unitFullMoves(state, unit) + generalAuraMP(state, unit) > (def.moves ?? 2);
+  return unitFullMoves(state, unit) + generalAuraMP(state, unit) > (def.moves ?? 2) * MP_SCALE;
 }
 
 /**

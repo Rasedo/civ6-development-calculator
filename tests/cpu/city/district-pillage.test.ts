@@ -5,6 +5,7 @@
  * restores, static counts unchanged.
  */
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
@@ -71,7 +72,7 @@ describe('district pillage', () => {
     expect(tileCity(campus)).toBe(city.id); // the district tile is owned
     const barb = spawnUnit(state, 'WARRIOR', campus.index, BARB_SEAT)!;
     barb.tileIndex = campus.index;
-    barb.movesLeft = 2;
+    barb.movesLeft = 2 * MP_SCALE;
     expect(campus.districtPillaged).toBeFalsy();
     hostileUnitAct(state, barb);
     expect(campus.districtPillaged).toBe(true);

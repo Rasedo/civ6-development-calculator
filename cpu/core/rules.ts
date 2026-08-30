@@ -95,6 +95,13 @@ export function canBuildRoad(tile: Tile, ownsTile: (t: Tile) => boolean): boolea
   return !tile.road && engineerTileOk(tile, ownsTile);
 }
 
+/** CIV6 (Railroad): "Can only be constructed by Military Engineers. Does not
+ *  cost a charge, but does cost 1 Iron and 1 Coal." Its page names no terrain
+ *  clause of its own, so the Engineer's own ground rule is the whole gate. */
+export function canBuildRailroad(tile: Tile, ownsTile: (t: Tile) => boolean): boolean {
+  return !tile.railroad && engineerTileOk(tile, ownsTile);
+}
+
 export function validImprovementsIn(
   tile: Tile,
   opts: {

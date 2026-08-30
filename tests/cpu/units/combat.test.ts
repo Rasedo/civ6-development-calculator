@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
@@ -151,7 +152,7 @@ describe('combat', () => {
 
     const builder = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 12, 9).index, 0)!;
     builder.tileIndex = tileAtCoords(state.map, 12, 9).index;
-    barb.movesLeft = 2;
+    barb.movesLeft = 2 * MP_SCALE;
     expect(meleeAttack(state, barb.id, builder.tileIndex, 0).ok).toBe(true);
     expect(state.units.some((u) => u.id === builder.id)).toBe(false);
   });
@@ -183,7 +184,7 @@ describe('barbarians', () => {
 
     let guard = 0;
     while (city.hp > 0 && city.population === 8 && guard++ < 60) {
-      barb.movesLeft = 4;
+      barb.movesLeft = 4 * MP_SCALE;
       barb.attacksLeft = 1;
       barb.hp = 100;
       meleeAttack(state, barb.id, city.centerIndex, 0);
@@ -490,14 +491,14 @@ describe('XP & levels', () => {
   });
 
   it('bankXp stalls at the threshold and carries no excess into the next level', () => {
-    const u = { level: 1, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 } as never as import('../../../cpu/core/types').Unit;
+    const u = { level: 1, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 * MP_SCALE } as never as import('../../../cpu/core/types').Unit;
     bankXp(u, 8);
     expect(u.xp).toBe(8);
     bankXp(u, 8);
     expect(u.xp).toBe(15); // "earning more XP than needed ... will not transfer"
     bankXp(u, 8);
     expect(u.xp).toBe(15); // "won't earn new XP until it finishes the level-up process"
-    const maxed = { level: MAX_LEVEL, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 } as never as import('../../../cpu/core/types').Unit;
+    const maxed = { level: MAX_LEVEL, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 * MP_SCALE } as never as import('../../../cpu/core/types').Unit;
     bankXp(maxed, 8);
     expect(maxed.xp).toBe(0);
   });
@@ -527,7 +528,7 @@ describe('XP & levels', () => {
     const { state: s2 } = battlefield();
     const barb = spawnUnit(s2, 'WARRIOR', atkTile(s2), BARB_SEAT)!;
     barb.tileIndex = atkTile(s2);
-    barb.movesLeft = 2;
+    barb.movesLeft = 2 * MP_SCALE;
     const mine = spawnUnit(s2, 'WARRIOR', defTile(s2), 0)!;
     mine.tileIndex = defTile(s2);
     mine.hp = 100;
@@ -580,7 +581,7 @@ describe('XP & levels', () => {
     const { state } = battlefield();
     const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
     u.hp = 40;
-    u.movesLeft = 2;
+    u.movesLeft = 2 * MP_SCALE;
     expect(promoReady(u)).toBe(false); // no XP banked yet
     expect(takePromotion(u, 0)).toBe(false);
     u.xp = XP_PER_LEVEL;

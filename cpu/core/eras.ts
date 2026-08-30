@@ -9,6 +9,7 @@ import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
 import { GW_BUILDINGS } from '../data/greatPeople';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
+import { ROAD_TIER_ERA } from '../data/constants';
 import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
@@ -42,11 +43,14 @@ export function addEraScore(state: GameState, seat: number, per: number, count =
  *  (S2), then the accumulators reset for the new window. */
 export function eraBoundary(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
-  // Civ 6 upgrades ROADS by era — the Ancient road has no bridges,
-  // the Classical road does. Latched at the FIRST era boundary and never
-  // cleared. Set here (rather than off a raw turn comparison) because this site
-  // is already proven to fire at the same moment in both engines.
-  state.roadBridges = true;
+  // CIV6: "all roads in your territory will upgrade to the next level
+  // automatically" on reaching the era that brings the tier. Latched here
+  // rather than off a raw turn comparison because this site is already proven
+  // to fire at the same moment in both engines, and never falls back.
+  const era = Math.floor(state.turn / ERA_LENGTH);
+  let tier = 0;
+  for (let i = 0; i < ROAD_TIER_ERA.length; i++) if (era >= ROAD_TIER_ERA[i]) tier = i;
+  state.roadTier = Math.max(state.roadTier ?? 0, tier);
   for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
     if (!seat) continue;

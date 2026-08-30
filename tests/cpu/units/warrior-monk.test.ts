@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { allCities, seatOf, setWar, emptySeat } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs, expandBorders } from '../helpers';
 import { purchaseReligiousUnit } from '../../../cpu/core/game';
@@ -51,7 +52,7 @@ describe('the attack budget', () => {
     expect(attacksLeftOf(atk)).toBe(1);
     expect(meleeAttack(state, atk.id, foe.tileIndex, 0).ok).toBe(true);
     expect(attacksLeftOf(atk)).toBe(0);
-    atk.movesLeft = 2; // movement alone is not permission to swing again
+    atk.movesLeft = 2 * MP_SCALE; // movement alone is not permission to swing again
     expect(meleeAttack(state, atk.id, foe.tileIndex, 0).reason).toBe('The attack is spent.');
     const arch = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 10, 12).index, 0)!;
     arch.attacksLeft = 0;
@@ -82,12 +83,12 @@ describe('the attack budget', () => {
     expect(meleeAttack(state, monk.id, foe.tileIndex, 0)).toEqual({ ok: true });
     // the first blow felled it and the victor advanced; step back and swing again
     monk.tileIndex = home;
-    monk.movesLeft = 3; // "if Movement allows"
+    monk.movesLeft = 3 * MP_SCALE; // "if Movement allows"
     const foe2 = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 10).index, 1)!;
     expect(meleeAttack(state, monk.id, foe2.tileIndex, 0)).toEqual({ ok: true });
     expect(attacksLeftOf(monk)).toBe(0);
     monk.tileIndex = home;
-    monk.movesLeft = 3;
+    monk.movesLeft = 3 * MP_SCALE;
     expect(meleeAttack(state, monk.id, foe2.tileIndex, 0).reason).toBe('The attack is spent.');
     refreshUnits(state);
     expect(attacksLeftOf(monk)).toBe(2);

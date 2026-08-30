@@ -37,6 +37,44 @@ export const FAITH_PURCHASE_MULT = 2;
 export const FOOD_PER_CITIZEN = 2;
 
 /**
+ * THE MOVEMENT UNIT. CIV6 publishes a route's movement cost in QUARTERS of a
+ * point — 1.0 for the Ancient and Classical Road, 0.75 for the Industrial,
+ * 0.5 for the Modern and 0.25 for the Railroad — so a quarter point is what
+ * this engine counts in. Every catalog figure below stays in WHOLE points and
+ * is multiplied where it enters, which is `unitFullMoves` and nowhere else.
+ */
+export const MP_SCALE = 4;
+
+/**
+ * THE ROAD LADDER. CIV6: "Roads are upgraded by researching technologies, or
+ * more specifically, by reaching specific eras. Upon doing so, all roads in
+ * your territory will upgrade to the next level automatically." Each tier's
+ * own Civilopedia page gives its Movement Cost and whether it bridges:
+ *   Ancient 1.0 no bridges | Classical 1.0 bridges
+ *   Industrial 0.75 bridges | Modern 0.5 bridges
+ * The tier is the WORLD's era count here, latched where the era boundary
+ * already fires in lockstep on both engines — "your territory" is a per-seat
+ * reading this model does not carry.
+ */
+export const ROAD_TIER_MP: readonly number[] = [4, 4, 3, 2];
+export const ROAD_TIER_BRIDGES: readonly boolean[] = [false, true, true, true];
+/** the world-era index at which each road tier arrives, ascending. */
+export const ROAD_TIER_ERA: readonly number[] = [0, 1, 4, 5];
+
+/** CIV6 (Railroad): "Movement Cost 0.25", and it "Creates Bridges over
+ *  Rivers" like every tier above the Ancient road. */
+export const RAILROAD_MP = 1;
+
+/** what EMBARKING or DISEMBARKING costs on top of the step, unless a Harbor
+ *  or a coastal City Center makes the dock free. Two whole points. */
+export const EMBARK_TRANSITION_MP = 2 * MP_SCALE;
+
+/** CIV6 (Railroad): the tech that unlocks it, and the resources one tile
+ *  costs — "does not cost a charge, but does cost 1 Iron and 1 Coal". */
+export const RAILROAD_TECH = 'STEAM_POWER';
+export const RAILROAD_COST: readonly (readonly [string, number])[] = [['IRON', 1], ['COAL', 1]];
+
+/**
  * EMBARK: the movement points a land unit has while EMBARKED (on water).
  * CIV6 (Movement): "Embarked units have 2 Movement in the Classical Era;
  * the following techs each add more: Square Rigging (+1), Steam Power (+2) and

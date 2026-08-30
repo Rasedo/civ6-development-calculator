@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { spawnUnit, concertVenue, performConcert } from '../../../cpu/core/units';
@@ -167,7 +168,7 @@ describe('performing a concert', () => {
     for (let level = 1; level < ROCK_BAND_MAX_LEVEL; level++) {
       expect(b.bandLevel).toBe(level);
       state.rngState = seedForTier(level, 0); // the very best outcome
-      b.movesLeft = 2;
+      b.movesLeft = 2 * MP_SCALE;
       expect(performConcert(state, b.id, 0).ok).toBe(true);
       expect(b.bandAlbum).toBe(ROCK_BAND_TIERS[0].album * level);
       expect(b.movesLeft).toBe(0); // the performance ends its turn

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import {
   spawnUnit, refreshUnits, moveCostInto, unitFullMoves, stepUnit, unitVisibleTo,
 } from '../../../cpu/core/units';
@@ -36,11 +37,11 @@ describe('promotion effects that are not Combat Strength', () => {
     const u = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 5, 5).index, 0)!;
     const before = unitFullMoves(state, u);
     const v = hold(u, 'MOVES');
-    expect(unitFullMoves(state, u)).toBe(before + v);
+    expect(unitFullMoves(state, u)).toBe(before + v * MP_SCALE);
     // "also applies while the unit is embarked"
     u.embarked = true;
     const bare = { ...u, promos: 0 } as Unit;
-    expect(unitFullMoves(state, u)).toBe(unitFullMoves(state, bare) + v);
+    expect(unitFullMoves(state, u)).toBe(unitFullMoves(state, bare) + v * MP_SCALE);
   });
 
   it('Alpine waives the hills charge and Ranger leaves it alone', () => {
@@ -48,11 +49,11 @@ describe('promotion effects that are not Combat Strength', () => {
     const t = tileAtCoords(state.map, 5, 5);
     t.elevation = 'HILLS';
     const scout = { type: 'SCOUT', promos: 0 };
-    const plain = moveCostInto(t, t, scout);
+    const plain = moveCostInto(state, t, t, scout);
     const { k: kh } = col(scout, 'TERRAIN_MOVE_HILLS');
     const { k: kw } = col(scout, 'TERRAIN_MOVE_WOODS');
-    expect(moveCostInto(t, t, { type: 'SCOUT', promos: 1 << kh })).toBe(plain - 1);
-    expect(moveCostInto(t, t, { type: 'SCOUT', promos: 1 << kw })).toBe(plain);
+    expect(moveCostInto(state, t, t, { type: 'SCOUT', promos: 1 << kh })).toBe(plain - MP_SCALE);
+    expect(moveCostInto(state, t, t, { type: 'SCOUT', promos: 1 << kw })).toBe(plain);
   });
 
   it('Auxiliary Ships heal on foreign ground at the own-ground rate', () => {
@@ -189,7 +190,7 @@ describe('promotion effects that are not Combat Strength', () => {
     expect(attacksLeftOf(arch)).toBe(2);
     // and once it has struck, the next step revokes what it had not spent
     arch.attacksLeft = 1;
-    arch.movesLeft = 2;
+    arch.movesLeft = 2 * MP_SCALE;
     expect(stepUnit(state, arch, tileAtCoords(state.map, 11, 9))).not.toBe('blocked');
     expect(attacksLeftOf(arch)).toBe(0);
   });

@@ -11,6 +11,7 @@
  * experience unit is preserved", and a formation never comes apart again.
  */
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState } from '../helpers';
 import { spawnUnit, formationCS } from '../../../cpu/core/units';
 import { formUp } from '../../../cpu/core/game';
@@ -43,7 +44,7 @@ function put(state: GameState, tile: number, type: string, over: Partial<Unit> =
   // tile, so the unit is pinned to it after.
   const u = spawnUnit(state, type, tile, SEAT)!;
   expect(u).toBeTruthy();
-  Object.assign(u, { tileIndex: tile, movesLeft: 2, ...over });
+  Object.assign(u, { tileIndex: tile, movesLeft: 2 * MP_SCALE, ...over });
   return u;
 }
 
@@ -128,7 +129,7 @@ describe('formations', () => {
     host.seat = SEAT;
     actor.movesLeft = 0;
     expect(formUp(state, actor, b).ok).toBe(false); // no movement left
-    actor.movesLeft = 2;
+    actor.movesLeft = 2 * MP_SCALE;
     expect(formUp(state, actor, b).ok).toBe(true);
   });
 

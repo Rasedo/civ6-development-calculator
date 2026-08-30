@@ -281,7 +281,8 @@ export interface GameState {
   gameOver?: boolean;
   victoryType?: number;
   victoryRow?: number;
-  roadBridges?: boolean;
+  /** the ROAD TIER the world has reached, 0..3 (`ROAD_TIER_MP`). */
+  roadTier?: number;
   congressSessions?: number;
   /** the ANNOUNCED slate for the next Regular Session: resolution indices
    *  drawn at the previous session's close (-1 = empty slot). */

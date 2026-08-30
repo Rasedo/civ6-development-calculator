@@ -90,6 +90,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // TILE-INDEX column order — a tile can hold both a defender and an
   // improvement, and the game lets the bomber choose.
   for (let k = 0; k < AIR_STRIKE_COLS; k++) names.push(`AIR_PILLAGE_${k}`);
+  // THE RAILROAD: the Military Engineer's third route verb. CIV6: "Can only
+  // be constructed by Military Engineers. Does not cost a charge, but does
+  // cost 1 Iron and 1 Coal." Appended last, like every verb since FOUND_CITY.
+  names.push('BUILD_RAILROAD');
   return names;
 }
 

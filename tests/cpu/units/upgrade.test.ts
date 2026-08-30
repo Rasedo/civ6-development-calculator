@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { UNITS } from '../../../cpu/data/units';
 import { spawnUnit, canUpgradeUnit, upgradeUnit } from '../../../cpu/core/units';
@@ -35,7 +36,7 @@ describe('the upgrade ladder', () => {
 
     u.movesLeft = 0;
     expect(canUpgradeUnit(state, u, 0)).toBe(false); // no movement left
-    u.movesLeft = 3;
+    u.movesLeft = 3 * MP_SCALE;
 
     const price = upgradeGoldCost(state, 0, 'SCOUT');
     expect(price).toBeGreaterThan(0);

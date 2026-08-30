@@ -113,6 +113,14 @@ class Rules:
     governor_promotions: list  # [{id, gov, tier, requires, <every effect channel>}] catalog order
     governments_live: bool  # master switch (GOVERNMENTS_ADOPTION_LIVE)
     district_scaffold: dict  # {campusIdx, campusUnlockTech}
+    mp_scale: int  # MP_SCALE: the movement point is counted in QUARTERS (the route ladder's own unit)
+    road_tier_mp: list  # what a route step costs per road tier, in mp_scale units
+    road_tier_bridges: list  # whether each tier bridges rivers
+    road_tier_era: list  # the world-era index each tier arrives at
+    railroad_mp: int  # CIV6 (Railroad): "Movement Cost 0.25"
+    railroad_tech: int  # the techs-table index of Steam Power, -1 if absent
+    railroad_cost: list  # [(stockpile slot, units)] one tile spends
+    embark_transition_mp: int  # the embark/disembark charge, unless a Harbor or coastal centre docks it free
     shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
     nuclear_plant_bidx: int  # NUCLEAR_POWER_PLANT row — the reactor whose age is clocked, -1 if absent
     ancient_walls_bidx: int  # building-roster index of ANCIENT_WALLS (outer HP + city strike), -1 if absent
@@ -294,6 +302,14 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         governor_promotions=r["governorPromotions"],
         governments_live=bool(r.get("governmentsLive", False)),
         district_scaffold=r.get("districtScaffold", {}),
+        mp_scale=int(r["mpScale"]),
+        road_tier_mp=[int(x) for x in r["roadTierMp"]],
+        road_tier_bridges=[bool(x) for x in r["roadTierBridges"]],
+        road_tier_era=[int(x) for x in r["roadTierEra"]],
+        railroad_mp=int(r["railroadMp"]),
+        railroad_tech=int(r["railroadTech"]),
+        railroad_cost=[(int(a), int(b)) for a, b in r["railroadCost"]],
+        embark_transition_mp=int(r["embarkTransitionMp"]),
         shipyard_bidx=int(r.get("shipyardBidx", -1)),
         nuclear_plant_bidx=int(r.get("nuclearPlantBidx", -1)),
         ancient_walls_bidx=int(r.get("ancientWallsBidx", -1)),
@@ -669,7 +685,7 @@ def pool_view(snap: dict, pre: str, plane: str):
 
 _MUTABLE = [
     "seat_science_total",
-    "rng_state", "centre_slot_at", "tdef", "tmove",
+    "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city

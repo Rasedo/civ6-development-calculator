@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -33,7 +34,7 @@ function person(state: GameState, cls: string, at: number, tile: number, seat = 
   const u = spawnUnit(state, cls, tile, seat)!;
   u.gpAt = at;
   u.charges = gpChargesOf(GREAT_PEOPLE[cls as keyof typeof GREAT_PEOPLE][at]);
-  u.movesLeft = 2;
+  u.movesLeft = 2 * MP_SCALE;
   setTileOwner(state.map.tiles[u.tileIndex], seat, state.seats[seat].cities[0].id);
   return u;
 }

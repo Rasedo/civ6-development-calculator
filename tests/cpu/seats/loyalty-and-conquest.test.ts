@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
 import { BARB_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
@@ -165,7 +166,7 @@ describe('city-state conquest and levies', () => {
     const attacker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 8).index, 0)!;
     const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cityState.centerIndex)!;
     attacker.tileIndex = adj.index;
-    attacker.movesLeft = 2;
+    attacker.movesLeft = 2 * MP_SCALE;
 
     // A city-state is a separate seat — you must DECLARE first.
     // Peace is the default, and the resolver now refuses a peaceful target.
@@ -188,7 +189,7 @@ describe('city-state conquest and levies', () => {
     const unit = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 8).index, 0)!;
     const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cityState.centerIndex)!;
     unit.tileIndex = adj.index;
-    unit.movesLeft = 2;
+    unit.movesLeft = 2 * MP_SCALE;
     expect(attackTargets(state, unit)).not.toContain(cityState.centerIndex);
     // ... And DOES once war is declared — the mask column the
     // residual was blocked on. The peaceful case above is the invariant

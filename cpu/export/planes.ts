@@ -18,7 +18,7 @@ import { tileCity, tileSeat } from '../core/seats';
 import { baseYieldCtx } from '../core/effects';
 import { tileYields, districtAdjacency } from '../core/yields';
 import { terrainDefense } from '../core/combat';
-import { moveCostInto, unitPassable } from '../core/units';
+import { terrainMp, unitPassable } from '../core/units';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../../world/query';
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
@@ -27,7 +27,7 @@ import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_BONUS, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZ_EFFECTS } from '../data/cityStates';
-import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER } from '../data/constants';
+import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER, MP_SCALE } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { IMPROVEMENTS } from '../data/improvements';
 import { LUXURY_IDS, RESOURCE_IDS, TERRAIN_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
@@ -108,8 +108,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         return ri >= 0 ? ri : -9;
       })(),
       tdef: terrainDefense(t),
-      tmove: (moveCostInto(t, t) - 1) * 3,
+      // the terrain PENALTY over a plain step, in MP_SCALE units
+      tmove: terrainMp(t) - MP_SCALE,
       rd: t.road ? 1 : 0, // the ROAD plane (false at t0)
+      rr: t.railroad ? 1 : 0, // the RAILROAD plane (false at t0)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,

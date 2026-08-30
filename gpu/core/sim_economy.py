@@ -2670,7 +2670,11 @@ class SimEconomy:
                 emb & ~naval, torch.full_like(base, self._embark_moves), base
             )
         base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
-        return base + self._promo_pool_val(pre, "MOVES") + getattr(self, f"{pre}_unit_aura_mp")
+        # ONE multiply, at the end: every figure above is in WHOLE points, and
+        # the aura's is already in `mp_scale` units (`unitFullMoves` scales its
+        # own sum and refreshUnits adds the aura on top).
+        return (self._mp_scale * (base + self._promo_pool_val(pre, "MOVES"))
+                + getattr(self, f"{pre}_unit_aura_mp"))
 
     def _attacks_after_moving(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
         """`attacksAfterMoving`, in `promos`' shape. CIV6 (Sweeping Wind / Elite

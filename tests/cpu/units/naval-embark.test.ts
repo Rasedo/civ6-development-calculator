@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
 import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
@@ -57,12 +58,12 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
 }
 
 describe('movement primitives', () => {
-  it('water tiles enter at cost 1; land units are land-only, terrain-passable', () => {
+  it('water tiles enter at a flat point; land units are land-only, terrain-passable', () => {
     const map = makeMap(12, 12, 'GRASSLAND');
     const land = tileAtCoords(map, 5, 5);
     const water = tileAtCoords(map, 6, 5);
     water.terrain = 'COAST';
-    expect(moveCostInto(water, water)).toBe(1);
+    expect(moveCostInto(makeState(map), water, water)).toBe(MP_SCALE);
     // land plane: a land unit (WARRIOR) stands on land, never on water
     const warrior = { type: 'WARRIOR' };
     expect(unitPassable(land, warrior)).toBe(true);
@@ -108,7 +109,7 @@ describe('movement primitives', () => {
     state.unitsMode = true;
     addCivAtWar(state, 5, 5, []);
     const exerter = state.units.find((u) => isCiv(u.seat))!;
-    const mover: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
+    const mover: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null };
     // the mover belongs to seat 0; a hostile civ military adjacent exerts ZOC
     expect(inEnemyZoc(state, mover.tileIndex, mover)).toBe(true);
     // once that civ is EMBARKED it exerts nothing
@@ -298,7 +299,7 @@ describe('N2 naval spawn + combat', () => {
     // cannot spawnUnit here) with a fortify counter that must be IGNORED.
     const embarked: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
       embarked: true, fortifyTurns: 2,
     };
     state.units.push(embarked);
@@ -419,7 +420,7 @@ describe('N2 naval spawn + combat', () => {
     expect(mv.ok).toBe(true);
     expect(galley.tileIndex).not.toBe(startIdx); // the ship actually sailed
     for (let t = 0; t < 8 && galley.tileIndex !== waterAdj.index; t++) {
-      galley.movesLeft = 3; // GALLEY moves
+      galley.movesLeft = 3 * MP_SCALE; // GALLEY moves
       walkPath(state, galley);
     }
     expect(galley.tileIndex).toBe(waterAdj.index);
@@ -449,7 +450,7 @@ describe('the amphibious attack', () => {
     const sea = neighbors(state.map, land).find((n) => isWater(n))!;
     const att: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: sea.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      tileIndex: sea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
       embarked: true,
     };
     state.units.push(att);
@@ -502,7 +503,7 @@ describe('the amphibious attack', () => {
     )!;
     const afloat: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: 0,
-      tileIndex: otherSea.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      tileIndex: otherSea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
       embarked: true,
     };
     state.units.push(afloat);
@@ -527,12 +528,12 @@ describe('the amphibious attack', () => {
     const water = tileAtCoords(state.map, 5, 5);
     const afloat: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
       embarked: true,
     };
     const escort: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: neighbors(state.map, water)[0].index, movesLeft: 2, hp: 100,
+      tileIndex: neighbors(state.map, water)[0].index, movesLeft: 2 * MP_SCALE, hp: 100,
       charges: null, path: null, embarked: true,
     };
     state.units.push(afloat, escort);
@@ -578,13 +579,13 @@ describe('embarked and sea movement climb the tech ladder', () => {
     tileAtCoords(state.map, 5, 5).terrain = 'GRASSLAND';
     state.unitsMode = true;
     const u = afloat(state, []);
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES);
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * EMBARK_MOVES);
     grantTechs(state, 'SQUARE_RIGGING');
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 1);
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + 1));
     grantTechs(state, 'STEAM_POWER');
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 3);
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + 3));
     grantTechs(state, 'COMBUSTION');
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 4);
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + 4));
   });
 
   it('the sea-movement tech lifts a ship and a passenger alike, once', () => {
@@ -594,15 +595,15 @@ describe('embarked and sea movement climb the tech ladder', () => {
     grantTechs(state, 'SAILING');
     const ship = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 8, 8).index, 0)!;
     const hull = UNITS.GALLEY.moves;
-    expect(unitFullMoves(state, ship)).toBe(hull);
+    expect(unitFullMoves(state, ship)).toBe(MP_SCALE * hull);
     const u = afloat(state, []);
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES);
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * EMBARK_MOVES);
     grantTechs(state, SEA_MOVE_TECH);
-    expect(unitFullMoves(state, ship)).toBe(hull + SEA_MOVE_TECH_BONUS);
-    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + SEA_MOVE_TECH_BONUS);
+    expect(unitFullMoves(state, ship)).toBe(MP_SCALE * (hull + SEA_MOVE_TECH_BONUS));
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + SEA_MOVE_TECH_BONUS));
     // a LAND unit ashore gains nothing from it
     const walker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
-    expect(unitFullMoves(state, walker)).toBe(UNITS.WARRIOR.moves);
+    expect(unitFullMoves(state, walker)).toBe(MP_SCALE * UNITS.WARRIOR.moves);
   });
 });
 
@@ -711,7 +712,7 @@ describe('a hull and its passenger share the hex', () => {
     h.tileIndex = water.index;
     const rider: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat,
-      tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null, embarked: true,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null, embarked: true,
     };
     state.units.push(rider);
     return { hull: h, rider };

@@ -455,7 +455,7 @@ class SimMasks:
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         return ((self._type_bombard[typ] <= 0) | ~self._spent_mp(pre)
                 | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
-                | (self._full_mp(pre) > self._type_moves[typ]))
+                | (self._full_mp(pre) > self._mp_scale * self._type_moves[typ]))
 
     def _siege_assist(self, seat: torch.Tensor, type_idx: torch.Tensor,
                       tile: torch.Tensor, tier: torch.Tensor) -> torch.Tensor:
@@ -1261,37 +1261,43 @@ class SimMasks:
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None):
-        """The (terrain, river) MP terms a step pays, road-aware —
-        the `moveCostInto` + `riverCharge` twin. A ROAD-to-ROAD step ignores the
-        terrain penalty entirely ("roads let a unit pass through Woods or Hills
-        as if it were flat"), and once `road_bridged` latches at the first era
-        boundary (Classical roads bring bridges) it ignores the river charge
-        too. A road on only ONE end does nothing, exactly as in real Civ 6.
+        """The (terrain, river) MP terms a step pays, route-aware —
+        the `moveCostInto` + `riverCharge` twin. A ROUTE-to-ROUTE step ignores
+        the terrain penalty entirely ("roads let a unit pass through Woods or
+        Hills as if it were flat") and pays its own tier's published cost
+        instead, which for a RAILROAD at both ends is `railroad_mp`. Every tier
+        above the Ancient road bridges rivers, so it drops the river charge
+        too. A route on only ONE end does nothing, exactly as in real Civ 6.
 
         CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
         with the appropriate terrain or terrain feature at the cost of only 1
         Movement" — Ranger names Woods and Jungle, Alpine the Hills, and Marsh
         is nobody's. `tmove` is the mover-free schedule, so each waived charge
-        is subtracted back out here."""
+        is subtracted back out here.
+
+        The pair returned is (what the step costs BEYOND a plain point, river)
+        — the caller adds the plain point itself."""
         dc = dest.clamp(min=0)
-        tm = torch.div(
-            self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1), 3, rounding_mode="floor"
-        )
+        tm = self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1)
         if utype is not None and promos is not None:
             d1 = dc.unsqueeze(1)
             hill = self.hills.gather(1, d1).squeeze(1)
-            tm = tm - (hill & self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS")).long()
+            tm = tm - (hill & self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS")).long() * self._mp_scale
             if self._woods_feats.numel():
                 wood = self._feature_live(d1, self._woods_feats).squeeze(1)
-                tm = tm - (wood & self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS")).long()
+                tm = tm - (wood & self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS")).long() * self._mp_scale
             tm = tm.clamp(min=0)
-        rd = (
-            self.road.gather(1, frm.clamp(min=0).unsqueeze(1)).squeeze(1)
-            & self.road.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
-        )
-        z = torch.zeros_like(tm)
-        terr = torch.where(rd, z, tm)
-        riv = torch.where(rd, torch.zeros_like(river3), river3) if self.road_bridged else river3
+        fc, dcc = frm.clamp(min=0).unsqueeze(1), dest.clamp(min=0).unsqueeze(1)
+        f_rr = self.railroad.gather(1, fc).squeeze(1)
+        d_rr = self.railroad.gather(1, dcc).squeeze(1)
+        rd = ((self.road.gather(1, fc).squeeze(1) | f_rr)
+              & (self.road.gather(1, dcc).squeeze(1) | d_rr))
+        step = torch.where(f_rr & d_rr,
+                           torch.full_like(tm, self._railroad_mp),
+                           torch.full_like(tm, self._road_tier_mp[self.road_tier]))
+        terr = torch.where(rd, step - self._mp_scale, tm)
+        bridged = bool(self._road_tier_bridges[self.road_tier])
+        riv = torch.where(rd, torch.zeros_like(river3), river3) if bridged else river3
         return terr, riv
 
     def _encamp_live(self) -> torch.Tensor:
@@ -2425,7 +2431,7 @@ class SimMasks:
                          & (_nimp | _ndis)).reshape(B, N, 6).any(dim=2)
             raid = (present & self._type_raider[utype]
                     & self.water.gather(1, tc)
-                    & (self.unit_mp.gather(1, sc) >= 3)
+                    & (self.unit_mp.gather(1, sc) >= 3 * self._mp_scale)
                     & _raidable)
             pillage = pillage | raid
         pillage = pillage.unsqueeze(2)
@@ -2595,6 +2601,25 @@ class SimMasks:
         _rd: list[torch.Tensor] = []
         if getattr(self, "_A_ROAD", -1) >= 0:
             _rd = [(eng_ground & ~self.road.gather(1, tc)).unsqueeze(2)]
+        # CIV6 (Railroad): "Can only be constructed by Military Engineers.
+        # Does not cost a charge, but does cost 1 Iron and 1 Coal", once Steam
+        # Power is in. Its page names no ground clause of its own, so the
+        # Engineer's own territory rule is the whole gate — but the CHARGE term
+        # is not one of its conditions, so it rides `eng_ground` rather than
+        # `eng_here`.
+        _rr: list[torch.Tensor] = []
+        if getattr(self, "_A_RAIL", -1) >= 0:
+            _rrok = torch.ones(B, 1, dtype=torch.bool, device=dev)
+            if self._railroad_tech >= 0:
+                _rrok = techs[:, self._railroad_tech].unsqueeze(1)
+            for _sl, _n in self._railroad_cost:
+                _rrok = _rrok & (self.civ_stockpile[:, row, _sl] >= _n).unsqueeze(1)
+            _rrg = (present
+                    & ((utype == self._eng_idx) if self._eng_idx >= 0 else torch.zeros_like(present))
+                    & (own_tile | (self.tile_seat < 0)).gather(1, tc)
+                    & self.passable.gather(1, tc)
+                    & ~self.water.gather(1, tc))
+            _rr = [(_rrg & _rrok & ~self.railroad.gather(1, tc)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -2639,7 +2664,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap,
+            + _ec + _ue + _ap + _rr,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

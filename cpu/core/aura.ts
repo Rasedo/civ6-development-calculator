@@ -13,11 +13,12 @@
 
 import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';
+import { MP_SCALE } from '../data/constants';
 import type { GameState, Unit } from './types';
 
 export const GENERAL_AURA_CS = 5;
 export const GENERAL_AURA_RANGE = 2;
-export const GENERAL_AURA_MP = 1;
+export const GENERAL_AURA_MP = 1 * MP_SCALE;
 
 export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): boolean {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return false; // civilians are never affected

@@ -8,6 +8,7 @@
  * this city" — an aircraft is a unit that promotes like any other.
  */
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { UNITS } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -257,7 +258,7 @@ describe('the naval raider tree', () => {
       const here = tileAtCoords(state.map, 10, 11);
       here.terrain = 'COAST';
       const u = spawnUnit(state, RAIDER, here.index, 0)!;
-      Object.assign(u, { tileIndex: here.index, movesLeft: 4, movesFull: 4 });
+      Object.assign(u, { tileIndex: here.index, movesLeft: 4 * MP_SCALE, movesFull: 4 * MP_SCALE });
       if (loot) u.promos = bit('NAVAL_RAIDER', 'LOOT');
       const seat = seatOf(state, 0)!;
       seat.treasury = 0;

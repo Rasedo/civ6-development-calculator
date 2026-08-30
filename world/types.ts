@@ -183,6 +183,9 @@ export interface Tile {
    *  bonus, but is still workable and can be repaired behind a Flood
    *  Barrier. */
   flooded?: boolean;
+  /** CIV6 (Railroad): the 0.25-Movement route a Military Engineer lays over
+   *  the road, at the cost of 1 Iron and 1 Coal. */
+  railroad?: boolean;
   fertility: number;
   /** the PRODUCTION half of flood silt — real Civ 6 fertilizes food and
    *  production on separate rolls, so the two accumulate apart. */

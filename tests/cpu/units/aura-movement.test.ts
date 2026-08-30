@@ -1,4 +1,5 @@
 import { seatOf } from '../../../cpu/core/seats';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
@@ -51,7 +52,7 @@ describe('general aura: +1 movement', () => {
     const far = tileAt(state, ctr, 5);
     const warriorIn = spawnUnit(state, 'WARRIOR', near, 0)!;
     const warriorOut = spawnUnit(state, 'WARRIOR', far, 0)!;
-    const base = UNITS.WARRIOR.moves ?? 2;
+    const base = MP_SCALE * (UNITS.WARRIOR.moves ?? 2);
 
     expect(generalAuraMP(state, warriorIn)).toBe(0); // no general yet
     spawnUnit(state, 'GENERAL', ctr, 0);
@@ -83,7 +84,7 @@ describe('general aura: +1 movement', () => {
     const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 0)!;
     refreshUnits(state); // both granted base+1, movesFull recorded
     const granted = moved.movesFull!;
-    expect(granted).toBe((UNITS.WARRIOR.moves ?? 2) + GENERAL_AURA_MP);
+    expect(granted).toBe(MP_SCALE * (UNITS.WARRIOR.moves ?? 2) + GENERAL_AURA_MP);
 
     moved.hp = 50;
     still.hp = 50;
@@ -136,6 +137,6 @@ describe('general aura: +1 movement', () => {
     w.hp = UNIT_HP - 20;
     refreshUnits(state); // `?? full` path
     expect(w.hp).toBeGreaterThan(UNIT_HP - 20);
-    expect(w.movesFull).toBe(UNITS.WARRIOR.moves ?? 2);
+    expect(w.movesFull).toBe(MP_SCALE * (UNITS.WARRIOR.moves ?? 2));
   });
 });

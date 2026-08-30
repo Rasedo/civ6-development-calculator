@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { IMPROVEMENTS } from '../../../cpu/data/improvements';
-import { canBuildRoad, engineerTileOk, validImprovementsIn } from '../../../cpu/core/rules';
+import { canBuildRoad, canBuildRailroad, engineerTileOk, validImprovementsIn } from '../../../cpu/core/rules';
+import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { spawnUnit } from '../../../cpu/core/units';
+import { applySeatUnitOrders } from '../../../cpu/core/phase';
+import { seatOf } from '../../../cpu/core/seats';
+import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
+import { STRATEGIC_IDS, RAILROAD_COST, RAILROAD_TECH } from '../../../cpu/data/constants';
+import { CARBON_PER_RESOURCE } from '../../../cpu/core/climate';
 import { airSlotsAt } from '../../../cpu/core/air';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { ENGINEER_FINISH_DISTRICTS, ENGINEER_FINISH_FRACTION, engineerFinish, engineerFinishCity } from '../../../cpu/core/game';
@@ -66,6 +73,73 @@ describe('the military engineer', () => {
     expect(canBuildRoad(tile(), () => true)).toBe(true);
     expect(canBuildRoad(tile({ road: true } as Partial<Tile>), () => true)).toBe(false);
     expect(canBuildRoad(tile({ terrain: 'OCEAN' }), () => true)).toBe(false);
+    // the RAILROAD asks the same ground and its own tier's absence
+    expect(canBuildRailroad(tile(), () => true)).toBe(true);
+    expect(canBuildRailroad(tile({ railroad: true } as Partial<Tile>), () => true)).toBe(false);
+    expect(canBuildRailroad(tile({ road: true } as Partial<Tile>), () => true)).toBe(true);
+    expect(canBuildRailroad(tile({ terrain: 'OCEAN' }), () => true)).toBe(false);
+  });
+});
+
+describe('the railroad', () => {
+  /** an engineer of seat 0 standing on its own ground, with `stock` of each
+   *  strategic resource in the bank. */
+  function scene(stock: number) {
+    const state = makeState(makeMap(12, 12));
+    state.unitsMode = true;
+    const seat = seatOf(state, 0)!;
+    seat.stockpile = STRATEGIC_IDS.map(() => stock);
+    seat.co2 = 0;
+    const at = tileAtCoords(state.map, 5, 5);
+    at.ownerSeat = 0;
+    const u = spawnUnit(state, 'MILITARY_ENGINEER', at.index, 0)!;
+    u.tileIndex = at.index;
+    return { state, seat, at, u };
+  }
+
+  const A_RAIL = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
+  const lay = (state: ReturnType<typeof scene>['state'], seat: ReturnType<typeof scene>['seat'],
+               u: ReturnType<typeof scene>['u']) => {
+    const mine = state.units.filter((x) => x.seat === 0);
+    applySeatUnitOrders(state, seat, [mine.map((x) => (x === u ? A_RAIL : -1))]);
+  };
+
+  it('spends 1 Iron and 1 Coal, no charge, and discharges their carbon', () => {
+    const { state, seat, at, u } = scene(4);
+    // CIV6: "Can only be constructed by Military Engineers. Does not cost a
+    // charge, but does cost 1 Iron and 1 Coal." Steam Power first.
+    lay(state, seat, u);
+    expect(at.railroad).toBeUndefined();
+    seat.research.techs.push(RAILROAD_TECH);
+    const charges = u.charges;
+    lay(state, seat, u);
+    expect(at.railroad).toBe(true);
+    expect(u.charges).toBe(charges); // no charge, so the engineer survives it
+    expect(u.movesLeft).toBe(0);
+    let carbon = 0;
+    for (const [id, n] of RAILROAD_COST) {
+      const k = STRATEGIC_IDS.indexOf(id);
+      expect(seat.stockpile![k]).toBe(4 - n);
+      carbon += n * CARBON_PER_RESOURCE[k];
+    }
+    expect(seat.co2).toBe(carbon);
+  });
+
+  it('refuses when the bank cannot pay, and never lays a second one', () => {
+    const { state, seat, at, u } = scene(0);
+    seat.research.techs.push(RAILROAD_TECH);
+    lay(state, seat, u);
+    expect(at.railroad).toBeUndefined();
+    expect(seat.co2).toBe(0);
+    // pay for one, then find the tile already carries it
+    seat.stockpile = STRATEGIC_IDS.map(() => 4);
+    u.movesLeft = 4;
+    lay(state, seat, u);
+    expect(at.railroad).toBe(true);
+    const bank = [...seat.stockpile!];
+    u.movesLeft = 4;
+    lay(state, seat, u);
+    expect(seat.stockpile).toEqual(bank);
   });
 });
 

@@ -572,7 +572,8 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         # the fallback when nothing else is placeable here.
         bcols = ([c for c in (getattr(sim, "_A_FINISH", -1),) if c >= 0]
                  + [c for c in sim._A_IMP if c >= 0]
-                 + [c for c in (getattr(sim, "_A_ROAD", -1),) if c >= 0])
+                 + [c for c in (getattr(sim, "_A_ROAD", -1),) if c >= 0]
+                 + [c for c in (getattr(sim, "_A_RAIL", -1),) if c >= 0])
         bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
         pick_b = torch.full_like(orders0, -1)
         if bmask is not None:

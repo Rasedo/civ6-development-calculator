@@ -38,16 +38,16 @@ import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_T
 import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
-import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
+import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost } from '../data/constants';
 import { cityDistrictSum, pillagedDistrictTypes } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
-import { accrueStockpiles, chargeUnitUpkeep, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
-import { canBuildRoad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
+import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
@@ -84,6 +84,7 @@ const A_SNIPE3 = unitActionIndex(IMPROVEMENT_IDS).SNIPE3_0;
 const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
+const A_BUILD_RAILROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
@@ -1156,6 +1157,17 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         upgradeUnit(state, unit, actor.seat);
         return;
       }
+      // THE RAILROAD. CIV6: "Can only be constructed by Military Engineers.
+      // Does not cost a charge, but does cost 1 Iron and 1 Coal" — so the
+      // Engineer survives it and may lay another the next turn.
+      if (a === A_BUILD_RAILROAD) {
+        if (unit.type !== 'MILITARY_ENGINEER') return;
+        if (!actor.research.techs.includes(RAILROAD_TECH)) return;
+        if (!canBuildRailroad(here, (t) => tileOwnedByCiv(t, actor.seat))) return;
+        if (!layRailroad(state, actor.seat, here)) return;
+        unit.movesLeft = 0;
+        return;
+      }
       // THE MILITARY ENGINEER'S TWO. Each spends a charge and the turn, and
       // vanishes on its last one, exactly as a Builder's improvement does.
       if (a === A_BUILD_ROAD || a === A_FINISH_DISTRICT) {
@@ -1261,7 +1273,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // whatever the wrecked target's own plunder row pays.
         const raidGold = (): void => { actor.treasury += promoValue(unit, 'RAID_GOLD'); };
         const spendPillage = (): void => {
-          unit.movesLeft = Math.max(0, unit.movesLeft - (pillageCost > 0 ? pillageCost : 3));
+          unit.movesLeft = Math.max(
+            0, unit.movesLeft - MP_SCALE * (pillageCost > 0 ? pillageCost : 3));
         };
         const wreckDistrict = (t: Tile): void => {
           t.districtPillaged = true;
@@ -1281,7 +1294,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           spendPillage();
         } else if (hereOwned && districtWreckable(here)) {
           wreckDistrict(here);
-        } else if (UNITS[unit.type]?.raider && isWater(here) && unit.movesLeft >= 3) {
+        } else if (UNITS[unit.type]?.raider && isWater(here) && unit.movesLeft >= 3 * MP_SCALE) {
           // CIV6 (Coastal Raid): the raider "must be next to the land
           // improvement or district, and must have at least 3 Movement
           // points remaining." One deterministic target: the lowest-index

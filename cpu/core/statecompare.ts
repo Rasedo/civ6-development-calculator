@@ -47,7 +47,7 @@ import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWi
 import { grievanceWith } from './grievance';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
-import { emptyStockpile } from '../data/constants';
+import { emptyStockpile, MP_SCALE } from '../data/constants';
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -375,7 +375,7 @@ const GAME: Record<string, Extractor> = {
     return out;
   },
   lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
-  roadBridges: (s) => [s.roadBridges ? 1 : 0],
+  roadTier: (s) => [s.roadTier ?? 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   enhancerBeliefsClaimed: (s) => [(s.claimedEnhancers ?? []).length],
@@ -670,7 +670,7 @@ const UNIT_G: Record<string, Extractor> = {
   xpPct: overUnits((u) => u.xpPct ?? 0),
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
-  movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),
+  movesFull: overUnits((u) => u.movesFull ?? MP_SCALE * (UNITS[u.type]?.moves ?? 0)),
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
   formation: overUnits((u) => u.formation ?? 0),
@@ -713,6 +713,7 @@ const TILE: Record<string, Extractor> = {
   hasFeature: overTiles((t) => (t.feature === null ? 0 : 1)),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
+  railroad: overTiles((t) => (t.railroad ? 1 : 0)),
   floodCount: overTiles((t) => t.floodCount ?? 0),
   airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),

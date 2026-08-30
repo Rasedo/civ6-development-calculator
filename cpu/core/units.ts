@@ -41,7 +41,10 @@ import {
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
-import { GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../data/constants';
+import {
+  GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
+  MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP,
+} from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
@@ -116,42 +119,67 @@ export function waterEnterable(
 }
 
 /**
- * Is this step ROAD-to-ROAD? Real Civ 6 roads only help a unit
- * moving FROM a road tile TO a road tile — a single roaded tile in open
- * country does nothing.
+ * Is this step ROUTE-to-ROUTE? Real Civ 6 roads only help a unit moving FROM
+ * a routed tile TO a routed tile — a single roaded tile in open country does
+ * nothing. A RAILROAD carries the road under it, so it answers here too.
  */
 export function roadStep(from: Tile, to: Tile): boolean {
-  return !!from.road && !!to.road;
+  return (!!from.road || !!from.railroad) && (!!to.road || !!to.railroad);
+}
+
+/** Is this step RAILROAD-to-RAILROAD, the 0.25 tier? */
+export function railStep(from: Tile, to: Tile): boolean {
+  return !!from.railroad && !!to.railroad;
+}
+
+/** The road TIER the world has reached, 0..3 — latched at each era boundary
+ *  (eras.ts), the one site both engines already fire in lockstep. */
+export function roadTier(state: GameState): number {
+  return state.roadTier ?? 0;
 }
 
 /**
- * Do roads carry BRIDGES yet? Civ 6 upgrades roads by ERA — the
- * Ancient road has no bridges, the Classical road does. The flag is latched at
- * the first era boundary (eras.ts), the one site both engines already fire in
- * lockstep. From the Classical era on, a road-to-road step pays no river.
+ * Do routes carry BRIDGES yet? The Ancient road has none; every tier from the
+ * Classical road up, the Railroad included, "Creates Bridges over Rivers".
  */
 export function roadBridges(state: GameState): boolean {
-  return !!state.roadBridges;
+  return !!ROAD_TIER_BRIDGES[roadTier(state)];
 }
 
-/** Civ 6-ish movement cost to ENTER a tile (river handled separately).
- * Water tiles enter at a flat 1 (embarked/naval movement — no
- * hills/features on water). Land tiles keep the terrain schedule.
- * A ROAD-to-ROAD step ignores the terrain penalty entirely —
- * "roads let a unit pass through Woods or Hills as if it were flat".
+/** What a ROUTE-to-ROUTE step costs, in MP_SCALE units: the railroad's own
+ *  0.25 where both ends carry one, else the world's current road tier. */
+export function routeStepMp(state: GameState, from: Tile, to: Tile): number {
+  if (railStep(from, to)) return RAILROAD_MP;
+  return ROAD_TIER_MP[roadTier(state)] ?? MP_SCALE;
+}
+
+/** Civ 6-ish movement cost to ENTER a tile, in MP_SCALE units (river handled
+ * separately). Water tiles enter at a flat point (embarked/naval movement —
+ * no hills/features on water). Land tiles keep the terrain schedule.
+ * A ROUTE-to-ROUTE step ignores the terrain penalty entirely — "roads let a
+ * unit pass through Woods or Hills as if it were flat" — and pays its tier's
+ * own published cost instead.
  * `from` is the tile being left; passing the same tile twice is harmless. */
-export function moveCostInto(from: Tile, tile: Tile, mover?: { promos?: number; type: string }): number {
-  if (isWater(tile)) return 1;
-  if (roadStep(from, tile)) return 1;
-  let cost = 1;
+export function moveCostInto(
+  state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string },
+): number {
+  if (isWater(tile)) return MP_SCALE;
+  if (roadStep(from, tile)) return routeStepMp(state, from, tile);
+  return terrainMp(tile, mover);
+}
+
+/** The TERRAIN schedule alone, in MP_SCALE units — what a step costs where no
+ *  route waives it. This is the half the fixture ships to the GPU. */
+export function terrainMp(tile: Tile, mover?: { promos?: number; type: string }): number {
+  let cost = MP_SCALE;
   // CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
   // with the appropriate terrain or terrain feature at the cost of only 1
   // Movement". Ranger names Woods and Jungle; Marsh is nobody's.
   const hills = !mover || !promoFlag(mover, 'TERRAIN_MOVE_HILLS');
   const woods = !mover || !promoFlag(mover, 'TERRAIN_MOVE_WOODS');
-  if (tile.elevation === 'HILLS' && hills) cost += 1;
-  if (tile.feature === 'MARSH') cost += 1;
-  else if ((tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') && woods) cost += 1;
+  if (tile.elevation === 'HILLS' && hills) cost += MP_SCALE;
+  if (tile.feature === 'MARSH') cost += MP_SCALE;
+  else if ((tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') && woods) cost += MP_SCALE;
   return cost;
 }
 
@@ -237,8 +265,8 @@ export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex:
 export const TRADE_ROAD_MAX_STEPS = 32;
 
 /** The MP a river crossing costs (real Civ 6 ends movement; this model charges
- *  a flat 3 — the pre-existing convention, now named). */
-export const RIVER_CROSS_MP = 3;
+ *  a flat 3 points — the pre-existing convention, now named). */
+export const RIVER_CROSS_MP = 3 * MP_SCALE;
 
 export function crossesRiver(from: Tile, to: Tile): boolean {
   if (from.riverMask === 0) return false;
@@ -623,7 +651,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
       if (closed.has(n.index) || !passOk(n)) continue;
       // Rivers cost +3 to cross — the same charge the walker pays (water steps
       // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
+      const g = cur.g + moveCostInto(state, curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -761,14 +789,15 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const promo = promoValue(unit, 'MOVES');
   const atSea = seaMoveBonus(state, unit.seat);
   if (unit.embarked && !def?.naval) {
-    return EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo;
+    return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo);
   }
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
-  return (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
+  return MP_SCALE * (
+    (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
     // an emergency member marches faster on its target's ground
     + emergencyMoveBonus(state, unit.seat,
-        unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex]));
+        unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex])));
 }
 
 /** the Mathematics rung every hull and every passenger reads. */
@@ -804,8 +833,8 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const easyDock = wEnd.district === 'HARBOR'
     || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd));
   const cost = transition
-    ? moveCostInto(from, to, unit) + (easyDock ? 0 : 2)
-    : moveCostInto(from, to, unit) + riverCharge(state, from, to); // roads
+    ? moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP)
+    : moveCostInto(state, from, to, unit) + riverCharge(state, from, to); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.
@@ -1338,8 +1367,8 @@ export function spawnUnit(
     type: unitType,
     seat,
     tileIndex: spot.index,
-    movesLeft: def.moves + (def.raider ? getModifiers(state, seat).navalRaiderMoves : 0)
-      + goldenMoveBonus(state, { type: unitType, seat }),
+    movesLeft: MP_SCALE * (def.moves + (def.raider ? getModifiers(state, seat).navalRaiderMoves : 0)
+      + goldenMoveBonus(state, { type: unitType, seat })),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
     path: null,

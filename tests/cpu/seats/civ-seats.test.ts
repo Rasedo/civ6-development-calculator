@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
@@ -260,7 +261,7 @@ describe('war and peace', () => {
       (t) => t.index !== center.index,
     )!;
     attacker.tileIndex = adj.index;
-    attacker.movesLeft = 2;
+    attacker.movesLeft = 2 * MP_SCALE;
     const r = meleeAttack(state, attacker.id, civCity.centerIndex, 0);
     expect(r.ok).toBe(true);
     expect(civ.cities.length).toBe(0);

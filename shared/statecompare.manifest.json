@@ -156,10 +156,10 @@
           ]
         },
         {
-          "name": "roadBridges",
+          "name": "roadTier",
           "compare": "exact",
           "covers": [
-            "GameState.roadBridges"
+            "GameState.roadTier"
           ],
           "planes": []
         },
@@ -2269,6 +2269,16 @@
           ],
           "planes": [
             "tile_flooded"
+          ]
+        },
+        {
+          "name": "railroad",
+          "compare": "exact",
+          "covers": [
+            "Tile.railroad"
+          ],
+          "planes": [
+            "railroad"
           ]
         },
         {

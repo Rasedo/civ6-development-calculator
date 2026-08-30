@@ -12,6 +12,7 @@
  * and the tile names its escort.
  */
 import { describe, it, expect } from 'vitest';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState } from '../helpers';
 import { spawnUnit, stepUnit, escortUnit, breakEscort, inEscort } from '../../../cpu/core/units';
 import { convoyCS } from '../../../cpu/core/combat';
@@ -40,7 +41,7 @@ function twoAdjacent(state: GameState): [number, number] {
 function put(state: GameState, tile: number, type: string, over: Partial<Unit> = {}): Unit {
   const u = spawnUnit(state, type, tile, SEAT)!;
   expect(u).toBeTruthy();
-  Object.assign(u, { tileIndex: tile, movesLeft: 2, movesFull: 2, ...over });
+  Object.assign(u, { tileIndex: tile, movesLeft: 2 * MP_SCALE, movesFull: 2 * MP_SCALE, ...over });
   return u;
 }
 

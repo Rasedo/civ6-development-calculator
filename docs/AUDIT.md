@@ -68,22 +68,21 @@ from the list below.
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
-| C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
+| C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the any-work pool does not reach artifacts, the Preserve table is a stylization |
-| C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
+| C-24 the climate arc | 1 | nothing is ever submerged (C-35), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
-| C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
 | C-39 no water improvement has a carrier | 1 | `validImprovementsIn` refuses every water plot and no unit can stand there; Fishing Boats and the Offshore Wind Farm both wait on it |
 | C-40 the feature roster is seven rows | 2 | no Geothermal Fissure, Ley Line, Volcanic Soil or Cataract — three shipped clauses read features that cannot exist |
-| **C. Absent systems** | **33** | |
-| **OPEN, TOTAL** | **57** | |
+| **C. Absent systems** | **31** | |
+| **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -771,13 +770,12 @@ under their blocker so the dependency is readable, and both halves count.
     and `SPY_CAPTURE_PCT` are those two, and they are stated model
     values. The Intelligence Agency's success bonus has no published
     figure either.
-- **C-20. THE MILITARY ENGINEER'S LAST THREE VERBS.** Weight 1. The Fort,
-  the Airstrip, the road and the 20% charge ship; gate reachability is
-  ZERO (no seed trains the chassis) and `engineer_test.py` pokes every
-  rule. OPEN, each blocked on a system:
+- **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1. The Fort, the
+  Airstrip, both routes and the 20% charge ship; gate reachability is ZERO
+  (no seed trains the chassis) and `engineer_test.py` pokes every rule.
+  OPEN, each blocked on a system:
   - **THE MISSILE SILO** bases nuclear devices — C-31.
   - **THE MOUNTAIN TUNNEL** makes an impassable tile passable — C-35.
-  - **THE RAILROAD** — C-36.
   - **"Can clean Nuclear Fallout"** waits on C-31; **"Can Remove Tile
     Improvements"** is a verb neither engine has for any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
@@ -895,11 +893,6 @@ under their blocker so the dependency is readable, and both halves count.
     already (`prodBoost`, `xpPct`, `gppMult`, `yieldMult`); what they
     lack is a card to sit on and the switched-away record above.
     Chiefdom alone has no legacy bonus.
-- **C-36. NO RAILROAD.** Weight 2. `Tile.road` / `sim.road` is ONE boolean
-  tier. The railroad is a second tier — its own movement rate, "1 Iron and
-  1 Coal per hex" against the existing stockpiles, and CO2 "quite a bit at
-  that". Waiting on it: C-20's fifth engineer verb and C-24's third
-  emitter.
 - **C-24. THE CLIMATE ARC.** Weight 1. Emissions, the phase ladder, ice
   melt, flooding, the Flood Barrier, warmed weather, Carbon Recapture and
   the Global Energy Treaty all ship; NONE of it is gate-reached (no seat's
@@ -910,7 +903,6 @@ under their blocker so the dependency is readable, and both halves count.
     `_flood_level` price the barrier); the tile turning to water is C-35.
   - **THE FLOOD BARRIER KEEPS FOR NOTHING** — its maintenance is
     published only as "Variable"; the row carries 0.
-  - **RAILROAD CONSTRUCTION EMITS NOTHING** — C-36.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
   and Government Plaza ride the gate on 12/12 seeds, the Canal on none

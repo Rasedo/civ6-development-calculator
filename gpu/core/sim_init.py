@@ -1310,6 +1310,7 @@ class SimInit:
             self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
             self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
             self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
+            self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
             self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
             self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
             self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
@@ -1336,6 +1337,7 @@ class SimInit:
                 + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
                 + (1 if self._A_UPGRADE >= 0 else 0) \
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
+                + (1 if self._A_RAIL >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -1504,12 +1506,16 @@ class SimInit:
         self.encamp_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         self.encamp_outer_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         # The ROAD plane (the TS `Tile.road` twin). Laid by trade routes; a
-        # road-to-road step ignores the terrain penalty, and once `road_bridged`
-        # latches at the first era boundary, the river charge too.
+        # route-to-route step ignores the terrain penalty and pays its tier's
+        # own cost, and every tier above the Ancient road drops the river
+        # charge too (`road_tier`).
         self.road = torch.tensor(
             [[bool(t.get("rd", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
-        self.road_bridged = False
+        # CIV6: "all roads in your territory will upgrade to the next level
+        # automatically" on reaching the era that brings the tier. Latched at
+        # the era boundary, the site both engines already fire in lockstep.
+        self.road_tier = 0
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
@@ -1850,6 +1856,14 @@ class SimInit:
         # buildings.
         self._city_centre_air_slots = 1
         self._aerodrome_air_slots = 2
+        self._mp_scale = int(rules.mp_scale)
+        self._road_tier_mp = list(rules.road_tier_mp)
+        self._road_tier_bridges = list(rules.road_tier_bridges)
+        self._road_tier_era = list(rules.road_tier_era)
+        self._railroad_mp = int(rules.railroad_mp)
+        self._railroad_tech = int(rules.railroad_tech)
+        self._railroad_cost = list(rules.railroad_cost)
+        self._embark_transition_mp = int(rules.embark_transition_mp)
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._nuclear_bidx = int(rules.nuclear_plant_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
@@ -2214,7 +2228,11 @@ class SimInit:
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # the terrain PENALTY over a plain step, in `mp_scale` units
         self.tmove = torch.tensor([[t.get("tmove", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # CIV6 (Railroad): the 0.25-Movement route a Military Engineer lays
+        # over the road, at the cost of 1 Iron and 1 Coal.
+        self.railroad = torch.tensor([[t.get("rr", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
         self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 4001), dtype=torch.float64, device=device)  # 0.1-granular exp table over ±200
@@ -2388,7 +2406,7 @@ class SimInit:
         self._admiral_cls = int(rr.get("admiralClassIdx", -1))
         self._gen_aura_cs_val = float(rr.get("generalAuraCs", 5))
         self._gen_aura_range = int(rr.get("generalAuraRange", 2))
-        self._gen_aura_mp = int(rr.get("generalAuraMp", 1))  # the aura's movement half
+        self._gen_aura_mp = int(rr.get("generalAuraMp", 1))  # the aura's movement half, already in mp_scale units
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
         self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
@@ -2467,7 +2485,7 @@ class SimInit:
                     self.major_unit_tile[b, i] = int(u_["tile"])
                     self.major_unit_hp[b, i] = rules.combat.get("unitHp", 100)
                     self.major_unit_charges[b, i] = int(self._type_charges[ti])
-                    _m0u = int(self._type_moves[ti])
+                    _m0u = self._mp_scale * int(self._type_moves[ti])
                     self.major_unit_mp[b, i] = _m0u
                     self.major_unit_mp_full[b, i] = _m0u
                     self.major_unit_attacks[b, i] = 1
@@ -2700,7 +2718,7 @@ class SimInit:
         return {
             "mut": {k: getattr(self, k).clone() for k in _MUTABLE},
             "turn": self.turn,
-            "road_bridged": self.road_bridged,
+            "road_tier": self.road_tier,
         }
 
     def restore(self, snap: dict) -> None:
@@ -2712,7 +2730,7 @@ class SimInit:
         # a scan for `self.tile_seat[...] =`.
         self._tile_owner_ver += 1
         self.turn = snap["turn"]
-        self.road_bridged = snap.get("road_bridged", False)
+        self.road_tier = snap.get("road_tier", 0)
         self._eff_version += 1
         self._fbase_cache = None
         self._food_cache = None

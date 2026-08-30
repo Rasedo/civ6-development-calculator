@@ -59,6 +59,7 @@ class SimOrders:
         _stc = getattr(self, "_A_SPY_TRAVEL", -1)
         _smc = getattr(self, "_A_SPY_MISSION", -1)
         _rdc = getattr(self, "_A_ROAD", -1)
+        _rrc = getattr(self, "_A_RAIL", -1)
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
         _pfc = getattr(self, "_A_PERFORM", -1)
@@ -105,6 +106,7 @@ class SimOrders:
             ((_ab == _ecc) if _ecc >= 0 else _no).any(dim=0),   # join an escort
             ((_ab == _uec) if _uec >= 0 else _no).any(dim=0),   # and leave it
             (((_ab >= _apc) & (_ab < _apc + _asw)) if _apc >= 0 else _no).any(dim=0),  # air pillage
+            ((_ab == _rrc) if _rrc >= 0 else _no).any(dim=0),                     # lay a railroad
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -112,7 +114,7 @@ class SimOrders:
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
-         _rk_escort, _rk_unescort, _rk_airpil) = _tab
+         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -339,6 +341,30 @@ class SimOrders:
                     _r = _rdm.nonzero(as_tuple=True)[0]
                     self.road[_r, hc[_r]] = True
                     self._spend_build_charge(_r, sc, hc)
+
+            # CIV6 (Railroad): "Does not cost a charge, but does cost 1 Iron
+            # and 1 Coal" — so the Engineer survives it and may lay another the
+            # next turn. The Coal it burns discharges the same per-resource
+            # carbon a plant's does (`layRailroad`).
+            if _rk_rail[n] and _rrc >= 0 and self._eng_idx >= 0:
+                _rrm = (
+                    act & (a == _rrc) & (utp == self._eng_idx)
+                    & (own_tile | (self.tile_seat < 0)).gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.railroad.gather(1, hc.unsqueeze(1)).squeeze(1)
+                )
+                if self._railroad_tech >= 0:
+                    _rrm = _rrm & techs[:, self._railroad_tech]
+                for _sl, _cn in self._railroad_cost:
+                    _rrm = _rrm & (self.civ_stockpile[:, row, _sl] >= _cn)
+                if bool(_rrm.any()):
+                    _r = _rrm.nonzero(as_tuple=True)[0]
+                    for _sl, _cn in self._railroad_cost:
+                        self.civ_stockpile[_r, row, _sl] -= _cn
+                        self._emit_carbon(row, _rrm.double() * float(_cn * self._carbon_per_resource[_sl]))
+                    self.railroad[_r, hc[_r]] = True
+                    self.unit_mp[_r, sc[_r]] = 0
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
                 _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)
@@ -751,7 +777,7 @@ class SimOrders:
                 # offers nothing.
                 _rd = (act & (a == self._A_PILLAGE) & self._type_raider[utp.clamp(min=0)]
                        & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
-                       & (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3)
+                       & (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3 * self._mp_scale)
                        & ~(_en & (_hi | _hd)))
                 if bool((_pl | _rd).any()):
                     _r = (_pl | _rd).nonzero(as_tuple=True)[0]
@@ -848,7 +874,7 @@ class SimOrders:
                     # CIV6: pillaging takes "3 Movement Points, or all of
                     # your movement"; Depredation prices it at 1.
                     _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")
-                    _cost = torch.where(_pc > 0, _pc, torch.full_like(_pc, 3))
+                    _cost = self._mp_scale * torch.where(_pc > 0, _pc, torch.full_like(_pc, 3))
                     _left = self.unit_mp[_r, sc[_r]]
                     self.unit_mp[_r, sc[_r]] = (_left - _cost).clamp(min=0)
                     self._eff_version += 1
@@ -1091,7 +1117,7 @@ class SimOrders:
         rows, tiles = rows[fresh], tiles[fresh]
         self.feat_stripped[rows, tiles] = True
         self.tdef[rows, tiles] = self.hills[rows, tiles].long() * 3  # a stripped feature no longer defends (TS terrainDefense reads live)
-        self.tmove[rows, tiles] = self.hills[rows, tiles].long() * 3  # nor slows movement (hills-only cost)
+        self.tmove[rows, tiles] = self.hills[rows, tiles].long() * self._mp_scale  # nor slows movement (hills-only cost)
         # TS builderRemoveFeature: chopping WOODS removes a LUMBER_MILL (it
         # requires woods), else a stale mill keeps +production on a bare tile.
         if self.LUMBER >= 0:
@@ -1194,7 +1220,8 @@ class SimOrders:
         afford rule and next turn's "spent no MP" gate both read — and it uses
         the plain type pool, not the embark one.
         """
-        self.barb_unit_mp.copy_(self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)])
+        self.barb_unit_mp.copy_(
+            self._mp_scale * self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)])
 
     def _barbarian_phase(self) -> None:
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device

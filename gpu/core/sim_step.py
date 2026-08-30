@@ -86,9 +86,16 @@ class SimStep:
         self._ww_audit()
         self.turn += 1
         if self._era_len > 0 and self.turn % self._era_len == 0:
-            # Roads reach the CLASSICAL tier (bridges) at the first era
-            # boundary, latched at the same site TS latches it.
-            self.road_bridged = True
+            # CIV6: "all roads in your territory will upgrade to the next
+            # level automatically" on reaching the era that brings the tier,
+            # latched at the same site TS latches it.
+            _era = self.turn // self._era_len
+            _tier = 0
+            for _i, _e in enumerate(self._road_tier_era):
+                if _era >= _e:
+                    _tier = _i
+            if _tier > self.road_tier:
+                self.road_tier = _tier
             sc = self.era_score
             # The PREVIOUS age, the Heroic test's substrate. CLONED because
             # civ_age is written IN PLACE below — a bare reference would read

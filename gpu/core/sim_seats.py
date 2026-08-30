@@ -2338,9 +2338,9 @@ class SimSeats:
         """[B, T] — the tiles a Military Engineer of seat row `row` would have
         work at. `trainableUnits` asks only for the Armory, so this is the
         GPU's own reason to offer the column: one of the engineer's own
-        improvements it could place, a tile with no road on it, or a 20% charge
-        waiting to be spent. All three go "in your own or neutral territory"
-        (`engineerTileOk`).
+        improvements it could place, a tile with no route of either tier on it,
+        or a 20% charge waiting to be spent. All of them go "in your own or
+        neutral territory" (`engineerTileOk`).
         """
         B = self.B
         dev = self.device
@@ -2353,7 +2353,7 @@ class SimSeats:
             & ~self.water
             & ~self.nwonder
         )
-        out = ground & ~self.road
+        out = ground & (~self.road | ~self.railroad)
         unpaved = (
             ground
             & (self.improvement < 0)
@@ -6058,7 +6058,8 @@ class SimSeats:
         # starve _seat_tile_add of yields TS still pays.
         frm_f = self.feat_removable[rows, s_idx]
         self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
-        self.tmove[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tmove[rows, s_idx])
+        self.tmove[rows, s_idx] = torch.where(
+            frm_f, self.hills[rows, s_idx].long() * self._mp_scale, self.tmove[rows, s_idx])
         fresh_f = ~self.feat_stripped[rows, s_idx] & frm_f
         self.feat_stripped[rows, s_idx] |= frm_f
         self.improvement[rows, s_idx] = -1
@@ -6769,9 +6770,9 @@ class SimSeats:
         gs1 = gslot.unsqueeze(1)
         u_type = self.unit_type.gather(1, gs1).squeeze(1)
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
-        river3 = 3 * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+        river3 = (3 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
         terr, riv = self._road_terms(here, dest, river3, u_type, u_promos)
-        land_cost = 1 + terr + riv
+        land_cost = self._mp_scale + terr + riv
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
         if self._embark_live:
@@ -6779,7 +6780,8 @@ class SimSeats:
             emb = self.unit_emb.gather(1, gs1).squeeze(1)
             to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
             transition = (emb != to_water) & ~naval
-            base_step = torch.where(to_water, torch.ones_like(land_cost), land_cost)
+            base_step = torch.where(
+                to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
             w_end = torch.where(to_water, dest.clamp(min=0), hc)
             l_end = torch.where(to_water, hc, dest.clamp(min=0))
             easy_dock = (
@@ -6790,7 +6792,7 @@ class SimSeats:
             cost = torch.where(
                 transition,
                 base_step + torch.where(easy_dock, torch.zeros_like(land_cost),
-                                        torch.full_like(land_cost, 2)),
+                                        torch.full_like(land_cost, self._embark_transition_mp)),
                 base_step,
             )
         else:
