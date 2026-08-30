@@ -2257,9 +2257,10 @@
           "covers": [
             "Tile.lowland"
           ],
-          "planes": [],
-          "note": "the coastal-lowland band 1..3, 0 = none. Derived from the map at creation, so a disagreement is a derivation split, not a rule split.",
-          "derived": true
+          "planes": [
+            "tile_lowland"
+          ],
+          "note": "the coastal-lowland band 1..3, 0 = none. Derived from the map at creation and cleared where the sea takes the ground: nothing is left to price a Flood Barrier against."
         },
         {
           "name": "flooded",
@@ -2280,6 +2281,26 @@
           "planes": [
             "railroad"
           ]
+        },
+        {
+          "name": "submerged",
+          "compare": "exact",
+          "covers": [
+            "Tile.submerged"
+          ],
+          "planes": [
+            "tile_submerged"
+          ],
+          "note": "the sea has taken this tile forever: open water for every rule that asks, and unusable besides."
+        },
+        {
+          "name": "water",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "water"
+          ],
+          "note": "isWater(tile) — the sea itself. Map generation decides it and a submersion moves it, so the two engines must agree tile by tile."
         },
         {
           "name": "floodCount",
@@ -2484,6 +2505,78 @@
       }
     ],
     "gpu": [
+      {
+        "plane": "wpass",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "passable",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "work_ok",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "settle_ok",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "d_usable",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "camp_ok",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "coastal_land",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "coastal_water",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "_sr_c",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "tile_wh",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "tile_yields",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "wok",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "res_id",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "res_cat",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "res_priority",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "lux_id",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "lux_req",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "res_imp",
+        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+      },
       {
         "plane": "civ_congress_vote",
         "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."

@@ -68,21 +68,21 @@ from the list below.
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
-| C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), clean-fallout and remove-improvement verbs |
+| C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), the Mountain Tunnel's clauses are unsourced here, clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization, the Consulate's Encampment half |
-| C-24 the climate arc | 1 | nothing is ever submerged (C-35), the Flood Barrier keeps for nothing |
+| C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
 | C-33 the Giant Death Robot's remaining abilities | 1 | its heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
-| C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion; the tile facts derived from it are frozen at map generation |
+| C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
 | C-39 no water improvement has a carrier | 1 | `validImprovementsIn` refuses every water plot and no unit can stand there; Fishing Boats and the Offshore Wind Farm both wait on it |
 | C-40 the feature roster is seven rows | 2 | no Geothermal Fissure, Ley Line, Volcanic Soil or Cataract — three shipped clauses read features that cannot exist |
-| **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **53** | |
+| **C. Absent systems** | **28** | |
+| **OPEN, TOTAL** | **52** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -775,7 +775,13 @@ under their blocker so the dependency is readable, and both halves count.
   (no seed trains the chassis) and `engineer_test.py` pokes every rule.
   OPEN, each blocked on a system:
   - **THE MISSILE SILO** bases nuclear devices — C-31.
-  - **THE MOUNTAIN TUNNEL** makes an impassable tile passable — C-35.
+  - **THE MOUNTAIN TUNNEL.** No longer blocked on a plane: `passable` is
+    state now (C-35's family), so a tile can start impassable and stop
+    being so. What blocks it is the SOURCE — this repo has no reading of
+    the improvement's own clauses (its tech, whether it spends a charge,
+    what a step through it costs, and whether it makes the mountain itself
+    passable or joins two tunnels) that is safe to build on. ASK THE OWNER
+    before any of it is written; no branch ships on a guess.
   - **"Can clean Nuclear Fallout"** waits on C-31; **"Can Remove Tile
     Improvements"** is a verb neither engine has for any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
@@ -870,21 +876,21 @@ under their blocker so the dependency is readable, and both halves count.
     which would reach 6. Both engines carry the page's reading (`airSlots`
     1 apiece, `_aerodrome_air_slots` + `_b_air_slots`). Neither number is
     invented, and nothing here decides between them.
-- **C-35. THE LAND/WATER FACT NEVER MOVES.** Weight 2. Sea-ness is decided
-  at map generation: TS `isWater`, GPU static `water` / `wpass` and their
-  derivations, none in `_MUTABLE`. Two of the four meanings the bit carried
-  now have planes of their own — "can a hull stand here" is `hullTile` /
-  `_canal_pass`, and a chassis water is ground to reads `unit_water_walk` —
-  so what is left is the SEA itself. Waiting on it: submersion (C-24) and
-  the Mountain Tunnel (C-20). Moving `water` moves more than the tile: the
-  GPU freezes at map generation every fact the exporter derives from
-  terrain over a tile's RING — coastal land and coastal water, water
-  housing, the Seaside Resort's candidacy, the Aqueduct's source, the
-  natural-wonder ring, the static half of district adjacency
-  (`d_static_adj`) and a built wonder's terrain legality (`wok`) — while
-  TS recomputes each of them live from the map. So a submersion that only
-  writes the drowned tile leaves the two engines answering differently
-  about its neighbours.
+- **C-35. THE DROWNED GROUND KEEPS ITS RECORD.** Weight 1. Sea-ness MOVES
+  now: `Tile.submerged` / `tile_submerged` turn a tile to open water, and
+  every GPU plane the exporter derives from `isWater` is state
+  (`_submerge`). What the sea takes with the ground is the improvement, the
+  district, the resource and the ground's own use; what it leaves is the
+  MAP's record — terrain, feature and river edges stay underneath. That
+  reading is unsourced either way, and it is what keeps both engines
+  identical: every ring fact the exporter derives reads TERRAIN
+  (`isCoastalLand`, the Seaside Resort's coast, fresh water, the Aqueduct's
+  source, district adjacency's WOODS/RAINFOREST/REEF sources), so a drowned
+  Woods still lends its neighbours what it always did, on both engines. The
+  ONE neighbour answer that asks `isLand` is `isCoastalWater`, and
+  `_submerge` moves it with the wonders that need it. OPEN: whether real
+  Civ 6 keeps a submerged tile's feature working for its neighbours, or
+  strips the ground bare.
 - **C-37. NO LEGACY POLICY CARDS.** Weight 2. Rise and Fall turned every
   government's LEGACY bonus into a WILDCARD policy card, unlocked only
   once the seat has switched AWAY from that government — so a government
@@ -904,13 +910,10 @@ under their blocker so the dependency is readable, and both halves count.
     lack is a card to sit on and the switched-away record above.
     Chiefdom alone has no legacy bonus.
 - **C-24. THE CLIMATE ARC.** Weight 1. Emissions, the phase ladder, ice
-  melt, flooding, the Flood Barrier, warmed weather, Carbon Recapture and
-  the Global Energy Treaty all ship; NONE of it is gate-reached (no seat's
-  CO2 leaves zero in 12x250) — `climate_test.py` / `climate.test.ts` are
-  the whole bar. OPEN:
-  - **NOTHING IS EVER SUBMERGED.** Phases IV/VI/VII submerge bands 1-3,
-    "lost forever". The sea level is on the wire (`floodLevel` /
-    `_flood_level` price the barrier); the tile turning to water is C-35.
+  melt, flooding, SUBMERSION, the Flood Barrier, warmed weather, Carbon
+  Recapture and the Global Energy Treaty all ship; NONE of it is
+  gate-reached (no seat's CO2 leaves zero in 12x250) — `climate_test.py` /
+  `climate.test.ts` are the whole bar. OPEN:
   - **THE FLOOD BARRIER KEEPS FOR NOTHING** — its maintenance is
     published only as "Variable"; the row carries 0.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist

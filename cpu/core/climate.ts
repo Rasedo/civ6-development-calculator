@@ -21,6 +21,9 @@ import {
   FAVOR_PER_POLLUTION_OVER, FAVOR_POLLUTION_CAP,
 } from '../data/climate';
 import { citiesOf, seatOf } from './seats';
+import { cityAtIndex, disbandUnit, unitsAt, waterWalks } from './units';
+import { displaceAirFrom } from './air';
+import { UNITS } from '../data/units';
 
 /** Whether this seat's units emit at the reduced rate. */
 export function powerCells(state: GameState, seat: number): boolean {
@@ -160,6 +163,60 @@ function floodLowland(tile: Tile): void {
   if (tile.district) tile.districtPillaged = true;
 }
 
+/**
+ * CIV6 (Coastal Lowlands): the phases that name a band take it "forever" —
+ * the tile becomes open water, unusable besides: it yields nothing and no
+ * citizen may work it, while a hull sails over it and the city beside it
+ * turns coastal. What stood on the ground goes with it — the improvement, the
+ * district and its city's record of it, and any LAND unit caught there (a
+ * hull is simply afloat now, and so is a chassis water is ground to). A CITY
+ * CENTRE is never taken: no sea destroys a city in this game.
+ *
+ * MODEL: the map's terrain, feature, resource and river edges stay recorded
+ * under the water, unread — the source publishes nothing about what a drowned
+ * Woods lends its neighbours, and leaving the record still is the reading both
+ * engines can hold identically.
+ */
+export function submergeTile(state: GameState, tile: Tile): void {
+  if (isWater(tile)) return;
+  if (cityAtIndex(state, tile.index)) return;
+  if (state.cityStates?.some((cs) => cs.centerIndex === tile.index)) return;
+  for (const u of [...unitsAt(state, tile.index)]) {
+    if (UNITS[u.type]?.naval || waterWalks(u.type)) continue;
+    disbandUnit(state, u.id);
+  }
+  displaceAirFrom(state, tile.index, false);
+  if (tile.district && tile.ownerSeat >= 0 && tile.ownerCity >= 0) {
+    const city = citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
+    if (city) city.districts = city.districts.filter((d) => d.tileIndex !== tile.index);
+  }
+  tile.submerged = true;
+  // the resource goes with the ground: a drowned Iron seam is not a SEA
+  // resource, and leaving it would lend a neighbouring district an
+  // adjacency the ground never had.
+  tile.resource = null;
+  tile.improvement = null;
+  tile.district = null;
+  tile.districtComplete = false;
+  tile.districtPillaged = false;
+  tile.builtWonder = null;
+  tile.builtWonderComplete = false;
+  tile.road = false;
+  tile.railroad = false;
+  tile.pillaged = false;
+  tile.flooded = false;
+  tile.lowland = undefined;   // nothing left to price a Flood Barrier against
+  tile.encampHp = undefined;
+  tile.encampOuterHp = undefined;
+  tile.park = undefined;
+  tile.antiquity = false;
+  tile.locked = false;
+  tile.airSlotBonus = undefined;
+  tile.fertility = 0;
+  tile.fertilityProd = 0;
+  tile.droughtTurns = 0;
+}
+
 /** CIV6: a Flood Barrier built late "can be repaired in full and used again,
  *  along with anything that's on them. Does not affect submerged tiles". */
 export function repairBehindBarrier(state: GameState, city: City): void {
@@ -201,6 +258,12 @@ export function climateTurn(state: GameState): void {
     if (ph.flood > 0) {
       for (const t of state.map.tiles) {
         if (t.lowland === ph.flood && !barrierAt(state, t)) floodLowland(t);
+      }
+    }
+    if (ph.submerge > 0) {
+      // ascending tile index, so both engines take the SAME ground
+      for (const t of state.map.tiles) {
+        if (t.lowland === ph.submerge && !barrierAt(state, t)) submergeTile(state, t);
       }
     }
     state.eventLog.push(

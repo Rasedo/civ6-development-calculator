@@ -117,6 +117,7 @@ class Rules:
     road_tier_mp: list  # what a route step costs per road tier, in mp_scale units
     road_tier_bridges: list  # whether each tier bridges rivers
     road_tier_era: list  # the world-era index each tier arrives at
+    wonder_coastal_mask: int  # the `wok` bits a COASTAL-WATER placement owns
     railroad_mp: int  # CIV6 (Railroad): "Movement Cost 0.25"
     railroad_tech: int  # the techs-table index of Steam Power, -1 if absent
     railroad_cost: list  # [(stockpile slot, units)] one tile spends
@@ -306,6 +307,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         road_tier_mp=[int(x) for x in r["roadTierMp"]],
         road_tier_bridges=[bool(x) for x in r["roadTierBridges"]],
         road_tier_era=[int(x) for x in r["roadTierEra"]],
+        wonder_coastal_mask=int(r["wonderCoastalMask"]),
         railroad_mp=int(r["railroadMp"]),
         railroad_tech=int(r["railroadTech"]),
         railroad_cost=[(int(a), int(b)) for a, b in r["railroadCost"]],
@@ -717,6 +719,12 @@ _MUTABLE = [
     "antiquity_era", "antiquity_seat",  # ...and what a dug Artifact remembers
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig
     "park",  # NATIONAL PARK tiles
+    # CIV6 (Coastal Lowlands): the sea takes ground, so every tile fact it
+    # moves is state now, not map generation (`_submerge`).
+    "tile_submerged", "water", "wpass", "passable", "work_ok", "settle_ok",
+    "d_usable", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
+    "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
+    "lux_req", "res_imp", "tile_lowland", "tile_air_bonus", "drought",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)

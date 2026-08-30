@@ -637,6 +637,83 @@ class SimEconomy:
         self.pillaged &= ~mine
         self.district_pillaged &= ~mine
 
+    def _centre_plane(self) -> torch.Tensor:
+        """[B, T] — every live city CENTRE on the map, major and minor alike."""
+        out = self.centre_slot_at >= 0
+        if self.S > 0:
+            ctr = self.citystate_center.clamp(min=0)
+            live = self.citystate_alive & (self.citystate_center >= 0)
+            out = out.scatter(1, ctr, live | out.gather(1, ctr))
+        return out
+
+    def _submerge(self, take: torch.Tensor) -> None:
+        """CIV6 (Coastal Lowlands): the sea takes a band "forever"
+        (`submergeTile`). The tile becomes open water and unusable besides —
+        it yields nothing and no citizen may work it — and what stood on the
+        ground goes with it: the improvement, the district and its city's
+        record of it, the resource, and any LAND unit caught there. A hull is
+        simply afloat now, and so is a chassis water is ground to.
+
+        MODEL: the terrain, the feature and the river edges stay recorded
+        under the water, unread. Every ring fact the exporter derives reads
+        TERRAIN — `isCoastalLand`, the Seaside Resort's coast, fresh water,
+        the Aqueduct's source — so the ONE neighbour answer the sea moves is
+        `isCoastalWater`, which asks `isLand`."""
+        if not bool(take.any()):
+            return
+        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
+        drown = (self.unit_alive
+                 & take.gather(1, self.unit_tile.clamp(min=0))
+                 & ~self.unit_naval[ty] & ~self.unit_water_walk[ty]
+                 & (self._type_air[ty] == 0))
+        for pool in ("major", "barb"):
+            lo, hi = self.POOL_LO[pool], self.POOL_HI[pool]
+            d = drown[:, lo:hi]
+            if not bool(d.any()):
+                continue
+            r, s = d.nonzero(as_tuple=True)
+            getattr(self, f"{pool}_unit_alive")[r, s] = False
+            self._vacate(pool, r, s)
+        # the district leaves its city's registry with the ground
+        _dt = self.city_dist_tile
+        _gone = take.gather(1, _dt.reshape(self.B, -1).clamp(min=0)).reshape(_dt.shape) & (_dt >= 0)
+        if bool(_gone.any()):
+            self.city_dist_tile[_gone] = -1
+        # THE TILE. `wpass` is `isWater && !isImpassable`, and the ground's own
+        # `passable` already carried that second half.
+        self.wpass |= take & self.passable
+        self.water |= take
+        self.tile_submerged |= take
+        for _p in ("passable", "work_ok", "settle_ok", "d_usable", "camp_ok",
+                   "coastal_land", "coastal_water", "_sr_c", "district_complete",
+                   "district_pillaged", "built_wonder_complete", "road", "railroad",
+                   "pillaged", "tile_flooded", "antiquity", "tile_locked"):
+            getattr(self, _p)[take] = False
+        for _p, _v in (("improvement", -1), ("district", -1), ("built_wonder", -1),
+                       ("res_id", -1), ("res_cat", 0), ("res_priority", 0),
+                       ("lux_id", -1), ("lux_req", -9), ("res_imp", -1),
+                       ("tile_lowland", 0), ("encamp_hp", 0), ("encamp_outer_hp", 0),
+                       ("park", -1), ("tile_air_bonus", 0), ("fertility", 0),
+                       ("fertility_prod", 0), ("drought", 0), ("wok", 0)):
+            getattr(self, _p)[take] = _v
+        self.tile_yields[take] = 0
+        # water housing is fresh-water first, then coastal — and the ground the
+        # sea took is no longer coastal LAND.
+        self.tile_wh[take & (self.tile_wh != self._h_fresh)] = self._h_none
+        # THE RING: a water tile whose last LAND neighbour just drowned stops
+        # being coastal water, and loses the wonders that ask for it.
+        _nb = self.neigh
+        _nbc = _nb.clamp(min=0)
+        _on = (_nb >= 0).unsqueeze(0)
+        _ring = (_on & take[:, _nbc]).any(dim=2)
+        _lost = _ring & self.water & ~(_on & ~self.water[:, _nbc]).any(dim=2)
+        if bool(_lost.any()):
+            self.coastal_water[_lost] = False
+            self.wok[_lost] = self.wok[_lost] & ~self._wonder_coastal_mask
+        self._air_orphans_die()   # an airstrip under water bases nothing
+        self._eff_version += 1
+        self._gen_ver += 1
+
     def _melt_ice(self, at: torch.Tensor, fraction: float) -> None:
         """CIV6: "the polar ice starts to melt (i.e., Ice tiles will disappear
         and be replaced by Ocean tiles)". The melted set is always a PREFIX of
@@ -673,6 +750,11 @@ class SimEconomy:
                 self.tile_flooded |= wet
                 self.pillaged |= wet
                 self.district_pillaged |= wet & (self.district >= 0)
+            sb = int(self._cl_submerge[p])
+            if sb > 0:
+                self._submerge((self.tile_lowland == sb) & ~barrier
+                               & at.unsqueeze(1) & ~self.water
+                               & ~self._centre_plane())
         self._eff_version += 1
 
     def _disaster_phase(self) -> None:

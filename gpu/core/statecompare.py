@@ -792,6 +792,8 @@ TILE = {
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),
     "railroad": lambda sim, b, rows: sim.railroad[b].long().numpy(),
+    "submerged": lambda sim, b, rows: sim.tile_submerged[b].long().numpy(),
+    "water": lambda sim, b, rows: sim.water[b].long().numpy(),
     "floodCount": lambda sim, b, rows: sim.tile_flood_ct[b].numpy(),
     "airSlotBonus": lambda sim, b, rows: sim.tile_air_bonus[b].numpy(),
     "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),

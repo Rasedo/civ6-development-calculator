@@ -153,6 +153,7 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       t.index !== city.centerIndex &&
       !t.district &&
       !t.builtWonder &&
+      !t.submerged &&
       !isImpassable(t),
   );
 }

@@ -431,6 +431,11 @@ export function buildRules() {
     roadTierBridges: ROAD_TIER_BRIDGES.map((b) => (b ? 1 : 0)),
     roadTierEra: ROAD_TIER_ERA,
     railroadMp: RAILROAD_MP,
+    // CIV6 (Coastal Lowlands): the wonders whose placement asks for COASTAL
+    // WATER — the one `wok` clause a tile turning to sea can move, because
+    // every other one the exporter derives reads TERRAIN, which stays.
+    wonderCoastalMask: BUILT_WONDER_LIST.reduce(
+      (m, w, i) => m | (w.placement.onCoastalWater ? 1 << i : 0), 0),
     // CIV6 (Railroad): the tech, and the stockpile slots one tile spends
     railroadTech: techIdx.get(RAILROAD_TECH) ?? -1,
     railroadCost: RAILROAD_COST.map(([id, n]: readonly [string, number]) => [STRATEGIC_IDS.indexOf(id), n]),

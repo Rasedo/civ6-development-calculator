@@ -1233,6 +1233,10 @@ class SimInit:
         _wera = (rules.wonders or {}).get("eras", []) or [0]
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        # CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER
+        # (`Tile.submerged`). Open water for every rule that asks, and unusable
+        # besides — it yields nothing and no citizen may work it.
+        self.tile_submerged = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         # A dig REMEMBERS its era and its civilization — the theming rule's
         # inputs travel with the Artifact out of the ground.
         self.antiquity_era = torch.full((B, self.T), -1, dtype=torch.long, device=device)
@@ -1861,6 +1865,7 @@ class SimInit:
         self._road_tier_bridges = list(rules.road_tier_bridges)
         self._road_tier_era = list(rules.road_tier_era)
         self._railroad_mp = int(rules.railroad_mp)
+        self._wonder_coastal_mask = int(rules.wonder_coastal_mask)
         self._railroad_tech = int(rules.railroad_tech)
         self._railroad_cost = list(rules.railroad_cost)
         self._embark_transition_mp = int(rules.embark_transition_mp)
@@ -1981,6 +1986,7 @@ class SimInit:
         ]
         self._appeal_house_idx = [i for i in range(len(self.districts_cat)) if bool(self._d_appeal_housing[i])]
         self._h_fresh = float(rules.housing_fresh)
+        self._h_none = float(rules.housing_none)
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 

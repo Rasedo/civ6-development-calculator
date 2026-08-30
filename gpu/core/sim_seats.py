@@ -4653,7 +4653,7 @@ class SimSeats:
         "adjacent unimproved tiles" by APPEAL, and a natural wonder is
         unimproved and Breathtaking by construction, so `tileYields`' wonder
         arm adds the band on top of the roster row."""
-        return (self.work_ok | self.nwonder).unsqueeze(2).to(self.dtype)
+        return ((self.work_ok | self.nwonder) & ~self.tile_submerged).unsqueeze(2).to(self.dtype)
 
     def _seat_route_income(self, row: int) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this

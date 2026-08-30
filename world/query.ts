@@ -6,7 +6,7 @@ import { WONDERS } from './wonders';
 import type { GameMap, Tile } from './types';
 
 export function isWater(tile: Tile): boolean {
-  return TERRAINS[tile.terrain].water;
+  return TERRAINS[tile.terrain].water || !!tile.submerged;
 }
 
 export function isLand(tile: Tile): boolean {

@@ -56,6 +56,8 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
 export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const out = emptyYields();
 
+  // a tile the sea has taken yields nothing, whatever is recorded under it
+  if (tile.submerged) return out;
   if (tile.wonder) {
     addYields(out, WONDERS[tile.wonder]?.tileYields ?? {});
     // CIV6 (Grove): "+1 Food and Faith to adjacent unimproved tiles with

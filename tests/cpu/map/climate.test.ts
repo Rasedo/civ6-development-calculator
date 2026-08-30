@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt, expandBorders, grantTechs } from '../helpers';
+import { makeMap, makeState, tileAtCoords, settleAt, expandBorders, grantTechs, bareCtx } from '../helpers';
 import {
   deriveLowlands, standingRemovable, deforestationLevel, worldCarbon, climatePoints,
   emitCarbon, plantCarbon, unitCarbon, climateTurn, floodLevel, floodBarrierCost,
@@ -17,6 +17,9 @@ import { completeQueueItem } from '../../../cpu/core/production';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import { seatOf } from '../../../cpu/core/seats';
 import { BUILDINGS } from '../../../cpu/data/buildings';
+import { spawnUnit, unitPassable } from '../../../cpu/core/units';
+import { tileYields } from '../../../cpu/core/yields';
+import { isWater } from '../../../world/query';
 import type { GameState } from '../../../cpu/core/types';
 
 // Gathering Storm's climate arc, clause by clause. Every magnitude below is
@@ -186,6 +189,66 @@ describe('the seven phases', () => {
     climateTurn(state);
     expect(state.climateIdx).toBe(2);
     expect(behind.flooded).toBe(true);
+  });
+
+  it('Phase IV takes band 1 forever, and the sea keeps what it takes', () => {
+    const state = makeState(coast());
+    state.unitsMode = true;
+    const front = tileAtCoords(state.map, 1, 3);
+    front.improvement = 'FARM';
+    front.road = true;
+    const foot = spawnUnit(state, 'WARRIOR', front.index, 0)!;
+    const hull = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 0, 3).index, 0)!;
+    emitPoints(state, 5);
+    climateTurn(state);
+    expect(state.climateIdx).toBe(3);
+    // CIV6 (Coastal Lowlands): the band is "lost forever" — open water for
+    // every rule that asks, and unusable besides.
+    expect(front.submerged).toBe(true);
+    expect(isWater(front)).toBe(true);
+    expect(front.improvement).toBe(null);
+    expect(front.road).toBe(false);
+    expect(front.lowland).toBeUndefined();
+    expect(unitPassable(front, hull)).toBe(true);
+    expect(unitPassable(front, foot)).toBe(false);
+    // it yields nothing and no citizen may work it
+    const ctx = bareCtx(state.map);
+    expect(Object.values(tileYields(ctx, front)).some((v) => v !== 0)).toBe(false);
+    // ...and the land unit caught on it went down with the ground, while the
+    // hull beside it is simply afloat
+    expect(state.units.includes(foot)).toBe(false);
+    expect(state.units.includes(hull)).toBe(true);
+    // band 2 is still dry: it goes at Phase VI
+    const behind = tileAtCoords(state.map, 2, 3);
+    expect(behind.submerged).toBeUndefined();
+    emitPoints(state, 2);
+    climateTurn(state);
+    expect(state.climateIdx).toBe(5);
+    expect(behind.submerged).toBe(true);
+  });
+
+  it('a Flood Barrier keeps its own city dry, and no centre is ever taken', () => {
+    const state = makeState(coast(12, 10));
+    const city = settleAt(state, tileAtCoords(state.map, 1, 4).index, 0);
+    expandBorders(state, city, 2);
+    const centre = state.map.tiles[city.centerIndex];
+    expect(centre.lowland).toBe(1);
+    const mine = state.map.tiles.find(
+      (x) => x.lowland === 1 && x.ownerCity === city.id && x.index !== centre.index,
+    )!;
+    const far = state.map.tiles.find((x) => x.lowland === 1 && x.ownerSeat < 0)!;
+    city.buildings.push('FLOOD_BARRIER');
+    emitPoints(state, 5);
+    climateTurn(state);
+    expect(state.climateIdx).toBe(3);
+    expect(mine.submerged).toBeUndefined();   // behind the barrier
+    expect(far.submerged).toBe(true);         // and outside it
+    // a city is never destroyed by the sea, barrier or no
+    city.buildings.length = 0;
+    expect(centre.submerged).toBeUndefined();
+    emitPoints(state, 2);
+    climateTurn(state);
+    expect(centre.submerged).toBeUndefined();
   });
 
   it('the polar ice melts by the phase fraction, from the front of the map', () => {

@@ -45,6 +45,7 @@ import { DEAL_ITEMS } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
+import { isWater } from '../../world/query';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile, MP_SCALE } from '../data/constants';
@@ -714,6 +715,8 @@ const TILE: Record<string, Extractor> = {
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   railroad: overTiles((t) => (t.railroad ? 1 : 0)),
+  submerged: overTiles((t) => (t.submerged ? 1 : 0)),
+  water: overTiles((t) => (isWater(t) ? 1 : 0)),
   floodCount: overTiles((t) => t.floodCount ?? 0),
   airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),

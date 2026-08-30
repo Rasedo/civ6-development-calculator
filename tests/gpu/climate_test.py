@@ -142,6 +142,64 @@ def main() -> int:
     assert bool(s5.tile_flooded[b, band2].all())
     print(f"  5 flooding OK ({len(band1)} band-1 tiles under at Phase II)")
 
+    # --- 5b) a phase that SUBMERGES takes its band forever ----------------
+    s5b = fresh(rules, paths[0])
+    keep = (s5b.tile_lowland[b] == 2).nonzero(as_tuple=True)[0]
+    take = (s5b.tile_lowland[b] == 1) & ~s5b._centre_plane()[b]
+    ti = take.nonzero(as_tuple=True)[0]
+    assert len(ti), "no band-1 tile to drown on this seed"
+    t0 = int(ti[0])
+    # stand a LAND unit on it and a hull beside it, and pave the ground
+    s5b.improvement[b, t0] = 0
+    s5b.road[b, t0] = True
+    land = next((v for v in range(s5b.major_unit_alive.shape[1])
+                 if bool(s5b.major_unit_alive[b, v])
+                 and not bool(s5b.unit_naval[s5b.major_unit_type[b, v]])), -1)
+    assert land >= 0, "the fixture fields no unit to drown"
+    lo = s5b.POOL_LO["major"]
+    s5b.military_at[b, s5b.major_unit_tile[b, land]] = -1
+    s5b.civilian_at[b, s5b.major_unit_tile[b, land]] = -1
+    s5b.major_unit_tile[b, land] = t0
+    s5b.military_at[b, t0] = land + lo
+    wh0 = float(s5b.tile_wh[b, t0])
+    _emit_points(s5b, row, 5)
+    s5b._climate_turn()
+    assert int(s5b.climate_idx[b]) == 3, "Phase IV is the first that submerges"
+    # CIV6 (Coastal Lowlands): the band is "lost forever" — open water for
+    # every rule that asks, and unusable besides.
+    assert bool(s5b.tile_submerged[b, t0]) and bool(s5b.water[b, t0])
+    assert bool(s5b.wpass[b, t0]) and not bool(s5b.passable[b, t0])
+    assert not bool(s5b.work_ok[b, t0]) and float(s5b.tile_yields[b, t0].sum()) == 0
+    assert not bool(s5b.settle_ok[b, t0]) and not bool(s5b.d_usable[b, t0])
+    assert not bool(s5b.camp_ok[b, t0]) and not bool(s5b.coastal_land[b, t0])
+    assert int(s5b.improvement[b, t0]) == -1 and not bool(s5b.road[b, t0])
+    assert int(s5b.tile_lowland[b, t0]) == 0, "nothing left to price a barrier against"
+    assert int(s5b.wok[b, t0]) == 0, "and no built wonder may stand in the sea"
+    if wh0 != s5b._h_fresh:
+        assert float(s5b.tile_wh[b, t0]) == s5b._h_none, (
+            "the ground the sea took is no longer coastal LAND")
+    assert not bool(s5b.major_unit_alive[b, land]), "the land unit went down with it"
+    assert int(s5b.military_at[b, t0]) < 0, "and left the plane it was holding"
+    assert not bool(s5b.tile_submerged[b, keep].any()), "band 2 goes at Phase VI"
+    _emit_points(s5b, row, 2)
+    s5b._climate_turn()
+    assert int(s5b.climate_idx[b]) == 5
+    assert bool(s5b.tile_submerged[b, keep].all()), "and it does"
+    print(f"  5b submersion OK ({len(ti)} band-1 tiles lost forever at Phase IV)")
+
+    # --- 5c) a barrier holds the sea off, and no CENTRE is ever taken ------
+    s5c = settle_all(fresh(rules, paths[0]))
+    ctr = s5c._centre_plane()[b] & (s5c.tile_lowland[b] > 0)
+    if bool(ctr.any()):
+        c0 = int(ctr.nonzero(as_tuple=True)[0][0])
+        band = int(s5c.tile_lowland[b, c0])
+        _emit_points(s5c, row, 8)
+        s5c._climate_turn()
+        assert int(s5c.climate_idx[b]) == 6, "every phase crossed at once"
+        assert not bool(s5c.tile_submerged[b, c0]), (
+            f"a band-{band} CENTRE stayed above water: no sea destroys a city")
+    print("  5c centre exemption OK (a city is never taken by the sea)")
+
     # --- 6) the FLOOD BARRIER: cost, gate, protection, repair -------------
     s6 = settle_all(fresh(rules, paths[0]))
     bidx = _bidx(rj, "FLOOD_BARRIER")

@@ -183,6 +183,12 @@ export interface Tile {
    *  bonus, but is still workable and can be repaired behind a Flood
    *  Barrier. */
   flooded?: boolean;
+  /** CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER. It is open
+   *  water for every rule that asks — a hull sails it, no land unit stands on
+   *  it, the city beside it turns coastal — and it is unusable besides: it
+   *  yields nothing and no citizen may work it. The map's terrain, feature,
+   *  resource and river edges stay recorded underneath, unread. */
+  submerged?: boolean;
   /** CIV6 (Railroad): the 0.25-Movement route a Military Engineer lays over
    *  the road, at the cost of 1 Iron and 1 Coal. */
   railroad?: boolean;
