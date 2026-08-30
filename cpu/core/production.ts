@@ -15,6 +15,7 @@ import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
 import { emitCarbon, repairBehindBarrier } from './climate';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
+import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
@@ -98,8 +99,15 @@ export function completeProject(state: GameState, city: City, projectId: string,
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }
-  if (def.space) {
-    if (!owner.spaceProjects.includes(projectId)) owner.spaceProjects.push(projectId);
+  if (def.wmd) {
+    // CIV6: the finished device joins the seat's INVENTORY, not any city's.
+    const inv = (owner.wmd ??= NUCLEAR_DEVICES.map(() => 0));
+    inv[def.wmd - 1] += 1;
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
+  if (def.once) {
+    if (!owner.projectsDone.includes(projectId)) owner.projectsDone.push(projectId);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     // The sourced side effects, per step (Launch Mars Colony has none — it
     // exists to open the expedition).

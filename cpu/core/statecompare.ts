@@ -496,7 +496,8 @@ const SEAT: Record<string, Extractor> = {
   pantheonDone: overSeats((s) => (s.religion.pantheon !== null ? 1 : 0)),
   enhancerDone: overSeats((s) => ((s.religion.enhancer ?? null) !== null ? 1 : 0)),
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
-  spaceProjects: overSeats((s) => s.spaceProjects.length),
+  projectsDone: overSeats((s) => s.projectsDone.length),
+  wmd: overSeats((s) => (s.wmd ?? []).reduce((n, x) => n + x, 0)),
   routeCount: overSeats((s) => (s.tradeRoutes ?? []).length),
   // Every route's IDENTITY, not just how many. Destinations are keyed by
   // CENTRE TILE — the digest's own city join key — so the comparison does not
@@ -716,6 +717,7 @@ const TILE: Record<string, Extractor> = {
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   railroad: overTiles((t) => (t.railroad ? 1 : 0)),
   submerged: overTiles((t) => (t.submerged ? 1 : 0)),
+  falloutTurns: overTiles((t) => t.falloutTurns ?? 0),
   water: overTiles((t) => (isWater(t) ? 1 : 0)),
   floodCount: overTiles((t) => t.floodCount ?? 0),
   airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),

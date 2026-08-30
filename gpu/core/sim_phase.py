@@ -831,22 +831,27 @@ class SimPhase:
                             _lr = hit.nonzero(as_tuple=True)[0]
                             if len(_lr) > 0:
                                 self.city_lasers[_lr, row, col[_lr]] += 1
-                    if int(prow.get("sp", 0)):
-                        step_k = self._space_step[pidx]
-                        self.space_done[hit, row, step_k] = True
+                    _wk = int(prow.get("wmd", 0))
+                    if _wk > 0:
+                        # CIV6: the finished device joins the seat INVENTORY,
+                        # not any city's.
+                        self.civ_wmd[:, row, _wk - 1] += hit.long()
+                    if int(prow["one"]):
+                        step_k = self._once_step[pidx]
+                        self.project_done[hit, row, step_k] = True
                         # The sourced per-step side effects (`completeProject`'s
-                        # space arm; step 2, Mars Colony, has none).
-                        if step_k == 0 and self.fog_of_war:
+                        # space arm; Mars Colony has none).
+                        if pidx == self._proj_reveal_idx and self.fog_of_war:
                             # CIV6: Launch Earth Satellite reveals the entire
                             # map — the same fog gate as every reveal site.
                             self.seat_explored[hit, row] = True
-                        if step_k == 1 and sci_turn is not None:
+                        if pidx == self._proj_moon_idx and sci_turn is not None:
                             # CIV6: one-time Culture of 10x science/turn, the
                             # applyLumpYield culture arm (pool + lifetime bank).
                             amt_c = js_round(10.0 * sci_turn)
                             self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_c, self.civ_civic_prog[:, row])
                             self.civ_culture[:, row] = torch.where(hit, self.civ_culture[:, row] + amt_c, self.civ_culture[:, row])
-                        if pidx in self._space_victory_idx:
+                        if pidx in self._once_victory_idx:
                             # CIV6: completing the Exoplanet Expedition LAUNCHES
                             # the craft; the win fires on ARRIVAL, in step().
                             self.space_ly[hit, row] = 0

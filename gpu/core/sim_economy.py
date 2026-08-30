@@ -1476,7 +1476,7 @@ class SimEconomy:
             "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
             "culsuz": _z.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
-            "xppct": _z.clone(), "wwcut": _z.clone(),
+            "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
             "dch": _z.clone(), "dca": _z.clone(),
             "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
             "gpp": torch.zeros(B, self._gov_gpp.shape[1], dtype=torch.float64, device=dev),
@@ -1530,7 +1530,8 @@ class SimEconomy:
                            ("crng", self._gov_crng), ("rgold", self._gov_rgold),
                            ("infl", self._gov_infl), ("culsuz", self._gov_culsuz),
                            ("xppct", self._gov_xppct),
-                           ("wwcut", self._gov_wwcut), ("dch", self._gov_dc_house),
+                           ("wwcut", self._gov_wwcut), ("wmdup", self._gov_wmdup),
+                           ("dch", self._gov_dc_house),
                            ("dca", self._gov_dc_amen), ("wallhouse", self._gov_wallhouse),
                            ("theocs", self._gov_theocs), ("govbldy", self._gov_govbldy)):
                 fx[_k] = fx[_k] + _t[adopted] * _gf
@@ -1583,7 +1584,8 @@ class SimEconomy:
                                ("crng", self._pol_crng), ("rgold", self._pol_rgold),
                                ("infl", self._pol_infl), ("culsuz", self._pol_culsuz),
                                ("xppct", self._pol_xppct),
-                               ("wwcut", self._pol_wwcut), ("dch", self._pol_dc_house),
+                               ("wwcut", self._pol_wwcut), ("wmdup", self._pol_wmdup),
+                               ("dch", self._pol_dc_house),
                                ("dca", self._pol_dc_amen), ("wallhouse", self._pol_wallhouse),
                                ("theocs", self._pol_theocs), ("govbldy", self._pol_govbldy)):
                     fx[_k] = fx[_k] + sd @ _t

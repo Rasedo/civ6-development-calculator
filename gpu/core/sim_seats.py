@@ -126,28 +126,31 @@ class SimSeats:
                         continue
                     ok_w[:, wi] = okc_m & self._wonder_cand(row, j, wi, base_okm).any(dim=1)
             # PROJECT columns [nP], the `availableProjects` predicate: the row's
-            # district must be COMPLETE on this city; a SPACE row must also be
-            # un-done, tech-unlocked, and preceded by its finished step; a
-            # LASER row is repeatable and tech-gated only.
+            # district must be COMPLETE on this city; a ONE-TIME row must also
+            # be un-done, tech-unlocked and preceded by its finished step; a
+            # LASER or a DEVICE row is repeatable and gated on its own terms.
+            # The CITY CENTER channel changes only how the district is found —
+            # every gate below it applies there too.
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
             for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
                 d_im = int(prow_m.get("d", -1))
                 if int(prow_m.get("cc", 0)):
-                    # the CITY CENTER channel: the one district every city
-                    # already has, so there is no registry entry to look up
+                    # the one district every city already has, so there is no
+                    # registry entry to look up
                     okp_m = self.city_alive[:, row, j]
-                    if int(prow_m.get("rep", 0)):
-                        okp_m = okp_m & self._repair_available(row, j)
-                    ok_p[:, pi_m] = okp_m
+                elif d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
                     continue
-                if d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
-                    continue
-                regp_m = self.city_dist_tile[:, row, j, d_im]
-                okp_m = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
-                if int(prow_m.get("sp", 0)):
-                    okp_m = okp_m & self._space_step_ok(row, pi_m)
+                else:
+                    regp_m = self.city_dist_tile[:, row, j, d_im]
+                    okp_m = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+                if int(prow_m.get("rep", 0)):
+                    okp_m = okp_m & self._repair_available(row, j)
+                elif int(prow_m["one"]):
+                    okp_m = okp_m & self._once_step_ok(row, pi_m)
                 elif int(prow_m.get("ls", 0)):
                     okp_m = okp_m & self._laser_project_ok(row, pi_m)
+                elif int(prow_m.get("wmd", 0)):
+                    okp_m = okp_m & self._wmd_project_ok(row, pi_m)
                 elif int(prow_m.get("rec", 0)):
                     okp_m = okp_m & self._recommission_ok(row, j, pi_m)
                 _rv = int(prow_m.get("rv", -1))
@@ -1604,10 +1607,12 @@ class SimSeats:
                     # RE-VALIDATE the chain at apply, not just at mask: a record
                     # is replayed a phase after the mask that justified it, and
                     # the step in front of it may have completed since.
-                    if int(prow_a.get("sp", 0)):
-                        has_pa = has_pa & self._space_step_ok(row, pi_a)
+                    if int(prow_a["one"]):
+                        has_pa = has_pa & self._once_step_ok(row, pi_a)
                     elif int(prow_a.get("ls", 0)):
                         has_pa = has_pa & self._laser_project_ok(row, pi_a)
+                    elif int(prow_a.get("wmd", 0)):
+                        has_pa = has_pa & self._wmd_project_ok(row, pi_a)
                     _rva = int(prow_a.get("rv", -1))
                     if _rva >= 0:
                         has_pa = has_pa & self.civ_civics[:, row, _rva]
@@ -1676,7 +1681,22 @@ class SimSeats:
             ok = ok & self.civ_techs[:, row, rt]
         rp = int(prow.get("rp", -1))
         if rp >= 0:
-            ok = ok & self.space_done[:, row, self._space_step[rp]]
+            ok = ok & self.project_done[:, row, self._once_step[rp]]
+        return ok & self._project_resource_ok(row, pi)
+
+    def _wmd_project_ok(self, row: int, pi: int) -> torch.Tensor:
+        '''[B] - may this seat START device build `pi`? Repeatable, so never in
+        the one-time ledger: it asks for its tech, for the unlock project that
+        opened it, and for its device Uranium (the `availableProjects` wmd
+        arm).'''
+        prow = self._proj_rows[pi]
+        ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        rt = int(prow.get("rt", -1))
+        if rt >= 0:
+            ok = ok & self.civ_techs[:, row, rt]
+        rp = int(prow.get("rp", -1))
+        if rp >= 0:
+            ok = ok & self.project_done[:, row, self._once_step[rp]]
         return ok & self._project_resource_ok(row, pi)
 
     def _recommission_ok(self, row: int, j: int, pi: int) -> torch.Tensor:
@@ -2177,7 +2197,7 @@ class SimSeats:
         col = self.civ_stockpile[:, row, rs]
         col.copy_(torch.where(hit, (col - rc).clamp(min=0), col))
 
-    def _space_step_ok(self, row: int, pi: int) -> torch.Tensor:
+    def _once_step_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START space-race step `pi` right now?
 
         The `availableProjects` space arm, term for term: not already in the
@@ -2186,14 +2206,14 @@ class SimSeats:
         projects table, so it maps through the same chain-step table the
         completion write uses — the ledger is keyed by STEP, not by row.
         """
-        ok = ~self.space_done[:, row, self._space_step[pi]]
+        ok = ~self.project_done[:, row, self._once_step[pi]]
         prow = self._proj_rows[pi]
         rt = int(prow.get("rt", -1))
         if rt >= 0:
             ok = ok & self.civ_techs[:, row, rt]
         rp = int(prow.get("rp", -1))
         if rp >= 0:
-            ok = ok & self.space_done[:, row, self._space_step[rp]]
+            ok = ok & self.project_done[:, row, self._once_step[rp]]
         return ok
 
     def _seat_job_mask(self, row: int) -> torch.Tensor:

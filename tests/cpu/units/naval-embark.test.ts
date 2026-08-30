@@ -45,7 +45,7 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
     buildersTrained: 0,
     bestMeleeCS: 0,
     tilesPurchased: 0,
-    spaceProjects: [],
+    projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   // A minimal off-map "home" so the civ is a real civ; the war-march targets
@@ -226,7 +226,7 @@ function bareCiv(state: GameState, atWar = true): Seat {
     buildersTrained: 0,
     bestMeleeCS: 0,
     tilesPurchased: 0,
-    spaceProjects: [],
+    projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   state.seats.push(civ);

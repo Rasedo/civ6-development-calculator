@@ -1,7 +1,7 @@
 
 import { PROMO_COLS } from '../data/promotions';
 
-export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM'];
+export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -11,6 +11,7 @@ export const AIR_STRIKE_COLS = 12;
 import { SPY_TRAVEL_COLS, SPY_MISSIONS } from '../data/espionage';
 export { SPY_TRAVEL_COLS, SPY_MISSIONS };
 export const AIR_REBASE_COLS = 6;
+
 
 export function unitActionNames(improvementIds: readonly string[]): string[] {
   const names: string[] = [];

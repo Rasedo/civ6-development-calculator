@@ -837,13 +837,23 @@
           ]
         },
         {
-          "name": "spaceProjects",
+          "name": "projectsDone",
           "compare": "exact",
           "covers": [
-            "Seat.spaceProjects"
+            "Seat.projectsDone"
           ],
           "planes": [
-            "space_done"
+            "project_done"
+          ]
+        },
+        {
+          "name": "wmd",
+          "compare": "exact",
+          "covers": [
+            "Seat.wmd"
+          ],
+          "planes": [
+            "civ_wmd"
           ]
         },
         {
@@ -2292,6 +2302,17 @@
             "tile_submerged"
           ],
           "note": "the sea has taken this tile forever: open water for every rule that asks, and unusable besides."
+        },
+        {
+          "name": "falloutTurns",
+          "compare": "exact",
+          "covers": [
+            "Tile.falloutTurns"
+          ],
+          "planes": [
+            "tile_fallout"
+          ],
+          "note": "turns of radioactive fallout still on the tile: it damages whoever ends a turn there, and nothing may be worked, built or bought on it."
         },
         {
           "name": "water",

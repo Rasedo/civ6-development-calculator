@@ -275,6 +275,21 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     airSlots: 3,
     description: 'Military Engineer only, flat land. Bases 3 aircraft and costs its neighbours a point of appeal.',
   },
+  // CIV6 (Missile Silo): "Base for launching nukes", built by the Military
+  // Engineer, unlocked by Rocketry, and its terrain list is the five FLAT
+  // land terrains this map carries. Plunder: None.
+  MISSILE_SILO: {
+    id: 'MISSILE_SILO',
+    name: 'Missile Silo',
+    code: 'Si',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    engineer: true,
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT'],
+    description: 'Military Engineer only, flat land. Launches nuclear devices at range.',
+  },
   // THE SUZERAIN IMPROVEMENTS. Each is built by "a player that is the
   // Suzerain of" one city-state, and each row below is that improvement's own
   // Civilopedia page, read line by line.

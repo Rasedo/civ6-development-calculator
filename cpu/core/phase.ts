@@ -46,6 +46,7 @@ import { accrueStockpiles, chargeUnitUpkeep, layRailroad, resolveSeatPower } fro
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
+import { wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater } from '../../world/query';
@@ -2226,6 +2227,7 @@ export function seatPhase(state: GameState): void {
       (s, u) => s + (u.seat === actor.seat ? unitUpkeep(seatMods, u.type) : 0),
       0,
     );
+    actor.treasury -= wmdUpkeep(state, actor.seat);
     if (Math.round(actor.treasury * 1000) < 0) {
       let victim: Unit | undefined;
       for (const u of state.units) {

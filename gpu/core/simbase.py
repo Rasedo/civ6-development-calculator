@@ -180,6 +180,8 @@ class Rules:
     b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
     b_appeal_y: torch.Tensor  # f64 [NB, 2, 6] — what it pays an adjacent unimproved tile at Breathtaking, then Charming
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
+    nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, cleanCharges, siloIid, wwLaunched, emergency*}
+    gdr: dict  # {upgradeTech[4], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS, navalPenalty}
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
@@ -370,6 +372,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),
         b_appeal_y=torch.tensor([b.get("appealYields") or [[0.0] * 6, [0.0] * 6] for b in B], dtype=torch.float64),
         strategic=r["strategic"],
+        nuclear=r["nuclear"],
+        gdr=r["gdr"],
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp_pct=torch.tensor([int(b.get("trainXpPct", 0)) for b in B], dtype=torch.long),
         b_train_xp_cls=_class_mask([b.get("trainXpClasses", []) for b in B], len(_P.get("classes", []))),
@@ -689,9 +693,11 @@ _MUTABLE = [
     "seat_science_total",
     "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
-    "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
+    "victory_type", "victory_row", "winner", "project_done",  # one-time project ledger
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
     "civ_stockpile", "city_powered",  # GS strategic banks, and the grid they run
+    "civ_wmd",  # nuclear devices held, dense over the device catalog
+    "tile_fallout",  # turns of radioactive fallout still on a tile
     "district_dead",  # captured districts are paved-but-dead
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor
     # `tile_seat` is STATE — the city-state part of tile ownership is stored

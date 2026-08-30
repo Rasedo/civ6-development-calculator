@@ -418,7 +418,7 @@ export function repairAvailable(state: GameState, city: City): boolean {
 
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
   const owner = seatOf(state, city.seat);
-  const done = owner?.spaceProjects ?? [];
+  const done = owner?.projectsDone ?? [];
   return Object.values(PROJECTS).filter((p) => {
     if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
       return false;
@@ -433,13 +433,20 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
       if (p.requiresProject && !done.includes(p.requiresProject)) return false;
       return canRunProject(state, city.seat, p.id);
     }
+    if (p.wmd) {
+      // CIV6: repeatable, so no ledger — but it wants its tech, the unlock
+      // project that opened it, and its device's Uranium in the stockpile.
+      if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
+      if (p.requiresProject && !done.includes(p.requiresProject)) return false;
+      return canRunProject(state, city.seat, p.id);
+    }
     if (p.recommission) {
       // CIV6: offered to a city whose Industrial Zone holds a Nuclear Power
       // Plant, once Nuclear Fission is in. Repeatable, so no ledger.
       if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
       return city.buildings.includes('NUCLEAR_POWER_PLANT');
     }
-    if (!p.space) return true;
+    if (!p.once) return true;
     if (done.includes(p.id)) return false; // one-time
     if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
     if (p.requiresProject && !done.includes(p.requiresProject)) return false;

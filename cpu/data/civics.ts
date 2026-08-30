@@ -199,6 +199,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
 
     C('COLD_WAR', 'Cold War', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockPolicy', policy: 'CONTAINMENT' },
+      { kind: 'unlockPolicy', policy: 'SECOND_STRIKE_CAPABILITY' },
     ]),
     C('SPACE_RACE', 'Space Race', 'Atomic', 2415, ['COLD_WAR']),
     C('RAPID_DEPLOYMENT', 'Rapid Deployment', 'Atomic', 2415, ['COLD_WAR'], [

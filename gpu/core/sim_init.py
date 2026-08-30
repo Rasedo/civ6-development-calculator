@@ -997,11 +997,19 @@ class SimInit:
         # order. space_proj_idx = the projects-table rows that are space steps;
         # space_step maps a row idx to its 0-based position in the chain;
         # space_victory_idx = the winning step(s). Mirrors cpu/data/projects.ts
-        # SPACE_PROJECTS + completeProject.
-        self._space_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row.get("sp", 0))]
-        self._n_space = len(self._space_proj_idx)
-        self._space_step = {pi: k for k, pi in enumerate(self._space_proj_idx)}
-        self._space_victory_idx = {i for i in self._space_proj_idx if int(self._proj_rows[i].get("vic", 0))}
+        # the one-time ledger + completeProject.
+        self._once_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row["one"])]
+        self._n_once = len(self._once_proj_idx)
+        self._once_step = {pi: k for k, pi in enumerate(self._once_proj_idx)}
+        self._once_victory_idx = {i for i in self._once_proj_idx if int(self._proj_rows[i].get("vic", 0))}
+        # the SPACE-RACE subset, which is what a Great Engineer's space
+        # production acts on — a one-time project elsewhere is not one.
+        self._space_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row["spc"])]
+        # the two space steps with a side effect of their own, addressed by ROW
+        # rather than by chain position - the ledger now holds more than the
+        # space chain.
+        self._proj_reveal_idx = self._space_proj_idx[0] if len(self._space_proj_idx) > 0 else -1
+        self._proj_moon_idx = self._space_proj_idx[1] if len(self._space_proj_idx) > 1 else -1
         # Laser-station rows: repeatable, gated on the tech AND the finished
         # expedition, each completion speeding the craft by +1 LY/turn. The
         # ORBITAL one (`orb`) pays unconditionally; the terrestrial one draws
@@ -1672,6 +1680,7 @@ class SimInit:
                 dtype=torch.float64, device=device)
             self._gov_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_wmdup = torch.tensor([float(r.get("wmdUpkeepPct", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _govs], dtype=dtype, device=device)
@@ -1707,6 +1716,7 @@ class SimInit:
             self._gov_fx_mag = float(
                 (self._gov_prodb[:, 0] >= 0).sum()
                 + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
+                + self._gov_wmdup.abs().sum()
                 + self._gov_vbarb.abs().sum() + self._gov_cdef.abs().sum()
                 + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
                 + (self._gov_rplun - 1).abs().sum() + self._gov_rgold.abs().sum()
@@ -1754,6 +1764,7 @@ class SimInit:
                 dtype=torch.float64, device=device)
             self._pol_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_wmdup = torch.tensor([float(r.get("wmdUpkeepPct", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _pols], dtype=dtype, device=device)
@@ -1826,6 +1837,7 @@ class SimInit:
             self._pol_fx_mag = float(
                 (self._pol_prodb[:, 0] >= 0).sum()
                 + self._pol_bcharge.abs().sum() + self._pol_mcut.abs().sum()
+                + self._pol_wmdup.abs().sum()
                 + self._pol_vbarb.abs().sum() + self._pol_cdef.abs().sum()
                 + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
                 + (self._pol_rplun - 1).abs().sum() + self._pol_rgold.abs().sum()
@@ -2143,6 +2155,29 @@ class SimInit:
         # GS STRATEGIC STOCKPILES: one slot per strategic resource, the
         # resource-table id it reads a tile with, and what one improved source
         # pays per turn. `_strat_slot_of` inverts the map for a tile's `rid`.
+        _nuc = rules.nuclear
+        self._devices = list(_nuc["devices"])
+        self._n_devices = len(self._devices)
+        self._nuke_radius = [int(d["radius"]) for d in self._devices]
+        self._nuke_fallout = [int(d["fallout"]) for d in self._devices]
+        self._nuke_range = [int(d["range"]) for d in self._devices]
+        self._nuke_upkeep = [float(d["upkeep"]) for d in self._devices]
+        self._fallout_damage = float(_nuc["falloutDamage"])
+        self._nuke_robot_damage = float(_nuc["robotDamage"])
+        self._nuke_cover_range = int(_nuc["coverRange"])
+        self._fallout_clean_charges = int(_nuc["cleanCharges"])
+        self._silo_iid = int(_nuc["siloIid"])
+        self._ww_wmd_launched = float(_nuc["wwLaunched"])
+        self._emg_nuclear = int(_nuc["emergencyNuclear"])
+        self._emg_nuke_cs = float(_nuc["emergencyNukeCS"])
+        self._emg_nuke_loyalty_cut = float(_nuc["emergencyNukeLoyaltyCut"])
+        _gdr = rules.gdr
+        self._gdr_upgrade_tech = [int(x) for x in _gdr["upgradeTech"]]
+        self._gdr_drone_aa = float(_gdr["droneAA"])
+        self._gdr_particle_cs = float(_gdr["particleBeamCS"])
+        self._gdr_enhanced_moves = int(_gdr["enhancedMoves"])
+        self._gdr_armor_cs = float(_gdr["armorPlatingCS"])
+        self._gdr_naval_penalty = float(_gdr["navalPenalty"])
         _st = rules.strategic
         self._strat_rid = [int(x) for x in _st["rid"]]
         self._strat_rate = [int(x) for x in _st["rate"]]
@@ -2220,7 +2255,9 @@ class SimInit:
         self.victory_type = torch.zeros(B, dtype=torch.long, device=device)
         self.victory_row = torch.full((B,), -1, dtype=torch.long, device=device)
         self.winner = torch.full((B,), -1, dtype=torch.long, device=device)
-        self.space_done = torch.zeros(B, self.n_majors, max(self._n_space, 1), dtype=torch.bool, device=device)
+        self.project_done = torch.zeros(B, self.n_majors, max(self._n_once, 1), dtype=torch.bool, device=device)
+        self.civ_wmd = torch.zeros(B, self.n_majors, max(self._n_devices, 1), dtype=torch.long, device=device)
+        self.tile_fallout = torch.zeros(B, self.T, dtype=torch.long, device=device)
         # The Exoplanet flight: LY travelled (-1 = no craft in flight) and the
         # completed laser stations that speed it. Win on ARRIVAL, in step().
         self.space_ly = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)

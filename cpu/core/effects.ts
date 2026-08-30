@@ -18,7 +18,7 @@ import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain, suzer
 
 import { GP_PERM } from '../data/greatPeople';
 import { CLASS_BIT, classBitOf } from '../data/promotions';
-import { PROJECTS } from '../data/projects';
+import { isSpaceProject } from '../data/projects';
 import { cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 export interface Unlocks {
@@ -157,6 +157,7 @@ export interface Modifiers {
   prodBoosts: ProdBoost[];
   builderCharges: number;
   unitMaintenanceCut: number;
+  wmdUpkeepPct: number;
   combatVsBarbarians: number;
   cityDefense: number;
   cityRanged: number;
@@ -243,6 +244,7 @@ export function defaultModifiers(): Modifiers {
     prodBoosts: [],
     builderCharges: 0,
     unitMaintenanceCut: 0,
+    wmdUpkeepPct: 0,
     combatVsBarbarians: 0,
     cityDefense: 0,
     cityRanged: 0,
@@ -319,6 +321,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.prodBoost) mods.prodBoosts.push(fx.prodBoost);
   if (fx.builderCharges) mods.builderCharges += fx.builderCharges;
   if (fx.unitMaintenanceCut) mods.unitMaintenanceCut += fx.unitMaintenanceCut;
+  if (fx.wmdUpkeepPct) mods.wmdUpkeepPct += fx.wmdUpkeepPct;
   if (fx.combatVsBarbarians) mods.combatVsBarbarians += fx.combatVsBarbarians;
   if (fx.cityDefense) mods.cityDefense += fx.cityDefense;
   if (fx.cityRanged) mods.cityRanged += fx.cityRanged;
@@ -438,7 +441,7 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
   // A Great Person's permanent share stacks additively with the cards, which
   // is how CIV6 stacks production modifiers.
   if (q.kind === 'unit' || q.kind === 'settler') pct += (gpPerm?.[GP_PERM.indexOf('unitProdPct')] ?? 0) / 100;
-  if (q.kind === 'project' && PROJECTS[q.project]?.space) pct += (gpPerm?.[GP_PERM.indexOf('spaceProdPct')] ?? 0) / 100;
+  if (q.kind === 'project' && isSpaceProject(q.project)) pct += (gpPerm?.[GP_PERM.indexOf('spaceProdPct')] ?? 0) / 100;
   for (const b of mods.prodBoosts) {
     if (b.target === 'wonder') {
       if (q.kind !== 'wonder') continue;

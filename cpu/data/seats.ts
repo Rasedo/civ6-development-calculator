@@ -125,7 +125,6 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // the thread's "+10 * base" nuke reading (12x total with the abroad multiplier).
 //
 // NOT MODELLED, and now known to exist because the data names them:
-//   * WAR_WEARINESS_PER_WMD_LAUNCHED 10 — there are no nuclear weapons here.
 //   * WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
 //     FOUNDED_CITY 0}. What these three DO is published nowhere; reading them
 //     as a per-city split is an inference off their names. The rule that IS
@@ -145,6 +144,13 @@ export const WW_DECAY_AT_WAR = 50;
 export const WW_DECAY_AT_PEACE = 200;
 export const WW_PEACE_TREATY = 2000;
 export const WAR_WEARINESS_PER_AMENITY = 400;
+/** CIV6 (War weariness): "every time you drop a nuke, the war weariness it
+ *  will incur is equal to 12 times the Era Base value. There is no difference
+ *  between dropping a Nuclear Device or a Thermonuclear Device" — 624 WWP in
+ *  a surprise war, 480 in a formal one, both of which the Industrial+ rows
+ *  above reproduce exactly. GlobalParameters carries the launch's own half as
+ *  WAR_WEARINESS_PER_WMD_LAUNCHED 10; the abroad multiplier is the other 2. */
+export const WW_WMD_LAUNCHED = 10;
 /* THERE IS NO SURPRISE-VS-FORMAL WEARINESS MULTIPLIER, and weariness is not
  * seat-dependent.
  *
@@ -355,6 +361,11 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // voters as the field, and B is the world declining to hold it. The TARGET
   // names WHICH competition, which is why a second one is a data row.
   { id: 'SCORED_COMPETITION', name: 'Scored Competition', minEra: 5, maxEra: 99, target: 'competition' },
+  // CIV6: "A: All players have their Weapons of Mass Destruction set equal to
+  // target player's. / B: Target player loses all of their Weapons of Mass
+  // Destruction." The published table puts it in the Atomic era, which is
+  // also the first era a device can exist in.
+  { id: 'ARMS_CONTROL', name: 'Arms Control', minEra: 6, maxEra: 99, target: 'seat' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -376,6 +387,7 @@ export const CONGRESS_WORLD_RELIGION = 16;
 export const CONGRESS_GOVERNANCE = 17;
 export const CONGRESS_ESPIONAGE = 18;
 export const CONGRESS_COMPETITION = 19;
+export const CONGRESS_ARMS_CONTROL = 20;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = 200;
 export const CONGRESS_PR_MULT_B = 50;
@@ -454,7 +466,7 @@ export const SPECIAL_SESSION_GAP = 15;
 export const EMERGENCY_SLOTS = 2;
 
 export interface EmergencyDef {
-  id: 'CITY_STATE' | 'MILITARY';
+  id: 'CITY_STATE' | 'MILITARY' | 'NUCLEAR';
   name: string;
   turns: number;
 }
@@ -470,9 +482,16 @@ export const EMERGENCIES: readonly EmergencyDef[] = [
   // when attacking member units with a City Strike; Target gains 200
   // Diplomatic Favor".
   { id: 'MILITARY', name: 'Military Emergency', turns: 30 },
+  // CIV6: "The Target has used a nuclear device; capture their Capital in 60
+  // turns!" Success: "Target units have -3 CS when fighting Member units;
+  // Members gain 100 Diplomatic Favor". Failure: "Member cities exert 1 less
+  // Loyalty pressure; Target gains 200 Diplomatic Favor". The contested city
+  // is the target's CAPITAL, and the members win by taking it.
+  { id: 'NUCLEAR', name: 'Nuclear Emergency', turns: 60 },
 ];
 export const EMERGENCY_CITY_STATE = 0;
 export const EMERGENCY_MILITARY = 1;
+export const EMERGENCY_NUCLEAR = 2;
 export const EMERGENCY_MEMBER_FAVOR = 100;
 export const EMERGENCY_TARGET_FAVOR = 200;
 /** CIV6 (both rows, "Specifics"): "Members gain +2 CS against targets' units;
@@ -485,6 +504,12 @@ export const EMERGENCY_MEMBER_HEAL = 5;
 export const EMERGENCY_TARGET_STRIKE_CS = 2;
 export const EMERGENCY_ENVOY_GOLD = 1;
 export const EMERGENCY_CS_ROUTE_GOLD = 2;
+/** CIV6 (Nuclear Emergency, success): "Target units have -3 CS when fighting
+ *  Member units" — the deeper, permanent version of the running penalty. */
+export const EMERGENCY_NUKE_TARGET_CS = 3;
+/** CIV6 (Nuclear Emergency, failure): "Member cities exert 1 less Loyalty
+ *  pressure." */
+export const EMERGENCY_NUKE_LOYALTY_CUT = 1;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 /** CIV6 (Tourism, "Different government penalty"): the penalty is

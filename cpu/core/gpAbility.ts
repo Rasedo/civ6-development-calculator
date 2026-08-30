@@ -22,7 +22,7 @@ import { resolveSuzerain } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
-import { PROJECTS } from '../data/projects';
+import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { nextRandom } from './rand';
@@ -246,7 +246,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   }
   if (fx.spaceProduction && city) {
     const q = city.queue[0];
-    if (q?.kind === 'project' && PROJECTS[q.project]?.space) q.progress += fx.spaceProduction;
+    if (q?.kind === 'project' && isSpaceProject(q.project)) q.progress += fx.spaceProduction;
   }
   if (fx.perAdjacent) {
     const n = perAdjacentCount(state, tile, fx.perAdjacent);

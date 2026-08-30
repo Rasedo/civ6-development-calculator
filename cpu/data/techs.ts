@@ -234,6 +234,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('ROCKETRY', 'Rocketry', 'Atomic', 1480, ['RADIO', 'CHEMISTRY'], [
       { kind: 'unlockDistrict', district: 'SPACEPORT' },
+      { kind: 'unlockImprovement', improvement: 'MISSILE_SILO' },
     ]),
     T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1480, ['RADIO']),
     T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 1480, ['STEEL', 'COMBUSTION']),
@@ -259,5 +260,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 2500, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
     T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, ['NANOTECHNOLOGY', 'ROBOTICS']),
     T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 2200, ['NUCLEAR_FUSION']),
+    // The two Future nodes the GIANT DEATH ROBOT's other upgrades hang on.
+    // Their published cost is "2200 or 2300", the same pair the two rows
+    // above carry, and this catalog reads that pair as 2200 throughout.
+    T('ADVANCED_AI', 'Advanced AI', 'Future', 2200, ['ROBOTICS']),
+    T('CYBERNETICS', 'Cybernetics', 'Future', 2200, ['ROBOTICS', 'NANOTECHNOLOGY']),
   ].map((t) => [t.id, t]),
 );

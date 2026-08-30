@@ -37,7 +37,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     gpp: {}, gpEarned: [], buildersTrained: 0, bestMeleeCS: 0,
-    tilesPurchased: 0, spaceProjects: [],
+    tilesPurchased: 0, projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   const city: City = {

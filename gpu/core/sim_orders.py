@@ -1189,9 +1189,21 @@ class SimOrders:
             return
         mine = self.unit_alive & (self.unit_seat == row)
         upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
+        upkeep = upkeep + self._wmd_upkeep(row)
         tre = self.civ_treasury[:, row]
         self.civ_treasury[:, row] = torch.where(active, tre - upkeep, tre)
         self._bankrupt_disband(row, active)
+
+    def _wmd_upkeep(self, row: int) -> torch.Tensor:
+        '''[B] gold the seat's nuclear devices bill this turn. CIV6: 14 Gold
+        per turn for a Nuclear Device, 16 for a Thermonuclear one, halved by
+        Second Strike Capability.'''
+        if self._n_devices <= 0:
+            return torch.zeros(self.B, dtype=self.dtype, device=self.device)
+        up = torch.tensor(self._nuke_upkeep, dtype=self.dtype, device=self.device)
+        gold = (self.civ_wmd[:, row].to(self.dtype) * up.unsqueeze(0)).sum(dim=1)
+        pct = self._fx_by_row("wmdup")[:, row].to(self.dtype)
+        return gold * (100.0 + pct) / 100.0
 
     def _bankrupt_disband(self, row: int = 0, active: torch.Tensor | None = None) -> None:
         """Disband ONE unit of seat-row `row` per turn while its treasury is

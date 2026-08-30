@@ -512,7 +512,8 @@ SEAT = {
     "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
     "enhancerDone": lambda sim, b, rows: [1 if bool(sim.civ_enhancer_done[b, c]) else 0 for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
-    "spaceProjects": lambda sim, b, rows: [sum(1 for x in sim.space_done[b, c].tolist() if x) for c in rows],
+    "projectsDone": lambda sim, b, rows: [sum(1 for x in sim.project_done[b, c].tolist() if x) for c in rows],
+    "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
     "laserSpeed": lambda sim, b, rows: [int(sim._laser_speed(c)[b]) for c in rows],
     "laserStations": lambda sim, b, rows: [
@@ -793,6 +794,7 @@ TILE = {
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),
     "railroad": lambda sim, b, rows: sim.railroad[b].long().numpy(),
     "submerged": lambda sim, b, rows: sim.tile_submerged[b].long().numpy(),
+    "falloutTurns": lambda sim, b, rows: sim.tile_fallout[b].long().numpy(),
     "water": lambda sim, b, rows: sim.water[b].long().numpy(),
     "floodCount": lambda sim, b, rows: sim.tile_flood_ct[b].numpy(),
     "airSlotBonus": lambda sim, b, rows: sim.tile_air_bonus[b].numpy(),

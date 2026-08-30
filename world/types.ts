@@ -67,7 +67,8 @@ export type ImprovementId =
   | 'FORT'
   | 'AIRSTRIP'
   | 'SOLAR_FARM'
-  | 'WIND_FARM';
+  | 'WIND_FARM'
+  | 'MISSILE_SILO';
 
 export type DistrictId =
   | 'CITY_CENTER'
@@ -189,6 +190,9 @@ export interface Tile {
    *  yields nothing and no citizen may work it. The map's terrain, feature,
    *  resource and river edges stay recorded underneath, unread. */
   submerged?: boolean;
+  /** CIV6 (Nuclear weapons): turns of radioactive fallout still on this tile.
+   *  A blast writes the device's own count; a build charge clears it. */
+  falloutTurns?: number;
   /** CIV6 (Railroad): the 0.25-Movement route a Military Engineer lays over
    *  the road, at the cost of 1 Iron and 1 Coal. */
   railroad?: boolean;

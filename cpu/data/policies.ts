@@ -86,6 +86,8 @@ export interface PolicyEffects {
   builderCharges?: number;
   /** gold per turn taken off every unit's maintenance, floored at free */
   unitMaintenanceCut?: number;
+  /** percentage change to the gold a nuclear device costs per turn. */
+  wmdUpkeepPct?: number;
   /** combat strength added when the opponent is a barbarian */
   combatVsBarbarians?: number;
   /** added to a city's defence strength */
@@ -359,6 +361,12 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     }),
     P('ONLINE_COMMUNITIES', 'Online Communities', 'economic', '+50% tourism toward civs this seat has a trade route to.', undefined, {
       tourismRouteBonus: 50,
+    }),
+
+    // CIV6 (Second Strike Capability): "Nuclear Device maintenance reduced by
+    // 50% Gold per turn." A Military card off the Cold War civic.
+    P('SECOND_STRIKE_CAPABILITY', 'Second Strike Capability', 'military', 'Nuclear device maintenance halved.', undefined, {
+      wmdUpkeepPct: -50,
     }),
 
     P('STRATEGOS', 'Strategos', 'wildcard', '+2 Great General points per turn.', 'SCORCHED_EARTH', {

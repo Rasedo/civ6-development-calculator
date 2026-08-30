@@ -5,7 +5,7 @@ import { createGame, endTurn, availableProjects, projectCost, districtCost } fro
 import { canPlaceDistrict } from '../../../cpu/core/rules';
 import { queueSeatProject } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
-import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY } from '../../../cpu/data/projects';
+import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY, isSpaceProject } from '../../../cpu/data/projects';
 import { cityPower, laserSpeed } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
@@ -79,16 +79,16 @@ describe('science victory', () => {
   it('gates each step on its tech AND the previous step (sequence); a laser needs the craft in flight, then repeats', () => {
     const { state, city } = newGameWithSpaceport();
     // No gating techs yet: no space project is available.
-    expect(availableProjects(state, city).some((p) => p.space || p.laser)).toBe(false);
+    expect(availableProjects(state, city).some((p) => isSpaceProject(p.id) || p.laser)).toBe(false);
 
     // All techs, but nothing completed: only step 1 (no requiresProject) is open.
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
-    let avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
+    let avail = availableProjects(state, city).filter((p) => isSpaceProject(p.id)).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_EARTH_SATELLITE']);
 
     // Complete step 1 by hand: step 2 opens, step 1 is now one-time-consumed.
-    seatOf(state, 0)!.spaceProjects = ['LAUNCH_EARTH_SATELLITE'];
-    avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
+    seatOf(state, 0)!.projectsDone = ['LAUNCH_EARTH_SATELLITE'];
+    avail = availableProjects(state, city).filter((p) => isSpaceProject(p.id)).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
 
     // Lasers: closed without Offworld Mission, and STILL closed with it while
@@ -98,7 +98,7 @@ describe('science victory', () => {
     expect(availableProjects(state, city).some((p) => p.laser)).toBe(false);
     seatOf(state, 0)!.research.techs.push('OFFWORLD_MISSION');
     expect(availableProjects(state, city).some((p) => p.laser)).toBe(false);
-    seatOf(state, 0)!.spaceProjects = [...CHAIN];
+    seatOf(state, 0)!.projectsDone = [...CHAIN];
     // the Lagrange station charges 30 Aluminum, so only the terrestrial one is
     // open on an empty bank
     expect(availableProjects(state, city).filter((p) => p.laser).map((p) => p.id))
@@ -128,7 +128,7 @@ describe('science victory', () => {
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
     for (const id of CHAIN) {
       completeThroughQueue(state, city, id);
-      expect(seatOf(state, 0)!.spaceProjects).toContain(id);
+      expect(seatOf(state, 0)!.projectsDone).toContain(id);
     }
     // The launch endTurn already ticked the craft once: 1 of 30 LY flown.
     expect(SPACE_FLIGHT_LY).toBe(30);
@@ -148,12 +148,12 @@ describe('science victory', () => {
     const { state, city } = newGameWithSpaceport();
     const s = seatOf(state, 0)!;
     s.research.techs.push('OFFWORLD_MISSION');
-    s.spaceProjects = [...CHAIN];
+    s.projectsDone = [...CHAIN];
     completeThroughQueue(state, city, 'TERRESTRIAL_LASER_STATION');
     completeThroughQueue(state, city, 'LAGRANGE_LASER_STATION');
     expect(city.laserStations).toBe(1);
     expect(s.orbitalLasers).toBe(1);
-    expect(s.spaceProjects).toEqual(CHAIN); // lasers never enter the ledger
+    expect(s.projectsDone).toEqual(CHAIN); // lasers never enter the ledger
 
     // The city draws 5 Power for the terrestrial station and has no supply, so
     // only the orbital one speeds the craft.
@@ -202,7 +202,7 @@ describe('science victory', () => {
       const g = newGameWithSpaceport();
       const s = seatOf(g.state, 0)!;
       s.research.techs.push(...GATING_TECHS);
-      s.spaceProjects = ['LAUNCH_EARTH_SATELLITE'];
+      s.projectsDone = ['LAUNCH_EARTH_SATELLITE'];
       return g;
     };
     const base = setup();
@@ -219,8 +219,8 @@ describe('science victory', () => {
     // Mars Colony: the twin's yields match the idle baseline exactly.
     const mBase = setup();
     const mTwin = setup();
-    seatOf(mBase.state, 0)!.spaceProjects.push('LAUNCH_MOON_LANDING');
-    seatOf(mTwin.state, 0)!.spaceProjects.push('LAUNCH_MOON_LANDING');
+    seatOf(mBase.state, 0)!.projectsDone.push('LAUNCH_MOON_LANDING');
+    seatOf(mTwin.state, 0)!.projectsDone.push('LAUNCH_MOON_LANDING');
     mTwin.city.queue = [{ kind: 'project', project: 'LAUNCH_MARS_COLONY', progress: 100000, cost: 1 }];
     endTurn(mBase.state);
     endTurn(mTwin.state);

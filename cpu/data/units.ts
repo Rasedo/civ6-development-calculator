@@ -59,6 +59,8 @@ export interface UnitDef {
   antiAirRange?: number;
   /** the GIANT DEATH ROBOT: its own class in every rule that names one. */
   gdr?: boolean;
+  /** CIV6 (Giant Death Robot): "Can only heal in friendly territory." */
+  healFriendlyOnly?: boolean;
   /** CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast tiles as
    *  it would on land." Such a chassis never embarks — it keeps its own
    *  Movement and its own Combat Strength out there, and asks no seafaring
@@ -1111,6 +1113,12 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       antiAir: 90,
       gdr: true,
       waterWalk: true,
+      // CIV6: "Can only heal in friendly territory", "Cannot earn experience
+      // or Promotions", "Cannot form Corps or Armies by any means", and
+      // "-17 Ranged Strength against District defenses and naval units" —
+      // the district half of which is the penalty every land ranged unit
+      // already pays, so `gdr` carries the NAVAL half.
+      healFriendlyOnly: true,
       requiresTech: 'ROBOTICS',
       requiresResource: 'URANIUM',
       resourceCost: 1,
@@ -1414,3 +1422,39 @@ export const ROCK_BAND_MAX_LEVEL = 4;
 /** CIV6: the faith "cost is progressive" — each band this seat has bought
  *  raises the next one's price by its base. */
 export const ROCK_BAND_COST_STEP = 1;
+
+/**
+ * THE GIANT DEATH ROBOT'S FUTURE-ERA UPGRADES. CIV6: the chassis "gains
+ * additional abilities and upgrades via Future Era technology research" — so
+ * an upgrade is the SEAT's tech, empire-wide, and no per-unit state stands
+ * behind it. Catalog order is the wire order.
+ */
+export interface GdrUpgradeDef {
+  id: string;
+  name: string;
+  tech: string;
+}
+export const GDR_UPGRADES: readonly GdrUpgradeDef[] = [
+  // CIV6: "Drone Air Defense: Anti-Air Defense Strength increased to 130."
+  { id: 'DRONE_AIR_DEFENSE', name: 'Drone Air Defense', tech: 'ADVANCED_AI' },
+  // CIV6: "Particle Beam Siege Cannon: Ranged attacks against Cities and
+  // Encampments are 100% effective and gain +30 Ranged Strength. (Applies to
+  // both melee and ranged attacks and when defending.)"
+  { id: 'PARTICLE_BEAM', name: 'Particle Beam Siege Cannon', tech: 'ADVANCED_POWER_CELLS' },
+  // CIV6: "Enhanced Mobility: +3 Moves. Can perform a Jump action to cross
+  // over mountain terrain." The jump is not a head of its own here: a
+  // mountain step simply becomes legal to this chassis, which is what the
+  // action does over one hex.
+  { id: 'ENHANCED_MOBILITY', name: 'Enhanced Mobility', tech: 'CYBERNETICS' },
+  // CIV6: "Reinforced Armor Plating: +10 Combat Strength when defending
+  // against land and naval units."
+  { id: 'REINFORCED_ARMOR', name: 'Reinforced Armor Plating', tech: 'SMART_MATERIALS' },
+];
+export const GDR_DRONE_AA = 130;
+export const GDR_PARTICLE_BEAM_CS = 30;
+export const GDR_ENHANCED_MOVES = 3;
+export const GDR_ARMOR_PLATING_CS = 10;
+/** CIV6: the chassis's own "-17 Ranged Strength against ... naval units". The
+ *  district half of the same clause is `RANGED_CITY_PENALTY`, which every land
+ *  ranged unit already pays. */
+export const GDR_NAVAL_PENALTY = 17;

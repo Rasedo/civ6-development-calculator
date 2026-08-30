@@ -41,10 +41,15 @@ export interface ProjectDef {
   /** Previous space-race project that must be completed first (the chain). */
   requiresProject?: string;
   victory?: boolean;
-  /** Marks a space-race project: one-time, gated on `requiresTech` and
-   *  `requiresProject`, and placed AFTER the base rows so a greedy
-   *  lowest-index pick resolves to a base project first. */
-  space?: boolean;
+  /** ONE-TIME: the seat may complete it once, and `Seat.projectsDone`
+   *  remembers that it did. Gated on `requiresTech` and `requiresProject`,
+   *  and placed AFTER the base rows so a greedy lowest-index pick resolves to
+   *  a base project first. */
+  once?: boolean;
+  /** Builds a NUCLEAR_DEVICES row into the seat's inventory: 1-based, so 0
+   *  and absent both mean "not a weapon". Repeatable, and its Uranium is the
+   *  generic `resource` charge. */
+  wmd?: number;
   /** The ORBITAL laser: its bonus is unconditional, where the terrestrial
    *  one draws Power in the city that built it. */
   orbital?: boolean;
@@ -184,10 +189,24 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // "does not scale with further research".
     P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.' }),
     P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
-    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
-    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
-    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
-    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'SPACEPORT', yield: null, gpClass: null, space: true, victory: true, cost: 2100, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — launches the craft; winning is its arrival.' }),
+    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
+    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
+    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
+    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'SPACEPORT', yield: null, gpClass: null, once: true, victory: true, cost: 2100, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — launches the craft; winning is its arrival.' }),
+
+    // THE NUCLEAR CHAIN, all four in the City Center, which every city has.
+    // CIV6 (Manhattan Project): 1000 Production, "becomes available after
+    // researching Nuclear Fission"; "once completed, [it] allows the player to
+    // undertake the Build Nuclear Device project". CIV6 (Operation Ivy): 1000
+    // Production, "becomes available after researching Nuclear Fusion and
+    // completing the Manhattan Project". The two BUILD projects are
+    // REPEATABLE — "there is no limit on the number that a player can build,
+    // as long as they have enough Gold to support them" — 800 and 1000
+    // Production, and each charges its device's Uranium once, when it starts.
+    P({ id: 'MANHATTAN_PROJECT', name: 'Manhattan Project', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FISSION', description: 'Opens the Build Nuclear Device project.' }),
+    P({ id: 'OPERATION_IVY', name: 'Operation Ivy', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'MANHATTAN_PROJECT', description: 'Opens the Build Thermonuclear Device project.' }),
+    P({ id: 'BUILD_NUCLEAR_DEVICE', name: 'Build Nuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 1, cost: 800, requiresTech: 'NUCLEAR_FISSION', requiresProject: 'MANHATTAN_PROJECT', resource: 'URANIUM', resourceCost: 10, description: 'Repeatable: adds one Nuclear Device to this seat inventory.' }),
+    P({ id: 'BUILD_THERMONUCLEAR_DEVICE', name: 'Build Thermonuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 2, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'OPERATION_IVY', resource: 'URANIUM', resourceCost: 20, description: 'Repeatable: adds one Thermonuclear Device to this seat inventory.' }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 
@@ -196,7 +215,17 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
  *  distance takes the game-speed coefficient like every other magnitude. */
 export const SPACE_FLIGHT_LY = Math.round(50 * GAME_SPEED);
 
-export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.space);
+export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS)
+  .filter((p) => p.once && p.district === 'SPACEPORT');
+const SPACE_IDS = new Set(SPACE_PROJECTS.map((p) => p.id));
+/** the SPACE-RACE chain specifically — what a Great Engineer's space
+ *  production and the space-production percentage act on. A one-time project
+ *  elsewhere (the nuclear unlocks) is not one of these. */
+export function isSpaceProject(id: string): boolean {
+  return SPACE_IDS.has(id);
+}
+/** The device a project builds, or null. */
+export const WMD_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.wmd);
 
 /** CIV6 (GS): a Terrestrial Laser Station "increases the city's Power
  *  requirement by 5 each time it is completed". */

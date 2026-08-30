@@ -13,7 +13,7 @@ Proven here, turn-exact with the TS contract (cpu/data/projects.ts +
   * the SPACEPORT: a scaffold row unlocked by the same tech as step 1, flat
     price, no specialty cap, and a flat-land surface (placement 4 = the plain
     surface minus Hills); the wire queues it at its fixed cost;
-  * `_space_step_ok`'s truth table — the `availableProjects` space arm: a step
+  * `_once_step_ok`'s truth table — the `availableProjects` space arm: a step
     needs its tech, needs its predecessor DONE, and is refused once it is in
     the ledger (these are one-time); laser rows are tech-gated only and stay
     offered after completing (repeatable);
@@ -32,7 +32,7 @@ Proven here, turn-exact with the TS contract (cpu/data/projects.ts +
     keeps its victor;
   * the step() recompute PRESERVES a science result over the domination/score
     one, and leaves a running game untouched;
-  * space_done / space_ly / civ_orbital_lasers / city_lasers are _MUTABLE
+  * project_done / space_ly / civ_orbital_lasers / city_lasers are _MUTABLE
     (snapshot/restore).
 """
 
@@ -92,17 +92,17 @@ def main() -> None:
 
     # --- 2) engine metadata mirrors the exported chain ---------------------
     sim = mk()
-    assert sim._n_space == 4, f"_n_space should be 4, got {sim._n_space}"
-    assert sim._space_proj_idx == [i for i, _ in space], "_space_proj_idx must match the exported space rows"
-    assert sim._space_step == {i: k for k, (i, _) in enumerate(space)}, "chain-step map mismatch"
-    assert sim._space_victory_idx == {space[-1][0]}, "victory step index mismatch"
+    assert sim._n_once == 4, f"_n_once should be 4, got {sim._n_once}"
+    assert sim._once_proj_idx == [i for i, _ in space], "_once_proj_idx must match the exported space rows"
+    assert sim._once_step == {i: k for k, (i, _) in enumerate(space)}, "chain-step map mismatch"
+    assert sim._once_victory_idx == {space[-1][0]}, "victory step index mismatch"
     assert sim._laser_proj_idx == {i for i, _ in lasers}, "_laser_proj_idx must match the exported laser rows"
     assert sim._orbital_proj_idx == {i for i, r in lasers if int(r.get("orb", 0))}, \
         "exactly the Lagrange row is orbital"
     assert len(sim._orbital_proj_idx) == 1, "one of the two stations is the orbital one"
-    for name in ("space_done", "space_ly", "civ_orbital_lasers", "city_lasers"):
+    for name in ("project_done", "space_ly", "civ_orbital_lasers", "city_lasers"):
         assert name in _MUTABLE, f"{name} must be registered in _MUTABLE"
-    assert sim.space_done.shape == (sim.B, sim.n_majors, 4), f"space_done shape {tuple(sim.space_done.shape)}"
+    assert sim.project_done.shape == (sim.B, sim.n_majors, 4), f"project_done shape {tuple(sim.project_done.shape)}"
     assert int(sim.rules.space_ly_target) == 30, "the craft's distance: 50 LY x 0.6 game speed"
     assert bool((sim.space_ly == -1).all()), "no craft is in flight at the start"
 
@@ -149,30 +149,30 @@ def main() -> None:
         f"the Spaceport must queue at its FLAT price 1080, got {float(sq.city_cost[0, rq, jq])}"
     assert int(sq.city_dist_tile[0, rq, jq, spt_didx]) == tq, "the registry missed the Spaceport's tile"
 
-    # --- 2b) _space_step_ok — the `availableProjects` space arm, term by term
+    # --- 2b) _once_step_ok — the `availableProjects` space arm, term by term
     #   Step 2 (Moon Landing) is the useful probe: it has both a tech gate and
     #   a predecessor, so all four states of the truth table are reachable.
     gk = mk()
     pi_1, row_1 = space[1][0], 1
-    rt_1, step_0, step_1 = int(space[1][1]["rt"]), gk._space_step[space[0][0]], gk._space_step[space[1][0]]
+    rt_1, step_0, step_1 = int(space[1][1]["rt"]), gk._once_step[space[0][0]], gk._once_step[space[1][0]]
     gk.civ_techs[:, row_1, rt_1] = False
-    gk.space_done[:, row_1, :] = False
-    assert not bool(gk._space_step_ok(row_1, pi_1)[0]), "no tech, no predecessor -> refused"
+    gk.project_done[:, row_1, :] = False
+    assert not bool(gk._once_step_ok(row_1, pi_1)[0]), "no tech, no predecessor -> refused"
     gk.civ_techs[:, row_1, rt_1] = True
-    assert not bool(gk._space_step_ok(row_1, pi_1)[0]), "tech alone is not enough — the predecessor must be DONE"
-    gk.space_done[:, row_1, step_0] = True
-    assert bool(gk._space_step_ok(row_1, pi_1)[0]), "tech + finished predecessor -> offered"
+    assert not bool(gk._once_step_ok(row_1, pi_1)[0]), "tech alone is not enough — the predecessor must be DONE"
+    gk.project_done[:, row_1, step_0] = True
+    assert bool(gk._once_step_ok(row_1, pi_1)[0]), "tech + finished predecessor -> offered"
     gk.civ_techs[:, row_1, rt_1] = False
-    assert not bool(gk._space_step_ok(row_1, pi_1)[0]), "predecessor alone is not enough — the tech gates it"
+    assert not bool(gk._once_step_ok(row_1, pi_1)[0]), "predecessor alone is not enough — the tech gates it"
     gk.civ_techs[:, row_1, rt_1] = True
-    gk.space_done[:, row_1, step_1] = True
-    assert not bool(gk._space_step_ok(row_1, pi_1)[0]), "a step already in the ledger is ONE-TIME — never re-offered"
+    gk.project_done[:, row_1, step_1] = True
+    assert not bool(gk._once_step_ok(row_1, pi_1)[0]), "a step already in the ledger is ONE-TIME — never re-offered"
     # and the gate is per SEAT: one seat's ledger must not open another's step
-    gk.space_done[:, row_1, :] = False
-    gk.space_done[:, row_1, step_0] = True
+    gk.project_done[:, row_1, :] = False
+    gk.project_done[:, row_1, step_0] = True
     other = 0 if row_1 != 0 else 1
     gk.civ_techs[:, other, rt_1] = True
-    assert not bool(gk._space_step_ok(other, pi_1)[0]), "the chain is per-seat: row A's progress must not open row B's step"
+    assert not bool(gk._once_step_ok(other, pi_1)[0]), "the chain is per-seat: row A's progress must not open row B's step"
 
     # --- 2c) THE MASK OFFERS THE CHAIN — space rows on the SPACEPORT --------
     mk_sim = mk()
@@ -189,7 +189,7 @@ def main() -> None:
     assert not bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_0]), "step 1 without its tech must be illegal"
     mk_sim.civ_techs[0, mrow, int(space[0][1]["rt"])] = True
     assert bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_0]), "step 1 with Rocketry and a complete Spaceport MUST be offered"
-    mk_sim.space_done[0, mrow, mk_sim._space_step[space[0][0]]] = True
+    mk_sim.project_done[0, mrow, mk_sim._once_step[space[0][0]]] = True
     assert not bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_0]), "a completed step must leave the mask"
     col_1 = mk_sim.PROJECT_BASE + space[1][0]
     mk_sim.civ_techs[0, mrow, int(space[1][1]["rt"])] = True
@@ -198,14 +198,14 @@ def main() -> None:
     li, lrow = lasers[0]
     col_l = mk_sim.PROJECT_BASE + li
     rt_l = int(lrow["rt"])
-    last_k = mk_sim._space_step[space[-1][0]]
-    mk_sim.space_done[0, mrow, last_k] = False
+    last_k = mk_sim._once_step[space[-1][0]]
+    mk_sim.project_done[0, mrow, last_k] = False
     mk_sim.civ_techs[0, mrow, rt_l] = False
     assert not bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_l]), "a laser row without its tech must be illegal"
     mk_sim.civ_techs[0, mrow, rt_l] = True
     assert not bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_l]), \
         "Offworld Mission alone is not enough — the craft has to be in flight"
-    mk_sim.space_done[0, mrow, last_k] = True
+    mk_sim.project_done[0, mrow, last_k] = True
     assert bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_l]), \
         "a laser row with its tech and the finished Expedition MUST be offered"
     mk_sim.city_lasers[0, mrow, mj] = 3
@@ -221,9 +221,9 @@ def main() -> None:
     sim2.city_current[0, r + 1, j] = sim2.PROJECT_BASE + pi_exo
     sim2.city_cost[0, r + 1, j] = 1.0
     sim2.city_progress[0, r + 1, j] = 1.0e6
-    last_step = sim2._space_step[pi_exo]
+    last_step = sim2._once_step[pi_exo]
     sim2._seat_phase()
-    assert bool(sim2.space_done[0, r + 1, last_step]), "civ's victory step must land in space_done"
+    assert bool(sim2.project_done[0, r + 1, last_step]), "civ's victory step must land in project_done"
     assert int(sim2.space_ly[0, r + 1]) == 0, "completing the Exoplanet Expedition LAUNCHES (space_ly = 0)"
     assert int(sim2.victory_type[0]) == 0, "the launch alone must NOT win — the craft has 30 LY to fly"
     assert not bool(sim2.game_over[0]), "the game runs on while the craft flies"
@@ -291,10 +291,10 @@ def main() -> None:
     for s in (base, twin, mars):
         s.city_current[0, 1, 0] = -1
     sci_pre = float(base.seat_science_total[0, 1])
-    twin.space_done[0, 1, step_0] = True
+    twin.project_done[0, 1, step_0] = True
     force_complete(twin, 1, 0, space[1][0])
-    mars.space_done[0, 1, step_0] = True
-    mars.space_done[0, 1, step_1] = True
+    mars.project_done[0, 1, step_0] = True
+    mars.project_done[0, 1, step_1] = True
     force_complete(mars, 1, 0, space[2][0])
     base._seat_phase()
     twin._seat_phase()
@@ -327,7 +327,7 @@ def main() -> None:
     lz._seat_phase()
     assert int(lz.civ_orbital_lasers[0, 1]) == 1, "the Lagrange station is the seat's, not a city's"
     assert int(lz.city_lasers[0, 1, 0]) == 2, "the orbital completion must not touch the city count"
-    assert not bool(lz.space_done[0, 1].any()), "laser rows never enter the one-time ledger"
+    assert not bool(lz.project_done[0, 1].any()), "laser rows never enter the one-time ledger"
     # the city's load is 2 stations x 5 Power, and nothing here supplies it
     assert float((lz.city_bldg[0, 1, 0].double() @ lz._b_power)) + 2 * lz._laser_power_load \
         == 2 * lz._laser_power_load, "no building in the capital draws Power this early"
@@ -354,12 +354,12 @@ def main() -> None:
     # --- 5) the flight state rides snapshot/restore (the _MUTABLE contract) --
     s = mk()
     snap = s.snapshot()
-    s.space_done[0, 1, 0] = True
+    s.project_done[0, 1, 0] = True
     s.space_ly[0, 1] = 7
     s.civ_orbital_lasers[0, 1] = 2
     s.city_lasers[0, 1, 0] = 3
     s.restore(snap)
-    assert not bool(s.space_done[0, 1, 0]), "restore must roll space_done back to the snapshot"
+    assert not bool(s.project_done[0, 1, 0]), "restore must roll project_done back to the snapshot"
     assert int(s.space_ly[0, 1]) == -1 and int(s.civ_orbital_lasers[0, 1]) == 0 \
         and int(s.city_lasers[0, 1, 0]) == 0, \
         "restore must roll the flight state back to the snapshot"

@@ -544,7 +544,12 @@ export interface Seat {
   conquestProdTurns?: number;
   bestMeleeCS: number;
   tilesPurchased: number;
-  spaceProjects: string[];
+  /** every ONE-TIME project this seat has completed. */
+  projectsDone: string[];
+  /** nuclear devices held, dense over `NUCLEAR_DEVICES`. CIV6: a finished
+   *  device "is added to the player's inventory and can then be used by any
+   *  unit or improvement capable of deploying it". */
+  wmd?: number[];
   /** Light-years the Exoplanet craft has travelled; -1 = no craft in flight.
    *  The win fires on ARRIVAL (spaceLy >= SPACE_FLIGHT_LY), not on launch. */
   spaceLy?: number;

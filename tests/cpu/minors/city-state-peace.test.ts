@@ -58,7 +58,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     buildersTrained: 0,
     bestMeleeCS: 0,
     tilesPurchased: 0,
-    spaceProjects: [],
+    projectsDone: [],
   } as unknown as Seat;
   state.seats.push(civ);
   setWar(state, civ.seat, 0, atWar);
