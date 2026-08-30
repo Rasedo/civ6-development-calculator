@@ -13,11 +13,11 @@
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
 import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, diploVisibility, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
+import { AGREEMENT_TURNS, COMPETITION_TURNS, CONGRESS_DV_MIN_ERA, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
 import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn } from './boosts';
-import { goldenBoostBonus } from './eras';
+import { goldenBoostBonus, worldEraIndex } from './eras';
 import { itemCost, districtCostIn, settlerCost } from './game';
 import { builderCost, settlerCount } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
@@ -168,9 +168,9 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   const nMeleeWQ = ownMil.filter((u) => !isRngType(u.type)).length
     + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
   const me = seatOf(state, seat);
-  // THE WORLD CONGRESS block: the ballot currency and the STANDING slate —
-  // what the last session passed and on whom. `env._congress_block` renders
-  // the identical layout.
+  // THE WORLD CONGRESS block: the ballot currency, the STANDING slate — what
+  // the last session passed and on whom — the one about to sit, and the
+  // running competition. `env._congress_block` renders the identical layout.
   const congress: number[] = [
     (me?.diplomaticFavor ?? 0) / 100.0,
     (me?.diplomaticPoints ?? 0) / DIPLO_VICTORY_POINTS,
@@ -189,6 +189,26 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     live ? live.phase + 1 : 0,
     live && live.target === seat ? 1 : 0,
     live && live.members.includes(seat) ? 1 : 0,
+  );
+  // THE SESSION ABOUT TO SIT: a ballot addresses the ANNOUNCED slate, and the
+  // turns until it is what makes the ballot worth filling in now.
+  for (let k = 0; k < 2; k++) congress.push(Math.max(0, (state.congressSlate?.[k] ?? -1) + 1));
+  const wera = worldEraIndex(state);
+  congress.push(
+    ((CONGRESS_INTERVAL - state.turn % CONGRESS_INTERVAL) % CONGRESS_INTERVAL) / CONGRESS_INTERVAL,
+    wera >= CONGRESS_MIN_ERA && wera >= CONGRESS_DV_MIN_ERA ? 1 : 0,
+  );
+  const comp = state.competition;
+  let compTop = 0;
+  if (comp) for (let i = 0; i < comp.member.length; i++) {
+    if (comp.member[i]) compTop = Math.max(compTop, comp.score[i]);
+  }
+  const compMine = comp?.member[seat] ? 1 : 0;
+  congress.push(
+    comp ? comp.kind + 1 : 0,
+    (comp?.left ?? 0) / COMPETITION_TURNS,
+    compMine,
+    compMine ? (comp?.score[seat] ?? 0) / Math.max(1, compTop) : 0,
   );
   const atAny = atWarWithAny(state, seat);
   const ctx: number[] = [

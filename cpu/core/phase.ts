@@ -86,6 +86,7 @@ const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
@@ -724,6 +725,7 @@ export function worldCongress(state: GameState): void {
   // emergency is settled whether one sat or not.
   if (worldEra >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
   resolveEmergencies(state);
+  resolveCompetition(state);
   if (state.turn % CONGRESS_INTERVAL !== 0 || worldEra < CONGRESS_MIN_ERA) return;
   congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
   state.lastSessionTurn = state.turn;

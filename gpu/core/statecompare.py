@@ -235,6 +235,10 @@ GAME = {
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
+    "competition": lambda sim, b, rows: (
+        [int(sim.comp_kind[b]), int(sim.comp_left[b])]
+        + [float(sim.comp_score[b, r]) for r in range(sim.n_majors)]
+        + [int(bool(sim.comp_member[b, r])) for r in range(sim.n_majors)]),
     "congressActive": lambda sim, b, rows: [int(x) for x in sim.congress_active[b].reshape(-1).tolist()],
     "emergencyTable": lambda sim, b, rows: _emg_table(sim, b),
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
@@ -444,6 +448,7 @@ SEAT = {
     "explored": _civ_scalar("seat_explored"),
     "treasury": _civ_scalar("civ_treasury"),
     "co2": _civ_scalar("civ_co2"),
+    "co2Turn": _civ_scalar("civ_co2_turn"),
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),

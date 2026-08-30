@@ -2,6 +2,7 @@ import type { City, GameState, Seat, Unit } from './types';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat } from './seats';
 import { NO_SEAT } from '../../world/types';
+import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
@@ -143,6 +144,41 @@ export function dropQueuedBuilding(city: City, buildingId: string): void {
     if (it?.kind !== 'building' || it.building !== buildingId) continue;
     city.productionBank = (city.productionBank ?? 0) + it.progress;
     city.queue.splice(i, 1);
+  }
+}
+
+/**
+ * CIV6 (Culture Bomb): a tile whose district or wonder is still under
+ * construction is flipped anyway — "construction will immediately stop and
+ * it'll disappear", "wiping out any unfinished construction in the process".
+ * The hammers already spent are NOT lost: they bank, which is where this model
+ * puts every carried-over hammer.
+ *
+ * `_wipe_construction` is the twin.
+ */
+export function wipeConstruction(state: GameState, tile: Tile): void {
+  const digging = tile.district !== null && !tile.districtComplete;
+  const raising = tile.builtWonder !== null && !tile.builtWonderComplete;
+  if (!digging && !raising) return;
+  const city = seatOf(state, tileSeat(tile))?.cities.find((c) => c.id === tileCity(tile));
+  if (city) {
+    for (let i = city.queue.length - 1; i >= 0; i--) {
+      const it = city.queue[i];
+      if (it.kind !== 'district' && it.kind !== 'wonder') continue;
+      if (it.tileIndex !== tile.index) continue;
+      city.productionBank = (city.productionBank ?? 0) + it.progress;
+      city.queue.splice(i, 1);
+    }
+    if (digging) city.districts = city.districts.filter((d) => d.tileIndex !== tile.index);
+    if (raising) city.wonders = city.wonders.filter((w) => w.tileIndex !== tile.index);
+  }
+  if (digging) {
+    tile.district = null;
+    tile.districtComplete = false;
+  }
+  if (raising) {
+    tile.builtWonder = null;
+    tile.builtWonderComplete = false;
   }
 }
 
@@ -294,14 +330,15 @@ export function completeQueueItem(
  * point of a bomb. Ascending tile order, so both engines claim the same set in
  * the same order.
  *
- * The source also flips a tile whose district or wonder is still UNDER
- * CONSTRUCTION, wiping the unfinished build; here such a tile is left alone.
+ * A tile whose district or wonder is still UNDER CONSTRUCTION is flipped too,
+ * and `wipeConstruction` undoes the build it was carrying.
  */
 function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnly: boolean): void {
   const owner = seatOf(state, city.seat);
   if (!owner) return;
   for (const t of neighbors(state.map, state.map.tiles[tileIndex]).slice().sort((a, b) => a.index - b.index)) {
-    if (t.district || t.builtWonder) continue;
+    // CIV6 (Culture Bomb): a COMPLETED district or wonder is never stolen.
+    if ((t.district && t.districtComplete) || (t.builtWonder && t.builtWonderComplete)) continue;
     // CIV6 (Preserve): "Initiate a Culture Bomb on adjacent UNOWNED tiles" —
     // it annexes what nobody holds and never takes a rival's.
     if (unownedOnly && tileSeat(t) !== NO_SEAT) continue;
@@ -311,6 +348,7 @@ function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnl
       return hexDistance(ctr.col, ctr.row, t.col, t.row) <= CULTURE_BOMB_RANGE;
     });
     if (!near) continue;
+    wipeConstruction(state, t);   // reads the plot's OLD owner, so it goes first
     setTileOwner(t, city.seat, city.id);
     city.tilesAcquired += 1;
   }

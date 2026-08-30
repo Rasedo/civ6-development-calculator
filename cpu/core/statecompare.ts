@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
-import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
@@ -346,6 +346,15 @@ const GAME: Record<string, Extractor> = {
   victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
   congressSlate: (s) => [s.congressSlate ?? [-1, -1]],
+  // The running SCORED COMPETITION, flat: [kind, turnsLeft, score per civ
+  // seat in ascending order, then membership]. -1 kind = none.
+  competition: (s) => {
+    const civs = s.seats.filter((x) => isCiv(x.seat)).map((x) => x.seat).sort((a, b) => a - b);
+    const c = s.competition;
+    return [c?.kind ?? -1, c?.left ?? 0,
+      ...civs.map((j) => c?.score[j] ?? 0),
+      ...civs.map((j) => (c?.member[j] ? 1 : 0))];
+  },
   congressActive: (s) => [0, 1].flatMap((i) => {
     const a = s.congress?.[i];
     return a ? [a.res, a.outcome, a.target] : [-1, -1, -1];
@@ -402,6 +411,7 @@ const SEAT: Record<string, Extractor> = {
   explored: overSeats((s, st) => (s.explored?.length ? s.explored : new Array(st.map.tiles.length).fill(0))),
   treasury: overSeats((s) => s.treasury),
   co2: overSeats((s) => s.co2 ?? 0),
+  co2Turn: overSeats((s) => s.co2Turn ?? 0),
   cultureTotal: overSeats((s) => s.cultureTotal),
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),

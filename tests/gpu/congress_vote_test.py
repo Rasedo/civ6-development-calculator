@@ -267,7 +267,8 @@ def main() -> None:
     ring = [int(t) for t in sim2.neigh[ctr] if int(t) >= 0]
     assert len(ring) >= 2, "the centre has no ring on this map"
     spot, paved = ring[0], ring[1]
-    sim2.district[0, paved] = 0                       # a district is never bombed away
+    sim2.district[0, paved] = 0                       # a FINISHED one is never stolen
+    sim2.district_complete[0, paved] = True
     sim2.tile_seat[0, paved] = other
     foreign = [int(t) for t in sim2.neigh[spot] if int(t) >= 0 and int(t) not in (ctr, paved)]
     assert foreign, "the trigger tile has no free neighbour"
@@ -278,8 +279,31 @@ def main() -> None:
                        torch.zeros(1, dtype=torch.long))
     assert int(sim2.tile_seat[0, foreign[0]]) == row, "the bomb left a foreign plot alone"
     assert int(sim2.tile_city[0, foreign[0]]) == int(sim2.city_id[0, row, 0])
-    assert int(sim2.tile_seat[0, paved]) == other, "the bomb took a tile carrying a district"
-    print("  the bomb claims a foreign plot in range and skips a district tile")
+    assert int(sim2.tile_seat[0, paved]) == other, "the bomb took a FINISHED district"
+
+    # ...and an UNFINISHED build is taken, and the build undone: CIV6 "if a
+    # Wonder or a District is still under construction and it suffers the
+    # effect of a Culture Bomb, construction will immediately stop and it'll
+    # disappear" — the hammers bank rather than burn.
+    ocol = 0
+    sim2.district[0, paved] = 0
+    sim2.district_complete[0, paved] = False
+    sim2.tile_seat[0, paved] = other
+    sim2.tile_city[0, paved] = int(sim2.city_id[0, other, ocol])
+    sim2.city_qtile[0, other, ocol] = paved
+    sim2.city_dist_tile[0, other, ocol, 0] = paved
+    sim2.city_current[0, other, ocol] = sim2.DISTRICT_BASE
+    sim2.city_progress[0, other, ocol] = 40
+    sim2.city_prod_bank[0, other, ocol] = 0
+    sim2._culture_bomb(row, rows, torch.tensor([spot], dtype=torch.long),
+                       torch.zeros(1, dtype=torch.long))
+    assert int(sim2.tile_seat[0, paved]) == row, "an unfinished district was spared"
+    assert int(sim2.district[0, paved]) == -1, "the unfinished district survived the bomb"
+    assert int(sim2.city_qtile[0, other, ocol]) == -1, "the dig site outlived its district"
+    assert int(sim2.city_dist_tile[0, other, ocol, 0]) == -1, "the registry kept the plot"
+    assert int(sim2.city_current[0, other, ocol]) == -1, "the item stayed in production"
+    assert float(sim2.city_prod_bank[0, other, ocol]) == 40.0, "the hammers burned"
+    print("  the bomb claims a foreign plot, spares a finished district and wipes an unfinished one")
 
     # --- 9. the Deforestation Treaty, which addresses a FEATURE ------------
     sim9 = build()
@@ -413,9 +437,122 @@ def main() -> None:
     assert int(win_t[0]) == 1, "the tied TARGET must go to the committed favor"
     print("  a tied vote goes to the side that COMMITTED the favor, outcome and target alike")
 
+    # --- THE SCORED COMPETITION: the window, the score and the podium -------
+    # CIV6 (Competition): one runs for exactly 30 turns; "the civilization with
+    # the highest score wins the Gold Tier rewards", every civ in the top 25%
+    # takes Silver and the next quarter Bronze. CIV6 (Climate Accords): "1
+    # point per turn for each CO2 emission less than the highest polluter".
+    simC = build()
+    nrow = simC.n_majors
+    assert nrow >= 3, "the podium's two quarters need three in the field"
+    ci = simC._congress_at["SCORED_COMPETITION"]
+    assert simC._congress_space(simC._congress_res[ci]["t"]) == len(simC._comps), (
+        "the target space and the competition catalog disagree"
+    )
+    simC._congress_dv_min = 99
+    simC.congress_slate[:, 0] = ci
+    simC.congress_slate[:, 1] = -1
+    simC.turn = iv
+    for row in range(nrow):
+        simC.civ_diplo_favor[:, row] = 0
+        simC.civ_congress_vote[0, row, 0] = torch.tensor([0, 0, 0])
+    against = nrow - 1
+    simC.civ_congress_vote[0, against, 0] = torch.tensor([1, 0, 0])   # outcome B
+    simC._world_congress()
+    assert int(simC.comp_kind[0]) == simC._comp_climate, "an enacted competition did not start"
+    assert int(simC.comp_left[0]) == simC._comp_turns, "the window is not 30 turns"
+    assert bool(simC.comp_member[0, 0]) and not bool(simC.comp_member[0, against]), (
+        "the field is the A voters, and only them"
+    )
+
+    # the score is the gap to the WORLD's highest polluter, and a seat outside
+    # the field scores nothing however clean it is
+    simC.civ_co2_turn[:] = 0
+    simC.civ_co2_turn[0, 0] = 10
+    simC.civ_co2_turn[0, 1] = 4
+    simC._resolve_competition()
+    assert float(simC.comp_score[0, 0]) == 0.0, "the highest polluter scored"
+    assert float(simC.comp_score[0, 1]) == 6.0, "the gap to the top polluter is the score"
+    assert float(simC.comp_score[0, against]) == 0.0, "a seat outside the field scored"
+    assert float(simC.civ_co2_turn[0, 0]) == 0.0, "the turn's emission carried into the next"
+    assert int(simC.comp_left[0]) == simC._comp_turns - 1, "the clock did not run"
+
+    # ...and on the FREE vote the smokestack decides: the dirtiest seat refuses
+    # the competition it cannot score in, and the rest enact it.
+    simC.comp_kind[:] = -1
+    simC.civ_co2[:] = 0
+    simC.civ_co2[0, 0] = 100
+    o_dirty, t_dirty = simC._congress_pref(ci, 0)
+    o_clean, t_clean = simC._congress_pref(ci, 1)
+    assert int(o_dirty[0]) == 1, "the highest polluter voted for the competition"
+    assert int(o_clean[0]) == 0, "a seat that stands to score refused"
+    assert int(t_dirty[0]) < len(simC._comps) and int(t_clean[0]) < len(simC._comps), (
+        "the free vote named a competition the catalog does not hold"
+    )
+    simC.congress_slate[:, 0] = ci
+    simC.congress_slate[:, 1] = -1
+    simC.turn = 2 * iv
+    simC._world_congress()
+    assert int(simC.comp_kind[0]) == simC._comp_climate, "the free vote did not enact it"
+    assert not bool(simC.comp_member[0, 0]), "the seat that voted B joined the field"
+
+    # the podium at the window's end: gold to the best, then the two quarters
+    ones = torch.ones(simC.B, dtype=torch.bool, device=simC.device)
+    field = torch.ones(simC.B, nrow, dtype=torch.bool, device=simC.device)
+    clim = torch.full((simC.B,), simC._comp_climate, dtype=torch.long, device=simC.device)
+    silver = -(-nrow * simC._comp_silver_pct // 100)
+    bronze = -(-nrow * simC._comp_bronze_pct // 100)
+    defn = simC._comps[simC._comp_climate]
+
+    def run_window(emit) -> None:
+        simC._start_competition(ones, clim, field)
+        for row in range(nrow):
+            simC.civ_diplo_points[:, row] = 0
+            simC.civ_diplo_favor[:, row] = 0
+        for _ in range(simC._comp_turns):
+            simC.civ_co2_turn[:] = 0
+            for row in range(nrow):
+                simC.civ_co2_turn[0, row] = emit(row)
+            simC._resolve_competition()
+        assert int(simC.comp_kind[0]) == -1, "the window did not close on time"
+
+    run_window(lambda row: 2.0 * (nrow - 1 - row))     # row 0 dirtiest, last cleanest
+    for rank, row in enumerate(reversed(range(nrow))):
+        want_p = int(defn["gold"]) if rank == 0 else 0
+        want_f = (int(defn["silver"]) if rank < silver
+                  else int(defn["bronze"]) if rank < bronze else 0)
+        assert int(simC.civ_diplo_points[0, row]) == want_p, (
+            f"rank {rank} took {int(simC.civ_diplo_points[0, row])} points, wanted {want_p}"
+        )
+        assert int(simC.civ_diplo_favor[0, row]) == want_f, (
+            f"rank {rank} took {int(simC.civ_diplo_favor[0, row])} favor, wanted {want_f}"
+        )
+
+    # ...and a tie takes the LOWER row, one total order both engines share
+    run_window(lambda row: 4.0 if row == 0 else 0.0)
+    assert int(simC.civ_diplo_points[0, 1]) == int(defn["gold"]), "a tie skipped the lower row"
+    assert int(simC.civ_diplo_points[0, 2]) == 0, "the tie paid gold twice"
+    assert int(simC.civ_diplo_favor[0, 2]) == int(defn["bronze"]), "the tied runner-up missed bronze"
+    print("  the competition runs its 30 turns, scores the CO2 gap and pays all three tiers")
+
+    # --- EVERY resolution's free vote lands inside its OWN target space ------
+    # A kind with no arm falls through to a default that sizes and picks off a
+    # different catalog, and the reader then indexes past its own rows.
+    for r in range(len(simC._congress_res)):
+        name = simC._congress_res[r]["id"]
+        space = simC._congress_space(simC._congress_res[r]["t"])
+        assert space > 0, f"{name} offers no target"
+        for row in range(nrow):
+            o, tg = simC._congress_pref(r, row)
+            assert int(o[0]) in (0, 1), f"{name} voted a third outcome"
+            assert 0 <= int(tg[0]) < space, (
+                f"{name}'s free vote named target {int(tg[0])} of {space}"
+            )
+    print(f"  all {len(simC._congress_res)} free votes land inside their own target space")
+
     print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
           "the wider slate, the route ban, the culture bomb, the feature target, "
-          "the three late resolutions and the favor tie-break")
+          "the three late resolutions, the favor tie-break and the scored competition")
 
 
 if __name__ == "__main__":

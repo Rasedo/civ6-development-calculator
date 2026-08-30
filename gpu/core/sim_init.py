@@ -353,7 +353,7 @@ class SimInit:
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
-            ("co2", dtype, 0),
+            ("co2", dtype, 0), ("co2_turn", dtype, 0),
             ("enhancer", torch.long, -1), ("enhancer_done", torch.bool, 0),
             ("follower", torch.long, -1), ("founder", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
@@ -397,6 +397,12 @@ class SimInit:
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
         self.seat_spy_held = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # THE SCORED COMPETITION running right now: which one (-1 = none), the
+        # turns it has left, and the field's running scores. ONE at a time.
+        self.comp_kind = torch.full((B,), -1, dtype=torch.long, device=device)
+        self.comp_left = torch.zeros(B, dtype=torch.long, device=device)
+        self.comp_score = torch.zeros(B, _pw, dtype=dtype, device=device)
+        self.comp_member = torch.zeros(B, _pw, dtype=torch.bool, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # the ANNOUNCED slate for the next Regular Session (resolution
         # indices; -1 = empty slot), drawn at the previous session's close.
@@ -519,6 +525,11 @@ class SimInit:
         self._deal_k_city = self._deal_kinds.index("CITY")
         self._deal_k_spy = self._deal_kinds.index("SPY")
         self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
+        self._comp_turns = int(_er2["competitionTurns"])
+        self._comp_silver_pct = int(_er2["competitionSilverPct"])
+        self._comp_bronze_pct = int(_er2["competitionBronzePct"])
+        self._comps = list(_er2["competitions"])
+        self._comp_climate = [c["id"] for c in self._comps].index("CLIMATE_ACCORDS")
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])

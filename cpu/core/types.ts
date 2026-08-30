@@ -252,6 +252,15 @@ export interface DealTerm {
   items: DealItem[];
 }
 
+/** One scored competition's record; `cpu/core/competition.ts` owns it. Both
+ *  arrays are dense over `state.seats`, so a seat's id IS its index. */
+export interface Competition {
+  kind: number;
+  left: number;
+  score: number[];
+  member: number[];
+}
+
 /** One emergency's record; `cpu/core/emergency.ts` owns the phases. */
 export interface Emergency {
   kind: number;
@@ -279,6 +288,9 @@ export interface GameState {
   congress?: { res: number; outcome: number; target: number }[];
   /** Emergencies at any stage — pending, called, running. */
   emergencies?: Emergency[];
+  /** The SCORED COMPETITION running right now. One at a time; real Civ 6
+   *  bounds nothing here, and a single slot is what makes the score a plane. */
+  competition?: Competition;
   /** The turn the Congress last sat, Regular or Special. A Special Session
    * needs SPECIAL_SESSION_GAP turns of quiet before it may be called. */
   lastSessionTurn?: number;
@@ -467,6 +479,9 @@ export interface Seat {
    *  (Carbon Recapture) "allows the lifetime carbon emissions of a
    *  civilization to go below 0". */
   co2?: number;
+  /** ...and what this seat emitted THIS TURN. The Climate Accords competition
+   *  compares it across seats; `resolveCompetition` clears it when it has. */
+  co2Turn?: number;
   diplomaticFavor: number;
   diplomaticPoints: number;
   /** THIS TURN's World Congress ballot, as the record left it. Written inside

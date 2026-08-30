@@ -92,6 +92,9 @@ export function emitCarbon(state: GameState, seat: number, raw: number): void {
   const s = seatOf(state, seat);
   if (!s || raw === 0) return;
   s.co2 = (s.co2 ?? 0) + raw;
+  // ...and THIS TURN's share of it, which the Climate Accords competition
+  // compares across seats and `resolveCompetition` clears when it has.
+  s.co2Turn = (s.co2Turn ?? 0) + raw;
 }
 
 /** What a plant discharges for burning `units` of its fuel to make Power. */

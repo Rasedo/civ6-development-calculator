@@ -65,7 +65,7 @@ PER_CITY = 10
 # THE WORLD CONGRESS block: this seat's ballot currency and the slate that is
 # STANDING — what the last session passed and on whom. A net votes off this;
 # the ladder's own vote reads the sim directly, the way the route verb does.
-CONGRESS = 12
+CONGRESS = 20
 CONGRESS_FIELDS = (
     "favor",          # diplomatic favor / 100
     "dvPoints",       # diplomatic victory points / 20 (the win threshold)
@@ -81,6 +81,18 @@ CONGRESS_FIELDS = (
     "emgPhase",       # 0 none, 1 pending, 2 called, 3 running
     "emgIsMe",        # 1 when this seat is the TARGET
     "emgMember",      # 1 when this seat is already a member
+    # THE SESSION ABOUT TO SIT. A ballot addresses the UPCOMING slate, drawn
+    # and announced at the previous session's close — never the standing one.
+    "nextRes0",       # announced slate slot 0: resolution index + 1, 0 = none
+    "nextRes1",
+    "nextIn",         # turns until that session / the interval
+    "nextDv",         # 1 when the Diplomatic Victory resolution runs in it
+    # THE SCORED COMPETITION running now: the other Diplomatic Victory faucet,
+    # and this seat moves its own score with its own emissions.
+    "compKind",       # kind + 1, 0 = none
+    "compLeft",       # turns left / the window
+    "compMine",       # 1 when this seat is in the field
+    "compShare",      # this seat's score over the field's best, 0 outside it
 )
 
 

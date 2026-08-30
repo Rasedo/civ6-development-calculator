@@ -20,7 +20,9 @@ import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
 import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
-import { congressPactBanned, congressPactLevels } from '../../../cpu/core/congress';
+import { congressPactBanned, congressPactLevels, targetSpaceSize } from '../../../cpu/core/congress';
+import { competitionOf } from '../../../cpu/core/competition';
+import { CONGRESS_COMPETITION, COMPETITION_CLIMATE, COMPETITION_TURNS } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS, SPY_UNIT, SPY_M_SIPHON_FUNDS, SPY_M_FOMENT_UNREST, SPY_M_GAIN_SOURCES } from '../../../cpu/data/espionage';
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
 import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
@@ -369,15 +371,47 @@ describe('world congress: the wider slate', () => {
 
   it('every resolution names a target space the vote can address', () => {
     // A target index the tally can produce must be legal for the reader; the
-    // kinds are what size that space, so each one has to be known.
-    for (const r of CONGRESS_RESOLUTIONS) {
-      expect(CONGRESS_TARGET_KINDS).toContain(r.target);
+    // kinds are what size that space, and the free vote has to land INSIDE it
+    // for every resolution — a kind with no arm falls through to a default
+    // that sizes and picks off a different catalog entirely.
+    const state = newGame(1);
+    const ctx = { government: 0, policies: [], envoysByType: [] };
+    for (let r = 0; r < CONGRESS_RESOLUTIONS.length; r++) {
+      expect(CONGRESS_TARGET_KINDS).toContain(CONGRESS_RESOLUTIONS[r].target);
+      const space = targetSpaceSize(state, r);
+      expect(space).toBeGreaterThan(0);
+      for (let s = 0; s < state.seats.length; s++) {
+        const p = congressPreference(state, r, s, ctx);
+        expect([0, 1]).toContain(p.outcome);
+        expect(p.target).toBeGreaterThanOrEqual(0);
+        expect(p.target).toBeLessThan(space);
+      }
     }
+  });
+
+  it('a Scored Competition opens a window whose field is its own A voters', () => {
+    // CIV6 (World Congress): "players who vote in favor of the Scored
+    // Competition will compete to contribute to the cause".
+    const state = newGame(2);
+    medieval(state);
+    settleFirstCity(state, 1);
+    settleFirstCity(state, 2);
+    // the highest polluter has nothing to score, so its own line refuses
+    seatOf(state, 0)!.co2 = 100;
+    state.turn = CONGRESS_INTERVAL;
+    state.congressSlate = [CONGRESS_COMPETITION, CONGRESS_UDT];
+    worldCongress(state);
+    const c = competitionOf(state)!;
+    expect(c.kind).toBe(COMPETITION_CLIMATE);
+    expect(c.left).toBe(COMPETITION_TURNS);
+    expect(c.member[0]).toBe(0);
+    expect(c.member[1]).toBe(1);
+    expect(c.member[2]).toBe(1);
   });
 });
 
 describe('the culture bomb', () => {
-  it('claims a neighbour of a new district for the bomber, and skips a district tile', () => {
+  it('claims a neighbour of a new district for the bomber, and skips a FINISHED district', () => {
     const state = newGame(1);
     settleFirstCity(state, 1);
     const city = seatOf(state, 0)!.cities[0];
@@ -388,7 +422,8 @@ describe('the culture bomb', () => {
     const foreign = ring[0];
     setTileOwner(foreign, 1, 999);       // another seat's plot, inside the blast
     const paved = ring[1];
-    paved.district = 'CAMPUS';           // a district is never bombed away
+    paved.district = 'CAMPUS';           // a FINISHED district is never stolen
+    paved.districtComplete = true;
     const pavedOwner = tileSeat(paved);
     const before = city.tilesAcquired;
     completeQueueItem(state, city, { kind: 'district', district: 'CAMPUS', tileIndex: spot.index, progress: 0 }, 0);
@@ -396,6 +431,32 @@ describe('the culture bomb', () => {
     expect(tileCity(foreign)).toBe(city.id);
     expect(tileSeat(paved)).toBe(pavedOwner);
     expect(city.tilesAcquired).toBeGreaterThan(before);
+  });
+
+  it('takes a plot whose district is UNFINISHED, and wipes the build', () => {
+    // CIV6 (Culture Bomb): "if a Wonder or a District is still under
+    // construction and it suffers the effect of a Culture Bomb, construction
+    // will immediately stop and it'll disappear".
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    const city = seatOf(state, 0)!.cities[0];
+    const theirs = seatOf(state, 1)!.cities[0];
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 0 }];
+    const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
+    const spot = around.find((t) => !isWater(t) && t.index !== city.centerIndex)!;
+    const digging = neighbors(state.map, spot).find((t) => t.index !== city.centerIndex)!;
+    setTileOwner(digging, 1, theirs.id);
+    digging.district = 'CAMPUS';
+    digging.districtComplete = false;
+    theirs.districts.push({ type: 'CAMPUS', tileIndex: digging.index });
+    theirs.queue = [{ kind: 'district', district: 'CAMPUS', tileIndex: digging.index, progress: 40 }];
+    completeQueueItem(state, city, { kind: 'district', district: 'CAMPUS', tileIndex: spot.index, progress: 0 }, 0);
+    expect(tileSeat(digging)).toBe(0);
+    expect(digging.district).toBe(null);
+    expect(theirs.districts.some((d) => d.tileIndex === digging.index)).toBe(false);
+    expect(theirs.queue.length).toBe(0);
+    // ...and the hammers are not burned: every carried-over hammer banks
+    expect(theirs.productionBank).toBe(40);
   });
 
   it('does not fire for a seat the resolution did not name', () => {

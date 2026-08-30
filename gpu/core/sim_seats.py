@@ -3130,6 +3130,7 @@ class SimSeats:
         # running emergency is settled whether one sat or not.
         self._special_sessions(votes)
         self._resolve_emergencies()
+        self._resolve_competition()
         fires, res0, res1, dv = self._congress_upcoming(int(self.turn))
         if not bool(fires.any()):
             return
@@ -3563,6 +3564,8 @@ class SimSeats:
             return max(1, self.n_governors)
         if kind == 14:
             return max(1, len(self._spy_offensive))
+        if kind == 15:
+            return max(1, len(self._comps))
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -3672,6 +3675,12 @@ class SimSeats:
             # A pays +10 religious strength to one religion, and a religion IS
             # its founder's seat here — every ballot names its own.
             return a, me
+        if name == "SCORED_COMPETITION":
+            # Climate Accords pays every seat BELOW the highest polluter, so
+            # the seat that stands to score enacts it and the dirtiest refuses.
+            # The target is which competition to run.
+            top = self.civ_co2[:, : self.n_majors].max(dim=1).values
+            return (self.civ_co2[:, row] >= top).long(), a
         if name == "ESPIONAGE_PACT":
             # A lifts every Spy on ONE operation and B bans it outright — a
             # seat takes the gift, and names the operation its own spies are
@@ -3791,6 +3800,11 @@ class SimSeats:
         voted = m & (weight > 0).any(dim=1)
         for f, val in ((0, torch.full_like(win_t, r)), (1, win_out), (2, win_t)):
             self.congress_active[:, slot, f] = torch.where(voted, val, self.congress_active[:, slot, f])
+        # CIV6 (World Congress): "If enacted, players who vote in favor of the
+        # Scored Competition will compete to contribute to the cause" — outcome
+        # A starts the 30-turn window, and its own A voters are the field.
+        if self._congress_res[r]["id"] == "SCORED_COMPETITION":
+            self._start_competition(voted & (win_out == 0), win_t, (out == 0) & (weight > 0))
         # CIV6 (Governance Doctrine, B): "All active Governors of this type are
         # neutralized for 6 Turns." The clock starts AT the session, so this is
         # the one resolution outcome that fires once instead of standing.
@@ -3801,6 +3815,76 @@ class SimSeats:
                 for nrow in range(self.n_majors):
                     if bool(self.civ_gov_appointed[b, nrow, g]):
                         self.neutralize_governor(b, nrow, g, self._gov_neutralize)
+
+    def _start_competition(self, fire: torch.Tensor, kind: torch.Tensor,
+                           field: torch.Tensor) -> None:
+        """Enact one. CIV6: "players who vote in favor of the Scored
+        Competition will compete to contribute to the cause", so the field is
+        the A voters, and a seat with no city is not in the world to compete.
+        `startCompetition`'s twin."""
+        fire = fire & (kind >= 0) & (kind < len(self._comps))
+        if not bool(fire.any()):
+            return
+        live = torch.stack([self.city_alive[:, r].any(dim=1) for r in range(self.n_majors)], dim=1)
+        self.comp_kind[fire] = kind[fire]
+        self.comp_left[fire] = self._comp_turns
+        self.comp_score[fire] = 0
+        self.comp_member[fire] = (field & live)[fire]
+
+    def _competition_score(self) -> None:
+        """CIV6 (Climate Accords): "1 point per turn for each CO2 emission less
+        than the highest polluter" — the WORLD's highest, so the top polluter
+        scores nothing. `scoreTurn`'s twin."""
+        run = (self.comp_kind >= 0) & (self.comp_kind == self._comp_climate)
+        if not bool(run.any()):
+            return
+        emit = self.civ_co2_turn[:, : self.n_majors]
+        top = emit.max(dim=1, keepdim=True).values
+        gain = (top - emit).clamp(min=0)
+        add = run.unsqueeze(1) & self.comp_member
+        self.comp_score += torch.where(add, gain, torch.zeros_like(gain)).to(self.comp_score.dtype)
+
+    def _competition_podium(self, done: torch.Tensor) -> None:
+        """CIV6 (Competition): "the civilization with the highest score wins the
+        Gold Tier rewards", every civ in the top 25% including it takes Silver,
+        and the next quarter takes Bronze. Ties break on the LOWER row, one
+        total order both engines share. `payPodium`'s twin."""
+        nrow = self.n_majors
+        for b in done.nonzero(as_tuple=True)[0].tolist():
+            k = int(self.comp_kind[b])
+            if not (0 <= k < len(self._comps)):
+                continue
+            row = self._comps[k]
+            field = [r for r in range(nrow) if bool(self.comp_member[b, r])]
+            if not field:
+                continue
+            field.sort(key=lambda r: (-float(self.comp_score[b, r]), r))
+            silver = -(-len(field) * self._comp_silver_pct // 100)
+            bronze = -(-len(field) * self._comp_bronze_pct // 100)
+            for rank, r in enumerate(field):
+                if rank == 0:
+                    self.civ_diplo_points[b, r] += int(row["gold"])
+                if rank < silver:
+                    self.civ_diplo_favor[b, r] += int(row["silver"])
+                elif rank < bronze:
+                    self.civ_diplo_favor[b, r] += int(row["bronze"])
+
+    def _resolve_competition(self) -> None:
+        """The turn's competition: score the field, run the clock down, pay the
+        podium at zero. `resolveCompetition`'s twin — and the per-turn emission
+        is read HERE and nowhere else, so it is cleared here too."""
+        run = self.comp_kind >= 0
+        if bool(run.any()):
+            self._competition_score()
+            self.comp_left[run] -= 1
+            done = run & (self.comp_left <= 0)
+            if bool(done.any()):
+                self._competition_podium(done)
+                self.comp_kind[done] = -1
+                self.comp_left[done] = 0
+                self.comp_member[done] = False
+                self.comp_score[done] = 0
+        self.civ_co2_turn[:] = 0
 
     def _congress_leader(self, m: torch.Tensor) -> torch.Tensor:
         """[B] the DVP leader among alive majors, ties to the LOWER row; -1
@@ -5592,12 +5676,68 @@ class SimSeats:
         self._eff_version += 1
         return True
 
+    def _wipe_construction(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """CIV6 (Culture Bomb): a tile whose district or wonder is still under
+        construction is flipped anyway — "construction will immediately stop
+        and it'll disappear", "wiping out any unfinished construction in the
+        process". The hammers already spent are NOT lost: they bank, which is
+        where this model puts every carried-over hammer. `wipeConstruction`'s
+        twin, and it reads the plot's owner, so it runs before the claim."""
+        if rows.numel() == 0:
+            return
+        live = (((self.district[rows, tiles] >= 0) & ~self.district_complete[rows, tiles])
+                | ((self.built_wonder[rows, tiles] >= 0) & ~self.built_wonder_complete[rows, tiles]))
+        if not bool(live.any()):
+            return
+        rr, tt = rows[live], tiles[live]
+        oseat, ocity = self.tile_seat[rr, tt], self.tile_city[rr, tt]
+        di, wi = self.district[rr, tt], self.built_wonder[rr, tt]
+        for orow in range(self.n_majors):
+            for col in range(self.RC):
+                hit = (oseat == orow) & (ocity >= 0) & (self.city_id[rr, orow, col] == ocity)
+                if not bool(hit.any()):
+                    continue
+                h = hit.nonzero(as_tuple=True)[0]
+                hr, ht, hd, hw = rr[h], tt[h], di[h], wi[h]
+                cur = self.city_current[hr, orow, col]
+                dig = (hd >= 0) & (self.city_qtile[hr, orow, col] == ht)
+                creg = self.city_wonder[hr, orow, col]
+                at_w = creg.gather(1, hw.clamp(min=0).unsqueeze(1)).squeeze(1)
+                rai = (hw >= 0) & (at_w == ht)
+                # THE PRODUCTION SLOT, only where it is this very build: the
+                # registries below outlive the item that filled them.
+                gone = ((dig & (cur == self.DISTRICT_BASE + hd))
+                        | (rai & (cur == self.WONDER_BASE + hw)))
+                if bool(gone.any()):
+                    g = hr[gone]
+                    self.city_prod_bank[g, orow, col] += self.city_progress[g, orow, col]
+                    self.city_progress[g, orow, col] = 0
+                    self.city_cost[g, orow, col] = 0
+                    self.city_current[g, orow, col] = -1
+                if bool(dig.any()):
+                    d = dig.nonzero(as_tuple=True)[0]
+                    self.city_qtile[hr[d], orow, col] = -1
+                    named = self.city_dist_tile[hr[d], orow, col, hd[d]] == ht[d]
+                    if bool(named.any()):
+                        n = d[named]
+                        self.city_dist_tile[hr[n], orow, col, hd[n]] = -1
+                if bool(rai.any()):
+                    r2 = rai.nonzero(as_tuple=True)[0]
+                    self.city_wonder[hr[r2], orow, col, hw[r2]] = -1
+        self.district[rr, tt] = torch.where(self.district_complete[rr, tt],
+                                            self.district[rr, tt], torch.full_like(di, -1))
+        self.built_wonder[rr, tt] = torch.where(self.built_wonder_complete[rr, tt],
+                                                self.built_wonder[rr, tt], torch.full_like(wi, -1))
+        self._claim_version += 1
+        self._eff_version += 1
+
     def _culture_bomb(self, row: int, rows: torch.Tensor, tiles: torch.Tensor,
                       cols: torch.Tensor, unowned_only: bool = False) -> None:
         """cultureBomb's twin — the six tiles around each of `tiles` annex to
-        the city in `cols`. A tile carrying a district (a CITY CENTRE included)
-        or a wonder is left alone, as is one further than
-        `_culture_bomb_range` from every living centre this row holds. The
+        the city in `cols`. A tile carrying a COMPLETE district (a CITY CENTRE
+        included) or a complete wonder is left alone, as is one further than
+        `_culture_bomb_range` from every living centre this row holds. An
+        UNFINISHED build is taken and undone by `_wipe_construction`. The
         claimed tiles are distinct, so claim ORDER cannot change the result.
 
         CIV6 (Preserve): "Initiate a Culture Bomb on adjacent UNOWNED tiles" —
@@ -5617,8 +5757,8 @@ class SimSeats:
                     & alive).any(dim=1)
             take = (
                 (tk >= 0) & near
-                & (self.district[rows, tc] < 0)
-                & (self.built_wonder[rows, tc] < 0)
+                & ~((self.district[rows, tc] >= 0) & self.district_complete[rows, tc])
+                & ~((self.built_wonder[rows, tc] >= 0) & self.built_wonder_complete[rows, tc])
                 & (centre_at[rows, tc] < 0)
                 & ~((self.tile_seat[rows, tc] == row) & (self.tile_city[rows, tc] == cid))
             )
@@ -5627,6 +5767,7 @@ class SimSeats:
             if not bool(take.any()):
                 continue
             rr, tt = rows[take], tk[take]
+            self._wipe_construction(rr, tt)   # reads the plot's OLD owner
             # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear);
             # a same-seat retag between two of the row's cities keeps it
             self.tile_locked[rr, tt] &= self.tile_seat[rr, tt] == row

@@ -282,8 +282,9 @@ class BatchEnv:
                           self._ctx_block(row)], dim=1)
 
     def _congress_block(self, row: int) -> torch.Tensor:
-        """[B, ladder.CONGRESS] — the ballot currency and the STANDING slate,
-        the same layout `observeSeat` renders."""
+        """[B, ladder.CONGRESS] — the ballot currency, the STANDING slate, the
+        one about to sit and the running competition, the same layout
+        `observeSeat` renders."""
         s = self.sim
         d = s.dtype
         cols = [s.civ_diplo_favor[:, row].to(d) / 100.0,
@@ -296,6 +297,21 @@ class BatchEnv:
             cols.append(torch.where(live, s.congress_active[:, k, 2], torch.zeros_like(res)).to(d))
         kind, phase, is_me, member = s._emergency_view(row)
         cols += [kind.to(d), phase.to(d), is_me.to(d), member.to(d)]
+        for k in range(2):
+            cols.append((s.congress_slate[:, k] + 1).clamp(min=0).to(d))
+        iv = max(1, int(s._congress_interval))
+        cols.append(torch.full((s.B,), float((iv - int(s.turn) % iv) % iv) / iv,
+                               dtype=d, device=s.device))
+        era = s._world_era()
+        cols.append(((era >= s._congress_min_era) & (era >= s._congress_dv_min)).to(d))
+        mine = s.comp_member[:, row]
+        top = torch.where(s.comp_member, s.comp_score,
+                          torch.zeros_like(s.comp_score)).max(dim=1).values
+        cols += [(s.comp_kind + 1).clamp(min=0).to(d),
+                 s.comp_left.to(d) / float(s._comp_turns),
+                 mine.to(d),
+                 torch.where(mine, s.comp_score[:, row].to(d) / top.clamp(min=1).to(d),
+                             torch.zeros(s.B, dtype=d, device=s.device))]
         return torch.stack(cols, dim=1)
 
     def _seat_strength(self, row: int) -> torch.Tensor:

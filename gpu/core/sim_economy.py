@@ -578,6 +578,9 @@ class SimEconomy:
         """Bank raw carbon against a seat. Signed: Carbon Recapture takes the
         lifetime total below zero, so nothing clamps (`emitCarbon`)."""
         self.civ_co2[:, row] += raw.to(self.civ_co2.dtype)
+        # ...and THIS TURN's share, which the Climate Accords competition
+        # compares across seats and `_resolve_competition` clears when it has.
+        self.civ_co2_turn[:, row] += raw.to(self.civ_co2_turn.dtype)
 
     def _pollution_points(self, raw: torch.Tensor) -> torch.Tensor:
         return (raw.double() / self._pollution_divisor).floor()

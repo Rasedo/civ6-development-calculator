@@ -105,6 +105,20 @@
           "note": "the ANNOUNCED slate for the next Regular Session — resolution indices drawn at the previous session's close, -1 for an empty slot."
         },
         {
+          "name": "competition",
+          "compare": "milli",
+          "covers": [
+            "GameState.competition"
+          ],
+          "planes": [
+            "comp_kind",
+            "comp_left",
+            "comp_score",
+            "comp_member"
+          ],
+          "note": "The running scored competition, flat: [kind, turnsLeft, score per civ seat, membership per civ seat]. -1 kind = none."
+        },
+        {
           "name": "congressActive",
           "compare": "exact",
           "covers": [
@@ -1109,6 +1123,17 @@
             "civ_co2"
           ],
           "note": "LIFETIME raw carbon; may go negative after Carbon Recapture, and carries half-units from unit emissions, which is why it is milli and not exact."
+        },
+        {
+          "name": "co2Turn",
+          "compare": "milli",
+          "covers": [
+            "Seat.co2Turn"
+          ],
+          "planes": [
+            "civ_co2_turn"
+          ],
+          "note": "THIS TURN's raw carbon, the Climate Accords score's input; cleared by resolveCompetition once every seat has emitted."
         },
         {
           "name": "gpUsed",

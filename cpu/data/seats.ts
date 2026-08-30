@@ -242,14 +242,15 @@ export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
-  | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission';
+  | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
+  | 'competition';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
-  'building', 'promoClass', 'religion', 'governor', 'spyMission',
+  'building', 'promoClass', 'religion', 'governor', 'spyMission', 'competition',
 ];
 
 export interface CongressResolutionDef {
@@ -347,6 +348,13 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // "Starting in the Renaissance era, Spies will become available" — because
   // neither outcome can act before a Spy can run an operation.
   { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 3, maxEra: 99, target: 'spyMission' },
+  // CIV6 (World Congress): a SCORED COMPETITION is enacted by a resolution in
+  // a Regular Session, and those "start appearing from the Modern Era onward".
+  // "If enacted, players who vote in favor of the Scored Competition will
+  // compete to contribute to the cause" — so outcome A runs it with its A
+  // voters as the field, and B is the world declining to hold it. The TARGET
+  // names WHICH competition, which is why a second one is a data row.
+  { id: 'SCORED_COMPETITION', name: 'Scored Competition', minEra: 5, maxEra: 99, target: 'competition' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -367,6 +375,7 @@ export const CONGRESS_MILITARY_ADVISORY = 15;
 export const CONGRESS_WORLD_RELIGION = 16;
 export const CONGRESS_GOVERNANCE = 17;
 export const CONGRESS_ESPIONAGE = 18;
+export const CONGRESS_COMPETITION = 19;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = 200;
 export const CONGRESS_PR_MULT_B = 50;
@@ -663,6 +672,51 @@ export const FORMAL_WAR_MIN_TURNS = 5;
  * after which its effects expire") all publish the same number.
  */
 export const AGREEMENT_TURNS = 30;
+
+// ---------------------------------------------------------------------------
+// SCORED COMPETITIONS (GS), which a Regular Session enacts.
+//
+// CIV6 (World Congress): they are "chances for civilizations to win esteem
+// through events and projects that benefit the world", and "If enacted,
+// players who vote in favor of the Scored Competition will compete to
+// contribute to the cause. The players that contribute the most will receive
+// lucrative rewards."
+//
+// CIV6 (Competition): each runs for exactly 30 turns, "after which it ends and
+// winners are chosen". "The civilization with the highest score wins the Gold
+// Tier rewards. Additionally, all civs whose scores fall within the top 25%
+// (including the Gold Tier winner) win the Silver Tier rewards, and all civs
+// whose scores fall within the next highest quarter (i.e. the top 26-50%) win
+// the Bronze Tier rewards."
+// ---------------------------------------------------------------------------
+export const COMPETITION_TURNS = AGREEMENT_TURNS;
+/** The score fractions the two lower podiums cut at, as published. */
+export const COMPETITION_SILVER_PCT = 25;
+export const COMPETITION_BRONZE_PCT = 50;
+
+export interface CompetitionDef {
+  id: string;
+  name: string;
+  /** Diplomatic Victory Points to the single highest score. */
+  goldPoints: number;
+  /** Diplomatic Favor to the top quarter, the gold winner included. */
+  silverFavor: number;
+  /** ...and to the quarter below it. */
+  bronzeFavor: number;
+}
+/**
+ * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
+ * A row belongs here only when its SCORED QUANTITY and all three tiers are
+ * published — the ones that are not are open AUDIT items.
+ */
+export const COMPETITIONS: readonly CompetitionDef[] = [
+  // CIV6 (Climate Accords): scored "1 point per turn for each CO2 emission
+  // less than the highest polluter"; Gold "2 Diplomatic Victory points",
+  // Silver "100 Diplomatic Favor", Bronze "50 Diplomatic Favor".
+  { id: 'CLIMATE_ACCORDS', name: 'Climate Accords', goldPoints: 2, silverFavor: 100, bronzeFavor: 50 },
+];
+export const COMPETITION_CLIMATE = 0;
+
 
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic
  *  visibility: None, Limited, Open, Secret, and Top Secret." Each source is

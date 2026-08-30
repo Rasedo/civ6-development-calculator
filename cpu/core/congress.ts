@@ -18,7 +18,7 @@ import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
-import { seatOf, tileSeat, unitsOf } from './seats';
+import { isCiv, seatOf, tileSeat, unitsOf } from './seats';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
@@ -34,11 +34,13 @@ import {
   CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
+  CONGRESS_COMPETITION, COMPETITIONS,
 } from '../data/seats';
 import { POWER_PLANT_IDS } from '../data/buildings';
 import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import { GOVERNOR_NEUTRALIZE_TURNS } from '../data/governors';
 import { neutralizeGovernor } from './governors';
+import { startCompetition } from './competition';
 import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
 
 const CLEARABLE_FEATURES = clearableFeatures();
@@ -193,6 +195,14 @@ export function preference(state: GameState, res: number, seat: number,
       }
       return { outcome: 0, target: argmaxLow(counts) };
     }
+    case CONGRESS_COMPETITION: {
+      // Climate Accords pays every seat BELOW the highest polluter, so the
+      // seat that stands to score enacts it and the dirtiest refuses. The
+      // target is which competition to run.
+      let top = 0;
+      for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2 ?? 0);
+      return { outcome: (sx.co2 ?? 0) >= top ? 1 : 0, target: 0 };
+    }
     default: { // CONGRESS_HERITAGE
       const counts = [0, 0, 0];
       for (const city of sx.cities) {
@@ -267,7 +277,7 @@ function settle(state: GameState, votes: readonly Vote[], spent: readonly number
   }
 }
 
-function targetSpaceSize(state: GameState, res: number): number {
+export function targetSpaceSize(state: GameState, res: number): number {
   switch (CONGRESS_RESOLUTIONS[res].target) {
     case 'district': return PLACEABLE_DISTRICTS.length;
     case 'gpClass': return GP_CLASSES.length;
@@ -282,6 +292,7 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'promoClass': return PROMO_CLASSES.length;
     case 'governor': return GOVERNORS.length;
     case 'spyMission': return SPY_OFFENSIVE_MISSIONS.length;
+    case 'competition': return COMPETITIONS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;
     default: return state.seats.length;
@@ -315,6 +326,12 @@ function runResolution(state: GameState, res: number, slot: number,
   // CIV6 (Governance Doctrine, B): "All active Governors of this type are
   // neutralized for 6 Turns." The clock starts AT the session, so this is the
   // one resolution outcome that fires once instead of standing.
+  // CIV6 (World Congress): "If enacted, players who vote in favor of the
+  // Scored Competition will compete to contribute to the cause" — outcome A
+  // starts the 30-turn window, and its own A voters are the field.
+  if (res === CONGRESS_COMPETITION && win.outcome === 0) {
+    startCompetition(state, win.target, votes.filter((v) => v.outcome === 0).map((v) => v.seat));
+  }
   if (res === CONGRESS_GOVERNANCE && win.outcome === 1) {
     for (const sx of state.seats) {
       const g = (sx.governors ?? [])[win.target];

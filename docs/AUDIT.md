@@ -45,7 +45,7 @@ from the list below.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 2 | the observation renders the standing slate, two resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions are absent |
+| B-22r World Congress | 1 | two resolutions have no carrier; the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
@@ -63,7 +63,7 @@ from the list below.
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **24** | |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -80,7 +80,7 @@ from the list below.
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **54** | |
+| **OPEN, TOTAL** | **53** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -137,11 +137,48 @@ Civ 6 source or is recorded as unverifiable.
   ~5 sessions per seed; rows past rotation rank 9 are poke-only
   (`world-congress.test.ts`, `congress_vote_test`); the CITY_STATE
   emergency trigger is poke-only (`tests/cpu/minors/emergencies.test.ts`,
-  `tests/gpu/emergency_test.py`). OPEN:
-  - **THE OBSERVATION RENDERS THE STANDING SLATE, not the UPCOMING one.**
-    A ballot addresses the session about to run; `_congress_upcoming` can
-    compute its slate but nothing renders it, so a net votes on the
-    previous session's resolutions.
+  `tests/gpu/emergency_test.py`).
+
+  THE OBSERVATION NOW ADDRESSES THE SESSION ABOUT TO SIT. Beside the
+  standing slate it renders the ANNOUNCED one, the turns until it and
+  whether the Diplomatic Victory resolution runs in it, so a ballot is
+  filled in against the resolutions it will actually answer.
+
+  THE CULTURE BOMB WIPES UNFINISHED CONSTRUCTION. SOURCED: "if a Wonder or
+  a District is still under construction and it suffers the effect of a
+  Culture Bomb, construction will immediately stop and it'll disappear",
+  while "a Culture Bomb will not steal completed wonders or districts". So
+  the claim now skips only a COMPLETE build, and `wipeConstruction` /
+  `_wipe_construction` undo an unfinished one — the tile's mark, the
+  city's registry entry and the production item, whose hammers BANK rather
+  than burn, which is where this model puts every carried-over hammer.
+
+  SCORED COMPETITIONS SHIP as one resolution row whose TARGET names which
+  competition to run, so a second competition is a data row and never a
+  new resolution. "If enacted, players who vote in favor of the Scored
+  Competition will compete to contribute to the cause", so outcome A opens
+  the window and its own A voters are the field. A competition runs for
+  exactly 30 turns; then "the civilization with the highest score wins the
+  Gold Tier rewards. Additionally, all civs whose scores fall within the
+  top 25% (including the Gold Tier winner) win the Silver Tier rewards,
+  and all civs whose scores fall within the next highest quarter (i.e. the
+  top 26-50%) win the Bronze Tier rewards" (`resolveCompetition` /
+  `_resolve_competition`). The era floor is the Modern era, where the
+  source puts the resolutions. CLIMATE ACCORDS is the first row, scored
+  "1 point per turn for each CO2 emission less than the highest polluter"
+  — the WORLD's highest, so the dirtiest civ scores nothing — paying Gold
+  2 Diplomatic Victory points, Silver 100 and Bronze 50 Diplomatic Favor.
+  Reach is unmeasured; `congress_vote_test` and
+  `tests/cpu/seats/competition.test.ts` are what exercise it. FOUR things
+  about it are decisions, not transcriptions: ONE competition runs at a
+  time, because real Civ 6 bounds nothing here and a single slot is what
+  makes the score a plane both engines compare; "CO2 emission" is read as
+  the per-turn RATE rather than the lifetime total, which is what makes
+  the score a per-turn gap; the podium's tie breaks on the LOWER seat, one
+  total order both engines share, where the source publishes none; and the
+  free vote's line — the highest polluter refuses what it cannot score in
+  — is this model's own self-interest heuristic, like every other AI line
+  in the catalog. OPEN:
   - **TWO resolutions have no carrier**: Arms Control (weapons of mass
     destruction, C-31); and
     Luxury Policy — SOURCED: "A: Duplicates of this Luxury resource grant
@@ -159,19 +196,21 @@ Civ 6 source or is recorded as unverifiable.
     is the Renaissance, where the chassis page puts the unit; and the
     target space is `SPY_OFFENSIVE_MISSIONS`, the operations either
     outcome can act on, since no source lists what the game offers.
-  - **THE CULTURE BOMB DOES NOT WIPE UNFINISHED CONSTRUCTION.** SOURCED
-    (Culture Bomb): a bombed tile carrying a district or wonder under
-    construction is flipped anyway, "wiping out any unfinished
-    construction in the process". `cultureBomb` / `_culture_bomb` leave
-    such a tile alone. Closing it needs a cross-engine
-    cancel-the-queued-item primitive: dropping an item from the middle of
-    the TS `City.queue` array has no GPU twin (`city_current` +
-    `city_qtile`).
-  - **SCORED COMPETITIONS are absent.** Aid Request, Border Dispute,
-    Catastrophe, Military Competition and the rest score participants
-    over a window and pay the podium — the other real DVP faucet. Floods
-    already fire, so an Aid-Request-shaped competition has a trigger;
-    what is missing is the per-seat scoring window and the podium payout.
+  - **THE COMPETITION CATALOG HOLDS ONE ROW.** The machinery takes a data
+    row per competition; what is missing is the rows. WORLD'S FAIR is
+    blocked on its own SOURCE: Silver is 50 Diplomatic Favor and Bronze a
+    free Civic, but the GOLD tier and the SCORED QUANTITY did not come
+    back from any reachable source, and neither will be invented. AID
+    REQUEST scores members who "send Gold to the target player", which
+    needs a gold-to-a-rival channel the deal table now has but no
+    competition scorer reads yet; BORDER DISPUTE, CATASTROPHE and
+    MILITARY COMPETITION each want a scored quantity of their own. THE
+    NOBEL PRIZE competitions are Sweden-only, so they sit behind C-26,
+    which is PARKED.
+  - **CLIMATE ACCORDS SCORES ONLY HALF ITS INPUTS.** The source scores the
+    Decommission Coal/Oil/Nuclear Power Plant projects alongside the
+    emission gap; those projects have no carrier (C-1), so the window
+    counts the gap alone.
   - ~~Peace deals carry no terms.~~ CLOSED: "the peaceful resolution of a
     war involves diplomatic negotiations ... You or your opponent may
     initiate a Peace Deal", so a table between two seats at war IS the
@@ -517,11 +556,11 @@ under their blocker so the dependency is readable, and both halves count.
   `tests/gpu/power_test.py`, `tests/cpu/city/power.test.ts`; the grid is
   poke-proven — no gate lane builds a plant). OPEN:
   - **THE DECOMMISSION AND RECOMMISSION PROJECTS** — nothing can retire a
-    plant, and the Nuclear plant's reactor has no age to reset.
+    plant, and the Nuclear plant's reactor has no age to reset. The
+    Climate Accords competition scores these projects too (B-22r), so the
+    window counts the emission gap alone until they exist.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
     `_resolve_seat_power` run inside the MAJOR seat loop only.
-  - **THE CLIMATE ACCORDS COMPETITION HAS NO CARRIER** — B-22r's absent
-    scored-competition machinery.
   - **THE FOUR RENEWABLE GENERATORS** — Geothermal Plant, Solar Farm,
     Wind Farm, Offshore Wind Farm — are improvements with terrain gates,
     and none is in the improvement roster.
