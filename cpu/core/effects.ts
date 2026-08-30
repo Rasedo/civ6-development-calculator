@@ -305,7 +305,7 @@ function addPartial(target: Partial<Yields>, src?: Partial<Yields>): void {
   }
 }
 
-function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
+export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   addPartial(mods.cityYields, fx.cityYields);
   addPartial(mods.capitalYields, fx.capitalYields);
   for (const [d, m] of Object.entries(fx.adjacencyMult ?? {})) {
@@ -411,7 +411,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   const mods = modifiersFromResearch(s.research);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat));
+    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -610,8 +610,15 @@ export function inDarkAge(state: GameState, seat: number): boolean {
   return (seatOf(state, seat)?.age ?? 1) === 0;
 }
 
+/** The `GovernmentState.held` bit for one government id, 0 for an unknown
+ *  one. Every reader of that mask goes through here. */
+export function governmentBit(id: string | null): number {
+  const i = id === null ? -1 : GOVERNMENT_LIST.findIndex((g) => g.id === id);
+  return i < 0 ? 0 : 1 << i;
+}
+
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
-                                blocked = -1, dark = false): {
+                                blocked = -1, dark = false, held = 0): {
   government: string | null;
   policies: (string | null)[];
 } {
@@ -633,7 +640,11 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   const era = civEraIndex(research.techs, research.civics);
   for (const card of Object.values(POLICIES)) {
     if (card.id === banned) continue;
-    if (card.dark
+    // CIV6 (Legacy policy card): no civic unlocks one — having BEEN in that
+    // government does, and it is unslottable while the seat is still in it.
+    if (card.legacyOf !== undefined) {
+      if (!(held & governmentBit(card.legacyOf)) || card.legacyOf === chosen.id) continue;
+    } else if (card.dark
       ? !(dark && era >= card.dark.firstEra && era <= card.dark.lastEra)
       : !u.policies.has(card.id)) continue;
     const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
@@ -643,8 +654,8 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
 }
 
 function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
-                         blocked = -1, dark = false): void {
-  const { government, policies } = computeAdoption(research, extra, blocked, dark);
+                         blocked = -1, dark = false, held = 0): void {
+  const { government, policies } = computeAdoption(research, extra, blocked, dark, held);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   applyPolicyEffects(mods, gov.effects);

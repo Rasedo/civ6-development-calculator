@@ -33,7 +33,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
     name: 'Rome', color: '#8e3db8', aggression: 0.5, seat: 1,
     ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0, influencePoints: 0,
     envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0,
-    tourism: 0, government: { current: null, policies: [] }, cities: [], nextCityId: 0,
+    tourism: 0, government: { current: null, policies: [], held: 0 }, cities: [], nextCityId: 0,
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     gpp: {}, gpEarned: [], buildersTrained: 0, bestMeleeCS: 0,

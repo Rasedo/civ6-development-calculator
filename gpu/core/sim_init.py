@@ -575,6 +575,11 @@ class SimInit:
         # the SOURCE seat's loyalty-pressure multiplier (halves — exact in f32
         # AND f64, so modulated sums stay association-free).
         self.civ_age = torch.ones(B, self.n_majors, dtype=torch.long, device=device)
+        # CIV6 (Legacy policy card): the governments this seat HAS BEEN in, as
+        # a bitmask over the government roster's own order — what unlocks each
+        # legacy card, and the one fact `_adopted_gov` cannot re-derive because
+        # it depends on the ORDER the civics arrived in.
+        self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er.get("darkT", 3))
@@ -1839,6 +1844,10 @@ class SimInit:
             # THE DARK-AGE window: [firstEra, lastEra], [-1, -1] on every
             # ordinary card. A Dark Age card needs no unlocking civic — the
             # seat's AGE and this window are its whole gate.
+            # CIV6 (Legacy policy card): the government whose bonus the card
+            # carries, -1 on an ordinary card. Having BEEN in that government
+            # unlocks it; being in it still forbids the slot.
+            self._pol_legacy = torch.tensor([int(r.get("legacy", -1)) for r in _pols], dtype=torch.long, device=device)
             _pdk = [r.get("dark", [-1, -1]) for r in _pols]
             self._pol_dark_lo = torch.tensor([int(x[0]) for x in _pdk], dtype=torch.long, device=device)
             self._pol_dark_hi = torch.tensor([int(x[1]) for x in _pdk], dtype=torch.long, device=device)
@@ -2170,6 +2179,7 @@ class SimInit:
         self._b_gov_title = rules.b_gov_title.to(device)
         self._b_spy_capacity = rules.b_spy_capacity.to(device)
         self._b_spy_pen = rules.b_spy_pen.to(device)
+        self._b_spy_pen_enc = rules.b_spy_pen_enc.to(device)
         self._b_influence = rules.b_influence.to(device)
         self._b_favor = rules.b_favor.to(device)
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)

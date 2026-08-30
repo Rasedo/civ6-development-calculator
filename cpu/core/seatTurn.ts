@@ -56,7 +56,7 @@ function policyTreatyFavor(state: GameState, seat: number): number {
   const sx = seatOf(state, seat);
   if (!sx) return 0;
   const held: number[] = [];
-  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat)).policies) {
+  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), sx.government.held).policies) {
     const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
     if (i >= 0) held.push(i);
   }

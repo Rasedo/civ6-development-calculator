@@ -5,14 +5,14 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from '../../../cpu/core/effects';
 import { cityBuildingYields } from '../../../cpu/core/yields';
 import { cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
-import { POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
+import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
 import { UNIT_ERA_INDEX, unitHasClass, UNITS } from '../../../cpu/data/units';
 import { spawnUnit } from '../../../cpu/core/units';
 import { seatOf, BARB_SEAT } from '../../../cpu/core/seats';
 
 describe('the policy catalog', () => {
-  it('every card is unlocked by exactly one civic, or by a Dark Age', () => {
+  it('every card is unlocked by exactly one civic, a Dark Age or a government', () => {
     const unlockedBy = new Map<string, string>();
     for (const c of Object.values(CIVICS)) {
       for (const fx of c.effects) {
@@ -30,6 +30,17 @@ describe('the policy catalog', () => {
         expect(p.obsoleteCivic, `${p.id} is a dark card — no civic retires it`).toBeUndefined();
         expect(p.kind, `${p.id} is a dark card — wildcard only`).toBe('wildcard');
         expect(p.dark.firstEra <= p.dark.lastEra, `${p.id} has an inverted era window`).toBe(true);
+        continue;
+      }
+      if (p.legacyOf !== undefined) {
+        // a LEGACY card is granted by having been in its government; no civic
+        // ever grants or retires it, and it fits a Wildcard alone
+        expect(GOVERNMENTS[p.legacyOf], `${p.id} names a government that does not exist`).toBeTruthy();
+        expect(unlockedBy.get(p.id), `${p.id} is a legacy card — no civic grants it`).toBeUndefined();
+        expect(p.obsoleteCivic, `${p.id} is a legacy card — no civic retires it`).toBeUndefined();
+        expect(p.kind, `${p.id} is a legacy card — wildcard only`).toBe('wildcard');
+        expect(p.effects, `${p.id} must carry its government's own bonus`)
+          .toEqual(GOVERNMENTS[p.legacyOf].effects);
         continue;
       }
       expect(unlockedBy.get(p.id), `${p.id} has no enabling civic`).toBeTruthy();
@@ -197,7 +208,16 @@ describe('the empire-wide channels', () => {
 
   it('every card carries a live effect set — none is inert', () => {
     const inert = POLICY_LIST.filter((p) => Object.keys(p.effects).length === 0).map((p) => p.id);
-    expect(inert.sort()).toEqual([]);
+    // LEGACY_DEMOCRACY carries Democracy's own inherent bonus, and that bonus
+    // asks for ALLIANCES, which this model has not got — the government row
+    // is empty for the same reason and by the same open item.
+    expect(inert.sort()).toEqual(['LEGACY_DEMOCRACY']);
+  });
+
+  it('every government but the Chiefdom has a legacy card', () => {
+    const want = Object.values(GOVERNMENTS).filter((g) => g.tier > 0).map((g) => `LEGACY_${g.id}`);
+    const got = POLICY_LIST.filter((p) => p.legacyOf !== undefined).map((p) => p.id);
+    expect(got.sort()).toEqual(want.sort());
   });
 });
 

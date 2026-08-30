@@ -260,20 +260,44 @@ export function effectiveLevel(
   return Math.max(0, lvl - (city ? cityCounterLevels(state, city) : 0));
 }
 
-/** the levels a city's own defences take off a spy working there. */
-export function cityCounterLevels(state: GameState, city: City): number {
-  let n = 0;
+/** the district types of a city that are built and unpillaged — what a
+ *  building standing in one needs before it pays anything. */
+function liveDistrictTypes(state: GameState, city: City): Set<string> {
   const live = new Set<string>();
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
-    if (!t.districtComplete || t.districtPillaged) continue;
-    live.add(d.type);
-    n += DISTRICTS[d.type].spyLevelPenalty ?? 0;
+    if (t.districtComplete && !t.districtPillaged) live.add(d.type);
+  }
+  return live;
+}
+
+/** the levels a city's own defences take off a spy working there. */
+export function cityCounterLevels(state: GameState, city: City): number {
+  let n = 0;
+  const live = liveDistrictTypes(state, city);
+  // per INSTANCE — a repeatable district may stand more than once
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].spyLevelPenalty ?? 0;
   }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def || !live.has(def.district)) continue;
     n += def.spyLevelPenalty ?? 0;
+  }
+  // CIV6 (Consulate): the penalty reaches "this city OR CITIES WITH
+  // ENCAMPMENTS" — the second half is empire-wide, so a Consulate standing
+  // anywhere covers every city of the seat holding a live Encampment. This
+  // city's own Consulate counted just above, so only the others add here.
+  if (live.has('ENCAMPMENT')) {
+    for (const other of citiesOf(state, city.seat)) {
+      if (other === city) continue;
+      const lv = liveDistrictTypes(state, other);
+      for (const id of other.buildings) {
+        const def = BUILDINGS[id];
+        if (def && lv.has(def.district)) n += def.spyLevelPenaltyEncampment ?? 0;
+      }
+    }
   }
   // CIV6 (Polygraph): "If this Spy is in home territory, enemy Spies in your
   // lands operate at 1 level below usual" — the posts standing in this city.

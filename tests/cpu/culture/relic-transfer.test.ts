@@ -34,7 +34,7 @@ function addCiv(state: GameState, col: number, row: number, name: string): Seat 
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { current: null, policies: [] },
+    government: { current: null, policies: [], held: 0 },
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,

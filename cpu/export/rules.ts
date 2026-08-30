@@ -1489,6 +1489,9 @@ export function buildRules() {
       healOnKill: b.healOnKill ?? 0,
       projectChargePct: b.projectChargePct ?? 0,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,
+      // the Consulate's empire-wide half — paid to any city of the seat
+      // holding a live Encampment, wherever the building itself stands
+      spyLevelPenaltyEncampment: b.spyLevelPenaltyEncampment ?? 0,
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,
       loyaltyWithoutGovernor: b.loyaltyWithoutGovernor ?? 0,
@@ -1580,6 +1583,8 @@ export function buildRules() {
       obsoleteCivic: p.obsoleteCivic ? civicIdx.get(p.obsoleteCivic) ?? -1 : -1,
       // a DARK AGE card's era window; [-1, -1] on every ordinary card
       dark: p.dark ? [p.dark.firstEra, p.dark.lastEra] : [-1, -1],
+      // a LEGACY card's government, by GOVERNMENTS order; -1 otherwise
+      legacy: p.legacyOf ? Object.keys(GOVERNMENTS).indexOf(p.legacyOf) : -1,
       ...effectRow(p.effects),
     })),
   };

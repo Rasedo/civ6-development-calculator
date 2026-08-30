@@ -159,6 +159,11 @@ export interface ResearchState {
 export interface GovernmentState {
   current: string | null;
   policies: (string | null)[];
+  /** CIV6 (Legacy policy card): a government's legacy card is "unlocked by"
+   *  that government, so the seat must remember every government it has been
+   *  in. A bitmask over `GOVERNMENT_LIST` positions — the roster is a fixed
+   *  catalog both engines derive from one export. */
+  held: number;
 }
 
 export interface SeatActionRecord {

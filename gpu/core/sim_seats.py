@@ -7059,7 +7059,11 @@ class SimSeats:
         """ZOC, mirroring units.inEnemyZoc: does `dest` sit adjacent to a MILITARY
         unit hostile to a mover of `seat`? [B] -> [B].
 
-        ONE function for every mover — the rule is identical whoever asks.
+        ONE function for every mover — the rule is identical whoever asks,
+        but WHICH zone answers is not: CIV6 (Zone of Control) reads "Religious
+        units exert ZOC against other religious units", so a religious mover
+        walks through a military zone and a military mover through a religious
+        one. Only a matching pair halts.
         Hostility is unitsHostile, exactly: barbarians are hostile to every
         non-barbarian and vice versa; otherwise it is civsAtWar(seat, other).
 
@@ -7078,6 +7082,17 @@ class SimSeats:
         no_exert_cls = ((pc == self._pc_ranged) | (pc == self._pc_siege))             & ~self._promo_flag(mtype, mpromos, "ZOC_EXERT")
         exert = here & ~self.unit_emb.gather(1, mslot) & ~self._type_zoc_none[mtype] & ~no_exert_cls
         hostmil = exert & self._seats_hostile(seat, mseat)
+        rel_mover = self._rel_strength[mover_type.clamp(min=0, max=self.NU - 1)] > 0
+        if bool(rel_mover.any()):
+            # the religious zone, off the CIVILIAN plane the religious units
+            # stand in; an embarked one exerts none, exactly as ashore.
+            civ = self.civilian_at
+            cslot = civ.clamp(min=0)
+            ctype = self.unit_type.gather(1, cslot).clamp(min=0, max=self.NU - 1)
+            cseat = torch.where(civ >= 0, self.unit_seat.gather(1, cslot), torch.full_like(civ, -1))
+            rel_here = (civ >= 0) & (self._rel_strength[ctype] > 0) & ~self.unit_emb.gather(1, cslot)
+            hostrel = rel_here & self._seats_hostile(seat, cseat)
+            hostmil = torch.where(rel_mover.reshape(-1, 1), hostrel, hostmil)
         dn = self.neigh[dest.clamp(min=0)]
         riv = (self.river_mask.gather(1, dest.clamp(min=0).unsqueeze(1))
                >> torch.arange(6, device=self.device).unsqueeze(0)) & 1

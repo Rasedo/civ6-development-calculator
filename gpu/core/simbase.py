@@ -162,6 +162,7 @@ class Rules:
     b_gov_title: torch.Tensor  # long [NB] — governor titles it awards while it stands
     b_spy_capacity: torch.Tensor  # long [NB] — spies its owner may keep beyond the research ladder
     b_spy_pen: torch.Tensor  # long [NB] — levels it takes off an enemy spy working in its city
+    b_spy_pen_enc: torch.Tensor  # long [NB] — the same, empire-wide, in any city of the seat holding an Encampment
     b_influence: torch.Tensor  # long [NB] — influence points per turn, paid to the SEAT
     b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
@@ -354,6 +355,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_gov_title=torch.tensor([int(b.get("govTitle", 0)) for b in B], dtype=torch.long),
         b_spy_capacity=torch.tensor([int(b.get("spyCapacity", 0)) for b in B], dtype=torch.long),
         b_spy_pen=torch.tensor([int(b.get("spyLevelPenalty", 0)) for b in B], dtype=torch.long),
+        b_spy_pen_enc=torch.tensor([int(b.get("spyLevelPenaltyEncampment", 0)) for b in B], dtype=torch.long),
         b_influence=torch.tensor([int(b.get("influencePerTurn", 0)) for b in B], dtype=torch.long),
         b_favor=torch.tensor([int(b.get("favorPerTurn", 0)) for b in B], dtype=torch.long),
         b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
@@ -706,7 +708,7 @@ _MUTABLE = [
     "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held",
-    "comp_kind", "comp_left", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
+    "comp_kind", "comp_left", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "civ_gov_held", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)

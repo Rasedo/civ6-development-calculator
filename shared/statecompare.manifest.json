@@ -722,6 +722,17 @@
           ]
         },
         {
+          "name": "governmentsHeld",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.held"
+          ],
+          "planes": [
+            "civ_gov_held"
+          ],
+          "note": "the bitmask of governments this seat has BEEN in, over the roster's own order. It gates every LEGACY policy card, and no other field can re-derive it: which government a seat held depends on the ORDER its civics arrived in."
+        },
+        {
           "name": "age",
           "compare": "exact",
           "covers": [
@@ -2432,7 +2443,7 @@
       },
       {
         "path": "Seat.government",
-        "why": "GovernmentState is STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
+        "why": "the container; `held` is covered and the other two are excluded one by one — they are STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
       },
       {
         "path": "Seat.religion",

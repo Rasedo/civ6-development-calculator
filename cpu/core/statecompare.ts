@@ -483,6 +483,7 @@ const SEAT: Record<string, Extractor> = {
   warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
   eraScore: overSeats((s) => s.eraScore ?? 0),
   age: overSeats((s) => s.age ?? 1),
+  governmentsHeld: overSeats((s) => s.government.held ?? 0),
   prevAge: overSeats((s) => s.prevAge ?? 1),
   dedications: overSeats((s) => s.dedications ?? 1),
   dedicationPicks: overSeats((s) => [...(s.dedicationPicks ?? [])].sort((a, b) => a - b)),

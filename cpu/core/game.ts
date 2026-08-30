@@ -1108,10 +1108,18 @@ export function naturalistCost(state: GameState, seat: number): number {
   return UNITS.NATURALIST.cost;
 }
 
+/**
+ * CIV6: production is never lost. Taking an item off the queue sends the
+ * hammers already spent on it to the city's buffer, which is where this model
+ * puts every carried-over hammer — real Civ 6 holds them against the ITEM, so
+ * resuming it later resumes where it stopped, and that needs a queue deeper
+ * than the one head both engines run.
+ */
 export function cancelQueueItem(state: GameState, cityId: number, index: number, seat: number): void {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city || index < 0 || index >= city.queue.length) return;
   const item = city.queue[index];
+  city.productionBank = (city.productionBank ?? 0) + item.progress;
   if (item.kind === 'district') {
     const tile = state.map.tiles[item.tileIndex];
     tile.district = null;
@@ -1771,7 +1779,8 @@ export function deserialize(json: string): GameState {
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     sx.research.boosted ??= [];
-    sx.government ??= { current: null, policies: [] };
+    sx.government ??= { current: null, policies: [], held: 0 };
+    sx.government.held ??= 0;
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
     sx.religion.enhancer ??= null;
     sx.buildersTrained ??= 0;

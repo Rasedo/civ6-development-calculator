@@ -526,7 +526,8 @@ class SimSpy:
         twin."""
         reg = self.city_dist_tile[b, hr, hc]              # [nD]
         # per INSTANCE off the tile plane — the registry keeps one per type
-        live = self._dist_counts(hr)[b, hc]
+        dcount = self._dist_counts(hr)[b]                 # [RC, nD]
+        live = dcount[hc]
         n = int((live * self._d_spy_pen).sum())
         if bool((self._b_spy_pen > 0).any()):
             stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
@@ -537,6 +538,19 @@ class SimSpy:
         for u in self._spies_of(hr)[b].nonzero(as_tuple=True)[0].tolist():
             if int(self.unit_tile[b, u]) == ctr:
                 n += self._spy_promo_sum(b, u, "SPY_HOME_ENEMY_LEVEL")
+        # CIV6 (Consulate): the penalty reaches "this city OR CITIES WITH
+        # ENCAMPMENTS" — the second half is empire-wide, so a Consulate
+        # standing anywhere covers every city of the seat holding a live
+        # Encampment. This city's own counted above, so only the others add.
+        if (self._encamp_didx >= 0 and int(live[self._encamp_didx]) > 0
+                and bool((self._b_spy_pen_enc > 0).any())):
+            breq = self._b_req_district
+            for j in self.city_alive[b, hr].nonzero(as_tuple=True)[0].tolist():
+                if j == hc:
+                    continue
+                lv = (dcount[j][breq.clamp(min=0)] > 0) | (breq < 0)
+                stand = self.city_bldg[b, hr, j] & lv
+                n += int((stand.long() * self._b_spy_pen_enc).sum())
         # CIV6 (Local Informants): "Enemy Spies operate at 3 levels below
         # normal in this city."
         if self.n_governors and hr < self.n_majors:

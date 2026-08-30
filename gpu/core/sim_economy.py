@@ -1426,7 +1426,8 @@ class SimEconomy:
     def _slotted_policies(self, civics2: torch.Tensor,
                           extra_slots: torch.Tensor | None = None,
                           dark: torch.Tensor | None = None,
-                          era: torch.Tensor | None = None) -> torch.Tensor:
+                          era: torch.Tensor | None = None,
+                          held: torch.Tensor | None = None) -> torch.Tensor:
         """[B, nPol] — the cards a seat's adopted government greedily slots,
         `computeAdoption().policies` as a mask over the card table.
 
@@ -1462,6 +1463,15 @@ class SimEconomy:
             pol_unlocked = torch.where(is_dark, dark.unsqueeze(1) & in_win, pol_unlocked)
         else:
             pol_unlocked = pol_unlocked & ~is_dark
+        # CIV6 (Legacy policy card): no civic unlocks one — having BEEN in that
+        # government does, and it is unslottable while the seat is still in it.
+        is_leg = self._pol_legacy.unsqueeze(0) >= 0
+        if held is not None:
+            lg = self._pol_legacy.clamp(min=0).unsqueeze(0)
+            been = ((held.unsqueeze(1) >> lg) & 1) > 0
+            pol_unlocked = torch.where(is_leg, been & (adopted.unsqueeze(1) != lg), pol_unlocked)
+        else:
+            pol_unlocked = pol_unlocked & ~is_leg
         pol_unlocked = pol_unlocked & ~torch.where(
             obs.unsqueeze(0) >= 0,
             civics2.gather(1, obs.clamp(min=0).unsqueeze(0).expand(B, -1)),
@@ -1479,7 +1489,8 @@ class SimEconomy:
         return slotted | (overflow & (w_rank <= nslots[:, 3:4]))
 
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None,
-                         dark: torch.Tensor | None = None, era: torch.Tensor | None = None):
+                         dark: torch.Tensor | None = None, era: torch.Tensor | None = None,
+                         held: torch.Tensor | None = None):
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
         [B,6], slotted-mask [B,nPol], encampHarborProdMult [B],
         tilePurchaseMult [B], amenitiesAll [B], housingIfDistricts triples,
@@ -1727,20 +1738,22 @@ class SimEconomy:
         ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
         if ent is not None and ent[0] == ver:
-            return ent[5]
+            return ent[6]
         # `_seat_civics` hands back a VIEW of the live plane; a key that is not
         # a copy compares equal to itself forever and freezes the answer.
         civ = self._seat_civics(row).clone()
         slots = self._wonder_extra_slots(row)
         dark = self.civ_age[:, row] == 0
         era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+        held = self.civ_gov_held[:, row].clone()
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
-                and torch.equal(ent[3], dark) and torch.equal(ent[4], era):
-            val = ent[5]
+                and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
+                and torch.equal(ent[5], held):
+            val = ent[6]
         else:
-            val = self._gov_policy_mods(civ, slots, dark, era)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, val)
+            val = self._gov_policy_mods(civ, slots, dark, era, held)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, val)
         return val
 
     def _seat_slotted(self, row: int) -> torch.Tensor:

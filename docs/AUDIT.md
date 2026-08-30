@@ -48,7 +48,7 @@ from the list below.
 | B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
+| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a cancelled item's hammers BANK where real Civ 6 holds them against the item (blocked on C-44) |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
@@ -57,19 +57,18 @@ from the list below.
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
-| B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
 | B-61r the Great Person clauses with no carrier | 2 | 12 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, a diplomatic-visibility grant whose mechanic ships now, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| **B. Fidelity vs real Civ 6** | **22** | |
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here; no unit removes a tile improvement |
-| C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization, the Consulate's Encampment half |
+| C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
@@ -77,13 +76,13 @@ from the list below.
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
-| C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
 | C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
+| C-44 the production queue is one head deep | 2 | a city builds ONE item; real Civ 6 queues several, and that queue is where a switched-away item's hammers wait |
 | **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **53** | |
+| **OPEN, TOTAL** | **52** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -366,7 +365,13 @@ Civ 6 source or is recorded as unverifiable.
     `dark-policies` lane. Which card fills a slot is a player decision
     both engines stand in for, and making the stand-in prefer a dark card
     is an invention no source settles — it belongs to the P8 decision
-    surface with the rest of `computeAdoption`'s greedy fill.
+    surface with the rest of `computeAdoption`'s greedy fill. THE NINE
+    GOVERNMENT LEGACY CARDS ARE THE SAME SHAPE and inherit the same
+    residual: they too are Wildcards appended last, so a seat that has
+    left a government unlocks its card and the fill still spends the
+    bench on ordinary overflow first. `legacy-cards.test.ts` and
+    `legacy_cards_test.py` prove the pool both ways — narrow bench, not
+    slotted; wide bench, slotted.
   - **WHO TO HIRE AND WHERE TO SEAT HIM IS A HEURISTIC, NOT A RULE.**
     Appoint in catalog order, promote the first legal row, seat every
     idle governor in the lowest-loyalty ungoverned city (quantized-milli
@@ -541,12 +546,6 @@ Civ 6 source or is recorded as unverifiable.
     ranged-vs-city-state scope-out — so a barbarian archer parked beside
     a minor holds its ring tile and fires nothing, where real Civ 6
     shoots.
-- **B-65. Religious zone of control.** Weight 1. CIV6 (Zone of Control):
-  a religious unit ignores the ZOC military units exert, and exerts one
-  that affects only OTHER RELIGIOUS units. `inEnemyZoc` / `_in_enemy_zoc`
-  run one military-only rule: a Missionary is halted at a hostile
-  Musketman's ring, and no religious unit exerts anything against
-  another.
 - **B-53r. The Great Person PASS.** All 205 people ship with the era
   gate, the frozen randomly-drawn offer and its frozen price
   (`ensureGpOffer` / `_gp_ensure_offer`, `gpCost`), and both patronage
@@ -556,16 +555,16 @@ Civ 6 source or is recorded as unverifiable.
     offer — the class's own points freeze and the passed person stays on
     offer to everyone else. Needs a per-seat passed flag beside the
     shared offer, and the rejoin rule when the next person stands.
-  - **A SWITCHED-AWAY ITEM LOSES ITS HAMMERS.** Real Civ 6 keeps the
-    production accumulated on an item you switch AWAY from, held against
-    that item, so resuming it later resumes where it stopped — which is
-    NOT what happens to an item that becomes unbuildable (those hammers
-    go to the city's buffer, `dropQueuedBuilding` / `_gp_instant_buildings`).
-    `cancelQueueItem` splices the item and its `progress` with it. The
-    blocker is storage: progress lives ON the queue item, so there is
-    nowhere to retain it once the item is gone, and neither engine has a
-    switch verb to reach the path — `cancelQueueItem` has no caller in
-    the engine, the driver or the scripted player.
+  - **A CANCELLED ITEM'S HAMMERS BANK, WHERE CIV 6 HOLDS THEM AGAINST
+    THE ITEM.** Production is never lost on either path now:
+    `cancelQueueItem` pays `progress` into `productionBank`, which is
+    where this model puts every carried-over hammer already
+    (`dropQueuedBuilding`, `wipeConstruction`). Real Civ 6 keeps them
+    against the ITEM, so resuming it later resumes where it stopped and
+    building something ELSE inherits nothing. Retaining per item wants a
+    queue that can hold the item after it stops being built — C-44. Both
+    engines are alike here and neither has a caller: `cancelQueueItem`
+    is reached by no engine path, driver or scripted player.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49
@@ -574,9 +573,9 @@ Civ 6 source or is recorded as unverifiable.
     INHERENT bonus and nothing else, re-sourced page by page. One term
     stays open: Democracy's, whose Trade Route to an Ally or Suzerain's
     city and whose alliance points both want ALLIANCES (C-2). The LEGACY
-    bonuses are a second catalog that does not exist here (C-37) — an
-    earlier reading of this row had five governments paying theirs as
-    inherent, which no version of the game does.
+    bonuses are a second catalog, and they ship as their own Wildcard
+    cards now — an earlier reading of this row had five governments
+    paying theirs as inherent, which no version of the game does.
     ADOPTION REACHABILITY: `computeAdoption` /
     `_adopted_gov` take the newest unlocked tier on table order, so
     Oligarchy and Classical Republic are adopted in NO game — the two
@@ -1045,24 +1044,6 @@ under their blocker so the dependency is readable, and both halves count.
   `_submerge` moves it with the wonders that need it. OPEN: whether real
   Civ 6 keeps a submerged tile's feature working for its neighbours, or
   strips the ground bare.
-- **C-37. NO LEGACY POLICY CARDS.** Weight 2. Rise and Fall turned every
-  government's LEGACY bonus into a WILDCARD policy card, unlocked only
-  once the seat has switched AWAY from that government — so a government
-  and its own legacy card can never run together. The catalog has no such
-  rows, and neither engine carries the record the unlock would read: a
-  seat's government is one current id (`seatGovernmentId` /
-  `civ_government`) with no set of the governments it has already left.
-  OPEN:
-  - **EIGHT LEGACY BONUSES PAY NOTHING** — Autocracy's "+10% Production
-    toward Wonders", Oligarchy's "+20% Unit Experience", Classical
-    Republic's "+15% Great Person points", Monarchy's "+50% Influence
-    Points", Merchant Republic's "+15% Production toward Districts",
-    Communism's "+10% Science", Fascism's "+50% Production toward Units"
-    and the two purchase discounts (Theocracy's 15% on Faith, Democracy's
-    25% on Gold). Five of the seven percentage rows have a live channel
-    already (`prodBoost`, `xpPct`, `gppMult`, `yieldMult`); what they
-    lack is a card to sit on and the switched-away record above.
-    Chiefdom alone has no legacy bonus.
 - **C-24. THE CLIMATE ARC.** Weight 1. Emissions, the phase ladder, ice
   melt, flooding, SUBMERSION, the Flood Barrier, warmed weather, Carbon
   Recapture and the Global Energy Treaty all ship; NONE of it is
@@ -1092,8 +1073,6 @@ under their blocker so the dependency is readable, and both halves count.
   - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
     `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; no source can close the middle.
-  - **THE CONSULATE'S "or cities with Encampments" half** — the widening
-    clause reads a district count the influence body never asks for.
 - **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
   colour and a city list (`CIV_LEADERS`). Real Civ 6 gives every
   civilization an ability, its leader an ability and an agenda, a unique
@@ -1157,6 +1136,24 @@ under their blocker so the dependency is readable, and both halves count.
   treating either zero as settled. The CIVILIZATION-unique adjacencies the
   Pasture and Farm pages name (Outback Station, Observatory) are C-26,
   parked.
+
+- **C-44. THE PRODUCTION QUEUE IS ONE HEAD DEEP.** Weight 2. A Civ 6
+  city holds a QUEUE: several items lined up, reorderable, each keeping
+  the production already spent on it, and the head is merely the one
+  being worked. Here a city builds exactly one thing. The GPU says so in
+  its storage — `city_current` is a single code, `city_current < 0` IS an
+  empty queue — and TS, whose `city.queue` is a list, gates every commit
+  on `queue.length === 0`, so the list never holds two. Consequences:
+  - there is no SWITCH verb on either engine, because there is nothing to
+    switch between, and a player's most ordinary production decision is
+    absent from the action space P8 will train on;
+  - a cancelled item's hammers have nowhere item-shaped to wait, which is
+    what keeps B-53r's second bullet open;
+  - the completion overflow banks rather than carrying into the next
+    item, which both engines already declare and pay a turn late.
+  Closing it moves `city_current` to a per-city list on the GPU (the
+  head's cost and tile travel with each entry), lifts the TS commit gate,
+  and adds the reorder verb to the wire on both sides.
 
 ## Reachability — what the green gate does NOT prove
 

@@ -498,6 +498,7 @@ SEAT = {
     "warWearinessTurn": _ww_pairs("ww_turn", lambda v: v >= 0),
     "eraScore": _civ_scalar("era_score"),
     "age": _civ_scalar("civ_age"),
+    "governmentsHeld": _civ_scalar("civ_gov_held"),
     "prevAge": _civ_scalar("prev_age"),
     "dedications": _civ_scalar("dedications"),
     "dedicationPicks": lambda sim, b, rows: [sorted(int(x) for x in sim.ded_picks[b, c].tolist() if x >= 0) for c in rows],

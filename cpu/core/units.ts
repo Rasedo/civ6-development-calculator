@@ -407,6 +407,14 @@ export function visibleHostilesAt(state: GameState, tileIndex: number, viewer: {
  *  back to a ranged unit. The two submarines carry "Does not exert zone of
  *  control" on the chassis, and an embarked unit exerts none either. Air
  *  units are no garrison, so `unitDomain` filters them. */
+/** CIV6 (Zone of Control): "Religious units exert ZOC against other religious
+ *  units" — the ONLY class whose zone is not the military one, so it is a
+ *  predicate of its own rather than a widening of `unitExertsZoc` (which the
+ *  encirclement ring also reads, and a Missionary holds no ring). */
+export function unitReligious(type: string): boolean {
+  return (UNITS[type]?.religiousStrength ?? 0) > 0;
+}
+
 export function unitExertsZoc(u: Unit): boolean {
   if (unitDomain(u.type) !== 'military' || u.embarked || UNITS[u.type]?.exertsNoZoc) return false;
   const cls = UNIT_PROMO_CLASS[u.type];
@@ -459,12 +467,19 @@ export function inEnemyZoc(
   // units ignore it too.
   if (mover.type !== undefined && (UNITS[mover.type]?.ignoresZoc || UNITS[mover.type]?.cavalry)) return false;
   const tile = state.map.tiles[tileIndex];
+  // CIV6 (Zone of Control): "Religious units exert ZOC against other religious
+  // units" — so a religious mover walks through a military zone, and a
+  // military one walks through a religious zone. Only a matching pair halts.
+  const relMover = mover.type !== undefined && unitReligious(mover.type);
   for (const n of neighbors(state.map, tile)) {
     // CIV6 (Zone of Control): rivers block ZOC — an exerter across a river
     // from the entered tile halts nothing.
     if (crossesRiver(tile, n)) continue;
     for (const u of unitsAt(state, n.index)) {
-      if (unitExertsZoc(u) && unitsHostile(state, u, mover)) return true;
+      const relU = unitReligious(u.type);
+      if (relU !== relMover) continue;
+      const exerts = relU ? !u.embarked : unitExertsZoc(u);
+      if (exerts && unitsHostile(state, u, mover)) return true;
     }
   }
   return false;

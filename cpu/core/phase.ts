@@ -26,7 +26,7 @@ import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSu
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { computeAdoption, inDarkAge, wonderExtraSlots } from './effects';
+import { computeAdoption, governmentBit, inDarkAge, wonderExtraSlots } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -580,7 +580,7 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
  *  adoption (which reads the standing slate back) and the envoy spread. */
 function congressVoter(state: GameState, seat: number): CongressVoterCtx {
   const sx = seatOf(state, seat)!;
-  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat));
+  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), sx.government.held);
   const policies: number[] = [];
   for (const id of adoption.policies) {
     const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
@@ -2299,6 +2299,10 @@ export function seatPhase(state: GameState): void {
       pickNext();
     }
     if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
+    // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
+    // government, so the seat remembers the one it is in now. Only a
+    // completed civic can move it, which is why this sits at the loop's exit.
+    actor.government.held |= governmentBit(computeAdoption(rsr).government);
 
     // Builder actions (build best-Δ improvement or walk to a job).
     // driven-parity layer 5: the GPU stands the BUILDER POLICY down for

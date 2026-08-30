@@ -349,6 +349,9 @@ def main() -> int:
                 ("gov_clauses", [py, "tests/gpu/gov_clauses_test.py"], 4),  # the five promotion clauses no seed reaches: no governed city ever holds one
                 ("geothermal", [py, "tests/gpu/geothermal_test.py"], 4),  # the map's new rows: no scripted seed places a Geothermal Plant or claims a Holy Site pantheon
                 ("imp_research", [py, "tests/gpu/imp_research_yields_test.py"], 4),  # the research raises on an improvement own yields, most of them past any lane's reach
+                ("legacy_cards", [py, "tests/gpu/legacy_cards_test.py"], 4),  # the government a seat has LEFT, and the Wildcard it unlocks — no lane leaves a government
+                ("consulate", [py, "tests/gpu/consulate_test.py"], 4),  # the Consulate empire-wide half, which wants a Diplomatic Quarter AND an Encampment in two different cities
+                ("religious_zoc", [py, "tests/gpu/religious_zoc_test.py"], 4),  # the second zone of control — faith-purchased units the driver never marches past a hostile
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

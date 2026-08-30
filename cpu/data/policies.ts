@@ -198,6 +198,10 @@ export interface PolicyDef {
    *  that are experiencing a Dark Age. They must be placed in Wildcard slots."
    *  No civic unlocks one; the era window is its whole availability. */
   dark?: { firstEra: number; lastEra: number };
+  /** CIV6 (Legacy policy card): the GOVERNMENT whose own inherent bonus this
+   *  card carries. No civic unlocks it — having BEEN in that government does,
+   *  and it cannot be slotted while the seat is still in it. */
+  legacyOf?: string;
   effects: PolicyEffects;
 }
 
@@ -540,6 +544,22 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       '+5 combat strength for all units; -15% war weariness.'),
   ].map((g) => [g.id, g]),
 );
+
+// CIV6: every government but the Chiefdom has a LEGACY policy card carrying
+// that government's own inherent bonus — "unlocked by" the government and
+// "cannot be slotted while in" it. Appended LAST, so the wire's card indices
+// (which the World Congress' Policy Treaty names) keep their positions.
+for (const g of Object.values(GOVERNMENTS)) {
+  if (g.tier === 0) continue; // the Chiefdom alone has no legacy bonus
+  POLICIES[`LEGACY_${g.id}`] = {
+    id: `LEGACY_${g.id}`,
+    name: `${g.name} Legacy`,
+    kind: 'wildcard',
+    description: g.description,
+    legacyOf: g.id,
+    effects: g.effects,
+  };
+}
 
 export function cardFitsSlot(card: PolicyDef, slot: SlotKind): boolean {
   return slot === 'wildcard' || card.kind === slot;

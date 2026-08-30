@@ -61,6 +61,10 @@ export interface BuildingDef {
   /** CIV6 (Consulate): "Spies operate at one level lower when targeting this
    *  city" — the Diplomatic Quarter itself carries the other two levels. */
   spyLevelPenalty?: number;
+  /** CIV6 (Consulate): the same penalty "or cities with Encampments" — an
+   *  EMPIRE-wide half, paid to every city of the seat holding a live
+   *  Encampment, wherever the building itself stands. */
+  spyLevelPenaltyEncampment?: number;
   /** CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn" — envoy
    *  currency, paid to the SEAT rather than to the city. */
   influencePerTurn?: number;
@@ -246,7 +250,9 @@ const rawList: BuildingDef[] = [
   { id: 'SANCTUARY', name: 'Sanctuary', district: 'PRESERVE', cost: 440, appealYields: { charming: { science: 1, gold: 1 }, breathtaking: { science: 2, gold: 2, production: 2 } } },
 
   // THE DIPLOMATIC QUARTER.
-  { id: 'CONSULATE', name: 'Consulate', district: 'DIPLOMATIC_QUARTER', cost: 150, maintenance: 1, influencePerTurn: 2, spyLevelPenalty: 1 },
+  // CIV6 (Consulate): "+2 Influence Points per turn. Enemy Spy's level is
+  // reduced by 1 when targeting this city or cities with Encampments."
+  { id: 'CONSULATE', name: 'Consulate', district: 'DIPLOMATIC_QUARTER', cost: 150, maintenance: 1, influencePerTurn: 2, spyLevelPenalty: 1, spyLevelPenaltyEncampment: 1 },
   { id: 'CHANCERY', name: 'Chancery', district: 'DIPLOMATIC_QUARTER', cost: 290, requiresAny: ['CONSULATE'], maintenance: 2, influencePerTurn: 3 },
 
   // THE GOVERNMENT PLAZA, in three tiers. Each tier needs a government of its

@@ -1110,6 +1110,14 @@ class SimPhase:
             self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
             self.civ_civic_retain[rows, row, curc[rows]] = 0
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
+        # CIV6 (Legacy policy card): the card is unlocked by having BEEN in
+        # its government, so the seat remembers the one it is in now. Only a
+        # completed civic can move it, which is why this sits at the loop's
+        # exit — the position `seatPhase` writes it at.
+        if self._ngov:
+            _adopted, _has = self._adopted_gov(self.civ_civics[:, row])
+            self.civ_gov_held[:, row] |= torch.where(
+                _has, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
         self._advance_great_people(row, active)
