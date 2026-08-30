@@ -51,6 +51,9 @@ export interface ProjectDef {
   /** A strategic resource this project charges once, when it is started. */
   resource?: string;
   resourceCost?: number;
+  /** CIV6 (Recommission Nuclear Reactor): resets the city's reactor age to 0.
+   *  Repeatable, and its cost "does not scale with further research". */
+  recommission?: boolean;
   /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
    *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
   laser?: boolean;
@@ -175,6 +178,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // CIV6 (Carbon Recapture): an Industrial Zone project, unlocked by the
     // Global Warming Mitigation civic; repeatable, and the only thing that
     // takes carbon back out of the air.
+    // CIV6 (Recommission Nuclear Reactor): available after Nuclear Fission to
+    // a city whose Industrial Zone holds a Nuclear Power Plant; completing it
+    // "resets the age of the reactor to 0". 400 Production, and the cost
+    // "does not scale with further research".
+    P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.' }),
     P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
     P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
     P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),

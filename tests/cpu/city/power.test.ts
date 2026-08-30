@@ -13,7 +13,12 @@ import { foundCity, queueDistrict } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { cityPower, regionalEffects } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
-import { seatOf } from '../../../cpu/core/seats';
+import { seatOf, setTileOwner } from '../../../cpu/core/seats';
+import { availableProjects } from '../../../cpu/core/game';
+import { completeProject } from '../../../cpu/core/production';
+import { PROJECTS } from '../../../cpu/data/projects';
+import { BIOSPHERE_POWER_MULT } from '../../../cpu/data/improvements';
+import { validImprovementsIn } from '../../../cpu/core/rules';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import type { City, GameState } from '../../../cpu/core/types';
 import { CARDIFF_HARBOR_POWER } from '../../../cpu/data/cityStates';
@@ -178,6 +183,105 @@ describe('power', () => {
     expect(lit(state, city)).toBe(true);
     // CIV6 (Stadium, GS): "+1 Amenity", "+2 Amenities additionally when Powered"
     expect(regionalEffects(state, city).amenities).toBe(3);
+  });
+
+  it('a renewable generator supplies the city that owns its plot, and the Biosphere triples it', () => {
+    const { state, city } = industrialCity();
+    city.buildings.push('RESEARCH_LAB'); // Base Load 3
+    expect(cityPower(state, city).supply).toBe(0);
+    // CIV6 (Solar Farm): "+2 Power" to the city that owns the plot.
+    const solar = tileAtCoords(state.map, 8, 9);
+    setTileOwner(solar, 0);
+    solar.ownerCity = city.id;
+    solar.improvement = 'SOLAR_FARM';
+    expect(cityPower(state, city).supply).toBe(2);
+    // CIV6 (Wind Farm): another +2, and a renewable covers the load alone —
+    // no stockpile stands behind it.
+    const wind = tileAtCoords(state.map, 7, 9);
+    setTileOwner(wind, 0);
+    wind.ownerCity = city.id;
+    wind.improvement = 'WIND_FARM';
+    expect(cityPower(state, city).supply).toBe(4);
+    seatOf(state, 0)!.stockpile = STRATEGIC_IDS.map(() => 0);
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(true);
+    // a pillaged generator pays nothing
+    solar.pillaged = true;
+    expect(cityPower(state, city).supply).toBe(2);
+    solar.pillaged = false;
+    // ...and a plot this city does not own pays some other city
+    wind.ownerCity = city.id + 999;
+    expect(cityPower(state, city).supply).toBe(2);
+    wind.ownerCity = city.id;
+    // CIV6 (Biosphere): "+200% Power" for every renewable the seat holds.
+    const wt = tileAtCoords(state.map, 9, 9);
+    setTileOwner(wt, 0);
+    wt.ownerCity = city.id;
+    wt.builtWonder = 'BIOSPHERE';
+    wt.builtWonderComplete = true;
+    city.wonders.push({ id: 'BIOSPHERE', tileIndex: wt.index });
+    expect(cityPower(state, city).supply).toBe(4 * BIOSPHERE_POWER_MULT);
+    // the Dam's renewable supply is on the wonder's list too
+    city.buildings.push('HYDROELECTRIC_DAM');
+    expect(cityPower(state, city).supply).toBe((4 + 6) * BIOSPHERE_POWER_MULT);
+  });
+
+  it('a generator is offered on its own ground and nowhere else', () => {
+    const { state } = industrialCity();
+    const plot = tileAtCoords(state.map, 6, 6);
+    const offer = () =>
+      validImprovementsIn(plot, { unlocks: null, ownsTile: () => true, builder: 'BUILDER' });
+    // CIV6 (Solar Farm): "Must be built on flat terrain. Cannot be built on Snow."
+    plot.terrain = 'PLAINS';
+    plot.elevation = 'FLAT';
+    expect(offer()).toContain('SOLAR_FARM');
+    expect(offer()).not.toContain('WIND_FARM');
+    plot.terrain = 'SNOW';
+    expect(offer()).not.toContain('SOLAR_FARM');
+    // CIV6 (Wind Farm): "Must be built on Hills terrain."
+    plot.terrain = 'PLAINS';
+    plot.elevation = 'HILLS';
+    expect(offer()).toContain('WIND_FARM');
+    expect(offer()).not.toContain('SOLAR_FARM');
+    // a plot with a resource of its own accepts only that resource's row
+    plot.resource = 'IRON';
+    expect(offer()).toEqual(['MINE']);
+    plot.resource = null;
+    // and neither is the Military Engineer's to build
+    expect(validImprovementsIn(plot, { unlocks: null, ownsTile: () => true, builder: 'MILITARY_ENGINEER' }))
+      .not.toContain('WIND_FARM');
+  });
+
+  it('the reactor ages with its plant, and the Recommission project puts it back', () => {
+    const { state, city } = industrialCity();
+    const owner = seatOf(state, 0)!;
+    owner.stockpile = STRATEGIC_IDS.map(() => 99);
+    expect(city.reactorAge).toBeUndefined();
+    // CIV6 (Nuclear accident): the age counts the turns since the plant was
+    // built, converted to, or last recommissioned.
+    city.buildings.push('FACTORY', 'NUCLEAR_POWER_PLANT');
+    for (let i = 1; i <= 3; i += 1) {
+      resolveSeatPower(state, 0);
+      expect(city.reactorAge).toBe(i);
+    }
+    // the project is offered only once Nuclear Fission is in...
+    const rec = PROJECTS.RECOMMISSION_REACTOR;
+    expect(rec.requiresTech).toBe('NUCLEAR_FISSION');
+    expect(availableProjects(state, city)).not.toContain(rec);
+    owner.research.techs.push('NUCLEAR_FISSION');
+    expect(availableProjects(state, city)).toContain(rec);
+    // ...and it resets the clock, which then ticks again from zero
+    completeProject(state, city, rec.id, rec.cost ?? 0);
+    expect(city.reactorAge).toBe(0);
+    resolveSeatPower(state, 0);
+    expect(city.reactorAge).toBe(1);
+    // repeatable: it is in no one-time ledger
+    expect(availableProjects(state, city)).toContain(rec);
+    // a plant lost with the building takes its clock with it
+    city.buildings = city.buildings.filter((b) => b !== 'NUCLEAR_POWER_PLANT');
+    resolveSeatPower(state, 0);
+    expect(city.reactorAge).toBeUndefined();
+    expect(availableProjects(state, city)).not.toContain(rec);
   });
 
   it('a pillaged district takes its buildings out of the demand, like their yields', () => {

@@ -53,6 +53,10 @@ export interface City {
   /** Completed Terrestrial Laser Stations here: each draws LASER_POWER_LOAD
    *  and speeds the craft by 1 LY/turn only while this city is powered. */
   laserStations?: number;
+  /** CIV6 (Nuclear accident): the reactor's AGE — "the number of turns that
+   *  have passed since the Power Plant was first constructed, converted to,
+   *  or last recommissioned". Absent until this city holds a plant. */
+  reactorAge?: number;
   /** Is this city POWERED? Resolved once a turn by `resolveSeatPower`, which
    *  is also where a plant burns its fuel; every reader takes the flag. */
   powered?: boolean;

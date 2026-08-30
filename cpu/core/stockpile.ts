@@ -234,6 +234,14 @@ export function spendStockpile(state: GameState, seat: number, resourceId: strin
  */
 export function resolveSeatPower(state: GameState, seat: number): void {
   for (const city of citiesOf(state, seat)) {
+    // CIV6 (Nuclear accident): the reactor ages one turn for every turn since
+    // it was built or last recommissioned. A city with no plant has no
+    // reactor, and a plant lost with the building takes its clock with it.
+    if (city.buildings.includes('NUCLEAR_POWER_PLANT')) {
+      city.reactorAge = (city.reactorAge ?? 0) + 1;
+    } else if (city.reactorAge !== undefined) {
+      city.reactorAge = undefined;
+    }
     const p = cityPower(state, city);
     if (p.demand <= 0) {
       city.powered = false;

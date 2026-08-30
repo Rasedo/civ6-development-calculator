@@ -593,6 +593,7 @@ const CITY: Record<string, Extractor> = {
   hp: overCities((r) => r.city.hp),
   outerHp: overCities((r) => r.city.outerHp ?? 0),
   lastHitTurn: overCities((r) => r.city.lastHitTurn ?? 0),
+  reactorAge: overCities((r) => r.city.reactorAge ?? -1),
   projectBoostTurn: overCities((r) => r.city.projectBoostTurn ?? 0),
   isCapital: overCities((r) => (r.city.isCapital ? 1 : 0)),
   foodBox: overCities((r) => r.city.foodBox),

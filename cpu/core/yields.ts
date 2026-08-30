@@ -1,15 +1,16 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, seatOf } from './seats';
+import { citiesOf, seatOf, tileBelongsTo } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import { isWater, isMountain, hasRiver } from '../../world/query';
 import type { YieldCtx } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { IMPROVEMENTS } from '../data/improvements';
+import { BIOSPHERE_POWER_MULT, IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { WONDERS } from '../../world/wonders';
+import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
@@ -305,6 +306,17 @@ export function cityPower(state: GameState, city: City): CityPower {
     const def = BUILDINGS[id];
     if (def?.powerSupply && !pillaged.has(def.district)) supply += def.powerSupply;
   }
+  // CIV6 (Solar Farm, Wind Farm): a renewable generator "provides Power to
+  // its city" — the one that owns its plot — from a source no stockpile
+  // stands behind, so it counts here beside the Dam and not with the plants.
+  for (const tile of state.map.tiles) {
+    if (!tileBelongsTo(tile, city) || tile.pillaged || !tile.improvement) continue;
+    supply += IMPROVEMENTS[tile.improvement as ImprovementId]?.power ?? 0;
+  }
+  // CIV6 (Biosphere): the wonder names no city, so every renewable this seat
+  // holds pays triple — Cardiff's Harbor power is not on its list and is
+  // added after.
+  if (seatWonderFlag(state, city.seat, 'renewablePowerBoost')) supply *= BIOSPHERE_POWER_MULT;
   if (!pillaged.has('HARBOR') && suzerainEffect(state, city.seat, 'harborPower')) {
     for (const id of city.buildings) {
       if (BUILDINGS[id]?.district === 'HARBOR') supply += CARDIFF_HARBOR_POWER;

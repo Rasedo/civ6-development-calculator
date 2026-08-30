@@ -192,6 +192,17 @@ export function validImprovementsIn(
   ) {
     out.push('SEASIDE_RESORT');
   }
+  // THE GROUND-ONLY ROWS. Nothing gates them but their own catalog clause:
+  // the resource branch and the water/pave refusals above have already
+  // answered for every tile that has an opinion of its own.
+  for (const def of Object.values(IMPROVEMENTS)) {
+    if (!def.groundOnly || !unlocked(def.id)) continue;
+    if (def.noFeature && tile.feature) continue;
+    if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
+    if (def.excludeTerrains?.includes(tile.terrain)) continue;
+    if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
+    out.push(def.id);
+  }
   return out;
 }
 

@@ -148,6 +148,8 @@ class SimSeats:
                     okp_m = okp_m & self._space_step_ok(row, pi_m)
                 elif int(prow_m.get("ls", 0)):
                     okp_m = okp_m & self._laser_project_ok(row, pi_m)
+                elif int(prow_m.get("rec", 0)):
+                    okp_m = okp_m & self._recommission_ok(row, j, pi_m)
                 _rv = int(prow_m.get("rv", -1))
                 if _rv >= 0:
                     okp_m = okp_m & self.civ_civics[:, row, _rv]
@@ -1677,6 +1679,18 @@ class SimSeats:
             ok = ok & self.space_done[:, row, self._space_step[rp]]
         return ok & self._project_resource_ok(row, pi)
 
+    def _recommission_ok(self, row: int, j: int, pi: int) -> torch.Tensor:
+        """[B] — may city slot `j` start the reactor reset? Repeatable, so never
+        in the one-time ledger: it asks for its tech and for the Nuclear Power
+        Plant to be standing (`availableProjects`' recommission arm)."""
+        if self._nuclear_bidx < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        ok = self.city_bldg[:, row, j, self._nuclear_bidx]
+        rt = int(self._proj_rows[pi].get("rt", -1))
+        if rt >= 0:
+            ok = ok & self.civ_techs[:, row, rt]
+        return ok
+
     def _project_resource_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — can this seat pay the project's one-time resource charge?"""
         prow = self._proj_rows[pi]
@@ -2187,6 +2201,13 @@ class SimSeats:
             ok = ok | (self.lumber_ok & tk[:, self._lumber_unlock_tech].unsqueeze(1))
         if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
             ok = ok | (self._seaside_ok() & tk[:, self._seaside_unlock_tech].unsqueeze(1))
+        for _g in self._imp_ground_idx:
+            _gu = int(self._imp_unlock[_g])
+            _gok = (self._imp_ground_ok(_g) & (self.res_imp == -1)
+                    & ~self.water & self.passable)
+            if _gu >= 0:
+                _gok = _gok & tk[:, _gu].unsqueeze(1)
+            ok = ok | _gok
         new_res = self.res_imp >= 3
         if bool(new_res.any()):
             unlocked = tk.gather(1, self._imp_unlock[self.res_imp.clamp(min=0)].clamp(min=0))
@@ -4997,6 +5018,22 @@ class SimSeats:
         # cover the whole load by itself before a plant is asked.
         if bool((self._b_power_supply > 0).any()):
             supply = supply + stand.double() @ self._b_power_supply
+        # CIV6 (Solar Farm, Wind Farm): a renewable generator "provides Power
+        # to its city" — the one that owns its plot — so it counts here beside
+        # the Dam and never with the plants.
+        if self._imp_power_any:
+            per = self._imp_power[self.improvement.clamp(min=0)] \
+                * ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == row)).double()
+            for j in range(cols):
+                mine = ((self.tile_city == self.city_id[:, row, j].unsqueeze(1))
+                        & alive[:, j].unsqueeze(1))
+                supply[:, j] = supply[:, j] + (per * mine.double()).sum(dim=1)
+        # CIV6 (Biosphere): the wonder names no city, so every renewable this
+        # seat holds pays triple. Cardiff's Harbor power is not on its list and
+        # is added after.
+        if self._wond_n and bool(self._wond_renew_power.any()):
+            bio = self._seat_wonder_any(row, self._wond_renew_power)
+            supply = torch.where(bio.unsqueeze(1), supply * self._biosphere_mult, supply)
         if self._harbor_idx >= 0 and self._suz_c_harbor_pow >= 0:
             hb = (self._b_req_district == self._harbor_idx).reshape(1, 1, -1)
             n_hb = (stand & hb).sum(dim=2).double()
@@ -5032,6 +5069,14 @@ class SimSeats:
         several cities is not published; this walks the city SLOTS in order, and
         a city the fuel no longer covers stays dark (`resolveSeatPower`)."""
         cols = self.RC
+        # CIV6 (Nuclear accident): the reactor ages one turn for every turn since
+        # it was built or last recommissioned. A city with no plant has no
+        # reactor, and a plant lost with the building takes its clock with it.
+        if self._nuclear_bidx >= 0:
+            has = self.city_alive[:, row, :cols] & self.city_bldg[:, row, :cols, self._nuclear_bidx]
+            age = self.city_reactor_age[:, row, :cols]
+            self.city_reactor_age[:, row, :cols] = torch.where(
+                has, age.clamp(min=0) + 1, torch.full_like(age, -1))
         demand, supply, reach_p = self._city_power_need(row)
         lit = (demand > 0) & (supply >= demand)
         need = (demand - supply).clamp(min=0).long()
@@ -5475,6 +5520,7 @@ class SimSeats:
         self.city_spec_pin[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
+        self.city_reactor_age[b, row, col] = -1
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0

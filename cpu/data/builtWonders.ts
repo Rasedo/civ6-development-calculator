@@ -138,6 +138,10 @@ export interface BuiltWonderDef {
     loyaltyAura?: number;
     /** Defence strength for a unit standing on the wonder tile, fortification included. */
     occupyDefense?: number;
+    /** CIV6 (Biosphere): every renewable Power source this seat holds pays
+     *  `BIOSPHERE_POWER_MULT` times its published figure, and pays Tourism
+     *  equal to the Power it ends up supplying. */
+    renewablePowerBoost?: boolean;
     /** Civics completed outright at completion. */
     freeCivics?: number;
     /** Technologies completed outright at completion. */
@@ -230,6 +234,20 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         tileYields: [{ terrain: 'DESERT', excludeFeature: 'FLOODPLAINS', yields: { food: 2, gold: 2, production: 1 } }],
       },
       description: "+2 food, +2 gold, +1 production on this city's non-floodplain desert tiles.",
+    }),
+    // CIV6 (Biosphere): "+200% Power for all Offshore Windfarms, Solar Farms,
+    // Wind Farms, Geothermal Plants, and Hydroelectric Dams. This building and
+    // these improvements provide Tourism equal to their Power." Built "along a
+    // River adjacent to a Neighborhood district".
+    W({
+      id: 'BIOSPHERE',
+      name: 'Biosphere',
+      code: 'Bi',
+      cost: 1740,
+      requiresTech: 'SYNTHETIC_MATERIALS',
+      placement: { requiresRiver: true, adjacentDistrict: 'NEIGHBORHOOD' },
+      effects: { renewablePowerBoost: true },
+      description: '+200% Power from every renewable source, and Tourism equal to the Power they supply. On a river beside a Neighborhood.',
     }),
     W({
       id: 'COLOSSUS',

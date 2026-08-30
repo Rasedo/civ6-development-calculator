@@ -11,7 +11,7 @@
 
 import { TURN_LIMIT } from '../core/game';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
-import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
+import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary } from '../core/units';
 import type { PlunderRow, ImprovementId } from '../core/types';
@@ -410,6 +410,7 @@ export function buildRules() {
     regionalRange: REGIONAL_RANGE, // regional-building reach (hex distance, city centers)
     cardiffHarborPower: CARDIFF_HARBOR_POWER,
     laserPowerLoad: LASER_POWER_LOAD,
+    biospherePowerMult: BIOSPHERE_POWER_MULT,
     boostFraction: BOOST_FRACTION,
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
     // real Civ 6 bands — Content exactly 0, Displeased -1..-2.
@@ -425,6 +426,7 @@ export function buildRules() {
     districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
     shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
+    nuclearPlantBidx: buildingIdx.get('NUCLEAR_POWER_PLANT') ?? -1,
     ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
     worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
     templeBidx: buildingIdx.get('TEMPLE') ?? -1,
@@ -882,6 +884,7 @@ export function buildRules() {
         apostleMartyr: w.effects?.apostleMartyr ? 1 : 0,
         holyShield: w.effects?.holyTourismShield ? 1 : 0,
         floodMitigation: w.effects?.floodMitigation ? 1 : 0,
+        renewablePower: w.effects?.renewablePowerBoost ? 1 : 0,
         dupNaval: w.effects?.duplicateNavalTrain ? 1 : 0,
         relicTourismMult: w.effects?.religiousTourismMult ?? 1,
         resortTourismMult: w.effects?.resortTourismMult ?? 1,
@@ -944,6 +947,8 @@ export function buildRules() {
         // `rep` marks the repair, whose price is the perimeter HP it restores.
         cc: p.district === 'CITY_CENTER' ? 1 : 0,
         rep: p.repair ? 1 : 0,
+        // the reactor reset, whose gate is a BUILDING rather than a ledger
+        rec: p.recommission ? 1 : 0,
       })),
       yieldFraction: PROJECT_YIELD_FRACTION,
       gppFraction: PROJECT_GPP_FRACTION,
@@ -1207,6 +1212,10 @@ export function buildRules() {
           // 0 = FLAT, 1 = HILLS; MOUNTAIN is never improvable
           elev: (def.elevations ?? []).map((e) => (e === 'FLAT' ? 0 : 1)),
           noAdjSame: def.noAdjacentSame ? 1 : 0,
+          // what a RENEWABLE generator supplies its city, per turn
+          power: def.power ?? 0,
+          // a row a Builder places on its own ground clause alone
+          gnd: def.groundOnly ? 1 : 0,
           adj: (def.adjacency ?? []).map((r) => ({
             bres: r.bonusResource ? 1 : 0,
             dist: r.district ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,

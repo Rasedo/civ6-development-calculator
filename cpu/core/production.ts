@@ -83,6 +83,13 @@ export function completeProject(state: GameState, city: City, projectId: string,
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }
+  if (def.recommission) {
+    // CIV6: the age is "the number of turns that have passed since the Power
+    // Plant was first constructed, converted to, or last recommissioned".
+    city.reactorAge = 0;
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
   if (def.laser) {
     // Repeatable: each station speeds the craft by +1 LY/turn. The orbital one
     // is the seat's; the terrestrial one belongs to the city it powers from.

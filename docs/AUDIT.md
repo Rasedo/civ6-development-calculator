@@ -64,7 +64,7 @@ from the list below.
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **23** | |
-| C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
+| C-1 POWER | 1 | two of the four renewables are blocked (C-39, C-40); the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
@@ -79,8 +79,11 @@ from the list below.
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
-| **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **53** | |
+| C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
+| C-39 no water improvement has a carrier | 1 | `validImprovementsIn` refuses every water plot and no unit can stand there; Fishing Boats and the Offshore Wind Farm both wait on it |
+| C-40 the feature roster is seven rows | 2 | no Geothermal Fissure, Ley Line, Volcanic Soil or Cataract — three shipped clauses read features that cannot exist |
+| **C. Absent systems** | **33** | |
+| **OPEN, TOTAL** | **57** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -550,27 +553,47 @@ waiting on a system this engine does not have. The missing system is one
 open item, and each gap that names it is another — the gaps are listed
 under their blocker so the dependency is readable, and both halves count.
 
-- **C-1. POWER — the emissions and the renewable roster.** Weight 2. The
+- **C-1. POWER — the emissions and the renewable roster.** Weight 1. The
   grid, the three plants, the fuel burn, the powered-yield splits and
   Cardiff all ship (`cityPower` / `_city_power_need`;
   `tests/gpu/power_test.py`, `tests/cpu/city/power.test.ts`; the grid is
-  poke-proven — no gate lane builds a plant). OPEN:
-  - **THE DECOMMISSION AND RECOMMISSION PROJECTS** — nothing can retire a
-    plant, and the Nuclear plant's reactor has no age to reset. The
-    Climate Accords competition scores these projects too (B-22r), so the
-    window counts the emission gap alone until they exist.
+  poke-proven — no gate lane builds a plant). So do the RENEWABLE half and
+  the reactor: the SOLAR FARM and WIND FARM are improvements paying the
+  Civilopedia's +2 Power each to the city that owns their plot, the
+  HYDROELECTRIC DAM's `powerSupply` 6 rides the same channel, and the
+  BIOSPHERE multiplies every one of them by `BIOSPHERE_POWER_MULT` /
+  `biosphere_power_mult` — Cardiff's Harbor power is not on the wonder's
+  list and is added after. The NUCLEAR reactor carries an AGE
+  (`City.reactorAge` / `city_reactor_age`), "the number of turns that have
+  passed since the Power Plant was first constructed, converted to, or last
+  recommissioned": it ticks in `resolveSeatPower` / `_resolve_seat_power`,
+  clears with the building, and RECOMMISSION_REACTOR (400 Production,
+  Nuclear Fission, repeatable, gated on the plant standing) puts it back to
+  0. Its REACH is unmeasured — the clock is poke-proven, and no scripted
+  lane reaches an Atomic-era plant. OPEN:
+  - **THE ACCIDENT ROLL.** The ages that open each severity are published
+    — Radioactive Steam Venting, Major Radiation Leaks and Nuclear
+    Meltdown become possible at 10, 20 and 30 — but NO SOURCE REACHED
+    PUBLISHES THE PER-TURN PROBABILITY. The clock ships; the roll does
+    not, and no number is invented for it.
+  - **THE DECOMMISSION PROJECTS.** "Removes the Nuclear Power Plant and
+    all its effects from this city", offered while a Climate Accords
+    competition runs, and the Coal and Oil rows beside it. The removal is
+    sourced; the COMPETITION SCORE each grants is not — a secondary source
+    says 100 and no first-party page reached states any figure, so the
+    window (B-22r) counts the emission gap alone until the owner rules on
+    the magnitude.
+  - **THE GEOTHERMAL PLANT** (+4 Power, Synthetic Materials) stands on a
+    Geothermal Fissure, and this world model has no feature row for one —
+    blocked on C-40.
+  - **THE OFFSHORE WIND FARM** (+2 Power, Predictive Systems) stands on
+    Coast or Lake, and no unit can build on water here — blocked on C-39.
+    Its unlock is a Future-era technology whose prerequisites the game
+    randomizes, so it has no canonical edge to transcribe either.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
-    `_resolve_seat_power` run inside the MAJOR seat loop only.
-  - **THE FOUR RENEWABLE GENERATORS** — Geothermal Plant, Solar Farm,
-    Wind Farm, Offshore Wind Farm — are improvements with terrain gates,
-    and none is in the improvement roster.
-  - **THE HYDROELECTRIC DAM** — the Dam district ships now (C-22), so
-    this is unblocked: the building's row plus its per-city renewable
-    supply.
-  - **THE BIOSPHERE** raises every renewable source by 200%; the wonder
-    is not in the roster.
-  - **THE NUCLEAR PLANT'S REACTOR AGE** — the rising accident chance and
-    the Recommission project that resets it — has no clock.
+    `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous
+    while it stands: a minor holds no building that asks for Power and no
+    plant that supplies one — blocked on C-38.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. The 30-turn agreement clock,
   friendship, the alliance with its defensive pact, the denouncement, open
   and CLOSED borders, the Great Work gift, the DELEGATION and Resident
@@ -922,6 +945,34 @@ under their blocker so the dependency is readable, and both halves count.
   CS, America's Film Studio, the unique-improvement appeal terms (B-36r)
   and suzerain rows (B-21r). PARKED BY OWNER DECISION — no round starts
   it; the row stays open on purpose.
+- **C-38. A CITY-STATE'S CITY NEVER DEVELOPS.** Weight 2. A minor is a
+  population, a hit-point pool, an envoy ledger and a research record
+  (`CityState`, `minorResearch` / `_city_state_phase`); its city is a centre
+  tile and nothing else. It never places a district, never finishes a
+  building and holds no production queue, so every rule addressed to a
+  minor's city is vacuous rather than wrong. Waiting on it: a minor's
+  cities are never POWERED (C-1), its maritime reach is its centre's alone
+  because no minor Harbor exists (B-31r), and FABRICATE SCANDAL has no
+  district registry to target (C-16). Real Civ 6 grows a city-state's
+  city, gives it walls and districts, and lets a suzerain see them.
+- **C-39. NO WATER IMPROVEMENT HAS A CARRIER.** Weight 1.
+  `validImprovementsIn` returns nothing for a water plot and the builder
+  must stand where it builds, so no unit on either engine can improve one; FISHING_BOATS is
+  deliberately outside the exported roster for exactly that reason. What
+  waits on it: the Fishing Boats themselves and their sea-resource yields,
+  the CELESTIAL_NAVIGATION eureka that asks for two improved sea
+  resources, and the OFFSHORE WIND FARM (C-1). The fix is a carrier — a
+  naval builder, or a land builder allowed to work an adjacent water plot
+  — not another improvement row.
+- **C-40. THE FEATURE ROSTER IS SEVEN ROWS.** Weight 2. `FeatureId` holds
+  Woods, Rainforest, Marsh, Floodplains, Oasis, Reef and Ice. Real Civ 6
+  adds the Geothermal Fissure, the Ley Line, Volcanic Soil, the Cataract,
+  Sand Dunes and every natural wonder. Three shipped clauses already name
+  a feature that cannot exist and are inert on that alone: the CAMPUS's
+  published +2 adjacency for one, the FIRE_GODDESS pantheon (a row whose
+  effect block is deliberately empty), and the GEOTHERMAL PLANT that must
+  stand on one (C-1). The district table's own header lists what it drops
+  for the same reason — the Ley Line, the Bath, the Lumber Mill.
 
 ## Reachability — what the green gate does NOT prove
 

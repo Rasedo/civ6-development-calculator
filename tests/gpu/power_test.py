@@ -21,7 +21,13 @@ because a gate lane reaches an Industrial-era grid only by accident:
   5. THE COAL PLANT — its Industrial Zone's adjacency, as LOCAL production.
   6. `_spec_tb` — a district's specialist tier lifts on ANY ONE of its top
      buildings (the Industrial Zone accepts all three plants).
-  7. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
+  7. THE RENEWABLES — a Solar/Wind Farm supplies the city that owns its
+     plot, a pillaged one supplies nothing, and the Biosphere triples every
+     renewable the seat holds (the Dam's included).
+  8. THE REACTOR — its age ticks with the Nuclear plant standing, clears when
+     the building goes, and the Recommission project puts it back to 0. The
+     project's own gate is the plant plus Nuclear Fission.
+  9. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
      source and its ceiling, `_charge_unit_resource` at the train, and the
      heal `_res_starved` denies a unit whose source the seat has lost.
 """
@@ -383,6 +389,127 @@ def test_starved_heal(sim) -> None:
     print("  starved heal OK: no access to the source, no heal — and only for the types that ask")
 
 
+def free_plot(sim, row: int, cid: int) -> int:
+    """A plot this city owns, carrying nothing — where a generator can stand."""
+    for t in range(sim.T):
+        if (int(sim.tile_seat[0, t]) == row and int(sim.district[0, t]) < 0
+                and int(sim.built_wonder[0, t]) < 0 and int(sim.improvement[0, t]) < 0
+                and int(sim.centre_slot_at[0, t]) < 0 and bool(sim.passable[0, t])):
+            sim.tile_city[0, t] = cid
+            sim._tile_owner_ver += 1
+            return t
+    raise AssertionError("the city owns no free plot")
+
+
+def supply_of(sim, row: int, j: int) -> float:
+    return float(sim._city_power_need(row)[1][0, j])
+
+
+def test_renewables(sim) -> None:
+    row, j = a_city(sim)
+    cid = int(sim.city_id[0, row, j])
+    solar_i, wind_i = sim._imp_ids.index("SOLAR_FARM"), sim._imp_ids.index("WIND_FARM")
+    assert float(sim._imp_power[solar_i]) == 2.0, "CIV6 (Solar Farm): +2 Power"
+    assert float(sim._imp_power[wind_i]) == 2.0, "CIV6 (Wind Farm): +2 Power"
+    # the supply is only ever read against a load, so give the city one
+    sim.city_bldg[0, row, j, bidx(sim, "RESEARCH_LAB")] = True
+    assert supply_of(sim, row, j) == 0.0, "no generator, no renewable supply"
+    st = free_plot(sim, row, cid)
+    sim.improvement[0, st] = solar_i
+    sim.pillaged[0, st] = False
+    assert supply_of(sim, row, j) == 2.0, "the Solar Farm supplies the city that owns its plot"
+    wt = free_plot(sim, row, cid)
+    sim.improvement[0, wt] = wind_i
+    sim.pillaged[0, wt] = False
+    assert supply_of(sim, row, j) == 4.0, "the Wind Farm adds its own"
+    # a renewable answers the whole load by itself — no stockpile behind it
+    assert lit(sim, row, j, fuel=0), "3 Power of load, 4 of renewable supply, no fuel"
+    # a PILLAGED generator pays nothing
+    sim.pillaged[0, st] = True
+    assert supply_of(sim, row, j) == 2.0, "a pillaged Solar Farm is not a supply"
+    sim.pillaged[0, st] = False
+    # ...and a plot this city does not own pays some other city
+    sim.tile_city[0, wt] = cid + 999
+    sim._tile_owner_ver += 1
+    assert supply_of(sim, row, j) == 2.0, "the generator belongs to the city that owns its plot"
+    sim.tile_city[0, wt] = cid
+    sim._tile_owner_ver += 1
+    # CIV6 (Biosphere): "+200% Power" for every renewable the seat holds.
+    flagged = sim._wond_renew_power.nonzero().flatten().tolist()
+    assert len(flagged) == 1, "one wonder carries the renewable-power flag"
+    bi = int(flagged[0])
+    bt = free_plot(sim, row, cid)
+    sim.built_wonder[0, bt] = bi
+    sim.built_wonder_complete[0, bt] = True
+    sim.city_wonder[0, row, j, bi] = bt
+    sim._eff_version += 1
+    assert supply_of(sim, row, j) == 4.0 * sim._biosphere_mult, "every renewable pays triple"
+    # the Dam's own renewable supply is on the wonder's list too
+    sim.city_bldg[0, row, j, bidx(sim, "HYDROELECTRIC_DAM")] = True
+    assert supply_of(sim, row, j) == (4.0 + 6.0) * sim._biosphere_mult, \
+        "CIV6 (Hydroelectric Dam): 6 Power, and the Biosphere names it"
+    print("  renewables OK: the two generators, the owning city, pillage, and the Biosphere")
+
+
+def test_generator_ground(sim) -> None:
+    """The BUILD column each generator gets is its own catalog ground clause —
+    the `validImprovementsIn` ground-only arm."""
+    solar_i, wind_i = sim._imp_ids.index("SOLAR_FARM"), sim._imp_ids.index("WIND_FARM")
+    assert sim._imp_ground[solar_i] and sim._imp_ground[wind_i], \
+        "both generators are ground-only rows"
+    assert not any(sim._imp_ground[k] for k in range(len(sim._imp_ids))
+                   if k not in (solar_i, wind_i)), "and no other row claims that arm"
+    sol, wnd = sim._imp_ground_ok(solar_i)[0], sim._imp_ground_ok(wind_i)[0]
+    hills, snow = sim.hills[0], sim.terrain[0] == sim._imp_xterr[solar_i][0]
+    assert bool((wnd == hills).all()), "CIV6 (Wind Farm): Hills, and only Hills"
+    assert bool((sol == (~hills & ~snow)).all()), \
+        "CIV6 (Solar Farm): flat terrain, and never Snow"
+    assert not bool((sol & wnd).any()), "no plot takes both"
+    print("  generator ground OK: flat-not-snow and hills, from the catalog clause alone")
+
+
+def test_reactor_age(sim) -> None:
+    row, j = a_city(sim)
+    nuc = bidx(sim, "NUCLEAR_POWER_PLANT")
+    assert sim._nuclear_bidx == nuc, "the reactor is the Nuclear Power Plant's own row"
+    pi = next(i for i, p in enumerate(sim._proj_rows) if int(p.get("rec", 0)))
+    rt = int(sim._proj_rows[pi].get("rt", -1))
+    assert rt >= 0, "CIV6 (Recommission): the project asks for Nuclear Fission"
+    put_district(sim, row, j, sim._iz_idx)
+    assert int(sim.city_reactor_age[0, row, j]) == -1, "no plant, no reactor"
+    assert not bool(sim._recommission_ok(row, j, pi)[0]), "and nothing to recommission"
+    # CIV6 (Nuclear accident): the age counts the turns since the plant was
+    # built, converted to, or last recommissioned.
+    sim.city_bldg[0, row, j, nuc] = True
+    for n in range(1, 4):
+        sim._resolve_seat_power(row)
+        assert int(sim.city_reactor_age[0, row, j]) == n, "the reactor ages a turn a turn"
+    # the project's gate is the plant AND the tech
+    sim.civ_techs[:, row, rt] = False
+    assert not bool(sim._recommission_ok(row, j, pi)[0]), "the tech is half the gate"
+    sim.civ_techs[:, row, rt] = True
+    assert bool(sim._recommission_ok(row, j, pi)[0]), "plant plus tech, and it is offered"
+    # completing it puts the clock back, and it ticks again from zero
+    sim.city_current[:, row, j] = sim.PROJECT_BASE + pi
+    sim.city_cost[:, row, j] = 10
+    sim.city_progress[:, row, j] = 10.0 ** 9
+    sim._seat_city_produce(
+        row, torch.full((sim.B,), j, dtype=torch.long, device=sim.device),
+        torch.ones(sim.B, dtype=torch.bool, device=sim.device),
+        torch.zeros(sim.B, dtype=torch.float64, device=sim.device))
+    assert int(sim.city_reactor_age[0, row, j]) == 0, "the recommission resets the age"
+    sim._resolve_seat_power(row)
+    assert int(sim.city_reactor_age[0, row, j]) == 1, "and the clock runs again"
+    # repeatable: it is in no one-time ledger
+    assert bool(sim._recommission_ok(row, j, pi)[0]), "the project is repeatable"
+    # a plant lost with the building takes its clock with it
+    sim.city_bldg[0, row, j, nuc] = False
+    sim._resolve_seat_power(row)
+    assert int(sim.city_reactor_age[0, row, j]) == -1, "no plant, no reactor"
+    assert not bool(sim._recommission_ok(row, j, pi)[0])
+    print("  reactor OK: the age ticks, the project resets it, and both halves of its gate")
+
+
 def test_spec_tier(sim) -> None:
     iz = sim._iz_idx
     tier = sim._spec_tb[iz]
@@ -398,13 +525,15 @@ def main() -> None:
     path = fixture_paths()[0]
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
                test_regional_powered, test_fuel, test_accrual, test_unit_charge,
-               test_upkeep, test_starved_heal, test_spec_tier):
+               test_upkeep, test_starved_heal, test_renewables, test_generator_ground,
+               test_reactor_age, test_spec_tier):
         fn(build(rules, path))
     print("power_test OK — demand (buildings + stations, dark under pillage), the plant's reach, "
           "Cardiff's renewable supply, all-or-nothing, the powered halves (local, regional, "
           "amenities), the Coal plant's adjacency, the FUEL it converts, the stockpile accrual "
           "and its ceiling, the unit charge, the per-turn FUEL upkeep, the heal a lost "
-          "source denies, and the three-plant specialist tier")
+          "source denies, the two renewable generators with the Biosphere over them, the "
+          "reactor's age and the project that resets it, and the three-plant specialist tier")
 
 
 if __name__ == "__main__":

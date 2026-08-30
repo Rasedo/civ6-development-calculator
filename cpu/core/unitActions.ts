@@ -1,7 +1,7 @@
 
 import { PROMO_COLS } from '../data/promotions';
 
-export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP'];
+export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

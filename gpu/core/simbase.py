@@ -114,6 +114,7 @@ class Rules:
     governments_live: bool  # master switch (GOVERNMENTS_ADOPTION_LIVE)
     district_scaffold: dict  # {campusIdx, campusUnlockTech}
     shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
+    nuclear_plant_bidx: int  # NUCLEAR_POWER_PLANT row — the reactor whose age is clocked, -1 if absent
     ancient_walls_bidx: int  # building-roster index of ANCIENT_WALLS (outer HP + city strike), -1 if absent
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
@@ -144,6 +145,7 @@ class Rules:
     b_iz_adj_prod: torch.Tensor  # bool [NB] — Coal Power Plant: adds its Industrial Zone's adjacency as production
     cardiff_harbor_power: float  # renewable Power per Harbor building for a Cardiff suzerain
     laser_power_load: float  # Power a Terrestrial Laser Station adds to its city
+    biosphere_power_mult: float  # CIV6 (Biosphere): "+200% Power" for every renewable
     b_fuel_slot: torch.Tensor  # long [NB] — the stockpile slot a power plant burns, -1 = none
     b_fuel_rate: torch.Tensor  # long [NB] — Power produced per unit of that resource
     b_air_slots: torch.Tensor  # long [NB] — air-unit slots this building adds to its Aerodrome
@@ -293,6 +295,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         governments_live=bool(r.get("governmentsLive", False)),
         district_scaffold=r.get("districtScaffold", {}),
         shipyard_bidx=int(r.get("shipyardBidx", -1)),
+        nuclear_plant_bidx=int(r.get("nuclearPlantBidx", -1)),
         ancient_walls_bidx=int(r.get("ancientWallsBidx", -1)),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
@@ -323,6 +326,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_iz_adj_prod=torch.tensor([bool(b["izAdjProduction"]) for b in B], dtype=torch.bool),
         cardiff_harbor_power=float(r["cardiffHarborPower"]),
         laser_power_load=float(r["laserPowerLoad"]),
+        biosphere_power_mult=float(r["biospherePowerMult"]),
         b_fuel_slot=torch.tensor([int(b["fuelSlot"]) for b in B], dtype=torch.long),
         b_fuel_rate=torch.tensor([int(b["fuelRate"]) for b in B], dtype=torch.long),
         b_air_slots=torch.tensor([int(b.get("airSlots", 0)) for b in B], dtype=torch.long),
@@ -715,7 +719,7 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_rock_bands",  # how many Rock Bands each seat has bought (the progressive price)
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus",
 ]

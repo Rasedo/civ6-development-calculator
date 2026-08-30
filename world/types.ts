@@ -65,7 +65,9 @@ export type ImprovementId =
   | 'OIL_WELL'
   | 'SEASIDE_RESORT'
   | 'FORT'
-  | 'AIRSTRIP';
+  | 'AIRSTRIP'
+  | 'SOLAR_FARM'
+  | 'WIND_FARM';
 
 export type DistrictId =
   | 'CITY_CENTER'

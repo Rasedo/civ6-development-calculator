@@ -433,6 +433,12 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
       if (p.requiresProject && !done.includes(p.requiresProject)) return false;
       return canRunProject(state, city.seat, p.id);
     }
+    if (p.recommission) {
+      // CIV6: offered to a city whose Industrial Zone holds a Nuclear Power
+      // Plant, once Nuclear Fission is in. Repeatable, so no ledger.
+      if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
+      return city.buildings.includes('NUCLEAR_POWER_PLANT');
+    }
     if (!p.space) return true;
     if (done.includes(p.id)) return false; // one-time
     if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;

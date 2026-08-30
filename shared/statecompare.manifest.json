@@ -1427,6 +1427,16 @@
           ]
         },
         {
+          "name": "reactorAge",
+          "compare": "exact",
+          "covers": [
+            "City.reactorAge"
+          ],
+          "planes": [
+            "city_reactor_age"
+          ]
+        },
+        {
           "name": "projectBoostTurn",
           "compare": "exact",
           "covers": [

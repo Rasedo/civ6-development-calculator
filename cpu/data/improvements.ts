@@ -64,10 +64,16 @@ export interface ImprovementDef {
   appealAdjacent?: number;
   /** aircraft it bases. */
   airSlots?: number;
+  /** CIV6 (Power): what this improvement supplies, per turn, to the city that
+   *  owns its tile — a renewable source, so no stockpile stands behind it. */
+  power?: number;
   /** built by the MILITARY ENGINEER rather than the Builder. */
   engineer?: boolean;
   /** refuses a tile that still carries a feature. */
   noFeature?: boolean;
+  /** a Builder places this row on its own catalog GROUND alone — no resource
+   *  under it, no suzerainty, no appeal bar, and not the Engineer's list. */
+  groundOnly?: boolean;
   /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager;
    *  absent = NO_PLUNDER. */
   plunder?: PlunderRow;
@@ -79,6 +85,9 @@ export const SEASIDE_RESORT_MIN_APPEAL = 4;
 /** CIV6 (National Park): every tile in the cluster must be CHARMING or
  *  better, and `appealTier` puts Charming at 2. */
 export const PARK_MIN_APPEAL = 2;
+/** CIV6 (Biosphere): "+200% Power" for every renewable source — three times
+ *  the published figure, not two. */
+export const BIOSPHERE_POWER_MULT = 3;
 /** CIV6: a National Park gives "2 Amenities to the city that owns it and
  *  1 Amenity to the four closest cities in your empire". */
 export const PARK_AMENITIES_OWNER = 2;
@@ -201,6 +210,40 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
+  },
+  // THE TWO RENEWABLE GENERATORS A LAND BUILDER CAN REACH. Each supplies its
+  // city with Power from a source no stockpile stands behind, which is why
+  // `cityPower` counts them against demand before it asks a plant to burn.
+  // CIV6 (Solar Farm): "Provides 2 Power per turn", "+1 Gold" and "+1
+  // Production", "Must be built on flat terrain. Cannot be built on Snow."
+  SOLAR_FARM: {
+    id: 'SOLAR_FARM',
+    name: 'Solar Farm',
+    code: 'So',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { gold: 1, production: 1 },
+    housing: 0,
+    resourceOnly: false,
+    groundOnly: true,
+    power: 2,
+    elevations: ['FLAT'],
+    excludeTerrains: ['SNOW'],
+    description: 'Flat non-snow land. Supplies 2 Power to its city from the sun.',
+  },
+  // CIV6 (Wind Farm): "Provides 2 Power per turn", "+2 Gold" and "+1
+  // Production", "Must be built on Hills terrain".
+  WIND_FARM: {
+    id: 'WIND_FARM',
+    name: 'Wind Farm',
+    code: 'Wf',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { gold: 2, production: 1 },
+    housing: 0,
+    resourceOnly: false,
+    groundOnly: true,
+    power: 2,
+    elevations: ['HILLS'],
+    description: 'Hills. Supplies 2 Power to its city from the wind.',
   },
   // THE MILITARY ENGINEER'S OWN TWO. Both pages read "in your own or neutral
   // territory", which is the engineer branch's rule rather than a column.

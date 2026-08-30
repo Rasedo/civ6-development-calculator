@@ -399,6 +399,10 @@ class SimInit:
         self.seat_spy_held = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         # THE SCORED COMPETITION running right now: which one (-1 = none), the
         # turns it has left, and the field's running scores. ONE at a time.
+        # CIV6 (Nuclear accident): the reactor's AGE per city — the turns since
+        # its plant was built or last recommissioned. -1 = no reactor here.
+        self.city_reactor_age = torch.full(
+            (B, self.n_majors, civ_city_pad), -1, dtype=torch.long, device=device)
         self.comp_kind = torch.full((B,), -1, dtype=torch.long, device=device)
         self.comp_left = torch.zeros(B, dtype=torch.long, device=device)
         self.comp_score = torch.zeros(B, _pw, dtype=dtype, device=device)
@@ -1036,6 +1040,9 @@ class SimInit:
             self._wond_grant_unit = torch.tensor([int(w.get("grantUnit", -1)) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
             self._wond_grant_prophet = torch.tensor([bool(w.get("grantProphet", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_religion_site = torch.tensor([bool(w.get("religionSite", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            # CIV6 (Biosphere): every renewable Power source the seat holds pays
+            # `_biosphere_mult` times its published figure.
+            self._wond_renew_power = torch.tensor([bool(w.get("renewablePower", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             # Policy slots [nW, 4] in SLOT_KINDS order (military, economic,
             # diplomatic, wildcard) — the counts `_gov_policy_mods` adds.
             self._wond_slots = torch.tensor([list(w["slots"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -1444,6 +1451,16 @@ class SimInit:
             [int(r.get("appeal", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_any = bool((self._imp_appeal_adj != 0).any())
         self._imp_air_any = bool((self._imp_air_slots > 0).any())
+        # CIV6 (Solar Farm, Wind Farm): what a RENEWABLE generator supplies the
+        # city that owns its plot, per turn.
+        self._imp_power = torch.tensor(
+            [float(r.get("power", 0)) for r in imp["rows"]], dtype=torch.float64, device=device)
+        self._imp_power_any = bool((self._imp_power > 0).any())
+        # The rows a Builder places on their own catalog GROUND alone — no
+        # resource under them, no suzerainty, no appeal bar, not the
+        # Engineer's (`validImprovementsIn`'s ground-only arm).
+        self._imp_ground = [bool(r.get("gnd", 0)) for r in imp["rows"]]
+        self._imp_ground_idx = [i for i, g in enumerate(self._imp_ground) if g]
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )
@@ -1834,6 +1851,7 @@ class SimInit:
         self._city_centre_air_slots = 1
         self._aerodrome_air_slots = 2
         self._shipyard_bidx = int(rules.shipyard_bidx)
+        self._nuclear_bidx = int(rules.nuclear_plant_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
         _tr = rules.trade or {}
         self._trade_mkt = int(_tr.get("marketBidx", -1))
@@ -2098,6 +2116,7 @@ class SimInit:
         self._b_appeal_y = rules.b_appeal_y.to(device)  # [NB, 2, 6]
         self._b_appeal_rows = [i for i in range(len(rules.b_appeal_y)) if float(rules.b_appeal_y[i].abs().sum()) != 0]
         self._laser_power_load = float(rules.laser_power_load)
+        self._biosphere_mult = float(rules.biosphere_power_mult)
         self._b_fuel_slot = rules.b_fuel_slot.to(device)  # [NB] long
         self._b_fuel_rate = rules.b_fuel_rate.to(device)  # [NB] long
         self._b_air_slots = rules.b_air_slots.to(device)  # [NB] long

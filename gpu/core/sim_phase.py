@@ -805,6 +805,13 @@ class SimPhase:
                             hit, torch.full_like(hit, -self._recapture_units, dtype=torch.float64),
                             torch.zeros(self.B, dtype=torch.float64, device=self.device)))
                         self.civ_diplo_favor[:, row] += hit.long() * self._recapture_favor
+                    if int(prow.get("rec", 0)):
+                        # CIV6 (Recommission Nuclear Reactor): the age counts
+                        # the turns since the plant was built, converted to, or
+                        # last recommissioned, so the project puts it back to 0.
+                        _cr = hit.nonzero(as_tuple=True)[0]
+                        if len(_cr) > 0:
+                            self.city_reactor_age[_cr, row, col[_cr]] = 0
                     if int(prow.get("rep", 0)):
                         # CIV6: "Once completed, it fully restores the HP of
                         # the city's (and Encampment's) Outer Defenses." One
