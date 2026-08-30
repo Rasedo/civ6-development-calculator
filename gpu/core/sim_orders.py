@@ -468,19 +468,30 @@ class SimOrders:
                         blocked,
                     )
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
+                _canal = self._canal_pass().gather(1, tc.unsqueeze(1)).squeeze(1)
+                cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
+                        else torch.zeros(B, dtype=torch.bool, device=dev))
+                _wet = self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
+                _hull = (_wet & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | cart)) | _canal
                 if self._embark_live:
-                    cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
-                            else torch.zeros(B, dtype=torch.bool, device=dev))
                     ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
                             else torch.zeros(B, dtype=torch.bool, device=dev))
-                    water = self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1) & (
+                    water = _wet & (
                         ~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | cart
                     )
                     any_war = self.war[:, row].any(dim=1)
-                    terr = torch.where(is_nav, water, terr | (water & ship & ~is_nav & any_war))
+                    terr = torch.where(is_nav, _hull, terr | (water & ship & ~is_nav & any_war))
+                else:
+                    terr = torch.where(is_nav, _hull, terr)
+                _wlk = self.unit_water_walk[ut]
+                if bool(_wlk.any()):
+                    terr = torch.where(
+                        _wlk, self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) | _wet, terr)
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
-                clf = self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
-                                             _scale.unsqueeze(1))[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
+                clf = self._cliff_block_dirs(
+                    hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
+                    (_scale | is_nav | self.unit_water_walk[ut]).unsqueeze(1),
+                )[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 shut = self._border_closed(tgt.unsqueeze(1), row, ut.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & ~shut & (mp > 0)
@@ -1345,8 +1356,9 @@ class SimOrders:
                     _nbc = _nb.clamp(min=0)
                     _free = (
                         (_nb >= 0)
-                        & self.wpass.gather(1, _nbc)
-                        & ~self.ocean_tile.gather(1, _nbc)  # barbarians have no CARTOGRAPHY
+                        & ((self.wpass.gather(1, _nbc)
+                            & ~self.ocean_tile.gather(1, _nbc))  # barbarians have no CARTOGRAPHY
+                           | self._canal_pass().gather(1, _nbc))
                         & (self.military_at.gather(1, _nbc) < 0)  # no unit at all
                         & (self.civilian_at.gather(1, _nbc) < 0)
                         & (self.embarked_at.gather(1, _nbc) < 0)
@@ -1602,7 +1614,8 @@ class SimOrders:
                 _navm = self.unit_naval[self.barb_unit_type[:, u].clamp(min=0)].unsqueeze(1)
                 _plane = torch.where(
                     _navm,
-                    self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),
+                    ((self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c))
+                     | self._canal_pass().gather(1, nb2c)),
                     self.passable.gather(1, nb2c),
                 )
                 step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, BARB_SEAT, is_naval=_navm)

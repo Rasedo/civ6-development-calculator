@@ -42,7 +42,7 @@ import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } fro
 // drift from every other seat's. units.ts already imports from here, so this
 // closes a cycle — both directions are called at RUN time, never at module
 // init, which is what makes that safe.
-import { unitFullMoves } from './units';
+import { unitFullMoves, waterWalks } from './units';
 import { warWearinessBattle } from './weariness';
 import { unitKillEvent } from './eras';
 
@@ -1274,7 +1274,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, 0, attacker)) {
     attacker.tileIndex = targetIndex;
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
-    if (!def.naval) attacker.embarked = isWater(state.map.tiles[targetIndex]);
+    if (!def.naval && !waterWalks(attacker.type)) {
+      attacker.embarked = isWater(state.map.tiles[targetIndex]);
+    }
     clearCampFor(state, attacker, targetIndex); // every seat clears it
   }
   return ok;

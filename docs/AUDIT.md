@@ -69,20 +69,20 @@ from the list below.
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), clean-fallout and remove-improvement verbs |
-| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the any-work pool does not reach artifacts, the Preserve table is a stylization |
+| C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization, the Consulate's Encampment half |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
-| C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
+| C-33 the Giant Death Robot's remaining abilities | 1 | its heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
-| C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
+| C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion; the tile facts derived from it are frozen at map generation |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
 | C-39 no water improvement has a carrier | 1 | `validImprovementsIn` refuses every water plot and no unit can stand there; Fishing Boats and the Offshore Wind Farm both wait on it |
 | C-40 the feature roster is seven rows | 2 | no Geothermal Fissure, Ley Line, Volcanic Soil or Cataract — three shipped clauses read features that cannot exist |
-| **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **55** | |
+| **C. Absent systems** | **29** | |
+| **OPEN, TOTAL** | **53** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -816,14 +816,16 @@ under their blocker so the dependency is readable, and both halves count.
   serve lane runs. The Espionage pool's reach is unmeasured for the same
   reason C-16's is: a level needs a spy fielded, sent, and carried through
   a successful offensive operation.
-- **C-33. THE GIANT DEATH ROBOT IS ONLY ITS STATS.** Weight 2. The
-  chassis, its fuel bill and Automaton Warfare's hooks ship. Every
-  ABILITY on its page is absent: it moves and fights on Coast and Ocean
-  "as it would on land" (C-35's family — the hull/embark rules give it
-  neither); it heals only in friendly territory; it takes -17 Ranged
-  Strength against district defenses and naval units; and its four
-  Future-era upgrades need per-unit upgrade state keyed on a FUTURE-era
-  tech, where the era ladder stops at Information.
+- **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1. The
+  chassis, its fuel bill, Automaton Warfare's hooks and the water walk
+  ship — it moves and fights on Coast and Ocean "as it would on land"
+  (`waterWalks` / `unit_water_walk`: no embark, no seafaring tech, no
+  cliff, and its own pool and strength throughout), poke-proven on both
+  engines and reached by no seed. OPEN: it heals only in friendly
+  territory; it takes -17 Ranged Strength against district defenses and
+  naval units; and its four Future-era upgrades need per-unit upgrade
+  state keyed on a FUTURE-era tech, where the era ladder stops at
+  Information.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2. Bases, both heads, the
   sortie, the carrier and the scatter ship — and the sortie now rolls
   the promotion term on both sides (`promoCS` / `_promo_cs` with `vsAir`
@@ -870,11 +872,19 @@ under their blocker so the dependency is readable, and both halves count.
     invented, and nothing here decides between them.
 - **C-35. THE LAND/WATER FACT NEVER MOVES.** Weight 2. Sea-ness is decided
   at map generation: TS `isWater`, GPU static `water` / `wpass` and their
-  derivations, none in `_MUTABLE`. The bit is OVERLOADED — "is this sea",
-  "can a hull stand here", "is this city coastal", "does this tile carry
-  water housing" — so moving it for one meaning moves all four. Waiting on
-  it: submersion (C-24), the Canal's naval passage (C-22), the Mountain
-  Tunnel (C-20), and the GDR's water walk (C-33).
+  derivations, none in `_MUTABLE`. Two of the four meanings the bit carried
+  now have planes of their own — "can a hull stand here" is `hullTile` /
+  `_canal_pass`, and a chassis water is ground to reads `unit_water_walk` —
+  so what is left is the SEA itself. Waiting on it: submersion (C-24) and
+  the Mountain Tunnel (C-20). Moving `water` moves more than the tile: the
+  GPU freezes at map generation every fact the exporter derives from
+  terrain over a tile's RING — coastal land and coastal water, water
+  housing, the Seaside Resort's candidacy, the Aqueduct's source, the
+  natural-wonder ring, the static half of district adjacency
+  (`d_static_adj`) and a built wonder's terrain legality (`wok`) — while
+  TS recomputes each of them live from the map. So a submersion that only
+  writes the drowned tile leaves the two engines answering differently
+  about its neighbours.
 - **C-37. NO LEGACY POLICY CARDS.** Weight 2. Rise and Fall turned every
   government's LEGACY bonus into a WILDCARD policy card, unlocked only
   once the seat has switched AWAY from that government — so a government
@@ -905,16 +915,15 @@ under their blocker so the dependency is readable, and both halves count.
     published only as "Variable"; the row carries 0.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
-  and Government Plaza ride the gate on 12/12 seeds, the Canal on none
-  (`canalPassageOk` / `_canal_plot` poke-proven). The Government Plaza's
+  and Government Plaza ride the gate on 12/12 seeds, the Canal on none —
+  its placement and its naval passage (`canalPassage` / `_canal_pass`) are
+  both poke-proven only. The Government Plaza's
   five effect rows all ship, the Royal Society's BOOST_PROJECT verb last
   (`projectBoostCity` / `_project_boost_slot`,
   `tests/cpu/city/plaza-buildings.test.ts`, `tests/gpu/plaza_test.py`);
   its measured gate reach is ZERO — no seed of the twelve builds the
   building, so no Builder is ever offered the column — which puts it
   beside the Military Engineer's two verbs as poke-proven only. OPEN:
-  - **THE CANAL CARRIES NO NAVAL PASSAGE** — the passage wants its own
-    plane, not a bit borrowed from the water one (C-35).
   - **THE ANY-WORK POOL DOES NOT REACH ARTIFACTS.** The National History
     Museum's four slots take a Great Work of any kind, and this model
     lets them take writing, art, music and relics. An ARTIFACT cannot

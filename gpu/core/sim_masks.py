@@ -1205,6 +1205,16 @@ class SimMasks:
                  if self._cartography_tech >= 0 else torch.zeros_like(celnav))
         return torch.where(celnav, torch.where(carto, out + 2, out + 1), out)
 
+    def _canal_pass(self) -> torch.Tensor:
+        """[B, T] — CIV6 (Canal): "Allows Naval units to pass through this
+        tile" (`canalPassage`). A HULL fact and nothing else: the ground under
+        a Canal stays land for every other rule, and a pillaged district
+        carries no effect."""
+        if self._canal_didx < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return ((self.district == self._canal_didx) & self.district_complete
+                & ~self.district_pillaged)
+
     def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
         """`tradeWalkable` — may a Trader at this water level stand here?
         `water` broadcasts against `tiles`."""
@@ -1499,7 +1509,8 @@ class SimMasks:
             ocean_ok = ~self.ocean_tile.gather(1, okc)
             if cart is not None:
                 ocean_ok = ocean_ok | cart.unsqueeze(1)
-            water_terr = self.wpass.gather(1, okc) & ocean_ok
+            water_terr = ((self.wpass.gather(1, okc) & ocean_ok)
+                          | self._canal_pass().gather(1, okc))
             terr = torch.where(naval_mask.unsqueeze(1), water_terr, terr)
         ok7 = (cand7 >= 0) & terr & ~blocked
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
@@ -1532,12 +1543,16 @@ class SimMasks:
         so their water plane is wpass minus OCEAN — exactly what
         waterEnterable allows them, with no arm of its own."""
         dc = dest.clamp(min=0).unsqueeze(1)
+        ut = u_type.clamp(min=0, max=self.NU - 1)
         land_ok = self.passable.gather(1, dc).squeeze(1)
         water_ok = self.wpass.gather(1, dc).squeeze(1) & (
             ~self.ocean_tile.gather(1, dc).squeeze(1)
             | self._seat_tech(u_seat, self._cartography_tech)
         )
-        return torch.where(self.unit_naval[u_type.clamp(min=0, max=self.NU - 1)], water_ok, land_ok)
+        hull_ok = water_ok | self._canal_pass().gather(1, dc).squeeze(1)
+        out = torch.where(self.unit_naval[ut], hull_ok, land_ok)
+        return torch.where(self.unit_water_walk[ut],
+                           land_ok | self.wpass.gather(1, dc).squeeze(1), out)
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False, ladder: bool = True) -> None:
         if not bool(mask.any()):
@@ -2224,6 +2239,11 @@ class SimMasks:
         is_nav = self.unit_naval[ut].unsqueeze(2)
         cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
                 else torch.zeros(B, dtype=torch.bool, device=dev)).view(B, 1, 1)
+        # a HULL floats over enterable water and through a Canal's passage;
+        # the OCEAN gate is the seat's Cartography and the passage asks none.
+        hull = ((self.wpass.gather(1, nbc).reshape(B, N, 6)
+                 & (~self.ocean_tile.gather(1, nbc).reshape(B, N, 6) | cart))
+                | self._canal_pass().gather(1, nbc).reshape(B, N, 6))
         if self._embark_live:
             ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
                     else torch.zeros(B, dtype=torch.bool, device=dev)).view(B, 1, 1)
@@ -2233,9 +2253,15 @@ class SimMasks:
             )
             any_war = self.war[:, row].any(dim=1).view(B, 1, 1)
             embark = water & ship & ~is_nav & any_war
-            terr = torch.where(is_nav, water, passable | embark)
+            terr = torch.where(is_nav, hull, passable | embark)
         else:
-            terr = passable
+            terr = torch.where(is_nav, hull, passable)
+        # ...and a WATER-WALKING chassis takes both planes at once, with no
+        # embark clause of any kind between them.
+        _walk = self.unit_water_walk[ut].unsqueeze(2)
+        if bool(_walk.any()):
+            terr = torch.where(
+                _walk, passable | self.wpass.gather(1, nbc).reshape(B, N, 6), terr)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
         _blk = torch.where(
             is_civ,
@@ -2245,7 +2271,8 @@ class SimMasks:
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
         has_atk = (self.unit_attacks.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = (self._cliff_block_dirs(tc, nb, own_tile,
-                                         self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")) & alive
+                                         self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")
+                                         | self.unit_naval[ut] | self.unit_water_walk[ut]) & alive
                   if self._embark_live else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
         shut = self._border_closed(nb, row, utype.unsqueeze(2).expand(B, N, 6))
         # THE ESCORT FORMATION. CIV6 (Formations): "A military unit can create a

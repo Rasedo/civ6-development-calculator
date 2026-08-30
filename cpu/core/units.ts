@@ -20,7 +20,7 @@ export function formationCS(unit: Unit): number {
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
-import { isWater, isImpassable, isCoastalLand } from '../../world/query';
+import { isWater, isImpassable, isCoastalLand, canalPassage, hullTile } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal, gpAppealResolver } from './appeal';
@@ -79,8 +79,16 @@ export { nextRandom } from './rand';
  */
 export function unitPassable(tile: Tile, unit?: { type: string }): boolean {
   if (isImpassable(tile)) return false;
+  if (unit && waterWalks(unit.type)) return true;
   const naval = unit ? !!UNITS[unit.type]?.naval : false;
-  return naval ? isWater(tile) : !isWater(tile);
+  return naval ? hullTile(tile) : !isWater(tile);
+}
+
+/** CIV6 (Giant Death Robot): a chassis that moves and fights in Coast and
+ *  Ocean "as it would on land" — so water is simply ground to it: no embark,
+ *  no seafaring tech, no cliff, and its own strength and Movement throughout. */
+export function waterWalks(type: string): boolean {
+  return !!UNITS[type]?.waterWalk;
 }
 
 function ownerTechs(state: GameState, unit: { seat: number }): string[] {
@@ -164,6 +172,8 @@ export function moveCostInto(
   state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string },
 ): number {
   if (isWater(tile)) return MP_SCALE;
+  // a hull in a Canal's passage pays the water step, not the ground's
+  if (mover && UNITS[mover.type]?.naval && canalPassage(tile)) return MP_SCALE;
   if (roadStep(from, tile)) return routeStepMp(state, from, tile);
   return terrainMp(tile, mover);
 }
@@ -514,6 +524,7 @@ export function cliffBlocksStep(
   unit: { type: string; seat: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false; // naval movers never transition
+  if (waterWalks(unit.type)) return false;   // nor does a chassis water is ground to
   if (isWater(from) === isWater(to)) return false; // not a land/water crossing
   return cliffBlocks(state, from, to, unit);
 }
@@ -580,15 +591,16 @@ export function tileFreeForUnit(
   // "jumps from city to city" rather than walking, so it holds no plot either.
   if (unit && (isAirUnit(unit.type) || isSpy(unit.type))) return true;
   const naval = unit ? !!UNITS[unit.type]?.naval : false;
+  const walks = !!unit && waterWalks(unit.type);
   if (isWater(tile)) {
     if (naval) {
       if (!unit || !waterEnterable(state, tile, unit)) return false;
-    } else {
+    } else if (!walks) {
       if (!allowEmbark || !unit || !canEmbark(state, unit) || !waterEnterable(state, tile, unit)) return false;
     }
   } else {
-    // Land tile: naval units cannot stand ashore; land units use the land plane.
-    if (naval) return false;
+    // Land tile: a hull stands ashore only in a Canal's passage.
+    if (naval && !canalPassage(tile)) return false;
   }
   // A LIVE enemy Encampment garrison bars entry outright. The
   // beat-it-down path is the melee attack ON the tile, never a move.
@@ -598,7 +610,7 @@ export function tileFreeForUnit(
   // the slot the mover would hold HERE: a land unit standing on water is a
   // passenger, whatever it is on land.
   const domain: StackSlot = unit
-    ? (isWater(tile) && !naval ? 'embarked' : unitDomain(unit.type))
+    ? (isWater(tile) && !naval && !walks ? 'embarked' : unitDomain(unit.type))
     : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
@@ -616,7 +628,9 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     // Routing never plans THROUGH a live enemy Encampment or closed ground.
     !encampmentBlocks(state, t, unit) &&
     !borderClosedTo(state, unit.seat, t, unit.type) &&
-    (naval ? isWater(t) && !isImpassable(t) && waterEnterable(state, t, unit) : unitPassable(t));
+    (naval
+      ? hullTile(t) && !isImpassable(t) && (canalPassage(t) || waterEnterable(state, t, unit))
+      : unitPassable(t, unit));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
@@ -826,7 +840,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   // the heal gate's `grantedLast`. A live recompute drifts the moment a tech
   // or aura lands mid-turn, and the GPU afford reads its stored pool.
   const full = unit.movesFull ?? unitFullMoves(state, unit);
-  const transition = !naval && isWater(from) !== isWater(to);
+  const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const wEnd = isWater(to) ? to : from;
   const lEnd = isWater(to) ? from : to;
@@ -858,7 +872,8 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     unit.movesFull = modeFull;
   }
   for (const rider of riders) {
-    const rTrans = !UNITS[rider.type]?.naval && isWater(from) !== isWater(to);
+    const rTrans = !UNITS[rider.type]?.naval && !waterWalks(rider.type)
+      && isWater(from) !== isWater(to);
     if (rTrans) rider.embarked = isWater(to);
     rider.tileIndex = to.index;
     if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);

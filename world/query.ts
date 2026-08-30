@@ -13,6 +13,21 @@ export function isLand(tile: Tile): boolean {
   return !isWater(tile);
 }
 
+/**
+ * CIV6 (Canal): "Allows Naval units to pass through this tile." The passage is
+ * a HULL fact and nothing else — the ground under a Canal is still land, so no
+ * city turns coastal on it, no citizen works it as sea, and no land unit is
+ * kept off it. A pillaged district carries no effect, this one included.
+ */
+export function canalPassage(tile: Tile): boolean {
+  return tile.district === 'CANAL' && tile.districtComplete && !tile.districtPillaged;
+}
+
+/** where a HULL may float: open water, or a Canal's passage. */
+export function hullTile(tile: Tile): boolean {
+  return isWater(tile) || canalPassage(tile);
+}
+
 export function isMountain(tile: Tile): boolean {
   return tile.elevation === 'MOUNTAIN';
 }

@@ -59,6 +59,11 @@ export interface UnitDef {
   antiAirRange?: number;
   /** the GIANT DEATH ROBOT: its own class in every rule that names one. */
   gdr?: boolean;
+  /** CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast tiles as
+   *  it would on land." Such a chassis never embarks — it keeps its own
+   *  Movement and its own Combat Strength out there, and asks no seafaring
+   *  tech for the water it crosses. */
+  waterWalk?: boolean;
   /**
    * AIR: this chassis lives at a BASE and strikes from it. CIV6 (Air combat):
    * "all air attacks are ranged, and the attacking plane doesn't suffer damage
@@ -1105,6 +1110,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       ranged: { strength: 120, range: 3 },
       antiAir: 90,
       gdr: true,
+      waterWalk: true,
       requiresTech: 'ROBOTICS',
       requiresResource: 'URANIUM',
       resourceCost: 1,

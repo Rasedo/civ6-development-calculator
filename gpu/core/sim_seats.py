@@ -1807,7 +1807,14 @@ class SimSeats:
                | self._seat_tech(seat, self._cartography_tech))
             & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
         )
-        dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & ~r_naval
+        # a hull comes ashore only in a Canal's passage, and a water-walking
+        # chassis takes both planes at once
+        dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & (
+            ~r_naval | self._canal_pass().gather(1, dc.unsqueeze(1)).squeeze(1))
+        _rwalk = self.unit_water_walk[rt]
+        if bool(_rwalk.any()):
+            wet_ok = wet_ok | (_rwalk & self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1))
+            dry_ok = dry_ok | (_rwalk & self.passable.gather(1, dc.unsqueeze(1)).squeeze(1))
         # the class the rider will STAND in at the destination, which is what
         # `_blocked_for` asks: a civilian ashore, a passenger on water.
         stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
@@ -6776,10 +6783,15 @@ class SimSeats:
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
         if self._embark_live:
-            naval = self.unit_naval[u_type.clamp(min=0, max=self.NU - 1)]
+            _ut = u_type.clamp(min=0, max=self.NU - 1)
+            naval = self.unit_naval[_ut]
             emb = self.unit_emb.gather(1, gs1).squeeze(1)
             to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
-            transition = (emb != to_water) & ~naval
+            # a hull in a Canal's passage pays the water step; a chassis water
+            # is ground to never transitions at all.
+            to_water = to_water | (naval & self._canal_pass().gather(
+                1, dest.clamp(min=0).unsqueeze(1)).squeeze(1))
+            transition = (emb != to_water) & ~naval & ~self.unit_water_walk[_ut]
             base_step = torch.where(
                 to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
             w_end = torch.where(to_water, dest.clamp(min=0), hc)
@@ -6837,7 +6849,9 @@ class SimSeats:
         if clear_camp:
             self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         if self._embark_live:
-            self.unit_emb[rows, gs] = (to_water & ~naval)[rows]
+            self.unit_emb[rows, gs] = (
+                to_water & ~naval
+                & ~self.unit_water_walk[u_type.clamp(min=0, max=self.NU - 1)])[rows]
         self._occ_set(rows, dest[rows], gs)
         spent = (mp - cost).clamp(min=0)
         if self._embark_live and bool((moved & transition).any()):

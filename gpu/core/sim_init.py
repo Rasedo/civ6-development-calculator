@@ -2304,6 +2304,10 @@ class SimInit:
         # natively; an embarked LAND mover stands on water via the embark gate.
         # Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
+        # CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast
+        # tiles as it would on land" — water is simply ground to such a
+        # chassis, so it never embarks and asks no seafaring tech.
+        self.unit_water_walk = torch.tensor([bool(u.get("ww", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
         # THE SIEGE CLASSES. `_type_bombard` > 0 marks a unit whose attack
         # "uses Bombard Strength": full damage to a perimeter, no city penalty,

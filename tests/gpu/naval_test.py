@@ -31,6 +31,8 @@ Covered here (all gate-unreachable):
  13. The raider's two zone-of-control abilities — ignored, and not exerted.
  14. A ring that exerts no zone of control is no siege: the city heals.
  15. A dead or captured PASSENGER leaves its own occupancy plane.
+ 16. The CANAL's passage — a hull's one step ashore, and nothing else's.
+ 17. The chassis water is ground to — no embark, no tech, its own pool.
 """
 
 from __future__ import annotations
@@ -907,6 +909,121 @@ def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
     assert free > 0, "a submarine ring besieged the city it exerts no control over"
     print(f"  14 submarine siege OK (frigate ring heals {besieged}, submarine ring heals {free})")
 
+def rank_of(sim, slot: int, row: int = 0) -> int:
+    smap = sim._seat_slot_map(row)
+    return int((smap[0] == slot).nonzero(as_tuple=True)[0][0])
+
+
+def shore_pair(sim, row: int = 0):
+    """(water tile, free land tile of seat `row` beside it) — the two ends of
+    a step a hull normally cannot take."""
+    for w in range(sim.T):
+        if not bool(sim.wpass[0, w]) or bool(sim.ocean_tile[0, w]):
+            continue
+        if int(sim.military_at[0, w]) >= 0 or is_center(sim, w):
+            continue
+        for d in range(6):
+            n = int(sim.neigh[w][d])
+            if n < 0 or is_center(sim, n) or int(sim.tile_seat[0, n]) != row:
+                continue
+            if (bool(sim.passable[0, n]) and int(sim.district[0, n]) < 0
+                    and int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0):
+                return w, n
+    raise AssertionError(f"seed holds no free shore plot for row {row}")
+
+
+def poke_canal(rules, path, GALLEY, WARRIOR):
+    """16. CIV6 (Canal): "Allows Naval units to pass through this tile." The
+    passage is a HULL fact and nothing else — the ground stays land for the
+    land plane, for the water plane, and for a pillaged district."""
+    sim = build(rules, path)
+    for _ in range(25):
+        sim.step()
+    assert sim._canal_didx >= 0, "the district catalog carries no Canal"
+    neutralize_barbs(sim)
+    w, land = shore_pair(sim)
+    clear_tile(sim, w)
+    g = place_mil(sim, 0, w, GALLEY)
+    d = dir_to(sim, w, land)
+    assert d >= 0
+    rw = rank_of(sim, g)
+    assert not bool(sim._seat_unit_mask(0)[0, rw, d]), "a hull has no step onto bare ground"
+    sim.district[0, land] = sim._canal_didx
+    sim.district_complete[0, land] = True
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    assert bool(sim._canal_pass()[0, land]), "a finished Canal carries the passage"
+    assert not bool(sim.water[0, land]), "and the ground under it is still land"
+    assert bool(sim._seat_unit_mask(0)[0, rw, d]), "the passage opens the hull's step"
+    sim.district_pillaged[0, land] = True
+    sim._eff_version += 1
+    assert not bool(sim._seat_unit_mask(0)[0, rw, d]), (
+        "a pillaged district carries no effect, this one included")
+    sim.district_pillaged[0, land] = False
+    sim._eff_version += 1
+    mp0 = float(sim.major_unit_mp[0, g])
+    sim._apply_seat_unit_actions(0, order(sim, g, d))
+    assert int(sim.major_unit_tile[0, g]) == land, "the hull did not take the passage"
+    assert not bool(sim.major_unit_emb[0, g]), "a hull is never embarked, ashore least of all"
+    assert abs(float(sim.major_unit_mp[0, g]) - (mp0 - sim._mp_scale)) < 1e-6, (
+        "the passage costs the WATER step, not the ground's schedule")
+    # ...and a land unit stands on the same plot, because it IS land
+    land2 = free_neighbor(sim, land, w)
+    assert land2 >= 0
+    clear_tile(sim, land2)
+    v = place_mil(sim, 0, land2, WARRIOR)
+    assert bool(sim.passable[0, land]), "the Canal's ground never left the land plane"
+    assert not bool(sim.wpass[0, land]), "nor did it join the water one"
+    assert int(sim.major_unit_tile[0, v]) == land2
+    print("  16 canal OK (the hull's step ashore, priced as water, and nobody else's rule)")
+
+
+def poke_water_walk(rules, path, GDR):
+    """17. CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast
+    tiles as it would on land" — no embark, no seafaring tech, its own pool."""
+    sim = build(rules, path)
+    for _ in range(25):
+        sim.step()
+    assert bool(sim.unit_water_walk[GDR]), "the robot's row carries no water walk"
+    assert not bool(sim.unit_water_walk.sum() > 1), "only the robot walks water"
+    neutralize_barbs(sim)
+    w, land = shore_pair(sim)
+    clear_tile(sim, w)
+    clear_tile(sim, land)
+    sim.civ_techs[0, 0, :] = False          # no SAILING, SHIPBUILDING or CARTOGRAPHY
+    sim._gen_ver += 1
+    u = place_mil(sim, 0, land, GDR)
+    # the pool the engine GRANTS such a chassis, on land and at sea alike
+    want = sim._mp_scale * float(sim._type_moves[GDR])
+    assert abs(float(sim._full_mp("major")[0, u]) - want) < 1e-6, (
+        "the robot's granted pool is its own roster figure")
+    sim.major_unit_mp_full[0, u] = want
+    sim.major_unit_mp[0, u] = want
+    d = dir_to(sim, land, w)
+    assert d >= 0
+    rw = rank_of(sim, u)
+    assert bool(sim._seat_unit_mask(0)[0, rw, d]), "water is ground to this chassis"
+    mp0 = float(sim.major_unit_mp[0, u])
+    sim._apply_seat_unit_actions(0, order(sim, u, d))
+    assert int(sim.major_unit_tile[0, u]) == w, "the robot refused the sea"
+    assert not bool(sim.major_unit_emb[0, u]), "it never embarks"
+    assert abs(float(sim.major_unit_mp[0, u]) - (mp0 - sim._mp_scale)) < 1e-6, (
+        "one plain point for the step, exactly as on land")
+    assert abs(float(sim._full_mp("major")[0, u]) - want) < 1e-6, (
+        "and it keeps its OWN pool out there, not an embarked one")
+    # the OCEAN asks it for no Cartography either
+    sim.ocean_tile[0, w] = True
+    back = dir_to(sim, w, land)
+    sim.major_unit_tile[0, u] = land
+    sim.military_at[0, w] = -1
+    sim.military_at[0, land] = u + sim.POOL_LO["major"]
+    sim._gen_ver += 1
+    assert bool(sim._seat_unit_mask(0)[0, rank_of(sim, u), d]), (
+        "no seafaring tech gates a chassis water is ground to")
+    assert back >= 0
+    print("  17 water walk OK (no embark, no tech, its own pool, Coast and Ocean alike)")
+
+
 def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     """15. A dead or captured PASSENGER must leave its own plane. Every kill and
     capture is slot-keyed (`_occ_clear` / `_occ_set`), so a body that cleared
@@ -992,6 +1109,8 @@ def main() -> None:
     poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE)
     poke_submarine_siege(rules, path, FRIGATE, SUBMARINE)
     poke_passenger_death(rules, path, WARRIOR, BUILDER)
+    poke_canal(rules, path, GALLEY, WARRIOR)
+    poke_water_walk(rules, path, idx(rules, "GIANT_DEATH_ROBOT"))
     print("NAVAL POKES OK")
 
 

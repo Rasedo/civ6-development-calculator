@@ -3,7 +3,7 @@ import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { purchaseUnit } from '../../../cpu/core/game';
-import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
+import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
 import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
@@ -743,5 +743,67 @@ describe('a hull and its passenger share the hex', () => {
     // a STRONGER hull answers the shot itself
     hull.type = 'IRONCLAD';
     expect(stackDefender(state, both, true)).toBe(hull);
+  });
+});
+
+describe('the passage a hull has ashore, and the chassis water is ground to', () => {
+  /** a land map with ONE water column down the middle, and the plot beside it
+   *  ready to carry a district. */
+  function shore() {
+    const state = makeState(makeMap(12, 12));
+    state.unitsMode = true;
+    for (let r = 0; r < 12; r++) tileAtCoords(state.map, 8, r).terrain = 'COAST';
+    const dry = tileAtCoords(state.map, 4, 5);
+    const wet = tileAtCoords(state.map, 8, 5);
+    return { state, dry, wet };
+  }
+
+  it('a Canal is water to a hull and land to everyone else', () => {
+    const { state, dry } = shore();
+    const hull = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 8, 4).index, 0)!;
+    // CIV6 (Canal): "Allows Naval units to pass through this tile."
+    expect(unitPassable(dry, hull)).toBe(false);
+    dry.district = 'CANAL';
+    dry.districtComplete = true;
+    expect(unitPassable(dry, hull)).toBe(true);
+    expect(tileFreeForUnit(state, dry.index, 0, hull, true)).toBe(true);
+    // ...and it costs a hull the WATER step, not the ground's schedule
+    dry.elevation = 'HILLS';
+    expect(moveCostInto(state, tileAtCoords(state.map, 4, 4), dry, hull)).toBe(MP_SCALE);
+    dry.elevation = 'FLAT';
+    // a pillaged district carries no effect, this one included
+    dry.districtPillaged = true;
+    expect(unitPassable(dry, hull)).toBe(false);
+    dry.districtPillaged = false;
+    // the ground is still LAND: a land unit stands on it, and no citizen or
+    // city reads it as sea
+    const foot = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 5).index, 0)!;
+    expect(unitPassable(dry, foot)).toBe(true);
+    expect(isWater(dry)).toBe(false);
+  });
+
+  it('a Giant Death Robot walks the sea, unembarked and untaught', () => {
+    const { state, wet } = shore();
+    const seat = seatOf(state, 0)!;
+    seat.research.techs = []; // no SAILING, no SHIPBUILDING, no CARTOGRAPHY
+    const gdr = spawnUnit(state, 'GIANT_DEATH_ROBOT', tileAtCoords(state.map, 7, 5).index, 0)!;
+    // CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast tiles
+    // as it would on land."
+    expect(canEmbark(state, gdr)).toBe(false);
+    expect(unitPassable(wet, gdr)).toBe(true);
+    expect(tileFreeForUnit(state, wet.index, 0, gdr, true)).toBe(true);
+    const full = unitFullMoves(state, gdr);
+    gdr.movesLeft = full;
+    expect(stepUnit(state, gdr, wet)).toBe('moved');
+    expect(gdr.tileIndex).toBe(wet.index);
+    expect(gdr.embarked).toBeFalsy();          // it never transitions
+    expect(unitFullMoves(state, gdr)).toBe(full); // so it keeps its own pool
+    expect(full).toBe(MP_SCALE * UNITS.GIANT_DEATH_ROBOT.moves);
+    // one plain point for the step, exactly as on land
+    expect(gdr.movesLeft).toBe(full - MP_SCALE);
+    // OCEAN asks it for no Cartography either
+    wet.terrain = 'OCEAN';
+    expect(unitPassable(wet, gdr)).toBe(true);
+    expect(waterEnterable(state, wet, gdr)).toBe(false); // the tech gate it skips
   });
 });
