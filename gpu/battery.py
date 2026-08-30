@@ -63,12 +63,39 @@ def lane_cost() -> dict[str, float]:
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
 import test_stats as _stats  # noqa: E402
 
+# NO LANE OUTLIVES THE RUN. A hung lane used to sit there until the box was
+# rebooted, holding its memory and a core; past this many seconds it is killed
+# with its whole tree and reported red. Six times the slowest lane, so a
+# healthy run can never reach it.
+LANE_CAP = 1800.0
+
 results: list[tuple[str, float, int]] = []
 lock = threading.Lock()
 failed = threading.Event()
 
 
-def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
+def kill_tree(p: subprocess.Popen) -> None:
+    """Kill a lane AND everything it spawned. `Popen.kill` reaches only the
+    child it launched, and a node lane is a chain of shims over a pool of
+    workers: killing the top of that chain strands the rest, which then hold
+    their memory and spin on a core indefinitely. `taskkill /T` walks the
+    tree; elsewhere the process group does."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                           capture_output=True, check=False)
+        else:
+            p.kill()
+    except OSError:
+        pass
+    try:
+        p.communicate(timeout=10)
+    except (subprocess.TimeoutExpired, ValueError, OSError):
+        pass
+
+
+def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
+        cap: float = LANE_CAP) -> None:
     env = os.environ.copy()
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
@@ -78,18 +105,26 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
         cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", errors="replace",
     )
+    out, err = "", ""
     while True:
         try:
             out, err = p.communicate(timeout=1.0)
             break
         except subprocess.TimeoutExpired:
             if bail and failed.is_set() and not NO_BAIL:
-                p.kill()
-                p.communicate()
+                kill_tree(p)
                 dt = time.time() - t0
                 with lock:
                     results.append((name, dt, -3))
                     print(f"  {name:<14} {dt:6.1f}s  bail  (another lane failed)", flush=True)
+                return
+            if cap and time.time() - t0 > cap:
+                kill_tree(p)
+                dt = time.time() - t0
+                with lock:
+                    results.append((name, dt, -4))
+                    failed.set()
+                    print(f"  {name:<14} {dt:6.1f}s  FAIL timeout (cap {cap:.0f}s)", flush=True)
                 return
     p = subprocess.CompletedProcess(cmd, p.returncode, out, err)
     dt = time.time() - t0
@@ -164,6 +199,9 @@ def main() -> int:
             return 2
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"
+    # Call the TS runner directly: `npm test` is npm.cmd -> cmd.exe -> node,
+    # and every shim in that chain is a link a kill does not cross.
+    vitest = ["node", str(ROOT / "node_modules" / "vitest" / "vitest.mjs"), "run"]
     py = sys.executable
     ruff = Path(py).with_name("ruff.exe" if os.name == "nt" else "ruff")
     t0 = time.time()
@@ -215,7 +253,7 @@ def main() -> int:
         print("lanes (parallel): vitest+" + _shards[0][0] + " | "
               + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
         lanes = [
-            [("vitest", [npm, "test"], 8), _shards[0]],
+            [("vitest", vitest, 8), _shards[0]],
             *[[sh] for sh in _shards[1:]],
             [
                 ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),
@@ -340,7 +378,7 @@ def main() -> int:
     wall = time.time() - t0
     print(f"\n{'step':<14} {'time':>7}  status")
     for name, dt, rc in results:
-        print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'FAIL'}")
+        print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'TIMEOUT' if rc == -4 else 'FAIL'}")
     serial = sum(dt for _, dt, _ in results)
     print(f"\nwall {wall:.0f}s (serial-equivalent {serial:.0f}s, {serial / max(wall, 1):.1f}x)")
     # WHICH lane is the wall. The serve shards take one lane each (the first
