@@ -158,7 +158,7 @@ def test_move_and_shoot(sim) -> None:
     arc = next(i for i in range(sim.NU)
                if int(sim._type_ranged_strength[i]) > 0 and int(sim._type_bombard[i]) == 0)
     s = 0
-    base = int(sim._type_moves[cat])
+    base = sim._mp_scale * int(sim._type_moves[cat])
     sim.major_unit_type[0, s] = cat
     sim.major_unit_emb[0, s] = False
     sim.major_unit_aura_mp[0, s] = 0
@@ -173,8 +173,8 @@ def test_move_and_shoot(sim) -> None:
     assert bool(sim._siege_may_shoot("major")[0, s]),         "+1 maximum Movement must lift the gate"
     sim.major_unit_type[0, s] = arc
     sim.major_unit_aura_mp[0, s] = 0
-    sim.major_unit_mp_full[0, s] = int(sim._type_moves[arc])
-    sim.major_unit_mp[0, s] = int(sim._type_moves[arc]) - 1
+    sim.major_unit_mp_full[0, s] = sim._mp_scale * int(sim._type_moves[arc])
+    sim.major_unit_mp[0, s] = sim._mp_scale * int(sim._type_moves[arc]) - 1
     assert bool(sim._siege_may_shoot("major")[0, s]),         "the gate is the siege class's alone — an Archer shoots after moving"
     print(f"  move-and-shoot OK: {base} MP shoots only unmoved, {base + 1} shoots either way")
 

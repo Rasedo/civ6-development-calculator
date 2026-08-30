@@ -87,7 +87,7 @@ def main() -> None:
     for i, row in lasers:
         assert int(row.get("pc", -1)) == 360, f"laser row {i} price: {row}"
         assert int(row.get("rt", -1)) >= 0 and int(row.get("sp", 0)) == 0, f"laser row {i} gating: {row}"
-    assert all(int(r.get("pc", -1)) == -1 for i, r in enumerate(rows) if i < base_n and not int(r.get("ls", 0))), \
+    assert all(int(r.get("pc", -1)) == -1 for i, r in enumerate(rows) if i < base_n and not int(r.get("ls", 0)) and not int(r.get("rec", 0))), \
         "base projects must keep the generic curve (pc -1)"
 
     # --- 2) engine metadata mirrors the exported chain ---------------------

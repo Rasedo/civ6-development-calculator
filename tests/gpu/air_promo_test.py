@@ -309,7 +309,7 @@ def main() -> None:
         s._tile_owner_ver += 1
         s._eff_version += 1
         sl, _ = retype(s, row, RAIDER, here)
-        s.major_unit_mp[0, sl] = 4.0
+        s.major_unit_mp[0, sl] = float(4 * s._mp_scale)
         s.military_at[0, here] = sl + s.POOL_LO["major"]
         if loot:
             s.major_unit_promos[0, sl] = 1 << col_with(rules, "NAVAL_RAIDER", "RAID_GOLD", v=50)

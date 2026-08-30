@@ -724,7 +724,7 @@ _MUTABLE = [
     "tile_submerged", "water", "wpass", "passable", "work_ok", "settle_ok",
     "d_usable", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
-    "lux_req", "res_imp", "tile_lowland", "tile_air_bonus", "drought",
+    "lux_req", "res_imp", "tile_lowland",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)

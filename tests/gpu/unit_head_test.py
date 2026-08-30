@@ -53,7 +53,8 @@ def main() -> None:
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
     # +1 CONVERT_HEATHEN, +1 UPGRADE, the five VARIABLE-width heads, the
-    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT, the Great Person's
+    # engineer's +1 BUILD_ROAD, +1 FINISH_DISTRICT and +1 BUILD_RAILROAD, the
+    # Great Person's
     # +1 ACTIVATE_GP, the Rock Band's +1 PERFORM_CONCERT, then the Royal
     # Society's +1 BOOST_PROJECT, then the 6-wide FORM_UP head.
     pcol = rj["promotions"]["cols"]
@@ -65,7 +66,7 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 28
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 29
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -79,8 +80,9 @@ def main() -> None:
              + ["PERFORM_CONCERT", "BOOST_PROJECT"]
              + [f"FORM_UP_{d}" for d in range(6)]
              + ["ESCORT", "BREAK_ESCORT"]
-             # the newest last-append: the bomber's second head
-             + [f"AIR_PILLAGE_{k}" for k in range(dict(heads)["AIR_PILLAGE_"])])
+             + [f"AIR_PILLAGE_{k}" for k in range(dict(heads)["AIR_PILLAGE_"])]
+             # the newest last-append: the engineer's second route
+             + ["BUILD_RAILROAD"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.

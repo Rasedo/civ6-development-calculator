@@ -54,7 +54,9 @@ def full(sim: BatchSim, pre: str, slot: int) -> int:
 
 
 def base(sim: BatchSim, type_idx: int) -> int:
-    return int(sim._type_moves[type_idx])
+    """The roster figure in the POOL's own unit: every catalog MP is a whole
+    point and `_full_mp` counts quarters."""
+    return sim._mp_scale * int(sim._type_moves[type_idx])
 
 
 def golden(sim: BatchSim, civ: int, kind: int) -> None:
@@ -64,7 +66,8 @@ def golden(sim: BatchSim, civ: int, kind: int) -> None:
 
 def main() -> None:
     sim = build()
-    bonus = sim._golden_move
+    # the catalog figure is a WHOLE point; the pool counts quarters
+    bonus = sim._mp_scale * sim._golden_move
     assert bonus > 0, (
         "eras.goldenMoveBonus is 0 — seeder/worlds/rules.json is STALE. "
         "Re-run `npx vite-node scripts/export-gpu.ts`."
@@ -123,11 +126,12 @@ def main() -> None:
         golden(sim4, 1, mono)
         assert full(sim4, "major", v_b) == base(sim4, bld) + bonus
         sim4.major_unit_emb[0, v_b] = True
-        assert full(sim4, "major", v_b) == sim4._embark_moves, (
+        assert full(sim4, "major", v_b) == sim4._mp_scale * sim4._embark_moves, (
             "an EMBARKED builder took the dedication onto the embark pool — "
             "embarkation speed is not a unit's own movement (TS unitFullMoves)"
         )
-        print(f"  6 embarked: {base(sim4, bld) + bonus} -> {sim4._embark_moves} (the flat pool, bonus dropped)")
+        print(f"  6 embarked: {base(sim4, bld) + bonus} -> "
+              f"{sim4._mp_scale * sim4._embark_moves} (the flat pool, bonus dropped)")
 
     # ---- 7. the OTHER three faces are keyed on the seat too --------------
     # The research discount / prophet points / culture answer for the civ that

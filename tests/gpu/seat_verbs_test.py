@@ -146,7 +146,8 @@ def main() -> None:
             if bool(s2.major_unit_alive[0, v]) and int(s2.major_unit_seat[0, v]) == row
             and float(s2._type_combat[int(s2.major_unit_type[0, v])]) > 0
         )
-        s2.major_unit_mp[0, sl] = 4.0
+        # two plain steps' worth, in the pool's own quarter points
+        s2.major_unit_mp[0, sl] = float(2 * s2._mp_scale * s2._mp_scale)
         sm = s2._seat_slot_map(row)[0]
         rw = int((sm == sl).nonzero(as_tuple=True)[0][0])
         return s2, sl, rw, sm.shape[0]
@@ -271,7 +272,7 @@ def main() -> None:
     assert sl8 is not None
     ni = next(i for i in range(sim8.NU) if bool(sim8.unit_naval[i]))
     sim8.major_unit_type[0, sl8] = ni
-    sim8.major_unit_mp[0, sl8] = 3.0
+    sim8.major_unit_mp[0, sl8] = float(3 * sim8._mp_scale)
     # park it on coastal water with a free water neighbour (occ bookkeeping
     # by hand, the centre_defence_test idiom)
     w8 = None
@@ -299,7 +300,7 @@ def main() -> None:
         f"t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.major_unit_tile[0, sl8])}, wanted {nb8})"
     )
     # and the same hull never walks onto land
-    sim8.major_unit_mp[0, sl8] = 3.0
+    sim8.major_unit_mp[0, sl8] = float(3 * sim8._mp_scale)
     landd = next((d for d in range(6) if int(sim8.neigh[nb8, d]) >= 0 and bool(sim8.passable[0, int(sim8.neigh[nb8, d])]) and not bool(sim8.wpass[0, int(sim8.neigh[nb8, d])])), None)
     if landd is not None:
         acts8[0, rw8] = landd
@@ -419,7 +420,7 @@ def main() -> None:
     sim12.improvement[0, tile12] = sim12.MINE
     sim12.pillaged[0, tile12] = False
     sim12.district[0, tile12] = -1
-    sim12.major_unit_mp[0, slot12] = 4.0
+    sim12.major_unit_mp[0, slot12] = float(4 * sim12._mp_scale)
     sim12._tile_owner_ver += 1
     g0 = float(sim12.civ_treasury[0, row])
     _tn = int(sim12.civ_techs[0, row].sum())
@@ -429,7 +430,7 @@ def main() -> None:
     assert bool(sim12.pillaged[0, tile12])
     got = float(sim12.civ_treasury[0, row]) - g0
     assert abs(got - _exp) < 1e-6, f"MINE plunder paid {got}, wanted {_exp}"
-    assert abs(float(sim12.major_unit_mp[0, slot12]) - 1.0) < 1e-6, \
+    assert abs(float(sim12.major_unit_mp[0, slot12]) - sim12._mp_scale) < 1e-6, \
         f"pillage must price 3 MP of 4, left {float(sim12.major_unit_mp[0, slot12])}"
     print(f"  11 PILLAGE pays OK (MINE gold {_exp} on the progression, 3 MP of 4 spent)")
 
@@ -452,8 +453,10 @@ def main() -> None:
     # CIV6 (Privateer): "must be next to the land improvement or district,
     # and must have at least 3 Movement points remaining."
     if bool(sim13._type_raider.any()):
-        for mp14, want14 in ((3.0, True), (2.0, False)):
+        # the pool counts QUARTER points, so the published 3 is 3 * MP_SCALE
+        for _whole14, want14 in ((3.0, True), (2.0, False)):
             sim14 = fresh(rules, path)
+            mp14 = _whole14 * sim14._mp_scale
             slot14, t14 = a_civ_soldier(sim14, row)
             # a water tile beside a land tile, both free
             pick = None
@@ -482,7 +485,7 @@ def main() -> None:
             sim14._tile_owner_ver += 1
             order(sim14, row, slot14, A_PIL)
             assert bool(sim14.pillaged[0, lt14]) == want14, \
-                f"COASTAL RAID at {mp14} MP: wrecked={bool(sim14.pillaged[0, lt14])}, wanted {want14}"
+                f"COASTAL RAID at {_whole14} MP: wrecked={bool(sim14.pillaged[0, lt14])}, wanted {want14}"
         print("  13 COASTAL RAID OK (3 MP raids the adjacent mine, 2 MP refuses)")
 
     print("CIV VERBS OK — including the upgrade ladder")

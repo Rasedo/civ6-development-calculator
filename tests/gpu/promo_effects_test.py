@@ -67,8 +67,8 @@ def place(sim, tile: int, utype: int, seat: int, *, hp=100, charges=0, promos=0)
     sim.major_unit_tile[0, slot] = tile
     sim.major_unit_hp[0, slot] = hp
     sim.major_unit_charges[0, slot] = charges
-    sim.major_unit_mp[0, slot] = 4
-    sim.major_unit_mp_full[0, slot] = 4
+    sim.major_unit_mp[0, slot] = sim._mp_scale * 4
+    sim.major_unit_mp_full[0, slot] = sim._mp_scale * 4
     sim.major_unit_attacks[0, slot] = 1
     sim.major_unit_promos[0, slot] = promos
     sim.major_unit_promo_offer[0, slot] = 0
@@ -105,9 +105,10 @@ def test_moves(sim) -> None:
     slot = place(sim, free_tile(sim, ctr), ty, ROW)
     base = int(sim._full_mp("major")[0, slot])
     sim.major_unit_promos[0, slot] = 1 << k
-    assert int(sim._full_mp("major")[0, slot]) == base + v, "the MOVES promotion did not reach the pool"
+    assert int(sim._full_mp("major")[0, slot]) == base + sim._mp_scale * v, (
+        "the MOVES promotion did not reach the pool")
     sim.major_unit_alive[0, slot] = False
-    print(f"  MOVES OK — the pool rose by {v}")
+    print(f"  MOVES OK — the pool rose by {v} whole points")
 
 
 def test_terrain_move(sim) -> None:
@@ -123,8 +124,10 @@ def test_terrain_move(sim) -> None:
     ut = torch.tensor([ty])
     plain, _r = sim._road_terms(frm, dest, z, ut, torch.zeros(1, dtype=torch.long))
     waived, _r2 = sim._road_terms(frm, dest, z, ut, torch.tensor([1 << kh]))
-    assert int(plain[0]) >= 1, "the hills tile charges nothing to enter"
-    assert int(waived[0]) == int(plain[0]) - 1, "Alpine did not waive the hills charge"
+    assert int(plain[0]) >= sim._mp_scale, "the hills tile charges nothing to enter"
+    # "at the cost of only 1 Movement" — a WHOLE point off the schedule
+    assert int(waived[0]) == int(plain[0]) - sim._mp_scale, (
+        "Alpine did not waive the hills charge")
     # the WOODS waiver must NOT touch a hills-only charge
     woods_only, _r3 = sim._road_terms(frm, dest, z, ut, torch.tensor([1 << kw]))
     assert int(woods_only[0]) == int(plain[0]), "Ranger waived a HILLS charge"
@@ -169,10 +172,11 @@ def test_move_after_attack(sim) -> None:
     fired[0] = True
     sim._spend_attack("major", slot, fired)
     assert int(sim.major_unit_mp[0, slot]) == 0, "an ordinary blow left movement behind"
-    sim.major_unit_mp[0, slot] = 4
+    sim.major_unit_mp[0, slot] = sim._mp_scale * 4
     sim.major_unit_promos[0, slot] = 1 << k
     sim._spend_attack("major", slot, fired)
-    assert int(sim.major_unit_mp[0, slot]) == 4, "Guerrilla's blow still consumed the turn"
+    assert int(sim.major_unit_mp[0, slot]) == sim._mp_scale * 4, (
+        "Guerrilla's blow still consumed the turn")
     sim.major_unit_alive[0, slot] = False
     print("  MOVE_AFTER_ATTACK OK — the blow costs the turn without it and nothing with it")
 
@@ -471,7 +475,7 @@ def test_extra_attack_still(sim) -> None:
     here = walk(slot, here)
     assert int(sim.major_unit_attacks[0, slot]) == 2, "a step before the blow cost an attack"
     sim.major_unit_attacks[0, slot] = 1                       # one blow struck
-    sim.major_unit_mp[0, slot] = 4
+    sim.major_unit_mp[0, slot] = sim._mp_scale * 4
     here = walk(slot, here)
     assert int(sim.major_unit_attacks[0, slot]) == 0, "the step kept the still-bonus"
     # Breakthrough's is not a still-bonus, so the same step leaves it alone
