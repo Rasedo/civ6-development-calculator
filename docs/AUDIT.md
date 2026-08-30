@@ -67,13 +67,13 @@ from the list below.
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
-| C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
+| C-16 the spy's second half | 2 | the escape sequence, captured spies, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
-| C-32 the classes with no promotion tree | 1 | the AIRCRAFT CARRIER and the SPY are offered no promotion; the air and naval-raider trees ship |
+| C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
@@ -553,14 +553,24 @@ under their blocker so the dependency is readable, and both halves count.
     two-sided deal; blocked on C-2.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
-  jump, the eleven-mission catalog, the counterspy post and the capture
-  roll ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured — treat
-  as poke-proven). OPEN:
+  jump, the eleven-mission catalog, the counterspy post, the capture roll
+  and the ESPIONAGE promotion class ship (`spy_test.py`, `spy.test.ts`;
+  gate reach unmeasured — treat as poke-proven). The class is a flat pool
+  of seventeen rows with no prerequisites, three drawn without replacement
+  at each level (`levelUpSpy` / `_level_up_spy` over the `promoOffer`
+  channel the Apostle already had). Nine are one shape — "<mission> as if
+  2 levels more experienced", read by `promoValueFor` / `_spy_op_levels`
+  off the mission's own bit — and the other four live rows are Linguist's
+  25% clock cut, Disguise's instant arrival, Quartermaster's +1 level to
+  every own spy from home and Polygraph's 1 level off every intruder.
+  Bodyguard of Lies rides Disguise's channel: the golden face's
+  no-establish clause had never landed on either engine. OPEN:
   - **THE ESCAPE SEQUENCE.** A discovered spy "will need to escape from
     the target city" — by Airplane, Boat, Vehicle or Foot, each gated on
     a district, each with its own danger and return time, a survivor
-    reappearing in the CAPITAL; the Ace Driver promotion improves them.
-    Here a discovered spy dies on one roll.
+    reappearing in the CAPITAL. Here a discovered spy dies on one roll,
+    so ACE_DRIVER ("a much higher chance of escape") ships INERT — there
+    is no escape roll for it to move.
   - **CAPTURED SPIES** — "imprisoned, but not killed", counting against
     capacity, tradeable back. A prisoner store plus a two-sided deal
     (C-2).
@@ -579,10 +589,19 @@ under their blocker so the dependency is readable, and both halves count.
     chassis is a civilian unit in its own promotion class ("Espionage")
     with no Combat Strength: the Combat-Strength readers refuse it on
     both engines, the production one does not.
+  - **A SPY STANDS ON THE CITY CENTRE AND NOWHERE ELSE.** The jump
+    targets `city_center`, and the mission reads the district registry
+    rather than the plot the spy holds, so a counterspy already defends
+    every district of its city. SURVEILLANCE ("when Counterspying all
+    city districts are defended, and +1 level at districts within 1 hex")
+    ships INERT on that: its first half is already true here and its
+    second has no geometry to measure. A spy that occupies the district
+    it works out of is the missing mechanic.
   - **LISTENING POST** — its payload is diplomatic VISIBILITY (C-2).
   - **FABRICATE SCANDAL** targets a city-state — R&F's ruleset; the
     majors-only scan is vanilla-faithful and the minor city block carries
-    no district registry to hang it on.
+    no district registry to hang it on. SMEAR_CAMPAIGN, which runs that
+    mission "as if 2 levels more experienced", ships INERT on it.
   - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not
     the district; a per-building pillage flag is the difference.
   - **WHAT A LEVEL IS WORTH IS THIS MODEL'S OWN.** The Spy chassis'
@@ -615,8 +634,9 @@ under their blocker so the dependency is readable, and both halves count.
     has an area-effect attack, a fallout tile state, or the Missile Silo
     (C-20).
 - **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
-  AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER now hold seven sourced rows
-  each, and with them: the chassis map (`UNIT_PROMO_CLASS` /
+  AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER hold seven sourced rows
+  each and ESPIONAGE seventeen (C-16), and with them: the chassis map
+  (`UNIT_PROMO_CLASS` /
   `u_promo_class`), the two new roll conditions `CS_DEF_VS_AIR` and
   `CS_DEF_VS_AA`, the carrier deck's `AIR_SLOTS` — three rows saying
   "+1 additional aircraft slot", summed into `airSlotsAt` /
@@ -624,24 +644,25 @@ under their blocker so the dependency is readable, and both halves count.
   experience lines, the Shipyard's and Seaport's "for all naval units"
   widened to the raider, an aircraft that banks XP at all
   (`xpEligible` / `_xp_eligible`), and Sky and Stars'
-  "+100% XP earned for all Air Units". `PROMO_COLS` did NOT widen — the
-  APOSTLE's nine still sets it, so no wire width moved. TWO CORRECTIONS
+  "+100% XP earned for all Air Units". `PROMO_COLS` is the Espionage
+  pool's seventeen now, so the PROMOTE head — and the unit action enum
+  with it — is eight columns wider. TWO CORRECTIONS
   to this row's own earlier text: the Civilopedia's promotion index lists
   no SUPPORT class at all, so the support chassis was never a gap; and
   the GDR's four rows (Drone Air Defense, Enhanced Mobility, Particle Beam
   Siege Cannon, Reinforced Armor Plating) are its Future-era upgrades,
   which is C-33's item, not this one. What is left:
-  - **THE SPY PROMOTION POOL** (C-16), whose random offer needs the
-    same shared-stream draw as its entry describes.
   - **THE ROCK BAND's twelve promotions** — the chassis carries its own
     level and album state instead (C-28); no `PROMO_CLASSES` entry, and
     the twelve rows are unsourced here.
 
-  GATE REACHABILITY IS ZERO for all four new trees: no seed trains an
-  aircraft, a Privateer, a Submarine or a carrier inside 250 turns, so the
-  whole pass is proved by `tests/gpu/air_promo_test.py` and
+  GATE REACHABILITY IS ZERO for the four military trees: no seed trains
+  an aircraft, a Privateer, a Submarine or a carrier inside 250 turns, so
+  that pass is proved by `tests/gpu/air_promo_test.py` and
   `tests/cpu/units/air-promotions.test.ts` and by nothing the battery's
-  serve lane runs.
+  serve lane runs. The Espionage pool's reach is unmeasured for the same
+  reason C-16's is: a level needs a spy fielded, sent, and carried through
+  a successful offensive operation.
 - **C-33. THE GIANT DEATH ROBOT IS ONLY ITS STATS.** Weight 2. The
   chassis, its fuel bill and Automaton Warfare's hooks ship. Every
   ABILITY on its page is absent: it moves and fights on Coast and Ocean

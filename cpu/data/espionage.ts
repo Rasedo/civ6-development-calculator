@@ -30,6 +30,11 @@ export const SPY_CAPACITY_MAX = 6;
  *  level stops gaining experience." */
 export const SPY_LEVELS = ['RECRUIT', 'AGENT', 'SECRET_AGENT', 'MASTER_SPY'] as const;
 export const SPY_MAX_LEVEL = SPY_LEVELS.length - 1;
+/** CIV6 (Spy): a spy is "able to choose one of three promotions each time
+ *  they gain a level, which are chosen at random from the pool"; the chassis
+ *  page caps it at three taken, which its three level-ups already do. */
+export const SPY_PROMO_OFFER = 3;
+
 /** the level at which Listening Post reads two levels of visibility rather
  *  than one — "2 if the Spy's level is Secret Agent or higher". */
 export const SPY_SECRET_AGENT_LEVEL = 2;

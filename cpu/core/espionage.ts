@@ -17,14 +17,14 @@ import {
   SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT,
   SPY_CAPTURE_PCT, SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
-  SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
+  SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS, SPY_PROMO_OFFER,
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
   SPY_M_COUNTERSPY,
 } from '../data/espionage';
-import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied } from './seats';
+import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
 import { cityHasGovernor, governorAt, governorsOf, neutralizeGovernor } from './governors';
@@ -34,6 +34,7 @@ import { BUILDINGS } from '../data/buildings';
 import { governorSum } from './governors';
 import { floodRiver } from './disasters';
 import { nextRandom } from './rand';
+import { promoFlag, promoValue, promoValueFor, unitPromoRows, xpToNextLevel } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
 import type { City, GameState, Seat, Unit } from './types';
 
@@ -132,10 +133,17 @@ export function canTravelTo(state: GameState, unit: Unit, tileIndex: number): bo
 
 export function beginTravel(state: GameState, unit: Unit, tileIndex: number): boolean {
   if (!canTravelTo(state, unit, tileIndex)) return false;
+  unit.movesLeft = 0;
+  if (spyNoEstablish(state, unit)) {
+    unit.tileIndex = tileIndex;
+    unit.spyMission = SPY_IDLE;
+    unit.spyTarget = undefined;
+    unit.spyTurns = 0;
+    return true;
+  }
   unit.spyMission = SPY_TRAVELLING;
   unit.spyTarget = tileIndex;
   unit.spyTurns = spyTravelTurns(state, unit.tileIndex, tileIndex);
-  unit.movesLeft = 0;
   return true;
 }
 
@@ -160,18 +168,67 @@ export function spyMissionMask(state: GameState, unit: Unit): boolean[] {
 
 /** CIV6 (Bodyguard of Lies, Golden face): "Time to complete all offensive spy
  *  operations reduced by 25%." */
-export function missionTurns(state: GameState, seat: number, m: number): number {
-  const base = SPY_MISSIONS[m]?.turns ?? 0;
-  if (!SPY_MISSIONS[m]?.offensive || !goldenDedication(state, seat, DED_BODYGUARD)) return base;
-  return Math.max(1, Math.floor((base * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
+export function missionTurns(state: GameState, unit: Unit, m: number): number {
+  let n = SPY_MISSIONS[m]?.turns ?? 0;
+  if (SPY_MISSIONS[m]?.offensive && goldenDedication(state, unit.seat, DED_BODYGUARD)) {
+    n = Math.max(1, Math.floor((n * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
+  }
+  // CIV6 (Linguist): "Time to complete all missions reduced by 25%" — every
+  // mission, the defensive post included, and after the dedication's own cut.
+  const cut = promoValue(unit, 'SPY_OP_SPEED');
+  if (cut > 0) n = Math.max(1, Math.floor((n * (100 - cut)) / 100));
+  return n;
+}
+
+/** CIV6 (Disguise; Bodyguard of Lies): "Takes no time to establish presence in
+ *  an enemy city." The establish clock is the TRAVEL clock here — the only
+ *  thing between being sent and being able to work. */
+export function spyNoEstablish(state: GameState, unit: Unit): boolean {
+  return promoFlag(unit, 'SPY_NO_ESTABLISH')
+    || goldenDedication(state, unit.seat, DED_BODYGUARD);
+}
+
+/** CIV6 (Quartermaster): "If this Spy is in home territory, all your Spies
+ *  operate at +1 level." */
+export function quartermasterLevels(state: GameState, seat: number): number {
+  let n = 0;
+  for (const u of spiesOf(state, seat)) {
+    if (tileSeat(state.map.tiles[u.tileIndex]) === seat) {
+      n += promoValue(u, 'SPY_HOME_ALLY_LEVEL');
+    }
+  }
+  return n;
 }
 
 export function beginMission(state: GameState, unit: Unit, m: number): boolean {
   if (!missionOffered(state, unit, m)) return false;
   unit.spyMission = m;
-  unit.spyTurns = missionTurns(state, unit.seat, m);
+  unit.spyTurns = missionTurns(state, unit, m);
   unit.movesLeft = 0;
   return true;
+}
+
+/** CIV6 (Spy): a spy "may gain levels from successful offensive operations, or
+ *  capturing an enemy Spy", and on each level is "able to choose one of three
+ *  promotions ... chosen at random from the pool". The draw takes three
+ *  DISTINCT columns without replacement, so the stream is exactly three
+ *  numbers however the offer lands. */
+export function levelUpSpy(state: GameState, unit: Unit): void {
+  const before = spyLevel(unit);
+  unit.spyLevel = Math.min(SPY_MAX_LEVEL, before + 1);
+  if (unit.spyLevel === before) return;
+  const rows = unitPromoRows(unit);
+  let offer = 0;
+  for (let j = 0; j < SPY_PROMO_OFFER && j < rows.length; j++) {
+    let pick = Math.floor(nextRandom(state) * (rows.length - j));
+    for (let k = 0; k < rows.length; k++) {
+      if (offer & (1 << k)) continue;
+      if (pick === 0) { offer |= 1 << k; break; }
+      pick -= 1;
+    }
+  }
+  unit.promoOffer = offer;
+  unit.xp = xpToNextLevel(unit);
 }
 
 export function spyLevel(unit: Unit): number {
@@ -185,9 +242,15 @@ export function spyLevel(unit: Unit): number {
  * targeting this district or adjacent districts" and (Consulate) "Spies
  * operate at one level lower when targeting this city".
  */
-export function effectiveLevel(state: GameState, unit: Unit, city: City | undefined): number {
+export function effectiveLevel(
+  state: GameState, unit: Unit, city: City | undefined, m: number,
+): number {
   const boost = (city?.spySources ?? [])[unit.seat] ?? 0;
-  const lvl = spyLevel(unit) + (boost > 0 ? SPY_SOURCES_LEVELS : 0);
+  // CIV6 (nine Espionage promotions): "<mission> as if 2 levels more
+  // experienced" — the row names the one operation it lifts.
+  const lvl = spyLevel(unit) + (boost > 0 ? SPY_SOURCES_LEVELS : 0)
+    + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
+    + quartermasterLevels(state, unit.seat);
   return Math.max(0, lvl - (city ? cityCounterLevels(state, city) : 0));
 }
 
@@ -205,6 +268,11 @@ export function cityCounterLevels(state: GameState, city: City): number {
     const def = BUILDINGS[id];
     if (!def || !live.has(def.district)) continue;
     n += def.spyLevelPenalty ?? 0;
+  }
+  // CIV6 (Polygraph): "If this Spy is in home territory, enemy Spies in your
+  // lands operate at 1 level below usual" — the posts standing in this city.
+  for (const u of spiesOf(state, city.seat)) {
+    if (u.tileIndex === city.centerIndex) n += promoValue(u, 'SPY_HOME_ENEMY_LEVEL');
   }
   // CIV6 (Local Informants): "Enemy Spies operate at 3 levels below normal in
   // this city."
@@ -290,10 +358,10 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     // counter-espionage stands its post rather than ending: the source has it
     // running until the spy is sent elsewhere.
     unit.spyMission = SPY_M_COUNTERSPY;
-    unit.spyTurns = missionTurns(state, unit.seat, m);
+    unit.spyTurns = missionTurns(state, unit, m);
     return;
   }
-  const lvl = effectiveLevel(state, unit, here.city);
+  const lvl = effectiveLevel(state, unit, here.city, m);
   const ok = def.certain
     || roll(state, (def.successPct ?? 0) + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
   if (ok) {
@@ -302,7 +370,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
       // CIV6: "Spies ... gain levels by successfully completing offensive
       // missions", and Bodyguard of Lies pays "+1 Era Score for each
       // successful offensive operation."
-      unit.spyLevel = Math.min(SPY_MAX_LEVEL, spyLevel(unit) + 1);
+      levelUpSpy(state, unit);
       dedicationEvent(state, unit.seat, DED_BODYGUARD);
     }
   }
@@ -317,7 +385,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     // the catch likelier is the one that earns it, and the first of them by
     // slot is the captor on both engines.
     const captor = posted[0];
-    if (captor) captor.spyLevel = Math.min(SPY_MAX_LEVEL, spyLevel(captor) + 1);
+    if (captor) levelUpSpy(state, captor);
     disbandUnit(state, unit.id);
   }
 }

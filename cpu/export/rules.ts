@@ -70,7 +70,7 @@ import { ENGINEER_FINISH_FRACTION } from '../core/game';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL,
-  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS,
+  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_PROMO_OFFER,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN, SPY_TRAVEL_TURNS_MAX,
   SPY_SUCCESS_PER_LEVEL_PCT, SPY_CAPTURE_PCT,
   SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
@@ -503,6 +503,7 @@ export function buildRules() {
         idle: SPY_IDLE,
         travelling: SPY_TRAVELLING,
         travelCols: SPY_TRAVEL_COLS,
+        promoOffer: SPY_PROMO_OFFER,
         missions: SPY_MISSIONS.map((m) => ({
           id: m.id,
           district: m.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(m.district),

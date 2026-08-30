@@ -193,6 +193,26 @@ export function promoValue(unit: { promos?: number; type: string }, kind: PromoK
   return n;
 }
 
+/** the summed value of one effect kind whose `mask` admits `bit` — the read
+ *  for a kind that names its TARGET rather than describing its holder. A row
+ *  with no mask answers for every target. */
+export function promoValueFor(
+  unit: { promos?: number; type: string }, kind: PromoKind, bit: number,
+): number {
+  const held = unit.promos ?? 0;
+  let n = 0;
+  unitPromoRows(unit).forEach((p, k) => {
+    if ((held & (1 << k)) === 0) return;
+    for (const e of p.effects) {
+      if (e.kind !== kind) continue;
+      const mask = e.mask ?? 0;
+      if (mask !== 0 && (mask & bit) === 0) continue;
+      n += e.v ?? 0;
+    }
+  });
+  return n;
+}
+
 export function promoFlag(unit: { promos?: number; type: string }, kind: PromoKind): boolean {
   return heldEffects(unit).some((e) => e.kind === kind);
 }

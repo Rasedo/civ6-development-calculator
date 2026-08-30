@@ -14,8 +14,13 @@ import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/
 import {
   canTrainSpy, spyCapacity, spiesOf, spyDestinations, spyTravelTurns,
   beginTravel, beginMission, missionOffered, spyMissionMask, missionTurns,
-  tickSpies, tickSpyEffects, spyIsCounterspy, isSpy,
+  tickSpies, tickSpyEffects, spyIsCounterspy, isSpy, cityCounterLevels,
+  effectiveLevel, levelUpSpy, quartermasterLevels, spyNoEstablish,
 } from '../../../cpu/core/espionage';
+import { promoValueFor, takePromotion, promoAvailable, promoReady } from '../../../cpu/core/promotions';
+import {
+  PROMO_COLS, SPY_OP_PROMO_LEVELS, UNIT_PROMO_CLASS, promoRows,
+} from '../../../cpu/data/promotions';
 import { governorAt, governorPhase, governorsOf, neutralizeGovernor } from '../../../cpu/core/governors';
 import { GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
 import {
@@ -39,6 +44,12 @@ const WINS = 7;
 /** the mission's own published duration. */
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 const LOSES = 1;
+/** the bit an Espionage promotion holds in its own class list. */
+function spyBit(id: string): number {
+  const k = promoRows('ESPIONAGE').findIndex((p) => p.id === id);
+  expect(k).toBeGreaterThanOrEqual(0);
+  return 1 << k;
+}
 
 /** Two majors, a city each, both spy-capable. */
 function spyState() {
@@ -208,14 +219,15 @@ describe('what a city offers', () => {
 
 describe('the clock', () => {
   it("Bodyguard of Lies' golden face shortens an offensive operation only", () => {
-    const { state, me } = spyState();
-    expect(missionTurns(state, 0, SPY_M_FOMENT_UNREST)).toBe(turnsOf(SPY_M_FOMENT_UNREST));
+    const { state, me, mine } = spyState();
+    const spy = spyAt(state, 0, mine);
+    expect(missionTurns(state, spy, SPY_M_FOMENT_UNREST)).toBe(turnsOf(SPY_M_FOMENT_UNREST));
     me.age = 2;
     me.dedicationPicks = [DED_BODYGUARD];
-    expect(missionTurns(state, 0, SPY_M_FOMENT_UNREST))
+    expect(missionTurns(state, spy, SPY_M_FOMENT_UNREST))
       .toBe(Math.floor((turnsOf(SPY_M_FOMENT_UNREST) * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
     // ...a defensive post keeps the full clock
-    expect(missionTurns(state, 0, SPY_M_COUNTERSPY)).toBe(turnsOf(SPY_M_COUNTERSPY));
+    expect(missionTurns(state, spy, SPY_M_COUNTERSPY)).toBe(turnsOf(SPY_M_COUNTERSPY));
   });
 
   it('each mission carries the duration and the odds its own table publishes', () => {
@@ -249,6 +261,116 @@ describe('the clock', () => {
     for (let i = 0; i < turnsOf(SPY_M_COUNTERSPY); i++) tickSpies(state, 0);
     expect(spy.spyMission).toBe(SPY_M_COUNTERSPY);
     expect(spy.spyTurns).toBe(turnsOf(SPY_M_COUNTERSPY));
+  });
+});
+
+describe('the espionage promotion pool', () => {
+  it('is one flat pool of seventeen with no prerequisites', () => {
+    // CIV6 (Spy): "able to choose one of three promotions each time they gain
+    // a level, which are chosen at random from the pool" — a pool, not a tree.
+    const rows = promoRows('ESPIONAGE');
+    expect(rows).toHaveLength(17);
+    for (const r of rows) expect(r.requires).toEqual([]);
+    expect(UNIT_PROMO_CLASS[SPY_UNIT]).toBe('ESPIONAGE');
+    // the head is as wide as the widest class, which is now this one
+    expect(PROMO_COLS).toBeGreaterThanOrEqual(17);
+    expect(new Set(rows.map((r) => r.id)).size).toBe(17);
+  });
+
+  it('each mission row lifts its OWN operation and no other', () => {
+    // CIV6 (Demolitions): "Sabotage Production as if 2 levels more experienced."
+    const u = (id: string) => ({ type: SPY_UNIT, promos: spyBit(id) });
+    const pairs: [string, number][] = [
+      ['DEMOLITIONS', SPY_M_SABOTAGE_PRODUCTION],
+      ['CON_ARTIST', SPY_M_SIPHON_FUNDS],
+      ['CAT_BURGLAR', SPY_M_GREAT_WORK_HEIST],
+      ['TECHNOLOGIST', SPY_M_STEAL_TECH_BOOST],
+      ['GUERRILLA_LEADER', SPY_M_RECRUIT_PARTISANS],
+      ['COVERT_ACTION', SPY_M_FOMENT_UNREST],
+      ['LICENSE_TO_KILL', SPY_M_NEUTRALIZE_GOVERNOR],
+      ['SEDUCTION', SPY_M_COUNTERSPY],
+    ];
+    for (const [id, m] of pairs) {
+      expect(promoValueFor(u(id), 'SPY_OP_LEVEL', 1 << m)).toBe(SPY_OP_PROMO_LEVELS);
+      expect(promoValueFor(u(id), 'SPY_OP_LEVEL', 1 << SPY_M_GAIN_SOURCES)).toBe(0);
+    }
+  });
+
+  it('LINGUIST shortens every mission, after the dedication has had its cut', () => {
+    // CIV6 (Linguist): "Time to complete all missions reduced by 25%."
+    const { state, me, mine } = spyState();
+    const spy = spyAt(state, 0, mine);
+    const post = turnsOf(SPY_M_COUNTERSPY);
+    expect(missionTurns(state, spy, SPY_M_COUNTERSPY)).toBe(post);
+    spy.promos = spyBit('LINGUIST');
+    expect(missionTurns(state, spy, SPY_M_COUNTERSPY)).toBe(Math.floor((post * 75) / 100));
+    // ...and it lands on top of Bodyguard of Lies rather than instead of it
+    me.age = 2;
+    me.dedicationPicks = [DED_BODYGUARD];
+    const op = turnsOf(SPY_M_FOMENT_UNREST);
+    const ded = Math.max(1, Math.floor((op * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
+    expect(missionTurns(state, spy, SPY_M_FOMENT_UNREST))
+      .toBe(Math.max(1, Math.floor((ded * 75) / 100)));
+  });
+
+  it('DISGUISE puts the spy in the city the turn it is sent', () => {
+    // CIV6 (Disguise): "Takes no time to establish presence in an enemy city."
+    const { state, mine, theirs } = spyState();
+    const spy = spyAt(state, 0, mine);
+    expect(spyNoEstablish(state, spy)).toBe(false);
+    expect(spyTravelTurns(state, mine.centerIndex, theirs.centerIndex)).toBeGreaterThan(0);
+    spy.promos = spyBit('DISGUISE');
+    expect(beginTravel(state, spy, theirs.centerIndex)).toBe(true);
+    expect(spy.tileIndex).toBe(theirs.centerIndex);
+    expect(spy.spyMission).toBe(SPY_IDLE);
+    expect(spy.spyTurns).toBe(0);
+  });
+
+  it('QUARTERMASTER pays from home, and POLYGRAPH costs the intruder', () => {
+    // CIV6 (Quartermaster): "If this Spy is in home territory, all your Spies
+    // operate at +1 level"; (Polygraph): "...enemy Spies in your lands operate
+    // at 1 level below usual."
+    const { state, mine, theirs } = spyState();
+    const home = spyAt(state, 0, mine);
+    home.promos = spyBit('QUARTERMASTER');
+    expect(quartermasterLevels(state, 0)).toBe(1);
+    const away = spyAt(state, 0, theirs);
+    expect(effectiveLevel(state, away, theirs, SPY_M_SIPHON_FUNDS)).toBe(1);
+    // ...and a Quartermaster ABROAD is out of home territory, so it pays nothing
+    home.tileIndex = theirs.centerIndex;
+    expect(quartermasterLevels(state, 0)).toBe(0);
+
+    const guard = spyAt(state, 1, theirs);
+    guard.promos = spyBit('POLYGRAPH');
+    expect(cityCounterLevels(state, theirs)).toBe(1);
+    expect(effectiveLevel(state, away, theirs, SPY_M_SIPHON_FUNDS)).toBe(0);
+  });
+
+  it('a level hands the spy three distinct columns and arms the head', () => {
+    const { state, mine } = spyState();
+    const spy = spyAt(state, 0, mine);
+    expect(promoReady(spy)).toBe(false);
+    levelUpSpy(state, spy);
+    expect(spy.spyLevel).toBe(1);
+    const offer = spy.promoOffer ?? 0;
+    let n = 0;
+    for (let k = 0; k < 17; k++) if (offer & (1 << k)) n += 1;
+    expect(n).toBe(3);
+    expect(promoReady(spy)).toBe(true);
+    // exactly the offered columns are takeable
+    for (let k = 0; k < 17; k++) expect(promoAvailable(spy, k)).toBe((offer & (1 << k)) !== 0);
+    const first = [...Array(17).keys()].find((k) => (offer & (1 << k)) !== 0)!;
+    expect(takePromotion(spy, first)).toBe(true);
+    expect(promoReady(spy)).toBe(false);
+  });
+
+  it('the rows that ship inert, and say so', () => {
+    // Ace Driver waits on the escape sequence, Smear Campaign on Fabricate
+    // Scandal, and Surveillance on a spy that stands anywhere but the centre.
+    for (const id of ['ACE_DRIVER', 'SMEAR_CAMPAIGN', 'SURVEILLANCE']) {
+      const row = promoRows('ESPIONAGE').find((p) => p.id === id)!;
+      expect(row.effects).toEqual([{ kind: 'NONE' }]);
+    }
   });
 });
 

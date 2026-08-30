@@ -610,6 +610,7 @@ class SimInit:
         self._spy_idle = int(_sp["idle"])
         self._spy_travelling = int(_sp["travelling"])
         self._spy_travel_cols = int(_sp["travelCols"])
+        self._spy_promo_offer = int(_sp["promoOffer"])
         self._spy_missions = [
             {k: int(v) for k, v in m.items() if k != "id"} for m in _sp["missions"]
         ]

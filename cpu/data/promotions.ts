@@ -13,10 +13,17 @@
  * names the blocker for each.
  */
 
+import {
+  SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST, SPY_M_SABOTAGE_PRODUCTION,
+  SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS, SPY_M_DISRUPT_ROCKETRY,
+  SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
+  SPY_M_COUNTERSPY,
+} from './espionage';
+
 export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE', 'MONK',
-  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER', 'ESPIONAGE',
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
@@ -71,6 +78,11 @@ export const PROMO_KINDS = [
   'RAID_GOLD',           // +v gold on top of a coastal raid's own take
   'AIR_SLOTS',           // +v aircraft this hull bases
   'AIR_PILLAGE_ANY_HP',  // may air pillage at any health
+  'SPY_OP_LEVEL',        // +v spy levels on the mission whose bit is in `mask`
+  'SPY_OP_SPEED',        // every mission's clock is v% shorter
+  'SPY_NO_ESTABLISH',    // the spy arrives ready, with no travel clock at all
+  'SPY_HOME_ALLY_LEVEL', // posted at home, every own spy operates at +v levels
+  'SPY_HOME_ENEMY_LEVEL',// posted at home, enemy spies here operate v levels down
   'PILLAGE_CHEAP',       // pillaging costs v movement
   'HOLD_THE_LINE',       // adjacent OWN units of another class get +v vs cavalry
   'TERRAIN_MOVE_WOODS',  // woods and rainforest cost 1
@@ -115,6 +127,11 @@ const P = (
 ): PromoDef => ({ id, cls, tier, requires, effects });
 
 const cs = (kind: PromoKind, v: number, mask = 0): PromoEffect => ({ kind, v, mask });
+
+/** CIV6 (nine Espionage promotions): "<mission> as if 2 levels more
+ *  experienced" — one shape, one magnitude, and the mission it names. */
+export const SPY_OP_PROMO_LEVELS = 2;
+const op = (m: number): PromoEffect => cs('SPY_OP_LEVEL', SPY_OP_PROMO_LEVELS, 1 << m);
 
 /** CIV6 (Disciples): the promotion "applies 250 Religious Pressure to cities
  *  within 10 hexes when it kills a non-Barbarian unit". */
@@ -300,6 +317,29 @@ export const PROMOTIONS: readonly PromoDef[] = [
     { kind: 'HEAL_AFTER_ATTACK' }),
   P('SUPERCARRIER', 'NAVAL_CARRIER', 4, ['FOLDING_WINGS', 'DECK_CREWS'],
     { kind: 'HEAL_ANYWHERE' }),
+
+  // ---- ESPIONAGE ------------------------------------------------------
+  // CIV6 (Spy): a spy is "able to choose one of three promotions each time
+  // they gain a level, which are chosen at random from the pool", and the
+  // chassis' own page caps it at three taken. So the seventeen are ONE flat
+  // pool: no tiers past the first, and no prerequisites to chain.
+  P('ACE_DRIVER', 'ESPIONAGE', 1, [], none),
+  P('CAT_BURGLAR', 'ESPIONAGE', 1, [], op(SPY_M_GREAT_WORK_HEIST)),
+  P('CON_ARTIST', 'ESPIONAGE', 1, [], op(SPY_M_SIPHON_FUNDS)),
+  P('COVERT_ACTION', 'ESPIONAGE', 1, [], op(SPY_M_FOMENT_UNREST)),
+  P('DEMOLITIONS', 'ESPIONAGE', 1, [], op(SPY_M_SABOTAGE_PRODUCTION)),
+  P('DISGUISE', 'ESPIONAGE', 1, [], { kind: 'SPY_NO_ESTABLISH' }),
+  P('GUERRILLA_LEADER', 'ESPIONAGE', 1, [], op(SPY_M_RECRUIT_PARTISANS)),
+  P('LICENSE_TO_KILL', 'ESPIONAGE', 1, [], op(SPY_M_NEUTRALIZE_GOVERNOR)),
+  P('LINGUIST', 'ESPIONAGE', 1, [], cs('SPY_OP_SPEED', 25)),
+  P('POLYGRAPH', 'ESPIONAGE', 1, [], cs('SPY_HOME_ENEMY_LEVEL', 1)),
+  P('QUARTERMASTER', 'ESPIONAGE', 1, [], cs('SPY_HOME_ALLY_LEVEL', 1)),
+  P('ROCKET_SCIENTIST', 'ESPIONAGE', 1, [], op(SPY_M_DISRUPT_ROCKETRY)),
+  P('SATCHEL_CHARGES', 'ESPIONAGE', 1, [], op(SPY_M_BREACH_DAM)),
+  P('SEDUCTION', 'ESPIONAGE', 1, [], op(SPY_M_COUNTERSPY)),
+  P('SMEAR_CAMPAIGN', 'ESPIONAGE', 1, [], none),
+  P('SURVEILLANCE', 'ESPIONAGE', 1, [], none),
+  P('TECHNOLOGIST', 'ESPIONAGE', 1, [], op(SPY_M_STEAL_TECH_BOOST)),
 ];
 
 /** the promotions of one class, in catalog order — the ORDER IS THE WIRE:
@@ -339,6 +379,7 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   PRIVATEER: 'NAVAL_RAIDER', SUBMARINE: 'NAVAL_RAIDER',
   NUCLEAR_SUBMARINE: 'NAVAL_RAIDER',
   AIRCRAFT_CARRIER: 'NAVAL_CARRIER',
+  SPY: 'ESPIONAGE',
 };
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */

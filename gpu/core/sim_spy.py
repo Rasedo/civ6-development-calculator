@@ -197,27 +197,52 @@ class SimSpy:
         return out
 
     # ---- the verbs ---------------------------------------------------------
-    def _begin_travel(self, hit: torch.Tensor, sc: torch.Tensor,
+    def _begin_travel(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
                       dest: torch.Tensor) -> None:
         g = (hit & (dest >= 0)).nonzero(as_tuple=True)[0]
         if g.numel() == 0:
             return
         s = sc[g]
-        self.unit_spy_turns[g, s] = self._spy_travel_turns(self.unit_tile[g, s], dest[g])
-        self.unit_spy_mission[g, s] = self._spy_travelling
-        self.unit_spy_target[g, s] = dest[g]
         self.unit_mp[g, s] = 0
+        # CIV6 (Disguise; Bodyguard of Lies): "Takes no time to establish
+        # presence in an enemy city" — the establish clock is the TRAVEL clock
+        # here, so the spy is simply there.
+        ty = self.unit_type[g, s].clamp(min=0, max=self.NU - 1)
+        now = (self._promo_flag(ty, self.unit_promos[g, s], "SPY_NO_ESTABLISH")
+               | self._golden_ded(row, self._ded_bodyguard)[g])
+        gi, gn = g[~now], g[now]
+        if gi.numel():
+            si = sc[gi]
+            self.unit_spy_turns[gi, si] = self._spy_travel_turns(self.unit_tile[gi, si], dest[gi])
+            self.unit_spy_mission[gi, si] = self._spy_travelling
+            self.unit_spy_target[gi, si] = dest[gi]
+        if gn.numel():
+            sn = sc[gn]
+            self.unit_tile[gn, sn] = dest[gn]
+            self.unit_spy_mission[gn, sn] = self._spy_idle
+            self.unit_spy_target[gn, sn] = -1
+            self.unit_spy_turns[gn, sn] = 0
+            self._gen_ver += 1
 
-    def _spy_mission_turns(self, row: int, m: int) -> torch.Tensor:
+    def _spy_mission_turns(self, row: int, m: int,
+                           sc: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6 (Bodyguard of Lies, Golden face): "Time to complete all
-        offensive spy operations reduced by 25%"."""
-        base = torch.full((self.B,), self._spy_missions[m]["turns"],
-                          dtype=torch.long, device=self.device)
-        if not self._spy_missions[m]["offensive"]:
-            return base
-        cut = torch.div(base * self._bodyguard_num, self._bodyguard_den,
-                        rounding_mode="floor").clamp(min=1)
-        return torch.where(self._golden_ded(row, self._ded_bodyguard), cut, base)
+        offensive spy operations reduced by 25%"; (Linguist): "Time to complete
+        all missions reduced by 25%" — every mission, the defensive post
+        included, and after the dedication's own cut."""
+        n = torch.full((self.B,), self._spy_missions[m]["turns"],
+                       dtype=torch.long, device=self.device)
+        if self._spy_missions[m]["offensive"]:
+            cut = torch.div(n * self._bodyguard_num, self._bodyguard_den,
+                            rounding_mode="floor").clamp(min=1)
+            n = torch.where(self._golden_ded(row, self._ded_bodyguard), cut, n)
+        if sc is not None:
+            ty = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            sp = self._promo_val(ty, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1),
+                                 "SPY_OP_SPEED")
+            n = torch.where(sp > 0, torch.div(n * (100 - sp), 100,
+                                              rounding_mode="floor").clamp(min=1), n)
+        return n
 
     def _begin_mission(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
                        m: int) -> None:
@@ -226,7 +251,7 @@ class SimSpy:
             return
         s = sc[g]
         self.unit_spy_mission[g, s] = m
-        self.unit_spy_turns[g, s] = self._spy_mission_turns(row, m)[g]
+        self.unit_spy_turns[g, s] = self._spy_mission_turns(row, m, sc)[g]
         self.unit_mp[g, s] = 0
 
     # ---- the turn ----------------------------------------------------------
@@ -280,6 +305,7 @@ class SimSpy:
         lvl = int(self.unit_spy_level[b, v]) + (
             self._spy_sources_levels
             if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
+        lvl += self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
         lvl = max(0, lvl - self._counter_levels(b, hr, hc))
         ok = bool(mdef["certain"]) or self._spy_roll(
             b, mdef["successPct"] + self._spy_success_per_level * lvl)
@@ -289,8 +315,7 @@ class SimSpy:
                 # CIV6: Spies "gain levels by successfully completing offensive
                 # missions", and Bodyguard of Lies pays "+1 Era Score for each
                 # successful offensive operation."
-                self.unit_spy_level[b, v] = min(
-                    self._spy_max_level, int(self.unit_spy_level[b, v]) + 1)
+                self._level_up_spy(b, v)
                 one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                 one[b] = True
                 self._dedication_event(row, self._ded_bodyguard, one)
@@ -311,9 +336,7 @@ class SimSpy:
             # made the catch likelier is the one that earns it, and the first of
             # them by slot is the captor on both engines.
             if posted.numel():
-                _c = int(posted[0])
-                self.unit_spy_level[b, _c] = min(
-                    self._spy_max_level, int(self.unit_spy_level[b, _c]) + 1)
+                self._level_up_spy(b, int(posted[0]))
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,
                        lvl: int) -> None:
@@ -394,6 +417,76 @@ class SimSpy:
             one[b] = True
             self._flood_river(one, torch.full((self.B,), dt, dtype=torch.long, device=self.device))
 
+    def _spy_op_levels(self, b: int, v: int, m: int) -> int:
+        """CIV6 (nine Espionage promotions): "<mission> as if 2 levels more
+        experienced" — the masked read `promoValueFor` makes TS-side. Scalar,
+        because the mission it answers for resolves one spy at a time."""
+        return self._spy_promo_sum(b, v, "SPY_OP_LEVEL", 1 << m)
+
+    def _spy_promo_sum(self, b: int, v: int, kind: str, bit: int = 0) -> int:
+        """the summed value of one promotion kind on one spy, counting only
+        rows whose target mask admits `bit` (0 = every row of that kind)."""
+        rd = self.rules_dev
+        k = self._pk.get(kind, -1)
+        ty = int(self.unit_type[b, v])
+        if k < 0 or ty < 0:
+            return 0
+        c = int(rd.u_promo_class[min(ty, self.NU - 1)])
+        if c < 0:
+            return 0
+        held = int(self.unit_promos[b, v])
+        n = 0
+        for j in range(int(rd.promo_rows[c])):
+            if not (held >> j) & 1:
+                continue
+            for s in range(rd.promo_kind.shape[2]):
+                if int(rd.promo_kind[c, j, s]) != k:
+                    continue
+                msk = int(rd.promo_mask[c, j, s])
+                if bit and msk and not (msk & bit):
+                    continue
+                n += int(rd.promo_v[c, j, s])
+        return n
+
+    def _quartermaster_levels(self, b: int, row: int) -> int:
+        """CIV6 (Quartermaster): "If this Spy is in home territory, all your
+        Spies operate at +1 level"."""
+        n = 0
+        for u in self._spies_of(row)[b].nonzero(as_tuple=True)[0].tolist():
+            if int(self.tile_seat[b, max(int(self.unit_tile[b, u]), 0)]) == row:
+                n += self._spy_promo_sum(b, u, "SPY_HOME_ALLY_LEVEL")
+        return n
+
+    def _level_up_spy(self, b: int, v: int) -> None:
+        """CIV6 (Spy): a spy "may gain levels from successful offensive
+        operations, or capturing an enemy Spy", and on each level is "able to
+        choose one of three promotions ... chosen at random from the pool".
+        The draw takes three DISTINCT columns without replacement, so the
+        stream is exactly three numbers however the offer lands."""
+        before = int(self.unit_spy_level[b, v])
+        after = min(self._spy_max_level, before + 1)
+        self.unit_spy_level[b, v] = after
+        if after == before:
+            return
+        rd = self.rules_dev
+        ty = int(self.unit_type[b, v])
+        c = int(rd.u_promo_class[min(max(ty, 0), self.NU - 1)])
+        rows = int(rd.promo_rows[c]) if c >= 0 else 0
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+        offer = 0
+        for j in range(min(self._spy_promo_offer, rows)):
+            pick = int(self._next_random(one)[b] * (rows - j))
+            for k in range(rows):
+                if (offer >> k) & 1:
+                    continue
+                if pick == 0:
+                    offer |= 1 << k
+                    break
+                pick -= 1
+        self.unit_promo_offer[b, v] = offer
+        self.unit_xp[b, v] = int(self._xp_to_next(self.unit_level[b, v:v + 1])[0])
+
     def _counter_levels(self, b: int, hr: int, hc: int) -> int:
         """CIV6 (Diplomatic Quarter): "Enemy Spies operate at 2 levels below
         normal when targeting this district or adjacent districts", and
@@ -408,6 +501,12 @@ class SimSpy:
         if bool((self._b_spy_pen > 0).any()):
             stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
             n += int((stand.long() * self._b_spy_pen).sum())
+        # CIV6 (Polygraph): "If this Spy is in home territory, enemy Spies in
+        # your lands operate at 1 level below usual" — the posts standing here.
+        ctr = int(self.city_center[b, hr, hc])
+        for u in self._spies_of(hr)[b].nonzero(as_tuple=True)[0].tolist():
+            if int(self.unit_tile[b, u]) == ctr:
+                n += self._spy_promo_sum(b, u, "SPY_HOME_ENEMY_LEVEL")
         # CIV6 (Local Informants): "Enemy Spies operate at 3 levels below
         # normal in this city."
         if self.n_governors and hr < self.n_majors:

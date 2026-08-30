@@ -294,6 +294,80 @@ def main() -> None:
     sim._spy_success_per_level = _per0
     sim._spy_capture_pct = _cap0
 
+    # -- 14: the espionage promotion pool -----------------------------------
+    # CIV6 (Spy): the seventeen promotions are one flat pool with no
+    # prerequisites, and the spy is "able to choose one of three promotions
+    # each time they gain a level, ... chosen at random from the pool".
+    rd = sim.rules_dev
+    ec = list(rd.promo_classes).index("ESPIONAGE")
+    assert int(rd.u_promo_class[sim._spy_idx]) == ec, "the Spy promotes from another class"
+    assert int(rd.promo_rows[ec]) == 17
+    assert int(rd.promo_cols) >= 17, "the PROMOTE head cannot offer the whole pool"
+    assert int(rd.promo_req[ec].abs().sum()) == 0, "an Espionage row asks a prerequisite"
+
+    def pcol(kind, bit=0):
+        """the ONE column of the pool carrying this effect, by what it does."""
+        k = sim._pk[kind]
+        hit = [j for j in range(int(rd.promo_rows[ec]))
+               if any(int(rd.promo_kind[ec, j, s]) == k
+                      and (not bit or int(rd.promo_mask[ec, j, s]) == bit)
+                      for s in range(rd.promo_kind.shape[2]))]
+        assert len(hit) == 1, f"{kind} names {len(hit)} columns, expected one"
+        return hit[0]
+
+    x = spawn_spy(sim, row, ctr_m)
+    # CIV6 (Demolitions): "Sabotage Production as if 2 levels more experienced"
+    # — the row names the ONE operation it lifts.
+    m_sab, m_src = sim._spy_m_sabotage, sim._spy_m_sources
+    sim.unit_promos[0, x] = 1 << pcol("SPY_OP_LEVEL", 1 << m_sab)
+    assert sim._spy_op_levels(0, x, m_sab) == 2
+    assert sim._spy_op_levels(0, x, m_src) == 0, "the masked read answered for another mission"
+
+    # CIV6 (Linguist): "Time to complete all missions reduced by 25%."
+    sc = torch.tensor([x])
+    post = int(sim._spy_mission_turns(row, sim._spy_m_counterspy)[0])
+    assert int(sim._spy_mission_turns(row, sim._spy_m_counterspy, sc)[0]) == post
+    sim.unit_promos[0, x] = 1 << pcol("SPY_OP_SPEED")
+    assert int(sim._spy_mission_turns(row, sim._spy_m_counterspy, sc)[0]) == (post * 75) // 100
+
+    # CIV6 (Disguise): "Takes no time to establish presence in an enemy city."
+    hit = torch.ones(1, dtype=torch.bool)
+    dest = torch.tensor([ctr_t])
+    sim.unit_promos[0, x] = 0
+    sim._begin_travel(row, hit, sc, dest)
+    assert int(sim.unit_spy_mission[0, x]) == sim._spy_travelling
+    assert int(sim.unit_spy_turns[0, x]) > 0 and int(sim.unit_tile[0, x]) == ctr_m
+    sim.unit_spy_mission[0, x] = sim._spy_idle
+    sim.unit_promos[0, x] = 1 << pcol("SPY_NO_ESTABLISH")
+    sim._begin_travel(row, hit, sc, dest)
+    assert int(sim.unit_tile[0, x]) == ctr_t, "the disguised Spy is still travelling"
+    assert int(sim.unit_spy_mission[0, x]) == sim._spy_idle
+    assert int(sim.unit_spy_turns[0, x]) == 0 and int(sim.unit_spy_target[0, x]) == -1
+
+    # CIV6 (Quartermaster): "If this Spy is in home territory, all your Spies
+    # operate at +1 level"; (Polygraph): enemy spies "operate at 1 level below
+    # usual" in the holder's own lands.
+    sim.unit_promos[0, x] = 1 << pcol("SPY_HOME_ALLY_LEVEL")
+    assert sim._quartermaster_levels(0, row) == 0, "the Spy abroad pays its own side nothing"
+    sim.unit_tile[0, x] = ctr_m
+    sim._gen_ver += 1
+    assert sim._quartermaster_levels(0, row) == 1
+    was = sim._counter_levels(0, foe, theirs)
+    y = spawn_spy(sim, foe, ctr_t)
+    sim.unit_promos[0, y] = 1 << pcol("SPY_HOME_ENEMY_LEVEL")
+    assert sim._counter_levels(0, foe, theirs) == was + 1
+
+    # the level hands the spy three DISTINCT columns and no more
+    sim.unit_promos[0, x] = 0
+    sim.unit_promo_offer[0, x] = 0
+    sim.unit_spy_level[0, x] = 0
+    sim._level_up_spy(0, x)
+    assert int(sim.unit_spy_level[0, x]) == 1
+    off = int(sim.unit_promo_offer[0, x])
+    assert bin(off).count("1") == sim._spy_promo_offer == 3
+    assert off >> int(rd.promo_rows[ec]) == 0, "the draw offered a column the pool lacks"
+    assert int(sim.unit_xp[0, x]) == int(sim._xp_to_next(sim.unit_level[0, x:x + 1])[0])
+
     print("BATTERY spy OK")
 
 

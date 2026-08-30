@@ -411,7 +411,8 @@ class SimOrders:
                     _cols = self._spy_destinations(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _stc).clamp(min=0, max=_stw - 1)
-                    self._begin_travel(stm, sc, _cols.gather(1, _k.unsqueeze(1)).squeeze(1))
+                    self._begin_travel(row, stm, sc,
+                                       _cols.gather(1, _k.unsqueeze(1)).squeeze(1))
 
             if _rk_mission[n] and _smc >= 0:
                 smm = act & (a >= _smc) & (a < _smc + _smw)
