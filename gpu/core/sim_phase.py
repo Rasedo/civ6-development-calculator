@@ -920,7 +920,10 @@ class SimPhase:
         # may close and the heal still runs.
         if self.n_governors:
             besieged = besieged & ~self._governor_flag(row, "noSiege")[bidx, col]
-        ok = act & ~besieged
+        # CIV6: a City Center caught in a blast has its HP reduced to 0 and
+        # "Healing is impossible ... while the fallout lasts".
+        _fo = self._fallout()
+        ok = act & ~besieged & ~_fo[bidx, self.city_center[bidx, row, col].clamp(min=0)]
         # "The city will automatically regain 20 HP per turn" until it is
         # encircled. The outer defenses are NOT on this gate: "once damaged,
         # the outer defenses of a City Center or defensible district will not
@@ -937,7 +940,8 @@ class SimPhase:
             _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
             _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
             occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)
-            rep = ok & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
+            rep = (ok & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0]
+                   & ~self.district_pillaged[bidx, e0] & ~_fo[bidx, e0])
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 

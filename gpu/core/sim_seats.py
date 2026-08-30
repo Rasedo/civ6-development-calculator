@@ -142,7 +142,9 @@ class SimSeats:
                     continue
                 else:
                     regp_m = self.city_dist_tile[:, row, j, d_im]
-                    okp_m = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    okp_m = ((regp_m >= 0)
+                             & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+                             & ~self._fallout().gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1))
                 if int(prow_m.get("rep", 0)):
                     okp_m = okp_m & self._repair_available(row, j)
                 elif int(prow_m["one"]):
@@ -1603,7 +1605,9 @@ class SimSeats:
                         continue
                     else:
                         regp_a = self.city_dist_tile[:, row, j, d_ia]
-                        has_pa = (regp_a >= 0) & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
+                        has_pa = ((regp_a >= 0)
+                                  & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
+                                  & ~self._fallout().gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1))
                     # RE-VALIDATE the chain at apply, not just at mask: a record
                     # is replayed a phase after the mask that justified it, and
                     # the step in front of it may have completed since.

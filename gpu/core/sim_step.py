@@ -46,6 +46,7 @@ class SimStep:
             # 0 included), and the barb window at the barbarian phase.
             for _pre in ("major", "barb"):
                 self._reset_mp(_pre)
+            self._fallout_toll()
 
         if self.units_mode:
             self._barbarian_phase()

@@ -62,6 +62,8 @@ import { canTrainWithStockpile, chargeUnitResource } from './stockpile';
 import type { ImprovementId } from './types';
 
 import { gpPermOf } from '../data/greatPeople';
+import { irradiated } from './nuclear';
+import { FALLOUT_DAMAGE } from '../data/nuclear';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -1012,6 +1014,11 @@ export function trainableUnits(
   city?: { centerIndex: number; districts: { type: string; tileIndex: number }[] },
 ): UnitDef[] {
   if (!state.unitsMode) return [];
+  // CIV6: fallout stops production and "prevents any Gold or Faith purchasing
+  // of units" there. A unit is raised in the CITY CENTER, so that is the tile
+  // that has to be clean — this one predicate serves the queue and every
+  // purchase path, which all funnel through here.
+  if (city && irradiated(state.map.tiles[city.centerIndex])) return [];
   return Object.values(UNITS).filter((d) => {
     // Faith-purchase-only chassis (MISSIONARY) — never trainable or
     // gold-purchasable (purchaseUnit funnels through here), sandbox included.
@@ -1512,16 +1519,22 @@ export function refreshUnits(state: GameState): void {
     const need = UNITS[unit.type]?.requiresResource;
     const starved = !!need && isCiv(unit.seat)
       && !civHasStrategic(state, unit.seat, need);
-    // CIV6 (Twilight Valor): "Cannot heal outside your territory."
-    const homeOnly = getModifiers(state, unit.seat).healOnlyHome;
+    // CIV6 (Twilight Valor): "Cannot heal outside your territory" — the
+    // seat's OWN ground. CIV6 (Giant Death Robot): "Can only heal in friendly
+    // territory", which is its own ground or an ally's. Two different bars, so
+    // two predicates.
+    const ownGround = tileSeat(tile) === unit.seat;
+    const friendly = ownGround || seatsAllied(state, unit.seat, tileSeat(tile));
+    const healBlocked = (getModifiers(state, unit.seat).healOnlyHome && !ownGround)
+      || (!!UNITS[unit.type]?.healFriendlyOnly && !friendly);
     // CIV6 (Tactical Maintenance): "Can heal after attacking." The kind lives
     // on the bomber's list alone, and a sortie is the only thing that spends an
     // aircraft's turn, so a spent attack excuses the spent movement. The
     // fortify gate below keeps the plain reading — no aircraft digs in.
     const rested = unit.movesLeft >= grantedLast
       || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'));
-    if (rested && !starved && !(homeOnly && tileSeat(tile) !== unit.seat)) {
-      const home = tileSeat(tile) === unit.seat;
+    if (rested && !starved && !healBlocked) {
+      const home = ownGround;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
         ? religiousHeal(state, unit, yctx(unit.seat))
@@ -1563,6 +1576,18 @@ export function refreshUnits(state: GameState): void {
     unit.movesFull = granted;
     unit.movesLeft = granted;
     unit.attacksLeft = attacksPerTurn(unit);
+    // CIV6: "Any units (except Giant Death Robots) that end their turn in a
+    // contaminated tile take 50 damage each turn." Taken at the turn's own
+    // refresh, AFTER whatever the tile healed — so a unit standing in fallout
+    // loses ground every turn it stays.
+    if (irradiated(tile) && !UNITS[unit.type]?.gdr) {
+      unit.hp -= FALLOUT_DAMAGE;
+      if (unit.hp <= 0) {
+        state.eventLog.push(`${unit.type} was lost to radioactive fallout.`);
+        disbandUnit(state, unit.id);
+        continue;
+      }
+    }
     if (unit.path) walkPath(state, unit);
     if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {
       const target = nearestUnexplored(state, unit);
@@ -1605,6 +1630,21 @@ function spendCharge(state: GameState, unit: Unit): void {
   unit.charges = (unit.charges ?? 1) - 1;
   unit.movesLeft = 0;
   if (unit.charges <= 0) disbandUnit(state, unit.id);
+}
+
+/** CIV6: fallout "can be cleaned from affected tiles by Builders, Military
+ *  Engineers, or any other unit that has at least 1 remaining build charge",
+ *  and doing so "takes 1 build charge" — the same charge, spent the same way
+ *  as an improvement's. */
+export function canCleanFallout(state: GameState, unit: Unit): boolean {
+  return irradiated(state.map.tiles[unit.tileIndex]) && (unit.charges ?? 0) > 0;
+}
+
+export function cleanFallout(state: GameState, unit: Unit): RuleResult {
+  if (!canCleanFallout(state, unit)) return no('Nothing here to clean, or no charge left.');
+  state.map.tiles[unit.tileIndex].falloutTurns = 0;
+  spendCharge(state, unit);
+  return { ok: true };
 }
 
 export function builderImprove(state: GameState, unitId: number, imp: ImprovementId, seat: number): RuleResult {

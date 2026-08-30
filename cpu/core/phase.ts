@@ -46,13 +46,13 @@ import { accrueStockpiles, chargeUnitUpkeep, layRailroad, resolveSeatPower } fro
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
-import { wmdUpkeep } from './nuclear';
+import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -86,6 +86,7 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_BUILD_RAILROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
+const A_CLEAN_FALLOUT = unitActionIndex(IMPROVEMENT_IDS).CLEAN_FALLOUT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
@@ -1169,6 +1170,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         unit.movesLeft = 0;
         return;
       }
+      // CLEAN FALLOUT: any chassis with a build charge left, not the Builder
+      // alone — and it spends the charge and the turn like any other.
+      if (a === A_CLEAN_FALLOUT) {
+        cleanFallout(state, unit);
+        return;
+      }
       // THE MILITARY ENGINEER'S TWO. Each spends a charge and the turn, and
       // vanishes on its last one, exactly as a Builder's improvement does.
       if (a === A_BUILD_ROAD || a === A_FINISH_DISTRICT) {
@@ -2168,7 +2175,12 @@ export function seatPhase(state: GameState): void {
       // may close and the heal still runs.
       if (governorFlag(state, civCity, (e) => e.noSiege)
           || !encircled(state, civCityCenter, actor.seat)) {
-        civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
+        // CIV6: a City Center or Encampment caught in a blast has its HP and
+        // Defense Strength reduced to 0, and "Healing is impossible ... while
+        // the fallout lasts".
+        if (!irradiated(state.map.tiles[civCity.centerIndex])) {
+          civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
+        }
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];
@@ -2176,7 +2188,9 @@ export function seatPhase(state: GameState): void {
           // "This is an automatic action, which happens if its tile is not
           // occupied" — an enemy standing on the district holds it silent.
           if (unitsAt(state, dt.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
-          dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
+          if (!irradiated(dt)) {
+            dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
+          }
         }
       }
     }

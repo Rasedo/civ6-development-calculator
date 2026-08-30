@@ -44,6 +44,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
+import { irradiated } from './nuclear';
 
 export const TURN_LIMIT = 250;
 
@@ -413,6 +414,9 @@ export function projectCost(state: GameState, seat: number, projectId?: string, 
 export function repairAvailable(state: GameState, city: City): boolean {
   const max = wallsMax(state, city);
   if (max <= 0 || (outerPool(state, city) >= max && encampOuterMissing(state, city) <= 0)) return false;
+  // CIV6 (a City Center or Encampment caught in a blast): "Healing is
+  // impossible and Repair Outer Defenses is unusable while the fallout lasts."
+  if (irradiated(state.map.tiles[city.centerIndex])) return false;
   return state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
 }
 
@@ -420,7 +424,12 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
   const owner = seatOf(state, city.seat);
   const done = owner?.projectsDone ?? [];
   return Object.values(PROJECTS).filter((p) => {
-    if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
+    // CIV6: "Production cannot be applied to anything in tiles containing
+    // contamination" — a project runs in a district, so that district's tile
+    // has to be clean as well as complete.
+    if (!city.districts.some((d) => d.type === p.district
+      && state.map.tiles[d.tileIndex].districtComplete
+      && !irradiated(state.map.tiles[d.tileIndex]))) {
       return false;
     }
     if (p.requiresCivic && !owner?.research.civics.includes(p.requiresCivic)) return false;

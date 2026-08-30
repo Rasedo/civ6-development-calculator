@@ -1323,6 +1323,7 @@ class SimInit:
             self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
             self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
             self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
+            self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
             self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
             self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
             self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
@@ -1350,6 +1351,7 @@ class SimInit:
                 + (1 if self._A_UPGRADE >= 0 else 0) \
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
                 + (1 if self._A_RAIL >= 0 else 0) \
+                + (1 if self._A_CLEAN >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -2351,6 +2353,9 @@ class SimInit:
         # tiles as it would on land" — water is simply ground to such a
         # chassis, so it never embarks and asks no seafaring tech.
         self.unit_water_walk = torch.tensor([bool(u.get("ww", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_heal_friendly = torch.tensor([bool(u.get("healFriendly", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_nuke_cover = torch.tensor([bool(u.get("nukeCover", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_nuke_carry = torch.tensor([bool(u.get("nukeCarry", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
         # THE SIEGE CLASSES. `_type_bombard` > 0 marks a unit whose attack
         # "uses Bombard Strength": full damage to a perimeter, no city penalty,

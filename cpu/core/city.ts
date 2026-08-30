@@ -34,6 +34,7 @@ import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { irradiated } from './nuclear';
 export interface CityStats {
   city: City;
   housing: number;
@@ -154,6 +155,9 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       !t.district &&
       !t.builtWonder &&
       !t.submerged &&
+      // CIV6: contaminated tiles "cannot be worked by the city until the
+      // contamination timer expires or until the tile is cleaned".
+      !irradiated(t) &&
       !isImpassable(t),
   );
 }

@@ -1,12 +1,17 @@
 /**
- * NUCLEAR WEAPONS: the seat's inventory and what holding it costs.
+ * NUCLEAR WEAPONS: the seat's inventory, what holding it costs, and the
+ * ground a blast leaves behind.
  *
  * A device is not a unit — CIV6: a finished one "is added to the player's
  * inventory and can then be used by any unit or improvement capable of
  * deploying it on the map", so it is a per-seat count, and the gold it bills
  * is the seat's, not any city's.
+ *
+ * A LEAF module: the verbs that SPEND a build charge to clean fallout live
+ * with the other charge verbs in `units`, so nothing here reaches back.
  */
 import type { GameState } from './types';
+import type { Tile } from '../../world/types';
 import { seatOf } from './seats';
 import { getModifiers } from './effects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -35,4 +40,10 @@ export function wmdUpkeep(state: GameState, seat: number): number {
   for (let k = 0; k < NUCLEAR_DEVICES.length; k++) gold += (inv[k] ?? 0) * NUCLEAR_DEVICES[k].upkeep;
   if (gold === 0) return 0;
   return (gold * (100 + getModifiers(state, seat).wmdUpkeepPct)) / 100;
+}
+
+/** CIV6: a tile still under radioactive fallout. Nothing may be worked,
+ *  built, repaired or bought on it, and whoever ends a turn there is hurt. */
+export function irradiated(tile: Tile | undefined): boolean {
+  return (tile?.falloutTurns ?? 0) > 0;
 }

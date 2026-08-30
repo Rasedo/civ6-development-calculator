@@ -62,12 +62,12 @@ def main() -> None:
 
     # --- 1) the exported chain: catalog + gating + sequence + prices --------
     rows = rj["projects"]["rows"]
-    space = [(i, row) for i, row in enumerate(rows) if int(row.get("sp", 0))]
+    space = [(i, row) for i, row in enumerate(rows) if int(row["spc"])]
     lasers = [(i, row) for i, row in enumerate(rows) if int(row.get("ls", 0))]
     assert len(space) == 4, f"expected 4 space-race rows exported, got {len(space)}"
     assert len(lasers) == 2, f"expected 2 laser-station rows exported, got {len(lasers)}"
-    # Space rows sit LAST, in chain order.
-    base_n = len(rows) - 4
+    # The space chain sits in catalog order; the nuclear rows follow it.
+    base_n = space[0][0]
     assert [i for i, _ in space] == list(range(base_n, base_n + 4)), "space rows must be the LAST 4 (chain order)"
     # exactly one victory step, and it is the final one (EXOPLANET_EXPEDITION).
     vic = [i for i, row in space if int(row.get("vic", 0))]
@@ -86,23 +86,26 @@ def main() -> None:
         f"space prices off: {[int(r.get('pc', -1)) for _, r in space]}"
     for i, row in lasers:
         assert int(row.get("pc", -1)) == 360, f"laser row {i} price: {row}"
-        assert int(row.get("rt", -1)) >= 0 and int(row.get("sp", 0)) == 0, f"laser row {i} gating: {row}"
+        assert int(row.get("rt", -1)) >= 0 and int(row["spc"]) == 0, f"laser row {i} gating: {row}"
     assert all(int(r.get("pc", -1)) == -1 for i, r in enumerate(rows) if i < base_n and not int(r.get("ls", 0)) and not int(r.get("rec", 0))), \
         "base projects must keep the generic curve (pc -1)"
 
     # --- 2) engine metadata mirrors the exported chain ---------------------
     sim = mk()
-    assert sim._n_once == 4, f"_n_once should be 4, got {sim._n_once}"
-    assert sim._once_proj_idx == [i for i, _ in space], "_once_proj_idx must match the exported space rows"
-    assert sim._once_step == {i: k for k, (i, _) in enumerate(space)}, "chain-step map mismatch"
+    once = [(i, row) for i, row in enumerate(rows) if int(row["one"])]
+    assert sim._n_once == len(once), f"_n_once should be {len(once)}, got {sim._n_once}"
+    assert sim._once_proj_idx == [i for i, _ in once], "_once_proj_idx must match the exported one-time rows"
+    assert sim._once_step == {i: k for k, (i, _) in enumerate(once)}, "ledger-step map mismatch"
+    assert sim._space_proj_idx == [i for i, _ in space], "_space_proj_idx must match the exported space rows"
     assert sim._once_victory_idx == {space[-1][0]}, "victory step index mismatch"
+    assert sim._proj_reveal_idx == space[0][0] and sim._proj_moon_idx == space[1][0],         "the reveal and moon side effects are addressed by project ROW, not chain position"
     assert sim._laser_proj_idx == {i for i, _ in lasers}, "_laser_proj_idx must match the exported laser rows"
     assert sim._orbital_proj_idx == {i for i, r in lasers if int(r.get("orb", 0))}, \
         "exactly the Lagrange row is orbital"
     assert len(sim._orbital_proj_idx) == 1, "one of the two stations is the orbital one"
     for name in ("project_done", "space_ly", "civ_orbital_lasers", "city_lasers"):
         assert name in _MUTABLE, f"{name} must be registered in _MUTABLE"
-    assert sim.project_done.shape == (sim.B, sim.n_majors, 4), f"project_done shape {tuple(sim.project_done.shape)}"
+    assert sim.project_done.shape == (sim.B, sim.n_majors, len(once)), f"project_done shape {tuple(sim.project_done.shape)}"
     assert int(sim.rules.space_ly_target) == 30, "the craft's distance: 50 LY x 0.6 game speed"
     assert bool((sim.space_ly == -1).all()), "no craft is in flight at the start"
 

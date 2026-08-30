@@ -761,6 +761,9 @@ class SimEconomy:
         B, dev = self.B, self.device
         self._eff_version += 1
         self.drought.copy_((self.drought - 1).clamp(min=0))
+        # CIV6: fallout lasts 10 turns from a Nuclear Device and 20 from a
+        # Thermonuclear one, and the tile is clean when the timer expires.
+        self.tile_fallout.copy_((self.tile_fallout - 1).clamp(min=0))
         every = torch.ones(B, dtype=torch.bool, device=dev)
         # A warming world runs every one of these draws more often, and its
         # storms and droughts take fertility off instead of laying it down.
@@ -1097,6 +1100,9 @@ class SimEconomy:
             rq = self._b_req_district  # [NB] the district each building needs, -1 = none
             reg = self.city_dist_tile[:, row][:, :, rq.clamp(min=0)]  # [B, C, NB] registry tile per building
             has_d = reg >= 0
+            # CIV6: an irradiated district takes no new picks and no purchase.
+            # Like the Urban Development Treaty's block, in-flight items finish.
+            has_d = has_d & ~self._fallout().gather(1, reg.clamp(min=0).reshape(B, -1)).reshape(B, C, NB)
             if complete:
                 has_d = has_d & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape(B, C, NB)
             district_ok = (rq < 0).reshape(1, 1, NB) | has_d
@@ -1240,8 +1246,13 @@ class SimEconomy:
             1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
         )
         ok = ok & self._res_avail_mask(self.tile_seat == row, row)
+        # CIV6: fallout stops production and "prevents any Gold or Faith
+        # purchasing of units" there. A unit is raised in the CITY CENTER, so
+        # that is the tile that has to be clean.
+        _ctr_clean = ~self._fallout().gather(1, self.city_center[:, row].clamp(min=0))
+        _ctr_clean = _ctr_clean & (self.city_center[:, row] >= 0)
         ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
-        out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True)
+        out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True) & _ctr_clean.unsqueeze(2)
         if bool(self.unit_naval.any()):
             out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
         # CIV6 (Air combat): aircraft "can only be built in a city with an
@@ -1964,6 +1975,9 @@ class SimEconomy:
                    else self.d_usable & ~self.hills if placement in (4, 6)
                    else self.d_usable & self.floodplain if placement == 5
                    else self.d_usable)
+        # CIV6: "Production cannot be applied to anything in tiles containing
+        # contamination" - `canPlaceDistrictIn` refuses an irradiated tile.
+        surface = surface & ~self._fallout()
         elig = (self._district_elig_site(row, j) if base is None else base) & surface
         if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment/Preserve: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
@@ -2549,11 +2563,18 @@ class SimEconomy:
                 if bool(_p.any()):
                     _fh = _fh | ((seat == _r) & _p.gather(1, t))
             heal = torch.where(_fh & home, torch.full_like(heal, 100), heal)
-        # CIV6 (Twilight Valor): "Cannot heal outside your territory."
+        # CIV6 (Twilight Valor): "Cannot heal outside your territory" - the
+        # seat's OWN ground.
         if self._gov_has_effects:
             _s0 = seat.clamp(min=0, max=self.n_majors - 1)
             _hh = self._fx_by_row("healhome").gather(1, _s0) & (seat >= 0) & (seat < self.n_majors)
             heal = torch.where(_hh & ~home, torch.zeros_like(heal), heal)
+        # CIV6 (Giant Death Robot): "Can only heal in friendly territory" -
+        # its own ground or an ally's, which is a wider bar than the card's.
+        if bool(self._type_heal_friendly.any()):
+            _hf = self._type_heal_friendly[getattr(self, f"{pre}_unit_type").clamp(min=0)]
+            _ally = home | self._ground_allied(seat, here)
+            heal = torch.where(_hf & ~_ally, torch.zeros_like(heal), heal)
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
         heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre) \
@@ -2563,6 +2584,48 @@ class SimEconomy:
         if bool(_rel.any()):
             heal = torch.where(_rel, self._religious_heal(pre), heal)
         return heal
+
+    def _ground_allied(self, seat: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        '''[B, U] - `seatsAllied(state, unit.seat, tileSeat(tile))`: does the
+        unit's seat hold a live alliance with whoever owns the ground it
+        stands on? A minor, a barbarian or unowned ground answers no.'''
+        owner = self.tile_seat.gather(1, tile.clamp(min=0))
+        NM = self.n_majors
+        ok = (seat >= 0) & (seat < NM) & (owner >= 0) & (owner < NM)
+        flat = seat.clamp(min=0, max=NM - 1) * NM + owner.clamp(min=0, max=NM - 1)
+        live = self.seat_ally_turns[:, :NM, :NM].reshape(self.B, -1).gather(1, flat) > 0
+        return live & ok
+
+    def _fallout_toll(self) -> None:
+        '''CIV6: "Any units (except Giant Death Robots) that end their turn in
+        a contaminated tile take 50 damage each turn." Taken at refreshUnits'
+        own position, after the turn's heal and movement reset, for both unit
+        windows; a unit the fallout finishes is removed like any other.'''
+        if self._n_devices <= 0:
+            return
+        fo = self._fallout()
+        for pre in ("major", "barb"):
+            alive = getattr(self, f"{pre}_unit_alive")
+            if not bool(alive.any()):
+                continue
+            tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+            typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+            hurt = alive & fo.gather(1, tile) & (typ != self._gdr_idx)
+            if not bool(hurt.any()):
+                continue
+            hp = getattr(self, f"{pre}_unit_hp")
+            hp.copy_(torch.where(hurt, hp - self._fallout_damage, hp))
+            dead = hurt & (hp <= 0)
+            if bool(dead.any()):
+                rows, slots = dead.nonzero(as_tuple=True)
+                self._vacate(pre, rows, slots)
+                alive[rows, slots] = False
+
+    def _fallout(self) -> torch.Tensor:
+        '''[B, T] - `irradiated`: a tile still under radioactive fallout.
+        Nothing may be worked, built, repaired or bought on it, and whoever
+        ends a turn there is hurt.'''
+        return self.tile_fallout > 0
 
     def _res_starved(self, pre: str) -> torch.Tensor:
         """[B, U] — CIV6 (Resource, GS): "if you had acquired Iron to produce
@@ -3079,7 +3142,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == row)
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self.work_ok)
+            & gat(self.work_ok & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)
             & (gat(self.built_wonder) < 0)
@@ -3209,7 +3272,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == row)
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self.work_ok)
+            & gat(self.work_ok & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)  # !t.district
             & (gat(self.built_wonder) < 0)  # !t.builtWonder

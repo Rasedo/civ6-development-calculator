@@ -95,6 +95,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // be constructed by Military Engineers. Does not cost a charge, but does
   // cost 1 Iron and 1 Coal." Appended last, like every verb since FOUND_CITY.
   names.push('BUILD_RAILROAD');
+  // CIV6: fallout "can be cleaned from affected tiles by Builders, Military
+  // Engineers, or any other unit that has at least 1 remaining build charge",
+  // and doing so "takes 1 build charge". One column, where the unit stands.
+  names.push('CLEAN_FALLOUT');
   return names;
 }
 

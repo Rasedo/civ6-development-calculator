@@ -66,7 +66,7 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 29
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -81,8 +81,9 @@ def main() -> None:
              + [f"FORM_UP_{d}" for d in range(6)]
              + ["ESCORT", "BREAK_ESCORT"]
              + [f"AIR_PILLAGE_{k}" for k in range(dict(heads)["AIR_PILLAGE_"])]
-             # the newest last-append: the engineer's second route
-             + ["BUILD_RAILROAD"])
+             # the newest last-appends: the engineer's second route, and
+             # the charge that clears radioactive fallout
+             + ["BUILD_RAILROAD", "CLEAN_FALLOUT"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.

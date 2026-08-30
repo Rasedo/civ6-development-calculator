@@ -26,6 +26,7 @@ import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { gpCityPermOf } from '../data/greatPeople';
 import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 import { getModifiers } from './effects';
+import { irradiated } from './nuclear';
 
 export interface RuleResult {
   ok: boolean;
@@ -273,6 +274,7 @@ export function canPlaceDistrictIn(
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
   if (tile.district) return no('Another district is here.');
+  if (irradiated(tile)) return no('Radioactive fallout covers this tile.');
   if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (tile.wonder) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
@@ -577,7 +579,12 @@ const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
-  const placed = new Set(city.districts.map((d) => d.type));
+  // CIV6: "Production cannot be applied to anything in tiles containing
+  // contamination" — an irradiated district takes no new picks, and like the
+  // Urban Development Treaty's block, whatever is in flight still finishes.
+  const placed = new Set(
+    city.districts.filter((d) => !irradiated(map.tiles[d.tileIndex])).map((d) => d.type),
+  );
   const queued = new Set(
     city.queue.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
   );
@@ -639,6 +646,14 @@ export function buildingCompletable(state: GameState, city: City, buildingId: st
     (d) => d.type === def.district && state.map.tiles[d.tileIndex].districtComplete,
   );
   if (!districtDone) return false;
+  // CIV6: "Production cannot be applied to anything in tiles containing
+  // contamination", and no Gold or Faith buys it either. A building lives in
+  // its district, so the district's TILE is what has to be clean.
+  const seat = city.districts.find(
+    (d) => d.type === def.district && state.map.tiles[d.tileIndex].districtComplete
+      && !irradiated(state.map.tiles[d.tileIndex]),
+  );
+  if (!seat) return false;
   if (def.requiresAny && !def.requiresAny.some((r) => city.buildings.includes(r))) return false;
   return true;
 }

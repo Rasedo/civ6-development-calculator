@@ -402,7 +402,11 @@ class SimMasks:
         OWN pool; a breach in either makes the project available."""
         mx = self._walls_max_all(row)[:, j]
         breached = (self.city_outer_hp[:, row, j] < mx) | (self._enc_outer_missing(row)[:, j] > 0)
-        return ((mx > 0) & breached
+        # CIV6 (a City Center caught in a blast): "Repair Outer Defenses is
+        # unusable while the fallout lasts."
+        _ctr = self.city_center[:, row, j]
+        clean = (_ctr >= 0) & ~self._fallout().gather(1, _ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return ((mx > 0) & breached & clean
                 & ((self.turn - self.city_last_hit[:, row, j]) >= self._repair_quiet))
 
     def _repair_cost(self, row: int, j: int) -> torch.Tensor:
@@ -2647,6 +2651,15 @@ class SimMasks:
                     & self.passable.gather(1, tc)
                     & ~self.water.gather(1, tc))
             _rr = [(_rrg & _rrok & ~self.railroad.gather(1, tc)).unsqueeze(2)]
+        # CIV6: fallout "can be cleaned from affected tiles by Builders,
+        # Military Engineers, or any other unit that has at least 1 remaining
+        # build charge", and doing so "takes 1 build charge". No chassis clause
+        # and no territory clause — the charge and the fallout are the whole
+        # gate.
+        _cf: list[torch.Tensor] = []
+        if getattr(self, "_A_CLEAN", -1) >= 0:
+            _cf = [(present & (u_charges > 0)
+                    & self._fallout().gather(1, tc)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -2691,7 +2704,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr,
+            + _ec + _ue + _ap + _rr + _cf,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

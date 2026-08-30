@@ -193,6 +193,9 @@ export function disasterPhase(state: GameState): void {
 
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;
+    // CIV6: fallout lasts "for 10 turns" / "for 20 turns" from the blast, and
+    // a tile is clean again when the timer expires.
+    if ((t.falloutTurns ?? 0) > 0) t.falloutTurns = (t.falloutTurns ?? 0) - 1;
   }
 
   if (nextRandom(state) < FLOOD_CHANCE * rate) {

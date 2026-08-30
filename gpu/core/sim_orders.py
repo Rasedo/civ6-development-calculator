@@ -60,6 +60,7 @@ class SimOrders:
         _smc = getattr(self, "_A_SPY_MISSION", -1)
         _rdc = getattr(self, "_A_ROAD", -1)
         _rrc = getattr(self, "_A_RAIL", -1)
+        _cfc = getattr(self, "_A_CLEAN", -1)
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
         _pfc = getattr(self, "_A_PERFORM", -1)
@@ -107,6 +108,7 @@ class SimOrders:
             ((_ab == _uec) if _uec >= 0 else _no).any(dim=0),   # and leave it
             (((_ab >= _apc) & (_ab < _apc + _asw)) if _apc >= 0 else _no).any(dim=0),  # air pillage
             ((_ab == _rrc) if _rrc >= 0 else _no).any(dim=0),                     # lay a railroad
+            ((_ab == _cfc) if _cfc >= 0 else _no).any(dim=0),                     # clean fallout
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -114,7 +116,7 @@ class SimOrders:
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
-         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail) = _tab
+         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -365,6 +367,16 @@ class SimOrders:
                         self._emit_carbon(row, _rrm.double() * float(_cn * self._carbon_per_resource[_sl]))
                     self.railroad[_r, hc[_r]] = True
                     self.unit_mp[_r, sc[_r]] = 0
+
+            # CIV6: cleaning fallout "takes 1 build charge", and any chassis
+            # carrying one may do it — no territory clause, no chassis clause.
+            if _rk_clean[n] and _cfc >= 0:
+                _cfm = (act & (a == _cfc) & (u_charges > 0)
+                        & self._fallout().gather(1, hc.unsqueeze(1)).squeeze(1))
+                if bool(_cfm.any()):
+                    _r = _cfm.nonzero(as_tuple=True)[0]
+                    self.tile_fallout[_r, hc[_r]] = 0
+                    self._spend_build_charge(_r, sc, hc)
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
                 _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)
