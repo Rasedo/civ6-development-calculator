@@ -443,11 +443,12 @@ class SimEconomy:
         every seat shares: the improvement is physically on the tile and
         pillage suspends it, whoever is looking.
 
-        The tech-boosted part is NOT missing, it is per SEAT and cannot live
-        in a [B, T] plane: `_seat_city_yields` adds `_mine_boost_amt` from
-        THAT row's own techs, which is what TS does when it builds the yield
-        context from `getModifiers(state, city.seat)`. Cached per
-        _eff_version (improvement/pillage changes bump it)."""
+        The research-boosted part is NOT missing, it is per SEAT and cannot
+        live in a [B, T] plane: `_seat_tile_add` adds `_tech_imp_y` and
+        `_civic_imp_y` from THAT row's own research, which is what TS does
+        when it builds the yield context from `getModifiers(state,
+        city.seat)`. Cached per _eff_version (improvement/pillage changes
+        bump it)."""
         base = self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype)
         if not self.improvements_on:
             return base
@@ -3357,6 +3358,7 @@ class SimEconomy:
         g = self._rcy_globals()
         f_plane = self._rcy_food_plane(row, g)
         p_plane, ty_oth, oth_sc, w = g["p_plane"], g["ty_oth"], g["oth_score"], g["w"]
+        tile_add = self._tile_add_any(row)
         has_bel = self._seat_has_beliefs(row)  # PANTHEON + FOUNDER: a seat's own claim
         # The FOLLOWER half keys on the religion each CITY follows, which under
         # live coupling need not be one this seat founded (withFollowerBelief
@@ -3364,7 +3366,7 @@ class SimEconomy:
         fol_live = self._follower_live(row)
         fol_id = self._follower_id_for(self._city_rel(row)[:, sl]) if fol_live else None
         featP = None
-        if has_bel or self._b_appeal_rows:
+        if tile_add:
             featP = self._seat_tile_add(row)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
@@ -3390,9 +3392,6 @@ class SimEconomy:
         )
         f = gat(f_plane).double()
         p = gat(p_plane).double()
-        if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
-            boost = (self._seat_techs(row)[:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
-            p = p + ((gat(self.improvement) == self.MINE) & ~gat(self.pillaged)).double() * boost.reshape(B, 1, 1)
         # tileScore('balanced') = SUM yields . FOCUS_BASE, ties to the LOWEST
         # GLOBAL index (assignWorkedTiles' `b.score - a.score || a.index -
         # b.index`), never window position. FORCED f64: under f32 the index

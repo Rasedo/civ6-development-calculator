@@ -4645,6 +4645,16 @@ class SimSeats:
                 out = add if out is None else out + add
         return out
 
+    def _tile_add_any(self, row: int) -> bool:
+        """Whether `_seat_tile_add` can pay this seat anything. Every half it
+        sums has to be named here: a gate that asked about beliefs alone would
+        silently drop the card, research, river and Preserve halves."""
+        return bool(
+            self._seat_has_beliefs(row) or self._b_appeal_rows
+            or self._research_imp_y_any or self._imp_river_any
+            or self._gov_has_effects or self._imp_adj_live
+        )
+
     def _seat_tile_add(self, row: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
         (fid >= 0 and not stripped), plus improvementOnResource at unpillaged
@@ -4664,13 +4674,16 @@ class SimSeats:
         # CIV6 (Collectivism): "Farms +1 Food." A card's improvement adder
         # lands in the same `mods.improvementYields` map a belief writes, so
         # both are gathered by the tile's improvement at one site.
-        polY = self._policy_imp_yields(row)
+        polY = self._mod_imp_yields(row)
         if not self._seat_has_beliefs(row):
             plane = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
             if suz is not None:
                 plane = plane + suz * self._tile_add_live()
             if polY is not None:
                 plane = plane + self._imp_gather(polY) * self._tile_add_live()
+            riv = self._imp_river_plane()
+            if riv is not None:
+                plane = plane + riv * self._tile_add_live()
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
@@ -4694,6 +4707,9 @@ class SimSeats:
         plane = plane + self._imp_gather(impY)
         if polY is not None:
             plane = plane + self._imp_gather(polY)
+        riv = self._imp_river_plane()
+        if riv is not None:
+            plane = plane + riv
         plane = plane * self._tile_add_live()
         pres = self._preserve_plane(row)
         if pres is not None:
@@ -4725,13 +4741,29 @@ class SimSeats:
         idx = self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)
         return per_imp.to(self.dtype).gather(1, idx) * live
 
-    def _policy_imp_yields(self, row: int) -> torch.Tensor | None:
-        """[B, nImp, 6] — the seat's card improvement adders, None when none
-        is slotted."""
-        if not self._gov_has_effects:
+    def _mod_imp_yields(self, row: int) -> torch.Tensor | None:
+        """[B, nImp, 6] — everything TS sums into `mods.improvementYields`
+        except the beliefs, which carry their own pool: the seat's slotted
+        CARDS and its RESEARCH, techs and civics alike. None where the seat
+        has neither."""
+        out = None
+        if self._gov_has_effects:
+            m = self._gov_mods(row)[12]["impy"]
+            if bool((m != 0).any()):
+                out = m
+        if self._research_imp_y_any:
+            r = (torch.einsum("bt,tik->bik", self._seat_techs(row).to(self.dtype), self._tech_imp_y)
+                 + torch.einsum("bc,cik->bik", self._seat_civics(row).to(self.dtype), self._civic_imp_y))
+            out = r if out is None else out + r
+        return out
+
+    def _imp_river_plane(self) -> torch.Tensor | None:
+        """[B, T, 6] — what an improvement pays extra for standing on a
+        RIVER tile, None where no row carries the column."""
+        if not self._imp_river_any:
             return None
-        m = self._gov_mods(row)[12]["impy"]
-        return m if bool((m != 0).any()) else None
+        return (self._imp_gather(self._imp_river_y.unsqueeze(0).expand(self.B, -1, -1))
+                * self.tile_river.unsqueeze(2).to(self.dtype))
 
     def _tile_add_live(self) -> torch.Tensor:
         """[B, T, 1] 1 where a generic runtime tile add lands. ORACLE:
@@ -5977,9 +6009,6 @@ class SimSeats:
         g = self._rcy_globals()
         f_plane = self._rcy_food_plane(row, g)
         p_plane = g["p_plane"]
-        if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
-            boost_r = (self._seat_techs(row)[:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
-            p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
         y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
         if self.improvements_on:
             live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
@@ -5988,7 +6017,7 @@ class SimSeats:
                 y_oth = y_oth + self._tile_appeal().clamp(min=0).to(self.dtype) * (
                     (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
                 )
-        if self._seat_has_beliefs(row) or self._b_appeal_rows:
+        if self._tile_add_any(row):
             featP = self._seat_tile_add(row)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]

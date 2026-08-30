@@ -81,9 +81,9 @@ from the list below.
 | C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
 | C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
-| C-42 no improvement's yields scale with a technology | 2 | eight improvement families carry published per-tech raises; only the Mine has a channel, hardwired to itself |
-| **C. Absent systems** | **30** | |
-| **OPEN, TOTAL** | **54** | |
+| C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
+| **C. Absent systems** | **29** | |
+| **OPEN, TOTAL** | **53** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1144,16 +1144,19 @@ under their blocker so the dependency is readable, and both halves count.
     answer is what this file exists to stop. ASK THE OWNER.
   Waiting on it: FIRE_GODDESS pays "+2 Faith from Geothermal Fissures and
   Volcanic Soil" and only the Fissure half can ever be paid.
-- **C-42. NO IMPROVEMENT'S YIELDS SCALE WITH A TECHNOLOGY.** Weight 2. Real
-  Civ 6 raises an improvement's own yields as the tree advances, and eight
-  families carry a published raise: FISHING BOATS (+2 Gold at Cartography,
-  +1 Food at Plastics), the CAMP, PLANTATION, QUARRY, PASTURE and LUMBER
-  MILL, and the FARM's civic-borne raises. `ImprovementDef` has no
-  `techYields` channel at all; the MINE alone has one, and it is hardwired
-  to the Mine (`mineBoostTechs` / `_mine_boost_tech`) rather than being a
-  column any row can fill. Every unlisted raise is silently absent, so an
-  improved tile's late-game yield is short on both engines equally — which
-  is why no parity gate can see it.
+- **C-43. TWO IMPROVEMENT PAGES WERE NEVER REACHED.** Weight 1. Thirteen
+  research raises ship, each transcribed from its own Civilopedia
+  "(requires X)" line, and the channel behind them takes any row: the wire
+  carries `techImpY` / `civicImpY` and the engines read them
+  (`modifiersFromResearch` / `_mod_imp_yields`). The OIL WELL, FORT and
+  MISSILE SILO pages were read and state no raise, so their zero is a fact.
+  The SEASIDE RESORT and AIRSTRIP pages BOTH 404 at the source used for the
+  other eleven, so their zero is an absence of evidence — and this file has
+  been burned by that before: sixteen wonder rows once read as silent and
+  carried twelve invented yields between them. Re-source those two before
+  treating either zero as settled. The CIVILIZATION-unique adjacencies the
+  Pasture and Farm pages name (Outback Station, Observatory) are C-26,
+  parked.
 
 ## Reachability — what the green gate does NOT prove
 

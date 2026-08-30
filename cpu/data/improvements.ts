@@ -73,6 +73,9 @@ export interface ImprovementDef {
   noFeature?: boolean;
   /** the row may stand ONLY on this feature (the Geothermal Plant). */
   requiresFeature?: FeatureId;
+  /** what the row pays extra on a RIVER tile (the Lumber Mill's second
+   *  Production), on top of `yields`. */
+  riverYields?: Partial<Yields>;
   /** a Builder places this row on its own catalog GROUND alone — no resource
    *  under it, no suzerainty, no appeal bar, and not the Engineer's list. */
   groundOnly?: boolean;
@@ -139,9 +142,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     code: 'Lu',
     plunder: { kind: 'gold', amount: 50 },
     yields: { production: 1 },
+    // CIV6 (Lumber Mill): "+1 Production. +1 Production if adjacent to River."
+    riverYields: { production: 1 },
     housing: 0,
     resourceOnly: false,
-    description: 'Woods.',
+    description: 'Woods. +1 production more on a river.',
   },
   PASTURE: {
     id: 'PASTURE',

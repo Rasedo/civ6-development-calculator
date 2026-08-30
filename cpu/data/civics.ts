@@ -173,7 +173,11 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
 
     C('MERCENARIES', 'Mercenaries', 'Medieval', 340, ['MILITARY_TRAINING', 'FEUDALISM']),
 
-    C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM']),
+    C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM'], [
+      // CIV6 (Camp): "+1 Production (requires Mercantilism)" and "+1 Food
+      // (requires Mercantilism)".
+      { kind: 'improvementYields', improvement: 'CAMP', yields: { production: 1, food: 1 } },
+    ]),
     C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS'], [
       { kind: 'unlockBuilding', building: 'CHANCERY' },
     ]),
@@ -207,7 +211,10 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('ENVIRONMENTALISM', 'Environmentalism', 'Information', 2880, ['CULTURAL_HERITAGE', 'RAPID_DEPLOYMENT']),
 
-    C('GLOBALIZATION', 'Globalization', 'Information', 2880, ['RAPID_DEPLOYMENT', 'SPACE_RACE']),
+    C('GLOBALIZATION', 'Globalization', 'Information', 2880, ['RAPID_DEPLOYMENT', 'SPACE_RACE'], [
+      // CIV6 (Plantation): "+2 Gold (requires Globalization)".
+      { kind: 'improvementYields', improvement: 'PLANTATION', yields: { gold: 2 } },
+    ]),
     C('SOCIAL_MEDIA', 'Social Media', 'Information', 2880, ['SPACE_RACE', 'PROFESSIONAL_SPORTS'], [
       { kind: 'unlockPolicy', policy: 'COLLECTIVE_ACTIVISM' },
       { kind: 'unlockPolicy', policy: 'ONLINE_COMMUNITIES' },

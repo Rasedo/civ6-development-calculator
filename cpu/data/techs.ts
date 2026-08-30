@@ -148,6 +148,8 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('BANKING', 'Banking', 'Renaissance', 600, ['EDUCATION', 'STIRRUPS'], [
       { kind: 'unlockBuilding', building: 'BANK' },
+      // CIV6 (Quarry): "+2 Gold (requires Banking)".
+      { kind: 'improvementYields', improvement: 'QUARRY', yields: { gold: 2 } },
     ]),
 
     T('MASS_PRODUCTION', 'Mass Production', 'Renaissance', 600, ['EDUCATION', 'BUTTRESS', 'MILITARY_TACTICS'], [
@@ -160,7 +162,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'COAL_POWER_PLANT' },
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
     ]),
-    T('SCIENTIFIC_THEORY', 'Scientific Theory', 'Industrial', 930, ['ASTRONOMY', 'BANKING']),
+    T('SCIENTIFIC_THEORY', 'Scientific Theory', 'Industrial', 930, ['ASTRONOMY', 'BANKING'], [
+      // CIV6 (Plantation): "+1 Food (requires Scientific Theory)".
+      { kind: 'improvementYields', improvement: 'PLANTATION', yields: { food: 1 } },
+    ]),
     T('SANITATION', 'Sanitation', 'Industrial', 1070, ['SCIENTIFIC_THEORY'], [
       { kind: 'unlockBuilding', building: 'SEWER' },
     ]),
@@ -185,6 +190,8 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('STEEL', 'Steel', 'Modern', 1250, ['RIFLING'], [
       { kind: 'unlockImprovement', improvement: 'OIL_WELL' },
+      // CIV6 (Lumber Mill): "+1 Production (requires Steel)".
+      { kind: 'improvementYields', improvement: 'LUMBER_MILL', yields: { production: 1 } },
     ]),
     T('REPLACEABLE_PARTS', 'Replaceable Parts', 'Modern', 1250, ['ECONOMICS'], [
       { kind: 'farmAdjacency' },
@@ -199,14 +206,20 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'DAM' },
     ]),
     T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 300, ['MATHEMATICS']),
-    T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING', 'APPRENTICESHIP']),
+    T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING', 'APPRENTICESHIP'], [
+      // CIV6 (Pasture): "+1 Food (requires Stirrups)".
+      { kind: 'improvementYields', improvement: 'PASTURE', yields: { food: 1 } },
+    ]),
     T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'MEDIEVAL_WALLS' },
     ]),
 
     T('GUNPOWDER', 'Gunpowder', 'Renaissance', 600, ['APPRENTICESHIP', 'STIRRUPS', 'MILITARY_ENGINEERING']),
     T('METAL_CASTING', 'Metal Casting', 'Renaissance', 730, ['GUNPOWDER']),
-    T('CARTOGRAPHY', 'Cartography', 'Renaissance', 600, ['BUTTRESS']),
+    T('CARTOGRAPHY', 'Cartography', 'Renaissance', 600, ['BUTTRESS'], [
+      // CIV6 (Fishing Boats): "+2 Gold (requires Cartography)".
+      { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { gold: 2 } },
+    ]),
     T('PRINTING', 'Printing', 'Renaissance', 600, ['MACHINERY']),
     T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 730, ['CARTOGRAPHY']),
     T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 730, ['CASTLES'], [
@@ -224,7 +237,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('COMBUSTION', 'Combustion', 'Modern', 1370, ['STEEL', 'REFINING']),
     T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING']),
-    T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION']),
+    T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION'], [
+      // CIV6 (Fishing Boats): "+1 Food (requires Plastics)".
+      { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { food: 1 } },
+    ]),
 
     T('COMPUTERS', 'Computers', 'Atomic', 1660, ['ELECTRICITY', 'RADIO'], [
       { kind: 'unlockBuilding', building: 'FLOOD_BARRIER' },
@@ -235,12 +251,16 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ROCKETRY', 'Rocketry', 'Atomic', 1480, ['RADIO', 'CHEMISTRY'], [
       { kind: 'unlockDistrict', district: 'SPACEPORT' },
       { kind: 'unlockImprovement', improvement: 'MISSILE_SILO' },
+      // CIV6 (Quarry): "+1 Production (requires Rocketry)".
+      { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
     ]),
     T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1480, ['RADIO']),
     T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 1480, ['STEEL', 'COMBUSTION']),
     T('ADVANCED_BALLISTICS', 'Advanced Ballistics', 'Atomic', 1480, ['REPLACEABLE_PARTS', 'STEEL']),
     T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS'], [
       { kind: 'unlockImprovement', improvement: 'GEOTHERMAL_PLANT' },
+      // CIV6 (Camp): "+1 Gold (requires Synthetic Materials)".
+      { kind: 'improvementYields', improvement: 'CAMP', yields: { gold: 1 } },
     ]),
     T('COMPOSITES', 'Composites', 'Information', 1850, ['SYNTHETIC_MATERIALS'], [
       { kind: 'unlockImprovement', improvement: 'WIND_FARM' },
@@ -254,7 +274,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('LASERS', 'Lasers', 'Information', 1850, ['NUCLEAR_FISSION']),
     T('NANOTECHNOLOGY', 'Nanotechnology', 'Information', 2155, ['COMPOSITES']),
     T('NUCLEAR_FUSION', 'Nuclear Fusion', 'Information', 2155, ['LASERS']),
-    T('ROBOTICS', 'Robotics', 'Information', 2155, ['COMPUTERS', 'SATELLITES', 'GUIDANCE_SYSTEMS', 'LASERS']),
+    T('ROBOTICS', 'Robotics', 'Information', 2155, ['COMPUTERS', 'SATELLITES', 'GUIDANCE_SYSTEMS', 'LASERS'], [
+      // CIV6 (Pasture): "+1 Production (requires Robotics)".
+      { kind: 'improvementYields', improvement: 'PASTURE', yields: { production: 1 } },
+    ]),
     T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 1850, ['COMPUTERS']),
 
     // CIV6: the Future techs' only published gate is the Future ERA; the

@@ -68,7 +68,7 @@ const slotsOf = (xs: number[]): number[] => {
 };
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { ENGINEER_FINISH_FRACTION } from '../core/game';
-import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
+import { TECHS, ERAS, MODERN_ERA_INDEX, type ResearchEffect } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL, SPY_SECRET_AGENT_LEVEL,
   SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_PROMO_OFFER,
@@ -353,6 +353,18 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   if (row) boostRows.push({ target, idx, ...row });
 }
 
+
+/** [row, improvement, yield] — what each research row adds to an
+ *  improvement's own yields, the `improvementYields` effect summed. */
+const researchImpYields = (rows: readonly { effects: readonly ResearchEffect[] }[]) =>
+  rows.map((r) => IMPROVEMENT_IDS.map((id) => {
+    const y = YIELD_KEYS.map(() => 0);
+    for (const e of r.effects) {
+      if (e.kind !== 'improvementYields' || e.improvement !== id) continue;
+      YIELD_KEYS.forEach((k, i) => { y[i] += e.yields[k] ?? 0; });
+    }
+    return y;
+  }));
 
 const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
@@ -1351,15 +1363,15 @@ export function buildRules() {
       lumberUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL'),
       ),
-      mineBoostTechs: techList
-        .map((t, i): [number, number] => {
-          let boost = 0;
-          for (const e of t.effects) {
-            if (e.kind === 'improvementYields' && e.improvement === 'MINE') boost += e.yields.production ?? 0;
-          }
-          return [i, boost];
-        })
-        .filter(([, boost]) => boost > 0),
+      // What RESEARCH adds to an improvement's own yields, [row, improvement,
+      // yield]. Techs and civics carry the same effect kind and TS sums both
+      // into one `mods.improvementYields` map, so both tables ship.
+      techImpY: researchImpYields(techList),
+      civicImpY: researchImpYields(civicList),
+      // what a row pays extra on a RIVER tile (the Lumber Mill's second
+      // Production), [improvement, yield]
+      impRiverY: IMPROVEMENT_IDS.map((id) =>
+        YIELD_KEYS.map((k) => IMPROVEMENTS[id as ImprovementId]?.riverYields?.[k] ?? 0)),
     },
     districts: PLACEABLE_DISTRICTS.map((id, idx) => {
       const d = DISTRICTS[id];

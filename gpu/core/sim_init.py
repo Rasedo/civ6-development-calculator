@@ -1465,10 +1465,14 @@ class SimInit:
         self._lumber_unlock_tech = int(imp.get("lumberUnlockTech", -1))   # CONSTRUCTION
         self._seaside_unlock_tech = int(imp.get("seasideUnlockTech", -1))  # RADIO
         self._seaside_min_appeal = int(imp.get("seasideMinAppeal", 4))     # BREATHTAKING
-        # techs that permanently lift a MINE's yield (Apprenticeship, Industrialization → +1⚙ each)
-        mbt = imp.get("mineBoostTechs", [])  # [[techIdx, prodAmount], ...]
-        self._mine_boost_tech = torch.tensor([x[0] for x in mbt], dtype=torch.long, device=device)
-        self._mine_boost_amt = torch.tensor([float(x[1]) for x in mbt], dtype=dtype, device=device)
+        # What RESEARCH adds to an improvement's own yields — the TS
+        # `mods.improvementYields` map, which techs and civics both write.
+        self._tech_imp_y = torch.tensor(imp.get("techImpY", [[[0.0] * 6]]), dtype=dtype, device=device)
+        self._civic_imp_y = torch.tensor(imp.get("civicImpY", [[[0.0] * 6]]), dtype=dtype, device=device)
+        self._research_imp_y_any = bool((self._tech_imp_y != 0).any() or (self._civic_imp_y != 0).any())
+        # CIV6 (Lumber Mill): "+1 Production if adjacent to River."
+        self._imp_river_y = torch.tensor(imp.get("impRiverY", [[0.0] * 6]), dtype=dtype, device=device)
+        self._imp_river_any = bool((self._imp_river_y != 0).any())
         irows = imp.get("rows", [])
         nI = max(len(ids), 1)
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
