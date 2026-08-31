@@ -354,6 +354,7 @@ def main() -> int:
                 ("religious_zoc", [py, "tests/gpu/religious_zoc_test.py"], 4),  # the second zone of control — faith-purchased units the driver never marches past a hostile
                 ("appeal_cache", [py, "tests/gpu/appeal_cache_test.py"], 4),  # the version contract `_tile_appeal` is cached on, which two mid-game writers owed it
                 ("advance_borders", [py, "tests/gpu/advance_borders_test.py"], 4),  # a melee victor advancing is ENTERING the tile, so the border binds it
+                ("stockpile_ceiling", [py, "tests/gpu/stockpile_ceiling_test.py"], 4),  # the stockpile maximum, on the one way IN that had no clamp of its own
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

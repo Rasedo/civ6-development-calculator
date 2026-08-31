@@ -282,7 +282,13 @@ class SimDeals:
             idx = va.clamp(min=0, max=ns - 1).unsqueeze(1)
             held = self.civ_stockpile[:, taker].gather(1, idx).squeeze(1)
             back = torch.where(sel, torch.minimum(vb, held), torch.zeros_like(vb))
+            # `grantStockpile`'s ceiling: coming home is a grant like any other,
+            # and the stockpile maximum is a HARD one — a lump handed back to a
+            # seat already at the cap is lost, not banked over it.
+            mine = self.civ_stockpile[:, giver].gather(1, idx).squeeze(1)
+            room = torch.minimum(mine + back, self._stockpile_cap(giver)) - mine
+            gain = torch.where(back > 0, room, torch.zeros_like(room))
             self.civ_stockpile[:, taker] = self.civ_stockpile[:, taker].scatter_add(1, idx, (-back).unsqueeze(1))
-            self.civ_stockpile[:, giver] = self.civ_stockpile[:, giver].scatter_add(1, idx, back.unsqueeze(1))
+            self.civ_stockpile[:, giver] = self.civ_stockpile[:, giver].scatter_add(1, idx, gain.unsqueeze(1))
         self.deal_term_item[:, giver, taker] = torch.where(
             done.reshape(-1, 1, 1), torch.full_like(items, -1), self.deal_term_item[:, giver, taker])
