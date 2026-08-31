@@ -228,7 +228,7 @@ def test_the_driver_swap_lands_only_on_offered_columns(rules, path) -> None:
     grant(sim, j, ma=True, civ1=True)  # corps offered, army NOT (no MOBILIZATION)
     m = sim.production_mask().unsqueeze(0) if sim.production_mask().dim() == 2 \
         else sim.production_mask()
-    corps, army = sim.FORM_BASE + ui, sim.FORM_BASE + sim.NU + ui
+    corps = sim.FORM_BASE + ui
     prod0 = torch.full((sim.B, sim.RC), -1, dtype=torch.long)
     prod0[B0, j] = sim.UNIT_BASE + ui
     swaps = 0
