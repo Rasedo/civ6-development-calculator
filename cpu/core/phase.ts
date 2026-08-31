@@ -6,7 +6,7 @@ import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { isWater, isImpassable } from '../../world/query';
+import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
@@ -130,7 +130,7 @@ export function warTargets(state: GameState, seat: number): number[] {
 
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
-  if (tile.wonder || tile.feature === 'OASIS' || tile.district) return -1;
+  if (naturalWonderAt(tile) || tile.feature === 'OASIS' || tile.district) return -1;
   if (tileClaimed(tile)) return -1;
   let q = hasFreshWater(state.map, tile) ? 8 : 0;
   for (const t of tilesWithin(state.map, tile.col, tile.row, 2)) {

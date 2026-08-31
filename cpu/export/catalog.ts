@@ -3,7 +3,7 @@
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { wonderTerrainOk } from '../core/rules';
 import { neighbors } from '../../world/hex';
-import { hasRiver, isWater } from '../../world/query';
+import { hasRiver, isWater, naturalWonderAt } from '../../world/query';
 import { type DistrictId, type GameState, type Tile } from '../core/types';
 import { BUILDINGS } from '../data/buildings';
 import { centerBuildingIds } from '../core/prodLayout';
@@ -89,11 +89,11 @@ function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number
     }
     for (const n of around) {
       const m =
-        rule.source === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !n.wonder
+        rule.source === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !naturalWonderAt(n)
         : rule.source === 'RAINFOREST' ? n.feature === 'RAINFOREST'
         : rule.source === 'WOODS' ? n.feature === 'WOODS'
         : rule.source === 'REEF' ? n.feature === 'REEF'
-        : rule.source === 'NATURAL_WONDER' ? n.wonder !== null
+        : rule.source === 'NATURAL_WONDER' ? naturalWonderAt(n) !== null
         : rule.source === 'SEA_RESOURCE' ? isWater(n) && n.resource !== null
         : rule.source === 'GEOTHERMAL_FISSURE' ? n.feature === 'GEOTHERMAL_FISSURE'
         : rule.source === 'TUNDRA' ? n.terrain === 'TUNDRA'

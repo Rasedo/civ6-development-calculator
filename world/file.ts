@@ -39,7 +39,6 @@ export interface WorldMapLayers {
   elevation: number[];
   feature: number[];
   resource: number[];
-  wonder: number[];
   riverMask: number[];
   cliffMask: number[];
   volcano: number[];
@@ -51,7 +50,6 @@ export interface WorldCatalogs {
   elevations: string[];
   features: string[];
   resources: string[];
-  wonders: string[];
 }
 
 export interface WorldFile {

@@ -2,14 +2,13 @@
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
 import { citiesOf, seatOf, tileBelongsTo } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
-import { isWater, isMountain, hasRiver } from '../../world/query';
+import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
 import type { YieldCtx } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
-import { WONDERS } from '../../world/wonders';
 import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
@@ -58,8 +57,9 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 
   // a tile the sea has taken yields nothing, whatever is recorded under it
   if (tile.submerged) return out;
-  if (tile.wonder) {
-    addYields(out, WONDERS[tile.wonder]?.tileYields ?? {});
+  const nw = naturalWonderAt(tile);
+  if (nw) {
+    addYields(out, FEATURES[nw]?.yields ?? {});
     // CIV6 (Grove): "+1 Food and Faith to adjacent unimproved tiles with
     // Charming Appeal. Yields increased ... for adjacent unimproved tiles
     // with Breathtaking Appeal." A natural wonder is unimproved and
@@ -105,8 +105,9 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   }
 
   for (const n of neighbors(ctx.map, tile)) {
-    if (!n.wonder) continue;
-    const w = WONDERS[n.wonder];
+    const wf = naturalWonderAt(n);
+    if (!wf) continue;
+    const w = FEATURES[wf];
     if (!w) continue;
     if (w.adjacentYields) addYields(out, w.adjacentYields);
     if (w.doublesAdjacentTerrain) addYields(out, terrainYields(tile));
@@ -126,7 +127,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
   switch (rule.source) {
     case 'MOUNTAIN':
-      return isMountain(neighbor) && !neighbor.wonder;
+      return isMountain(neighbor) && !naturalWonderAt(neighbor);
     case 'RAINFOREST':
       return neighbor.feature === 'RAINFOREST';
     case 'WOODS':
@@ -140,7 +141,7 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
     case 'DESERT':
       return neighbor.terrain === 'DESERT';
     case 'NATURAL_WONDER':
-      return neighbor.wonder !== null;
+      return naturalWonderAt(neighbor) !== null;
     case 'BUILT_WONDER':
       return neighbor.builtWonder !== null && neighbor.builtWonderComplete;
     case 'DISTRICT':

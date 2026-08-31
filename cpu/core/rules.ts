@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver, naturalWonderAt } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
@@ -58,7 +58,7 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   if (!isExplored(state, seat, tileIndex)) return no('Unexplored — send a unit to scout it first.');
   if (isWater(tile)) return no('Cities must be founded on land.');
   if (isImpassable(tile)) return no('Impassable terrain.');
-  if (tile.wonder) return no('Cannot settle on a natural wonder.');
+  if (naturalWonderAt(tile)) return no('Cannot settle on a natural wonder.');
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
   if (tileClaimed(tile) && tileSeat(tile) !== seat) return no('Foreign territory.');
@@ -88,7 +88,7 @@ export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): bool
   // A NATURAL WONDER takes nothing built on it — the clause `canFoundCity`,
   // `validImprovementsIn`, `canPlaceDistrictIn` and `wonderTerrainOk` each
   // ask, and the engineer's ground is the last place that did not.
-  if (tile.wonder) return false;
+  if (naturalWonderAt(tile)) return false;
   return ownsTile(tile) || tileSeat(tile) < 0;
 }
 
@@ -124,7 +124,7 @@ export function validImprovementsIn(
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
   // in-flight wonder pave refuses improvements exactly like a district pave
   // (real Civ 6).
-  if (tile.district || tile.wonder || tile.builtWonder || isImpassable(tile)) return [];
+  if (tile.district || naturalWonderAt(tile) || tile.builtWonder || isImpassable(tile)) return [];
 
   const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
@@ -282,7 +282,7 @@ export function canPlaceDistrictIn(
   if (tile.district) return no('Another district is here.');
   if (irradiated(tile)) return no('Radioactive fallout covers this tile.');
   if (tile.builtWonder) return no('A wonder occupies this tile.');
-  if (tile.wonder) return no('Cannot build on a natural wonder.');
+  if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.feature === 'OASIS') return no('Districts cannot be built on an oasis.');
   // GS lets districts be built on every kind of Floodplains (they flood
@@ -696,7 +696,7 @@ export function wonderExists(state: GameState, wonderId: string): boolean {
  * it out of this one body and neither re-derives it.
  */
 export function wonderTerrainOk(def: BuiltWonderDef, tile: Tile, map: GameMap): boolean {
-  if (tile.wonder || isImpassable(tile)) return false;
+  if (naturalWonderAt(tile) || isImpassable(tile)) return false;
   const p = def.placement;
   if (p.onCoastalWater) {
     // CIV6: "on Coast adjacent to land", and every wonder that asks for it
@@ -751,7 +751,7 @@ export function canPlaceWonder(
   const dist = hexDistance(center.col, center.row, tile.col, tile.row);
   if (dist === 0 || dist > CITY_WORK_RADIUS) return no('Must be within 3 tiles of the city center.');
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
-  if (tile.wonder) return no('Cannot build on a natural wonder.');
+  if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.resource) {
     const cat = RESOURCES[tile.resource].category;

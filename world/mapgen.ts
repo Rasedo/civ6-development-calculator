@@ -25,6 +25,7 @@ import {
 import type { GameMap, MapGenOptions, TerrainId, Tile } from './types';
 import { RESOURCES, type ResourceDef } from './resources';
 import { TERRAINS } from './terrains';
+import { naturalWonderAt } from './query';
 import { WONDERS, wonderQuota, type NaturalWonderDef } from './wonders';
 
 export function generateMap(opts: MapGenOptions): GameMap {
@@ -45,7 +46,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
         elevation: 'FLAT',
         feature: null,
         resource: null,
-        wonder: null,
         riverMask: 0,
         cliffMask: 0,
         improvement: null,
@@ -224,7 +224,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
 
   {
     const rngVo = mulberry32(deriveSeed(seed, 'volcanoes'));
-    const mountains = shuffle(rngVo, map.tiles.filter((t) => t.elevation === 'MOUNTAIN' && !t.wonder));
+    const mountains = shuffle(rngVo, map.tiles.filter((t) => t.elevation === 'MOUNTAIN' && !naturalWonderAt(t)));
     const count = Math.max(1, Math.round(mountains.length * 0.12));
     for (let i = 0; i < count && i < mountains.length; i++) {
       mountains[i].volcano = true;
@@ -258,7 +258,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
     for (const t of shuffle(rngV, [...map.tiles])) {
       if (quota <= 0) break;
       if (TERRAINS[t.terrain].water || t.elevation === 'MOUNTAIN') continue;
-      if (t.feature === 'ICE' || t.feature === 'OASIS' || t.wonder || t.resource) continue;
+      if (t.feature === 'ICE' || t.feature === 'OASIS' || naturalWonderAt(t) || t.resource) continue;
       if (neighbors(map, t).some((n) => n.goodyHut)) continue;
       t.goodyHut = true;
       quota--;
@@ -294,7 +294,7 @@ function wonderTileValid(
   latOf: (row: number) => number,
   isAnchor: boolean,
 ): boolean {
-  if (t.wonder) return false;
+  if (naturalWonderAt(t)) return false;
   if (t.col < 2 || t.row < 2 || t.col >= map.width - 2 || t.row >= map.height - 2) return false;
   if (isAnchor) {
     const lat = latOf(t.row);
@@ -345,8 +345,7 @@ function placeWonders(map: GameMap, seed: number): void {
         continue;
       }
       for (const t of tiles) {
-        t.wonder = def.id;
-        t.feature = null;
+        t.feature = def.id;
         t.resource = null;
         if (def.becomesTerrain) {
           t.terrain = def.becomesTerrain;
@@ -480,7 +479,7 @@ function placeResources(map: GameMap, seed: number, opts: MapGenOptions): void {
   for (const t of order) {
     if (quota <= 0) break;
     if (t.terrain === 'OCEAN') continue;
-    if (t.elevation === 'MOUNTAIN' || t.wonder) continue;
+    if (t.elevation === 'MOUNTAIN' || naturalWonderAt(t)) continue;
     if (t.feature === 'ICE' || t.feature === 'OASIS') continue;
     if (neighbors(map, t).some((n) => n.resource)) continue;
 

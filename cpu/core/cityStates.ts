@@ -7,7 +7,7 @@ import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
-import { isWater, isImpassable, hasFreshWater } from '../../world/query';
+import { isWater, isImpassable, hasFreshWater, naturalWonderAt } from '../../world/query';
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
@@ -28,7 +28,7 @@ const CITY_STATE_SPACING = 8;
 
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
-  if (tile.wonder || tile.feature === 'OASIS') return -1;
+  if (naturalWonderAt(tile) || tile.feature === 'OASIS') return -1;
   let q = hasFreshWater(state.map, tile) ? 8 : 0;
   for (const t of tilesWithin(state.map, tile.col, tile.row, 2)) {
     if (isWater(t) || isImpassable(t)) continue;

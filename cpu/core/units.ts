@@ -20,7 +20,7 @@ export function formationCS(unit: Unit): number {
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
@@ -941,7 +941,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     revealAround(state, unit.seat, to.index, unitSight(unit));
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
     // wonder for the first time."
-    if (neighbors(state.map, to).some((t) => t.wonder !== null)) {
+    if (neighbors(state.map, to).some((t) => naturalWonderAt(t) !== null)) {
       const extra = promoFirstUse(unit, 'PILGRIM');
       if (extra > 0) unit.charges = (unit.charges ?? 0) + extra;
     }

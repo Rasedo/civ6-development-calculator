@@ -2608,10 +2608,6 @@
         "why": "world geometry (see Tile.terrain)."
       },
       {
-        "path": "Tile.wonder",
-        "why": "natural wonder placement, fixed at build."
-      },
-      {
         "path": "Tile.riverMask",
         "why": "world geometry, fixed at build."
       },

@@ -24,7 +24,7 @@
  */
 import type { GameMap, Tile } from '../world/types';
 import { hexDistance, tilesWithin } from '../world/hex';
-import { isWater, isImpassable } from '../world/query';
+import { isWater, isImpassable, naturalWonderAt } from '../world/query';
 import { mulberry32, deriveSeed, randInt, type Rng } from '../world/rng';
 import type { WorldCiv, WorldCityState } from '../world/file';
 
@@ -59,7 +59,7 @@ const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
 };
 
 function startLegal(t: Tile): boolean {
-  return !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' && !t.goodyHut;
+  return !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && t.feature !== 'OASIS' && !t.goodyHut;
 }
 
 function resourcesNear(map: GameMap, t: Tile): number {

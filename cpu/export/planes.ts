@@ -19,7 +19,7 @@ import { baseYieldCtx } from '../core/effects';
 import { tileYields, districtAdjacency } from '../core/yields';
 import { terrainDefense } from '../core/combat';
 import { terrainMp, unitPassable } from '../core/units';
-import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../../world/query';
+import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { TERRAINS } from '../../world/terrains';
@@ -74,7 +74,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     return {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
-      wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
       // what a Great Person's per-adjacent clause counts: the MOUNTAIN is
       // static, the natural wonder rides `nw` and RAINFOREST `fid` +
       // feat_stripped.
@@ -112,7 +111,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       tmove: terrainMp(t) - MP_SCALE,
       rd: t.road ? 1 : 0, // the ROAD plane (false at t0)
       rr: t.railroad ? 1 : 0, // the RAILROAD plane (false at t0)
-      camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
+      camp: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
       // Chop planes: ftr = the chop grant key when this tile's feature
@@ -123,10 +122,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       ftu: chopUnlockTech(t),
       wt: isWater(t) ? 1 : 0,
       cw:
-        isCoastalWater(map, t) && !t.wonder && !t.builtWonder &&
+        isCoastalWater(map, t) && !naturalWonderAt(t) && !t.builtWonder &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       fw: hasFreshWater(map, t) ? 1 : 0,
-      nw: t.wonder ? 1 : 0,
       // statically settleable for civ-seat expansion (mirrors siteQuality's -1s;
       // ownership and dynamic districts are the engine's job). GEO-H:
       // `st` must NOT bake `!t.district` — the district is a LIVE property
@@ -136,12 +134,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // freed center) as permanently unsettleable in the GPU while TS re-opens
       // it live — the seed 9235/9144 founding-site divergence. Keep `st`
       // purely static: water / impassable / natural wonder / OASIS.
-      st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' ? 1 : 0,
+      st: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && t.feature !== 'OASIS' ? 1 : 0,
       // canPlaceDistrictIn's STATIC half. GS allows districts on floodplains,
       // so only the Oasis is refused by feature; the removable-feature TECH
       // gate is dynamic and lives on `ftu` (the engine reads it per seat).
       du:
-        !isWater(t) && !isImpassable(t) && !t.wonder && !t.builtWonder &&
+        !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
         t.feature !== 'OASIS' && !t.district &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       dadj: PLACEABLE_DISTRICTS.map((id) => {
@@ -192,8 +190,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // MINE/QUARRY/OIL_WELL -1, INDUSTRIAL_ZONE/ENCAMPMENT -1).
       ap: (() => {
         let a = 0;
-        if (t.wonder) a += 2;
-        if (isMountain(t) && !t.wonder) a += 1;
+        if (naturalWonderAt(t)) a += 2;
+        if (isMountain(t) && !naturalWonderAt(t)) a += 1;
         if (t.terrain === 'COAST' || t.terrain === 'LAKE') a += 1;
         if (t.feature === 'WOODS') a += 1;
         if (t.feature === 'RAINFOREST' || t.feature === 'MARSH') a -= 1;
@@ -208,7 +206,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
             ? -1
             : 0,
       aps: (t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0,
-      apo: t.wonder ? 5 : isMountain(t) ? 4 : -999,
+      apo: naturalWonderAt(t) ? 5 : isMountain(t) ? 4 : -999,
       // river-edge crossing bits for the civ-seat MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward
@@ -225,7 +223,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         return i >= 0 ? i : -9;
       })(),
       fa_f:
-        !t.district && !t.wonder && !isImpassable(t) &&
+        !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? // resource tiles accept only the resource's improvement, ungated,
             RESOURCES[t.resource]?.improvement === 'FARM'
@@ -235,40 +233,40 @@ export function buildFixture(state: GameState, world: WorldFile): object {
           ? 1
           : 0,
       fa_h:
-        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
+        !t.resource && !t.district && !naturalWonderAt(t) && !isImpassable(t) && !isWater(t) &&
         t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
           ? 1
           : 0,
       mi:
-        !t.district && !t.wonder && !isImpassable(t) &&
+        !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? RESOURCES[t.resource]?.improvement === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS' && t.feature === null)
           ? 1
           : 0,
       lu:
-        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) && t.feature === 'WOODS'
+        !t.resource && !t.district && !naturalWonderAt(t) && !isImpassable(t) && !isWater(t) && t.feature === 'WOODS'
           ? 1
           : 0,
       sr_c:
-        !t.district && !t.wonder && !t.builtWonder && !isImpassable(t) && !isWater(t) &&
+        !t.district && !naturalWonderAt(t) && !t.builtWonder && !isImpassable(t) && !isWater(t) &&
         !t.resource && t.elevation === 'FLAT' &&
         (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS' || t.terrain === 'DESERT') &&
         neighbors(map, t).some((n) => n.terrain === 'COAST')
           ? 1 : 0,
       sr_nf: t.feature === null ? 1 : 0,
       fa_f_c:
-        !t.district && !t.wonder && !isImpassable(t) &&
+        !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? RESOURCES[t.resource]?.improvement === 'FARM'
           : !isWater(t) && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT')
           ? 1 : 0,
       fa_h_c:
-        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
+        !t.resource && !t.district && !naturalWonderAt(t) && !isImpassable(t) && !isWater(t) &&
         (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
           ? 1 : 0,
       mi_c:
-        !t.district && !t.wonder && !isImpassable(t) &&
+        !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? RESOURCES[t.resource]?.improvement === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS')

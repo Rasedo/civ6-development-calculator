@@ -2,7 +2,6 @@
 import { neighbors } from './hex';
 import { TERRAINS } from './terrains';
 import { FEATURES } from './features';
-import { WONDERS } from './wonders';
 import type { GameMap, Tile } from './types';
 
 export function isWater(tile: Tile): boolean {
@@ -34,8 +33,13 @@ export function isMountain(tile: Tile): boolean {
 
 export function isImpassable(tile: Tile): boolean {
   if (isMountain(tile)) return true;
-  if (tile.wonder && WONDERS[tile.wonder]?.impassable) return true;
   return tile.feature != null && !!FEATURES[tile.feature]?.impassable;
+}
+
+/** the natural-wonder FEATURE standing on this tile, null otherwise — the
+ *  one reader of the roster's `naturalWonder` flag. */
+export function naturalWonderAt(tile: Tile): string | null {
+  return tile.feature !== null && FEATURES[tile.feature]?.naturalWonder ? tile.feature : null;
 }
 
 export function hasRiver(tile: Tile): boolean {

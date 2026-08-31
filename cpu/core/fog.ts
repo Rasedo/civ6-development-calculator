@@ -3,7 +3,7 @@ import type { GameState, Unit } from './types';
 import { citiesOf, isCiv, seatOf, tileSeat, unitsOf } from './seats';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { nextRandom } from './rand';
-import { isWater, isImpassable } from '../../world/query';
+import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
 import { TECHS } from '../data/techs';
 import { dedicationEvent } from './eras';
 import { promoValue } from './promotions';
@@ -45,7 +45,7 @@ export function revealAround(
   const t = state.map.tiles[tileIndex];
   let found = 0;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
-    if (s.explored[n.index] !== 1 && n.wonder) found++;
+    if (s.explored[n.index] !== 1 && naturalWonderAt(n)) found++;
     s.explored[n.index] = 1;
   }
   // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover

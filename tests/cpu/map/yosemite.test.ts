@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { WONDERS } from '../../../world/wonders';
+import { FEATURES } from '../../../world/features';
 
 /**
  * — YOSEMITE, sourced from the Civilopedia
  * (features/feature_yosemite): "+1 Gold, +1 Food, and +1 Science to adjacent
  * tiles" and "impassable — units cannot enter this two-tile natural wonder".
  *
- * The fixtures carry `nw` as a BOOLEAN ("is a natural wonder tile"), not a
- * wonder id, so the gate cannot tell whether Yosemite specifically was rolled
- * onto any map — parity green does not prove this one. These assertions pin the
- * data directly instead.
+ * The gate cannot tell whether Yosemite specifically was rolled onto any
+ * map — parity green does not prove this one. These assertions pin the
+ * FEATURE row (the roster natural wonders live on) directly instead.
  */
 describe('Yosemite', () => {
   it('is impassable', () => {
-    expect(WONDERS.YOSEMITE.impassable).toBe(true);
+    expect(FEATURES.YOSEMITE.impassable).toBe(true);
   });
 
   it('pays its yields to ADJACENT tiles, not its own', () => {
-    expect(WONDERS.YOSEMITE.adjacentYields).toEqual({ gold: 1, food: 1, science: 1 });
-    expect(WONDERS.YOSEMITE.tileYields).toEqual({});
+    expect(FEATURES.YOSEMITE.adjacentYields).toEqual({ gold: 1, food: 1, science: 1 });
+    expect(FEATURES.YOSEMITE.yields).toEqual({});
   });
 
   it('is a two-tile wonder', () => {
@@ -39,13 +39,13 @@ describe('fixed appeal bases', () => {
     ({
       index: 0, col: 0, row: 0, terrain: 'PLAINS', elevation: 'FLAT',
       feature: null, resource: null, improvement: null, district: null,
-      wonder: null, builtWonder: null, riverMask: 0, pillaged: false,
+      builtWonder: null, riverMask: 0, pillaged: false,
       ...over,
     }) as never;
 
   it('a natural-wonder tile is 5 regardless of neighbours', async () => {
     const { tileAppeal } = await import('../../../cpu/core/appeal');
-    const tiles = [t({ index: 0, col: 0, wonder: 'YOSEMITE' }),
+    const tiles = [t({ index: 0, col: 0, feature: 'YOSEMITE' }),
                    t({ index: 1, col: 1, district: 'INDUSTRIAL_ZONE' }),
                    t({ index: 2, col: 2, feature: 'MARSH' })];
     expect(tileAppeal(map(tiles), tiles[0] as never)).toBe(5);

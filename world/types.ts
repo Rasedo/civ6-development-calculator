@@ -45,7 +45,19 @@ export type FeatureId =
   | 'REEF'
   | 'ICE'
   | 'GEOTHERMAL_FISSURE'
-  | 'VOLCANIC_SOIL';
+  | 'VOLCANIC_SOIL'
+  | 'CRATER_LAKE'
+  | 'DEAD_SEA'
+  | 'GALAPAGOS'
+  | 'GREAT_BARRIER_REEF'
+  | 'PANTANAL'
+  | 'ULURU'
+  | 'TORRES_DEL_PAINE'
+  | 'MOUNT_KILIMANJARO'
+  | 'YOSEMITE'
+  | 'CLIFFS_OF_DOVER'
+  | 'MOUNT_EVEREST'
+  | 'EYE_OF_THE_SAHARA';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -111,7 +123,6 @@ export interface Tile {
   elevation: Elevation;
   feature: FeatureId | null;
   resource: string | null; // resource id from world/resources
-  wonder: string | null;
   riverMask: number;
   improvement: string | null; // ImprovementId
   district: DistrictId | null;

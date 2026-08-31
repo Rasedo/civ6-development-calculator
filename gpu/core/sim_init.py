@@ -99,7 +99,6 @@ class SimInit:
 
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # what a Great Person's per-adjacent clause counts. Both are static;
         # RAINFOREST is `feat_id` minus whatever has since been chopped.
         self.tile_mountain = torch.tensor([[t.get("mtn", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -304,7 +303,6 @@ class SimInit:
         self._civ_city_reg_check = bool(_os.environ.get("CIV6_RC_REGISTRY_CHECK"))
         civ_city_pad = self.RC
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.settle_ok = torch.tensor([[t.get("st", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.site_q3 = torch.tensor(
             [[t.get("sq", [0.0, 0.0, 0.0]) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device
@@ -1194,6 +1192,16 @@ class SimInit:
             self._wond_relic = torch.tensor([int(w["relicslots"]) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # ONE roster: a natural wonder is a FEATURE row, and this plane is a
+        # VIEW of `feat_id` through the catalog flag — never a wire field of
+        # its own. `wonder_near` is its neighbourhood closure (the ASTROLOGY
+        # eureka's "near a wonder").
+        self._feat_natural = torch.tensor([bool(x) for x in rules.improvements["featNatural"]], dtype=torch.bool, device=device)
+        self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
+        self.nwonder = self._feat_natural[self.feat_id.clamp(min=0)] & (self.feat_id >= 0)
+        _nwn = self.neigh.reshape(1, -1).expand(B, -1).clamp(min=0)
+        _nwv = (self.nwonder.gather(1, _nwn) & (self.neigh.reshape(1, -1) >= 0)).reshape(B, T, 6)
+        self.wonder_near = self.nwonder | _nwv.any(dim=2)
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
                 row = int(cv["seat"])

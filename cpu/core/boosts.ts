@@ -11,7 +11,7 @@ import { congressPolicyBlocked } from './congress';
 import { DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
 import { GREAT_PEOPLE } from '../data/greatPeople';
-import { isCoastalLand } from '../../world/query';
+import { isCoastalLand, naturalWonderAt } from '../../world/query';
 
 export { BOOST_FRACTION };
 
@@ -76,7 +76,7 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       return state.map.tiles.some(
         (t) =>
           tileOwnedByCiv(t, seat) &&
-          (t.wonder !== null || neighbors(state.map, t).some((n) => n.wonder !== null)),
+          (naturalWonderAt(t) !== null || neighbors(state.map, t).some((n) => naturalWonderAt(n) !== null)),
       );
     case 'policies': {
       // ORACLE: the GPU counts the scripted adoption's slotted cards

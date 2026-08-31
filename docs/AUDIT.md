@@ -76,12 +76,11 @@ from the list below.
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district and the coastal Harbor ship; district BUILDINGS, the yields of any of it, and power are still absent |
-| C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **25** | |
-| **OPEN, TOTAL** | **47** | |
+| **C. Absent systems** | **24** | |
+| **OPEN, TOTAL** | **46** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1148,18 +1147,6 @@ under their blocker so the dependency is readable, and both halves count.
   - **the yields of any of it** — a minor's districts produce nothing for
     the minor (its research runs on population, not on the Campus);
   - **power** (C-1) — a minor's cities still draw and supply nothing.
-- **C-40. THE FEATURE ROSTER.** Weight 1. Woods, Rainforest, Marsh,
-  Floodplains, Oasis, Reef, Ice, the GEOTHERMAL FISSURE and VOLCANIC SOIL.
-  This entry once also named the Cataract, Sand Dunes and the Ley Line: the
-  Gathering Storm feature index carries NONE of the three — the Ley Line is
-  Secret Societies and the Impact Zone and the Burning/Burnt rows are
-  Apocalypse mode — so they are corrections to this entry, not gaps.
-  WHAT REMAINS: a NATURAL WONDER is a tile flag (`Tile.wonder`), not a
-  feature row, so each one's own clauses have nowhere to hang. The
-  Fissure's own are all live — the tile's +1 Science, the CAMPUS's +2, the
-  Aqueduct's Amenity, and the ground the GEOTHERMAL PLANT stands on — and
-  the generator places 3-7 per fixture beside mountains. Volcanic Soil is
-  a row nothing places (C-41).
 - **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 2. The row ships with the
   name its page gives ("This land adjacent to a volcano has suffered from a
   previous eruption ... Can receive additional yields from environmental

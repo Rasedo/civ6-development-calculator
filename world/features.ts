@@ -17,6 +17,14 @@ export interface FeatureDef {
   removable: boolean;
   freshWater?: boolean;
   chopYield?: YieldKey;
+  /** a NATURAL WONDER row — one roster with every other feature. Its
+   *  `yields` are the tile's WHOLE yields (no terrain underneath),
+   *  `adjacentYields` pay every neighbouring tile, and a
+   *  `doublesAdjacentTerrain` row doubles the neighbour's terrain yields
+   *  instead. Spawn rules, size and colour stay in `WONDERS`. */
+  naturalWonder?: boolean;
+  adjacentYields?: Partial<Yields>;
+  doublesAdjacentTerrain?: boolean;
 }
 
 /** Features a builder can CLEAR — the Deforestation Treaty's target space,
@@ -119,3 +127,24 @@ export const FEATURES: Record<string, FeatureDef> = {
     removable: false,
   },
 };
+
+// The NATURAL WONDERS, appended LAST — this record's order is the exported
+// feature index, so anything but an append renumbers every other row.
+// SOURCING SWEEP: Crater Lake faith 4 -> 5. Real Civ 6 Crater Lake yields
+// 5 Faith and 1 Science on its tile (Civilization wiki, "Crater Lake
+// (Civ6)"). Dead Sea (+2 culture / +2 faith) re-verified and correct.
+const NW = { terrains: [] as TerrainId[], allowHills: false, removable: false, naturalWonder: true };
+Object.assign(FEATURES, {
+  CRATER_LAKE: { id: 'CRATER_LAKE', name: 'Crater Lake', yields: { science: 1, faith: 5 }, ...NW },
+  DEAD_SEA: { id: 'DEAD_SEA', name: 'Dead Sea', yields: { faith: 2, culture: 2 }, ...NW },
+  GALAPAGOS: { id: 'GALAPAGOS', name: 'Galápagos Islands', yields: {}, impassable: true, adjacentYields: { science: 2 }, ...NW },
+  GREAT_BARRIER_REEF: { id: 'GREAT_BARRIER_REEF', name: 'Great Barrier Reef', yields: { food: 2, science: 2 }, ...NW },
+  PANTANAL: { id: 'PANTANAL', name: 'Pantanal', yields: { food: 2, culture: 2 }, ...NW },
+  ULURU: { id: 'ULURU', name: 'Uluru', yields: {}, impassable: true, adjacentYields: { culture: 2, faith: 2 }, ...NW },
+  TORRES_DEL_PAINE: { id: 'TORRES_DEL_PAINE', name: 'Torres del Paine', yields: {}, impassable: true, doublesAdjacentTerrain: true, ...NW },
+  MOUNT_KILIMANJARO: { id: 'MOUNT_KILIMANJARO', name: 'Mount Kilimanjaro', yields: {}, impassable: true, adjacentYields: { food: 1, science: 1 }, ...NW },
+  YOSEMITE: { id: 'YOSEMITE', name: 'Yosemite', yields: {}, impassable: true, adjacentYields: { gold: 1, food: 1, science: 1 }, ...NW },
+  CLIFFS_OF_DOVER: { id: 'CLIFFS_OF_DOVER', name: 'Cliffs of Dover', yields: {}, impassable: true, adjacentYields: { gold: 2, culture: 1 }, ...NW },
+  MOUNT_EVEREST: { id: 'MOUNT_EVEREST', name: 'Mount Everest', yields: {}, impassable: true, adjacentYields: { faith: 1, science: 1 }, ...NW },
+  EYE_OF_THE_SAHARA: { id: 'EYE_OF_THE_SAHARA', name: 'Eye of the Sahara', yields: { science: 2, gold: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

@@ -10,7 +10,6 @@ import { CITY_STATE_TYPES } from '../data/cityStates';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { WONDERS } from '../../world/wonders';
 import { UNITS } from '../data/units';
 
 function checkCatalog(kind: string, ids: string[], known: Record<string, unknown> | Set<string>): void {
@@ -28,7 +27,6 @@ export function loadWorld(world: WorldFile): GameState {
   checkCatalog('terrain', c.terrains, TERRAINS);
   checkCatalog('feature', c.features, FEATURES);
   checkCatalog('resource', c.resources, RESOURCES);
-  checkCatalog('natural wonder', c.wonders, WONDERS);
   checkCatalog('elevation', c.elevations, new Set(['FLAT', 'HILLS', 'MOUNTAIN']));
 
   const m = world.map;
@@ -42,7 +40,6 @@ export function loadWorld(world: WorldFile): GameState {
       elevation: c.elevations[m.elevation[i]] as Elevation,
       feature: m.feature[i] < 0 ? null : (c.features[m.feature[i]] as FeatureId),
       resource: m.resource[i] < 0 ? null : c.resources[m.resource[i]],
-      wonder: m.wonder[i] < 0 ? null : c.wonders[m.wonder[i]],
       riverMask: m.riverMask[i],
       cliffMask: m.cliffMask[i],
       improvement: null,

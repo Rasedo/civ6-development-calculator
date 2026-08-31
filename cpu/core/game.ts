@@ -1803,8 +1803,7 @@ export function deserialize(json: string): GameState {
   state.claimedGreatPeople ??= [];
   if (!state.gpOffer || state.gpOffer.length !== GP_CLASSES.length) state.gpOffer = GP_CLASSES.map((_, i) => state.gpOffer?.[i] ?? -1);
   if (!state.gpPrice || state.gpPrice.length !== GP_CLASSES.length) state.gpPrice = GP_CLASSES.map((_, i) => state.gpPrice?.[i] ?? 0);
-  for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
-    t.wonder ??= null;
+  for (const t of state.map.tiles) {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }

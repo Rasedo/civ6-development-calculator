@@ -232,7 +232,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
  
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS } from './catalog';
-import { clearableFeatures } from '../../world/features';
+import { clearableFeatures, FEATURES } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -1365,6 +1365,11 @@ export function buildRules() {
         };
       }),
       luxAmenityCities: LUXURY_AMENITY_CITIES,
+      // the roster's naturalWonder flags and per-feature CATALOG yields, in
+      // FEAT_IDS order — what lets the GPU derive its wonder plane and price
+      // a feature that ARRIVES after t0 from the same table TS reads.
+      featNatural: FEAT_IDS.map((f) => (FEATURES[f]?.naturalWonder ? 1 : 0)),
+      featCatalogY: FEAT_IDS.map((f) => YIELD_KEYS.map((k) => FEATURES[f]?.yields?.[k] ?? 0)),
       nLuxuries: LUXURY_IDS.length,
       farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
       farmHousing: IMPROVEMENTS.FARM.housing,

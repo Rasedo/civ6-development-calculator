@@ -90,7 +90,7 @@ describe('the four new dedications', () => {
     settleAt(state, tileAtCoords(state.map, 3, 9).index);
     commit(state, 0, DED_DRACONES);
     seatOf(state, 0)!.explored = [];
-    tileAtCoords(state.map, 12, 9).wonder = 'CLIFFS';
+    tileAtCoords(state.map, 12, 9).feature = 'CLIFFS_OF_DOVER';
     revealAround(state, 0, tileAtCoords(state.map, 12, 10).index, 2);
     expect(seatOf(state, 0)!.eraScore).toBe(DRACONES_DISCOVERY_SCORE * DED_EVENT_SCORE[DED_DRACONES]);
     revealAround(state, 0, tileAtCoords(state.map, 12, 8).index, 2); // already explored

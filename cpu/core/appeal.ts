@@ -25,7 +25,7 @@
 
 import type { GameMap, ImprovementId, Tile } from './types';
 import { neighbors } from '../../world/hex';
-import { isMountain } from '../../world/query';
+import { isMountain, naturalWonderAt } from '../../world/query';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 
@@ -34,15 +34,15 @@ import { IMPROVEMENTS } from '../data/improvements';
 export type GpAppeal = ((t: Tile) => number) | undefined;
 
 export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>, gpAppeal?: GpAppeal): number {
-  if (tile.wonder) return 5;
+  if (naturalWonderAt(tile)) return 5;
   if (isMountain(tile)) return 4;
   let appeal = gpAppeal?.(tile) ?? 0;
   if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;
   for (const n of neighbors(map, tile)) {
-    if (n.wonder) appeal += 2;
+    if (naturalWonderAt(n)) appeal += 2;
     if (n.builtWonder && n.builtWonderComplete) appeal += 1;
     if (n.feature === 'WOODS') appeal += 1;
-    if (isMountain(n) && !n.wonder) appeal += 1;
+    if (isMountain(n) && !naturalWonderAt(n)) appeal += 1;
     if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
     if (n.feature === 'OASIS') appeal += 1;
     if (n.district) appeal += DISTRICTS[n.district].appealAdjacent;

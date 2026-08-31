@@ -23,7 +23,6 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         elevation: 'FLAT',
         feature: null,
         resource: null,
-        wonder: null,
         riverMask: 0,
     cliffMask: 0,
         improvement: null,

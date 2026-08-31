@@ -9,6 +9,7 @@ import type { City, GameState, GreatPersonClass, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
+import { naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import {
@@ -143,7 +144,7 @@ function permAdd(target: { gpPerm?: number[] }, width: number, key: string, keys
 function perAdjacentCount(state: GameState, tile: Tile, fx: NonNullable<GpEffect['perAdjacent']>): number {
   const hit = (t: Tile): boolean =>
     fx.source === 'MOUNTAIN' ? t.elevation === 'MOUNTAIN'
-      : fx.source === 'NATURAL_WONDER' ? t.wonder !== null
+      : fx.source === 'NATURAL_WONDER' ? naturalWonderAt(t) !== null
         : t.feature === 'RAINFOREST';
   let n = neighbors(state.map, tile).filter(hit).length;
   if (fx.here && hit(tile)) n += 1;

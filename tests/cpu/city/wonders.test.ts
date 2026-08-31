@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateMap } from '../../../world/mapgen';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
 import { tileYields, districtAdjacency } from '../../../cpu/core/yields';
-import { isImpassable } from '../../../world/query';
+import { isImpassable, naturalWonderAt } from '../../../world/query';
 import { canFoundCity, canPlaceDistrict, validImprovements } from '../../../cpu/core/rules';
 import { foundCity } from '../../../cpu/core/game';
 import { workableTiles } from '../../../cpu/core/city';
@@ -13,9 +13,9 @@ describe('wonder generation', () => {
     const map = generateMap({ width: 84, height: 54, seed: 42 });
     const byWonder = new Map<string, number>();
     for (const t of map.tiles) {
-      if (!t.wonder) continue;
-      byWonder.set(t.wonder, (byWonder.get(t.wonder) ?? 0) + 1);
-      expect(t.feature).toBeNull();
+      const w = naturalWonderAt(t);
+      if (!w) continue;
+      byWonder.set(w, (byWonder.get(w) ?? 0) + 1);
       expect(t.resource).toBeNull();
     }
     expect(byWonder.size).toBeGreaterThanOrEqual(1);
@@ -26,7 +26,7 @@ describe('wonder generation', () => {
 
   it('honors withWonders=false', () => {
     const map = generateMap({ width: 44, height: 26, seed: 7, withWonders: false });
-    expect(map.tiles.every((t) => t.wonder === null)).toBe(true);
+    expect(map.tiles.every((t) => naturalWonderAt(t) === null)).toBe(true);
   });
 
   it('is deterministic', () => {
@@ -40,7 +40,7 @@ describe('wonder effects', () => {
   it('passable wonder tiles use the wonder yields', () => {
     const map = makeMap();
     const t = tileAtCoords(map, 5, 5);
-    t.wonder = 'GREAT_BARRIER_REEF';
+    t.feature = 'GREAT_BARRIER_REEF';
     t.terrain = 'COAST';
     expect(tileYields(bareCtx(map), t)).toMatchObject({ food: 2, science: 2 });
     expect(isImpassable(t)).toBe(false);
@@ -48,7 +48,7 @@ describe('wonder effects', () => {
 
   it('Uluru grants +2 culture +2 faith to adjacent tiles', () => {
     const map = makeMap();
-    tileAtCoords(map, 5, 5).wonder = 'ULURU';
+    tileAtCoords(map, 5, 5).feature = 'ULURU';
     const next = tileAtCoords(map, 6, 5); // grassland 2F
     expect(tileYields(bareCtx(map), next)).toMatchObject({ food: 2, culture: 2, faith: 2 });
     expect(isImpassable(tileAtCoords(map, 5, 5))).toBe(true);
@@ -56,7 +56,7 @@ describe('wonder effects', () => {
 
   it('Torres del Paine doubles adjacent terrain yields', () => {
     const map = makeMap();
-    tileAtCoords(map, 5, 5).wonder = 'TORRES_DEL_PAINE';
+    tileAtCoords(map, 5, 5).feature = 'TORRES_DEL_PAINE';
     const next = tileAtCoords(map, 6, 5);
     next.elevation = 'HILLS'; // grassland hills: 2F1P -> doubled to 4F2P
     expect(tileYields(bareCtx(map), next)).toMatchObject({ food: 4, production: 2 });
@@ -64,14 +64,14 @@ describe('wonder effects', () => {
 
   it('Holy Site gets +2 faith per adjacent natural wonder', () => {
     const map = makeMap();
-    tileAtCoords(map, 6, 5).wonder = 'ULURU';
+    tileAtCoords(map, 6, 5).feature = 'ULURU';
     expect(districtAdjacency(map, tileAtCoords(map, 5, 5), 'HOLY_SITE')).toBe(2);
   });
 
   it('wonder tiles cannot be settled, improved or districted, but are workable', () => {
     const state = makeState(makeMap(16, 16));
     const wonderTile = tileAtCoords(state.map, 9, 8);
-    wonderTile.wonder = 'GREAT_BARRIER_REEF';
+    wonderTile.feature = 'GREAT_BARRIER_REEF';
     wonderTile.terrain = 'COAST';
     expect(canFoundCity(state, wonderTile.index, 0).ok).toBe(false);
 

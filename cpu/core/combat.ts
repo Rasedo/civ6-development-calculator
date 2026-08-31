@@ -1,7 +1,7 @@
 
 import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
-import { isWater, isImpassable } from '../../world/query';
+import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
 import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
@@ -2060,7 +2060,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
 function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar;
   return state.map.tiles.filter((t) => {
-    if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
+    if (isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.district || t.builtWonder) return false;
     if (tileClaimed(t) || t.goodyHut) return false;
     if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
     for (const c of allCities(state)) {
