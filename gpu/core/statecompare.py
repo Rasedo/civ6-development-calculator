@@ -821,7 +821,7 @@ TILE = {
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),
     "droughtTurns": _tile("drought"),
-    "hasFeature": lambda sim, b, rows: ((sim.feat_id[b] >= 0) & ~sim.feat_stripped[b]).long().numpy(),
+    "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),
     "railroad": lambda sim, b, rows: sim.railroad[b].long().numpy(),

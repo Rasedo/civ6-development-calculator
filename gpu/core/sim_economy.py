@@ -408,6 +408,49 @@ class SimEconomy:
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
 
+    def _feat_gone(self) -> torch.Tensor:
+        """[B, T] bool — the BAKED (t0) feature's yields no longer apply: it
+        was chopped or founding-stripped, or a feature that ARRIVED after t0
+        (`_add_feature`) stands in its place."""
+        return self.feat_stripped | (self.feat_id != self.feat_id0)
+
+    def _feat_added(self) -> torch.Tensor:
+        """[B, T] bool — a LIVE feature the map did not start with."""
+        return (self.feat_id != self.feat_id0) & ~self.feat_stripped
+
+    def _feat_add_y(self) -> torch.Tensor:
+        """[B, T, 6] — an ARRIVED feature's CATALOG yields (`featCatalogY`,
+        the row TS reads live). The terms a bake specialises per tile (the
+        Floodplains' bare-desert food) are t0-only by design; every addable
+        row is unconditional."""
+        return (self._feat_cat_y[self.feat_id.clamp(min=0)]
+                * self._feat_added().unsqueeze(2).to(self.dtype))
+
+    def _add_feature(self, att: torch.Tensor, tile: torch.Tensor, fid: int) -> torch.Tensor:
+        """`addFeature` — a feature ARRIVES after t0, the carrier C-41 names.
+        Nothing in the rollout calls it yet: WHERE a feature lands (and what
+        it does to an improvement) is an open owner question, so the refusal
+        set is the conservative envelope — bare land only — mirrored clause
+        for clause by the TS helper. Returns the rows that planted."""
+        if bool(self._feat_natural[fid]):
+            return torch.zeros_like(att)
+        tt = tile.clamp(min=0)
+        t1 = tt.unsqueeze(1)
+        ok = (att
+              & ~self.water.gather(1, t1).squeeze(1)
+              & ~self.tile_submerged.gather(1, t1).squeeze(1)
+              & ((self.feat_id.gather(1, t1).squeeze(1) < 0)
+                 | self.feat_stripped.gather(1, t1).squeeze(1))
+              & (self.district.gather(1, t1).squeeze(1) < 0)
+              & (self.built_wonder.gather(1, t1).squeeze(1) < 0)
+              & (self.improvement.gather(1, t1).squeeze(1) < 0))
+        rows = ok.nonzero(as_tuple=True)[0]
+        if rows.numel():
+            self.feat_id[rows, tt[rows]] = fid
+            self.feat_stripped[rows, tt[rows]] = False
+            self._eff_version += 1
+        return ok
+
     def _food_base(self) -> torch.Tensor:
         """[B, T] tile FOOD as tileYields has it at the END of the improvement
         block — terrain + feature + resource, less a CHOPPED or
@@ -423,8 +466,9 @@ class SimEconomy:
         if self._fbase_cache is not None and self._fbase_cache[0] == self._eff_version:
             return self._fbase_cache[1]
         base = self.tile_yields[:, :, 0]
-        if bool(self.feat_stripped.any()):
-            base = base - self.feat_yields[:, :, 0] * self.feat_stripped.to(self.dtype)
+        gone = self._feat_gone()
+        if bool(gone.any()):
+            base = base - self.feat_yields[:, :, 0] * gone.to(self.dtype) + self._feat_add_y()[:, :, 0]
         if self.improvements_on:
             live = ~self.pillaged
             base = base + ((self.improvement == self.FARM) & live).to(self.dtype) * self._farm_food
@@ -3253,7 +3297,7 @@ class SimEconomy:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         return (
             self._sr_c
-            & (self._sr_nf | self.feat_stripped)
+            & ((self.feat_id < 0) | self.feat_stripped)
             & (self.improvement < 0)
             & (self.district < 0)
             & (self._tile_appeal() >= self._seaside_min_appeal)
@@ -3534,9 +3578,11 @@ class SimEconomy:
         # subtracting again on food/production would double-strip a flipped
         # centre. TS passes `{...center, district: null}`, so the centre's own
         # CITY_CENTER never suppresses it.
-        strip = self.feat_stripped.gather(1, ctr).double().unsqueeze(2)  # [B, n, 1]
+        strip = self._feat_gone().gather(1, ctr).double().unsqueeze(2)  # [B, n, 1]
         _c6 = ctr.unsqueeze(2).expand(-1, -1, 6)
-        ctr6 = self.tile_yields.gather(1, _c6).double() - self.feat_yields.gather(1, _c6).double() * strip
+        ctr6 = (self.tile_yields.gather(1, _c6).double()
+                - self.feat_yields.gather(1, _c6).double() * strip
+                + self._feat_add_y().gather(1, _c6).double())
         if has_bel:
             ctr6 = ctr6 + featP.gather(1, _c6).double()
         ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev))

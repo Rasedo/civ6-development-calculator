@@ -46,9 +46,13 @@ import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
 import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
+import { FEATURES } from '../../world/features';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile, MP_SCALE } from '../data/constants';
+
+// the exported feature index (FEAT_IDS order = the catalog's own)
+const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -746,7 +750,7 @@ const TILE: Record<string, Extractor> = {
   fertility: overTiles((t) => t.fertility),
   fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),
-  hasFeature: overTiles((t) => (t.feature === null ? 0 : 1)),
+  featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   railroad: overTiles((t) => (t.railroad ? 1 : 0)),

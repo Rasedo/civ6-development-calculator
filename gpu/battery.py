@@ -265,7 +265,8 @@ def main() -> int:
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
                 ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
-                ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),  # a flood pillages the district on the floodplain
+                ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),
+                ("feature_add", [py, "tests/gpu/feature_add_test.py"], 2),  # the carrier for a feature that ARRIVES after t0 — no rollout caller yet  # a flood pillages the district on the floodplain
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
                 ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target

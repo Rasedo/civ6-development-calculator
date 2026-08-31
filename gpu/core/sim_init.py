@@ -100,7 +100,9 @@ class SimInit:
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # what a Great Person's per-adjacent clause counts. Both are static;
-        # RAINFOREST is `feat_id` minus whatever has since been chopped.
+        # RAINFOREST reads the LIVE pair (`feat_id`/`feat_stripped`), so a
+        # chop leaves it and `_add_feature` joins it, exactly as TS reads
+        # `tile.feature` live.
         self.tile_mountain = torch.tensor([[t.get("mtn", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -1198,6 +1200,9 @@ class SimInit:
         # eureka's "near a wonder").
         self._feat_natural = torch.tensor([bool(x) for x in rules.improvements["featNatural"]], dtype=torch.bool, device=device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
+        # `feat_id` is LIVE (`_add_feature` writes it); `feat_id0` keeps the
+        # t0 bake the per-tile `feat_yields`/chop planes were computed from.
+        self.feat_id0 = self.feat_id.clone()
         self.nwonder = self._feat_natural[self.feat_id.clamp(min=0)] & (self.feat_id >= 0)
         _nwn = self.neigh.reshape(1, -1).expand(B, -1).clamp(min=0)
         _nwv = (self.nwonder.gather(1, _nwn) & (self.neigh.reshape(1, -1) >= 0)).reshape(B, T, 6)
@@ -1610,13 +1615,12 @@ class SimInit:
         self._fa_f_c = torch.tensor([[t.get("fa_f_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self._fa_h_c = torch.tensor([[t.get("fa_h_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self._mi_c = torch.tensor([[t.get("mi_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # The Seaside Resort's STATIC half (flat G/P/D beside COAST, unpaved)
-        # and whether the tile carried NO feature at t0. The live feature test
-        # is `sr_nf | feat_stripped` (a chop makes a tile eligible, exactly as
-        # TS gates on the LIVE tile.feature === null); the appeal test is
-        # dynamic and runs off _tile_appeal().
+        # The Seaside Resort's STATIC half (flat G/P/D beside COAST, unpaved).
+        # The live feature test reads the mutable pair directly — a chop makes
+        # a tile eligible, an ARRIVED feature un-makes it, exactly as TS gates
+        # on the LIVE tile.feature === null; the appeal test is dynamic and
+        # runs off _tile_appeal().
         self._sr_c = torch.tensor([[t.get("sr_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self._sr_nf = torch.tensor([[t.get("sr_nf", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
 

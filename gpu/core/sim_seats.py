@@ -4707,12 +4707,14 @@ class SimSeats:
     def _rcy_globals(self) -> dict:
         if self._rcy_cache is not None and self._rcy_cache[0] == self._eff_version:
             return self._rcy_cache[1]
-        fs = self.feat_stripped.to(self.dtype)
-        # _eff_food already subtracts a stripped feature's food, ahead of its
-        # drought floor (the tileYields order) — do NOT strip column 0 again.
+        fs = self._feat_gone().to(self.dtype)
+        _addy = self._feat_add_y()
+        # _eff_food already prices a gone t0 feature AND an arrived one, ahead
+        # of its drought floor (the tileYields order) — do NOT touch column 0
+        # again.
         f_base = self._eff_food()
-        p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
-        ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
+        p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs + _addy[:, :, 1]
+        ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1) + _addy  # live-adjusted static (cols 2-5)
         # CAMP/PLANTATION catalog gold joins the static columns
         # (TS tileYields adds improvement yields in every context; pillage
         # suspends them). Cols 0/1 stay untouched — food/production ride
@@ -6275,7 +6277,8 @@ class SimSeats:
         g = self._rcy_globals()
         f_plane = self._rcy_food_plane(row, g)
         p_plane = g["p_plane"]
-        y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
+        y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)
+                 + self._feat_add_y()[:, :, 2:]).sum(dim=2)
         if self.improvements_on:
             live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
             y_oth = y_oth + self._imp_yields[self.improvement.clamp(min=0), 2:].sum(dim=2) * live_imp

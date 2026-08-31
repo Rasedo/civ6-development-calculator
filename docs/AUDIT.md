@@ -76,11 +76,11 @@ from the list below.
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district and the coastal Harbor ship; district BUILDINGS, the yields of any of it, and power are still absent |
-| C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
+| C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **24** | |
-| **OPEN, TOTAL** | **46** | |
+| **C. Absent systems** | **23** | |
+| **OPEN, TOTAL** | **45** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1147,25 +1147,25 @@ under their blocker so the dependency is readable, and both halves count.
   - **the yields of any of it** — a minor's districts produce nothing for
     the minor (its research runs on population, not on the Campus);
   - **power** (C-1) — a minor's cities still draw and supply nothing.
-- **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 2. The row ships with the
+- **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 1. The row ships with the
   name its page gives ("This land adjacent to a volcano has suffered from a
   previous eruption ... Can receive additional yields from environmental
   effects" — the `fertility` channel, which the eruption already lays
-  down) and no yields of its own. NEITHER ENGINE CAN PLACE IT. Two ways
-  in, both shut:
-  - AT RUNTIME, off the eruption. No engine adds a feature after t0: the
-    GPU keeps the feature id in a STATIC plane and records only removal
-    (`feat_stripped`), and `statecompare` compares feature PRESENCE for the
-    same reason. A paint needs a mutable id plane on the GPU and a
-    which-feature comparison on both sides.
-  - AT MAP GENERATION, on volcano-adjacent land. Every improvement clause
-    in this engine reads a featured tile as occupied — a Farm, a Mine and a
-    Seaside Resort each ask for `tile.feature === null` — so placing the
-    row would refuse those three on every tile beside a volcano. No source
-    reached says Volcanic Soil refuses an improvement, and inventing either
-    answer is what this file exists to stop. ASK THE OWNER.
-  Waiting on it: FIRE_GODDESS pays "+2 Faith from Geothermal Fissures and
-  Volcanic Soil" and only the Fissure half can ever be paid.
+  down) and no yields of its own. THE CARRIER NOW SHIPS: `addFeature` /
+  `_add_feature` plant a feature after t0 on both engines (`feat_id` is
+  live beside a static `feat_id0`, the yield walk prices the arrival from
+  `featCatalogY`, and `statecompare` compares feature IDENTITY), and
+  FIRE_GODDESS's "+2 Faith from ... Volcanic Soil" half pays the turn the
+  soil exists (`feature_add_test` / `feature-add.test.ts` — the carrier's
+  whole reach, since no rollout path calls it). OPEN:
+  - WHERE THE SOIL LANDS. The eruption laying it on volcano-adjacent land
+    is the obvious runtime writer, but every improvement clause in this
+    engine reads a featured tile as occupied — a Farm, a Mine and a
+    Seaside Resort each ask for `tile.feature === null` — so the paint
+    would refuse those three on every tile beside a volcano, and the
+    carrier's own envelope refuses a tile already improved. No source
+    reached says Volcanic Soil refuses an improvement, and inventing
+    either answer is what this file exists to stop. ASK THE OWNER.
 - **C-43. TWO IMPROVEMENT PAGES WERE NEVER REACHED.** Weight 1. Thirteen
   research raises ship, each transcribed from its own Civilopedia
   "(requires X)" line, and the channel behind them takes any row: the wire

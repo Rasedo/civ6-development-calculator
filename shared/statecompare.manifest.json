@@ -2359,15 +2359,16 @@
           ]
         },
         {
-          "name": "hasFeature",
+          "name": "featureId",
           "compare": "exact",
           "covers": [
             "Tile.feature"
           ],
           "planes": [
+            "feat_id",
             "feat_stripped"
           ],
-          "note": "PRESENCE only. The GPU keeps the feature id in a static plane (feat_id) and records removal with feat_stripped, so 'which feature' would need the fixture's t0 ids on the TS side; 'is there one' is fully determined by live state on both engines and is what a chop changes."
+          "note": "IDENTITY, in catalog order: feat_id is live now (a chop strips, `_add_feature` plants), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
         },
         {
           "name": "hasResource",

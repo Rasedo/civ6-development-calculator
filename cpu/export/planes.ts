@@ -254,7 +254,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS' || t.terrain === 'DESERT') &&
         neighbors(map, t).some((n) => n.terrain === 'COAST')
           ? 1 : 0,
-      sr_nf: t.feature === null ? 1 : 0,
       fa_f_c:
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
