@@ -1432,6 +1432,32 @@ class SimMasks:
             closed = closed & ~free.expand_as(closed)
         return closed.reshape(tiles.shape)
 
+    def _advance_open(self, u_type: torch.Tensor, u_seat: torch.Tensor,
+                      dest: torch.Tensor) -> torch.Tensor:
+        """`tileFreeForUnit`'s BORDER half for a post-battle advance — [B] bool,
+        true where the victor may stand on the ground it just cleared.
+
+        Winning a fight is not a grant of entry: CIV6 (Movement) lets a unit
+        enter another empire's territory only with Open Borders, an alliance or
+        a war, and the advance is an entry like any other. A barbarian killed
+        inside a third party's land is the ordinary case — the attacker is at
+        war with the barbarian, not with the owner of the ground.
+
+        `_border_closed` asks per SEAT ROW and the attacking slot's seat differs
+        across the batch, so the majors are asked one at a time and each answer
+        is taken where that seat attacked. A non-major walks free, which is what
+        `borderClosedTo` says of anyone `isCiv` refuses."""
+        out = torch.ones(dest.shape[0], dtype=torch.bool, device=dest.device)
+        if self._open_borders_civic < 0:
+            return out
+        for r in range(self.n_majors):
+            mine = u_seat == r
+            if not bool(mine.any()):
+                continue
+            shut = self._border_closed(dest.unsqueeze(1), r, u_type.unsqueeze(1)).squeeze(1)
+            out = out & ~(mine & shut)
+        return out
+
     def _blocked_for(
         self,
         tiles: torch.Tensor,

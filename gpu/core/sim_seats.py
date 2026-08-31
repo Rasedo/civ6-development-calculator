@@ -6422,8 +6422,10 @@ class SimSeats:
                 self._occ_clear(ar, here[ar], torch.full_like(ar, u + a_lo))
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
             _anav = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-            adv = def_dead & ~atk_dead & adv_terr & ~self._blocked_for(
-                tgt.unsqueeze(1), a_seat[:, u].unsqueeze(1), is_naval=_anav).squeeze(1)
+            adv = (def_dead & ~atk_dead & adv_terr
+                   & self._advance_open(a_type[:, u], a_seat[:, u], tgt)
+                   & ~self._blocked_for(
+                       tgt.unsqueeze(1), a_seat[:, u].unsqueeze(1), is_naval=_anav).squeeze(1))
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 _gs = torch.full_like(vr, u + a_lo)
@@ -6454,6 +6456,7 @@ class SimSeats:
             adv = (
                 kill_adv
                 & self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
+                & self._advance_open(a_type[:, u], a_seat[:, u], tgt)
                 & ~self._blocked_for(
                     tgt.unsqueeze(1), a_seat[:, u].unsqueeze(1),
                     is_naval=self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]).squeeze(1)
