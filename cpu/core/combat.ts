@@ -1655,6 +1655,24 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
       CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0, 'vrnge');
     return true;
   }
+  // CIV6: a minor's city is a CITY to ranged fire too — `cityStateAttackable`
+  // answers, the walls take their share first, and the roll floors it at
+  // 1 HP like any centre (only melee finishes a city).
+  const csHere = cityStateAt(state, targetIndex);
+  if (csHere && csHere.centerIndex === targetIndex && cityStateAttackable(state, csHere, unitSeat(attacker))) {
+    const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
+    const csOuter = outerPool(state, csShape);
+    const defCS = 15 + csHere.population + (csHere.type === 'militaristic' ? 6 : 0)
+      + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrngcs', targetIndex);
+    const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
+    if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
+    csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);
+    warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { city: true });
+    spendAttack(attacker, true);
+    awardCityXp(state, attacker, csHere.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+    return true;
+  }
   // A RANGED unit does not engage another civ's units — the ranged-vs-civ
   // scope-out, the same predicate `attackTargets` applies. A civ unit standing
   // on a centre this strike could otherwise reach therefore makes the strike a
@@ -1712,15 +1730,16 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
         ? d === 1
         : civsAtWar(state, unitSeat(unit), holder.holder.seat) && d <= (def.ranged ? range : 1));
 
-    // A CITY-STATE centre is a target on a DECLARED war, melee and adjacent
-    // (ranged-vs-city-state stays out of scope). The autopilot invariant —
-    // "target lists never include PEACEFUL city-states" — holds by
-    // construction: nothing but a war offers the tile.
+    // A CITY-STATE centre answers exactly like a major's: adjacent for an
+    // alwaysHostile attacker whatever the weapon, and within range for a
+    // ranged unit at war (`cityStateAttackable` carries the war and
+    // suzerain-drag clauses). The autopilot invariant — "target lists never
+    // include PEACEFUL city-states" — holds by construction: nothing but a
+    // war offers the tile.
     const cityStateHere = state.cityStates.find((c) => c.centerIndex === t.index);
     const cityStateTarget =
       cityStateHere !== undefined &&
-      d === 1 &&
-      !def.ranged &&
+      (capsOf(unit.seat).alwaysHostile ? d === 1 : def.ranged ? d <= range : d === 1) &&
       cityStateAttackable(state, cityStateHere, unitSeat(unit));
 
     // A district's defenses are a RANGED target too, at the same -17 every

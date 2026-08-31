@@ -89,3 +89,9 @@ export const RESOURCE_CATEGORY_COLORS: Record<ResourceCategory, string> = {
   luxury: '#8e6fb0',
   strategic: '#c97a4a',
 };
+
+/** the LUXURY rows in catalog order — the one shared order every luxury
+ *  index rides: the tile plane's `lux`, and the Congress target space. */
+export const LUXURY_IDS = Object.values(RESOURCES)
+  .filter((r) => r.category === 'luxury')
+  .map((r) => r.id);

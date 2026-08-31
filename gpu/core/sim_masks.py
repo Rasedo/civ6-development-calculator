@@ -2578,12 +2578,21 @@ class SimMasks:
             _res_s = torch.where(_res_ >= 0, self.unit_seat.gather(1, _res_.clamp(min=0)), _rneg)
             _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)
                        | (_res_s == BARB_SEAT)).reshape(B, N, 12)
-            _ring_c = self._seats_hostile(row, self._centre_seat_plane().gather(1, ringc)).reshape(B, N, 12)
+            _ring_ctr = self._centre_seat_plane().gather(1, ringc)
+            _ring_c = self._seats_hostile(
+                row, torch.where(_ring_ctr < 100, _ring_ctr, _rneg)).reshape(B, N, 12)
+            # CIV6: ranged fire bombards a minor's centre on
+            # `cityStateAttackable`'s own clauses — a declared war, or a war
+            # with its suzerain.
+            _ring_csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+            if self.S > 0:
+                _ring_csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
+            _ring_cs = (_ring_csp.gather(1, ringc) & (_ring_ctr >= 100)).reshape(B, N, 12)
             # a district's defenses are a target at range too
             _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
             _sn = [
                 present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & has_atk & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_e)
+                & has_atk & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_cs | _ring_e)
             ]
 
         _sp: list[torch.Tensor] = []
@@ -2795,11 +2804,17 @@ class SimMasks:
             # barbarian units, hostile centres, and district defenses.
             _ring3u = ((_rms3 == BARB_SEAT) | (_rcs3 == BARB_SEAT)
                        | (_res3s == BARB_SEAT)).reshape(B, N, 18)
-            _ring3ct = self._seats_hostile(row, self._centre_seat_plane().gather(1, ring3c)).reshape(B, N, 18)
+            _ring3ctr = self._centre_seat_plane().gather(1, ring3c)
+            _ring3ct = self._seats_hostile(
+                row, torch.where(_ring3ctr < 100, _ring3ctr, _rneg3)).reshape(B, N, 18)
+            _ring3csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+            if self.S > 0:
+                _ring3csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
+            _ring3cs = (_ring3csp.gather(1, ring3c) & (_ring3ctr >= 100)).reshape(B, N, 18)
             _ring3e = self._encamp_block(ring3c, row).reshape(B, N, 18)
             _sn3 = [
                 present.unsqueeze(2) & rngd3.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & has_atk & may_shoot & (ring3 >= 0) & (_ring3u | _ring3ct | _ring3e)
+                & has_atk & may_shoot & (ring3 >= 0) & (_ring3u | _ring3ct | _ring3cs | _ring3e)
             ]
 
         out = torch.cat(

@@ -22,6 +22,7 @@ class SimEconomy:
         improved = (self.lux_id >= 0) & (self.tile_seat == row) & (self.improvement == self.lux_req)
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        own_copies = counts.clone()  # the seat's OWN improved copies, pre-Affluence
         # CIV6 (Affluence): "While established in a city-state, provides a copy
         # of its Luxury resources to you." A minor improves nothing here, so the
         # copy is the ground's own resource; a copy of one already worked is no
@@ -34,7 +35,20 @@ class SimEconomy:
                 mine = ((self.lux_id >= 0) & (self.tile_seat == 100 + s)
                         & aff[:, s].unsqueeze(1))
                 counts.scatter_add_(1, self.lux_id.clamp(min=0), mine.long())
-        rounds = (counts > 0).long().sum(dim=1)
+        # CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
+        # B: This Luxury resource grants no Amenities." B silences the named
+        # luxury outright (the Affluence copies with it); A pays one extra
+        # full-reach round per OWN improved copy beyond the first.
+        lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
+        dup = torch.zeros(B, dtype=torch.long, device=self.device)
+        if bool((lp_out >= 0).any()):
+            t0 = lp_tgt.clamp(min=0, max=self._n_lux - 1)
+            ban = lp_out == 1
+            counts[ban, t0[ban]] = 0
+            dup = torch.where(lp_out == 0,
+                              (own_copies.gather(1, t0.unsqueeze(1)).squeeze(1) - 1).clamp(min=0),
+                              dup)
+        rounds = (counts > 0).long().sum(dim=1) + dup
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how
         # many it reaches. They rank AFTER the worked ones, in creation order.

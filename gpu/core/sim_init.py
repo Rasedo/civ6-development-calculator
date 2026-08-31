@@ -116,7 +116,10 @@ class SimInit:
         # activates it (-9 = outside the GPU roster, never matches).
         self.lux_id = torch.tensor([[t.get("lux", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.lux_req = torch.tensor([[t.get("luxreq", -9) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self._n_lux = int(self.lux_id.max().item()) + 1 if int(self.lux_id.max().item()) >= 0 else 0
+        # the CATALOG width, not the fixtures' max index — the Congress
+        # target space must agree with `LUXURY_IDS.length` even when the last
+        # luxury never spawned on any map in the batch.
+        self._n_lux = int(rules.improvements["nLuxuries"])
         self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]

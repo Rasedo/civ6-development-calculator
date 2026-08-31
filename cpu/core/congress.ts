@@ -18,6 +18,7 @@ import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
+import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { isCiv, seatOf, tileSeat, unitsOf } from './seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import {
@@ -32,7 +33,7 @@ import {
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
-  CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL,
+  CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL, CONGRESS_LUXURY_POLICY,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
   CONGRESS_COMPETITION, COMPETITIONS,
@@ -125,6 +126,17 @@ export function preference(state: GameState, res: number, seat: number,
       return { outcome: 0, target: argmaxLow(GP_CLASSES.map((cls) => sx.gpp[cls] ?? 0)) };
     case CONGRESS_MIGRATION:
       return { outcome: 0, target: seat };
+    case CONGRESS_LUXURY_POLICY: {
+      // A pays +1 Amenity per DUPLICATE copy — a seat names the luxury it
+      // holds the most improved copies of.
+      const counts = LUXURY_IDS.map(() => 0);
+      for (const t of state.map.tiles) {
+        if (!t.resource || tileSeat(t) !== seat) continue;
+        const rdef = RESOURCES[t.resource];
+        if (rdef.category === 'luxury' && t.improvement === rdef.improvement) counts[LUXURY_IDS.indexOf(t.resource)]++;
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
     case CONGRESS_MERCENARY:
       // A RAISES the price, so self-interest votes B on the currency this
       // seat actually buys with — the one it holds the most of.
@@ -332,6 +344,7 @@ export function targetSpaceSize(state: GameState, res: number): number {
     case 'governor': return GOVERNORS.length;
     case 'spyMission': return SPY_OFFENSIVE_MISSIONS.length;
     case 'competition': return COMPETITIONS.length;
+    case 'luxury': return LUXURY_IDS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;
     default: return state.seats.length;
@@ -453,6 +466,20 @@ export function congressSession(state: GameState, worldEra: number,
 function congressEffect(state: GameState, res: number): { outcome: number; target: number } | null {
   for (const a of state.congress ?? []) if (a.res === res) return a;
   return null;
+}
+
+/** Luxury Policy outcome B: the luxury that grants no Amenities; null when
+ * not standing. */
+export function congressBannedLuxury(state: GameState): string | null {
+  const e = congressEffect(state, CONGRESS_LUXURY_POLICY);
+  return e && e.outcome === 1 ? LUXURY_IDS[e.target] ?? null : null;
+}
+
+/** Luxury Policy outcome A: the luxury whose DUPLICATE improved copies each
+ * pay +1 Amenity; null when not standing. */
+export function congressDuplicateLuxury(state: GameState): string | null {
+  const e = congressEffect(state, CONGRESS_LUXURY_POLICY);
+  return e && e.outcome === 0 ? LUXURY_IDS[e.target] ?? null : null;
 }
 
 /** Urban Development Treaty outcome A: the district whose buildings take

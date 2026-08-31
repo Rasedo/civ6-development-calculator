@@ -257,7 +257,7 @@ export const DIPLO_VICTORY_POINTS = 20;
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
   | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
-  | 'competition';
+  | 'competition' | 'luxury';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
@@ -265,6 +265,7 @@ export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
   'building', 'promoClass', 'religion', 'governor', 'spyMission', 'competition',
+  'luxury',
 ];
 
 export interface CongressResolutionDef {
@@ -374,6 +375,12 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // Destruction." The published table puts it in the Atomic era, which is
   // also the first era a device can exist in.
   { id: 'ARMS_CONTROL', name: 'Arms Control', minEra: 6, maxEra: 99, target: 'seat' },
+  // CIV6: "A: +1 Amenity on duplicates of a Resource. / B: This Luxury
+  // resource grants no Amenities." (Renaissance through Industrial per the
+  // published table.) Outcome A's REACH — which cities a duplicate's +1
+  // serves — is unpublished; it rides the luxury machinery's own
+  // LUXURY_AMENITY_CITIES spread, a recorded model choice.
+  { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 3, maxEra: 4, target: 'luxury' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -396,6 +403,7 @@ export const CONGRESS_GOVERNANCE = 17;
 export const CONGRESS_ESPIONAGE = 18;
 export const CONGRESS_COMPETITION = 19;
 export const CONGRESS_ARMS_CONTROL = 20;
+export const CONGRESS_LUXURY_POLICY = 21;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = 200;
 export const CONGRESS_PR_MULT_B = 50;

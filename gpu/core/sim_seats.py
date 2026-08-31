@@ -3903,6 +3903,8 @@ class SimSeats:
             return max(1, len(self._spy_offensive))
         if kind == 15:
             return max(1, len(self._comps))
+        if kind == 16:
+            return max(1, self._n_lux)
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -4030,6 +4032,16 @@ class SimSeats:
             hold = tot[:, row] >= other.max(dim=1).values
             return (torch.where(hold, a + 1, a),
                     torch.where(hold, rival, self._argmax_low(-tot)))
+        if name == "LUXURY_POLICY":
+            # A pays +1 Amenity per DUPLICATE copy — a seat names the luxury
+            # it holds the most improved copies of.
+            nL = max(1, self._n_lux)
+            counts = torch.zeros(B, nL, dtype=torch.float64, device=dev)
+            if self._n_lux > 0 and self.improvements_on:
+                mine = ((self.lux_id >= 0) & (self.tile_seat == row)
+                        & (self.improvement == self.lux_req)).double()
+                counts.scatter_add_(1, self.lux_id.clamp(min=0), mine)
+            return a, self._argmax_low(counts)
         if name == "ESPIONAGE_PACT":
             # A lifts every Spy on ONE operation and B bans it outright — a
             # seat takes the gift, and names the operation its own spies are
@@ -8286,7 +8298,8 @@ class SimSeats:
             self.unit_hp[dr, ds_all[dr]] = healed[dr]
         return rows, def_dead, atk_raw & ~def_dead, atk_raw
 
-    def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> torch.Tensor:
+    def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int,
+                               row: int | None = None) -> torch.Tensor:
         ttc = tgt.clamp(min=0)
         att = att & self._siege_may_shoot(atk_kind)[:, u]
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
@@ -8306,6 +8319,8 @@ class SimSeats:
         _cneg = torch.full_like(ctr, -1)
         city_att = att & self._seats_hostile(
             a_seat.unsqueeze(1), torch.where((ctr >= 0) & (ctr < 100), ctr, _cneg).unsqueeze(1)).squeeze(1)
+        # both city arms split the roll by the attacker's hit class
+        _klass = self._hit_class(ut0, True)
         if bool(city_att.any()):
             hrow = ctr.clamp(min=0, max=self.n_majors - 1)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
@@ -8337,7 +8352,6 @@ class SimSeats:
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
-            _klass = self._hit_class(ut0, True)
             rows = city_att.nonzero(as_tuple=True)[0]
             hr_, hc_ = hrow[rows], hcol[rows]
             outer = self.city_outer_hp[rows, hr_, hc_]
@@ -8358,6 +8372,51 @@ class SimSeats:
                 enc_att, ttc, atk_kind, u,
                 self._rel_atk_cs(a_seat, tgt) if self._city_rel_live else torch.zeros_like(a_hp),
                 "vrnge")
+        # CIV6: a minor's city is a CITY to ranged fire too — a barbarian
+        # (`alwaysHostile`) needs no war, a major's SNIPE asks
+        # `cityStateAttackable`'s own clauses (a declared war, or a war with
+        # its suzerain), the roll floors the minor at 1 HP.
+        cs_t = torch.zeros_like(att)
+        if self.S > 0:
+            _cst = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+            _csgate = (self.citystate_alive[:, :self.S] if row is None
+                       else self._citystate_target(row))
+            _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), _csgate)
+            cs_t = _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
+        cs_att = att & ~city_att & ~enc_att & cs_t
+        if bool(cs_att.any()):
+            csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
+            mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+            cs_tier = self._minor_walls_tier_at(csx)
+            cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
+            cs_outer = torch.minimum(self.city_outer_hp[_bidx, cs_mrow, 0], self._walls_tier_hp[cs_tier])
+            def_cs = (
+                15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
+                + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+                + self._walls_tier_cs[cs_tier]
+            )
+            atk_cs = (self._city_ranged_strength(ut0, a_seat, cs_outer)
+                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
+                      - self._wound(a_hp)
+                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
+            if not barb:
+                atk_cs = atk_cs + (self._rel_atk_cs(a_seat, tgt).to(atk_cs.dtype) if self._city_rel_live else 0)
+                atk_cs = atk_cs + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_cs.dtype)
+            atk_cs = atk_cs + (self._congress_unit_cs(ut0, a_seat)
+                               + self._gov_unit_cs(ut0, a_seat)).to(atk_cs.dtype)
+            d_csv = self._damage_roll(cs_att, atk_cs - def_cs, k="vrngcs", tile=tgt)
+            self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
+                            self._row_of(100 + csx), tgt, city=True)
+            rr = cs_att.nonzero(as_tuple=True)[0]
+            cs_wall, cs_centre = self._city_damage_split(
+                cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_csv[rr], _klass[rr])
+            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
+            _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
+            self._award_city_xp(cs_att, atk_kind, u, _type_p[:, u], a_seat,
+                                torch.where(_cshp <= 1,
+                                            torch.full_like(_cshp, XP_CITY_FELLED),
+                                            torch.full_like(_cshp, XP_CITY_ATTACK)))
         mslot = self._visible_military_at(a_seat).gather(1, ttc.unsqueeze(1)).squeeze(1)
         cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         neg = torch.full_like(mslot, -1)
@@ -8383,7 +8442,7 @@ class SimSeats:
         civ_def = ~elig_m & elig_c
         d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
         d_seat = torch.where(elig_m, m_seat, torch.where(elig_c, c_seat, neg))
-        unit_att = att & ~city_att & ~enc_att & (d_slot >= 0)
+        unit_att = att & ~city_att & ~enc_att & ~cs_att & (d_slot >= 0)
         if bool(unit_att.any()):
             ds0 = d_slot.clamp(min=0)
             d_barb = d_seat == BARB_SEAT
@@ -8471,10 +8530,10 @@ class SimSeats:
                 a_died=torch.zeros_like(unit_att),
                 d_died=unit_att & ((def_hp0 - d_def) <= 0))
         _mp = getattr(self, f"{atk_kind}_unit_mp")
-        _mp[:, u] = torch.where(city_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
-        self._spend_one_attack(atk_kind, u, city_att)
+        _mp[:, u] = torch.where(city_att | cs_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
+        self._spend_one_attack(atk_kind, u, city_att | cs_att)
         self._spend_attack(atk_kind, u, unit_att)
-        return city_att | unit_att
+        return city_att | cs_att | unit_att
 
     def _ranged_attack(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
                        u: int, row: int) -> torch.Tensor:

@@ -650,7 +650,7 @@ class SimOrders:
                         # and its scope-out keeps a major's fire off another
                         # major's units. It spends the turn itself, and only
                         # when it fired.
-                        self._hostile_ranged_strike(one, tgt_s, "major", v)
+                        self._hostile_ranged_strike(one, tgt_s, "major", v, row=row)
 
                 if getattr(self, "_A_SNIPE3", -1) >= 0:
                     snp3 = act & (a >= self._A_SNIPE3) & (a < self._A_SNIPE3 + 18) & ~is_civ
@@ -668,7 +668,7 @@ class SimOrders:
                             v = int(sc[b_])
                             one = torch.zeros(B, dtype=torch.bool, device=dev)
                             one[b_] = True
-                            self._hostile_ranged_strike(one, tgt_3, "major", v)
+                            self._hostile_ranged_strike(one, tgt_3, "major", v, row=row)
 
             if _rk_chop[n] and self._builder_idx >= 0:
                 ftr = self.tile_ftr.gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -1476,7 +1476,7 @@ class SimOrders:
             # ANY adjacent centre is a melee target — `caps.alwaysHostile`
             # needs no war, `cityAtIndex` names no seat, and a CITY-STATE
             # centre answers through `attackTargets`'s cityStateTarget arm
-            # (melee and adjacent only). `centre_slot_at` carries the majors'
+            # (adjacent, either weapon). `centre_slot_at` carries the majors'
             # centres, `citystate_at` the minors'.
             ctr = self.centre_slot_at.gather(1, nbc) >= 0
             # the CENTRE tile only — TS's cityStateTarget arm keys on
@@ -1500,10 +1500,10 @@ class SimOrders:
             # hostile unit, military or civilian; a barbarian is never hostile
             # to a barbarian) at d in [1, range], and `cityTarget`, which for
             # an alwaysHostile seat is ADJACENT ONLY (`d === 1`) whatever the
-            # weapon — a barbarian never shoots a city from range. City-state
-            # centres carry no district in TS, so they are NOT targets, same
-            # as the melee scan. Gated on `.any()` so a batch with no ranged
-            # barbarian pays nothing for the [B, T] scan.
+            # weapon — a barbarian never shoots a city from range — and a
+            # CITY-STATE centre joins that adjacent clause exactly like a
+            # major's. Gated on `.any()` so a batch with no ranged barbarian
+            # pays nothing for the [B, T] scan.
             rngd = u_rngd_all[:, u]
             if any_rngd and bool((act & rngd).any()):
                 # CIV6 (Forward Observers / Coincidence Rangefinding): "+1
@@ -1512,17 +1512,19 @@ class SimOrders:
                          + self._promo_pool_val("barb", "RANGE")[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 # a district's defenses are a target at range, priced by the
-                # -17 rather than refused; the centre stays adjacent-only, and
-                # a CITY-STATE centre is a MELEE target only (`attackTargets`'s
-                # cityStateTarget arm carries `!def.ranged`), so the ranged
-                # scan leaves it out.
+                # -17 rather than refused; every centre — a major's or a live
+                # minor's — stays adjacent-only.
                 _enc_plane = (self._encamp_block_plane(BARB_SEAT) if self._encamp_didx >= 0
                               else torch.zeros_like(self.centre_slot_at, dtype=torch.bool))
+                _cs_ctr = torch.zeros_like(self.centre_slot_at, dtype=torch.bool)
+                if self.S > 0:
+                    _cs_ctr.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0),
+                                     self.citystate_alive[:, :self.S])
                 rng_valid = (
                     (d_all >= 1)
                     & (d_all <= rng_u.unsqueeze(1))
                     & (self._nonbarb_unit_plane() | _enc_plane)
-                ) | ((d_all == 1) & (self.centre_slot_at >= 0))
+                ) | ((d_all == 1) & ((self.centre_slot_at >= 0) | _cs_ctr))
                 rng_key = torch.where(rng_valid, self._arange_bt, self._tile_miss)
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
             attack = act & (target_tile <= T)

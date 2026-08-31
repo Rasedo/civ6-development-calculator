@@ -44,7 +44,7 @@ from the list below.
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
+| B-22r World Congress | 1 | the Espionage Pact's and Luxury Policy's era windows are table readings; the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the PASS ships (fee, discount, lockout); what remains is the hammers bullet — a REMOVED item's progress banks where real Civ 6 remembers it against the item |
@@ -55,14 +55,13 @@ from the list below.
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
-| B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-61r the Great Person clauses with no carrier | 2 | 10 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, barbarian conversion, ocean passage, Tupac Amaru's per-district undefended grant walk); Goddard's visibility grant and Shah Jahan's gold-buyout SHIP now; Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| **B. Fidelity vs real Civ 6** | **22** | |
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -82,7 +81,7 @@ from the list below.
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | **C. Absent systems** | **25** | |
-| **OPEN, TOTAL** | **48** | |
+| **OPEN, TOTAL** | **47** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -124,7 +123,7 @@ Civ 6 source or is recorded as unverifiable.
   (`cityStateSuzerainCapitalBonus` / `_suz_capital_mask`, peace with every
   MAJOR); what survives of its row is the magnitude alone — +15% of the
   city's Science against a flat +3.
-- **B-22r. World Congress residuals.** Eighteen regular resolutions, the
+- **B-22r. World Congress residuals.** Nineteen regular resolutions, the
   DV resolution, emergencies as special sessions, the favor tie-break,
   refund tiers and the ballot wire all ship (`congressSession` /
   `_world_congress`; emergencies in `cpu/core/emergency.ts` /
@@ -174,13 +173,22 @@ Civ 6 source or is recorded as unverifiable.
   free vote's line — the highest polluter refuses what it cannot score in
   — is this model's own self-interest heuristic, like every other AI line
   in the catalog. OPEN:
-  - **ONE resolution has no carrier**: Luxury Policy — SOURCED: "A:
-    Duplicates of this Luxury resource grant additional Amenities. / B:
-    This Luxury resource grants no Amenities." B is fully specified, A
-    publishes no number, and nothing here counts DUPLICATE copies of a
-    luxury. A resolution whose two outcomes cannot both act eats a
-    rotation slot and passes a no-op, so it waits whole.
-    (ARMS CONTROL now acts — SOURCED: "A: All players have their weapons
+  LUXURY POLICY SHIPS — the nineteenth regular row, appended LAST with
+  its own 'luxury' target kind (the target space is the luxury catalog,
+  `LUXURY_IDS`' order, the tile plane's own). SOURCED: "A: +1 Amenity on
+  duplicates of a Resource. / B: This Luxury resource grants no
+  Amenities." B silences the named luxury outright, Affluence copies
+  included; A pays one extra full-reach amenity round per OWN improved
+  copy beyond the first (`luxuryAmenities` / `_luxury_amenities`). Three
+  cells are decisions, not transcriptions: A's REACH rides the
+  machinery's own LUXURY_AMENITY_CITIES spread (the published line names
+  no cities); the DUPLICATE count reads the seat's own improved tiles,
+  the one count both engines already share; and the era window,
+  Renaissance through Industrial, is the published table's reading. The
+  free vote is A on the luxury the voter holds the most improved copies
+  of.
+
+  - (ARMS CONTROL now acts — SOURCED: "A: All players have their weapons
     of Mass Destruction set equal to the target player. / B: The target
     player loses all of their Weapons of Mass Destruction." An inventory
     is state rather than a standing modifier, so `armsControl` /
@@ -544,19 +552,6 @@ Civ 6 source or is recorded as unverifiable.
   - **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
     city capture; the district's own pool rides through unchanged on both
     engines — no source says which is right.
-- **B-44r. City-state war tails.** The minor war head, its clocks, the
-  suzerain refusal, a seat's march on a minor and the barbarian MARAUD
-  all ship (`warTargets` / `war_targets`; the walker's city scan covers
-  majors and minors on one key, an adjacent minor CENTRE is a melee
-  target — `cityStateAttackable` answers for an alwaysHostile seat — and
-  a barbarian assault floors the minor at 1 HP, never a capture;
-  `cs_war_test` and `citystates.test.ts` hold what the gate does not).
-  OPEN:
-  - **A RANGED RAIDER NEVER SHOOTS A MINOR CENTRE.** `attackTargets`'
-    cityStateTarget arm carries `!def.ranged` — the seat verbs' own
-    ranged-vs-city-state scope-out — so a barbarian archer parked beside
-    a minor holds its ring tile and fires nothing, where real Civ 6
-    shoots.
 - **B-53r. The Great Person PASS.** All 205 people ship with the era
   gate, the frozen randomly-drawn offer and its frozen price
   (`ensureGpOffer` / `_gp_ensure_offer`, `gpCost`), and both patronage

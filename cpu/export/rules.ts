@@ -231,7 +231,7 @@ import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, C
 import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index; FORT appended LAST)
 
  
-import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
+import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS } from './catalog';
 import { clearableFeatures } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
@@ -1365,6 +1365,7 @@ export function buildRules() {
         };
       }),
       luxAmenityCities: LUXURY_AMENITY_CITIES,
+      nLuxuries: LUXURY_IDS.length,
       farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
       farmHousing: IMPROVEMENTS.FARM.housing,
       mineProd: IMPROVEMENTS.MINE.yields.production ?? 1,

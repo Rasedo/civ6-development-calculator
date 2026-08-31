@@ -23,7 +23,7 @@ import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
-import { congressGrowthMult, congressGwMult } from './congress';
+import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
@@ -372,18 +372,28 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   for (const c of cities) result.set(c.id, 0);
   if (cities.length === 0) return result;
 
+  // CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
+  // B: This Luxury resource grants no Amenities." B silences the named
+  // luxury outright; A pays one extra full-reach round per OWN improved
+  // copy beyond the first.
+  const banned = congressBannedLuxury(state);
+  const dupLux = congressDuplicateLuxury(state);
+  let dupCopies = 0;
   const luxuries = new Set<string>();
   for (const t of state.map.tiles) {
     if (!t.resource || tileSeat(t) !== seat) continue;
     const def = RESOURCES[t.resource];
-    if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
+    if (def.category === 'luxury' && t.improvement === def.improvement && t.resource !== banned) {
+      luxuries.add(t.resource);
+      if (t.resource === dupLux) dupCopies++;
+    }
   }
   // CIV6 (Affluence): "While established in a city-state, provides a copy of
   // its Luxury resources to you." A copy of one already worked is no second
   // amenity, which the set answers by itself.
   for (const cityState of state.cityStates ?? []) {
     if (!minorGovernorEffects(state, seat, cityState.id).some((e) => e.minorLuxuries)) continue;
-    for (const r of minorLuxuries(state, cityState)) luxuries.add(r);
+    for (const r of minorLuxuries(state, cityState)) if (r !== banned) luxuries.add(r);
   }
 
   const baseHave = new Map<number, number>();
@@ -396,7 +406,7 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   // INVENTED luxury serves cities exactly like a worked one, and its own row
   // says how many it reaches.
   const reach = [
-    ...new Array<number>(luxuries.size).fill(LUXURY_AMENITY_CITIES),
+    ...new Array<number>(luxuries.size + Math.max(0, dupCopies - 1)).fill(LUXURY_AMENITY_CITIES),
     ...(seatOf(state, seat)?.gpLuxuries ?? []),
   ];
   for (const n of reach) {

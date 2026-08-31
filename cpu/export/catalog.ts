@@ -12,7 +12,7 @@ import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
-import { RESOURCES } from '../../world/resources';
+import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
 // the roster grew — indices 0-2 stay stable (every existing
@@ -23,9 +23,6 @@ import { RESOURCES } from '../../world/resources';
 // improvement index, so anything but an append renumbers every other row.
 
  
-const LUXURY_IDS = Object.values(RESOURCES)
-  .filter((r) => r.category === 'luxury')
-  .map((r) => r.id);
 
 
 function chopKeyCode(t: any): number {

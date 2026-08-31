@@ -534,6 +534,7 @@ WW_BATTLE_KEYS = frozenset({
     "enc",      # melee assault on ANY seat's Encampment district
     "vrngc",    # hostile ranged vs ANY seat's city
     "vrnge",    # hostile ranged vs ANY seat's Encampment district
+    "vrngcs",   # hostile ranged vs a city-state centre
     "rngrc",    # ordered ranged vs ANY seat's city
     "rnge",     # ordered ranged vs ANY seat's Encampment district
     "rngcs",    # ordered ranged vs a city-state centre
