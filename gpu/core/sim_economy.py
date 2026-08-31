@@ -412,8 +412,16 @@ class SimEconomy:
         if bool(self.feat_stripped.any()):
             base = base - self.feat_yields[:, :, 0] * self.feat_stripped.to(self.dtype)
         if self.improvements_on:
-            farm = (self.improvement == self.FARM) & ~self.pillaged
-            base = base + farm.to(self.dtype) * self._farm_food
+            live = ~self.pillaged
+            base = base + ((self.improvement == self.FARM) & live).to(self.dtype) * self._farm_food
+            # `_neutral_prod`'s arm, on the other column tileYields' improvement
+            # block writes: FARM, MINE and LUMBER_MILL are the three the loader
+            # names, and every row past them pays its catalog yield — the
+            # FISHING_BOATS food a sea resource is worked for.
+            new_imp = self.improvement >= 3
+            if bool(new_imp.any()):
+                base = base + (new_imp & live).to(self.dtype) * self._imp_yields[
+                    self.improvement.clamp(min=0), 0]
         self._fbase_cache = (self._eff_version, base)
         return base
 
