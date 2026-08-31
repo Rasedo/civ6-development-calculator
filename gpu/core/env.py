@@ -140,9 +140,9 @@ class BatchEnv:
 
         alive = s.city_alive[:, row]
         pop = s.city_pop[:, row]
-        cur = s.city_current[:, row]
+        cur = s._q_head(row)
         need = s._growth_needed(pop).clamp(min=1)
-        denom = s.city_cost[:, row].clamp(min=1)
+        denom = s.city_cost[:, row, :, 0].clamp(min=1)
         # OWNED TILES per city: `tile_seat` names the holding row and
         # `tile_city` the PERSISTENT id within it — the `ownerSeat` /
         # `ownerCity` pair TS filters on, one derivation for every seat.
@@ -155,7 +155,7 @@ class BatchEnv:
                 alive.to(d),
                 pop.to(d) / 10.0,
                 s.city_growth[:, row] / need,
-                torch.where(cur >= 0, s.city_progress[:, row] / denom, torch.zeros_like(denom)),
+                torch.where(cur >= 0, s.city_progress[:, row, :, 0] / denom, torch.zeros_like(denom)),
                 s.city_cbox[:, row] / s._border_cost(s.city_acquired[:, row]).clamp(min=1),
                 owned / 20.0,
                 torch.where(alive, s.city_hp[:, row], torch.zeros_like(s.city_hp[:, row])).to(d) / 200.0,
@@ -183,7 +183,8 @@ class BatchEnv:
                 # settler column). Both are live reads, never a cumulative
                 # counter, and both gate on a LIVING city as TS's reduce does.
                 s._seat_settlers(row).to(d),
-                (alive & (cur == s.SETTLER)).sum(dim=1).to(d),
+                # observe.ts counts every settler ON ORDER, at any depth
+                (alive.unsqueeze(2) & (s.city_current[:, row] == s.SETTLER)).sum(dim=(1, 2)).to(d),
                 alive.sum(dim=1).to(d) / C,
                 (s.civ_treasury[:, row] / 200.0).clamp(max=5.0),
                 s.civ_envoys_avail[:, row].to(d) / 5.0,
@@ -330,7 +331,7 @@ class BatchEnv:
         rng_t = s._type_ranged_strength > 0
         alive = s.city_alive[:, row]
         n_cities = alive.sum(dim=1)
-        qcur = s.city_current[:, row]
+        qcur = s._q_head(row)      # observe.ts counts `queue[0]` and no deeper
         q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
         q_u = alive & (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
         q_mil = q_u & (s._type_combat[q_ty] > 0)

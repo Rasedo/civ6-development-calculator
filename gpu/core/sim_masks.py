@@ -427,10 +427,10 @@ class SimMasks:
         reading the pool off total progress would silently undo."""
         if self._repair_proj_idx < 0:
             return
-        head = self.city_current[:, row] == self.PROJECT_BASE + self._repair_proj_idx
+        head = self._q_head(row) == self.PROJECT_BASE + self._repair_proj_idx
         if not bool(head.any()):
             return
-        gain = (js_round(self.city_progress[:, row].double())
+        gain = (js_round(self.city_progress[:, row, :, 0].double())
                 - js_round(before.double())).long()
         oh = self.city_outer_hp[:, row]
         mx = self._walls_max_all(row)

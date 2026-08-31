@@ -754,7 +754,8 @@ def _buy_ctx(sim, row: int) -> dict:
     n_cities = alive_row.sum(dim=1)
     active = sim.seat_ext[:, row] & (n_cities > 0) & sim.civ_alive[:, row]
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
-    _sq = (alive_row & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=1)
+    # `settlerCost` counts every settler on order, at any depth in any queue
+    _sq = (alive_row.unsqueeze(2) & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=(1, 2))
     sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
                  * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
     mon_g = sim._golden_ded(row, sim._ded_monumentality)
@@ -1071,12 +1072,34 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
     return out
 
 
+def _maybe_reorder(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
+                   seeds, turn) -> torch.Tensor:
+    """Sometimes bring a waiting item to the head instead of queuing another.
+
+    A reorder commits nothing, so the applier can only ever refuse it for want
+    of an entry to move; that makes it free variation, and without it the
+    promote columns are legal every turn and chosen never."""
+    lo = sim.PROMOTE_BASE
+    if seeds is None or mask.shape[2] <= lo:
+        return prod
+    legal = mask[:, :, lo:]                                   # [B, C, QD-1]
+    any_l = legal.any(dim=2)
+    if not bool(any_l.any()):
+        return prod
+    hit = any_l & (_policy_rng(sim, seeds, turn or 0, row, 6) < ladder.REORDER_SHARE).unsqueeze(1)
+    if not bool(hit.any()):
+        return prod
+    # the SHALLOWEST waiting entry — the one a player reaches for first
+    return torch.where(hit, lo + legal.long().argmax(dim=2), prod)
+
+
 def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None, pre: dict | None = None):
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     style = _seat_style(row)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row),
                                   tier_order=style["tier_order"])
+    prod = _maybe_reorder(sim, row, m["production"], prod, seeds, turn)
     dtile = _district_tiles(sim, row, prod)
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
     if style["deep"] is not None:

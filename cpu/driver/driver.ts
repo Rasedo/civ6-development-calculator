@@ -306,7 +306,7 @@ for (let t = 0; t < N_TURNS; t++) {
         // queued AQUEDUCT/CANAL/DAM dig or the Flood Barrier's centre).
         let engJobTiles: Tile[] | null = null;
         const engTiles = () => (engJobTiles ??= state.map.tiles.filter((t) =>
-          (canBuildRoad(t, owns) && !t.wonder)
+          canBuildRoad(t, owns)
           || validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, builder: 'MILITARY_ENGINEER' }).length > 0
           || engineerFinishCity(state, seat, t.index) !== undefined));
         for (const u of state.units) {

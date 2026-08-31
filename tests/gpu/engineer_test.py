@@ -248,35 +248,35 @@ def main() -> None:
     sim.district[0, site] = di
     sim.district_complete[0, site] = False
     sim.city_dist_tile[0, row, j, di] = site
-    sim.city_qtile[0, row, j] = site
-    sim.city_current[0, row, j] = sim.DISTRICT_BASE + s
-    sim.city_cost[0, row, j] = 200
-    sim.city_progress[0, row, j] = 0
+    sim.city_qtile[0, row, j, 0] = site
+    sim.city_current[0, row, j, 0] = sim.DISTRICT_BASE + s
+    sim.city_cost[0, row, j, 0] = 200
+    sim.city_progress[0, row, j, 0] = 0
     sim._eff_version += 1
     v = retype(sim, row, ENG, site)
     sim.major_unit_charges[0, v] = 2
     assert bool(mask_of(sim, row, v)[sim._A_FINISH]), (
         "an engineer standing on the site being dug must be offered the charge")
     order(sim, row, v, sim._A_FINISH)
-    got = float(sim.city_progress[0, row, j])
+    got = float(sim.city_progress[0, row, j, 0])
     assert got == 40.0, f"CIV6: a charge completes 20% of a 200-cost district -> 40, read {got}"
     assert int(sim.major_unit_charges[0, v]) == 1, "the charge is spent"
 
     if sim._barrier_bidx >= 0:
         ctr = int(sim.city_center[0, row, j])
-        sim.city_current[0, row, j] = sim._barrier_bidx
-        sim.city_qtile[0, row, j] = -1
-        sim.city_progress[0, row, j] = 0
+        sim.city_current[0, row, j, 0] = sim._barrier_bidx
+        sim.city_qtile[0, row, j, 0] = -1
+        sim.city_progress[0, row, j, 0] = 0
         sim.major_unit_tile[0, v] = ctr
         sim.major_unit_mp[0, v] = 2.0
         sim._gen_ver += 1
         sim._reprice_live(row)
-        cost = float(sim.city_cost[0, row, j])
+        cost = float(sim.city_cost[0, row, j, 0])
         assert bool(mask_of(sim, row, v)[sim._A_FINISH]), (
             "the Flood Barrier is a BUILDING, so its charge is spent at the centre")
         order(sim, row, v, sim._A_FINISH)
         want = round(cost * sim._eng_finish_frac)
-        got = float(sim.city_progress[0, row, j])
+        got = float(sim.city_progress[0, row, j, 0])
         assert abs(got - want) < 1e-6, f"a barrier charge is 20% of its LIVE price {cost} -> {want}, read {got}"
     print("  8 charge OK (20% of a district, and of the Flood Barrier's live price)")
 

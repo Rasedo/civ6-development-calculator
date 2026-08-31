@@ -303,7 +303,7 @@ def poke_exclusive_with(rules, rj, path):
     sim.district[0, T] = EN
     sim.district_complete[0, T] = True
     sim.city_dist_tile[0, r + 1, j, EN] = T
-    sim.city_current[0, r + 1, j] = -1  # idle
+    sim.city_current[0, r + 1, j, 0] = -1  # idle
     sim.city_bldg[0, r + 1, j, BAR] = False
     sim.city_bldg[0, r + 1, j, STA] = False
 

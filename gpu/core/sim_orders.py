@@ -180,8 +180,8 @@ class SimOrders:
                     _c = self._project_boost_slot(row, hc.unsqueeze(1)).squeeze(1)[_r]
                     _pct = self._bsum_by_row("projcharge", self._b_project_charge)[_r, row]
                     _ch = self.unit_charges[_r, sc[_r]].double()
-                    _cst = self.city_cost[_r, row, _c].double()
-                    self.city_progress[_r, row, _c] += js_round(
+                    _cst = self.city_cost[_r, row, _c, 0].double()
+                    self.city_progress[_r, row, _c, 0] += js_round(
                         _cst * _pct.double() * _ch / 100).to(self.city_progress.dtype)
                     self.city_boost_turn[_r, row, _c] = self.turn
                     self.unit_charges[_r, sc[_r]] = 0
@@ -400,8 +400,8 @@ class SimOrders:
                         _c = _col[_r]
                         # `itemCost`: a district's price locked at queue, a
                         # building's read live.
-                        _cst = self._live_building_cost(row)[_r, _c].double()
-                        self.city_progress[_r, row, _c] += js_round(
+                        _cst = self._live_building_cost(row)[_r, _c, 0].double()
+                        self.city_progress[_r, row, _c, 0] += js_round(
                             _cst * self._eng_finish_frac).to(self.city_progress.dtype)
                         self._spend_build_charge(_r, sc, hc)
 
@@ -705,7 +705,7 @@ class SimOrders:
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
                     col_c = self._city_col_at(row, cr, ct)
-                    _drip_c = self.city_progress[:, row].clone()
+                    _drip_c = self.city_progress[:, row, :, 0].clone()
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
                         amt = float(amount[b2])
@@ -716,8 +716,8 @@ class SimOrders:
                             continue
                         if int(ftr[cr[i2]]) == 1:
                             self.city_growth[b2, row, j2] += amt
-                        elif int(self.city_current[b2, row, j2]) >= 0:
-                            self.city_progress[b2, row, j2] += amt
+                        elif int(self.city_current[b2, row, j2, 0]) >= 0:
+                            self.city_progress[b2, row, j2, 0] += amt
                         else:
                             self.city_prod_bank[b2, row, j2] += amt
                     self._repair_drip(row, _drip_c)
@@ -1140,10 +1140,7 @@ class SimOrders:
             self.city_cbox[b, row, col] = 0
             self.city_acquired[b, row, col] = 0
             self.city_outer_hp[b, row, col] = 0
-            self.city_current[b, row, col] = -1
-            self.city_progress[b, row, col] = 0
-            self.city_cost[b, row, col] = 0
-            self.city_qtile[b, row, col] = -1
+            self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
             self.city_gw_writing[b, row, col] = 0
             self.city_gw_art[b, row, col] = 0

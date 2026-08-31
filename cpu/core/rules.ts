@@ -85,6 +85,10 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
  */
 export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): boolean {
   if (isWater(tile) || isImpassable(tile)) return false;
+  // A NATURAL WONDER takes nothing built on it — the clause `canFoundCity`,
+  // `validImprovementsIn`, `canPlaceDistrictIn` and `wonderTerrainOk` each
+  // ask, and the engineer's ground is the last place that did not.
+  if (tile.wonder) return false;
   return ownsTile(tile) || tileSeat(tile) < 0;
 }
 

@@ -47,11 +47,11 @@ def main() -> None:
 
     # 3. production: idle a city, confirm the picker leaves it idle
     j = 0
-    sim.city_current[0, r + 1, j] = -1
-    sim.city_progress[0, r + 1, j] = 0.0
-    sim.city_cost[0, r + 1, j] = 0.0
+    sim.city_current[0, r + 1, j, 0] = -1
+    sim.city_progress[0, r + 1, j, 0] = 0.0
+    sim.city_cost[0, r + 1, j, 0] = 0.0
     sim.step()
-    assert int(sim.city_current[0, r + 1, j]) == -1, "picker must not queue for a controlled civ"
+    assert int(sim.city_current[0, r + 1, j, 0]) == -1, "picker must not queue for a controlled civ"
 
     # 4. write a WARRIOR queue item; the completion machinery must run it.
     #    Park the civ's OTHER cities idle first so the +1 isolates THIS
@@ -61,12 +61,12 @@ def main() -> None:
     w = sim._warrior_idx
     sim.city_current[0, r + 1, :] = -1
     sim.civ_treasury[0, r + 1] = 0.0  # no gold unit/settler buy to inflate the count
-    sim.city_current[0, r + 1, j] = sim.UNIT_BASE + w
-    sim.city_cost[0, r + 1, j] = float(sim._type_cost[w])
-    sim.city_progress[0, r + 1, j] = float(sim._type_cost[w]) - 0.5  # one turn from done
+    sim.city_current[0, r + 1, j, 0] = sim.UNIT_BASE + w
+    sim.city_cost[0, r + 1, j, 0] = float(sim._type_cost[w])
+    sim.city_progress[0, r + 1, j, 0] = float(sim._type_cost[w]) - 0.5  # one turn from done
     units_before = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())
     sim.step()
-    done = int(sim.city_current[0, r + 1, j]) == -1
+    done = int(sim.city_current[0, r + 1, j, 0]) == -1
     units_after = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())
     assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
 

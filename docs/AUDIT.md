@@ -41,14 +41,13 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| A-2 the road apply arm skips the wonder clause | 1 | TS `canBuildRoad` accepts a natural-wonder tile the GPU mask refuses; unreachable until the driver fuzzes a road order |
-| **A. Engine vs engine** | **1** | |
+| **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a cancelled item's hammers BANK where real Civ 6 holds them against the item (blocked on C-44) |
+| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a REMOVED item's hammers bank where real Civ 6 remembers them against the item |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
@@ -61,8 +60,9 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
+| B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **22** | |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -80,9 +80,9 @@ from the list below.
 | C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
-| C-44 the production queue is one head deep | 2 | a city builds ONE item; real Civ 6 queues several, and that queue is where a switched-away item's hammers wait |
-| **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **52** | |
+| C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
+| **C. Absent systems** | **28** | |
+| **OPEN, TOTAL** | **51** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -96,14 +96,7 @@ bounds nothing the gate does not reach ("Reachability" below), and a round
 that widens coverage is worth more here than a round that re-reads the
 exporter.
 
-- **A-2. THE ROAD APPLY ARM SKIPS THE WONDER CLAUSE.** The GPU's
-  `_seat_engineer_job_mask` refuses a road on a natural-wonder tile
-  (`~self.nwonder`); the TS apply arm validates with `canBuildRoad`, which
-  asks `engineerTileOk` and never the wonder. No driven trajectory reaches
-  it (the mask never offers the tile), but the driver may fuzz decisions,
-  and then TS lays a road the GPU refused. One clause in `canBuildRoad`.
-
-What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
+No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
@@ -430,6 +423,18 @@ Civ 6 source or is recorded as unverifiable.
   raises. OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and
   Macedon's Hypaspist raise flanking or support for themselves alone, and
   no civilization unique exists (C-26).
+- **B-67. A NATURAL WONDER'S ROUTE CLAUSE IS UNSOURCED.** Weight 1.
+  `engineerTileOk` now refuses a natural-wonder tile, so `canBuildRoad`
+  and `canBuildRailroad` refuse one too and the GPU's
+  `_seat_engineer_job_mask` (which always carried `~self.nwonder`) agrees.
+  That follows every other clause the engine DOES source — `canFoundCity`,
+  `validImprovementsIn`, `canPlaceDistrictIn` and `wonderTerrainOk` each
+  refuse the tile — but the Civilopedia's own Natural Wonder page speaks of
+  IMPROVEMENTS and districts, not routes, and a passable natural wonder is
+  ground a unit may stand on. Whether real Civ 6 lets a Military Engineer
+  lay a road across one is unsourced either way; an owner ruling would
+  either confirm the clause or delete it from both engines.
+
 - **B-66. FORMATIONS.** Weight 1 — the mechanic SHIPS; two tails stay open.
   Corps, Armies, Fleets and Armadas exist on both engines: one
   `formation` tier per unit (`formationCS` / `_form_cs`, `_form_cs_pool`),
@@ -555,16 +560,16 @@ Civ 6 source or is recorded as unverifiable.
     offer — the class's own points freeze and the passed person stays on
     offer to everyone else. Needs a per-seat passed flag beside the
     shared offer, and the rejoin rule when the next person stands.
-  - **A CANCELLED ITEM'S HAMMERS BANK, WHERE CIV 6 HOLDS THEM AGAINST
-    THE ITEM.** Production is never lost on either path now:
-    `cancelQueueItem` pays `progress` into `productionBank`, which is
-    where this model puts every carried-over hammer already
-    (`dropQueuedBuilding`, `wipeConstruction`). Real Civ 6 keeps them
-    against the ITEM, so resuming it later resumes where it stopped and
-    building something ELSE inherits nothing. Retaining per item wants a
-    queue that can hold the item after it stops being built — C-44. Both
-    engines are alike here and neither has a caller: `cancelQueueItem`
-    is reached by no engine path, driver or scripted player.
+  - **A REMOVED ITEM'S HAMMERS BANK, WHERE CIV 6 HOLDS THEM AGAINST THE
+    ITEM.** SWITCHING is faithful now: the queue holds the item after it
+    stops being worked, so its hammers wait on its own entry and a reorder
+    spends nothing. What still banks is REMOVAL — `cancelQueueItem`,
+    `dropQueuedBuilding` and `wipeConstruction` each pay `progress` into
+    `productionBank`. Real Civ 6 remembers the hammers against the ITEM
+    even once it leaves the queue, so queuing it again later resumes where
+    it stopped; that wants a per-item ledger the city does not have. Both
+    engines are alike here, and `cancelQueueItem` is reached by no engine
+    path, driver or scripted player.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49
@@ -1137,23 +1142,16 @@ under their blocker so the dependency is readable, and both halves count.
   Pasture and Farm pages name (Outback Station, Observatory) are C-26,
   parked.
 
-- **C-44. THE PRODUCTION QUEUE IS ONE HEAD DEEP.** Weight 2. A Civ 6
-  city holds a QUEUE: several items lined up, reorderable, each keeping
-  the production already spent on it, and the head is merely the one
-  being worked. Here a city builds exactly one thing. The GPU says so in
-  its storage — `city_current` is a single code, `city_current < 0` IS an
-  empty queue — and TS, whose `city.queue` is a list, gates every commit
-  on `queue.length === 0`, so the list never holds two. Consequences:
-  - there is no SWITCH verb on either engine, because there is nothing to
-    switch between, and a player's most ordinary production decision is
-    absent from the action space P8 will train on;
-  - a cancelled item's hammers have nowhere item-shaped to wait, which is
-    what keeps B-53r's second bullet open;
-  - the completion overflow banks rather than carrying into the next
-    item, which both engines already declare and pay a turn late.
-  Closing it moves `city_current` to a per-city list on the GPU (the
-  head's cost and tile travel with each entry), lifts the TS commit gate,
-  and adds the reorder verb to the wire on both sides.
+- **C-45. THE QUEUE'S DEPTH IS A FIXED FIVE.** Weight 1. A city holds
+  `PRODUCTION_QUEUE_MAX` items and refuses the sixth. Real Civ 6 publishes
+  no ceiling on its queue, and the number here is a CAPACITY choice, not a
+  sourced magnitude: the GPU's queue is a tensor dimension (`sim.QD`, the
+  last axis of `city_current` / `city_progress` / `city_cost` /
+  `city_qtile`) and must be finite, so TS carries the same cap to keep the
+  two engines answering alike. Raising it costs one constant and one
+  re-export; removing the ceiling entirely would cost the GPU its dense
+  storage. Reach: the driven gate fills queues to the cap by the early
+  hundreds of turns, so the refusal itself is exercised.
 
 ## Reachability — what the green gate does NOT prove
 

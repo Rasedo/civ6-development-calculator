@@ -44,6 +44,10 @@ class SimInit:
         # and this storage cannot drift. Settling caps at maxCities; loyalty
         # flips exceed it. Empty slots are city_alive=False.
         self.RC = int(rules.seats.get("citySlots", 24))
+        # A city's production QUEUE is a tensor dimension: `city_current`,
+        # `city_progress`, `city_cost` and `city_qtile` are dense over it, slot
+        # 0 the head, -1 an empty slot. `_q_*` is the only way in or out.
+        self.QD = max(int(rules.seats.get("productionQueueMax", 1)), 1)
         self.S = int(f0.get("cityStateMax", 0))
         # FOG IS LIVE in units mode (fogOfWar rides the fixture; older
         # fixtures predate the key and fall back to unitsMode — the creation
@@ -68,10 +72,10 @@ class SimInit:
             ("acquired", torch.long, 0, None, None),
             ("growth", dtype, 0, None, None),
             ("cbox", dtype, 0, None, None),
-            ("current", torch.long, -1, None, None),
-            ("progress", dtype, 0, None, None),
-            ("cost", dtype, 0, None, None),
-            ("qtile", torch.long, -1, None, None),
+            ("current", torch.long, -1, None, self.QD),
+            ("progress", dtype, 0, None, self.QD),
+            ("cost", dtype, 0, None, self.QD),
+            ("qtile", torch.long, -1, None, self.QD),
             ("gw_writing", torch.long, 0, None, None),
             ("gw_art", torch.long, 0, None, None),
             ("gw_music", torch.long, 0, None, None),
@@ -2414,6 +2418,9 @@ class SimInit:
         self.DISTRICT_BASE = NB + 2 + self.NU
         self.WONDER_BASE = self.DISTRICT_BASE + len(self._scaffold)
         self.PROJECT_BASE = self.WONDER_BASE + self._wond_n
+        # ...and PROMOTE closes it: code PROMOTE_BASE + k moves queue entry
+        # k+1 to the head. There is no column for entry 0 — it is the head.
+        self.PROMOTE_BASE = self.PROJECT_BASE + len(self._proj_rows)
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)

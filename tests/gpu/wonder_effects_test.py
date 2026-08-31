@@ -287,8 +287,8 @@ def main() -> None:
     s15.civ_techs[0, 0, int(early.nonzero()[0])] = True  # already researched: no eureka
     tile15 = plant(s15, 0, 0, library)
     s15.built_wonder_complete[0, tile15] = False
-    s15.city_current[:, 0, 0] = s15.WONDER_BASE + library
-    s15.city_progress[:, 0, 0] = 10.0 ** 9
+    s15.city_current[:, 0, 0, 0] = s15.WONDER_BASE + library
+    s15.city_progress[:, 0, 0, 0] = 10.0 ** 9
     s15._seat_city_produce(
         0, torch.zeros(s15.B, dtype=torch.long, device=s15.device),
         torch.ones(s15.B, dtype=torch.bool, device=s15.device),

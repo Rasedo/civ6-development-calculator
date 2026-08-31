@@ -102,12 +102,12 @@ def poke_settler_prod(rules, path):
         col = bidx_of(sim, ROW)
         if hall:
             stand(sim, ROW, col, "ANCESTRAL_HALL")
-        sim.city_current[0, ROW, col] = sim.SETTLER
-        sim.city_progress[0, ROW, col] = 0.0
-        sim.city_cost[0, ROW, col] = 10_000.0  # never completes inside the poke
+        sim.city_current[0, ROW, col, 0] = sim.SETTLER
+        sim.city_progress[0, ROW, col, 0] = 0.0
+        sim.city_cost[0, ROW, col, 0] = 10_000.0  # never completes inside the poke
         sim.city_prod_bank[0, ROW, col] = 0.0
         sim.step()
-        return float(sim.city_progress[0, ROW, col])
+        return float(sim.city_progress[0, ROW, col, 0])
 
     plain = run(False)
     assert plain > 0, "the control city produced nothing"
@@ -120,12 +120,12 @@ def poke_settler_prod(rules, path):
         col = bidx_of(sim, ROW)
         if hall:
             stand(sim, ROW, col, "ANCESTRAL_HALL")
-        sim.city_current[0, ROW, col] = 0  # the first building row
-        sim.city_progress[0, ROW, col] = 0.0
-        sim.city_cost[0, ROW, col] = 10_000.0
+        sim.city_current[0, ROW, col, 0] = 0  # the first building row
+        sim.city_progress[0, ROW, col, 0] = 0.0
+        sim.city_cost[0, ROW, col, 0] = 10_000.0
         sim.city_prod_bank[0, ROW, col] = 0.0
         sim.step()
-        return float(sim.city_progress[0, ROW, col])
+        return float(sim.city_progress[0, ROW, col, 0])
 
     assert abs(run_b(True) - run_b(False)) < 1e-9, "the Hall paid a BUILDING"
     print("  2 Ancestral Hall production OK — x1.5 on a settler, x1 on a building")
@@ -194,12 +194,12 @@ def poke_conquest_prod(rules, path):
         stand(sim, ROW, col, "WARLORDS_THRONE")
         if open_window:
             sim.conquest_turns[0, ROW] = 5
-        sim.city_current[0, ROW, col] = sim.SETTLER
-        sim.city_progress[0, ROW, col] = 0.0
-        sim.city_cost[0, ROW, col] = 10_000.0
+        sim.city_current[0, ROW, col, 0] = sim.SETTLER
+        sim.city_progress[0, ROW, col, 0] = 0.0
+        sim.city_cost[0, ROW, col, 0] = 10_000.0
         sim.city_prod_bank[0, ROW, col] = 0.0
         sim.step()
-        return float(sim.city_progress[0, ROW, col])
+        return float(sim.city_progress[0, ROW, col, 0])
 
     shut = run(False)
     assert shut > 0, "the control city produced nothing"
@@ -272,9 +272,9 @@ def _working_campus(sim, col):
         sim.district_pillaged[0, n] = False
         sim.tile_seat[0, n] = ROW
         sim.tile_city[0, n] = cid
-        sim.city_current[0, ROW, col] = sim.PROJECT_BASE + pi
-        sim.city_cost[0, ROW, col] = 300
-        sim.city_progress[0, ROW, col] = 0
+        sim.city_current[0, ROW, col, 0] = sim.PROJECT_BASE + pi
+        sim.city_cost[0, ROW, col, 0] = 300
+        sim.city_progress[0, ROW, col, 0] = 0
         return n, pi
     raise AssertionError("no free plot beside the centre for a Campus")
 
@@ -315,8 +315,8 @@ def poke_project_boost(rules, path):
     a = torch.full(smap.shape, -1, dtype=torch.long)
     a[0, rank] = sim._A_BOOST
     sim._apply_seat_unit_actions(ROW, a)
-    assert float(sim.city_progress[0, ROW, col]) == 18.0, (
-        f"3 charges x 2% x 300 = 18, got {float(sim.city_progress[0, ROW, col])}")
+    assert float(sim.city_progress[0, ROW, col, 0]) == 18.0, (
+        f"3 charges x 2% x 300 = 18, got {float(sim.city_progress[0, ROW, col, 0])}")
     assert not bool(sim.unit_alive[0, slot]), "the Builder survived its whole bank"
     assert int(sim.city_boost_turn[0, ROW, col]) == sim.turn, "the city took no stamp"
 

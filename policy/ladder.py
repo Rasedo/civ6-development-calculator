@@ -458,6 +458,12 @@ def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project
     }
 
 
+#: how often a driven seat REORDERS a city's queue instead of adding to it.
+#: The driver is the fuzzer — the applier re-validates every pick — and this is
+#: the only thing that reaches the promote columns at all.
+REORDER_SHARE = 0.06
+
+
 def pick_production(
     mask: torch.Tensor,
     classes: dict,

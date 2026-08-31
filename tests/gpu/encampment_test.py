@@ -394,15 +394,15 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
 
     def _run(mult):
         s = _prep()
-        s.city_current[0, r + 1, j] = enc_code
-        s.city_cost[0, r + 1, j] = 1e9      # never completes, so progress stays readable
-        s.city_progress[0, r + 1, j] = 0.0
+        s.city_current[0, r + 1, j, 0] = enc_code
+        s.city_cost[0, r + 1, j, 0] = 1e9      # never completes, so progress stays readable
+        s.city_progress[0, r + 1, j, 0] = 0.0
         s.city_prod_bank[0, r + 1, j] = 0.0
         s._gov_ehprod[:] = 1.0
         s._gov_ehprod[gi] = mult
         s._eff_version += 1           # the gov/policy mods cache keys on this
         s.step()
-        return float(s.city_progress[0, r + 1, j])
+        return float(s.city_progress[0, r + 1, j, 0])
 
     plain, doubled = _run(1.0), _run(2.0)
     assert plain > 0, "the civ city produced nothing — poke cannot measure the multiplier"

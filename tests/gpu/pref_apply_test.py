@@ -52,9 +52,9 @@ def main() -> None:
     NEG = float("-inf")
 
     def idle_city():
-        sim.city_current[0, r + 1, j] = -1
-        sim.city_progress[0, r + 1, j] = 0.0
-        sim.city_cost[0, r + 1, j] = 0.0
+        sim.city_current[0, r + 1, j, 0] = -1
+        sim.city_progress[0, r + 1, j, 0] = 0.0
+        sim.city_cost[0, r + 1, j, 0] = 0.0
 
     def pref(ranked):
         """ranked = columns best-first; everything else is -inf (ruled out)."""
@@ -72,7 +72,7 @@ def main() -> None:
     b1 = legal_b[1] if len(legal_b) > 1 else b0
     sim.apply_seat_actions(r + 1, production_pref=pref([b0, b1]))
     sim._seat_record_apply(r + 1, ACTIVE)
-    got = int(sim.city_current[0, r + 1, j])
+    got = int(sim.city_current[0, r + 1, j, 0])
     assert got == b0, f"top-ranked legal column must win, got {got}"
     print("  1 top-ranked legal column wins OK")
 
@@ -82,9 +82,9 @@ def main() -> None:
     # rejects on. The district column stays legal in the mask we hand over.
     sim2 = fresh(rules, path)
     sim2.seat_ext[0, r + 1] = True
-    sim2.city_current[0, r + 1, j] = -1
-    sim2.city_progress[0, r + 1, j] = 0.0
-    sim2.city_cost[0, r + 1, j] = 0.0
+    sim2.city_current[0, r + 1, j, 0] = -1
+    sim2.city_progress[0, r + 1, j, 0] = 0.0
+    sim2.city_cost[0, r + 1, j, 0] = 0.0
     ctr = int(sim2.city_center[0, r + 1, j])
     own = ((sim2.tile_city[0] == sim2.city_id[0, r + 1, j]) & (sim2.district[0] < 0)).nonzero(as_tuple=True)[0]
     for t in own.tolist():
@@ -101,7 +101,7 @@ def main() -> None:
     dt2[0, j, 0] = next(t for t in own.tolist() if t != ctr)
     sim2.apply_seat_actions(r + 1, production_pref=pref([d_col, legal_b2[0]]), production_tile=dt2)
     sim2._seat_record_apply(r + 1, ACTIVE)
-    got2 = int(sim2.city_current[0, r + 1, j])
+    got2 = int(sim2.city_current[0, r + 1, j, 0])
     assert got2 != -1, "REGRESSION: an unplaceable top pick left the city IDLE"
     assert got2 == legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
     print("  2 unplaceable top pick falls to the policy's next rank (not idle) OK")
@@ -109,13 +109,13 @@ def main() -> None:
     # -- 3: ranks run dry -> the city stays idle, nothing is invented -------
     sim3 = fresh(rules, path)
     sim3.seat_ext[0, r + 1] = True
-    sim3.city_current[0, r + 1, j] = -1
-    sim3.city_progress[0, r + 1, j] = 0.0
-    sim3.city_cost[0, r + 1, j] = 0.0
+    sim3.city_current[0, r + 1, j, 0] = -1
+    sim3.city_progress[0, r + 1, j, 0] = 0.0
+    sim3.city_cost[0, r + 1, j, 0] = 0.0
     p_none = torch.full((1, sim3.RC, W), NEG, dtype=torch.float64)
     sim3.apply_seat_actions(r + 1, production_pref=p_none)
     sim3._seat_record_apply(r + 1, ACTIVE)
-    assert int(sim3.city_current[0, r + 1, j]) == -1, "an all -inf ranking must queue NOTHING"
+    assert int(sim3.city_current[0, r + 1, j, 0]) == -1, "an all -inf ranking must queue NOTHING"
     print("  3 exhausted ranking queues nothing (the engine never invents a pick) OK")
 
     # --- 4: WONDER + PROJECT codes at the driven apply ----------------------
@@ -143,7 +143,7 @@ def main() -> None:
             sim5.civ_techs[0, r5 + 1, int(_wrow["ut"])] = True
             break
     assert wi5 is not None, "fixture has no forceable wonder candidate near r0c0"
-    sim5.city_current[0, r5 + 1, j5] = -1  # these columns are idle-gated like every base column
+    sim5.city_current[0, r5 + 1, j5, 0] = -1  # these columns are idle-gated like every base column
     m5 = sim5.seat_masks(r5 + 1)["production"]
     assert bool(m5[0, j5, w_lo5 + wi5]), "the granted wonder column must read legal"
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
@@ -151,21 +151,21 @@ def main() -> None:
     sim5.apply_seat_actions(r5 + 1, production=prod5)
     sim5._seat_record_apply(r5 + 1, ACTIVE)
     code_w5 = sim5.WONDER_BASE + wi5
-    assert int(sim5.city_current[0, r5 + 1, j5]) == code_w5, "wonder code must queue via the shared helper"
+    assert int(sim5.city_current[0, r5 + 1, j5, 0]) == code_w5, "wonder code must queue via the shared helper"
     assert int(sim5.city_wonder[0, r5 + 1, j5, wi5]) >= 0, "the pave must register the tile"
     assert bool((sim5.built_wonder[0] == wi5).any()), "built_wonder plane must carry the in-flight pave"
     # cross-seat one-per-world: a fresh sim where ANOTHER civ already paved it
     sim6 = fresh(rules, path)
     sim6.seat_ext[0, r5 + 1] = True
     sim6.civ_techs[0, r5 + 1, int(sim6._wond_rows[wi5]["ut"])] = True  # same grant — the CLAIM must be the only blocker
-    sim6.city_current[0, r5 + 1, j5] = -1
+    sim6.city_current[0, r5 + 1, j5, 0] = -1
     free6 = int((sim6.built_wonder[0] < 0).nonzero(as_tuple=True)[0][0])
     sim6.built_wonder[0, free6] = wi5  # any tile, any owner — wonderExists is global
     m6 = sim6.seat_masks(r5 + 1)["production"]
     assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
     sim6.apply_seat_actions(r5 + 1, production=prod5)
     sim6._seat_record_apply(r5 + 1, ACTIVE)
-    assert int(sim6.city_current[0, r5 + 1, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
+    assert int(sim6.city_current[0, r5 + 1, j5, 0]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
     # PROJECT: plant a completed district matching base project 0, then apply
     sim7 = fresh(rules, path)
     sim7.seat_ext[0, r5 + 1] = True
@@ -176,7 +176,7 @@ def main() -> None:
     sim7.district[0, dt7] = d_i7
     sim7.district_complete[0, dt7] = True
     sim7.city_dist_tile[0, r5 + 1, j5, d_i7] = dt7
-    sim7.city_current[0, r5 + 1, j5] = -1
+    sim7.city_current[0, r5 + 1, j5, 0] = -1
     m7 = sim7.seat_masks(r5 + 1)["production"]
     p_lo7 = w_lo5 + sim7._wond_n
     assert bool(m7[0, j5, p_lo7]), "base project 0 must be legal on its completed district"
@@ -184,8 +184,8 @@ def main() -> None:
     prod7[0, j5] = p_lo7
     sim7.apply_seat_actions(r5 + 1, production=prod7)
     sim7._seat_record_apply(r5 + 1, ACTIVE)
-    assert int(sim7.city_current[0, r5 + 1, j5]) == sim7.PROJECT_BASE + 0, "project code must queue"
-    assert float(sim7.city_cost[0, r5 + 1, j5]) > 0, "project cost must lock"
+    assert int(sim7.city_current[0, r5 + 1, j5, 0]) == sim7.PROJECT_BASE + 0, "project code must queue"
+    assert float(sim7.city_cost[0, r5 + 1, j5, 0]) > 0, "project cost must lock"
     print("  4 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 
     # -- 5: ONE production mask — seat 0 reads the same body, same width ----

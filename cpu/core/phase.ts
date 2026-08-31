@@ -49,7 +49,7 @@ import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPo
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
-import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
+import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -908,7 +908,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
  * `apply_seat_actions`: the idle gate, then the same cost/progress semantics. */
 export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatActionRecord): void {
-  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo } = prodLayout();
+  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, promoteLo } = prodLayout();
   // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
   // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
   // apply_turn needed on the GPU side, and the second driven-parity red: every
@@ -1024,7 +1024,17 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
     const a = aCol;
-    if (a < 0 || civCity.queue.length > 0) continue; // the idle gate, as the GPU applies it
+    // A city takes another order while its queue has ROOM — the head is
+    // merely the item being worked, and the rest wait behind it.
+    if (a < 0) continue;
+    if (a >= promoteLo) {
+      // PROMOTE: entry k+1 moves to the head, the rest closing up behind it.
+      // Every entry keeps its own progress, so the move spends nothing.
+      const k = a - promoteLo + 1;
+      if (k < civCity.queue.length) civCity.queue.unshift(...civCity.queue.splice(k, 1));
+      continue;
+    }
+    if (civCity.queue.length >= PRODUCTION_QUEUE_MAX) continue;
     if (a < NB) {
       const id = buildings[a];
       const def = id ? BUILDINGS[id] : undefined;
@@ -2059,26 +2069,20 @@ export function seatPhase(state: GameState): void {
         if (q.progress >= cost) {
           civCity.queue.shift();
           completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
-          // A completion's OVERFLOW carries to the next item, for every seat.
-          // this is the largest single production leak in the model.
-          // Every seat's city is the same record, so the bank field is
-          // already here — nothing new to store.
+          // CIV6: a completion's OVERFLOW carries into the next item. The
+          // shift has already happened, so `queue[0]` is that item; only a
+          // queue that ran EMPTY has nowhere to put the hammers, and that is
+          // the one case they bank and pay a turn late.
           //
-          // IT ALWAYS BANKS — it does NOT carry into `civCity.queue[0]` even when a
-          // next item is waiting. Real Civ 6 (and this file's own queue) would
-          // carry it immediately, and that is the more faithful shape, but the
-          // GPU's seat city is a SINGLE SLOT with no queue at all. Carrying
-          // here let TS complete a second item in the same turn while the GPU
-          // banked and paid next turn, which diverged parity at t105
-          // on `rng` itself — the completion spawns a unit, so the DRAW COUNT
-          // moved, in a slice whose whole premise is that production touches no
-          // draw site.
-          //
-          // Porting a queue to the GPU is explicitly out of this slice's scope
-          // (§7-4b). So the engines agree on the weaker rule and the LOSS is
-          // declared here rather than hidden: banked overflow is paid on the
-          // NEXT turn, one turn later than Civ 6 would pay it.
-          civCity.productionBank = (civCity.productionBank ?? 0) + (q.progress - cost);
+          // The carry does NOT cascade: one completion per city per turn, so
+          // an overflow big enough to finish the item behind it finishes it
+          // NEXT turn. The GPU completes once per city per turn too, and a
+          // second completion here would move the DRAW COUNT — a completion
+          // can spawn a unit — against an engine that had not made it.
+          const over = q.progress - cost;
+          const next = civCity.queue[0];
+          if (next) next.progress += over;
+          else civCity.productionBank = (civCity.productionBank ?? 0) + over;
         }
       }
       civCity.cultureBox += culC;

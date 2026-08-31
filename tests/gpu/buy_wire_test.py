@@ -148,7 +148,7 @@ def settler_price(sim, row: int) -> float:
     r = sim.rules
     n = n_cities(sim, row)
     live = int(sim._seat_settlers(row)[0])
-    q = int((sim.city_alive[0, row] & (sim.city_current[0, row] == sim.SETTLER)).sum())
+    q = int((sim.city_alive[0, row].unsqueeze(1) & (sim.city_current[0, row] == sim.SETTLER)).sum())
     return (r.settler_base + r.settler_per_city * max(0, n - 1 + live + q)) * mult(sim)
 
 

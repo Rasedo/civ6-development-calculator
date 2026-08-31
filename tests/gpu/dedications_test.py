@@ -181,12 +181,12 @@ def main() -> None:
 
     def run_prod(cur_code: int, golden_kind: int) -> float:
         commit(sim, 0, golden_kind, golden=True)
-        sim.city_current[0, 0, col] = cur_code
-        sim.city_cost[0, 0, col] = 100000
-        sim.city_progress[0, 0, col] = 0
+        sim.city_current[0, 0, col, 0] = cur_code
+        sim.city_cost[0, 0, col, 0] = 100000
+        sim.city_progress[0, 0, col, 0] = 0
         sim.city_prod_bank[0, 0, col] = 0
         sim._seat_city_produce(0, colv, act, prod.clone())
-        return float(sim.city_progress[0, 0, col])
+        return float(sim.city_progress[0, 0, col, 0])
 
     got = run_prod(sim.UNIT_BASE + warr, sim._ded_to_arms)
     assert abs(got - 10.0 * sim._to_arms_prod) < 1e-9, got
@@ -203,9 +203,9 @@ def main() -> None:
     else:
         got = run_prod(sim.UNIT_BASE + warr, sim._ded_to_arms)
         print("to-arms production ok; steam wonder SKIPPED (no Industrial+ wonder)")
-    sim.city_current[0, 0, col] = -1
-    sim.city_cost[0, 0, col] = 0
-    sim.city_progress[0, 0, col] = 0
+    sim.city_current[0, 0, col, 0] = -1
+    sim.city_cost[0, 0, col, 0] = 0
+    sim.city_progress[0, 0, col, 0] = 0
     sim.city_prod_bank[0, 0, col] = 0
     sim._eff_version += 1
 

@@ -493,9 +493,9 @@ def test_reactor_age(sim) -> None:
     sim.civ_techs[:, row, rt] = True
     assert bool(sim._recommission_ok(row, j, pi)[0]), "plant plus tech, and it is offered"
     # completing it puts the clock back, and it ticks again from zero
-    sim.city_current[:, row, j] = sim.PROJECT_BASE + pi
-    sim.city_cost[:, row, j] = 10
-    sim.city_progress[:, row, j] = 10.0 ** 9
+    sim.city_current[:, row, j, 0] = sim.PROJECT_BASE + pi
+    sim.city_cost[:, row, j, 0] = 10
+    sim.city_progress[:, row, j, 0] = 10.0 ** 9
     sim._seat_city_produce(
         row, torch.full((sim.B,), j, dtype=torch.long, device=sim.device),
         torch.ones(sim.B, dtype=torch.bool, device=sim.device),

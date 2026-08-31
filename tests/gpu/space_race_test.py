@@ -140,16 +140,16 @@ def main() -> None:
     rq, jq, tq = spaceport_site(sq)
     sq.civ_techs[0, rq, spt_ut] = True
     sq.seat_ext[0, rq] = True
-    sq.city_current[0, rq, jq] = -1
+    sq.city_current[0, rq, jq, 0] = -1
     dt = torch.full((1, sq.RC, len(sq._scaffold)), -1, dtype=torch.long)
     dt[0, jq, spt_si] = tq
     pr = torch.full((1, sq.RC), -1, dtype=torch.long)
     pr[0, jq] = sq.DISTRICT_BASE + spt_si
     sq.apply_seat_actions(rq, production=pr, production_tile=dt)
     sq._seat_record_apply(rq, torch.ones(1, dtype=torch.bool))
-    assert int(sq.city_current[0, rq, jq]) == sq.DISTRICT_BASE + spt_si, "the Spaceport column did not queue"
-    assert float(sq.city_cost[0, rq, jq]) == 1080.0, \
-        f"the Spaceport must queue at its FLAT price 1080, got {float(sq.city_cost[0, rq, jq])}"
+    assert int(sq.city_current[0, rq, jq, 0]) == sq.DISTRICT_BASE + spt_si, "the Spaceport column did not queue"
+    assert float(sq.city_cost[0, rq, jq, 0]) == 1080.0, \
+        f"the Spaceport must queue at its FLAT price 1080, got {float(sq.city_cost[0, rq, jq, 0])}"
     assert int(sq.city_dist_tile[0, rq, jq, spt_didx]) == tq, "the registry missed the Spaceport's tile"
 
     # --- 2b) _once_step_ok — the `availableProjects` space arm, term by term
@@ -186,7 +186,7 @@ def main() -> None:
     t_spt = int(mk_sim.city_center[0, mrow, mj])
     mk_sim.city_dist_tile[0, mrow, mj, di_spt] = t_spt
     mk_sim.district_complete[0, t_spt] = True
-    mk_sim.city_current[0, mrow, mj] = -1          # idle, or no column is legal
+    mk_sim.city_current[0, mrow, mj, 0] = -1          # idle, or no column is legal
     col_0 = mk_sim.PROJECT_BASE + space[0][0]
     mk_sim.civ_techs[0, mrow, int(space[0][1]["rt"])] = False
     assert not bool(mk_sim.seat_masks(mrow)["production"][0, mj, col_0]), "step 1 without its tech must be illegal"
@@ -221,9 +221,9 @@ def main() -> None:
     r, j = 0, 0
     assert bool(sim2.civ_alive[0, r + 1]) and bool(sim2.city_alive[0, r + 1, j]), "civ capital must be alive at turn 0"
     pi_exo = space[-1][0]
-    sim2.city_current[0, r + 1, j] = sim2.PROJECT_BASE + pi_exo
-    sim2.city_cost[0, r + 1, j] = 1.0
-    sim2.city_progress[0, r + 1, j] = 1.0e6
+    sim2.city_current[0, r + 1, j, 0] = sim2.PROJECT_BASE + pi_exo
+    sim2.city_cost[0, r + 1, j, 0] = 1.0
+    sim2.city_progress[0, r + 1, j, 0] = 1.0e6
     last_step = sim2._once_step[pi_exo]
     sim2._seat_phase()
     assert bool(sim2.project_done[0, r + 1, last_step]), "civ's victory step must land in project_done"
@@ -266,9 +266,9 @@ def main() -> None:
 
     # --- 3b) SIDE EFFECTS, measured against an identical baseline twin ------
     def force_complete(s: BatchSim, row: int, jj: int, pidx: int) -> None:
-        s.city_current[0, row, jj] = s.PROJECT_BASE + pidx
-        s.city_cost[0, row, jj] = 1.0
-        s.city_progress[0, row, jj] = 1.0e6
+        s.city_current[0, row, jj, 0] = s.PROJECT_BASE + pidx
+        s.city_cost[0, row, jj, 0] = 1.0
+        s.city_progress[0, row, jj, 0] = 1.0e6
 
     # Launch Earth Satellite: reveals the seat's ENTIRE fog plane — under the
     # same fog gate as every reveal site (a fog-off world accrues nothing).
@@ -292,7 +292,7 @@ def main() -> None:
     twin = mk()
     mars = mk()
     for s in (base, twin, mars):
-        s.city_current[0, 1, 0] = -1
+        s.city_current[0, 1, 0, 0] = -1
     sci_pre = float(base.seat_science_total[0, 1])
     twin.project_done[0, 1, step_0] = True
     force_complete(twin, 1, 0, space[1][0])

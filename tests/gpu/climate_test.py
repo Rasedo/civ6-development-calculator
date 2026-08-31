@@ -360,30 +360,30 @@ def main() -> int:
     s12 = settle_all(fresh(rules, paths[0]))
     col12 = int(s12._city_lowland_count(row)[b].argmax())
     n12 = int(s12._city_lowland_count(row)[b, col12])
-    s12.city_current[b, row, col12] = s12._barrier_bidx
-    s12.city_cost[b, row, col12] = 80 * n12
+    s12.city_current[b, row, col12, 0] = s12._barrier_bidx
+    s12.city_cost[b, row, col12, 0] = 80 * n12
     s12.climate_idx[b] = 1
     s12._reprice_live(row)
-    assert int(s12.city_cost[b, row, col12]) == 80 * n12 * 2, "the sea moved the price"
+    assert int(s12.city_cost[b, row, col12, 0]) == 80 * n12 * 2, "the sea moved the price"
 
     plant = s12._plant_bidx[0]
     col13 = next(c for c in range(s12.RC)
                  if c != col12 and bool(s12.city_alive[b, row, c])) if bool(
         s12.city_alive[b, row].sum() > 1) else col12
-    s12.city_current[b, row, col13] = plant
+    s12.city_current[b, row, col13, 0] = plant
     full = float(rules.b_cost[plant])
-    s12.city_cost[b, row, col13] = full
+    s12.city_cost[b, row, col13, 0] = full
     res12 = next(i for i, r in enumerate(rj["eras"]["congressResolutions"])
                  if r["id"] == "GLOBAL_ENERGY_TREATY")
     s12.congress_active[b, 0] = torch.tensor([res12, 0, 0])
     s12._eff_version += 1
     s12._reprice_live(row)
-    assert int(s12.city_cost[b, row, col13]) == round(full * 0.5), (
+    assert int(s12.city_cost[b, row, col13, 0]) == round(full * 0.5), (
         "the treaty's discount moved the price")
     # and the digest reads the same live number the plane now holds
     from core.statecompare import EXTRACTORS  # noqa: PLC0415
     live = EXTRACTORS["city"]["queueCost"](s12, b, [(row, col13)])
-    assert int(live[0]) == round(full * 0.5)
+    assert int(live[0][0]) == round(full * 0.5)   # the extractor answers per QUEUE SLOT
     print("  12 live building price OK (the sea and the treaty both move it)")
 
     print("BATTERY OK climate")

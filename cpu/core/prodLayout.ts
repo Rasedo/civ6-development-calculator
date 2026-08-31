@@ -14,6 +14,9 @@
  *     [projectLo, +nP)   run that district project — base rows and the four
  *                        space-race steps alike; a space row is legal only
  *                        with its tech and its predecessor step complete
+ *     [promoteLo, +Q-1)  move queue entry k+1 to the HEAD (k = 0 names the
+ *                        second entry — the first is already the head, so
+ *                        there is no column for it)
  * There is no PURCHASE block: gold and faith spending is the BUY WIRE (kinds
  * 0-7, one purchase per seat per turn), which every seat records and both
  * engines re-validate at the gold block's own phase position.
@@ -23,6 +26,7 @@ import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
+import { PRODUCTION_QUEUE_MAX } from '../data/seats';
 
 export const BUILDING_DISTRICTS: Set<string> = new Set<string>([
   'CITY_CENTER',
@@ -63,6 +67,7 @@ export interface ProdLayout {
   districtLo: number;
   wonderLo: number;
   projectLo: number;
+  promoteLo: number;
   width: number;
 }
 
@@ -76,6 +81,7 @@ export function prodLayout(): ProdLayout {
   const nS = SCAFFOLD_DISTRICTS.length;
   const wonderLo = NB + 2 + NU + nS;
   const projectLo = wonderLo + wonders.length;
+  const promoteLo = projectLo + projects.length;
   return {
     NB,
     NU,
@@ -89,6 +95,7 @@ export function prodLayout(): ProdLayout {
     districtLo: NB + 2 + NU,
     wonderLo,
     projectLo,
-    width: projectLo + projects.length,
+    promoteLo,
+    width: promoteLo + PRODUCTION_QUEUE_MAX - 1,
   };
 }

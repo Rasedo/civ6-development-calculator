@@ -6,13 +6,113 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimSeats:
+    # ---------------------------------------------------------- the queue
+    def _q_head(self, row: int) -> torch.Tensor:
+        """[B, RC] — the code each of this row's cities is WORKING, -1 where the
+        queue is empty. `city.queue[0]`'s twin: the head is merely the entry
+        being paid, and every `progress +=` in either engine reads it."""
+        return self.city_current[:, row, :, 0]
+
+    def _q_depth(self, row: int) -> torch.Tensor:
+        """[B, RC] long — `queue.length`. Entries are kept packed from slot 0,
+        so the depth is the count and the first free slot is the same number."""
+        return (self.city_current[:, row] >= 0).sum(dim=2)
+
+    def _q_room(self, row: int) -> torch.Tensor:
+        """[B, RC] — may another item be queued here? The idle gate both
+        engines used to spell `queue.length === 0`."""
+        return self._q_depth(row) < self.QD
+
+    def _q_holds(self, row: int, code: int) -> torch.Tensor:
+        """[B, RC] — does this city's queue hold `code` ANYWHERE? The
+        `queue.some(...)` question, which a head test stopped answering the day
+        the queue could hold two."""
+        return (self.city_current[:, row] == code).any(dim=2)
+
+    def _q_planes(self):
+        """The four planes one queue entry spans, with the value an EMPTY slot
+        carries. They move together — an entry's cost and tile travel with it."""
+        return ((self.city_current, -1), (self.city_progress, 0),
+                (self.city_cost, 0), (self.city_qtile, -1))
+
+    def _q_push(self, row: int, col, hit: torch.Tensor, code: torch.Tensor,
+                cost: torch.Tensor | None = None,
+                qtile: torch.Tensor | None = None) -> None:
+        """`queue.push` — append one item at the first free slot of column
+        `col`, on the batch rows `hit` selects. A FULL queue takes nothing: the
+        mask refuses it and the apply re-validates, so this is the last word
+        rather than the only one."""
+        bidx = self._bidx
+        depth = (self.city_current[bidx, row, col] >= 0).sum(dim=1)
+        take = hit & (depth < self.QD)
+        if not bool(take.any()):
+            return
+        slot = depth.clamp(max=self.QD - 1)
+        for plane, val in zip(self._q_planes(),
+                              (code, None, cost, qtile)):
+            p, empty = plane
+            old = p[bidx, row, col, slot]
+            if val is None:                      # a new entry starts on zero
+                new = torch.full_like(old, empty)
+            else:
+                new = val.to(old.dtype)
+            p[bidx, row, col, slot] = torch.where(take, new, old)
+
+    def _q_pop(self, row: int, col, hit: torch.Tensor) -> None:
+        """`queue.shift()` — drop the head and close the gap, all four planes
+        together, so slot 0 is always the entry being worked and the tail slot
+        is always empty."""
+        bidx = self._bidx
+        for p, empty in self._q_planes():
+            cur = p[bidx, row, col]
+            shifted = torch.cat([cur[:, 1:], torch.full_like(cur[:, :1], empty)], dim=1)
+            p[bidx, row, col] = torch.where(hit.unsqueeze(1), shifted, cur)
+
+    def _q_clear(self, rows, row: int, col) -> None:
+        """Empty the whole queue of one city — what a transfer, a raze and a
+        loyalty flip each leave behind (TS `city.queue = []`)."""
+        for p, empty in self._q_planes():
+            p[rows, row, col] = empty
+
+    def _q_drop(self, rows, row: int, col, gone: torch.Tensor) -> None:
+        """Remove the entries `gone` marks — `queue.splice(i, 1)` for each — and
+        close the gap so the survivors stay packed from slot 0 in their own
+        order. The caller has already banked whatever the dropped entries held.
+
+        `gone` is [m, QD] over the same rows the caller indexed with."""
+        keep = ~gone
+        order = torch.argsort((~keep).long(), dim=1, stable=True)
+        for p, empty in self._q_planes():
+            cur = p[rows, row, col]
+            moved = cur.gather(1, order)
+            p[rows, row, col] = torch.where(
+                keep.gather(1, order), moved, torch.full_like(moved, empty))
+
+    def _q_promote(self, row: int, col, hit: torch.Tensor, k: int) -> None:
+        """Move queue entry `k` to the HEAD, the rest closing up behind it —
+        the reorder a player makes when the thing they are building is no
+        longer the thing they want first. Every entry keeps its own progress,
+        so nothing is spent by the move."""
+        if k <= 0 or k >= self.QD:
+            return
+        bidx = self._bidx
+        live = hit & (self.city_current[bidx, row, col, k] >= 0)
+        if not bool(live.any()):
+            return
+        order = [k] + [i for i in range(self.QD) if i != k]
+        for p, _empty in self._q_planes():
+            cur = p[bidx, row, col]
+            p[bidx, row, col] = torch.where(live.unsqueeze(1), cur[:, order], cur)
+
     def _seat_production_mask(self, row: int) -> torch.Tensor:
         """[B, RC, W] — THE production decision space, for seat row `row`.
 
         ONE body for every seat, in the ONE production layout
         (cpu/core/prodLayout.ts): NB queue-building columns, 1 settler, 1 idle,
+        nQ-1 promote-that-entry columns,
         NU train-unit columns, nScaffold district columns, then nW wonder and
-        nP project columns — every one idle-gated. Gold and faith spending is
+        nP project columns — every one gated on the queue having ROOM. Gold and
+        faith spending is
         NOT here: it is the BUY WIRE, decided per seat per turn.
 
         Every column asks a row-generic legality body — `_seat_buildable`,
@@ -24,7 +124,7 @@ class SimSeats:
         B, dev = self.B, self.device
         nS = len(self._scaffold)
         alive = self.city_alive[:, row]
-        idle = alive & (self.city_current[:, row] == -1)
+        room = alive & self._q_room(row)
         # buildings / units: the row-generic legality bodies the APPLY asks too.
         # QUEUE legality wants the district merely PLACED (availableBuildings),
         # which is what these columns offer.
@@ -39,8 +139,8 @@ class SimSeats:
         ones_b = torch.ones(B, dtype=torch.bool, device=dev)
         nW_m = self._wond_n if self.districts_on else 0
         nP_m = len(self._proj_rows) if self.districts_on else 0
-        W = bld_q.shape[2] + 2 + tr_city.shape[2] + nS + nW_m + nP_m
-        # EVERY column below is `& idle_j`, so a column no game can queue in
+        W = bld_q.shape[2] + 2 + tr_city.shape[2] + nS + nW_m + nP_m + (self.QD - 1)
+        # EVERY column below is `& room_j`, so a column no game can queue in
         # contributes an all-False row whatever the legality bodies answer —
         # and the district/wonder bodies are the two most expensive in a step.
         dead_col = torch.zeros(B, W, dtype=torch.bool, device=dev)
@@ -49,18 +149,18 @@ class SimSeats:
         ovr: list[tuple[int, torch.Tensor]] = []
         if self.improvements_on and self._builder_idx >= 0:
             has_alive = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._builder_idx)).any(dim=1)
-            has_q = ((self.city_current[:, row] == self.UNIT_BASE + self._builder_idx) & alive).any(dim=1)
+            has_q = (self._q_holds(row, self.UNIT_BASE + self._builder_idx) & alive).any(dim=1)
             ovr.append((self._builder_idx, ~(has_alive | has_q) & self._seat_job_mask(row).any(dim=1)))
         if self._seat_eng_live and self._eng_idx >= 0:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
-            has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
+            has_q_e = (self._q_holds(row, self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
             ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_engineer_job_mask(row).any(dim=1)))
         if getattr(self, "_archaeologist_idx", -1) >= 0:
             # `_trainable_units` already asks for the museum's free slot; the
             # queue is what it cannot see, so refuse a second one in flight.
             has_alive_a = (self.major_unit_alive & (self.major_unit_seat == row)
                            & (self.major_unit_type == self._archaeologist_idx)).any(dim=1)
-            has_q_a = ((self.city_current[:, row] == self.UNIT_BASE + self._archaeologist_idx) & alive).any(dim=1)
+            has_q_a = (self._q_holds(row, self.UNIT_BASE + self._archaeologist_idx) & alive).any(dim=1)
             ovr.append((self._archaeologist_idx, ~(has_alive_a | has_q_a)))
         # The siege SUPPORT chassis carry no combat strength, so the generic
         # military arm below never offers them; `trainableUnits` gates them on
@@ -71,7 +171,7 @@ class SimSeats:
             # `_trainable_units` already counts free Traders + active routes
             # against tradeCapacity; the queue is the one thing it cannot see,
             # so refuse while one is mid-production anywhere.
-            has_q_t = ((self.city_current[:, row] == self.UNIT_BASE + self._trader_idx) & alive).any(dim=1)
+            has_q_t = (self._q_holds(row, self.UNIT_BASE + self._trader_idx) & alive).any(dim=1)
             ovr.append((self._trader_idx, ~has_q_t))
         # A district's unlock and a wonder's unlock/already-built pair are per
         # SEAT too, so both tables are built once for the whole column sweep.
@@ -87,8 +187,11 @@ class SimSeats:
             w_okc.append(okc_m if okc_m is not None and bool(okc_m.any()) else None)
         prod_cols = []
         for j in range(self.RC):
-            if not bool(idle[:, j].any()):
-                prod_cols.append(dead_col)
+            # A REORDER needs no room, so a FULL queue still has its promote
+            # columns and only the expensive legality bodies are skipped.
+            prom_j = (self.city_current[:, row, j, 1:] >= 0) & alive[:, j].unsqueeze(1)
+            if not bool(room[:, j].any()):
+                prod_cols.append(torch.cat([dead_col[:, :self.PROMOTE_BASE], prom_j], dim=1))
                 continue
             ok_b = bld_q[:, j]
             ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
@@ -159,8 +262,9 @@ class SimSeats:
                 if _rv >= 0:
                     okp_m = okp_m & self.civ_civics[:, row, _rv]
                 ok_p[:, pi_m] = okp_m
-            idle_j = idle[:, j].unsqueeze(1)
-            prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
+            room_j = room[:, j].unsqueeze(1)
+            prod_cols.append(torch.cat(
+                [base_j & room_j, ok_w & room_j, ok_p & room_j, prom_j], dim=1))
         return torch.stack(prod_cols, dim=1)
 
     def seat_masks(self, row: int) -> dict[str, torch.Tensor]:
@@ -1063,7 +1167,9 @@ class SimSeats:
         the input to the gold ladder's unit quota."""
         vt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         live = (self.major_unit_alive & (self.major_unit_seat == row) & (self._type_combat[vt] > 0)).sum(dim=1)
-        cur = self.city_current[:, row]
+        # the HEAD only — phase.ts's levy walk reads `civCity.queue[0]`, so a
+        # unit waiting behind one is not yet a unit this seat is fielding.
+        cur = self._q_head(row)
         q_ty = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
         q_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0) & self.city_alive[:, row]
         return live + q_mil.sum(dim=1)
@@ -1089,7 +1195,7 @@ class SimSeats:
         alive_row = self.city_alive[:, row]
         return self._settler_cost(
             alive_row.sum(dim=1), self._seat_settlers(row),
-            (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1),
+            (alive_row.unsqueeze(2) & (self.city_current[:, row] == self.SETTLER)).sum(dim=(1, 2)),
         )
 
     def _seat_patronage_cost(self, row: int):
@@ -1481,7 +1587,7 @@ class SimSeats:
         scores = pref.gather(2, order)
         live = torch.isfinite(scores)
         for k in range(min(max_tries, int(pref.shape[2]))):
-            idle = (self.city_current[:, row, :RCj] == -1) & self.city_alive[:, row, :RCj]
+            idle = self._q_room(row)[:, :RCj] & self.city_alive[:, row, :RCj]
             if not bool(idle.any()):
                 return
             code = order[:, :RCj, k].clone()
@@ -1507,7 +1613,7 @@ class SimSeats:
         same slot order.
 
         Idempotent across passes by construction — the `act` gate needs
-        `city_current == -1`, so a city assigned by an earlier pass is untouched
+        room in the queue, so a city filled by an earlier pass is untouched
         by a later one, which is what the preference walk relies on.
 
         Every gate below is the TS rule re-validated AT APPLY, never a mask term
@@ -1521,8 +1627,8 @@ class SimSeats:
         ext = self.seat_ext[:, row]
         alive_row = self.city_alive[:, row]
         n_cities = alive_row.sum(dim=1)
-        cur_row = self.city_current[:, row]
-        queued_s = (alive_row & (cur_row == self.SETTLER)).sum(dim=1)
+        queued_s = (alive_row.unsqueeze(2)
+                    & (self.city_current[:, row] == self.SETTLER)).sum(dim=(1, 2))
         settlers_live = self._seat_settlers(row)
         nW_a = self._wond_n if self.districts_on else 0
         nP_a = len(self._proj_rows) if self.districts_on else 0
@@ -1531,8 +1637,13 @@ class SimSeats:
         for j in range(min(int(production.shape[1]), self.RC)):
             a = production[:, j].to(torch.long)
             alive_j = self.city_alive[:, row, j]
-            cur_j = self.city_current[:, row, j]
-            act = (a >= 0) & ext & alive_j & (cur_j == -1)
+            # THE REORDER ARM, ahead of the room gate: promoting an entry
+            # commits nothing, so a full queue may still do it.
+            is_pr = (a >= self.PROMOTE_BASE) & ext & alive_j
+            if bool(is_pr.any()):
+                for _k in sorted(set((a[is_pr] - self.PROMOTE_BASE).tolist())):
+                    self._q_promote(row, j, is_pr & (a == self.PROMOTE_BASE + _k), int(_k) + 1)
+            act = (a >= 0) & (a < self.PROMOTE_BASE) & ext & alive_j & self._q_room(row)[:, j]
             is_b = act & (a >= 0) & (a < NBn)
             if bool(is_b.any()):
                 bi = a.clamp(min=0, max=NBn - 1)
@@ -1542,19 +1653,15 @@ class SimSeats:
                 is_b = is_b & self._seat_buildable(row)[:, j].gather(1, bi.unsqueeze(1)).squeeze(1)
                 if self._walls_rows:
                     is_b = is_b & (self._walls_build_ok(row)[:, j] | (self._b_walls[bi] == 0))
-                self.city_current[:, row, j] = torch.where(is_b, bi, self.city_current[:, row, j])
-                self.city_cost[:, row, j] = torch.where(
-                    is_b, self._building_cost_in(row, j, bi), self.city_cost[:, row, j])
-                self.city_progress[:, row, j] = torch.where(is_b, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
+                self._q_push(row, j, is_b, bi, self._building_cost_in(row, j, bi))
             # CIV6 (Isolationism): "Can't train or buy Settlers nor settle new
             # cities."
             is_s = act & (a == self.SETTLER) & (self.city_pop[:, row, j] >= rls.settler_pop_gate) \
                 & ~self._no_settlers(row)
             if bool(is_s.any()):
                 s_cost = self._settler_cost(n_cities, settlers_live, queued_s)
-                self.city_current[:, row, j] = torch.where(is_s, torch.full_like(cur_j, self.SETTLER), self.city_current[:, row, j])
-                self.city_cost[:, row, j] = torch.where(is_s, s_cost, self.city_cost[:, row, j])
-                self.city_progress[:, row, j] = torch.where(is_s, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
+                self._q_push(row, j, is_s,
+                             torch.full_like(a, self.SETTLER), s_cost)
                 queued_s = queued_s + is_s.long()
             is_u = act & (a >= self.UNIT_BASE) & (a < self.UNIT_BASE + self.NU)
             if bool(is_u.any()):
@@ -1566,11 +1673,9 @@ class SimSeats:
                                          self._builder_cost(self.civ_builders_trained[:, row]).double(), cost_q)
                 # the TRADER prices off ITS escalator (game progress)
                 cost_q = torch.where(ui == self._trader_idx, self._trader_cost(row).double(), cost_q)
-                self.city_current[:, row, j] = torch.where(is_u, a, self.city_current[:, row, j])
+                self._q_push(row, j, is_u, a, cost_q)
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, is_u & (ui == _ui), _ui, at=j)
-                self.city_cost[:, row, j] = torch.where(is_u, cost_q, self.city_cost[:, row, j])
-                self.city_progress[:, row, j] = torch.where(is_u, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
             is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
             if bool(is_d.any()) and self.districts_on and self._scaffold \
                     and dtile is not None and j < int(dtile.shape[1]):
@@ -1603,9 +1708,9 @@ class SimSeats:
                         d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
-                        self.city_current[:, row, j] = torch.where(placed, torch.full_like(cur_j, self.DISTRICT_BASE + si), self.city_current[:, row, j])
-                        self.city_cost[:, row, j] = torch.where(placed, d_cost_si, self.city_cost[:, row, j])
-                        self.city_progress[:, row, j] = torch.where(placed, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
+                        self._q_push(row, j, placed,
+                                     torch.full_like(a, self.DISTRICT_BASE + si), d_cost_si,
+                                     dtile[:, j, si])
                         if spec_si:
                             spec_cnt = spec_cnt + placed.long()
             is_w = act & (a >= self.WONDER_BASE) & (a < self.WONDER_BASE + nW_a)
@@ -1666,10 +1771,9 @@ class SimSeats:
                         price_a = torch.full_like(pc_a, float(pc_fixed))
                     else:
                         price_a = pc_a
-                    self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
+                    self._q_push(row, j, rows_p,
+                                 torch.full_like(a, self.PROJECT_BASE + pi_a), price_a)
                     self._charge_project_resource(row, rows_p, pi_a)
-                    self.city_cost[:, row, j] = torch.where(rows_p, price_a, self.city_cost[:, row, j])
-                    self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
 
     def _select_research(self, row: int, want: torch.Tensor, ok: torch.Tensor, is_civic: bool = False) -> None:
         """The `selectResearch` twin: switch item, keeping the old one's science.
@@ -2344,7 +2448,7 @@ class SimSeats:
         out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
         if self._eng_idx < 0 or not self._eng_finish_slots:
             return out
-        cur = self.city_current[:, row]                              # [B, RC]
+        cur = self._q_head(row)                                      # [B, RC]
         alive = self.city_alive[:, row]
         for j in range(self.RC):
             live = alive[:, j]
@@ -2353,7 +2457,7 @@ class SimSeats:
             want = torch.zeros(B, dtype=torch.bool, device=self.device)
             for s in self._eng_finish_slots:
                 want = want | (cur[:, j] == self.DISTRICT_BASE + s)
-            at = torch.where(want, self.city_qtile[:, row, j], torch.full_like(want, -1, dtype=torch.long))
+            at = torch.where(want, self.city_qtile[:, row, j, 0], torch.full_like(want, -1, dtype=torch.long))
             if self._barrier_bidx >= 0:
                 at = torch.where(cur[:, j] == self._barrier_bidx, self.city_center[:, row, j], at)
             hit = live.unsqueeze(1) & (at >= 0).unsqueeze(1) & (tiles == at.unsqueeze(1))
@@ -2381,7 +2485,7 @@ class SimSeats:
         if not bool(site.any()):
             return out
         town = self.tile_city.gather(1, tc)
-        cur = self.city_current[:, row]
+        cur = self._q_head(row)
         alive = self.city_alive[:, row]
         for j in range(self.RC):
             live = alive[:, j]
@@ -3732,7 +3836,7 @@ class SimSeats:
             return a, self._argmax_low(counts)
         if name == "PUBLIC_WORKS_PROGRAM":
             nP = max(1, len(self._proj_rows))
-            cur = self.city_current[:, row] - self.PROJECT_BASE
+            cur = self._q_head(row) - self.PROJECT_BASE
             live = self.city_alive[:, row] & (cur >= 0) & (cur < nP)
             counts = torch.zeros(B, nP, dtype=torch.float64, device=dev)
             for t in range(nP):
@@ -5669,10 +5773,7 @@ class SimSeats:
         self.city_hp[b, row, col] = int(self.rules.combat.get("cityMaxHp", 200))
         self.city_outer_hp[b, row, col] = 0
         self.city_last_hit[b, row, col] = 0
-        self.city_current[b, row, col] = -1
-        self.city_progress[b, row, col] = 0
-        self.city_cost[b, row, col] = 0
-        self.city_qtile[b, row, col] = -1
+        self._q_clear(b, row, col)
         self.city_prod_bank[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
@@ -5837,10 +5938,7 @@ class SimSeats:
         self.city_hp[b, dst_row, col] = half_hp
         self.city_outer_hp[b, dst_row, col] = 0  # the Walls ride along, the perimeter does not: a captured city stands behind a breach until it runs the repair project
         self.city_last_hit[b, dst_row, col] = 0
-        self.city_current[b, dst_row, col] = -1  # TS queue: []
-        self.city_progress[b, dst_row, col] = 0
-        self.city_cost[b, dst_row, col] = 0
-        self.city_qtile[b, dst_row, col] = -1
+        self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_gw_writing[b, dst_row, col] = old_gww
         self.city_gw_art[b, dst_row, col] = old_gwa
@@ -5917,27 +6015,32 @@ class SimSeats:
                     continue
                 h = hit.nonzero(as_tuple=True)[0]
                 hr, ht, hdg, hrz = rr[h], tt[h], dg[h], rz[h]
-                cur = self.city_current[hr, orow, col]
+                cur = self.city_current[hr, orow, col]           # [m, QD]
                 dreg = self.city_dist_tile[hr, orow, col]        # [m, nD]
                 wreg = self.city_wonder[hr, orow, col]           # [m, nW]
                 # A BUILD IS NAMED BY ITS SITE, never by what the tile's own
                 # plane says is going up there: a re-queue moves the plane and
                 # the item independently, and the `wipeConstruction` twin
-                # matches the queue item on its OWN tile and nothing else.
-                site = (self.city_qtile[hr, orow, col] == ht) & hdg
+                # matches the queue item on its OWN tile and nothing else. It
+                # walks the WHOLE queue — a plot can carry a deeper entry as
+                # readily as the head — and each entry it drops banks its own
+                # hammers, which is where an INVALIDATED item's work goes.
+                _ht = ht.unsqueeze(1)
+                site = (self.city_qtile[hr, orow, col] == _ht) & hdg.unsqueeze(1)
                 is_d = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + nD)
                 wc = (cur - self.WONDER_BASE).clamp(min=0, max=max(nW - 1, 0))
-                at_w = (wreg == ht.unsqueeze(1)).gather(1, wc.unsqueeze(1)).squeeze(1)
-                rai = hrz & at_w & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nW)
+                at_w = wreg.gather(1, wc.reshape(wc.shape[0], -1)).reshape(wc.shape) == _ht
+                rai = (hrz.unsqueeze(1) & at_w & (cur >= self.WONDER_BASE)
+                       & (cur < self.WONDER_BASE + nW))
                 gone = (site & is_d) | rai
+                stay = site & ~gone
+                if bool(stay.any()):
+                    self.city_qtile[hr, orow, col] = torch.where(
+                        stay, torch.full_like(_ht, -1), self.city_qtile[hr, orow, col])
                 if bool(gone.any()):
-                    g = hr[gone]
-                    self.city_prod_bank[g, orow, col] += self.city_progress[g, orow, col]
-                    self.city_progress[g, orow, col] = 0
-                    self.city_cost[g, orow, col] = 0
-                    self.city_current[g, orow, col] = -1
-                if bool(site.any()):
-                    self.city_qtile[hr[site], orow, col] = -1
+                    prog = self.city_progress[hr, orow, col]
+                    self.city_prod_bank[hr, orow, col] += (prog * gone).sum(dim=1)
+                    self._q_drop(hr, orow, col, gone)
                 # ...and the city's registries drop EVERY entry naming the
                 # plot, the `city.districts` / `city.wonders` filters' twin.
                 drop_d = (dreg == ht.unsqueeze(1)) & hdg.unsqueeze(1)
@@ -6196,10 +6299,7 @@ class SimSeats:
         self.city_hp[rows, row, slot] = self.rules.combat.get("cityMaxHp", 200)
         self.city_outer_hp[rows, row, slot] = 0
         self.city_last_hit[rows, row, slot] = 0
-        self.city_current[rows, row, slot] = -1
-        self.city_progress[rows, row, slot] = 0
-        self.city_cost[rows, row, slot] = 0
-        self.city_qtile[rows, row, slot] = -1
+        self._q_clear(rows, row, slot)
         self.city_dist_tile[rows, row, slot, :] = -1
         self.city_wonder[rows, row, slot, :] = -1
         self.city_bldg[rows, row, slot, :] = False

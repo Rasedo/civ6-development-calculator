@@ -187,12 +187,12 @@ def test_repair_drip(rules, path) -> None:
     assert sim._repair_proj_idx >= 0, "the repair row must be findable by its flag"
     sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
     sim.city_outer_hp[0, 0, 0] = 40
-    sim.city_current[0, 0, 0] = sim.PROJECT_BASE + sim._repair_proj_idx
-    sim.city_progress[0, 0, 0] = 0.0
+    sim.city_current[0, 0, 0, 0] = sim.PROJECT_BASE + sim._repair_proj_idx
+    sim.city_progress[0, 0, 0, 0] = 0.0
 
     def drip(add: float) -> int:
-        before = sim.city_progress[:, 0].clone()
-        sim.city_progress[0, 0, 0] = before[0, 0] + add
+        before = sim.city_progress[:, 0, :, 0].clone()   # `_repair_drip` reads the HEAD plane
+        sim.city_progress[0, 0, 0, 0] = before[0, 0] + add
         sim._repair_drip(0, before)
         return int(sim.city_outer_hp[0, 0, 0])
 
@@ -201,7 +201,7 @@ def test_repair_drip(rules, path) -> None:
     sim.city_outer_hp[0, 0, 0] = 20  # a hit lands while the project runs
     assert drip(0.0) == 20, "an unchanged progress plane must pay nothing"
     assert drip(10.0) == 30, "and the next turn pays its own 10, not the total"
-    sim.city_current[0, 0, 0] = -1
+    sim.city_current[0, 0, 0, 0] = -1
     assert drip(50.0) == 30, "production into any other head must leave the pool alone"
     print("  repair drip OK: pays round(delta) per turn, caps at the tier pool, keeps damage taken")
 
@@ -347,8 +347,8 @@ def test_repair_project(rules, path) -> None:
     assert int(sim._repair_cost(0, 0)[0]) == sim._walls_hp - 40, int(sim._repair_cost(0, 0)[0])
     # the MASK offers it, and only in the column that qualifies
     m = sim._seat_production_mask(0)
-    base = m.shape[2] - len(sim._proj_rows)
-    if bool(sim.city_alive[0, 0, 0]) and int(sim.city_current[0, 0, 0]) == -1:
+    base = sim.PROJECT_BASE   # NOT derived from the mask WIDTH: the promote block sits past the projects
+    if bool(sim.city_alive[0, 0, 0]) and int(sim.city_current[0, 0, 0, 0]) == -1:
         assert bool(m[0, 0, base + rep]), "the repair column is closed on a city that qualifies"
     print(f"  repair OK: gated on Walls + damage + {sim._repair_quiet} quiet turns, price {int(sim._repair_cost(0, 0)[0])} = the HP it restores")
 

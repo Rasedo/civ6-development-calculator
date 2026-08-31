@@ -41,7 +41,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
-import { DEAL_ITEMS } from '../data/seats';
+import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
@@ -178,7 +178,15 @@ const ENHANCER_IDX = beliefIdx(ENHANCER_BELIEFS);
 const idx = (m: Map<string, number>, id: string | null | undefined): number =>
   id == null ? -1 : m.get(id) ?? -1;
 
-/** The front queue item as a PRODUCTION COLUMN in the shared layout
+/** Every queue slot, dense over PRODUCTION_QUEUE_MAX and padded with the empty
+ *  entry — the GPU's queue is a tensor dimension of that width, and a queue
+ *  that agrees at the front and differs behind it is still two different
+ *  cities. */
+function overQueue<T>(q: City['queue'], f: (it: City['queue'][number] | undefined) => T): T[] {
+  return Array.from({ length: PRODUCTION_QUEUE_MAX }, (_, k) => f(q[k]));
+}
+
+/** One queue item as a PRODUCTION COLUMN in the shared layout
  *  (cpu/core/prodLayout.ts), which is the space the GPU's `city_current` uses.
  *  -1 = an empty queue, matching the GPU's idle slot. */
 function queueColumn(q: City['queue'][number] | undefined): number {
@@ -620,7 +628,7 @@ const CITY: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
-  queueFront: overCities((r) => [queueColumn(r.city.queue[0]), queueTile(r.city.queue[0])]),
+  queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueColumn(q), queueTile(q)]).flat()),
   specialists: overCities((r, state) => {
     const eff = effectiveSpecialists(state, r.city);
     return PLACEABLE_DISTRICTS.map((type) => {
@@ -629,8 +637,8 @@ const CITY: Record<string, Extractor> = {
     });
   }),
   specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
-  queueProgress: overCities((r) => r.city.queue[0]?.progress ?? 0),
-  queueCost: overCities((r, state) => queueItemCost(state, r.city, r.city.queue[0])),
+  queueProgress: overCities((r) => overQueue(r.city.queue, (q) => q?.progress ?? 0)),
+  queueCost: overCities((r, state) => overQueue(r.city.queue, (q) => queueItemCost(state, r.city, q))),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),
   // The GPU's pressure vector is one column per RELIGION, and religions are
   // indexed in the civ-seat space, so the vector is exactly as wide as the

@@ -609,19 +609,18 @@ def _cty(plane: str):
 
 
 def _queue_cost(sim, b, rows):
-    """`queueItemCost` — a BUILDING's price is read live, which is what TS
-    does; every other queue kind carries the cost it locked."""
+    """`queueItemCost` over the WHOLE queue — a BUILDING's price is read live,
+    which is what TS does, and it does it for a waiting entry as readily as for
+    the head; every other kind carries the cost it locked."""
     stored = sim.city_cost[b].tolist()
     cur = sim.city_current[b].tolist()
     live: dict = {}
     out = []
     for c, s in rows:
-        if 0 <= cur[c][s] < sim.NB:
-            if c not in live:
-                live[c] = sim._live_building_cost(c)[b].tolist()
-            out.append(live[c][s])
-        else:
-            out.append(stored[c][s])
+        if c not in live:
+            live[c] = sim._live_building_cost(c)[b].tolist()
+        out.append([live[c][s][k] if 0 <= cur[c][s][k] < sim.NB else stored[c][s][k]
+                    for k in range(sim.QD)])
     return out
 
 
@@ -640,11 +639,17 @@ def _spec_rows(sim, b, rows):
 def _qfront(sim, b, c, s):
     # ORACLE: TS's queueTile reads the queue item's own tileIndex for both
     # district and wonder kinds. Here the district pick is city_qtile; a
-    # WONDER's completion target lives in the city_wonder registry.
-    cur = int(sim.city_current[b, c, s])
-    if sim.WONDER_BASE <= cur < sim.PROJECT_BASE:
-        return [cur, int(sim.city_wonder[b, c, s, cur - sim.WONDER_BASE])]
-    return [cur, int(sim.city_qtile[b, c, s])]
+    # WONDER's completion target lives in the city_wonder registry. EVERY entry
+    # is compared, not the head alone — a queue that agrees at the front and
+    # differs behind it is still two different cities.
+    out = []
+    for k in range(sim.QD):
+        cur = int(sim.city_current[b, c, s, k])
+        if sim.WONDER_BASE <= cur < sim.PROJECT_BASE:
+            out += [cur, int(sim.city_wonder[b, c, s, cur - sim.WONDER_BASE])]
+        else:
+            out += [cur, int(sim.city_qtile[b, c, s, k])]
+    return out
 
 
 CITY = {

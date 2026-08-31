@@ -1064,20 +1064,20 @@ class SimEconomy:
                            js_round(base * self._c_energy_discount), base)
 
     def _live_building_cost(self, row: int) -> torch.Tensor:
-        """[B, RC] — `buildingCostIn` for whatever BUILDING each of this row's
-        cities is producing, and the stored price wherever the queue head is
-        not a building. TS locks no building price at all: it re-reads
-        `buildingCostIn` at every completion check and again for its digest,
-        so a price that can MOVE while the item is queued — the Flood
-        Barrier's lowland formula, the Global Energy Treaty's discount —
-        has to be followed here rather than locked at queue."""
-        cur = self.city_current[:, row]                       # [B, RC]
+        """[B, RC, QD] — `buildingCostIn` for every BUILDING standing in this
+        row's queues, and the stored price wherever an entry is not a building.
+        TS locks no building price at all: it re-reads `buildingCostIn` at every
+        completion check and again for its digest, so a price that can MOVE
+        while the item WAITS — the Flood Barrier's lowland formula, the Global
+        Energy Treaty's discount — has to be followed here rather than locked
+        at queue, and it has to be followed for a deeper entry too."""
+        cur = self.city_current[:, row]                       # [B, RC, QD]
         bi = cur.clamp(min=0, max=self.NB - 1)
         base = self.rules_dev.b_cost.gather(0, bi.reshape(-1)).reshape(bi.shape).double()
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
-                               self._flood_barrier_cost(row).double(), base)
-        disc = self._congress_energy_discount().unsqueeze(1)  # [B, 1]
+                               self._flood_barrier_cost(row).unsqueeze(2).double(), base)
+        disc = self._congress_energy_discount().reshape(-1, 1, 1)
         live = torch.where((disc >= 0) & (bi == disc),
                            js_round(base * self._c_energy_discount), base)
         return torch.where((cur >= 0) & (cur < self.NB),
@@ -1102,9 +1102,9 @@ class SimEconomy:
         body claims follower/founder/enhancer and no worship id) — the one
         live path to a worship building is `buyWorshipBuilding`.
 
-        `queued` is the one-slot twin of TS's queued SET: the production slot
-        holds a BUILDING code exactly when that building is on order, and TS
-        offers neither it nor a prerequisite it would satisfy twice.
+        `queued` is TS's queued SET: a building anywhere in the city's queue is
+        already on order, and TS offers neither it nor a prerequisite it would
+        satisfy twice — the whole queue, not merely the item being worked.
         """
         key = (row, complete)
         hit = self._bld_cache.get(key)
@@ -1123,8 +1123,9 @@ class SimEconomy:
             self.civ_civics[:, row].gather(1, rd.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
             ones_nb,
         )  # Temple/Amphitheater/... gate on a CIVIC (availableBuildings' unlocks.buildings)
-        cur = self.city_current[:, row]  # [B, C] production layout: [0, NB) IS the building range
-        queued = torch.nn.functional.one_hot(cur.clamp(min=0, max=NB - 1), NB).bool() & ((cur >= 0) & (cur < NB)).unsqueeze(2)
+        cur = self.city_current[:, row]  # [B, C, QD]; layout: [0, NB) IS the building range
+        queued = (torch.nn.functional.one_hot(cur.clamp(min=0, max=NB - 1), NB).bool()
+                  & ((cur >= 0) & (cur < NB)).unsqueeze(3)).any(dim=2)
         # hasRiver at each centre, read off the static tile plane (a dead
         # slot's centre is -1; its column is masked by `alive` downstream).
         river_c = self.tile_river.gather(1, self.city_center[:, row].clamp(min=0))  # [B, C]
@@ -2164,7 +2165,9 @@ class SimEconomy:
         NAMES. The engine does not choose the plot: `tile` [B] is the policy's
         pick and this body only re-validates it, so a tile that stopped being
         eligible since the mask REFUSES rather than sliding to a neighbour the
-        policy never asked for."""
+        policy never asked for. The completion TARGET rides the queue entry the
+        caller pushes, not this body — one plot per entry, so a second district
+        queued behind the first keeps its own."""
         elig = self._district_elig(row, j, di, placement)
         bt_all = tile.clamp(min=0, max=self.T - 1)
         place = want & (tile >= 0) & (tile < self.T) & elig.gather(1, bt_all.unsqueeze(1)).squeeze(1)
@@ -2174,7 +2177,6 @@ class SimEconomy:
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
             self.improvement[rows, bt] = -1           # queueDistrict clears it
-            self.city_qtile[rows, row, j] = bt        # the completion target
             # The city registry, written at queue. A REPEATABLE type keeps its
             # FIRST tile: nothing reads the entry for its own sake (no
             # buildings, no projects, no adjacency of its own), and

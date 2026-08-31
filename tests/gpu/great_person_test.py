@@ -349,17 +349,17 @@ def poke_grant_drops_queue(rules, path):
     sim._gp_bldg[cls, at, :] = False
     sim._gp_bldg[cls, at, 0] = True
     sim.city_bldg[bidx, ROW, col, 0] = False
-    sim.city_current[bidx, ROW, col] = 0
-    sim.city_progress[bidx, ROW, col] = 37.0
-    sim.city_cost[bidx, ROW, col] = 200.0
+    sim.city_current[bidx, ROW, col, 0] = 0
+    sim.city_progress[bidx, ROW, col, 0] = 37.0
+    sim.city_cost[bidx, ROW, col, 0] = 200.0
     sim.city_prod_bank[bidx, ROW, col] = 5.0
     ctr = int(sim.city_center[bidx, ROW, col])
     v = make_person(sim, ROW, cls, at, ctr)
     order(sim, ROW, v, sim._A_GP)
     assert bool(sim.city_bldg[bidx, ROW, col, 0]), "the grant did not land"
-    assert int(sim.city_current[bidx, ROW, col]) == -1,         "the granted building stayed on the production slot"
+    assert int(sim.city_current[bidx, ROW, col, 0]) == -1,         "the granted building stayed on the production slot"
     assert float(sim.city_prod_bank[bidx, ROW, col]) == 42.0,         f"the hammers burned instead of banking ({float(sim.city_prod_bank[bidx, ROW, col])})"
-    assert float(sim.city_progress[bidx, ROW, col]) == 0.0, "the slot kept its progress"
+    assert float(sim.city_progress[bidx, ROW, col, 0]) == 0.0, "the slot kept its progress"
     print("  8 grant drops the queue OK — slot cleared, 37 hammers banked onto the 5 already there")
 
 

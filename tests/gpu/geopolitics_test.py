@@ -663,7 +663,7 @@ def poke_transfer(rules, path):
     assert int(sim.civ_grievance.abs().sum()) == 0, "a flip must not touch the ledger"
 
     assert not bool(sim.city_alive[0, civ_only_from + 1, j]), "the loser slot must die"
-    assert int(sim.city_bldg[0, civ_only_from + 1, j].sum()) == 0 and int(sim.city_current[0, civ_only_from + 1, j]) == -1, (
+    assert int(sim.city_bldg[0, civ_only_from + 1, j].sum()) == 0 and int(sim.city_current[0, civ_only_from + 1, j, 0]) == -1, (
         "loser-slot hygiene: buildings/queue wiped"
     )
     assert bool((sim.city_dist_tile[0, civ_only_from + 1, j] == -1).all()), "loser-slot hygiene: district registry wiped"

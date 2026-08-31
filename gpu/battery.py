@@ -356,6 +356,7 @@ def main() -> int:
                 ("advance_borders", [py, "tests/gpu/advance_borders_test.py"], 4),  # a melee victor advancing is ENTERING the tile, so the border binds it
                 ("stockpile_ceiling", [py, "tests/gpu/stockpile_ceiling_test.py"], 4),  # the stockpile maximum, on the one way IN that had no clamp of its own
                 ("improvement_food", [py, "tests/gpu/improvement_food_test.py"], 4),  # the tile-food column's improvement arm, which knew only the FARM
+                ("production_queue", [py, "tests/gpu/production_queue_test.py"], 4),  # the city's queue: the head, the overflow carry and the reorder
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

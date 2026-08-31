@@ -102,18 +102,18 @@ def main() -> None:
         pr = torch.full((1, s.RC), -1, dtype=torch.long)
         pr[0, j] = s.DISTRICT_BASE + si
         s.seat_ext[0, row] = True
-        s.city_current[0, row, j] = -1
+        s.city_current[0, row, j, 0] = -1
         s.apply_seat_actions(row, production=pr, production_tile=dt)
         s._seat_record_apply(row, torch.ones(1, dtype=torch.bool))
 
     no_tile = build(rules, path)
     apply_district(no_tile, -1)
-    assert int(no_tile.city_current[0, row, j]) == -1, "a district column with tile -1 queued something"
+    assert int(no_tile.city_current[0, row, j, 0]) == -1, "a district column with tile -1 queued something"
     assert int(no_tile.city_dist_tile[0, row, j, di]) < 0, "the registry gained a tile nobody named"
 
     with_tile = build(rules, path)
     apply_district(with_tile, pick)
-    assert int(with_tile.city_current[0, row, j]) == with_tile.DISTRICT_BASE + si, \
+    assert int(with_tile.city_current[0, row, j, 0]) == with_tile.DISTRICT_BASE + si, \
         "the SAME record with a tile did not queue — the -1 case above proves nothing"
     assert int(with_tile.city_dist_tile[0, row, j, di]) == pick, "the registry recorded another tile"
 
@@ -181,7 +181,7 @@ def main() -> None:
 
     back = build(rules, path)
     back.seat_ext[0, row] = True
-    back.city_current[0, row, j] = -1
+    back.city_current[0, row, j, 0] = -1
     drive.replay_seat(back, row, {"production": rec["production"], "tech": None, "civic": None, "units": []})
     back._seat_record_apply(row, torch.ones(1, dtype=torch.bool))
     assert int(back.city_dist_tile[0, row, j, di]) == t6, \
@@ -217,10 +217,10 @@ def main() -> None:
             dt[0, j, si_x] = t
             pr = torch.full((1, s.RC), -1, dtype=torch.long)
             pr[0, j] = s.DISTRICT_BASE + si_x
-            s.city_current[0, row, j] = -1
+            s.city_current[0, row, j, 0] = -1
             s.apply_seat_actions(row, production=pr, production_tile=dt)
             s._seat_record_apply(row, torch.ones(1, dtype=torch.bool))
-            took = int(s.city_current[0, row, j]) == s.DISTRICT_BASE + si_x
+            took = int(s.city_current[0, row, j, 0]) == s.DISTRICT_BASE + si_x
             out.append(t if took else -1)
             if took and complete_first:
                 s.district_complete[0, t] = True

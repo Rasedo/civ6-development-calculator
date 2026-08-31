@@ -411,18 +411,14 @@ class SimPhase:
         completion and every completion's payout. ONE body, every seat row, at
         the per-city seatPhase position (after growth, before border growth).
 
-        The GPU queue is depth ONE: `city_current < 0` IS an empty queue, so a
-        completion always banks its overflow rather than carrying it (the TS
-        twin declares the same loss — banked overflow pays a turn late).
-
-        Row 0 ran a short copy of this that knew settlers, units, buildings and
-        districts only. Three things fell through it: a seat-0 WONDER completed
-        into nothing (the head cleared, the overflow banked, the wonder was
-        never registered and no era score was paid), a seat-0 PROJECT paid no
-        yield, no great-person points and no space-race step, and the head's
-        `city_cost` was left standing where TS reads 0 off an empty queue."""
+        Only the HEAD accrues — a deeper entry keeps whatever hammers it
+        already holds and waits — and a completion SHIFTS the queue, so CIV6's
+        overflow carries onto the item behind it. Nothing but an empty queue
+        banks: with somewhere item-shaped to put them, the hammers go there."""
         bidx = self._bidx
-        cur = self.city_current[bidx, row, col].clone()
+        cur = self.city_current[bidx, row, col, 0].clone()
+        # the head's PLOT, read before the shift takes it away
+        qt0 = self.city_qtile[bidx, row, col, 0].clone()
         has_q = act & (cur >= 0)
         if not bool(has_q.any()):
             return
@@ -551,11 +547,11 @@ class SimPhase:
         prod = prod * _emall
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
-        prog = self.city_progress[bidx, row, col]
+        prog = self.city_progress[bidx, row, col, 0]
         bank = self.city_prod_bank[bidx, row, col]
-        _drip0 = self.city_progress[:, row].clone()
+        _drip0 = self.city_progress[:, row, :, 0].clone()
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
-        self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog).to(prog.dtype)
+        self.city_progress[bidx, row, col, 0] = torch.where(has_q, prog + prod + bank, prog).to(prog.dtype)
         self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
         # the perimeter takes its share BEFORE the completion below zeroes the
         # progress it is measured against
@@ -566,17 +562,22 @@ class SimPhase:
         # Lowland tiles in this city and the current sea level", and whatever
         # plant the Global Energy Treaty is discounting this session.
         self._reprice_live(row)
-        cost = self.city_cost[bidx, row, col].clone()
-        done = has_q & (self.city_progress[bidx, row, col] >= cost)
+        cost = self.city_cost[bidx, row, col, 0].clone()
+        done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
         if not bool(done.any()):
             return
-        # queue.shift() — the head clears BEFORE completeQueueItem runs, and an
-        # empty queue reads cost 0 on the TS side of the digest.
-        self.city_current[bidx, row, col] = torch.where(done, torch.full_like(cur, -1), self.city_current[bidx, row, col])
-        ovf = (self.city_progress[bidx, row, col] - cost).clamp(min=0)
-        self.city_prod_bank[bidx, row, col] = torch.where(done, self.city_prod_bank[bidx, row, col] + ovf, self.city_prod_bank[bidx, row, col])
-        self.city_progress[bidx, row, col] = torch.where(done, torch.zeros_like(prog), self.city_progress[bidx, row, col])
-        self.city_cost[bidx, row, col] = torch.where(done, torch.zeros_like(cost), cost)
+        # queue.shift() — the head goes BEFORE completeQueueItem runs, and the
+        # item behind it moves up carrying the hammers it had already earned.
+        ovf = (self.city_progress[bidx, row, col, 0] - cost).clamp(min=0)
+        self._q_pop(row, col, done)
+        # CIV6: the overflow carries into the next item. Only a queue that ran
+        # EMPTY has nowhere to put it, and that is the one case it banks.
+        nxt = self.city_current[bidx, row, col, 0] >= 0
+        carry = done & nxt
+        _hp = self.city_progress[bidx, row, col, 0]
+        self.city_progress[bidx, row, col, 0] = torch.where(carry, _hp + ovf, _hp)
+        _bk = self.city_prod_bank[bidx, row, col]
+        self.city_prod_bank[bidx, row, col] = torch.where(done & ~nxt, _bk + ovf, _bk)
         ctr = self.city_center[bidx, row, col]
 
         # CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction
@@ -621,7 +622,7 @@ class SimPhase:
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
         if bool(made_d.any()):
             dr = made_d.nonzero(as_tuple=True)[0]
-            dt = self.city_qtile[bidx, row, col][dr].clamp(min=0)
+            dt = qt0[dr].clamp(min=0)
             self.district_complete[dr, dt] = True
             # The registry holds ONE tile per type; TS walks every instance. So
             # for a type a city may hold SEVERAL of, point the entry at the one
@@ -662,7 +663,6 @@ class SimPhase:
                 _add = torch.zeros(self.B, dtype=torch.long, device=self.device)
                 _add.index_add_(0, dr, env * _touch.long())
                 self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + _add
-            self.city_qtile[bidx, row, col] = torch.where(made_d, torch.full_like(cur, -1), self.city_qtile[bidx, row, col])
             self._eff_version += 1
 
         made_b2 = done & (cur >= 0) & (cur < self.NB)

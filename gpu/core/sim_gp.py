@@ -210,12 +210,12 @@ class SimGp:
         prod_fx = col("prodCapital")
         if bool((prod_fx != 0).any()):
             _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
-            capm = _capa & (self.city_current[:, row] >= 0)
-            _drip = self.city_progress[:, row].clone()
-            self.city_progress[:, row] = self.city_progress[:, row] + torch.where(
-                capm, prod_fx.unsqueeze(1), torch.zeros_like(self.city_progress[:, row]))
+            capm = _capa & (self._q_head(row) >= 0)
+            _drip = self.city_progress[:, row, :, 0].clone()
+            self.city_progress[:, row, :, 0] = self.city_progress[:, row, :, 0] + torch.where(
+                capm, prod_fx.unsqueeze(1), torch.zeros_like(_drip))
             self._repair_drip(row, _drip)
-            _capb = _capa & (self.city_current[:, row] < 0)
+            _capb = _capa & (self._q_head(row) < 0)
             self.city_prod_bank[:, row] = self.city_prod_bank[:, row] + torch.where(
                 _capb, prod_fx.unsqueeze(1), torch.zeros_like(self.city_prod_bank[:, row]))
 
@@ -233,7 +233,7 @@ class SimGp:
         self._gp_wonder_charge(row, has_city, cls, at, cc)
         _space = self._gp_fx(cls, at, "spaceProduction").double() * has_city.to(dt)
         if bool((_space != 0).any()) and self._proj_rows:
-            _cur = self.city_current[:, row].gather(1, cc.unsqueeze(1)).squeeze(1)
+            _cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
             _pi = _cur - self.PROJECT_BASE
             _sp_tab = torch.tensor([1 if i in set(self._space_proj_idx) else 0 for i in range(len(self._proj_rows))],
                                    dtype=torch.bool, device=dev)
@@ -241,7 +241,7 @@ class SimGp:
             _sm = has_city & _is_space & (_space != 0)
             if bool(_sm.any()):
                 _r = _sm.nonzero(as_tuple=True)[0]
-                self.city_progress[_r, row, cc[_r]] += _space[_r].to(self.city_progress.dtype)
+                self.city_progress[_r, row, cc[_r], 0] += _space[_r].to(self.city_progress.dtype)
         self._gp_per_adjacent(row, m, cls, at, hc)
         self._gp_luxuries(row, m, cls, at)
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
@@ -392,17 +392,14 @@ class SimGp:
         # off the production slot; the hammers already spent BANK, which is
         # where every carried-over hammer goes. `dropQueuedBuilding` is the twin.
         col = cc[r]
-        cur = self.city_current[r, row, col]
-        gone = (cur >= 0) & (cur < nb) & want[r, :nb].gather(
-            1, cur.clamp(min=0, max=nb - 1).unsqueeze(1)).squeeze(1)
+        cur = self.city_current[r, row, col]                  # [m, QD]
+        _bi = cur.clamp(min=0, max=nb - 1)
+        gone = (cur >= 0) & (cur < nb) & want[r, :nb].gather(1, _bi.reshape(_bi.shape[0], -1)).reshape(_bi.shape)
         if bool(gone.any()):
-            hit = r[gone]
-            hcol = col[gone]
-            self.city_prod_bank[hit, row, hcol] = (self.city_prod_bank[hit, row, hcol]
-                                                   + self.city_progress[hit, row, hcol])
-            self.city_progress[hit, row, hcol] = 0
-            self.city_cost[hit, row, hcol] = 0
-            self.city_current[hit, row, hcol] = -1
+            prog = self.city_progress[r, row, col]
+            self.city_prod_bank[r, row, col] = (self.city_prod_bank[r, row, col]
+                                                + (prog * gone).sum(dim=1))
+            self._q_drop(r, row, col, gone)
 
     def _gp_wonder_charge(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                           at: torch.Tensor, cc: torch.Tensor) -> None:
@@ -412,7 +409,7 @@ class SimGp:
         amt = self._gp_fx(cls, at, "wonderProduction").double()
         if not bool(((amt != 0) & m).any()):
             return
-        cur = self.city_current[:, row].gather(1, cc.unsqueeze(1)).squeeze(1)
+        cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
         wi = cur - self.WONDER_BASE
         is_w = (wi >= 0) & (wi < max(self._wond_n, 1))
         dbl_to = self._gp_fx(cls, at, "wonderEraDouble").long()
@@ -421,9 +418,9 @@ class SimGp:
         hit = m & is_w & (amt != 0)
         if not bool(hit.any()):
             return
-        _drip = self.city_progress[:, row].clone()
+        _drip = self.city_progress[:, row, :, 0].clone()
         r = hit.nonzero(as_tuple=True)[0]
-        self.city_progress[r, row, cc[r]] += (amt[r] * mult[r]).to(self.city_progress.dtype)
+        self.city_progress[r, row, cc[r], 0] += (amt[r] * mult[r]).to(self.city_progress.dtype)
         self._repair_drip(row, _drip)
 
     def _gp_per_adjacent(self, row: int, m: torch.Tensor, cls: torch.Tensor,

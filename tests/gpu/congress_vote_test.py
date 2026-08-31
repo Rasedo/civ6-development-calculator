@@ -290,18 +290,18 @@ def main() -> None:
     sim2.district_complete[0, paved] = False
     sim2.tile_seat[0, paved] = other
     sim2.tile_city[0, paved] = int(sim2.city_id[0, other, ocol])
-    sim2.city_qtile[0, other, ocol] = paved
+    sim2.city_qtile[0, other, ocol, 0] = paved
     sim2.city_dist_tile[0, other, ocol, 0] = paved
-    sim2.city_current[0, other, ocol] = sim2.DISTRICT_BASE
-    sim2.city_progress[0, other, ocol] = 40
+    sim2.city_current[0, other, ocol, 0] = sim2.DISTRICT_BASE
+    sim2.city_progress[0, other, ocol, 0] = 40
     sim2.city_prod_bank[0, other, ocol] = 0
     sim2._culture_bomb(row, rows, torch.tensor([spot], dtype=torch.long),
                        torch.zeros(1, dtype=torch.long))
     assert int(sim2.tile_seat[0, paved]) == row, "an unfinished district was spared"
     assert int(sim2.district[0, paved]) == -1, "the unfinished district survived the bomb"
-    assert int(sim2.city_qtile[0, other, ocol]) == -1, "the dig site outlived its district"
+    assert int(sim2.city_qtile[0, other, ocol, 0]) == -1, "the dig site outlived its district"
     assert int(sim2.city_dist_tile[0, other, ocol, 0]) == -1, "the registry kept the plot"
-    assert int(sim2.city_current[0, other, ocol]) == -1, "the item stayed in production"
+    assert int(sim2.city_current[0, other, ocol, 0]) == -1, "the item stayed in production"
     assert float(sim2.city_prod_bank[0, other, ocol]) == 40.0, "the hammers burned"
     # ...and the build is named by its SITE, not by what the tile's own plane
     # says is going up: a re-queue moves the two independently, so a plane that
@@ -313,21 +313,21 @@ def main() -> None:
     sim2.district_complete[0, paved] = False
     sim2.tile_seat[0, paved] = other
     sim2.tile_city[0, paved] = int(sim2.city_id[0, other, ocol])
-    sim2.city_qtile[0, other, ocol] = paved
+    sim2.city_qtile[0, other, ocol, 0] = paved
     sim2.city_dist_tile[0, other, ocol, other_d] = paved
-    sim2.city_current[0, other, ocol] = sim2.DISTRICT_BASE + (other_d + 1) % sim2.city_dist_tile.shape[3]
-    sim2.city_progress[0, other, ocol] = 55
+    sim2.city_current[0, other, ocol, 0] = sim2.DISTRICT_BASE + (other_d + 1) % sim2.city_dist_tile.shape[3]
+    sim2.city_progress[0, other, ocol, 0] = 55
     sim2.city_prod_bank[0, other, ocol] = 0
     # a DEAD column shares the id plane's zero fill, and must never be written
-    sim2.city_qtile[0, other, dcol] = paved
+    sim2.city_qtile[0, other, dcol, 0] = paved
     sim2._culture_bomb(row, rows, torch.tensor([spot], dtype=torch.long),
                        torch.zeros(1, dtype=torch.long))
-    assert int(sim2.city_current[0, other, ocol]) == -1, (
+    assert int(sim2.city_current[0, other, ocol, 0]) == -1, (
         "the item survived because the tile's plane named a different district"
     )
     assert float(sim2.city_prod_bank[0, other, ocol]) == 55.0, "the hammers burned"
     assert int(sim2.city_dist_tile[0, other, ocol, other_d]) == -1, "the registry kept the plot"
-    assert int(sim2.city_qtile[0, other, dcol]) == paved, (
+    assert int(sim2.city_qtile[0, other, dcol, 0]) == paved, (
         "a DEAD city column was written — the id plane's zero fill matched it"
     )
     print("  the bomb claims a foreign plot, spares a finished district and wipes an unfinished one")

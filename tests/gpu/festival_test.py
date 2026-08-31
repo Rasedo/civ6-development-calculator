@@ -59,9 +59,9 @@ def main() -> None:
     assert bool(sim.civ_alive[0, r + 1]) and bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
     code = sim.PROJECT_BASE + pi_fest
     cost = 100.0
-    sim.city_current[0, r + 1, j] = code
-    sim.city_cost[0, r + 1, j] = cost
-    sim.city_progress[0, r + 1, j] = 1.0e6
+    sim.city_current[0, r + 1, j, 0] = code
+    sim.city_cost[0, r + 1, j, 0] = cost
+    sim.city_progress[0, r + 1, j, 0] = 1.0e6
     before = sim.civ_gpp[0, r + 1].clone()
     sim._seat_phase()
     delta = (sim.civ_gpp[0, r + 1] - before).tolist()

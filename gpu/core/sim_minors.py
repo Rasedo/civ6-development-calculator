@@ -171,9 +171,11 @@ class SimMinors:
         self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
         self.city_wonder[rows_w, row, j, wi] = bwt
         code_w = self.WONDER_BASE + wi
-        self.city_current[:, row, j] = torch.where(has_w, torch.full_like(self.city_current[:, row, j], code_w), self.city_current[:, row, j])
-        self.city_cost[:, row, j] = torch.where(has_w, torch.full_like(self.city_cost[:, row, j], float(wrow["cost"])), self.city_cost[:, row, j])
-        self.city_progress[:, row, j] = torch.where(has_w, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
+        # the wonder's PLOT lives in the `city_wonder` registry, which is keyed
+        # by wonder rather than by queue slot, so the entry carries no qtile.
+        _b1 = torch.ones(self.B, dtype=torch.long, device=self.device)
+        self._q_push(row, j, has_w, _b1 * code_w,
+                     _b1.to(self.city_cost.dtype) * float(wrow["cost"]))
         self._eff_version += 1
 
     def _seat_proj_cost(self, row: int) -> torch.Tensor:

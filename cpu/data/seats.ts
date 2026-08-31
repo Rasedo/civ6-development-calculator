@@ -62,6 +62,14 @@ export const MAX_CITIES_PER_SEAT = 6;
  * window would hide them from the observation and leave them undecidable. The
  * GPU's per-seat-row storage width is this same number (rules.seats.citySlots). */
 export const CITY_SLOTS_PER_SEAT = 24;
+/**
+ * CIV6: a city holds a production QUEUE — several items lined up, each keeping
+ * the production already spent on it, the head merely being the one worked.
+ * The game's own queue has no published ceiling; this is the depth both engines
+ * carry, because the GPU's queue is a tensor dimension and must be finite.
+ * MODEL: the number itself is a capacity choice, not a sourced magnitude.
+ */
+export const PRODUCTION_QUEUE_MAX = 5;
 /** CIV 6: a war must run **10** turns before either side may negotiate peace
  *  (the leaders' action panel unlocks the offer then). One floor for every
  *  pairing here, majors and city-states alike. */
