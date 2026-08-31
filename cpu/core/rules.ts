@@ -156,7 +156,20 @@ export function validImprovementsIn(
     const imp = RESOURCES[tile.resource].improvement;
     return unlocked(imp) ? [imp] : [];
   }
-  if (isWater(tile)) return [];
+  if (isWater(tile)) {
+    // the WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
+    // resource under it to insist on a different improvement; each row's own
+    // `terrains` list is the whole ground rule.
+    const out: ImprovementId[] = [];
+    if (tile.submerged) return out;
+    for (const def of Object.values(IMPROVEMENTS)) {
+      if (!def.waterOnly || !unlocked(def.id)) continue;
+      if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
+      if (def.noFeature && tile.feature) continue;
+      out.push(def.id);
+    }
+    return out;
+  }
 
   const out: ImprovementId[] = [];
   // THE SUZERAIN IMPROVEMENTS. Each is offered only while this seat holds the

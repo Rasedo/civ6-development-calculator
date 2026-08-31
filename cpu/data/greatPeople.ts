@@ -1,6 +1,7 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
 import { LUXURY_AMENITY_CITIES } from './constants';
+import { BUILDINGS } from './buildings';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -422,7 +423,19 @@ export const ARTIFACT_TOURISM = 3;
 export const ARCHAEOLOGIST_CHARGES = 3;
 export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
 
-type ArtCity = { artifacts?: number; artifactEras?: number[]; artifactSeats?: number[] };
+type ArtCity = {
+  artifacts?: number;
+  artifactEras?: number[];
+  artifactSeats?: number[];
+  buildings?: readonly string[];
+};
+
+/** artifacts standing IN the Archaeological Museum, as opposed to the
+ *  any-work pool — the theming rule and its DOUBLE reach exactly these. */
+function artifactsInMuseum(city: ArtCity): number {
+  return city.buildings?.includes(ARTIFACT_BUILDING)
+    ? Math.min(city.artifacts ?? 0, ARTIFACT_SLOTS) : 0;
+}
 
 /**
  * Is this city's ARCHAEOLOGICAL MUSEUM themed? CIV6: the slots must
@@ -431,7 +444,9 @@ type ArtCity = { artifacts?: number; artifactEras?: number[]; artifactSeats?: nu
  * one). A themed museum DOUBLES the yields of everything in it.
  */
 export function museumThemed(city: ArtCity): boolean {
-  if ((city.artifacts ?? 0) < ARTIFACT_SLOTS) return false;
+  // a pool-standing find never themes — the museum itself must STAND and
+  // hold its three
+  if (artifactsInMuseum(city) < ARTIFACT_SLOTS) return false;
   const eras = city.artifactEras ?? [];
   const seats = city.artifactSeats ?? [];
   if (eras.length < ARTIFACT_SLOTS || seats.length < ARTIFACT_SLOTS) return false;
@@ -445,11 +460,21 @@ export function museumThemed(city: ArtCity): boolean {
 export const THEMING_MULT = 2;
 
 export function artifactCulture(city: ArtCity): number {
-  return (city.artifacts ?? 0) * ARTIFACT_CULTURE * (museumThemed(city) ? THEMING_MULT : 1);
+  const inM = artifactsInMuseum(city);
+  return (inM * (museumThemed(city) ? THEMING_MULT : 1)
+    + (city.artifacts ?? 0) - inM) * ARTIFACT_CULTURE;
 }
 export function artifactTourism(city: ArtCity): number {
-  return (city.artifacts ?? 0) * ARTIFACT_TOURISM * (museumThemed(city) ? THEMING_MULT : 1);
+  const inM = artifactsInMuseum(city);
+  return (inM * (museumThemed(city) ? THEMING_MULT : 1)
+    + (city.artifacts ?? 0) - inM) * ARTIFACT_TOURISM;
 }
+/** every slot an Artifact can STAND in per city — the museum's own plus the
+ *  whole any-work pool; the width of the provenance arrays both engines
+ *  compare. */
+export const ARTIFACT_PROV_W = ARTIFACT_SLOTS
+  + Object.values(BUILDINGS).reduce((n, b) => n + (b.anyWorkSlots ?? 0), 0);
+
 export const GW_SLOTS = [2, 3, 1] as const;
 /** How many KINDS of Great Work there are — writing, art, music. */
 export const GW_KINDS = 3;

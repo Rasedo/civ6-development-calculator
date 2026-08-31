@@ -1,7 +1,7 @@
 
 import type { City, GameState, GreatPersonClass } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_KINDS, GW_WONDER_SLOTS, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_WONDER_SLOTS, gpChargesOf, gpCost, gwCapacity, gwCount } from '../data/greatPeople';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_KINDS, GW_WONDER_SLOTS, ARTIFACT_BUILDING, ARTIFACT_SLOTS, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_WONDER_SLOTS, gpChargesOf, gpCost, gwCapacity, gwCount } from '../data/greatPeople';
 import { cityBuildingSum } from './city';
 import { nextRandom } from './rand';
 import { congressGppFactor } from './congress';
@@ -177,6 +177,7 @@ export function wonderGwSlots(state: GameState, kind: number) {
  *  pillaged one takes its buildings with it) and what it already holds. */
 type WorkCity = {
   buildings: string[];
+  artifacts?: number;
   districts?: City['districts'];
   relics?: number;
   wonders?: { id: string; tileIndex: number }[];
@@ -220,7 +221,18 @@ export function anyWorkFree(state: GameState, city: WorkCity): number {
   const relicDedicated = (city.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0)
     + wonderRelicSlots(state, city);
   used += Math.max(0, (city.relics ?? 0) - relicDedicated);
+  used += Math.max(0, (city.artifacts ?? 0)
+    - (city.buildings.includes(ARTIFACT_BUILDING) ? ARTIFACT_SLOTS : 0));
   return Math.max(0, pool - used);
+}
+
+/** CIV6 (National History Museum): its any-kind slots take an Artifact like
+ *  any other Great Work, so a find's room is per-CITY — the Archaeological
+ *  Museum's own slots plus what is left of the pool — never the bare museum
+ *  constant. */
+export function artifactFree(state: GameState, c: WorkCity): number {
+  const ded = c.buildings.includes(ARTIFACT_BUILDING) ? ARTIFACT_SLOTS : 0;
+  return Math.max(0, ded - (c.artifacts ?? 0)) + anyWorkFree(state, c);
 }
 
 /** The extra Great-Work slots of one kind a city carries beyond its slot

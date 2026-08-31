@@ -30,7 +30,7 @@ import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
-import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
+import { artifactFree } from './greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
@@ -1072,15 +1072,13 @@ export function trainableUnits(
     if (d.settler) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
     if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic, seat)) return false;
-    // An ARCHAEOLOGIST may only be trained where its city's
-    // ARCHAEOLOGICAL MUSEUM still has a FREE artifact slot — the real Civ 6
-    // rule, and the reason its charge count equals the free slots. Without a
-    // museum the unit has nowhere to put what it digs up.
+    // An ARCHAEOLOGIST may only be trained where its city still has a FREE
+    // artifact slot — the museum's own or the any-work pool's (the real
+    // Civ 6 rule: with no room the unit has nowhere to put what it digs up).
     if (d.id === 'ARCHAEOLOGIST' && !state.sandbox) {
       if (!city) return false;
       const held = seatOf(state, seat)!.cities.find((c) => c.centerIndex === city.centerIndex);
-      const has = (held?.buildings ?? []).includes(ARTIFACT_BUILDING);
-      if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
+      if (!held || artifactFree(state, held) <= 0) return false;
     }
     // A unit whose CITY must already hold a building (the Military Engineer's
     // Armory, which carries its Encampment with it).
@@ -1211,9 +1209,9 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
     return no('That dig lies behind a closed border.');
   }
   const home = seatOf(state, seat)!.cities
-    .filter((c) => c.buildings.includes(ARTIFACT_BUILDING) && (c.artifacts ?? 0) < ARTIFACT_SLOTS)
+    .filter((c) => artifactFree(state, c) > 0)
     .sort((a, b) => a.id - b.id)[0];
-  if (!home) return no('No Archaeological Museum has a free artifact slot.');
+  if (!home) return no('No city has a free artifact slot.');
   home.artifacts = (home.artifacts ?? 0) + 1;
   // CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
   // extracted."

@@ -718,7 +718,7 @@ CITY = {
     # the museum's provenance, slot by slot: era then civilization, so one
     # row reads [e0, s0, e1, s1, ...] exactly like the TS extractor.
     "artifactProv": lambda sim, b, rows: [
-        [int(x) for i in range(sim._artifact_slots)
+        [int(x) for i in range(sim._artifact_prov_w)
          for x in (sim.city_artifact_era[b, c, s, i], sim.city_artifact_seat[b, c, s, i])]
         for c, s in rows
     ],

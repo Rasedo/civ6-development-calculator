@@ -65,7 +65,7 @@ def main() -> None:
         t = getattr(sim, _p)
         assert t.shape == (sim.B, sim.T), f"{_p} shape"
         assert t.dtype == torch.long, f"{_p} dtype"
-    assert sim.city_artifact_era.shape[-1] == sim._artifact_slots
+    assert sim.city_artifact_era.shape[-1] == sim._artifact_prov_w
     print("constants + planes ok")
 
     # --- 2) the rhombus ----------------------------------------------------
@@ -149,8 +149,7 @@ def main() -> None:
         s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
         s2.city_alive[:, row], s2.tile_seat == row,
         s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        None, s2.city_artifacts[:, row],
-        themed=s2._museum_themed(row))[0]
+        None, s2._artifact_theming_counts(row))[0]
     s2._do_park(row, torch.ones(s2.B, dtype=torch.bool),
                 torch.full((s2.B,), ctr, dtype=torch.long),
                 torch.full((s2.B,), slot, dtype=torch.long))
@@ -164,8 +163,7 @@ def main() -> None:
         s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
         s2.city_alive[:, row], s2.tile_seat == row,
         s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        None, s2.city_artifacts[:, row],
-        themed=s2._museum_themed(row))[0]
+        None, s2._artifact_theming_counts(row))[0]
     want = sum(int(ap2[t]) for t in parked)
     assert int(tour_after - tour_before) == want, f"park tourism = total appeal ({want}), got {int(tour_after - tour_before)}"
     amen = s2._park_amenities(row)[0]
@@ -220,6 +218,8 @@ def main() -> None:
     for i in range(n):
         s4.city_artifact_era[0, row, 0, i] = 2
         s4.city_artifact_seat[0, row, 0, i] = i
+    assert not bool(s4._museum_themed(row)[0, 0]),         "a set with no standing museum must not theme"
+    s4.city_bldg[0, row, 0, s4._artifact_bidx] = True   # the museum STANDS
     assert bool(s4._museum_themed(row)[0, 0]), "one era, three civilizations, every slot"
     s4.city_artifact_seat[0, row, 0, 1] = 0  # a repeated civilization
     assert not bool(s4._museum_themed(row)[0, 0])
@@ -232,12 +232,13 @@ def main() -> None:
     s4.city_artifacts[0, row, 0] = n
     own = s4.tile_seat == row
     era = s4._civ_era(s4.civ_techs[:, row], s4.civ_civics[:, row])
-    t_plain = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
-                             s4.city_alive[:, row], own, era, None,
-                             s4.city_artifacts[:, row], themed=None)[0]
     t_themed = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
                               s4.city_alive[:, row], own, era, None,
-                              s4.city_artifacts[:, row], themed=s4._museum_themed(row))[0]
+                              s4._artifact_theming_counts(row))[0]
+    s4.city_artifact_seat[0, row, 0, 1] = 0   # a repeated civilization un-themes
+    t_plain = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
+                             s4.city_alive[:, row], own, era, None,
+                             s4._artifact_theming_counts(row))[0]
     assert int(t_themed - t_plain) == s4._artifact_tourism * n, "theming DOUBLES the museum's tourism"
     print("theming ok")
 

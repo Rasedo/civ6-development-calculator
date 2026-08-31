@@ -79,6 +79,10 @@ export interface ImprovementDef {
   /** a Builder places this row on its own catalog GROUND alone — no resource
    *  under it, no suzerainty, no appeal bar, and not the Engineer's list. */
   groundOnly?: boolean;
+  /** a Builder row that stands on WATER with no resource under it — its
+   *  `terrains` list is the whole ground rule (the Offshore Wind Farm's
+   *  "Coast and Lake"). */
+  waterOnly?: boolean;
   /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager;
    *  absent = NO_PLUNDER. */
   plunder?: PlunderRow;
@@ -382,5 +386,21 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // CIV6: "Provides +15 HP healing every turn for friendly religious units."
     religiousHeal: 15,
     description: '+2 faith, +1 more per 2 adjacent districts, +1 housing (+1 with Colonialism), heals religious units 15. Not beside another Monastery.',
+  },
+  // CIV6 (Offshore Wind Farm): "+2 Production", "Provides 2 Power per turn",
+  // "Must be constructed on Coast and Lake", unlocked by Predictive Systems
+  // and built by Builders.
+  OFFSHORE_WIND_FARM: {
+    id: 'OFFSHORE_WIND_FARM',
+    name: 'Offshore Wind Farm',
+    code: 'Ow',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { production: 2 },
+    housing: 0,
+    resourceOnly: false,
+    waterOnly: true,
+    power: 2,
+    terrains: ['COAST', 'LAKE'],
+    description: 'Coast or Lake. Supplies 2 Power to its city from the wind.',
   },
 };

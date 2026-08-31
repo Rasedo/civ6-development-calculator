@@ -6965,18 +6965,15 @@ class SimSeats:
 
     def _do_excavate(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
         """EXCAVATE for the games in `mask` — `archaeologistExcavate`'s twin.
-        The find lands in the LOWEST-id own city holding an Archaeological
-        Museum with a free slot, carrying the dig's PROVENANCE into that
-        museum's next slot; the dig is cleared and a charge is spent. A unit
+        The find lands in the LOWEST-id own city with artifact ROOM — the
+        museum's own slots or the any-work pool's — carrying the dig's
+        PROVENANCE into that city's next slot; the dig is cleared and a
+        charge is spent. A unit
         out of charges is disbanded, exactly as `spendCharge` does it."""
-        if not bool(mask.any()) or self._artifact_bidx < 0:
+        if not bool(mask.any()):
             return
         tc = tile.clamp(min=0)
-        room = (
-            self.city_alive[:, row]
-            & self.city_bldg[:, row, :, self._artifact_bidx]
-            & (self.city_artifacts[:, row] < self._artifact_slots)
-        )
+        room = self.city_alive[:, row] & (self._artifact_free(row) > 0)
         # TS sorts the candidate cities by CITY ID; the id plane holds it.
         BIG = 1 << 30
         key = torch.where(room, self.city_id[:, row], torch.full_like(self.city_id[:, row], BIG))
@@ -6989,7 +6986,7 @@ class SimSeats:
         land = self.antiquity[rows, tc[rows]]
         era = torch.where(land, self.antiquity_era[rows, tc[rows]], self.shipwreck_era[rows, tc[rows]])
         dseat = torch.where(land, self.antiquity_seat[rows, tc[rows]], self.shipwreck_seat[rows, tc[rows]])
-        nxt = self.city_artifacts[rows, row, hslot].clamp(max=self._artifact_slots - 1)
+        nxt = self.city_artifacts[rows, row, hslot].clamp(max=self._artifact_prov_w - 1)
         self.city_artifact_era[rows, row, hslot, nxt] = era
         self.city_artifact_seat[rows, row, hslot, nxt] = dseat
         self.city_artifacts[rows, row, hslot] = self.city_artifacts[rows, row, hslot] + 1

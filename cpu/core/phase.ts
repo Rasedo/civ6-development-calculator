@@ -90,6 +90,7 @@ const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_BUILD_RAILROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
 const A_CLEAN_FALLOUT = unitActionIndex(IMPROVEMENT_IDS).CLEAN_FALLOUT;
+const A_REMOVE_IMP = unitActionIndex(IMPROVEMENT_IDS).REMOVE_IMPROVEMENT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
@@ -1415,6 +1416,17 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
         // RANGE promotion, which is what `unitAttackRange` sums.
         if (rt !== undefined && UNITS[unit.type]?.ranged && unitAttackRange(unit) >= 3) hostileRangedStrike(state, unit, rt);
+      } else if (a === A_REMOVE_IMP) {
+        // CIV6 (Builder / Military Engineer): "Can Remove Tile Improvements
+        // (costs no charge)". The improvement is GONE rather than pillaged,
+        // its based aircraft scatter, and the turn is spent.
+        if (unit.type !== 'BUILDER' && unit.type !== 'MILITARY_ENGINEER') return;
+        if (here.improvement && tileOwnedByCiv(here, actor.seat)) {
+          here.improvement = null;
+          here.pillaged = false;
+          displaceAirFrom(state, here.index);
+          unit.movesLeft = 0;
+        }
       }
     });
   }

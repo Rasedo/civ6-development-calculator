@@ -113,6 +113,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   for (let k = 0; k < NUCLEAR_DEVICES.length; k++) {
     for (let c = 0; c < NUKE_COLS; c++) names.push(`NUKE_${k}_${c}`);
   }
+  // CIV6 (Builder / Military Engineer): "Can Remove Tile Improvements
+  // (costs no charge)" — both unit pages, verbatim. One column, the tile
+  // underfoot; the turn is spent, never a charge.
+  names.push('REMOVE_IMPROVEMENT');
   return names;
 }
 

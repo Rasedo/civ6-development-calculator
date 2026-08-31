@@ -76,6 +76,8 @@ class SimOrders:
         _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
         if getattr(self, "_A_REPAIR", -1) >= 0:
             _ic.append(self._A_REPAIR)
+        if getattr(self, "_A_REMOVE_IMP", -1) >= 0:
+            _ic.append(self._A_REMOVE_IMP)
         _tab = torch.stack([
             _held.any(dim=0),
             _cmd.any(dim=0),
@@ -780,6 +782,13 @@ class SimOrders:
                         elif self._imp_eng[_k]:
                             _valid = _unl & self._imp_ground_ok(_k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
+                        elif self._imp_water[_k]:
+                            _valid = (
+                                _unl & (_rq == -1)
+                                & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & ~self.tile_submerged.gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & self._imp_ground_ok(_k).gather(1, hc.unsqueeze(1)).squeeze(1)
+                            )
                         elif self._imp_ground[_k]:
                             _valid = (
                                 _unl & (_rq == -1)
@@ -817,6 +826,26 @@ class SimOrders:
                     self.district_pillaged[_r[_dis], _tt[_dis]] = False
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
+                # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
+                # "Can Remove Tile Improvements (costs no charge)". GONE, not
+                # pillaged; based aircraft scatter; the turn is spent.
+                _rmv = (
+                    act & (a == getattr(self, "_A_REMOVE_IMP", -2))
+                    & (((utp == self._builder_idx) if self._builder_idx >= 0
+                        else torch.zeros_like(act))
+                       | ((utp == self._eng_idx) if self._eng_idx >= 0
+                          else torch.zeros_like(act)))
+                    & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0)
+                )
+                if bool(_rmv.any()):
+                    _r = _rmv.nonzero(as_tuple=True)[0]
+                    _tt = hc[_r]
+                    self.improvement[_r, _tt] = -1
+                    self.pillaged[_r, _tt] = False
+                    self.unit_mp[_r, sc[_r]] = 0
+                    self._eff_version += 1
+                    self._air_scatter_from(_r, _tt)
 
             if _rk_pillage[n]:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)

@@ -62,12 +62,12 @@ from the list below.
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **22** | |
-| C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
+| C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
-| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here; no unit removes a tile improvement |
-| C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization |
+| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here |
+| C-22 the district roster | 1 | the Preserve table is a stylization |
 | C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
@@ -669,12 +669,17 @@ under their blocker so the dependency is readable, and both halves count.
     says 100 and no first-party page reached states any figure, so the
     window (B-22r) counts the emission gap alone until the owner rules on
     the magnitude.
-  - **THE OFFSHORE WIND FARM** (+2 Power, Predictive Systems) stands on
-    Coast or Lake. A Builder reaches a water plot now, so the carrier is no
-    longer what stops it: its unlock is a FUTURE-ERA technology this tech
-    tree does not hold, and one whose prerequisites the game RANDOMIZES per
-    match, so there is no canonical edge to transcribe. The row waits on a
-    Future era, not on a rule.
+  - **THE OFFSHORE WIND FARM SHIPS** — "+2 Production", "Provides 2 Power
+    per turn", "Must be constructed on Coast and Lake", by Builders, the
+    catalog's one `waterOnly` row, offered wherever a Builder stands on an
+    owned resource-free Coast/Lake plot (`validImprovementsIn`'s water arm
+    / `_imp_water`). PREDICTIVE SYSTEMS joins the tree with it: Future era,
+    2200 Science, "+1 Production to Quarry, Oil Well, and Oil Rig" (the Oil
+    Rig's share waits on an improvement the catalog does not hold), under
+    the Future block's recorded convention — the game randomizes Future
+    prerequisites per match, so the deepest Information-era nodes stand in.
+    Reachability is poke-level: the driver's job ladder never walks a
+    Builder onto water, so no gate lane builds one.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
     `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous
     while it stands: a minor holds no building that asks for Power and no
@@ -906,8 +911,12 @@ under their blocker so the dependency is readable, and both halves count.
     what a step through it costs, and whether it makes the mountain itself
     passable or joins two tunnels) that is safe to build on. ASK THE OWNER
     before any of it is written; no branch ships on a guess.
-  - **"Can Remove Tile Improvements"** is a verb neither engine has for
-    any unit.
+  - **"Can Remove Tile Improvements (costs no charge)" SHIPS** — the
+    Builder's and the Military Engineer's pages carry the ability verbatim,
+    and `REMOVE_IMPROVEMENT` is one appended column for both chassis on an
+    own tile holding one: the improvement is GONE rather than pillaged, its
+    based aircraft scatter, the turn is spent and no charge is. The driver
+    never picks it, so it is poke-proven only.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
     C-26.)
 - **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1. The ARSENAL,
@@ -1095,7 +1104,7 @@ under their blocker so the dependency is readable, and both halves count.
   `climate.test.ts` are the whole bar. OPEN:
   - **THE FLOOD BARRIER KEEPS FOR NOTHING** — its maintenance is
     published only as "Variable"; the row carries 0.
-- **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist
+- **C-22. THE DISTRICT ROSTER.** Weight 1. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
   and Government Plaza ride the gate on 12/12 seeds, the Canal on none —
   its placement and its naval passage (`canalPassage` / `_canal_pass`) are
@@ -1105,15 +1114,17 @@ under their blocker so the dependency is readable, and both halves count.
   `tests/cpu/city/plaza-buildings.test.ts`, `tests/gpu/plaza_test.py`);
   its measured gate reach is ZERO — no seed of the twelve builds the
   building, so no Builder is ever offered the column — which puts it
-  beside the Military Engineer's two verbs as poke-proven only. OPEN:
-  - **THE ANY-WORK POOL DOES NOT REACH ARTIFACTS.** The National History
-    Museum's four slots take a Great Work of any kind, and this model
-    lets them take writing, art, music and relics. An ARTIFACT cannot
-    reach them: `ARTIFACT_SLOTS` / `_artifact_slots` is a bare three that
-    the Archaeological Museum's theming walk counts on, and the
-    Archaeologist's own training gate names that building. Closing it
-    wants the artifact slot count to become a per-city capacity like the
-    other four.
+  beside the Military Engineer's two verbs as poke-proven only. The
+  ANY-WORK POOL REACHES ARTIFACTS: artifact room is a per-city capacity
+  like the other four kinds (`artifactFree` / `_artifact_free` — the
+  museum's own slots plus what is left of the pool), the Archaeologist's
+  training gate and the excavation's landing city both read it, and the
+  pool's free count debits artifact overflow. The theming rule stays the
+  museum's own — it asks that the building STAND, and the DOUBLE reaches
+  only the three it holds (`_artifact_theming_counts`), never a
+  pool-standing find; the provenance arrays widened to every slot a find
+  can stand in (`ARTIFACT_PROV_W`) and statecompare compares the full
+  width. OPEN:
   - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
     `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; no source can close the middle.

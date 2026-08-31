@@ -67,7 +67,7 @@ import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { ARTIFACT_SLOTS, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { ARTIFACT_PROV_W, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 
@@ -682,7 +682,7 @@ const CITY: Record<string, Extractor> = {
     const eras = r.city.artifactEras ?? [];
     const seats = r.city.artifactSeats ?? [];
     const out: number[] = [];
-    for (let i = 0; i < ARTIFACT_SLOTS; i++) out.push(eras[i] ?? -1, seats[i] ?? -1);
+    for (let i = 0; i < ARTIFACT_PROV_W; i++) out.push(eras[i] ?? -1, seats[i] ?? -1);
     return out;
   }),
   // the ART MUSEUM's provenance, slot by slot — the other theming rule.

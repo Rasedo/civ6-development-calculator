@@ -290,5 +290,14 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     // above carry, and this catalog reads that pair as 2200 throughout.
     T('ADVANCED_AI', 'Advanced AI', 'Future', 2200, ['ROBOTICS']),
     T('CYBERNETICS', 'Cybernetics', 'Future', 2200, ['ROBOTICS', 'NANOTECHNOLOGY']),
+    // CIV6 (Predictive Systems): Future era, 2200 Science, "Unlocks Offshore
+    // Wind Farm improvement" and "+1 Production to Quarry, Oil Well, and Oil
+    // Rig improvements" — the Oil Rig's share waits on an improvement this
+    // catalog does not hold.
+    T('PREDICTIVE_SYSTEMS', 'Predictive Systems', 'Future', 2200, ['TELECOMMUNICATIONS', 'ROBOTICS'], [
+      { kind: 'unlockImprovement', improvement: 'OFFSHORE_WIND_FARM' },
+      { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
+      { kind: 'improvementYields', improvement: 'OIL_WELL', yields: { production: 1 } },
+    ]),
   ].map((t) => [t.id, t]),
 );

@@ -81,8 +81,8 @@ class SimInit:
             ("gw_music", torch.long, 0, None, None),
             ("relics", torch.long, 0, None, None),
             ("artifacts", torch.long, 0, None, None),
-            ("artifact_era", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
-            ("artifact_seat", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
+            ("artifact_era", torch.long, -1, None, max(int((rules.seats or {}).get("artifactProvW", 3)), 1)),
+            ("artifact_seat", torch.long, -1, None, max(int((rules.seats or {}).get("artifactProvW", 3)), 1)),
             ("gwart_type", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("gwart_artist", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
@@ -1316,6 +1316,9 @@ class SimInit:
         self._artifact_slots = int(rr.get("artifactSlots", 3))
         self._artifact_culture = int(rr.get("artifactCulture", 3))
         self._artifact_tourism = int(rr.get("artifactTourism", 3))
+        # every slot an Artifact can STAND in per city — the museum's own
+        # plus the whole any-work pool; the provenance arrays' width.
+        self._artifact_prov_w = max(int(rr.get("artifactProvW", self._artifact_slots)), 1)
         self._theming_mult = int(rr["themingMult"])
         self._artist_works = [[int(x) for x in w] for w in rr.get("artistWorks", [])]
         _ri = rules.improvements or {}
@@ -1443,6 +1446,7 @@ class SimInit:
             self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
             self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
             self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
+            self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
             assert _apc in (0, self._air_strike_cols), (
@@ -1468,6 +1472,7 @@ class SimInit:
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
                 + (1 if self._A_RAIL >= 0 else 0) \
                 + (1 if self._A_CLEAN >= 0 else 0) \
+                + (1 if self._A_REMOVE_IMP >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -1490,6 +1495,7 @@ class SimInit:
             self._A_FOUND = -1  # no names -> no FOUND column
             self._A_EXCAVATE = -1
             self._A_PARK = -1
+            self._A_REMOVE_IMP = -1
             self._A_PERFORM = -1
             self._A_BOOST = -1
             self._A_FORM_UP = -1
@@ -1601,6 +1607,8 @@ class SimInit:
         # Engineer's (`validImprovementsIn`'s ground-only arm).
         self._imp_ground = [bool(r.get("gnd", 0)) for r in imp["rows"]]
         self._imp_ground_idx = [i for i, g in enumerate(self._imp_ground) if g]
+        # a Builder row standing on WATER on its own terrain list alone
+        self._imp_water = [bool(r.get("wtr", 0)) for r in imp["rows"]]
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )

@@ -67,7 +67,7 @@ def main() -> None:
         ("SPY_MISSION_", len(esp["missions"])),
         ("NUKE_", rj["nuclear"]["nukeCols"] * len(rj["nuclear"]["devices"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -87,7 +87,9 @@ def main() -> None:
              + ["BUILD_RAILROAD", "CLEAN_FALLOUT"]
              # ...and the nuclear head, one per device row
              + [f"NUKE_{k}_{c}" for k in range(len(rj["nuclear"]["devices"]))
-                for c in range(rj["nuclear"]["nukeCols"])])
+                for c in range(rj["nuclear"]["nukeCols"])]
+             # ...and the improvement REMOVER, the newest last-append
+             + ["REMOVE_IMPROVEMENT"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.

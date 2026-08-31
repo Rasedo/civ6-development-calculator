@@ -1943,15 +1943,10 @@ class SimMasks:
 
 
     def _museum_room(self, row: int) -> torch.Tensor:
-        """[B] bool — does this seat hold an ARCHAEOLOGICAL MUSEUM with a
-        free artifact slot anywhere? The excavation's landing place."""
-        if self._artifact_bidx < 0:
-            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return (
-            self.city_alive[:, row]
-            & self.city_bldg[:, row, :, self._artifact_bidx]
-            & (self.city_artifacts[:, row] < self._artifact_slots)
-        ).any(dim=1)
+        """[B] bool — does this seat hold a city with a free artifact slot
+        anywhere — the museum's own or the any-work pool's? The excavation's
+        landing place."""
+        return (self.city_alive[:, row] & (self._artifact_free(row) > 0)).any(dim=1)
 
     def _dig_here(self, row: int, tc: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — is there a workable dig under these tiles?
@@ -2241,12 +2236,7 @@ class SimMasks:
             return civ_ok
         C = self.RC
         need = self._type_needs_slot.reshape(1, 1, -1)
-        if self._artifact_bidx < 0:
-            room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
-        else:
-            room = (
-                self.city_bldg[:, row, :, self._artifact_bidx] & (self.city_artifacts[:, row] < self._artifact_slots)
-            ).unsqueeze(2)
+        room = (self._artifact_free(row) > 0).unsqueeze(2)
         out = civ_ok.unsqueeze(1) & (~need | room)
         # CIV6 (Military Engineer): "can only be built in a city that has an
         # Encampment with an Armory" — the building carries its district.
@@ -2506,6 +2496,13 @@ class SimMasks:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_eng[_k]:
                     _ok = eng_here & _unl & self._imp_ground_ok(_k).gather(1, tc)
+                elif self._imp_water[_k]:
+                    # WATER-ONLY (the Offshore Wind Farm): the row's own
+                    # terrain list is the whole ground rule, on a water plot
+                    # with no resource to insist on a different improvement.
+                    _ok = (here_ok & _unl & (_rq == -1)
+                           & self.water.gather(1, tc) & ~self.tile_submerged.gather(1, tc)
+                           & self._imp_ground_ok(_k).gather(1, tc))
                 elif self._imp_ground[_k]:
                     # GROUND-ONLY: the row's own clause, on a plot with no
                     # resource of its own to insist on a different improvement.
@@ -2771,6 +2768,18 @@ class SimMasks:
         if getattr(self, "_A_CLEAN", -1) >= 0:
             _cf = [(present & (u_charges > 0)
                     & self._fallout().gather(1, tc)).unsqueeze(2)]
+        # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer): "Can
+        # Remove Tile Improvements (costs no charge)", both pages verbatim.
+        # An OWN tile holding one; the turn is spent, never a charge.
+        _ri: list[torch.Tensor] = []
+        if getattr(self, "_A_REMOVE_IMP", -1) >= 0:
+            _rm_u = torch.zeros_like(present)
+            if self._builder_idx >= 0:
+                _rm_u = _rm_u | (utype == self._builder_idx)
+            if self._eng_idx >= 0:
+                _rm_u = _rm_u | (utype == self._eng_idx)
+            _ri = [(present & _rm_u & own_tile.gather(1, tc)
+                    & (self.improvement.gather(1, tc) >= 0)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -2821,7 +2830,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

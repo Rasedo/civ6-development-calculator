@@ -2409,6 +2409,27 @@ class SimEconomy:
         occupied work keeps the work, not a slot conjured to hold it."""
         return torch.minimum((held - dedicated).clamp(min=0), pool)
 
+    def _artifact_free(self, row: int) -> torch.Tensor:
+        """[B, RC] — room for one more ARTIFACT in each city: the
+        Archaeological Museum's own slots plus what is left of the any-work
+        pool. `artifactFree`'s twin — per-CITY capacity, never the bare
+        museum constant."""
+        ded = (self.city_bldg[:, row, :, self._artifact_bidx].long() * self._artifact_slots
+               if self._artifact_bidx >= 0
+               else torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device))
+        return (ded - self.city_artifacts[:, row]).clamp(min=0) + self._any_work_free_all()[:, row]
+
+    def _artifact_theming_counts(self, row: int) -> torch.Tensor:
+        """[B, RC] — artifact counts with the theming DOUBLE folded in: a
+        themed Archaeological Museum doubles what IT holds, never a find
+        standing in the any-work pool (`artifactCulture`'s split)."""
+        c = self.city_artifacts[:, row]
+        mus = (self.city_bldg[:, row, :, self._artifact_bidx] if self._artifact_bidx >= 0
+               else torch.zeros_like(c, dtype=torch.bool))
+        inm = torch.minimum(c, torch.full_like(c, self._artifact_slots)) * mus.long()
+        tm = torch.where(self._museum_themed(row), self._theming_mult, 1)
+        return inm * tm + (c - inm)
+
     def _any_work_pool_all(self) -> torch.Tensor:
         """[B, n_majors, RC] long — the any-work slots each city's STANDING
         buildings open, before anything takes one."""
@@ -2437,6 +2458,9 @@ class SimEconomy:
                 held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[k][:, r]
                 used[:, r] = used[:, r] + (held - self._gw_dedicated(r, k)).clamp(min=0)
             used[:, r] = used[:, r] + (self.city_relics[:, r] - rded[:, r]).clamp(min=0)
+            aded = (self.city_bldg[:, r, :, self._artifact_bidx].long() * self._artifact_slots
+                    if self._artifact_bidx >= 0 else torch.zeros_like(used[:, r]))
+            used[:, r] = used[:, r] + (self.city_artifacts[:, r] - aded).clamp(min=0)
         return (pool - used).clamp(min=0)
 
     def _gw_dedicated(self, row: int, kind: int) -> torch.Tensor:
@@ -3170,6 +3194,9 @@ class SimEconomy:
         eras = self.city_artifact_era[:, row, :, :n]   # [B, RC, n]
         seats = self.city_artifact_seat[:, row, :, :n]
         full = self.city_artifacts[:, row] >= n
+        if self._artifact_bidx >= 0:
+            # a pool-standing find never themes — the museum must STAND
+            full = full & self.city_bldg[:, row, :, self._artifact_bidx]
         one_era = (eras == eras[:, :, :1]).all(dim=2)
         distinct = torch.ones_like(full)
         for i in range(n):
@@ -3177,7 +3204,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -3206,11 +3233,9 @@ class SimEconomy:
             + self._gw_tour_k[2] * km[:, 2] * (gw_m * av).sum(dim=1)
         )
         if artifacts is not None:
-            # a THEMED Archaeological Museum doubles what it holds.
-            tm = torch.ones_like(artifacts)
-            if themed is not None:
-                tm = torch.where(themed, self._theming_mult, 1)
-            t = t + self._artifact_tourism * (artifacts * av * tm).sum(dim=1)
+            # per-city artifact counts with the museum's theming DOUBLE
+            # already folded in by the caller (`_artifact_theming_counts`)
+            t = t + self._artifact_tourism * (artifacts * av).sum(dim=1)
         w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
         if bool(w_live.any()):
             w_era = self._wonder_era[self.built_wonder.clamp(min=0, max=max(self._wonder_era.numel() - 1, 0))]
@@ -3807,8 +3832,7 @@ class SimEconomy:
             + self._gw_cul_k[1] * (self.city_gw_art[:, row, sl] + self._art_themed_works(row)[:, sl]).double()
             + self._gw_cul_k[2] * self.city_gw_music[:, row, sl].double()
         ) * alivef
-        _thm = torch.where(self._museum_themed(row)[:, sl], self._theming_mult, 1).double()
-        bld_y[:, :, 4] = bld_y[:, :, 4] + self._artifact_culture * self.city_artifacts[:, row, sl].double() * _thm * alivef
+        bld_y[:, :, 4] = bld_y[:, :, 4] + self._artifact_culture * self._artifact_theming_counts(row)[:, sl].double() * alivef
         _pb = self._golden_ded(row, self._ded_pen_brush)
         if bool(_pb.any()):
             bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef
