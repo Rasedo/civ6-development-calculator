@@ -8040,9 +8040,16 @@ class SimSeats:
         at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
         here = a_tile[:, u].clamp(min=0)
         mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+        # CIV6: walls raise the defense and take their share first — the
+        # minor's city rides the majors' own split (`attackCityState`).
+        cs_tier = self._minor_walls_tier_at(citystate_sc)
+        _bax = torch.arange(self.B, device=self.device)
+        cs_mrow = self._CITY_MINOR0 + citystate_sc.clamp(min=0, max=max(self.S - 1, 0))
+        cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
         def_cs = (
             15 + self.citystate_pop.gather(1, citystate_sc.unsqueeze(1)).squeeze(1)
             + (self.citystate_type.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+            + self._walls_tier_cs[cs_tier]
         )
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
@@ -8064,7 +8071,12 @@ class SimSeats:
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         self._spend_one_attack(atk_kind, u, att)
         rows = att.nonzero(as_tuple=True)[0]
-        self.citystate_hp[rows, citystate_sc[rows]] -= d_cs[rows]
+        cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
+        cs_wall, cs_centre = self._city_damage_split(
+            cs_outer[rows], self._walls_tier_hp[cs_tier][rows], d_cs[rows],
+            self._hit_class(at0, False)[rows], cs_assist[rows])
+        self.city_outer_hp[rows, cs_mrow[rows], 0] = cs_outer[rows] - cs_wall
+        self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre
         if atk_kind == "barb":
             # CIV6: barbarians never capture a city — their assault leaves the
             # minor standing at 1 HP, `_hostile_ranged_strike`'s own floor.
@@ -8499,18 +8511,28 @@ class SimSeats:
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+            # CIV6: the minor's walls raise the defense and take their share
+            # first, exactly as the major-city arm above.
+            cs_tier = self._minor_walls_tier_at(csx)
+            _bax = torch.arange(self.B, device=self.device)
+            cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
+            cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
             def_cs = (
                 15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
                 + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+                + self._walls_tier_cs[cs_tier]
             )
-            _cs_rs = self._city_ranged_strength(at0, aseat, torch.zeros_like(def_cs))
+            _cs_rs = self._city_ranged_strength(at0, aseat, cs_outer)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_cs = self._damage_roll(cs_att,
                                      atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city - def_cs,
                                      k="rngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
-            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - d_cs[rr]).clamp(min=1)
+            cs_wall, cs_centre = self._city_damage_split(
+                cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_cs[rr], _klass[rr])
+            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, a_type[:, u], aseat,
                                 torch.where(_cshp <= 1,

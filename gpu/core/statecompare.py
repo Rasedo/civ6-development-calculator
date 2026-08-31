@@ -594,6 +594,12 @@ CITY_STATE = {
     "civics": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on] for s in rows],
     "techProgress": lambda sim, b, rows: [int(sim.citystate_tech_prog[b, s]) for s in rows],
     "civicProgress": lambda sim, b, rows: [int(sim.citystate_civic_prog[b, s]) for s in rows],
+    "prodProgress": lambda sim, b, rows: [int(sim.citystate_prod[b, s]) for s in rows],
+    "minorBuildings": lambda sim, b, rows: [
+        [i for i, on in enumerate(sim.city_bldg[b, sim._CITY_MINOR0 + s, 0].tolist()) if on] for s in rows],
+    "minorDistricts": lambda sim, b, rows: [
+        [int(x) for x in sim.city_dist_tile[b, sim._CITY_MINOR0 + s, 0].tolist()] for s in rows],
+    "minorOuterHp": lambda sim, b, rows: [int(sim.city_outer_hp[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "religionPressure": lambda sim, b, rows: [
         [int(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],

@@ -1528,8 +1528,16 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   // other about one rule; real Civ 6 treats a city-state as a separate
   // seat you must declare on. See [[target-legality-gates]].
   if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
-    const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (cityRangedStrength(state, attacker, 0) + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rngcs', targetIndex));
+    // CIV6: a minor's city is a CITY — its walls raise the defense and take
+    // their share of the hit first, through the majors' own split.
+    const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
+    const csOuter = outerPool(state, csShape);
+    const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
+      + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
+    const csRoll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rngcs', targetIndex);
+    const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll, cityHitClass(attacker.type, true));
+    if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre);
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, cityState.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -1849,8 +1857,18 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City):
 
 function attackCityState(state: GameState, attacker: Unit, cityState: CityState): void {
   const atkCS = assaultAtkCS(state, attacker, cityState.centerIndex);
-  const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-  cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
+  // CIV6: walls raise the defense and take their share first — the minor's
+  // city rides the majors' own split, siege support included.
+  const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
+  const csTier = wallsTier(state, csShape);
+  const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
+    + (WALLS_TIER_CS[csTier] ?? 0);
+  const csOuter = outerPool(state, csShape);
+  const csRoll = damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
+  const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll,
+    cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier));
+  if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
+  cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre;
   // CIV6: barbarians never capture a city — their assault leaves the minor
   // standing at 1 HP, `hostileRangedStrike`'s own city floor.
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
@@ -1926,9 +1944,12 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     queue: [],
     isCapital: false,
     founderSeat: -1,   // a minor founded it, and minors keep no ledger
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
+    // what the minor BUILT comes along — the tiles already carry the
+    // districts, so a registry that said "none" would disagree with them
+    buildings: [...(cityState.buildings ?? [])],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
+    outerHp: cityState.outerHp,
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   revealAround(state, seat, cityState.centerIndex, 3);
@@ -1972,9 +1993,10 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     queue: [],
     isCapital: false,
     founderSeat: -1,   // a minor founded it, and minors keep no ledger
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
+    buildings: [...(cityState.buildings ?? [])],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
+    outerHp: cityState.outerHp,
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });

@@ -1366,6 +1366,40 @@
           ]
         },
         {
+          "name": "prodProgress",
+          "compare": "exact",
+          "covers": [
+            "CityState.prodProgress"
+          ],
+          "planes": [
+            "citystate_prod"
+          ]
+        },
+        {
+          "name": "minorBuildings",
+          "compare": "exact",
+          "covers": [
+            "CityState.buildings"
+          ],
+          "planes": []
+        },
+        {
+          "name": "minorDistricts",
+          "compare": "exact",
+          "covers": [
+            "CityState.districts"
+          ],
+          "planes": []
+        },
+        {
+          "name": "minorOuterHp",
+          "compare": "exact",
+          "covers": [
+            "CityState.outerHp"
+          ],
+          "planes": []
+        },
+        {
           "name": "religionPressure",
           "compare": "exact",
           "covers": [

@@ -196,6 +196,11 @@ class SimInit:
         self.citystate_civics = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.bool, device=device)
         self.citystate_tech_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_civic_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the minor's PRODUCTION pot (`minorBuild`): population points a turn,
+        # spent down the fixed build ladder — walls, the type's district, the
+        # coastal Harbor. The built results live on the shared city planes
+        # (`city_bldg`, `city_dist_tile`, `city_outer_hp`) at the minor's row.
+        self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index
         self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -734,7 +739,9 @@ class SimInit:
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
-        self.city_dist_tile = torch.full((B, self.n_majors, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # ... spanning the MINOR rows too: a city-state's one city keeps its
+        # district registry at [:, n_majors+s, 0] like every other city fact.
+        self.city_dist_tile = torch.full((B, self.n_majors + max(self.S, 1), civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
         # CITIZENS PINNED into each district's specialist slots, -1 where the
         # automatic rule decides (City.specialistPref). Same geometry as the
         # registry above, because a pin names a district TYPE.

@@ -76,13 +76,13 @@ from the list below.
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
-| C-38 a city-state's city never develops | 2 | a minor has no production queue, no district registry and no buildings, so every clause addressed to one is vacuous |
+| C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district and the coastal Harbor ship; district BUILDINGS, the yields of any of it, and power are still absent |
 | C-40 the feature roster | 1 | natural wonders are a tile flag, not feature rows |
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **28** | |
-| **OPEN, TOTAL** | **51** | |
+| **C. Absent systems** | **27** | |
+| **OPEN, TOTAL** | **50** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -381,8 +381,9 @@ Civ 6 source or is recorded as unverifiable.
     every Trade Route which passes through this city") has no carrier — a
     route stores endpoints and a walking Trader, never the cities it
     passes; blocked on a stored route PATH.
-  - A city-state's maritime access is its CENTRE's alone (no minor
-    Harbor exists to widen it).
+  - A city-state's maritime access is its CENTRE's alone. The minor
+    Harbor EXISTS now (C-38's ladder builds it); what remains is the
+    reach reader taking the Harbor tile as a second water anchor.
   - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
     the real base magnitude.
   - **The destination is ONE candidate row plus a take/skip.** The single
@@ -844,8 +845,8 @@ under their blocker so the dependency is readable, and both halves count.
     it works out of is the missing mechanic.
 
   - **FABRICATE SCANDAL** targets a city-state — R&F's ruleset; the
-    majors-only scan is vanilla-faithful and the minor city block carries
-    no district registry to hang it on. SMEAR_CAMPAIGN, which runs that
+    majors-only scan is vanilla-faithful. The minor city block CARRIES a
+    district registry now (C-38), so the verb has ground to stand on. SMEAR_CAMPAIGN, which runs that
     mission "as if 2 levels more experienced", ships INERT on it.
   - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not
     the district; a per-building pillage flag is the difference.
@@ -1095,16 +1096,27 @@ under their blocker so the dependency is readable, and both halves count.
   CS, America's Film Studio, the unique-improvement appeal terms (B-36r)
   and suzerain rows (B-21r). PARKED BY OWNER DECISION — no round starts
   it; the row stays open on purpose.
-- **C-38. A CITY-STATE'S CITY NEVER DEVELOPS.** Weight 2. A minor is a
-  population, a hit-point pool, an envoy ledger and a research record
-  (`CityState`, `minorResearch` / `_city_state_phase`); its city is a centre
-  tile and nothing else. It never places a district, never finishes a
-  building and holds no production queue, so every rule addressed to a
-  minor's city is vacuous rather than wrong. Waiting on it: a minor's
-  cities are never POWERED (C-1), its maritime reach is its centre's alone
-  because no minor Harbor exists (B-31r), and FABRICATE SCANDAL has no
-  district registry to target (C-16). Real Civ 6 grows a city-state's
-  city, gives it walls and districts, and lets a suzerain see them.
+- **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1. The minor
+  BUILDS now (`minorBuildPhase` / `_minor_build`): a production pot takes
+  POPULATION points a turn — the `minorResearch` pacing stylization, since
+  no source publishes a rate — and a fixed ladder spends it: Ancient Walls,
+  the district its type names (SOURCED: a city-state "will build a district
+  within their territory that corresponds to their type"), a Harbor when it
+  sits on the coast, then the higher walls. Each item pays the rules a
+  major pays — the minor's OWN researched unlock, `canPlaceDistrictIn` on
+  its own ground (the lowest legal plot), the district price scaled by its
+  own research, and no higher wall over a damaged perimeter. The walls
+  FIGHT: both engines' city-state damage sites route through the shared
+  `cityDamageSplit`, the tier joins the defense strength, and the conquest
+  CARRIES buildings, registry and perimeter into the captured city.
+  `tests/gpu/minor_builds_test.py` is the bar; the LADDER's order and the
+  one-item-a-turn pace are MODEL choices, recorded. Still absent:
+  - **district BUILDINGS** — the minor's Campus holds no Library, so the
+    real 3/6-envoy building-tier bonuses stay district-keyed (B-45r's
+    family) and a levied garrison earns no barracks experience;
+  - **the yields of any of it** — a minor's districts produce nothing for
+    the minor (its research runs on population, not on the Campus);
+  - **power** (C-1) — a minor's cities still draw and supply nothing.
 - **C-40. THE FEATURE ROSTER.** Weight 1. Woods, Rainforest, Marsh,
   Floodplains, Oasis, Reef, Ice, the GEOTHERMAL FISSURE and VOLCANIC SOIL.
   This entry once also named the Cataract, Sand Dunes and the Ley Line: the

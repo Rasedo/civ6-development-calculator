@@ -19,6 +19,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect } from './cityStates';
+import { minorBuildPhase } from './minorBuild';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
@@ -1372,6 +1373,7 @@ export function endTurn(state: GameState): void {
   }
   if (state.disasters) disasterPhase(state);
   cityStatePhase(state);
+  minorBuildPhase(state);
   seatPhase(state);
 
 

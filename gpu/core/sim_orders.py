@@ -1132,14 +1132,15 @@ class SimOrders:
             self.city_hp[b, row, col] = half_hp
             self.city_loyalty[b, row, col] = 100.0
             self.centre_slot_at[b, c_t] = col
-            # Everything the TS literal leaves empty. A city-state carries no
-            # buildings, districts, wonders, works or religion, so all of this is
-            # SLOT HYGIENE: the append head is a compacted-away city's index, and
-            # a fact left behind would serve the previous occupant's.
+            # Everything the TS literal leaves empty is SLOT HYGIENE (the
+            # append head is a compacted-away city's index) — except what the
+            # minor BUILT, which the conquest carries: the tiles already hold
+            # its districts, so a registry that said "none" would disagree
+            # with them.
             self.city_growth[b, row, col] = 0
             self.city_cbox[b, row, col] = 0
             self.city_acquired[b, row, col] = 0
-            self.city_outer_hp[b, row, col] = 0
+            self.city_outer_hp[b, row, col] = self.city_outer_hp[b, self._CITY_MINOR0 + s, 0]
             self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
             self.city_gw_writing[b, row, col] = 0
@@ -1151,10 +1152,10 @@ class SimOrders:
             self.city_artifact_seat[b, row, col, :] = -1
             self.city_gwart_type[b, row, col, :] = -1
             self.city_gwart_artist[b, row, col, :] = -1
-            self.city_dist_tile[b, row, col, :] = -1
+            self.city_dist_tile[b, row, col, :] = self.city_dist_tile[b, self._CITY_MINOR0 + s, 0, :]
             self.city_spec_pin[b, row, col, :] = -1
             self.city_wonder[b, row, col, :] = -1
-            self.city_bldg[b, row, col, :] = False
+            self.city_bldg[b, row, col, :] = self.city_bldg[b, self._CITY_MINOR0 + s, 0, :]
             self._bldg_version += 1
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0

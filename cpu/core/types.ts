@@ -689,6 +689,13 @@ export interface CityState extends Seat {
   suzerain?: number;
   /** The minor's one city holds pressure like any other city (index = seat). */
   religionPressure?: number[];
+  /** the minor's own BUILD record — `minorBuild` writes these, the tile
+   *  planes carry the districts, and the conquest hands the whole set to the
+   *  captured City. Absent = nothing built yet. */
+  districts?: { type: DistrictId; tileIndex: number }[];
+  buildings?: string[];
+  outerHp?: number;
+  prodProgress?: number;
   /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];
