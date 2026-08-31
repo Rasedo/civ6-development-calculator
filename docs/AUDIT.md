@@ -751,6 +751,10 @@ under their blocker so the dependency is readable, and both halves count.
     - Research 2's CADENCE is 20 turns per the analyst table read
       verbatim; one search paraphrase of the wiki said 30 — the shipped
       cell is sourced but CONTESTED, flagged for the question ledger.
+    - The GOLD purchase of the item UNDER PRODUCTION (queue front) is
+      refused on both engines — `goldPurchasableBuildings` holds the
+      shared reading. Real Civ 6 likely allows it with the progress
+      banked, but no source in reach settles it. UNSOURCED — ask.
     - The model's OWN choices, recorded: points are ONE per-pair pool
       that persists when an alliance lapses; the shared boost lands on
       the LOWEST tech neither side has researched; the level-3 percentage
