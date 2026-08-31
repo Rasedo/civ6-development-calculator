@@ -8851,9 +8851,9 @@ class SimSeats:
                            torch.full_like(wide, self._trade_range, dtype=torch.long))
 
     def _centre_maritime_map(self) -> torch.Tensor:
-        """[B, T] bool — `centreMaritime` per TILE: coastal land, or a MAJOR's
-        living city stands there with a complete Harbor (a city-state's access
-        is its centre's coast alone — it cannot build one)."""
+        """[B, T] bool — `centreMaritime` per TILE: coastal land, or a living
+        city stands there with a complete Harbor — a city-state's (the minor
+        ladder builds one) exactly like a major's."""
         B, T, dev = self.B, self.T, self.device
         acc = torch.zeros(B, T, dtype=torch.long, device=dev)
         if self._harbor_didx >= 0:
@@ -8861,6 +8861,12 @@ class SimSeats:
                 ht = self.city_dist_tile[:, r2, :, self._harbor_didx]
                 hb = (ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0)) & self.city_alive[:, r2]
                 acc.scatter_add_(1, self.city_center[:, r2].clamp(min=0), hb.long())
+            if self.S > 0:
+                m0 = self._CITY_MINOR0
+                ht2 = self.city_dist_tile[:, m0:m0 + self.S, 0, self._harbor_didx]
+                hb2 = ((ht2 >= 0) & self.district_complete.gather(1, ht2.clamp(min=0))
+                       & self.citystate_alive[:, :self.S])
+                acc.scatter_add_(1, self.citystate_center[:, :self.S].clamp(min=0), hb2.long())
         return self.coastal_land | (acc > 0)
 
     def _centre_city_map(self) -> torch.Tensor:

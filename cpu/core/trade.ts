@@ -50,7 +50,8 @@ export function cityMaritime(state: GameState, centerIndex: number, city?: City)
 
 /** `cityMaritime` for a bare CENTRE tile — the city standing there is looked
  *  up across every seat, because a Trading Post can sit at anyone's centre.
- *  A city-state's access is its centre's coast alone (no Harbor to build). */
+ *  A city-state's Harbor (the minor ladder builds one) is a water anchor
+ *  exactly like a major's. */
 export function centreMaritime(state: GameState, centerIndex: number): boolean {
   const centre = state.map.tiles[centerIndex];
   if (centre && isCoastalLand(state.map, centre)) return true;
@@ -58,7 +59,10 @@ export function centreMaritime(state: GameState, centerIndex: number): boolean {
     const c = s.cities.find((x) => x.centerIndex === centerIndex);
     if (c) return cityMaritime(state, centerIndex, c);
   }
-  return false;
+  const cs = (state.cityStates ?? []).find((x) => x.centerIndex === centerIndex);
+  return (cs?.districts ?? []).some(
+    (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex]?.districtComplete,
+  );
 }
 
 /** a living city — any major's, or a city-state — standing at this centre. */

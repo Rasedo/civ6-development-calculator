@@ -48,7 +48,8 @@ class SimPhase:
         self._seat_route_cache = None
 
 
-    def _seat_city_strike(self, row: int, col: torch.Tensor, fire: torch.Tensor, key: str) -> None:
+    def _seat_city_strike(self, row: int, col: torch.Tensor, fire: torch.Tensor, key: str,
+                          origin: torch.Tensor | None = None) -> None:
         """ONE city's once-per-turn RANGED STRIKE — target scan plus the battle.
 
         `col` [B] is the city slot per batch row, `fire` [B] whether it may
@@ -66,7 +67,10 @@ class SimPhase:
             return
         bidx = torch.arange(Bn, device=dev2)
         ctr = self.city_center[bidx, row, col].clamp(min=0)  # [B]
-        dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
+        # CIV6: the Encampment conducts a ranged strike of its OWN — the scan
+        # measures from the district's tile, the centre's otherwise.
+        org = ctr if origin is None else origin.clamp(min=0)
+        dist = self.pair_dist[org].to(torch.long)  # [B, T]
         _mil, _civ = self._visible_military_at(row), self.civilian_at
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
@@ -959,7 +963,7 @@ class SimPhase:
                 self._walls_max_at(torch.full_like(col, row), col)) > 0)
             _efire = _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0)
             for _sk in range(n_strike):
-                self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk")
+                self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk", origin=e0)
         ctr = self.city_center[bidx, row, col].clamp(min=0)
         nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)
@@ -1403,8 +1407,9 @@ class SimPhase:
         `recruit` twin): mark the person claimed, retire the offer, pay era
         score and the dedication, and stand the person up as a UNIT — in the
         city holding a completed district of its own class (lowest centre
-        tile), the capital otherwise. Nothing is paid out here and no RNG is
-        drawn; the redraw waits for the race loop."""
+        tile), the capital otherwise. Nothing is paid out here; the redraw
+        waits for the race loop. The ONE draw is the Great Library's — a
+        SCIENTIST claim hands every other holder a random boost."""
         if not bool(hit.any()):
             return
         maxN = self._gp_effects.shape[1]
@@ -1419,6 +1424,26 @@ class SimPhase:
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."
         self._dedication_event(row, self._ded_sky, hit)
+        # CIV6 (Great Library): "Receive a random tech boost after another
+        # player recruits a Great Scientist" — every OTHER holder of a
+        # completed carrier draws one, ascending seat order, so the stream is
+        # identical on both engines.
+        if cls == self._gp_scientist and bool(self._wond_rival_sci.any()):
+            wsel = self._wond_rival_sci.nonzero(as_tuple=True)[0]
+            for b in hr.tolist():
+                one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                one[b] = True
+                for o in range(self.n_majors):
+                    if o == row:
+                        continue
+                    reg = self.city_wonder[b, o][:, wsel]
+                    if not bool(((reg >= 0) & self.built_wonder_complete[b, reg.clamp(min=0)]).any()):
+                        continue
+                    pool = (~self.civ_techs[b, o] & ~self.civ_tech_boosted[b, o]).nonzero(as_tuple=True)[0]
+                    if pool.numel() == 0:
+                        continue
+                    k = int(self._next_random(one)[b] * pool.numel())
+                    self.civ_tech_boosted[b, o, int(pool[min(k, pool.numel() - 1)])] = True
         guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
         if guidx < 0:
             return

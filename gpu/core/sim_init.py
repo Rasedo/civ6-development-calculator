@@ -1135,6 +1135,7 @@ class SimInit:
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
             self._wond_grant_unit = torch.tensor([int(w.get("grantUnit", -1)) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
             self._wond_grant_prophet = torch.tensor([bool(w.get("grantProphet", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_rival_sci = torch.tensor([bool(w.get("rivalSciBoost", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_religion_site = torch.tensor([bool(w.get("religionSite", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             # CIV6 (Biosphere): every renewable Power source the seat holds pays
             # `_biosphere_mult` times its published figure.
@@ -1250,6 +1251,7 @@ class SimInit:
         self._gp_site = _gp_pad("gpSite", 0)               # GP_SITES index
         self._gp_site_district = _gp_pad("gpSiteDistrict", -1)
         self._gp_charges = _gp_pad("gpCharges", 1)
+        self._gp_scientist = int(rr["gpScientist"])
         # the NAMED eurekas and the instant buildings, catalog bitmasks
         _eu = rr.get("gpEureka", [])
         _bl_gp = rr.get("gpBuildings", [])

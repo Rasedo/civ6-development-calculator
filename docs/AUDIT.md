@@ -51,10 +51,10 @@ from the list below.
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
-| B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
+| B-45r sourced-sweep finds in the other rows | 1 | B-31r's route yields carry the last effect family |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
-| B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
+| B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-61r the Great Person clauses with no carrier | 2 | 10 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, barbarian conversion, ocean passage, Tupac Amaru's per-district undefended grant walk); Goddard's visibility grant and Shah Jahan's gold-buyout SHIP now; Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
@@ -376,14 +376,14 @@ Civ 6 source or is recorded as unverifiable.
     war declaration variant the war table does not carry.
   - **Per-civ tech-era drift** — eras are global 50-turn blocks.
 - **B-31r. Trade-route tails.** The Trader unit, sea legs, trading posts,
-  chained reach and the whole-destination-set candidate all ship. OPEN:
+  chained reach and the whole-destination-set candidate all ship, and a
+  city-state's complete Harbor is a second water anchor
+  (`centreMaritime`'s minor arm / the maritime plane's minor scatter).
+  OPEN:
   - **The PASS-THROUGH half of the post gold** ("+1 Gold to the yields of
     every Trade Route which passes through this city") has no carrier — a
     route stores endpoints and a walking Trader, never the cities it
     passes; blocked on a stored route PATH.
-  - A city-state's maritime access is its CENTRE's alone. The minor
-    Harbor EXISTS now (C-38's ladder builds it); what remains is the
-    reach reader taking the Harbor tile as a second water anchor.
   - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
     the real base magnitude.
   - **The destination is ONE candidate row plus a take/skip.** The single
@@ -408,14 +408,16 @@ Civ 6 source or is recorded as unverifiable.
   shield. OPEN, each blocked: Apadana's "+2 Great Work slots (any type)"
   and the Hermitage's LANDSCAPE-only art slots, both waiting on the
   per-work TYPE B-20r names.
-- **B-45r. The effects the SOURCED sweep found in the other rows.** Six
+- **B-45r. The effects the SOURCED sweep found in the other rows.** Seven
   of eight have channels (`cityYieldPerImprovement`,
   `boostTechsThroughEra`, `districtGpPoints`, the completion unit grant
   `grantUnit` / `_wond_grant_unit`, Stonehenge's free Prophet +
-  `religionSite` founding gate, the Oracle's `patronageFaithPct`).
-  OPEN — the two with nowhere to live:
-  - The Great Library's boost when a RIVAL recruits a Great Scientist: no
-    engine raises an event on another seat's recruit.
+  `religionSite` founding gate, the Oracle's `patronageFaithPct`, and the
+  Great Library's `rivalScientistBoost` / `_wond_rival_sci` — a rival's
+  SCIENTIST claim hands every holder of a COMPLETE carrier one random
+  unresearched-unboosted tech boost, drawn on the shared stream in
+  ascending seat order).
+  OPEN — the one with nowhere to live:
   - The Colossus' and Great Zimbabwe's +1 route capacity and free Trader,
     Great Zimbabwe's per-bonus-resource route gold and Sankoré's three
     route-yield terms: all wait on B-31r's route-yield work.
@@ -536,11 +538,9 @@ Civ 6 source or is recorded as unverifiable.
   BOTH pools (centre first), and a melee walker ENTERING a shot-emptied
   district conquers it "as you would a City Center" (the `stepUnit` /
   `_step_verb` entry hook; a ranged walker only OCCUPIES it, and the
-  20 HP/turn heal re-blocks). OPEN:
-  - **THE DISTRICT'S STRIKE IS MEASURED FROM THE CENTRE.** The `estk`
-    target scan walks distance 1..2 of the CITY CENTRE's tile
-    (`seatPhase`'s strike block / `_seat_city_fire_and_heal`); real Civ 6
-    fires from the district's own tile.
+  20 HP/turn heal re-blocks), and the `estk` target scan measures
+  distance 1..2 from the DISTRICT's own tile — CIV6: the Encampment
+  conducts a ranged strike of its own. OPEN:
   - **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
     city capture; the district's own pool rides through unchanged on both
     engines — no source says which is right.

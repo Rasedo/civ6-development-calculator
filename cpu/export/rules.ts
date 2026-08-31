@@ -799,6 +799,7 @@ export function buildRules() {
       gpSiteDistrict: GP_CLASSES.map((c) =>
         GREAT_PEOPLE[c].map((p) => PLACEABLE_DISTRICTS.indexOf(gpSiteOf(p).district))),
       gpCharges: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpChargesOf(p))),
+      gpScientist: GP_CLASSES.indexOf('SCIENTIST'),
       // the NAMED eurekas and the instant buildings, as catalog bitmasks
       gpEureka: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => {
         const ids = new Set(gpEffectOf(p).eurekaTechs ?? []);
@@ -953,6 +954,7 @@ export function buildRules() {
         dvp: w.effects?.dvp ?? 0,
         grantUnit: w.effects?.grantUnit ? Object.values(UNITS).findIndex((u) => u.id === w.effects!.grantUnit) : -1,
         grantProphet: w.effects?.grantProphet ? 1 : 0,
+        rivalSciBoost: w.effects?.rivalScientistBoost ? 1 : 0,
         religionSite: w.effects?.religionSite ? 1 : 0,
         // policy slots, parallel to SLOT_KINDS
         slots: SLOT_KINDS.map((k) => w.effects?.extraSlots?.[k] ?? 0),

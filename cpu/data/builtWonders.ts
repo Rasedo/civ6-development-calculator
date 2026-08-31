@@ -86,6 +86,9 @@ export interface BuiltWonderDef {
      *  technologies" — every technology of this era index or lower is boosted
      *  once, at completion. -1 for none. */
     boostTechsThroughEra?: number;
+    /** CIV6 (Great Library): "Receive a random tech boost after another
+     *  player recruits a Great Scientist." */
+    rivalScientistBoost?: boolean;
     /** CIV6 (Oracle): "Districts in this city provide +2 Great Person points
      *  of their type." */
     districtGpPoints?: number;
@@ -209,7 +212,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'RECORDED_HISTORY',
       placement: { flatOnly: true, adjacentDistrict: 'CAMPUS', adjacentDistrictBuilding: 'LIBRARY' },
       cityYields: { science: 2 },
-      effects: { gpPoints: { SCIENTIST: 1, WRITER: 1 }, boostTechsThroughEra: 1 },
+      effects: { gpPoints: { SCIENTIST: 1, WRITER: 1 }, boostTechsThroughEra: 1, rivalScientistBoost: true },
       description: '+2 science, +1 Scientist and +1 Writer point per turn, 2 Great Work of Writing slots, boosts every Ancient and Classical technology. Flat land adjacent to a Campus.',
     }),
     W({

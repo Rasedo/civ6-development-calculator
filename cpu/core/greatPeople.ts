@@ -6,6 +6,8 @@ import { cityBuildingSum } from './city';
 import { nextRandom } from './rand';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { TECHS } from '../data/techs';
 import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY, ERA_SCORE_GP } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
@@ -284,6 +286,26 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   // CIV6 (Sky and Stars): "+1 Era Score each time a Great Person is Earned."
   dedicationEvent(state, seat, DED_SKY);
   state.eventLog.push(`${owner.name} claimed ${person.name}.`);
+  // CIV6 (Great Library): "Receive a random tech boost after another player
+  // recruits a Great Scientist" — every OTHER holder of a completed carrier
+  // draws one, ascending seat order, so the stream is identical on both
+  // engines.
+  if (cls === 'SCIENTIST') {
+    for (const o of state.seats) {
+      if (o.seat === seat) continue;
+      const holds = o.cities.some((c) => c.wonders.some(
+        (w) => BUILT_WONDERS[w.id]?.effects?.rivalScientistBoost
+          && state.map.tiles[w.tileIndex]?.builtWonderComplete,
+      ));
+      if (!holds) continue;
+      const pool = Object.keys(TECHS).filter(
+        (id) => !o.research.techs.includes(id) && !o.research.boosted.includes(id),
+      );
+      if (pool.length === 0) continue;
+      const pick = pool[Math.floor(nextRandom(state) * pool.length)];
+      if (pick) o.research.boosted.push(pick);
+    }
+  }
 }
 
 /** CIV6 (Great People): "you may pass on a Great Person, which will cost you

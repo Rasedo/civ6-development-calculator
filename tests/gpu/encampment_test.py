@@ -123,9 +123,12 @@ def build_strike_scene(rules, path):
     _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
     sim.barb_unit_alive[0, :] = False
     sim.n_camps[0] = sim.max_camps[0]
-    # an OWNED non-center tile with no district -> plant a complete Encampment
-    owned = ((sim.city_slot_at(0)[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
-    assert len(owned) > 0, "no free owned tile to place the Encampment"
+    # an OWNED ring-1 tile with no district -> plant a complete Encampment.
+    # The district's strike scans from ITS OWN tile; beside the centre, one
+    # distance-1 target sits in both strikes' range.
+    dfc = sim.pair_dist[ctr].to(torch.long)
+    owned = ((sim.city_slot_at(0)[0] == 0) & (sim.district[0] < 0) & (dfc == 1)).nonzero(as_tuple=True)[0]
+    assert len(owned) > 0, "no free owned ring-1 tile to place the Encampment"
     enc_tile = int(owned[0])
     sim.district[0, enc_tile] = sim._encamp_didx
     sim.district_complete[0, enc_tile] = True
@@ -139,9 +142,9 @@ def build_strike_scene(rules, path):
     sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
     sim.district_pillaged[0, enc_tile] = False
     sim.district_dead[0, enc_tile] = False
-    # a distance-1 empty tile for the target
-    dfc = sim.pair_dist[ctr].to(torch.long)
+    # a distance-1 empty tile for the target, off the district itself
     free = ((dfc == 1) & (sim.military_at[0] < 0) & (sim.civilian_at[0] < 0)).nonzero(as_tuple=True)[0]
+    free = free[free != enc_tile]
     assert len(free) > 0, "no free adjacent tile for the target"
     tgt = int(free[0])
     vslot = int((~sim.major_unit_alive[0]).nonzero(as_tuple=True)[0][0])

@@ -2182,14 +2182,19 @@ export function seatPhase(state: GameState): void {
       // CIV6: "building any level of Walls in the city will supply both" the
       // centre and the Encampment — each with its OWN pool — and the district
       // strikes on its own only "while its Wall defenses are still up".
-      for (let sk = 0; sk < strikes && civCity.districts.some((dd) => {
-        const edt = state.map.tiles[dd.tileIndex];
-        return encampmentIntact(edt) && encampOuterPool(state, civCity, edt) > 0;
-      }); sk++) {
+      for (let sk = 0; sk < strikes; sk++) {
+        const encD = civCity.districts.find((dd) => {
+          const edt = state.map.tiles[dd.tileIndex];
+          return encampmentIntact(edt) && encampOuterPool(state, civCity, edt) > 0;
+        });
+        if (!encD) break;
+        // CIV6: the Encampment conducts a ranged strike of its OWN — the scan
+        // measures from the district's tile, not the centre's.
+        const encT = state.map.tiles[encD.tileIndex];
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
-          const d = hexDistance(civCityCenter.col, civCityCenter.row, t.col, t.row);
+          const d = hexDistance(encT.col, encT.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
           // ANY unit hostile to this civ. A city's strike picks its
           // target by distance and combat strength, never by which enemy the
