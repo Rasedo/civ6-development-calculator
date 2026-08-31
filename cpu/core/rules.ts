@@ -576,13 +576,27 @@ export function buildingCostIn(state: GameState, city: City, id: string): number
 }
 
 /** building ids some tech or civic unlocks — the rows `computeUnlocks` can ever grant */
-const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
+export const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
   [...Object.values(TECHS), ...Object.values(CIVICS)]
     .flatMap((d) => d.effects)
     .flatMap((fx) => (fx.kind === 'unlockBuilding' ? [fx.building] : [])),
 );
 
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
+  return buildableBuildings(state, city, false);
+}
+
+/** The GOLD-purchase list — `availableBuildings` with the queue term relaxed
+ * to the item being WORKED (real Civ 6 sells a queued building: the entry is
+ * invalidated and its progress banks) and an exclusion firing off built rows
+ * alone; worship rows never sell for Gold. Buying out the item under
+ * production stays refused on both engines — an open fidelity question. Pair
+ * with `buildingCompletable`, exactly as the purchase appliers do. */
+export function goldPurchasableBuildings(state: GameState, city: City): BuildingDef[] {
+  return buildableBuildings(state, city, true);
+}
+
+function buildableBuildings(state: GameState, city: City, gold: boolean): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
   // CIV6: "Production cannot be applied to anything in tiles containing
@@ -591,8 +605,9 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   const placed = new Set(
     city.districts.filter((d) => !irradiated(map.tiles[d.tileIndex])).map((d) => d.type),
   );
+  const queuedSrc = gold ? city.queue.slice(0, 1) : city.queue;
   const queued = new Set(
-    city.queue.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
+    queuedSrc.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
   );
   const have = new Set(city.buildings);
   const center = map.tiles[city.centerIndex];
@@ -607,6 +622,7 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
       if (def.worship) {
+        if (gold) continue;
         if (seatOf(state, city.seat)?.religion.worship !== def.id) continue;
       } else if (unlocks && RESEARCH_GATED_BUILDINGS.has(def.id) && !unlocks.buildings.has(def.id)) {
         // the research gate holds only rows some tech or civic GRANTS: a
@@ -616,7 +632,7 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
         continue;
       }
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
-      if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
+      if (def.exclusiveWith?.some((x) => have.has(x) || (!gold && queued.has(x)))) continue;
       // CIV6: a government building "requires a Tier 2 government (Merchant
       // Republic, Monarchy, or Theocracy)" — the tier of what the seat is
       // running NOW, so a revolution can take an unbuilt row back off the list.

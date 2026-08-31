@@ -1086,7 +1086,7 @@ class SimEconomy:
     def _reprice_live(self, row: int) -> None:
         self.city_cost[:, row].copy_(self._live_building_cost(row))
 
-    def _seat_buildable(self, row: int, complete: bool = False) -> torch.Tensor:
+    def _seat_buildable(self, row: int, complete: bool = False, gold: bool = False) -> torch.Tensor:
         """[B, RC, NB] buildings seat row `row`'s cities may QUEUE now —
         `availableBuildings`, which is seat-generic in TS and so has ONE body
         for every row here.
@@ -1105,8 +1105,14 @@ class SimEconomy:
         `queued` is TS's queued SET: a building anywhere in the city's queue is
         already on order, and TS offers neither it nor a prerequisite it would
         satisfy twice — the whole queue, not merely the item being worked.
+
+        `gold=True` is the GOLD-purchase reading: real Civ 6 sells a building
+        that sits in the queue (the entry is invalidated and its progress
+        banks), so only the item being WORKED — queue slot 0 — refuses, and an
+        exclusion fires off built rows alone, `city.buildings` like the
+        prerequisite term.
         """
-        key = (row, complete)
+        key = (row, complete, gold)
         hit = self._bld_cache.get(key)
         if hit is not None and hit[0] == self._eff_version:
             return hit[1]
@@ -1124,8 +1130,9 @@ class SimEconomy:
             ones_nb,
         )  # Temple/Amphitheater/... gate on a CIVIC (availableBuildings' unlocks.buildings)
         cur = self.city_current[:, row]  # [B, C, QD]; layout: [0, NB) IS the building range
-        queued = (torch.nn.functional.one_hot(cur.clamp(min=0, max=NB - 1), NB).bool()
-                  & ((cur >= 0) & (cur < NB)).unsqueeze(3)).any(dim=2)
+        _qsrc = cur[:, :, :1] if gold else cur
+        queued = (torch.nn.functional.one_hot(_qsrc.clamp(min=0, max=NB - 1), NB).bool()
+                  & ((_qsrc >= 0) & (_qsrc < NB)).unsqueeze(3)).any(dim=2)
         # hasRiver at each centre, read off the static tile plane (a dead
         # slot's centre is -1; its column is masked by `alive` downstream).
         river_c = self.tile_river.gather(1, self.city_center[:, row].clamp(min=0))  # [B, C]
@@ -1165,9 +1172,10 @@ class SimEconomy:
             for nb, reqs in enumerate(self._b_req_buildings):
                 if reqs:
                     prereq_ok[:, :, nb] = req_src[:, :, reqs].any(dim=2)
+            _exq = have if gold else hq
             for nb, excl in enumerate(self._b_excl_buildings):
                 if excl:
-                    prereq_ok[:, :, nb] &= ~hq[:, :, excl].any(dim=2)
+                    prereq_ok[:, :, nb] &= ~_exq[:, :, excl].any(dim=2)
             base = base & district_ok & prereq_ok
         if self._barrier_bidx >= 0:
             # CIV6 (Flood Barrier): "Must be built in a city with one or more

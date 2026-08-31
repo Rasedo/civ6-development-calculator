@@ -30,7 +30,7 @@ import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCE
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
-import { availableBuildings, buildingCompletable, canBuildRoad, validImprovementsIn } from '../core/rules';
+import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
@@ -108,12 +108,11 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     let buyB = -1;
     let bd: (typeof BUILDINGS)[string] | null = null;
     let bc: (typeof actor.cities)[number] | null = null;
-    // The purchase's OWN legality, not a second copy of it: `purchaseBuilding`
-    // admits what `availableBuildings` offers and `buildingCompletable`
-    // finishes, minus the walls no gold can buy.
+    // The purchase's OWN legality, not a second copy of it: the shared gold
+    // list plus `buildingCompletable`, the pair the phase arm applies.
     for (const city of actor.cities) {
-      for (const def of availableBuildings(state, city)) {
-        if (def.worship || def.noPurchase) continue;
+      for (const def of goldPurchasableBuildings(state, city)) {
+        if (def.noPurchase) continue;
         if (!buildingCompletable(state, city, def.id)) continue;
         if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
           bd = def;

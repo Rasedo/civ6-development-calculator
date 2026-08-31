@@ -790,13 +790,14 @@ class SimSeats:
         Returns (jj, bb, can, price, elig): the cheapest completable building
         anywhere in the seat (argmin of (cost*1024 + bIdx)*32 + citySlot) and
         whether the treasury clears price + the peace-gold RESERVE (a POLICY
-        war chest, not a rule). Legality is `_seat_buildable(row, True)` —
-        purchaseBuilding's own availableBuildings + buildingCompletable pair.
+        war chest, not a rule). Legality is `_seat_buildable`'s gold reading —
+        availableBuildings + buildingCompletable, with the queue term relaxed
+        to the item being WORKED, the way the TS replay arm reads it.
         The affordability test is milli-quantised via js_round to match TS."""
         B, dev = self.B, self.device
         rdv6 = self.rules_dev
         NB6 = rdv6.b_cost.shape[0]
-        elig6 = self._seat_buildable(row, True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
+        elig6 = self._seat_buildable(row, True, gold=True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
         # CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with
         # Gold" — and no walls tier is buildable at all while the perimeter
         # this city already has is damaged.
@@ -1375,6 +1376,17 @@ class SimSeats:
                     & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
                 if bool(ok.any()):
                     self._seat_buy_building(row, ok, jc, bc, price)
+                    # CIV6: hammers never burn — a queued copy of the bought
+                    # building is INVALIDATED: its progress banks and the
+                    # entry closes up, `dropQueuedBuilding`'s splice.
+                    rows0 = ok.nonzero(as_tuple=True)[0]
+                    colq = jc[rows0]
+                    curq = self.city_current[rows0, row, colq]
+                    gone0 = curq == bc[rows0].unsqueeze(1)
+                    if bool(gone0.any()):
+                        prog0 = self.city_progress[rows0, row, colq]
+                        self.city_prod_bank[rows0, row, colq] += (prog0 * gone0).sum(dim=1)
+                        self._q_drop(rows0, row, colq, gone0)
                     bought = bought | ok
         # Kind 1: the SETTLER buy is a UNIT purchase. It spawns at the capital
         # (else the first alive city), which must have the pop to pay — WHERE

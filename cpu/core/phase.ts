@@ -37,7 +37,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
-import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
+import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost } from '../data/constants';
@@ -51,7 +51,7 @@ import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
-import { hasRiver, hasFreshWater } from '../../world/query';
+import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
@@ -1727,7 +1727,6 @@ export function seatPhase(state: GameState): void {
         }
       }
     }
-    const seatUnlocks = computeUnlocksIn(actor.research);
     const rec = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (rec) applySeatActionRecord(state, actor, rec);
     // The record replaces the PICKS and nothing else. Bookkeeping — yields,
@@ -1738,7 +1737,7 @@ export function seatPhase(state: GameState): void {
     // building, 1 a settler, 2 a military unit. Nothing here picks; each arm
     // re-validates the named intent against its own predicates at this
     // position and refuses silently if it no longer holds, which is what the
-    // GPU's `_consume_driven_buy` does with the same column.
+    // GPU's `_seat_buy_ladder` does with the same column — clause for clause.
     //
     // Priority BUILDING > SETTLER > UNIT still governs, because a record may
     // only name one and `bought` short-circuits the rest.
@@ -1752,17 +1751,10 @@ export function seatPhase(state: GameState): void {
           const def = bid ? BUILDINGS[bid] : undefined;
           if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)
               && !def.noPurchase && !wallsGoldBlocked(state, actor.seat, def.id)) {
-            const have = new Set(civCity.buildings);
-            const done = new Set(
-              civCity.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
-            );
-            const center = state.map.tiles[civCity.centerIndex];
-            const okBuy =
-              !have.has(def.id) && done.has(def.district) && seatUnlocks.buildings.has(def.id) &&
-              (!def.requiresAny || def.requiresAny.some((x) => have.has(x))) &&
-              !def.exclusiveWith?.some((x) => have.has(x)) &&
-              !(def.special === 'WATER_MILL' && !hasRiver(center)) &&
-              !(civCity.queue[0]?.kind === 'building' && civCity.queue[0].building === def.id);
+            // ONE legality body with the candidate row and the GPU's gold
+            // read: the shared gold list paired with `buildingCompletable`.
+            const okBuy = goldPurchasableBuildings(state, civCity).some((b) => b.id === def.id)
+              && buildingCompletable(state, civCity, def.id);
             if (okBuy) {
               const price = def.cost * GOLD_PURCHASE_MULT;
               const reserve = PEACE_GOLD_COST(0);
