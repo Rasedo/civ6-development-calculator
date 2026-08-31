@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
-import { allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
@@ -429,6 +429,9 @@ const SEAT: Record<string, Extractor> = {
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),
   tourismReligious: overSeats((s) => s.tourismReligious ?? 0),
+  sciRate: overSeats((s) => s.sciRate ?? 0),
+  culRate: overSeats((s) => s.culRate ?? 0),
+  tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
   rockBandsBought: overSeats((s) => s.rockBandsBought ?? 0),
@@ -555,6 +558,15 @@ const SEAT: Record<string, Extractor> = {
   ),
   friendTurns: overSeats((s, state) => agreementClockLine(state, s.seat, friendTurnsWith)),
   allyTurns: overSeats((s, state) => agreementClockLine(state, s.seat, allyTurnsWith)),
+  allianceType: overSeats((s, state) => {
+    const out: number[] = [];
+    for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+      const ty = allianceTypeWith(state, s.seat, other);
+      if (ty >= 0) out.push(other, ty);
+    }
+    return out;
+  }),
+  alliancePts: overSeats((s, state) => agreementClockLine(state, s.seat, alliancePtsWith)),
   // DIRECTED: what this seat GRANTS, never what it was granted.
   borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
   delegations: overSeats((s, state) => agreementClockLine(state, s.seat, delegationWith)),

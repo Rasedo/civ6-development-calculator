@@ -1,12 +1,12 @@
 
 import type { City, GameState, GreatPersonClass } from './types';
-import { citiesOf, seatOf, unitSeat } from './seats';
+import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_KINDS, GW_WONDER_SLOTS, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_WONDER_SLOTS, gpChargesOf, gpCost, gwCapacity, gwCount } from '../data/greatPeople';
 import { cityBuildingSum } from './city';
 import { nextRandom } from './rand';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
-import { DED_SKY, ERA_SCORE_GP } from '../data/seats';
+import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY, ERA_SCORE_GP } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
 import { getModifiers } from './effects';
@@ -125,6 +125,11 @@ export function greatPersonPointsPerTurn(
     // of their type" — the HOLDING city's districts only.
     const distGpp = completedWonders(state, city)
       .reduce((n, w) => n + (w.def.effects?.districtGpPoints ?? 0), 0);
+    // CIV6 (Cultural alliance 2): +1 Great Person point per class-matched
+    // district in origin cities holding a Trade Route to the ally.
+    const c2Routed = (seatOf(state, seat)?.tradeRoutes ?? []).some((r) =>
+      r.from === city.id && r.toSeat !== undefined
+      && alliedAtLevel(state, seat, r.toSeat, ALLIANCE_CULTURAL, 2)) ? ALLIANCE_C2_GPP : 0;
     for (const cls of GP_CLASSES) {
       const district = GP_CLASS_DISTRICT[cls];
       const inst = city.districts.find(
@@ -134,7 +139,7 @@ export function greatPersonPointsPerTurn(
           !state.map.tiles[d.tileIndex].districtPillaged,
       );
       if (!inst) continue;
-      out[cls] += 1 + (gppFlat[cls] ?? 0) + distGpp
+      out[cls] += 1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
     }
   }

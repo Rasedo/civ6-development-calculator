@@ -1,7 +1,7 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { SeatCaps, SeatClass } from '../data/seats';
-import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
+import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
@@ -279,6 +279,44 @@ export function seatsAllied(state: GameState, a: number, b: number): boolean {
   return allyTurnsWith(state, a, b) > 0;
 }
 
+/** The live alliance's TYPE with `b` (ALLIANCE_TYPES index), -1 outside one.
+ *  The tick clears the entry when the alliance lapses. */
+export function allianceTypeWith(state: GameState, a: number, b: number): number {
+  return state.allianceType?.[warClockKey(a, b)] ?? -1;
+}
+
+export function setAllianceTypeWith(state: GameState, a: number, b: number, t: number): void {
+  if (!state.allianceType) state.allianceType = {};
+  state.allianceType[warClockKey(a, b)] = t;
+}
+
+export function alliancePtsWith(state: GameState, a: number, b: number): number {
+  return state.alliancePts?.[warClockKey(a, b)] ?? 0;
+}
+
+export function setAlliancePtsWith(state: GameState, a: number, b: number, v: number): void {
+  if (!state.alliancePts) state.alliancePts = {};
+  state.alliancePts[warClockKey(a, b)] = v;
+}
+
+/** CIV6 (Alliance): "80 to reach Level 2 and 160 more to reach Level 3" on
+ *  Standard - quarter-point thresholds. 0 while no alliance stands. */
+export function allianceLevelWith(state: GameState, a: number, b: number): number {
+  if (!seatsAllied(state, a, b)) return 0;
+  const qp = alliancePtsWith(state, a, b);
+  return qp >= ALLIANCE_L3_QP ? 3 : qp >= ALLIANCE_L2_QP ? 2 : 1;
+}
+
+/** Does `a` hold a TYPE `ty` alliance with `b`, at `lvl` or above? */
+export function alliedAtLevel(state: GameState, a: number, b: number, ty: number, lvl: number): boolean {
+  return allianceTypeWith(state, a, b) === ty && allianceLevelWith(state, a, b) >= lvl;
+}
+
+/** Does seat `a` run at least one Trade Route into `b`'s cities? */
+export function hasRouteToSeat(state: GameState, a: number, b: number): boolean {
+  return (seatOf(state, a)?.tradeRoutes ?? []).some((r) => r.toSeat === b);
+}
+
 /** CIV6 (Diplomatic Visibility and Gossip): "Performing the Listening Post
  *  mission in another civilization's city increases visibility by one level",
  *  two once the spy is a Secret Agent — and only while the mission RUNS, which
@@ -329,6 +367,33 @@ export function diploVisibility(state: GameState, viewer: number, target: number
 export function visibilityCS(state: GameState, own: number, foe: number): number {
   const d = diploVisibility(state, own, foe) - diploVisibility(state, foe, own);
   return d > 0 ? d * VISIBILITY_CS_PER_LEVEL : 0;
+}
+
+/** CIV6 (Military alliance 1): "+5 Combat Strength against units of players
+ *  at war with you and your ally." Any war the clocks carry qualifies; a
+ *  barbarian is hostile, not at war, and pays nothing. */
+export function allianceWarCS(state: GameState, own: number, foe: number): number {
+  if (!isCiv(own) || !civsAtWar(state, own, foe)) return 0;
+  for (const o of state.seats) {
+    if (o.seat !== own && alliedAtLevel(state, own, o.seat, ALLIANCE_MILITARY, 1)
+      && civsAtWar(state, o.seat, foe)) return ALLIANCE_M1_CS;
+  }
+  return 0;
+}
+
+/** CIV6 (Military alliance 3): "Units start with a free Promotion." */
+export function allianceFreePromo(state: GameState, seat: number): boolean {
+  return state.seats.some((o) => o.seat !== seat && alliedAtLevel(state, seat, o.seat, ALLIANCE_MILITARY, 3));
+}
+
+/** CIV6 (Religious alliance 2): "+10 Religious Combat Strength against
+ *  non-ally Religions" - any duel opponent but the ally itself. */
+export function allianceTheoCS(state: GameState, own: number, foe: number): number {
+  for (const o of state.seats) {
+    if (o.seat !== own && o.seat !== foe
+      && alliedAtLevel(state, own, o.seat, ALLIANCE_RELIGIOUS, 2)) return ALLIANCE_REL2_THEO_CS;
+  }
+  return 0;
 }
 
 /** Turns `grantor`'s OPEN BORDERS grant to `guest` still runs. Directed. */

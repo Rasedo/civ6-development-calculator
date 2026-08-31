@@ -1,6 +1,6 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith } from './seats';
+import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel } from './seats';
 import { cancelRoutes } from './trade';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
@@ -10,7 +10,7 @@ import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
-import { PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
+import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { TERRAINS } from '../../world/terrains';
@@ -247,12 +247,35 @@ export function isSuzerain(state: GameState, cityState: CityState, seat: number)
  * are rules rather than flat capital yields carry a `suz` code in
  * CITY_STATE_SUZERAIN_BONUS; every rule site asks this one question.
  */
+/** CIV6 (Economic alliance 2): the count behind the Envoy point per turn
+ *  "for every City-State with your Ally as Suzerain". */
+export function allianceSuzInfluence(state: GameState, seat: number): number {
+  let n = 0;
+  for (const o of state.seats) {
+    if (o.seat === seat || !alliedAtLevel(state, seat, o.seat, ALLIANCE_ECONOMIC, 2)) continue;
+    for (const cityState of state.cityStates ?? []) if (isSuzerain(state, cityState, o.seat)) n++;
+  }
+  return n;
+}
+
 export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect): boolean {
-  for (const cityState of state.cityStates ?? []) {
-    if (!isSuzerain(state, cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
-    if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz === effect) return true;
+  for (const holder of suzerainShareSeats(state, seat)) {
+    for (const cityState of state.cityStates ?? []) {
+      if (!isSuzerain(state, cityState, holder) || suzerainBonusBlocked(state, cityState)) continue;
+      if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz === effect) return true;
+    }
   }
   return false;
+}
+
+/** CIV6 (Economic alliance 3): "Allies share the Suzerain bonus of all
+ *  city-states of which they are Suzerain" - the seat, then those allies. */
+export function suzerainShareSeats(state: GameState, seat: number): number[] {
+  const out = [seat];
+  for (const o of state.seats) {
+    if (o.seat !== seat && alliedAtLevel(state, seat, o.seat, ALLIANCE_ECONOMIC, 3)) out.push(o.seat);
+  }
+  return out;
 }
 
 /** SOVEREIGNTY outcome B: a minor of the named TYPE provides no unique
@@ -312,8 +335,9 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
 export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): Partial<Yields> {
   const out: Partial<Yields> = {};
   const atWar = state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat));
+  const holders = suzerainShareSeats(state, seat);
   for (const cityState of state.cityStates) {
-    if (!isSuzerain(state, cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
+    if (!holders.some((h) => isSuzerain(state, cityState, h)) || suzerainBonusBlocked(state, cityState)) continue;
     if (atWar && CITY_STATE_SUZERAIN_PEACE_ONLY.includes(cityState.name)) continue;
     const key = CITY_STATE_SUZERAIN_LIVE[cityState.name];
     if (!key) continue; // descoped row

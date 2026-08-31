@@ -591,7 +591,7 @@ SPEC_KEEP = -2
 
 # The DIPLOMATIC verbs, in the order both engines apply them. `apply_geo`
 # stashes by these names and `_geo_agreements` drains them in this order.
-GEO_VERBS = ("denounce", "friend", "ally", "delegation", "borders", "gift", "offer", "accept")
+GEO_VERBS = ("denounce", "friend", "ally", "ally_type", "delegation", "borders", "gift", "offer", "accept")
 XP_PER_LEVEL = 15
 MAX_LEVEL = 8
 PROMOTE_HEAL = 50
@@ -710,7 +710,7 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",
-    "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_borders_turns", "seat_delegation",
+    "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held",
     "comp_kind", "comp_left", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "civ_gov_held", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",

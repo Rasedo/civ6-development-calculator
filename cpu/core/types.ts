@@ -202,6 +202,8 @@ export interface SeatActionRecord {
   nuke?: [number, number] | null;
   denounce?: number[];
   ally?: number[];
+  /** the alliance TYPE formed with each `ally` entry, parallel to it. */
+  allyType?: number[];
   /** DECLARATION OF FRIENDSHIP: the seats this one offers friendship to.
    *  Symmetric and instant — the prerequisite an Alliance asks for. */
   friend?: number[];
@@ -324,6 +326,12 @@ export interface GameState {
   /** Turns an ALLIANCE still runs, keyed like `warTurns`. The single storage:
    *  `seatsAllied` is this clock above zero. */
   allyTurns?: Record<string, number>;
+  /** THE ALLIANCE'S TYPE, keyed like `allyTurns` - an index into
+   *  ALLIANCE_TYPES while the alliance stands; cleared when it lapses. */
+  allianceType?: Record<string, number>;
+  /** ALLIANCE POINTS in QUARTER-points, keyed like `allyTurns` - the pair's
+   *  accumulated trust, kept when an alliance lapses. */
+  alliancePts?: Record<string, number>;
   /** Turns an OPEN BORDERS grant still runs, keyed `${grantor}>${guest}`.
    *  DIRECTED, because granting is one-way: "Granting open borders to a rival
    *  doesn't mean that rival also grants open borders to you." */
@@ -539,6 +547,11 @@ export interface Seat {
   cultureTotal: number;
   faith: number;
   tourism: number;
+  /** the seat's science / culture / tourism OUTPUT of its last completed
+   *  accrual - what an ally's percentage bonus reads (Alliance level 3). */
+  sciRate?: number;
+  culRate?: number;
+  tourRate?: number;
   /** Lifetime tourism SENT to each rival seat (index = seat), the general
    *  half and the religious half apart — real Civ 6 accrues per foreign
    *  civilization, and the international modifiers are per pair. */

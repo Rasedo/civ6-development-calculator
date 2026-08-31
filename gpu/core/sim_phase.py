@@ -270,8 +270,51 @@ class SimPhase:
             hi[:, :row + 1] = False
             for plane in (self.seat_friend_turns, self.seat_ally_turns):
                 run = hi & (plane[:, row] > 0)
+                if plane is self.seat_ally_turns and bool(run.any()):
+                    # a threshold crossing or an expiry changes what the
+                    # (turn, _eff_version)-keyed suzerain-share cache answers
+                    self._eff_version += 1
+                    # CIV6 (Alliance): points accrue "every turn", faster when
+                    # the pair trades - either direction pays its own
+                    # quarter-point. Once per pair, the tick's own discipline.
+                    NM = self.n_majors
+                    to_o = (self.seat_route_dseat[:, row, :].unsqueeze(2)
+                            == torch.arange(NM, device=self.device).view(1, 1, NM)).any(dim=1)
+                    from_o = (self.seat_route_dseat[:, :NM] == row).any(dim=2)
+                    add = run.long() * (self._al_qp_turn + self._al_qp_route * (to_o.long() + from_o.long()))
+                    self.seat_alliance_pts[:, row] += add
+                    self.seat_alliance_pts[:, :, row] += add
+                    # CIV6 (Military alliance 2): "Allies share visibility" -
+                    # each side's explored map folds into the other's.
+                    m2 = (run & (self.seat_alliance_type[:, row, :NM] == 3)
+                          & (self.seat_alliance_pts[:, row, :NM] >= self._al_l2_qp))
+                    for _o in m2.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                        _u = self.seat_explored[:, row] | self.seat_explored[:, _o]
+                        _m = m2[:, _o].unsqueeze(1)
+                        self.seat_explored[:, row] = torch.where(_m, _u, self.seat_explored[:, row])
+                        self.seat_explored[:, _o] = torch.where(_m, _u, self.seat_explored[:, _o])
+                    # CIV6 (Research alliance 2): the shared tech boost lands
+                    # "every 20 turns" - the lowest tech neither side has
+                    # researched, both sides.
+                    if self._al_r2_boost_turns > 0 and int(self.turn) % self._al_r2_boost_turns == 0:
+                        r2 = (run & (self.seat_alliance_type[:, row, :NM] == 0)
+                              & (self.seat_alliance_pts[:, row, :NM] >= self._al_l2_qp))
+                        for _o in r2.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                            both = ~self.civ_techs[:, row] & ~self.civ_techs[:, _o]
+                            has = both.any(dim=1) & r2[:, _o]
+                            pick = both.long().argmax(dim=1, keepdim=True)
+                            for _pr in (row, _o):
+                                cur = self.civ_tech_boosted[:, _pr].gather(1, pick)
+                                self.civ_tech_boosted[:, _pr].scatter_(1, pick, cur | has.unsqueeze(1))
                 plane[:, row] -= run.long()
                 plane[:, :, row] -= run.long()
+                if plane is self.seat_ally_turns:
+                    # the TYPE is the live alliance's; the points stay
+                    ended = run & (plane[:, row] == 0)
+                    if bool(ended.any()):
+                        gone = torch.full_like(self.seat_alliance_type[:, row], -1)
+                        self.seat_alliance_type[:, row] = torch.where(ended, gone, self.seat_alliance_type[:, row])
+                        self.seat_alliance_type[:, :, row] = torch.where(ended, gone, self.seat_alliance_type[:, :, row])
             ob = self.seat_borders_turns
             out = hi & (ob[:, row] > 0)
             ob[:, row] -= out.long()
@@ -337,9 +380,14 @@ class SimPhase:
              * self.city_alive[:, :nrow].reshape(B, -1).double())
         sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]
         own = sub[:, row]
-        keep = torch.ones(nrow, dtype=F, device=dev)
-        keep[row] = 0.0
-        foreign = (sub * keep.reshape(1, -1)).sum(dim=1)
+        keep = torch.ones(B, nrow, dtype=F, device=dev)
+        keep[:, row] = 0.0
+        # CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure
+        # on each other."
+        cul_ally = ((self.seat_alliance_type[:, row, :nrow] == 1)
+                    & (self.seat_ally_turns[:, row, :nrow] > 0))
+        keep = torch.where(cul_ally, torch.zeros_like(keep), keep)
+        foreign = (sub * keep).sum(dim=1)
         tot = own + foreign
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         delta = (press
@@ -388,6 +436,11 @@ class SimPhase:
                 press = w.reshape(nrow, self.RC).sum(dim=1)
                 press = torch.where(self.civ_alive[b, :nrow], press, torch.full_like(press, -1.0))
                 press[row] = -1.0
+                # CIV6 (Cultural alliance 1): an ally exerts nothing, so it
+                # never receives the flip either.
+                for _o in range(nrow):
+                    if _o != row and int(self.seat_alliance_type[b, row, _o]) == 1                             and int(self.seat_ally_turns[b, row, _o]) > 0:
+                        press[_o] = -1.0
                 # A flip is never a conquest, so it never razes and never
                 # plunders, whoever receives.
                 self._transfer_city(b, row, j, int(first_argmax(press.unsqueeze(0))[0]), conquest=False)
@@ -612,7 +665,10 @@ class SimPhase:
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui)
-            fp = self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)                 if self.n_governors else None
+            fp = (self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)
+                  if self.n_governors else torch.zeros_like(made_u))
+            # CIV6 (Military alliance 3): "Units start with a free Promotion."
+            fp = fp | self._allied_type(row, 3, 3).any(dim=1)
             self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp, free_promo=fp, formation=form_t)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
@@ -1007,6 +1063,53 @@ class SimPhase:
         def bank(plane: torch.Tensor, add: torch.Tensor) -> None:
             plane[:, row] = plane[:, row] + torch.where(active, add, torch.zeros_like(add))
 
+        # CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
+        # receiver half of the typed route bonus - empire-level, per route.
+        # CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
+        # following your ally's religion."
+        NMa = self.n_majors
+        for _o in range(NMa):
+            if _o == row:
+                continue
+            _aty = self.seat_alliance_type[:, row, _o]
+            _live = self.seat_ally_turns[:, row, _o] > 0
+            if bool((_live & (_aty >= 0)).any()):
+                _a0 = _aty.clamp(min=0)
+                _n = (self.seat_route_dseat[:, _o] == row).sum(dim=1).double()
+                _amt = torch.where(_live & (_aty >= 0),
+                                   self._al_route_from[_a0].double() * _n,
+                                   torch.zeros_like(_n))
+                _yc = self._al_route_ycol[_a0]
+                sci_sum = sci_sum + torch.where(_yc == 3, _amt, torch.zeros_like(_amt))
+                cul_sum = cul_sum + torch.where(_yc == 4, _amt, torch.zeros_like(_amt))
+                gold_sum = gold_sum + torch.where(_yc == 2, _amt, torch.zeros_like(_amt))
+                faith_sum = faith_sum + torch.where(_yc == 5, _amt, torch.zeros_like(_amt))
+            _r3 = self._allied_type(row, 4, 3)[:, _o]
+            if bool(_r3.any()):
+                _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
+                faith_sum = faith_sum + (_r3.double() * self._al_rel3_faith_pop
+                                         * (_fol * self.city_pop[:, row].double()).sum(dim=1))
+        # the seat's OUTPUT this turn, stored for allies' percentage reads -
+        # written before those reads, so the terms never compound
+        self.civ_sci_rate[:, row] = torch.where(active, sci_sum, self.civ_sci_rate[:, row])
+        self.civ_cul_rate[:, row] = torch.where(active, cul_sum, self.civ_cul_rate[:, row])
+        for _o in range(NMa):
+            if _o == row:
+                continue
+            # CIV6 (Research alliance 3): "+10% of your ally's Science" while
+            # researching a tech the ally completed, or the tech the ally is on
+            _r3a = self._allied_type(row, 0, 3)[:, _o]
+            if bool(_r3a.any()):
+                curt = self.civ_cur_tech[:, row]
+                done_o = self.civ_techs[:, _o].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1)
+                co = (curt >= 0) & (done_o | (self.civ_cur_tech[:, _o] == curt))
+                sci_sum = sci_sum + torch.where(
+                    _r3a & co, self._al_r3_sci_pct * self.civ_sci_rate[:, _o], torch.zeros_like(sci_sum))
+            # CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
+            _c3a = self._allied_type(row, 1, 3)[:, _o]
+            if bool(_c3a.any()):
+                cul_sum = cul_sum + torch.where(
+                    _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
         bank(self.civ_tech_prog, sci_sum)
         bank(self.seat_science_total, sci_sum)
         bank(self.civ_treasury, gold_sum)
@@ -1062,20 +1165,29 @@ class SimPhase:
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
             gw_mult=js_round(self._governor_mult(row, "gwTourismMult")).long() if self.n_governors else None,
         )
+        _rel_t = self._tourism_religious_of(row)
+        self.civ_tour_rate[:, row] = torch.where(active, (_nat_gen + _rel_t).long(), self.civ_tour_rate[:, row])
+        # CIV6 (Cultural alliance 3): "+20% of your ally's Tourism".
+        _c3t = self._allied_type(row, 1, 3)
+        for _o in range(self.n_majors):
+            if _o != row and bool(_c3t[:, _o].any()):
+                _nat_gen = _nat_gen + torch.where(
+                    _c3t[:, _o],
+                    torch.floor(self._al_c3_tour_pct * self.civ_tour_rate[:, _o].double()).long(),
+                    torch.zeros_like(_nat_gen))
         bank(self.civ_tourism, _nat_gen)
-        bank(self.civ_tourism_rel, self._tourism_religious_of(row))
-        self._bank_tourism_per_rival(row, active, _nat_gen, self._tourism_religious_of(row))
+        bank(self.civ_tourism_rel, _rel_t)
+        self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t)
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)
         # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance
-        # gives you +1 Diplomatic Favor per turn per level" — levels are not
-        # modeled, so every live alliance pays the level-1 rate. Each ORIGINAL
+        # gives you +1 Diplomatic Favor per turn per level". Each ORIGINAL
         # CAPITAL this row sits in costs it. The rate can go negative, and the
         # bank floors at zero.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row])
              + self._favor_per_suz * self._suzerain_count(row)
-             + self._favor_per_alliance * (self.seat_ally_turns[:, row] > 0).sum(dim=1)
+             + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
              + self._congress_policy_favor(self._seat_slotted(row))
              # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
              + self._seat_building_sum(row, self._b_favor)
@@ -1149,6 +1261,18 @@ class SimPhase:
         dgpp = (self._city_wonder_flat(row, self._wond_distgpp)
                 if self._wond_n and float(self._wond_distgpp.sum()) != 0.0
                 else torch.zeros(B, 1, dtype=torch.float64, device=dev))
+        # CIV6 (Cultural alliance 2): +1 Great Person point per class-matched
+        # district in origin cities holding a Trade Route to the ally.
+        c2 = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
+        if self._al_c2_gpp:
+            c2ally = self._allied_type(row, 1, 2)
+            if bool(c2ally.any()):
+                ds = self.seat_route_dseat[:, row]
+                to_ally = (ds >= 0) & (ds < self.n_majors) & c2ally.gather(1, ds.clamp(min=0, max=self.n_majors - 1))
+                ids = self.city_id[:, row]
+                hit = ((self.seat_routes[:, row, :, 0].unsqueeze(2) == ids.unsqueeze(1))
+                       & to_ally.unsqueeze(2)).any(dim=1)
+                c2 = (hit & self.city_alive[:, row]).double() * float(self._al_c2_gpp)
         for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
             comp_c = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
@@ -1170,7 +1294,7 @@ class SimPhase:
                     _pg = self._gov_mods(row)[12]["gpp"]
                     if cls < _pg.shape[1]:
                         gflat = gflat + _pg[:, cls].unsqueeze(1)
-                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double())).sum(dim=1)
+                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + c2)).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:

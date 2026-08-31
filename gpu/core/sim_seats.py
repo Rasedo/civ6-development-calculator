@@ -2922,9 +2922,10 @@ class SimSeats:
             _fl, _sp = self._theo_flank_support(
                 torch.where(hit, d_tile, torch.full_like(d_tile, -1)),
                 d_seat, torch.full_like(a_seat, u + self.POOL_LO["major"]), a_seat)
-            a_eff = a_eff + FLANKING_CS * _fl + self._vis_cs(a_seat, d_seat)
+            a_eff = (a_eff + FLANKING_CS * _fl + self._vis_cs(a_seat, d_seat)
+                     + self._ally_theo_cs(a_seat, d_seat))
             d_eff = (d_eff + SUPPORT_CS * _sp + self._theo_def_strength(d_seat, d_tile)
-                     + self._vis_cs(d_seat, a_seat))
+                     + self._vis_cs(d_seat, a_seat) + self._ally_theo_cs(d_seat, a_seat))
             to_def = self._damage_roll(hit, a_eff - d_eff, k="theo", tile=d_tile)
             to_atk = self._damage_roll(hit, d_eff - a_eff, k="theoc", tile=self.major_unit_tile[:, u])
             hp = self.major_unit_hp
@@ -3226,6 +3227,21 @@ class SimSeats:
                 m = m & (mine > env[:, o])
         return m
 
+    def _alliance_levels_of(self, row: int) -> torch.Tensor:
+        """[B, n_majors] - the live alliance's LEVEL against each other major
+        (0 where none stands). CIV6 (Alliance): "80 to reach Level 2 and 160
+        more to reach Level 3" on Standard - quarter-point thresholds on the
+        wire."""
+        NM = self.n_majors
+        live = self.seat_ally_turns[:, row, :NM] > 0
+        qp = self.seat_alliance_pts[:, row, :NM]
+        return live.long() + (live & (qp >= self._al_l2_qp)).long() + (live & (qp >= self._al_l3_qp)).long()
+
+    def _allied_type(self, row: int, ty: int, lvl: int = 1) -> torch.Tensor:
+        """[B, n_majors] - the other majors holding a TYPE `ty` alliance
+        with `row` at level `lvl` or above."""
+        return (self.seat_alliance_type[:, row, : self.n_majors] == ty) & (self._alliance_levels_of(row) >= lvl)
+
     def _occupied_capitals(self, row: int) -> torch.Tensor:
         """[B] f64 — ORIGINAL CAPITALS this row holds that it did not found
         (`occupiedCapitals`'s twin). A city whose founder is gone still counts:
@@ -3260,8 +3276,15 @@ class SimSeats:
                 codes[code] = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=self.device)
             else:
                 hold = self.citystate_suz_code[:, :self.S] == code
-                codes[code] = torch.stack(
+                base = torch.stack(
                     [(self._suz_live_mask(r) & hold[:, : self.S]).any(dim=1) for r in range(self.n_majors)], dim=1)
+                # CIV6 (Economic alliance 3): "Allies share the Suzerain bonus
+                # of all city-states of which they are Suzerain."
+                NMh = self.n_majors
+                e3 = ((self.seat_alliance_type[:, :NMh, :NMh] == 2)
+                      & (self.seat_ally_turns[:, :NMh, :NMh] > 0)
+                      & (self.seat_alliance_pts[:, :NMh, :NMh] >= self._al_l3_qp))
+                codes[code] = base | (e3 & base.unsqueeze(1)).any(dim=2)
         return codes[code]
 
     def _suz_effect(self, row: int, code: int) -> torch.Tensor:
@@ -5153,6 +5176,14 @@ class SimSeats:
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            # CIV6 (Alliance, level 1): the typed alliance pays its route
+            # bonus on every paying leg - the sender half.
+            _aty = self.seat_alliance_type[:, row].gather(1, dr)
+            _yc = self._al_route_ycol[_aty.clamp(min=0)]
+            _hit = pays_i & (_aty >= 0) & (_yc >= 0)
+            if bool(_hit.any()):
+                inc.scatter_add_(1, from_j * 6 + _yc.clamp(min=0),
+                                 self._al_route_to[_aty.clamp(min=0)].double() * _hit.double())
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
             # CIV6 (Letters of Marque): "Trade Route yields -50%."
@@ -6591,6 +6622,7 @@ class SimSeats:
                 atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
+                atk_e = atk_e + self._ally_war_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
@@ -6598,6 +6630,7 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + self._vis_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
+            def_e = def_e + self._ally_war_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, a_type[:, u])
@@ -7391,6 +7424,20 @@ class SimSeats:
         def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
                   + torch.where(held, self._walls_tier_cs[wtier],
                                 torch.zeros_like(self._walls_tier_cs[wtier])))
+        # a CITY-STATE's Encampment fights at the minor's own centre
+        # strength (`attackCityState`'s formula), its walls tier included -
+        # never at a clamped major row's floor.
+        is_cs = (hseat >= 100) & (hseat < 100 + self.S)
+        if bool(is_cs.any()):
+            csx = (hseat - 100).clamp(min=0, max=max(self.S - 1, 0))
+            cs_tier = self._minor_walls_tier_at(csx)
+            mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+            cs_def = (15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
+                      + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+                      + self._walls_tier_cs[cs_tier])
+            def_cs = torch.where(is_cs, cs_def.to(def_cs.dtype), def_cs)
+            wtier = torch.where(is_cs, cs_tier, wtier)
+            held = held | is_cs
         return def_cs, hrow, hcol, wtier, held
 
     def _encamp_take_roll(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
@@ -7419,7 +7466,11 @@ class SimSeats:
         hr2 = rows[held[rows]]
         if hr2.numel() > 0:
             self.encamp_outer_hp[hr2, tc[hr2]] = (_eouter - _wall)[hr2]
-            self.city_last_hit[hr2, hrow[hr2], _hc0[hr2]] = self.turn
+        # the repair stamp is the MAJOR city's; a minor tracks no last hit
+        hm = held & (hcol >= 0)
+        hr3 = rows[hm[rows]]
+        if hr3.numel() > 0:
+            self.city_last_hit[hr3, hrow[hr3], _hc0[hr3]] = self.turn
 
     def _conquer_encampment(self, m: torch.Tensor, tc: torch.Tensor, captor: torch.Tensor) -> None:
         """`conquerEncampment`'s twin. CIV6 (Combat): the Encampment "cannot be
@@ -8367,8 +8418,8 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
-            def_e = def_e + self._vis_cs(d_seat, a_seat).to(def_e.dtype)
-            atk_e = atk_e + self._vis_cs(a_seat, d_seat).to(atk_e.dtype)
+            def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
+            atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, ut0)
@@ -8587,8 +8638,8 @@ class SimSeats:
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
-            def_e = def_e + self._vis_cs(d_seat, aseat).to(def_e.dtype)
-            atk_e = atk_e + self._vis_cs(aseat, d_seat).to(atk_e.dtype)
+            def_e = def_e + (self._vis_cs(d_seat, aseat) + self._ally_war_cs(d_seat, aseat)).to(def_e.dtype)
+            atk_e = atk_e + (self._vis_cs(aseat, d_seat) + self._ally_war_cs(aseat, d_seat)).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
                              + self._gov_unit_cs(d_type, _ucs_seat)
@@ -8663,6 +8714,14 @@ class SimSeats:
         # CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn."
         if bool((self._b_influence != 0).any()):
             pt = pt + self._seat_building_sum(row, self._b_influence).double()
+        # CIV6 (Economic alliance 2): an Envoy point per turn "for every
+        # City-State with your Ally as Suzerain".
+        if self._al_e2_influence and self.S:
+            _e2 = self._allied_type(row, 2, 2)
+            for _o in range(self.n_majors):
+                if _o != row and bool(_e2[:, _o].any()):
+                    pt = pt + (self._al_e2_influence
+                               * _e2[:, _o].double() * self._suzerain_mask(_o)[:, : self.S].sum(dim=1).double())
         # CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if self._gov_has_effects:
             any_met = any_met & ~self._gov_mods(row)[12]["noenvoy"]
@@ -9508,10 +9567,20 @@ class SimSeats:
                     & ~self.war[:, a, b] & (self.seat_ally_turns[:, a, b] == 0)
                     & ~self._denounce_active(a, b) & ~self._denounce_active(b, a))
             if bool(form.any()):
+                self._eff_version += 1
+                tyv = stashes["ally_type"].get(a)
+                ty = (tyv[:, b].clamp(min=0, max=4) if tyv is not None
+                      else torch.zeros(self.B, dtype=torch.long, device=self.device))
                 for _x, _y in ((a, b), (b, a)):
                     self.seat_ally_turns[:, _x, _y] = torch.where(
                         form, torch.full_like(self.seat_ally_turns[:, _x, _y], term),
                         self.seat_ally_turns[:, _x, _y])
+                    # the TYPE rides the same write; the POINTS are the
+                    # pair's own and persist across formations
+                    self.seat_alliance_type[:, _x, _y] = torch.where(
+                        form, ty, self.seat_alliance_type[:, _x, _y])
+
+        stashes["ally_type"].clear()
 
         for a, b, ok in pairs("delegation"):
             # CIV6 (Delegations and Embassies): the Resident Embassy "replaces"

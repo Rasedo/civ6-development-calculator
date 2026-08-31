@@ -24,7 +24,7 @@ import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
@@ -44,7 +44,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 
@@ -1638,11 +1638,13 @@ function theologicalCombatPhase(state: GameState): void {
     // combat". The location bonuses are the DEFENDER's alone.
     const atkStr = theoStrength(state, att)
       + FLANKING_CS * theoFlankCount(state, def.tileIndex, att)
-      + visibilityCS(state, g, unitSeat(def));
+      + visibilityCS(state, g, unitSeat(def))
+      + allianceTheoCS(state, g, unitSeat(def));
     const defStr = theoStrength(state, def)
       + theoDefenseStrength(state, def, state.map.tiles[def.tileIndex])
       + SUPPORT_CS * theoSupportCount(state, def.tileIndex, def)
-      + visibilityCS(state, unitSeat(def), g);
+      + visibilityCS(state, unitSeat(def), g)
+      + allianceTheoCS(state, unitSeat(def), g);
     def.hp -= damageRoll(state, atkStr - defStr, 'theo', def.tileIndex);
     att.hp -= damageRoll(state, defStr - atkStr, 'theoc', att.tileIndex);
     att.movesLeft = 0;
@@ -1739,6 +1741,9 @@ function spreadReligiousPressure(state: GameState): void {
     const deaf = governorFlag(state, city as City, (e) => e.ignoreForeignPressure);
     for (let g = 0; g < nRel; g++) {
       if (deaf && g !== city.seat) continue;
+      // CIV6 (Religious alliance 1): allies' religions exert no pressure on
+      // each other's cities.
+      if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
       for (const src of sources[g]) {
         const h = tiles[src];
         if (hexDistance(cc.col, cc.row, h.col, h.row) > range[g]) continue;

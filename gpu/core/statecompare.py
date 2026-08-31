@@ -392,6 +392,15 @@ def _seat_pair_clock(plane: str):
     return get
 
 
+def _seat_pair_mark(plane: str):
+    """`allianceType`'s renderer: [opponentSeat, code, ...] where a code
+    >= 0 stands, in ascending opponent order."""
+    def get(sim, b, rows):
+        m = getattr(sim, plane)[b].tolist()
+        return [[x for j, v in enumerate(m[c]) if v >= 0 for x in (j, int(v))] for c in rows]
+    return get
+
+
 def _centre_of(sim, b: int, row: int, city_id: int) -> int:
     """The centre TILE of seat row `row`'s city `city_id`, or -1. Routes are
     compared in centre-tile space because `city_id` is not compared at all —
@@ -454,6 +463,9 @@ SEAT = {
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),
     "tourismReligious": _civ_scalar("civ_tourism_rel"),
+    "sciRate": _civ_scalar("civ_sci_rate"),
+    "culRate": _civ_scalar("civ_cul_rate"),
+    "tourRate": _civ_scalar("civ_tour_rate"),
     "tourismTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
     "tourismReligiousTo": lambda sim, b, rows: [
@@ -545,6 +557,8 @@ SEAT = {
     "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
     "friendTurns": _seat_pair_clock("seat_friend_turns"),
     "allyTurns": _seat_pair_clock("seat_ally_turns"),
+    "allianceType": _seat_pair_mark("seat_alliance_type"),
+    "alliancePts": _seat_pair_clock("seat_alliance_pts"),
     # DIRECTED: the row is what that seat GRANTS, never what it holds.
     "borderTurns": _seat_pair_clock("seat_borders_turns"),
     "delegations": _seat_pair_clock("seat_delegation"),

@@ -213,6 +213,45 @@ def test_the_conquest_carries_the_build(rules, path) -> None:
     print("  5 conquest OK — walls, perimeter and registry all arrive")
 
 
+def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
+    """CIV6: a defensible district fights "similar to the parent City
+    Center" - a militaristic minor's Encampment at the minor's OWN centre
+    strength, walls tier included, never at a clamped major row's floor."""
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    dv = int(sim._encamp_didx)
+    if dv < 0:
+        print("  7 encampment SKIPPED — no ENCAMPMENT row in the catalog")
+        return
+    own = (sim.tile_seat[B0] == 100 + s) & (sim.district[B0] < 0)
+    if not bool(own.any()):
+        print("  7 encampment SKIPPED — the minor owns no free tile")
+        return
+    et = int(own.long().argmax())
+    sim.city_dist_tile[B0, row, 0, dv] = et
+    sim.district[B0, et] = dv
+    sim.district_complete[B0, et] = True
+    sim.encamp_hp[B0, et] = 100
+    anc = walls_rows(sim)[0]
+    grant_walls_tech(sim, s, anc)
+    sim.city_bldg[B0, row, 0, anc] = True
+    tt = torch.full((sim.B,), et, dtype=torch.long)
+    d, _hrow, hcol, wtier, held = sim._encamp_terms(tt)
+    csx = torch.full((sim.B,), s, dtype=torch.long)
+    tier = int(sim._minor_walls_tier_at(csx)[B0])
+    mil = int(sim.rules.citystate.get("militaristicIdx", -1))
+    want = (15 + int(sim.citystate_pop[B0, s])
+            + (6 if int(sim.citystate_type[B0, s]) == mil else 0)
+            + int(sim._walls_tier_cs[tier]))
+    assert tier >= 1, "the walls did not reach the tier read"
+    assert int(d[B0]) == want, f"the minor's Encampment defends at {int(d[B0])}, its centre says {want}"
+    assert bool(held[B0]), "the minor's own walls did not size the perimeter"
+    assert int(wtier[B0]) == tier, "the split tier is not the minor's"
+    assert int(hcol[B0]) < 0, "a major city column leaked into the minor's district"
+    print("  7 encampment OK — the minor's district fights at its centre's strength")
+
+
 def test_a_dead_minor_builds_nothing(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
@@ -236,6 +275,7 @@ def main() -> int:
     test_the_landlocked_minor_never_harbors(rules, path)
     test_damaged_walls_block_the_higher_tier(rules, path)
     test_the_conquest_carries_the_build(rules, path)
+    test_the_minor_encampment_fights_as_its_centre(rules, path)
     test_a_dead_minor_builds_nothing(rules, path)
     print("BATTERY OK minor_builds")
     return 0

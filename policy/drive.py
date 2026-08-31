@@ -820,6 +820,7 @@ def _geo_turn(sim, seeds=None):
     nrow = sim.n_majors
     den = torch.zeros(B, nrow, nrow, dtype=torch.bool, device=dev)
     ally = torch.zeros_like(den)
+    ally_ty = torch.full((B, nrow, nrow), -1, dtype=torch.long, device=dev)
     frd = torch.zeros_like(den)
     bord = torch.zeros_like(den)
     gift = torch.zeros(B, ladder.GW_KINDS, nrow, nrow, dtype=torch.bool, device=dev)
@@ -828,7 +829,7 @@ def _geo_turn(sim, seeds=None):
     off = torch.full((B, nrow, 1 + 2 * _di * 3), -1, dtype=torch.long, device=dev)
     acc = torch.zeros_like(den)
     if sim.n_majors < 2:
-        return den, frd, ally, bord, gift, deleg, off, acc
+        return den, frd, ally, bord, gift, deleg, off, acc, ally_ty
     rr = sim.rules.seats
     n_c = sim.city_alive[:, :nrow].sum(dim=2)
     alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)
@@ -873,6 +874,10 @@ def _geo_turn(sim, seeds=None):
                 quiet & diplo[:, a] & al_civic[:, a]
                 & (sim.seat_friend_turns[:, a, b] > 0) & (sim.seat_ally_turns[:, a, b] == 0)
             )
+            # the TYPE is a per-(game, pair) style - stable across renewals
+            ally_ty[:, a, b] = (
+                (_policy_rng(sim, seeds, 0, min(a, b) * nrow + max(a, b), 9) * 5).long().clamp(min=0, max=4)
+                if seeds is not None else torch.zeros(B, dtype=torch.long, device=dev))
             # Granted to whoever this seat already trusts, and by a diplomat to
             # any quiet neighbour — the grant is one-way, so it costs the
             # grantor nothing but the passage.
@@ -899,7 +904,7 @@ def _geo_turn(sim, seeds=None):
                 theirs = (held[:, b] * sim.city_alive[:, b].long()).sum(dim=1)
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (mine > theirs)
     _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max)
-    return den, frd, ally, bord, gift, deleg, off, acc
+    return den, frd, ally, bord, gift, deleg, off, acc, ally_ty
 
 
 # The driver's own PRICES. No source publishes what the AI thinks a deal is
@@ -1003,22 +1008,24 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
 
 def geo_decide_and_apply(sim, seeds=None):
     geo = _geo_turn(sim, seeds)
-    den, frd, ally, bord, gift, deleg, off, acc = geo
+    den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
-                      borders=bord[:, row], gift=gift[:, :, row], delegation=deleg[:, row],
-                      offer=off[:, row], accept=acc[:, row])
+                      ally_type=ally_ty[:, row], borders=bord[:, row], gift=gift[:, :, row],
+                      delegation=deleg[:, row], offer=off[:, row], accept=acc[:, row])
     return geo
 
 
 def _extract_geo(geo, row: int, b: int) -> dict:
-    den, frd, ally, bord, gift, deleg, off, acc = geo
+    den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
     out = {}
     for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord),
                        ("delegation", deleg)):
         tl = want[b, row].nonzero(as_tuple=True)[0].tolist()
         if tl:
             out[name] = tl
+    if "ally" in out:
+        out["allyType"] = [int(ally_ty[b, row, j]) for j in out["ally"]]
     gl = [[int(k), int(j)] for k, j in gift[b, :, row].nonzero(as_tuple=False).tolist()]
     if gl:
         out["gift"] = gl
@@ -1512,6 +1519,14 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     for _name in ("denounce", "friend", "ally", "delegation", "borders", "accept"):
         if rec.get(_name):
             geo_kwargs[_name] = _geo_mask(rec[_name])
+    if rec.get("ally"):
+        _tyl = rec.get("allyType") or []
+        _ty = torch.full((sim.B, sim.n_majors), -1, dtype=torch.long, device=dev)
+        for _k, _j in enumerate(rec["ally"]):
+            if 0 <= int(_j) < sim.n_majors:
+                # the wire's ONE default: an absent type column reads RESEARCH
+                _ty[:, int(_j)] = int(_tyl[_k]) if _k < len(_tyl) else 0
+        geo_kwargs["ally_type"] = _ty
     if rec.get("offer"):
         _to, _give, _ask = rec["offer"]
         _di = sim._deal_items

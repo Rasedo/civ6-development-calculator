@@ -842,6 +842,55 @@ export const ALLIANCE_CIVIC = 'CIVIL_SERVICE';
  */
 export const FAVOR_PER_ALLIANCE = 1;
 
+/** CIV6 (Alliance): the five types; a pair holds ONE alliance at a time and
+ *  picks its type when it forms. This order is the wire code. */
+export const ALLIANCE_TYPES = ['RESEARCH', 'CULTURAL', 'ECONOMIC', 'MILITARY', 'RELIGIOUS'] as const;
+export const ALLIANCE_RESEARCH = 0;
+export const ALLIANCE_CULTURAL = 1;
+export const ALLIANCE_ECONOMIC = 2;
+export const ALLIANCE_MILITARY = 3;
+export const ALLIANCE_RELIGIOUS = 4;
+/** CIV6 (Alliance): points accrue every turn - 1, +0.25 for sending at least
+ *  one Trade Route to the ally and +0.25 for receiving one - and the levels
+ *  land at "80 to reach Level 2 and 160 more to reach Level 3" on Standard.
+ *  Stored in QUARTER-points so both engines bank integers. */
+export const ALLIANCE_QP_TURN = 4;
+export const ALLIANCE_QP_ROUTE = 1;
+export const ALLIANCE_L2_QP = 320;
+export const ALLIANCE_L3_QP = 960;
+/** CIV6 (Alliance, level 1): Trade Routes between allies pay extra - "+2
+ *  Science from Trade Routes to your ally" and +1 from the ally's routes to
+ *  you, the same 2/1 in Culture and Faith for their types, 4/2 in Gold for
+ *  the Economic type. Indexed by ALLIANCE_TYPES; Military routes pay nothing. */
+export const ALLIANCE_ROUTE_TO = [2, 2, 4, 0, 2] as const;
+export const ALLIANCE_ROUTE_FROM = [1, 1, 2, 0, 1] as const;
+export const ALLIANCE_ROUTE_YKEY = ['science', 'culture', 'gold', '', 'faith'] as const;
+/** CIV6 (Military alliance 1): "+5 Combat Strength against units of players
+ *  at war with you and your ally." */
+export const ALLIANCE_M1_CS = 5;
+/** CIV6 (Research alliance 2): the shared tech boost lands "every 20 turns"
+ *  on Standard. */
+export const ALLIANCE_R2_BOOST_TURNS = 20;
+/** CIV6 (Research alliance 3): "+10% of your ally's Science" while
+ *  researching a tech the ally completed, or the tech the ally is on. */
+export const ALLIANCE_R3_SCI_PCT = 0.1;
+/** CIV6 (Cultural alliance 2): +1 Great Person point per class-matched
+ *  district in origin cities holding a Trade Route to the ally. */
+export const ALLIANCE_C2_GPP = 1;
+/** CIV6 (Cultural alliance 3): "+10% of your ally's Culture" and "+20% of
+ *  your ally's Tourism". */
+export const ALLIANCE_C3_CUL_PCT = 0.1;
+export const ALLIANCE_C3_TOUR_PCT = 0.2;
+/** CIV6 (Economic alliance 2): an Envoy point per turn "for every City-State
+ *  with your Ally as Suzerain". */
+export const ALLIANCE_E2_INFLUENCE = 1;
+/** CIV6 (Religious alliance 2): "+10 Religious Combat Strength against
+ *  non-ally Religions." */
+export const ALLIANCE_REL2_THEO_CS = 10;
+/** CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens following
+ *  your ally's religion." */
+export const ALLIANCE_REL3_FAITH_PER_POP = 1;
+
 /**
  * GRIEVANCES (GS). CIV6: "a score which each pair of civilizations keep for
  * each other, reflecting serious transgressions which happened between them",

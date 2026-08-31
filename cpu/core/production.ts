@@ -1,6 +1,6 @@
 import type { City, GameState, Seat, Unit } from './types';
 import type { QueueItem } from './types';
-import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat } from './seats';
+import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo } from './seats';
 import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
@@ -299,7 +299,9 @@ export function completeQueueItem(
       const where = UNITS[item.unit]?.air
         ? airTrainTile(state, city.seat, city) ?? city.centerIndex
         : city.centerIndex;
-      const freePromo = governorFlag(state, city, (e) => e.freePromoOnTrain);
+      // CIV6 (Military alliance 3): "Units start with a free Promotion."
+      const freePromo = governorFlag(state, city, (e) => e.freePromoOnTrain)
+        || allianceFreePromo(state, city.seat);
       const trained = spawnUnit(state, item.unit, where, city.seat);
       if (trained) {
         trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));

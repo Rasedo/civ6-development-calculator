@@ -440,6 +440,36 @@
           "note": "the RELIGIOUS half (relics + holy cities), banked apart so the read can halve it per rival"
         },
         {
+          "name": "sciRate",
+          "compare": "exact",
+          "covers": [
+            "Seat.sciRate"
+          ],
+          "planes": [
+            "civ_sci_rate"
+          ]
+        },
+        {
+          "name": "culRate",
+          "compare": "exact",
+          "covers": [
+            "Seat.culRate"
+          ],
+          "planes": [
+            "civ_cul_rate"
+          ]
+        },
+        {
+          "name": "tourRate",
+          "compare": "exact",
+          "covers": [
+            "Seat.tourRate"
+          ],
+          "planes": [
+            "civ_tour_rate"
+          ]
+        },
+        {
           "name": "grievances",
           "compare": "exact",
           "covers": [
@@ -1076,6 +1106,26 @@
           ],
           "planes": [
             "seat_ally_turns"
+          ]
+        },
+        {
+          "name": "allianceType",
+          "compare": "exact",
+          "covers": [
+            "GameState.allianceType"
+          ],
+          "planes": [
+            "seat_alliance_type"
+          ]
+        },
+        {
+          "name": "alliancePts",
+          "compare": "exact",
+          "covers": [
+            "GameState.alliancePts"
+          ],
+          "planes": [
+            "seat_alliance_pts"
           ]
         },
         {

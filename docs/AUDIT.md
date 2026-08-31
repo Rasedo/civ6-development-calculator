@@ -64,7 +64,7 @@ from the list below.
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
+| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here; no unit removes a tile improvement |
@@ -81,8 +81,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **27** | |
-| **OPEN, TOTAL** | **50** | |
+| **C. Absent systems** | **26** | |
+| **OPEN, TOTAL** | **49** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -717,20 +717,46 @@ under their blocker so the dependency is readable, and both halves count.
   from t4, and every level of the ladder is entered — Limited 12/12 from
   t4, Open 12/12 from t105, Secret 9/12 from t115, Top Secret 2/12 from
   t187. OPEN:
-  - **ALLIANCE TYPES AND LEVELS.** The Alliances page names five types —
-    Research, Cultural, Military, Religious, Economic — says "the effects
-    of these levels are cumulative", and that points accrue "every turn"
-    at a rate trading with the ally raises. It publishes NO number: not a
-    level threshold, not a per-turn rate, and not a magnitude for most of
-    the fifteen effects, which read "additional Science", "additional
-    Culture", "additional Gold", "a portion of your ally's Tourism".
-    Four of the fifteen are fully specified and would need no magnitude —
-    Cultural 1 ("Allies do not exert Loyalty pressure on each other"),
-    Religious 1 (the same for Religious pressure), Military 2 ("Allies
-    share visibility", which has a mechanic now) and Economic 3 ("Allies
-    share the Suzerain bonus of all city-states of which they are
-    Suzerain") — but all four are gated on the type-and-level machinery,
-    which cannot be built without the thresholds.
+  - **ALLIANCE TYPES AND LEVELS SHIP.** The numbers ARE published — the
+    wiki's Alliance page (reached through search extracts, corroborated)
+    and the Well of Souls analyst table carry them. Five types ride the
+    wire (`allyType` beside `ally` in the record), one alliance per pair,
+    its TYPE chosen at formation and cleared when the clock runs out.
+    POINTS accrue on the pair tick — 1 per turn, "+0.25 for sending at
+    least one Trade Route to the ally" and +0.25 for receiving one,
+    QUARTER-points so both engines bank integers — and LEVELS land at "80
+    to reach Level 2 and 160 more to reach Level 3" on Standard; each
+    alliance pays Favor "per turn per level". THIRTEEN of the fifteen
+    effects ship with sourced text (`alliance_levels_test.py` is the bar):
+    the four route halves (+2/+1 Science, Culture, Faith; +4/+2 Gold, the
+    sender and receiver sides), Cultural 1 (no Loyalty pressure between
+    allies) / 2 (+1 GPP per class district in cities routed to the ally) /
+    3 (+10% of the ally's Culture and +20% of its Tourism), Research 2
+    (the 20-turn shared boost) / 3 (+10% of the ally's Science while
+    researching a tech the ally completed or is on), Military 1 (+5 vs
+    common enemies, unit-vs-unit like the intel term) / 2 (shared
+    visibility — the two explored maps fold together) / 3 (a free
+    promotion on trained units), Religious 1 (no religious pressure
+    between allies) / 2 (+10 theological strength vs non-ally religions) /
+    3 (+1 Faith per citizen following the ally's religion), Economic 2
+    (+1 Envoy point per turn per ally-suzerained minor) / 3 (the named
+    Suzerain bonus shared). Still OPEN, each with its blocker:
+    - **Military 2's PRODUCTION clause** ("bonus Production toward
+      military units when either ally is at war") ships nothing — no
+      reachable source publishes the magnitude; the wiki's
+      Module:Data/Civ6/GS/Alliances data page would settle it and every
+      mirror of it refuses automated readers. UNSOURCED — ask.
+    - **Religious 3's SECOND clause** (bonus Religious Pressure to the
+      ally's religion) is unpublished the same way. UNSOURCED — ask.
+    - Research 2's CADENCE is 20 turns per the analyst table read
+      verbatim; one search paraphrase of the wiki said 30 — the shipped
+      cell is sourced but CONTESTED, flagged for the question ledger.
+    - The model's OWN choices, recorded: points are ONE per-pair pool
+      that persists when an alliance lapses; the shared boost lands on
+      the LOWEST tech neither side has researched; the level-3 percentage
+      terms read the ally's most recently STORED per-turn output
+      (`sciRate` / `culRate` / `tourRate`, compared state on both
+      engines) so the two reads never compound.
   - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP.** The delegation
     itself ships — "Delegations cost 10 Gold and Embassies cost 25 Gold,
     which is paid to the other leader", one directed mission per pair,

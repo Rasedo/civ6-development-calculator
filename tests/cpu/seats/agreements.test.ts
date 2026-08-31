@@ -35,7 +35,7 @@ import {
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL, SPY_UNIT } from '../../../cpu/data/espionage';
 import { defenderCS } from '../../../cpu/core/combat';
 import { borderClosedTo, spawnUnit, tileFreeForUnit } from '../../../cpu/core/units';
-import { diplomaticFavorPerTurn, allianceCount } from '../../../cpu/core/seatTurn';
+import { diplomaticFavorPerTurn, allianceLevels } from '../../../cpu/core/seatTurn';
 import { gwCount } from '../../../cpu/data/greatPeople';
 import {
   AGREEMENT_TURNS, ALLIANCE_CIVIC, FAVOR_PER_ALLIANCE, FORMAL_WAR_MIN_TURNS, OPEN_BORDERS_CIVIC,
@@ -117,7 +117,7 @@ describe('the agreements run on one 30-turn clock', () => {
     expect(allyTurnsWith(state, 1, 2)).toBe(SIGNED);
     expect(allyTurnsWith(state, 2, 1)).toBe(SIGNED);
 
-    expect(allianceCount(state, 1)).toBe(1);
+    expect(allianceLevels(state, 1)).toBe(1); // a fresh alliance is level 1
     expect(diplomaticFavorPerTurn(null, 0, 0, 0, 1)
       - diplomaticFavorPerTurn(null, 0, 0, 0, 0)).toBe(FAVOR_PER_ALLIANCE);
   });

@@ -386,6 +386,16 @@ class SimInit:
         # above zero, the single storage for that fact.
         self.seat_friend_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.seat_ally_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # THE ALLIANCE'S TYPE (the exporter's ALLIANCE_TYPES order, -1 while
+        # none stands) and its POINTS in quarter-points - the pair's
+        # accumulated trust, kept when an alliance lapses.
+        self.seat_alliance_type = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
+        self.seat_alliance_pts = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # the seat's science / culture / tourism OUTPUT of its last completed
+        # accrual - what an ally's percentage bonus reads (Alliance level 3)
+        self.civ_sci_rate = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
+        self.civ_cul_rate = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
+        self.civ_tour_rate = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.seat_borders_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         # DIRECTED, 1 where the row seat holds a Delegation or Resident Embassy
         # with the column seat. Indefinite: a war ends it, never a clock.
@@ -466,6 +476,22 @@ class SimInit:
         self._alliance_civic = int(rules.seats["allianceCivic"])
         self._open_borders_civic = int(rules.seats["openBordersCivic"])
         self._favor_per_alliance = int(rules.seats["favorPerAlliance"])
+        self._al_qp_turn = int(rules.seats["allianceQpTurn"])
+        self._al_qp_route = int(rules.seats["allianceQpRoute"])
+        self._al_l2_qp = int(rules.seats["allianceL2Qp"])
+        self._al_l3_qp = int(rules.seats["allianceL3Qp"])
+        self._al_route_to = torch.tensor([int(x) for x in rules.seats["allianceRouteTo"]], dtype=torch.long, device=device)
+        self._al_route_from = torch.tensor([int(x) for x in rules.seats["allianceRouteFrom"]], dtype=torch.long, device=device)
+        self._al_route_ycol = torch.tensor([int(x) for x in rules.seats["allianceRouteYcol"]], dtype=torch.long, device=device)
+        self._al_m1_cs = int(rules.seats["allianceM1Cs"])
+        self._al_r2_boost_turns = int(rules.seats["allianceR2BoostTurns"])
+        self._al_r3_sci_pct = float(rules.seats["allianceR3SciPct"])
+        self._al_c2_gpp = int(rules.seats["allianceC2Gpp"])
+        self._al_c3_cul_pct = float(rules.seats["allianceC3CulPct"])
+        self._al_c3_tour_pct = float(rules.seats["allianceC3TourPct"])
+        self._al_e2_influence = int(rules.seats["allianceE2Influence"])
+        self._al_rel2_theo_cs = int(rules.seats["allianceRel2TheoCs"])
+        self._al_rel3_faith_pop = int(rules.seats["allianceRel3FaithPerPop"])
         self._treaty_turns = int(rules.seats["peaceTreatyTurns"])
         # rules.eras is the exporter's eras bag (the diplomacy/congress
         # scalars ride it); reading it off rules.seats returned {} and every

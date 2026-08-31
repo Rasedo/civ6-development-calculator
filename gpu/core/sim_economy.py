@@ -1829,8 +1829,14 @@ class SimEconomy:
         turn. CIV6 (Geneva): "when you are not at war with any civilization",
         which is a MAJOR, so a war with a minor leaves the channel standing."""
         peace = ~self.war[:, row, : self.n_majors].any(dim=1)
-        return self._suz_live_mask(row) & (
-            peace.unsqueeze(1) | ~self.citystate_suz_peace[:, : self.S])
+        m = self._suz_live_mask(row)
+        # CIV6 (Economic alliance 3): "Allies share the Suzerain bonus of all
+        # city-states of which they are Suzerain."
+        e3 = self._allied_type(row, 2, 3)
+        for _o in range(self.n_majors):
+            if _o != row and bool(e3[:, _o].any()):
+                m = m | (e3[:, _o].unsqueeze(1) & self._suz_live_mask(_o))
+        return m & (peace.unsqueeze(1) | ~self.citystate_suz_peace[:, : self.S])
 
     def _listening_levels(self) -> torch.Tensor:
         """[B, NM, NM] long — the best Listening Post row v has running in a
@@ -1905,6 +1911,47 @@ class SimEconomy:
         d = vis[bi, a, f] - vis[bi, f, a]
         ok = (own >= 0) & (own < NM) & (foe >= 0) & (foe < NM) & (d > 0)
         return torch.where(ok, (d * self._vis_cs_per_level).to(self.dtype), z)
+
+    def _ally_war_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Military alliance 1): "+5 Combat Strength against units of
+        players at war with you and your ally." Any war the matrix carries
+        qualifies; a barbarian is hostile, not at war, and pays nothing."""
+        z = torch.zeros_like(own, dtype=self.dtype)
+        NM = self.n_majors
+        if NM < 2 or self._al_m1_cs == 0:
+            return z
+        sh = own.shape
+        o_f = own.clamp(min=0, max=NM - 1).reshape(self.B, -1)          # [B, N]
+        rf_f = self._seat_row[foe.clamp(min=0)].reshape(self.B, -1)     # [B, N]
+        bi = torch.arange(self.B, device=self.device).unsqueeze(1)
+        mine = self.war[bi, o_f, rf_f]                                  # [B, N]
+        MT = 3  # the exporter's ALLIANCE_TYPES order: MILITARY
+        m_pair = ((self.seat_alliance_type[:, :NM, :NM] == MT)
+                  & (self.seat_ally_turns[:, :NM, :NM] > 0))            # [B, NM, NM]
+        wx = self.war[:, :NM].gather(2, rf_f.unsqueeze(1).expand(self.B, NM, rf_f.shape[1]))  # [B, NM, N]
+        mp = m_pair.gather(1, o_f.unsqueeze(2).expand(self.B, o_f.shape[1], NM))              # [B, N, NM]
+        hit = ((own >= 0) & (own < NM)).reshape(self.B, -1) & (foe >= 0).reshape(self.B, -1)
+        hit = hit & mine & (mp & wx.transpose(1, 2)).any(dim=2)
+        return torch.where(hit.reshape(sh), torch.full_like(z, float(self._al_m1_cs)), z)
+
+    def _ally_theo_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Religious alliance 2): "+10 Religious Combat Strength against
+        non-ally Religions" - any duel opponent but the ally itself."""
+        z = torch.zeros_like(own, dtype=self.dtype)
+        NM = self.n_majors
+        if NM < 2 or self._al_rel2_theo_cs == 0:
+            return z
+        RT = 4  # the exporter's ALLIANCE_TYPES order: RELIGIOUS
+        pair = ((self.seat_alliance_type[:, :NM, :NM] == RT)
+                & (self.seat_ally_turns[:, :NM, :NM] > 0)
+                & (self.seat_alliance_pts[:, :NM, :NM] >= self._al_l2_qp))
+        sh = own.shape
+        o_f = own.clamp(min=0, max=NM - 1).reshape(self.B, -1)          # [B, N]
+        mp = pair.gather(1, o_f.unsqueeze(2).expand(self.B, o_f.shape[1], NM))  # [B, N, NM]
+        f_col = foe.clamp(min=0, max=NM - 1).reshape(self.B, -1)
+        mp = mp & (torch.arange(NM, device=self.device).view(1, 1, NM) != f_col.unsqueeze(2))
+        hit = ((own >= 0) & (own < NM)).reshape(self.B, -1) & mp.any(dim=2)
+        return torch.where(hit.reshape(sh), torch.full_like(z, float(self._al_rel2_theo_cs)), z)
 
     def _barb_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """[B] — CIV6 (Discipline): "+5 Combat Strength when fighting
@@ -2462,6 +2509,12 @@ class SimEconomy:
                 == torch.arange(NSC, device=self.device).reshape(1, NSC, 1, 1)
             _deaf = torch.stack([self._governor_flag(g, "ignoreForeignPressure") for g in range(NSC)], dim=1)
             add = torch.where(_deaf.unsqueeze(3) & ~_own, torch.zeros_like(add), add)
+        # CIV6 (Religious alliance 1): allies' religions exert no pressure on
+        # each other's cities - zero the ally-founded column at ally-owned rows.
+        _rp = ((self.seat_alliance_type[:, :NSC, :O] == 4)
+               & (self.seat_ally_turns[:, :NSC, :O] > 0))
+        if bool(_rp.any()):
+            add = torch.where(_rp.unsqueeze(2), torch.zeros_like(add), add)
         self.city_pressure[:, :NSC].copy_(
             torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
         )

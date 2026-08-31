@@ -22,7 +22,7 @@ import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
-import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -91,13 +91,13 @@ const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_BUILD_RAILROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
 const A_CLEAN_FALLOUT = unitActionIndex(IMPROVEMENT_IDS).CLEAN_FALLOUT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -365,7 +365,9 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   for (const s of state.seats) {
     const sub = pressureFrom(s.cities) * agePressureFactor(state, s.seat);
     if (s.seat === city.seat) own += sub;
-    else foreign += sub;
+    // CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure on
+    // each other."
+    else if (!alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) foreign += sub;
   }
   const pressure =
     own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
@@ -432,6 +434,9 @@ export function flipCity(state: GameState, city: City): void {
   let best = -1;
   for (const s of state.seats) {
     if (s.seat === city.seat) continue;
+    // CIV6 (Cultural alliance 1): an ally exerts nothing, so it never
+    // receives the flip either.
+    if (alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) continue;
     let pressure = 0;
     for (const c of s.cities) {
       const t = state.map.tiles[c.centerIndex];
@@ -1483,7 +1488,9 @@ export function seatPhase(state: GameState): void {
   for (const actor of state.seats) {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.ally ?? []) {
+    const allyList = recG?.ally ?? [];
+    for (let tk = 0; tk < allyList.length; tk++) {
+      const tj = allyList[tk];
       const target = seatOf(state, tj);
       if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
       // CIV6 (Alliance): "Alliances become possible after developing the Civil
@@ -1494,6 +1501,9 @@ export function seatPhase(state: GameState): void {
       if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
       if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
       setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
+      // The record names the TYPE beside the target; an absent column reads
+      // RESEARCH, the wire's one default (the GPU replay parser matches).
+      setAllianceTypeWith(state, actor.seat, target.seat, recG?.allyType?.[tk] ?? 0);
       state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
     }
   }
@@ -1650,7 +1660,10 @@ export function seatPhase(state: GameState): void {
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
           actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
             + getModifiers(state, actor.seat).influencePerTurn
-            + seatBuildingSum(state, actor.seat, 'influencePerTurn');
+            + seatBuildingSum(state, actor.seat, 'influencePerTurn')
+            // CIV6 (Economic alliance 2): an Envoy point per turn "for every
+            // City-State with your Ally as Suzerain".
+            + ALLIANCE_E2_INFLUENCE * allianceSuzInfluence(state, actor.seat);
         }
         // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
         // envoy the moment the meter fills, assigned or not. WHERE it is spent
@@ -2252,6 +2265,44 @@ export function seatPhase(state: GameState): void {
     for (const civCity of civCityDefectors) flipCity(state, civCity);
 
     const rsr = actor.research;
+    // CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
+    // receiver half of the typed route bonus - empire-level, per route.
+    for (const o of state.seats) {
+      if (o.seat === actor.seat) continue;
+      const aty = allianceTypeWith(state, actor.seat, o.seat);
+      if (aty >= 0 && ALLIANCE_ROUTE_FROM[aty] > 0 && ALLIANCE_ROUTE_YKEY[aty]) {
+        const n = (o.tradeRoutes ?? []).filter((r) => r.toSeat === actor.seat).length;
+        const amt = ALLIANCE_ROUTE_FROM[aty] * n;
+        if (ALLIANCE_ROUTE_YKEY[aty] === 'science') sciSum += amt;
+        else if (ALLIANCE_ROUTE_YKEY[aty] === 'culture') culSum += amt;
+        else if (ALLIANCE_ROUTE_YKEY[aty] === 'gold') goldSum += amt;
+        else if (ALLIANCE_ROUTE_YKEY[aty] === 'faith') faithSum += amt;
+      }
+      // CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
+      // following your ally's religion."
+      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RELIGIOUS, 3)) {
+        for (const c of actor.cities) {
+          if (c.followedReligion === o.seat) faithSum += ALLIANCE_REL3_FAITH_PER_POP * c.population;
+        }
+      }
+    }
+    // the seat's OUTPUT this turn, stored for allies' percentage reads -
+    // written before those reads, so the terms never compound
+    actor.sciRate = sciSum;
+    actor.culRate = culSum;
+    for (const o of state.seats) {
+      if (o.seat === actor.seat) continue;
+      // CIV6 (Research alliance 3): "+10% of your ally's Science" while
+      // researching a tech the ally completed, or the tech the ally is on.
+      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RESEARCH, 3) && rsr.tech
+        && (o.research.techs.includes(rsr.tech) || o.research.tech === rsr.tech)) {
+        sciSum += ALLIANCE_R3_SCI_PCT * (o.sciRate ?? 0);
+      }
+      // CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
+      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_CULTURAL, 3)) {
+        culSum += ALLIANCE_C3_CUL_PCT * (o.culRate ?? 0);
+      }
+    }
     const gTech = goldenBoostBonus(state, actor.seat, false);
     const gCivic = goldenBoostBonus(state, actor.seat, true);
     const pickNext = () => {
@@ -2412,7 +2463,42 @@ export function seatPhase(state: GameState): void {
       const fr = friendTurnsWith(state, actor.seat, other);
       if (fr > 0) setFriendTurnsWith(state, actor.seat, other, fr - 1);
       const al = allyTurnsWith(state, actor.seat, other);
-      if (al > 0) setAllyTurnsWith(state, actor.seat, other, al - 1);
+      if (al > 0) {
+        // CIV6 (Alliance): points accrue "every turn", faster when the pair
+        // trades - either direction pays its own quarter-point.
+        setAlliancePtsWith(state, actor.seat, other, alliancePtsWith(state, actor.seat, other)
+          + ALLIANCE_QP_TURN
+          + (hasRouteToSeat(state, actor.seat, other) ? ALLIANCE_QP_ROUTE : 0)
+          + (hasRouteToSeat(state, other, actor.seat) ? ALLIANCE_QP_ROUTE : 0));
+        // CIV6 (Military alliance 2): "Allies share visibility" - each
+        // side's explored map folds into the other's, the fog this model keeps.
+        if (alliedAtLevel(state, actor.seat, other, ALLIANCE_MILITARY, 2)) {
+          const oa = seatOf(state, actor.seat);
+          const ob = seatOf(state, other);
+          if (oa?.explored && ob?.explored) {
+            for (let ei = 0; ei < oa.explored.length; ei++) {
+              const u = oa.explored[ei] | ob.explored[ei];
+              oa.explored[ei] = u;
+              ob.explored[ei] = u;
+            }
+          }
+        }
+        // CIV6 (Research alliance 2): the shared tech boost lands "every 20
+        // turns" - the lowest tech neither side has researched, both sides.
+        if (state.turn % ALLIANCE_R2_BOOST_TURNS === 0
+          && alliedAtLevel(state, actor.seat, other, ALLIANCE_RESEARCH, 2)) {
+          const ra = actor.research;
+          const rb = seatOf(state, other)!.research;
+          const pick = Object.keys(TECHS).find((tid) => !ra.techs.includes(tid) && !rb.techs.includes(tid));
+          if (pick) {
+            if (!ra.boosted.includes(pick)) ra.boosted.push(pick);
+            if (!rb.boosted.includes(pick)) rb.boosted.push(pick);
+          }
+        }
+        setAllyTurnsWith(state, actor.seat, other, al - 1);
+        // the TYPE is the live alliance's; the points are the pair's and stay
+        if (al === 1) delete state.allianceType?.[warClockKey(actor.seat, other)];
+      }
       for (const [g, h] of [[actor.seat, other], [other, actor.seat]] as const) {
         const ob = borderTurnsFrom(state, g, h);
         if (ob > 0) setBorderTurnsFrom(state, g, h, ob - 1);

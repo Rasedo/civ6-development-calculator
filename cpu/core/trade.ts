@@ -4,8 +4,9 @@
  * met city-states pay gold plus the city-state's specialty yield.
  */
 
-import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type Yields } from './types';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar } from './seats';
+import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith } from './seats';
+import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance } from '../../world/hex';
 import { isCoastalLand, isWater } from '../../world/query';
 import { tradeWalkReachable, tradeWaterLevel, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
@@ -313,6 +314,12 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, civCity));
+        // CIV6 (Alliance, level 1): the typed alliance pays its route bonus
+        // on every paying leg - the sender half.
+        const aty = allianceTypeWith(state, seat, route.toSeat);
+        if (aty >= 0 && ALLIANCE_ROUTE_TO[aty] > 0) {
+          out[ALLIANCE_ROUTE_YKEY[aty] as YieldKey] += ALLIANCE_ROUTE_TO[aty];
+        }
         out.gold += routePostGold(state, seat, civCity.centerIndex);
         // TRADE POLICY outcome A pays the SENDER for every route that ends at
         // the named seat.

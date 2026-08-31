@@ -1,6 +1,6 @@
 
 import type { City, GameState, QueueItem, Seat } from './types';
-import { seatOf, civsAtWar, seatsAllied } from './seats';
+import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
@@ -8,7 +8,7 @@ import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSu
 import { computeAdoption, inDarkAge } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
-import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
+import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
 import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
@@ -35,10 +35,10 @@ export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, tr
 }
 
 /** CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1
- *  Diplomatic Favor per turn per level." Levels are not modeled, so every
- *  live alliance pays the level-1 rate. */
-export function allianceCount(state: GameState, seat: number): number {
-  return state.seats.reduce((n, o) => n + (o.seat !== seat && seatsAllied(state, seat, o.seat) ? 1 : 0), 0);
+ *  Diplomatic Favor per turn per level" - the LEVEL sum over live
+ *  alliances. */
+export function allianceLevels(state: GameState, seat: number): number {
+  return state.seats.reduce((n, o) => n + (o.seat !== seat ? allianceLevelWith(state, seat, o.seat) : 0), 0);
 }
 
 /** Original capitals this seat holds that it did not found — the -5/turn
@@ -88,15 +88,23 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   const s = seatOf(state, seat);
   if (!s) return;
   s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
-  const natGeneral = seatTourism(state, seat, govCityIds);
+  let natGeneral = seatTourism(state, seat, govCityIds);
   const natReligious = seatTourismReligious(state, seat);
+  // stored before the ally reads below, so the terms never compound
+  s.tourRate = natGeneral + natReligious;
+  // CIV6 (Cultural alliance 3): "+20% of your ally's Tourism".
+  for (const o of state.seats) {
+    if (o.seat !== seat && alliedAtLevel(state, seat, o.seat, ALLIANCE_CULTURAL, 3)) {
+      natGeneral += Math.floor(ALLIANCE_C3_TOUR_PCT * (o.tourRate ?? 0));
+    }
+  }
   s.tourism = (s.tourism ?? 0) + natGeneral;
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
   bankTourismPerRival(state, s, natGeneral, natReligious);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
-                             allianceCount(state, seat),
+                             allianceLevels(state, seat),
                              seatBuildingSum(state, seat, 'favorPerTurn') + cardFavorPerBuilding(state, seat),
                              pollutionFavorPenalty(state, seat),
                              grievanceFavorPenalty(state, seat)));
