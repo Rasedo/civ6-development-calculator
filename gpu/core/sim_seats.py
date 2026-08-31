@@ -8525,6 +8525,8 @@ class SimSeats:
         cs_att = att & ~city_t & ~enc_t & cs_t
         rel_city = (self._rel_atk_cs(aseat, tgt).to(atk_base.dtype) if self._city_rel_live
                     else torch.zeros_like(atk_base))
+        # both city arms split the roll by the attacker's hit class
+        _klass = self._hit_class(at0, True)
 
         if bool(city_att.any()):
             hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
@@ -8546,7 +8548,6 @@ class SimSeats:
                                        k="rngrc", tile=tgt)
             self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
-            _klass = self._hit_class(at0, True)
             rr = city_att.nonzero(as_tuple=True)[0]
             hr, sl = hrow[rr], slot[rr]
             outer = self.city_outer_hp[rr, hr, sl]
