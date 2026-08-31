@@ -1093,12 +1093,58 @@ def _maybe_reorder(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
     return torch.where(hit, lo + legal.long().argmax(dim=2), prod)
 
 
+def _maybe_form_tier(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
+                     seeds, turn) -> torch.Tensor:
+    """Sometimes train the corps instead of the unit — and rarely the army.
+
+    A formation column the driver never picks is a verb the gate never
+    reaches; the applier re-validates every clause, so a swap the city cannot
+    honour is refused there like any other fuzzed decision."""
+    if seeds is None or mask.shape[2] <= sim.FORM_BASE:
+        return prod
+    is_u = (prod >= sim.UNIT_BASE) & (prod < sim.UNIT_BASE + sim.NU)
+    if not bool(is_u.any()):
+        return prod
+    r = _policy_rng(sim, seeds, turn or 0, row, 7)
+    hit = is_u & (r < ladder.FORM_SHARE).unsqueeze(1)
+    if not bool(hit.any()):
+        return prod
+    corps = torch.where(is_u, sim.FORM_BASE + prod - sim.UNIT_BASE, prod)
+    army = corps + sim.NU
+    lastc = mask.shape[2] - 1
+    can_a = mask.gather(2, army.clamp(min=0, max=lastc).unsqueeze(2)).squeeze(2)
+    can_c = mask.gather(2, corps.clamp(min=0, max=lastc).unsqueeze(2)).squeeze(2)
+    # the army is the rarer, richer order; the corps is the fallback
+    deep = can_a & (r < ladder.FORM_SHARE * 0.3).unsqueeze(1)
+    pick = torch.where(deep, army, corps)
+    return torch.where(hit & (deep | can_c), pick, prod)
+
+
+def _decide_gp_pass(sim, row: int, seeds, turn) -> torch.Tensor | None:
+    """Sometimes PASS on a claimable Great Person. Free variation like the
+    reorder: the applier re-validates every clause, and a verb nothing ever
+    chooses is a verb the gate never reaches."""
+    if seeds is None or getattr(sim, "_gp_nc", 0) == 0:
+        return None
+    elig = ((sim.gp_offer >= 0) & (sim.gp_passed_by < 0)
+            & (sim.civ_gpp[:, row].double() >= sim.gp_price))
+    if not bool(elig.any()):
+        return None
+    r = _policy_rng(sim, seeds, turn or 0, row, 8)
+    hit = elig.any(dim=1) & (r < ladder.GP_PASS_SHARE)
+    if not bool(hit.any()):
+        return None
+    pick = elig.long().argmax(dim=1)
+    return torch.where(hit, pick, torch.full_like(pick, -1))
+
+
 def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None, pre: dict | None = None):
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     style = _seat_style(row)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row),
                                   tier_order=style["tier_order"])
+    prod = _maybe_form_tier(sim, row, m["production"], prod, seeds, turn)
     prod = _maybe_reorder(sim, row, m["production"], prod, seeds, turn)
     dtile = _district_tiles(sim, row, prod)
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
@@ -1128,12 +1174,13 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     nuke = sim._seat_nuke_candidate(row)
     spec, lock = _decide_citizens(sim, row)
     vote = _decide_vote(sim, row)
+    gp_pass = _decide_gp_pass(sim, row, seeds, turn)
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -1202,10 +1249,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -1248,6 +1295,8 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
         ballot = [e if e[0] >= 0 else None for e in ballot]
         if any(e is not None for e in ballot):
             rec["vote"] = ballot
+    if gp_pass is not None and int(gp_pass[b]) >= 0:
+        rec["gpPass"] = int(gp_pass[b])
     return rec
 
 
@@ -1445,9 +1494,12 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 continue
             for _f in range(3):
                 vote[:, _k, _f] = int(_ent[_f])
+    _gpv = rec.get("gpPass")
+    gp_pass = (torch.full((sim.B,), int(_gpv), dtype=torch.long, device=dev)
+               if _gpv is not None and int(_gpv) >= 0 else None)
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)

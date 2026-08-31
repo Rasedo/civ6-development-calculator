@@ -14,6 +14,10 @@
  *     [projectLo, +nP)   run that district project — base rows and the four
  *                        space-race steps alike; a space row is legal only
  *                        with its tech and its predecessor step complete
+ *     [formLo, +2*NU)    train that roster unit AS A FORMATION — the corps
+ *                        block then the army block; a column is legal only
+ *                        with the enabling building standing and the tier's
+ *                        civic in
  *     [promoteLo, +Q-1)  move queue entry k+1 to the HEAD (k = 0 names the
  *                        second entry — the first is already the head, so
  *                        there is no column for it)
@@ -67,6 +71,7 @@ export interface ProdLayout {
   districtLo: number;
   wonderLo: number;
   projectLo: number;
+  formLo: number;
   promoteLo: number;
   width: number;
 }
@@ -81,7 +86,8 @@ export function prodLayout(): ProdLayout {
   const nS = SCAFFOLD_DISTRICTS.length;
   const wonderLo = NB + 2 + NU + nS;
   const projectLo = wonderLo + wonders.length;
-  const promoteLo = projectLo + projects.length;
+  const formLo = projectLo + projects.length;
+  const promoteLo = formLo + 2 * NU;
   return {
     NB,
     NU,
@@ -95,6 +101,7 @@ export function prodLayout(): ProdLayout {
     districtLo: NB + 2 + NU,
     wonderLo,
     projectLo,
+    formLo,
     promoteLo,
     width: promoteLo + PRODUCTION_QUEUE_MAX - 1,
   };

@@ -15,7 +15,7 @@ export type QueueItem =
   | { kind: 'building'; building: string; progress: number }
   | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number }
   | { kind: 'settler'; progress: number; cost: number }
-  | { kind: 'unit'; unit: string; progress: number; cost?: number }
+  | { kind: 'unit'; unit: string; progress: number; cost?: number; formation?: number }
   | { kind: 'project'; project: string; progress: number; cost: number };
 
 export type GreatPersonClass =
@@ -235,6 +235,8 @@ export interface SeatActionRecord {
    * (0 = A, 1 = B), the target index, and how many EXTRA votes to buy up the
    * favor curve. A slot the record leaves out votes the AI line. */
   vote?: CongressVote;
+  /** the Great Person class this seat PASSES on this turn (-1/absent none) */
+  gpPass?: number;
 }
 
 /** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
@@ -364,6 +366,10 @@ export interface GameState {
   gpOffer?: number[];
   /** the price FROZEN when the offer was drawn. */
   gpPrice?: number[];
+  /** who PASSED on the standing offer, per class — -1 (or absent) nobody.
+   *  CIV6: the passer is locked out of THAT individual and the price falls
+   *  20% for everyone else; the claim resets the cell for the next person. */
+  gpPassedBy?: number[];
   unitsMode: boolean;
   units: Unit[];
   nextUnitId: number;

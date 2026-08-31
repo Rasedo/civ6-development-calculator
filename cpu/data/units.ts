@@ -28,6 +28,15 @@ export const FORMATION_CIVIC: readonly string[] = ['', 'NATIONALISM', 'MOBILIZAT
 
 export const FORMATION_MAX = 2;
 
+/** CIV6 (Military Academy, Seaport): the building lets its city train a
+ *  formation DIRECTLY — a Corps or Army from the Academy, a Fleet or Armada
+ *  from the Seaport — once the formation's own civic is in. The order costs
+ *  150% of the unit for the two-step and 225% for the three-step, and the
+ *  enabling building takes 25% off that price. */
+export const FORMATION_COST_MULT: readonly number[] = [1, 1.5, 2.25];
+export const FORMATION_TRAIN_DISCOUNT = 0.75;
+export const FORMATION_TRAIN_BUILDING = { land: 'MILITARY_ACADEMY', naval: 'SEAPORT' } as const;
+
 export interface UnitDef {
   id: string;
   name: string;

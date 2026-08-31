@@ -123,6 +123,8 @@ class Rules:
     railroad_cost: list  # [(stockpile slot, units)] one tile spends
     embark_transition_mp: int  # the embark/disembark charge, unless a Harbor or coastal centre docks it free
     shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
+    military_academy_bidx: int  # building-roster index of MILITARY_ACADEMY (trains land formations directly), -1 if absent
+    seaport_bidx: int  # building-roster index of SEAPORT (trains naval formations directly), -1 if absent
     nuclear_plant_bidx: int  # NUCLEAR_POWER_PLANT row — the reactor whose age is clocked, -1 if absent
     ancient_walls_bidx: int  # building-roster index of ANCIENT_WALLS (outer HP + city strike), -1 if absent
     palace_yields: torch.Tensor  # [6]
@@ -316,6 +318,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         railroad_cost=[(int(a), int(b)) for a, b in r["railroadCost"]],
         embark_transition_mp=int(r["embarkTransitionMp"]),
         shipyard_bidx=int(r.get("shipyardBidx", -1)),
+        military_academy_bidx=int(r.get("militaryAcademyBidx", -1)),
+        seaport_bidx=int(r.get("seaportBidx", -1)),
         nuclear_plant_bidx=int(r.get("nuclearPlantBidx", -1)),
         ancient_walls_bidx=int(r.get("ancientWallsBidx", -1)),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
@@ -716,7 +720,7 @@ _MUTABLE = [
     "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_offer", "gp_price", "gp_claimed", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair

@@ -417,6 +417,11 @@ class SimPhase:
         banks: with somewhere item-shaped to put them, the hammers go there."""
         bidx = self._bidx
         cur = self.city_current[bidx, row, col, 0].clone()
+        # A FORMATION head is the unit's own column to every multiplier and to
+        # the completion below — TS's `kind === 'unit'` tests cannot tell them
+        # apart — and only the spawn asks the tier.
+        form_t = self._q_form_tier(cur)
+        cur = self._q_unit_of(cur)
         # the head's PLOT, read before the shift takes it away
         qt0 = self.city_qtile[bidx, row, col, 0].clone()
         has_q = act & (cur >= 0)
@@ -608,13 +613,14 @@ class SimPhase:
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui)
             fp = self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)                 if self.n_governors else None
-            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp, free_promo=fp)
+            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp, free_promo=fp, formation=form_t)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
             if self._wond_n and bool(self._wond_dupnaval.any()):
                 twin = made_u & self.unit_naval[ui] & self._seat_wonder_any(row, self._wond_dupnaval)
                 if bool(twin.any()):
-                    self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp)
+                    # what was trained arrives twice, tier and all
+                    self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
             if self._builder_idx >= 0:
                 made_b = made_u & (ui == self._builder_idx)
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
@@ -1190,7 +1196,9 @@ class SimPhase:
                 self._gp_ensure_offer(active, cls)
                 has_person = self.gp_offer[:, cls] >= 0
                 gcost = self.gp_price[:, cls]
-                hit = active & has_person & (self.civ_gpp[:, row, cls] >= gcost)
+                # the PASSER is locked out of this individual — points wait
+                hit = active & has_person & (self.gp_passed_by[:, cls] != row) \
+                    & (self.civ_gpp[:, row, cls] >= gcost)
                 if not bool(hit.any()):
                     break
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
@@ -1281,6 +1289,8 @@ class SimPhase:
         hr = hit.nonzero(as_tuple=True)[0]
         self.gp_claimed[hr, cls, at_c[hr]] = True
         self.gp_offer[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_offer[:, cls])
+        # the claim ends the pass: the NEXT person starts with nobody locked out
+        self.gp_passed_by[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_passed_by[:, cls])
         self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."

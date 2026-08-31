@@ -330,6 +330,52 @@ def poke_arms(rules, path):
     print("  6 arms OK — the site code selects, it does not fall through")
 
 
+# ------------------------------------------------------- 7 the gold buyout
+def poke_wonder_buyout(rules, path):
+    """CIV6 (Shah Jahan): "Grants Production towards wonder construction,
+    capped at half of your current treasury. Then reduces your Gold by twice
+    the amount of purchased Production." — and with no wonder at the head,
+    the charge buys nothing and costs nothing."""
+    sim = fresh(rules, path)
+    cls, at = 0, 0
+    k = sim._GPFX.get("wonderBuyout", -1)
+    assert k >= 0, "the fx table names no wonderBuyout column"
+    sim._gp_site[cls, at] = 1
+    sim._gp_charges[cls, at] = 1
+    sim._gp_effects[cls, at, :] = 0
+    sim._gp_effects[cls, at, k] = 1
+    sim._gp_any_fx = True
+    ctr = int(sim.city_center[0, ROW, 0])
+    assert ctr >= 0, "row has no city to spend in"
+
+    # POOR: the treasury is the cap — production = treasury / 2, gold to zero
+    sim.city_current[0, ROW, 0, 0] = sim.WONDER_BASE
+    sim.city_cost[0, ROW, 0, 0] = 500.0
+    sim.city_progress[0, ROW, 0, 0] = 100.0
+    sim.civ_treasury[0, ROW] = 300.0
+    v = make_person(sim, ROW, cls, at, ctr)
+    order(sim, ROW, v, sim._A_GP)
+    assert float(sim.city_progress[0, ROW, 0, 0]) == 250.0,         f"poor buyout bought {float(sim.city_progress[0, ROW, 0, 0]) - 100.0}, wanted 150"
+    assert float(sim.civ_treasury[0, ROW]) == 0.0, "the gold did not fall by twice the production"
+
+    # RICH: the wonder's need is the cap
+    sim.civ_treasury[0, ROW] = 10000.0
+    v = make_person(sim, ROW, cls, at, ctr)
+    order(sim, ROW, v, sim._A_GP)
+    assert float(sim.city_progress[0, ROW, 0, 0]) == 500.0, "rich buyout must fill the need exactly"
+    assert float(sim.civ_treasury[0, ROW]) == 10000.0 - 2 * 250.0,         f"treasury {float(sim.civ_treasury[0, ROW])}, wanted {10000.0 - 500.0}"
+
+    # NOT A WONDER at the head: nothing bought, nothing paid
+    sim.city_current[0, ROW, 0, 0] = sim.UNIT_BASE
+    sim.city_progress[0, ROW, 0, 0] = 0.0
+    sim.civ_treasury[0, ROW] = 1000.0
+    v = make_person(sim, ROW, cls, at, ctr)
+    order(sim, ROW, v, sim._A_GP)
+    assert float(sim.city_progress[0, ROW, 0, 0]) == 0.0, "the buyout paid a non-wonder head"
+    assert float(sim.civ_treasury[0, ROW]) == 1000.0, "gold left for a head no clause names"
+    print("  7 buyout OK — half the purse, then the need, and never a non-wonder")
+
+
 # ------------------------------------------ 8 the grant onto a half-built one
 def poke_grant_drops_queue(rules, path):
     """CIV6 (Isaac Newton): "Instantly builds a Library and University in this
@@ -376,6 +422,7 @@ def main() -> None:
     poke_spend(rules, p)
     poke_perm(rules, p)
     poke_arms(rules, p)
+    poke_wonder_buyout(rules, p)
     poke_grant_drops_queue(rules, p)
     print("GREAT_PERSON POKES OK")
 

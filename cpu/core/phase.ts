@@ -1,6 +1,6 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
-import { advanceGreatPeople, gwExtraSlots, patronizeGreatPerson, relicSlotsIn } from './greatPeople';
+import { advanceGreatPeople, gwExtraSlots, passGreatPerson, patronizeGreatPerson, relicSlotsIn } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from '../data/greatPeople';
 import { completeQueueItem, dropQueuedBuilding } from './production';
@@ -16,7 +16,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocksIn, isCivicComplete, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -36,7 +36,7 @@ import { prodLayout } from './prodLayout';   // ONE column layout, shared with t
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
 import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
@@ -54,7 +54,7 @@ import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, val
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -908,7 +908,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
  * `apply_seat_actions`: the idle gate, then the same cost/progress semantics. */
 export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatActionRecord): void {
-  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, promoteLo } = prodLayout();
+  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, formLo, promoteLo } = prodLayout();
   // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
   // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
   // apply_turn needed on the GPU side, and the second driven-parity red: every
@@ -1020,6 +1020,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // The WORLD CONGRESS ballot is banked, not spent: the session runs at the
   // turn tail, after every seat has had its phase.
   if (rec.vote) actor.congressVote = rec.vote;
+  if (rec.gpPass !== undefined && rec.gpPass >= 0) passGreatPerson(state, actor.seat, rec.gpPass);
   for (const [centre, aCol, aTile] of prodPairs) {
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
@@ -1069,6 +1070,25 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       if (wd) placeSeatWonder(state, actor, civCity, wd);
     } else if (a >= projectLo && a < projectLo + projects.length) {
       queueSeatProject(state, civCity, projects[a - projectLo]);
+    } else if (a >= formLo && a < formLo + 2 * NU) {
+      // CIV6 (Military Academy, Seaport): the building lets the city train a
+      // Corps or Army (a Fleet or Armada at sea) DIRECTLY once the
+      // formation's own civic is in — 150% / 225% of the unit's cost, 25%
+      // off for the building that enables the order. Every clause here is
+      // re-validated at apply, like the plain unit arm above it.
+      const tier = a < formLo + NU ? 1 : 2;
+      const id = units[(a - formLo) % NU];
+      const def = id ? UNITS[id] : undefined;
+      const civic = FORMATION_CIVIC[tier];
+      if (def && def.combat > 0 && unitDomain(id) === 'military' && !formationBanned(id)
+          && civCity.buildings.includes(def.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land)
+          && (!civic || isCivicComplete(state, civic, actor.seat))
+          && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)) {
+        commitProduction(state, civCity.seat, civCity, {
+          kind: 'unit', unit: id, formation: tier, progress: 0,
+          cost: Math.round(def.cost * FORMATION_COST_MULT[tier] * FORMATION_TRAIN_DISCOUNT),
+        });
+      }
     } else if (a >= NB + 2 + NU) {
       // DISTRICT: the file names the TYPE **and the TILE**. Which plot a
       // district takes is a decision, not derived state, so it is recorded and

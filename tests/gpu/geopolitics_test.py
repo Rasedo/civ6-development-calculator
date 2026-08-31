@@ -926,6 +926,16 @@ def poke_visibility(rules, path):
     v = sim._diplo_vis()
     assert int(v[0, a, b]) == 2 and int(v[0, a, 0]) == 1, "the tech pays one column only"
 
+    # CIV6 (Mary Katherine Goddard): "+1 level of Diplomatic visibility with
+    # all other civilizations" — the spent charge is permanent and
+    # target-blind, a second all-columns term beside the tech's
+    _kv = sim._gp_perm_names.index("visibilityAll")
+    sim.civ_gp_perm[0, a, _kv] = 1
+    v = sim._diplo_vis()
+    assert int(v[0, a, b]) == 3 and int(v[0, a, 0]) == 2, "the charge must pay EVERY column"
+    assert int(v[0, b, a]) == 0, "the charge read back the other way"
+    sim.civ_gp_perm[0, a, _kv] = 0
+
     # The post and the alliance do not stack.
     sim.seat_ally_turns[0, a, b] = sim.seat_ally_turns[0, b, a] = 20
     assert int(sim._diplo_vis()[0, a, b]) == 3

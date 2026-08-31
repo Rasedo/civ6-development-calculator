@@ -331,7 +331,9 @@ class BatchEnv:
         rng_t = s._type_ranged_strength > 0
         alive = s.city_alive[:, row]
         n_cities = alive.sum(dim=1)
-        qcur = s._q_head(row)      # observe.ts counts `queue[0]` and no deeper
+        # observe.ts counts `queue[0]` and no deeper — and a FORMATION entry
+        # is `kind === 'unit'` there, so it counts as the unit it trains
+        qcur = s._q_unit_of(s._q_head(row))
         q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
         q_u = alive & (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
         q_mil = q_u & (s._type_combat[q_ty] > 0)

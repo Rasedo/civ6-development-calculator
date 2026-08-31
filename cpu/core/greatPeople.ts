@@ -104,6 +104,8 @@ export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: num
   const cost = patronageCost(state, seat, cls, gold);
   const purse = gold ? (owner.treasury ?? 0) : owner.faith;
   if (!Number.isFinite(cost) || Math.round(purse * 1000) < Math.round(cost * 1000)) return { ok: false };
+  // the PASSER cannot buy their way back to the individual they passed on
+  if ((state.gpPassedBy?.[clsIdx] ?? -1) === seat) return { ok: false };
   if (gold) owner.treasury = (owner.treasury ?? 0) - cost;
   else owner.faith -= cost;
   owner.gpp[cls] = 0;
@@ -270,11 +272,38 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   }
 
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
+  // the claim ends the pass: the NEXT person starts with nobody locked out
+  if (state.gpPassedBy) state.gpPassedBy[GP_CLASSES.indexOf(cls)] = -1;
   owner.gpEarned.push(person.id); // ...and recorded as this seat's recruit
   addEraScore(state, seat, ERA_SCORE_GP);
   // CIV6 (Sky and Stars): "+1 Era Score each time a Great Person is Earned."
   dedicationEvent(state, seat, DED_SKY);
   state.eventLog.push(`${owner.name} claimed ${person.name}.`);
+}
+
+/** CIV6 (Great People): "you may pass on a Great Person, which will cost you
+ *  some Great Person points, but decrease the cost of the next one" — the
+ *  pass sacrifices 20% of the person's cost from the passer's points, drops
+ *  the price 20% for everyone ELSE, and locks the passer out of that
+ *  individual until another civilization claims them. Only a seat that could
+ *  claim right now may pass, and a person already passed on cannot be passed
+ *  again. */
+export function passGreatPerson(state: GameState, seat: number, clsIdx: number): { ok: boolean } {
+  const cls = GP_CLASSES[clsIdx];
+  const owner = cls ? seatOf(state, seat) : undefined;
+  if (!cls || !owner) return { ok: false };
+  // a READ of the standing offer, never the draw: `ensureGpOffer` is the
+  // seat-phase loop's alone, and a pass while the redraw is pending refuses
+  // on both engines rather than moving the RNG stream here
+  if (gpOffer(state, cls) < 0) return { ok: false };
+  if ((state.gpPassedBy?.[clsIdx] ?? -1) >= 0) return { ok: false };
+  const cost = gpOfferCost(state, cls);
+  const pts = owner.gpp[cls] ?? 0;
+  if (!Number.isFinite(cost) || pts < cost) return { ok: false };
+  owner.gpp[cls] = pts - cost * 0.2;
+  state.gpPrice![clsIdx] = cost * 0.8;
+  (state.gpPassedBy ??= GP_CLASSES.map(() => -1))[clsIdx] = seat;
+  return { ok: true };
 }
 
 export function advanceGreatPeople(state: GameState, seat: number): void {
@@ -286,6 +315,8 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
     let pts = (owner.gpp[cls] ?? 0) + perTurn[cls];
     if (pts !== 0) {
       for (;;) {
+        // the PASSER is locked out of this individual — the points wait
+        if ((state.gpPassedBy?.[GP_CLASSES.indexOf(cls)] ?? -1) === seat) break;
         const cost = gpOfferCost(state, cls); // Infinity while no offer stands
         if (!Number.isFinite(cost) || pts < cost) break;
         pts -= cost;

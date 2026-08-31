@@ -200,7 +200,10 @@ function queueColumn(q: City['queue'][number] | undefined): number {
       return LAYOUT.settlerCol;
     case 'unit': {
       const i = UNIT_IDX.get(q.unit);
-      return i === undefined ? -1 : LAYOUT.unitLo + i;
+      if (i === undefined) return -1;
+      // a FORMATION entry sits in its own block — corps first, then army —
+      // because that is the column that queued it and what the GPU stores
+      return q.formation ? LAYOUT.formLo + (q.formation - 1) * LAYOUT.NU + i : LAYOUT.unitLo + i;
     }
     case 'district': {
       const i = SCAFFOLD_IDX.get(q.district);
@@ -394,6 +397,7 @@ const GAME: Record<string, Extractor> = {
       ...GP_CLASSES.map((c) => GREAT_PEOPLE[c].flatMap((p, at) => (claimed.has(p.id) ? [at] : []))),
       GP_CLASSES.map((_, i) => s.gpOffer?.[i] ?? -1),
       GP_CLASSES.map((_, i) => s.gpPrice?.[i] ?? 0),
+      GP_CLASSES.map((_, i) => s.gpPassedBy?.[i] ?? -1),
     ];
   },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],

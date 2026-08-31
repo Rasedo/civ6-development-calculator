@@ -13,6 +13,24 @@ class SimSeats:
         being paid, and every `progress +=` in either engine reads it."""
         return self.city_current[:, row, :, 0]
 
+    def _q_unit_of(self, cur: torch.Tensor) -> torch.Tensor:
+        """`cur` with any FORMATION code folded onto its unit's own column.
+        ORACLE: TS keys every production-side unit test on `kind === 'unit'`,
+        which a formation entry satisfies — so the multipliers, the army
+        census and the completion all see the unit, and only the spawn asks
+        `_q_form_tier`. Non-formation codes pass through untouched."""
+        is_f = (cur >= self.FORM_BASE) & (cur < self.FORM_BASE + 2 * self.NU)
+        return torch.where(is_f, self.UNIT_BASE + (cur - self.FORM_BASE) % self.NU, cur)
+
+    def _q_form_tier(self, cur: torch.Tensor) -> torch.Tensor:
+        """The tier a FORMATION code trains at — 1 corps, 2 army — and 0 for
+        every other code."""
+        is_f = (cur >= self.FORM_BASE) & (cur < self.FORM_BASE + 2 * self.NU)
+        return torch.where(
+            is_f,
+            torch.div((cur - self.FORM_BASE).clamp(min=0), self.NU, rounding_mode="floor") + 1,
+            torch.zeros_like(cur))
+
     def _q_depth(self, row: int) -> torch.Tensor:
         """[B, RC] long — `queue.length`. Entries are kept packed from slot 0,
         so the depth is the count and the first free slot is the same number."""
@@ -139,7 +157,8 @@ class SimSeats:
         ones_b = torch.ones(B, dtype=torch.bool, device=dev)
         nW_m = self._wond_n if self.districts_on else 0
         nP_m = len(self._proj_rows) if self.districts_on else 0
-        W = bld_q.shape[2] + 2 + tr_city.shape[2] + nS + nW_m + nP_m + (self.QD - 1)
+        W = bld_q.shape[2] + 2 + tr_city.shape[2] + nS + nW_m + nP_m \
+            + 2 * tr_city.shape[2] + (self.QD - 1)
         # EVERY column below is `& room_j`, so a column no game can queue in
         # contributes an all-False row whatever the legality bodies answer —
         # and the district/wonder bodies are the two most expensive in a step.
@@ -180,6 +199,21 @@ class SimSeats:
              else (self.civ_civics[:, row, uciv] if uciv >= 0 else ones_b))
             for (_di, utech, uciv, _plc, _fc) in self._scaffold
         ] if (self.districts_on and self._scaffold) else []
+        # FORMATION columns: the chassis gates are per SEAT (per unit row),
+        # only the enabling building is per city. CIV6 (Military Academy,
+        # Seaport): the building trains a Corps or Army (Fleet or Armada)
+        # directly once the formation's own civic is in.
+        form_u = (self._type_combat > 0) & (self._type_air == 0)
+        if self._gdr_idx >= 0:
+            # CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any
+            # means."
+            form_u = form_u.clone()
+            form_u[self._gdr_idx] = False
+        form_civ = []
+        for _fk in (1, 2):
+            _fci = self._formation_civic[_fk] if _fk < len(self._formation_civic) else -1
+            form_civ.append(self.civ_civics[:, row, _fci] if _fci >= 0
+                            else torch.zeros(B, dtype=torch.bool, device=dev))
         w_okc: list[torch.Tensor | None] = []
         for wi in range(nW_m):
             unl_w = self._wonder_unlock_ok(row, wi)
@@ -262,9 +296,20 @@ class SimSeats:
                 if _rv >= 0:
                     okp_m = okp_m & self.civ_civics[:, row, _rv]
                 ok_p[:, pi_m] = okp_m
+            ok_f = torch.zeros(B, 2 * self.NU, dtype=torch.bool, device=dev)
+            if self._ma_bidx >= 0 or self._seaport_bidx >= 0:
+                has_ma = (self.city_bldg[:, row, j, self._ma_bidx] if self._ma_bidx >= 0
+                          else torch.zeros(B, dtype=torch.bool, device=dev))
+                has_sp = (self.city_bldg[:, row, j, self._seaport_bidx] if self._seaport_bidx >= 0
+                          else torch.zeros(B, dtype=torch.bool, device=dev))
+                bld_f = torch.where(self.unit_naval.unsqueeze(0),
+                                    has_sp.unsqueeze(1), has_ma.unsqueeze(1))
+                base_f = tr_j & form_u.unsqueeze(0) & bld_f
+                ok_f[:, :self.NU] = base_f & form_civ[0].unsqueeze(1)
+                ok_f[:, self.NU:] = base_f & form_civ[1].unsqueeze(1)
             room_j = room[:, j].unsqueeze(1)
             prod_cols.append(torch.cat(
-                [base_j & room_j, ok_w & room_j, ok_p & room_j, prom_j], dim=1))
+                [base_j & room_j, ok_w & room_j, ok_p & room_j, ok_f & room_j, prom_j], dim=1))
         return torch.stack(prod_cols, dim=1)
 
     def seat_masks(self, row: int) -> dict[str, torch.Tensor]:
@@ -298,6 +343,7 @@ class SimSeats:
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
         vote: torch.Tensor | None = None,  # [B, 3, 3] the congress ballot: [outcome, target, extra votes] per slate slot
+        gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
@@ -334,6 +380,8 @@ class SimSeats:
             self._driven_citizens[row] = (spec, lock)
         if vote is not None:
             self._driven_vote[row] = vote
+        if gp_pass is not None:
+            self._driven_gp_pass[row] = gp_pass
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
@@ -591,6 +639,7 @@ class SimSeats:
         war = self._driven_war.pop(row, None)
         citizens = self._driven_citizens.pop(row, None)
         vote = self._driven_vote.pop(row, None)
+        gp_pass = self._driven_gp_pass.pop(row, None)
         production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
         if not bool(active.any()):
             return
@@ -653,6 +702,31 @@ class SimSeats:
             # seat has had its phase.
             take = (active & ext).view(-1, 1, 1)
             self.civ_congress_vote[:, row] = torch.where(take, vote.to(torch.long), self.civ_congress_vote[:, row])
+        if gp_pass is not None and self._gp_nc > 0:
+            # CIV6 (Great People): the PASS — 20% of the person's cost leaves
+            # the passer's points, the price falls 20% for everyone else, and
+            # `gp_passed_by` locks the passer out until the claim. Only a seat
+            # that could claim right now may pass, and a person already
+            # passed on cannot be passed again (`passGreatPerson`).
+            g = gp_pass.to(torch.long)
+            gi = g.clamp(min=0, max=self._gp_nc - 1)
+            price_g = self.gp_price.gather(1, gi.unsqueeze(1)).squeeze(1)
+            ok_g = (active & ext & (g >= 0) & (g < self._gp_nc)
+                    & (self.gp_offer.gather(1, gi.unsqueeze(1)).squeeze(1) >= 0)
+                    & (self.gp_passed_by.gather(1, gi.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.civ_gpp[:, row].gather(1, gi.unsqueeze(1)).squeeze(1) >= price_g))
+            if bool(ok_g.any()):
+                pts_g = self.civ_gpp[:, row].gather(1, gi.unsqueeze(1)).squeeze(1)
+                self.civ_gpp[:, row] = self.civ_gpp[:, row].scatter(
+                    1, gi.unsqueeze(1),
+                    torch.where(ok_g, pts_g - price_g * 0.2, pts_g).unsqueeze(1))
+                self.gp_price.scatter_(
+                    1, gi.unsqueeze(1),
+                    torch.where(ok_g, price_g * 0.8, price_g).unsqueeze(1))
+                self.gp_passed_by.scatter_(
+                    1, gi.unsqueeze(1),
+                    torch.where(ok_g, torch.full_like(gi, row),
+                                self.gp_passed_by.gather(1, gi.unsqueeze(1)).squeeze(1)).unsqueeze(1))
         if pref is not None:
             self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
@@ -1221,7 +1295,9 @@ class SimSeats:
         if self._gp_nc == 0:
             return no, neg, no.clone(), neg.clone()
         fcost, gcost = self._seat_patronage_cost(row)
-        stand = self.gp_offer >= 0  # [B, nC]
+        # the passer's lockout hides the class from the DRIVER too — the
+        # applier's own refusal is the clause this mirrors
+        stand = (self.gp_offer >= 0) & (self.gp_passed_by != row)  # [B, nC]
         d = (self.gp_price - self.civ_gpp[:, row, :].double()).clamp(min=0)
         aff_f = stand & self._afford(self.civ_faith[:, row].unsqueeze(1), fcost) & active.unsqueeze(1)
         aff_g = stand & self._afford(self.civ_treasury[:, row].unsqueeze(1), gcost) & active.unsqueeze(1)
@@ -1246,7 +1322,8 @@ class SimSeats:
         for c in sorted(set(int(x) for x in cls_t[want].tolist())):
             if c < 0 or c >= self._gp_nc:
                 continue
-            sel = want & (cls_t == c) & (self.gp_offer[:, c] >= 0)
+            sel = want & (cls_t == c) & (self.gp_offer[:, c] >= 0) \
+                & (self.gp_passed_by[:, c] != row)
             price = gcost[:, c] if gold else fcost[:, c]
             purse = self.civ_treasury[:, row] if gold else self.civ_faith[:, row]
             ok = sel & self._afford(purse, price)
@@ -1774,6 +1851,37 @@ class SimSeats:
                     self._q_push(row, j, rows_p,
                                  torch.full_like(a, self.PROJECT_BASE + pi_a), price_a)
                     self._charge_project_resource(row, rows_p, pi_a)
+            is_f = act & (a >= self.FORM_BASE) & (a < self.FORM_BASE + 2 * self.NU)
+            if bool(is_f.any()):
+                # CIV6 (Military Academy, Seaport): a formation trained
+                # directly — every mask clause re-validated at apply, exactly
+                # as the plain unit arm above re-asks trainableUnits.
+                fk = (a - self.FORM_BASE).clamp(min=0, max=2 * self.NU - 1)
+                fui = fk % self.NU
+                ftier = torch.div(fk, self.NU, rounding_mode="floor") + 1
+                is_f = is_f & self._trainable_units(row)[:, j].gather(1, fui.unsqueeze(1)).squeeze(1) \
+                    & (self._type_combat.gather(0, fui) > 0) \
+                    & (self._type_air.gather(0, fui) == 0)
+                if self._gdr_idx >= 0:
+                    is_f = is_f & (fui != self._gdr_idx)
+                f_naval = self.unit_naval.gather(0, fui)
+                has_ma_a = (self.city_bldg[:, row, j, self._ma_bidx] if self._ma_bidx >= 0
+                            else torch.zeros_like(is_f))
+                has_sp_a = (self.city_bldg[:, row, j, self._seaport_bidx] if self._seaport_bidx >= 0
+                            else torch.zeros_like(is_f))
+                is_f = is_f & torch.where(f_naval, has_sp_a, has_ma_a)
+                for _fk in (1, 2):
+                    _fci = self._formation_civic[_fk] if _fk < len(self._formation_civic) else -1
+                    civ_ok_f = (self.civ_civics[:, row, _fci] if _fci >= 0
+                                else torch.zeros_like(is_f))
+                    is_f = is_f & ((ftier != _fk) | civ_ok_f)
+                # Math.round is half-UP; torch.round is half-even, so spell it
+                cost_f = torch.floor(self._type_cost.gather(0, fui).double()
+                                     * self._form_cost_mult.gather(0, ftier.clamp(max=self._form_cost_mult.shape[0] - 1))
+                                     * self._form_train_disc + 0.5)
+                self._q_push(row, j, is_f, a, cost_f)
+                for _ui, _sl, _c in self._res_slot_units:
+                    self._charge_unit_resource(row, is_f & (fui == _ui), _ui, at=j)
 
     def _select_research(self, row: int, want: torch.Tensor, ok: torch.Tensor, is_civic: bool = False) -> None:
         """The `selectResearch` twin: switch item, keeping the old one's science.

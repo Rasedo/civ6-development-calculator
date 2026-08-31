@@ -89,7 +89,8 @@ def test_the_depth_is_shared(rules, path) -> None:
     assert sim.city_current.shape[-1] == sim.QD, "the code plane is not dense over the queue"
     for name in ("city_progress", "city_cost", "city_qtile"):
         assert getattr(sim, name).shape[-1] == sim.QD, f"{name} does not span the queue"
-    assert sim.PROMOTE_BASE == sim.PROJECT_BASE + len(sim._proj_rows), \
+    assert sim.FORM_BASE == sim.PROJECT_BASE + len(sim._proj_rows),         "the formation block must open right after the projects"
+    assert sim.PROMOTE_BASE == sim.FORM_BASE + 2 * sim.NU, \
         "the promote block does not sit at the end of the production layout"
     assert sim.production_mask().shape[2] == sim.PROMOTE_BASE + sim.QD - 1, \
         "the mask width does not carry one column per promotable entry"

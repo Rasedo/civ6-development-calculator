@@ -888,6 +888,9 @@ class SimInit:
         # frozen with it.
         self.gp_offer = torch.full((B, n_gp), -1, dtype=torch.long, device=device)
         self.gp_price = torch.zeros(B, n_gp, dtype=torch.float64, device=device)
+        # who PASSED on the standing offer, per class (-1 nobody): the passer
+        # is locked out of THAT individual, the claim resets the cell
+        self.gp_passed_by = torch.full((B, n_gp), -1, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -1957,6 +1960,8 @@ class SimInit:
         self._railroad_cost = list(rules.railroad_cost)
         self._embark_transition_mp = int(rules.embark_transition_mp)
         self._shipyard_bidx = int(rules.shipyard_bidx)
+        self._ma_bidx = int(rules.military_academy_bidx)
+        self._seaport_bidx = int(rules.seaport_bidx)
         self._nuclear_bidx = int(rules.nuclear_plant_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
         _tr = rules.trade or {}
@@ -2016,6 +2021,10 @@ class SimInit:
         self._formation_cs = torch.tensor(
             [int(x) for x in rules.combat.get("formationCs", [0])], dtype=torch.long, device=device)
         self._formation_civic = [int(x) for x in rules.combat.get("formationCivic", [-1])]
+        self._form_cost_mult = torch.tensor(
+            [float(x) for x in rules.combat.get("formationCostMult", [1.0])],
+            dtype=torch.float64, device=device)
+        self._form_train_disc = float(rules.combat.get("formationTrainDiscount", 1.0))
         self._form_max = self._formation_cs.numel() - 1
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
         self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
@@ -2418,9 +2427,12 @@ class SimInit:
         self.DISTRICT_BASE = NB + 2 + self.NU
         self.WONDER_BASE = self.DISTRICT_BASE + len(self._scaffold)
         self.PROJECT_BASE = self.WONDER_BASE + self._wond_n
-        # ...and PROMOTE closes it: code PROMOTE_BASE + k moves queue entry
-        # k+1 to the head. There is no column for entry 0 — it is the head.
-        self.PROMOTE_BASE = self.PROJECT_BASE + len(self._proj_rows)
+        # FORM trains the unit AS A FORMATION — the corps block then the army
+        # block — and PROMOTE closes the layout: code PROMOTE_BASE + k moves
+        # queue entry k+1 to the head. There is no column for entry 0 — it is
+        # the head already.
+        self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
+        self.PROMOTE_BASE = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
@@ -2585,6 +2597,7 @@ class SimInit:
         self._driven_route: dict = {}
         self._driven_citizens: dict = {}
         self._driven_vote: dict = {}
+        self._driven_gp_pass: dict = {}
         self._driven_buy_nat: dict = {}
         self._driven_buy_cls: dict = {}
         self._driven_buy_ucls: dict = {}

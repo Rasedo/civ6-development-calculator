@@ -1875,6 +1875,12 @@ class SimEconomy:
         # your visibility with ALL civilizations by one level."
         if 0 <= self._vis_tech < self.civ_techs.shape[2]:
             out = out + self.civ_techs[:, :NM, self._vis_tech].long().unsqueeze(2)
+        # CIV6 (Mary Katherine Goddard): "+1 level of Diplomatic visibility
+        # with all other civilizations" — permanent and target-blind, so the
+        # spent charge broadcasts over the row's whole column axis.
+        _kv = self._gp_perm_names.index("visibilityAll") if "visibilityAll" in self._gp_perm_names else -1
+        if _kv >= 0:
+            out = out + self.civ_gp_perm[:, :NM, _kv].long().unsqueeze(2)
         # The post and the alliance are ALTERNATIVES: "These two actions do not
         # add separate Diplomatic Visibility levels".
         ally = (self.seat_ally_turns[:, :NM, :NM] > 0).long()

@@ -251,6 +251,7 @@ GAME = {
           for c in range(sim.gp_claimed.shape[1])],
         [int(x) for x in sim.gp_offer[b].tolist()],
         [float(x) for x in sim.gp_price[b].tolist()],
+        [int(x) for x in sim.gp_passed_by[b].tolist()],
     ],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
     "cityCount": lambda sim, b, rows: [len(_city_rows(sim, b))],

@@ -3,6 +3,7 @@ import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { SeatCaps, SeatClass } from '../data/seats';
 import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL } from '../data/seats';
+import { gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
@@ -311,6 +312,9 @@ export function diploVisibility(state: GameState, viewer: number, target: number
   // "...researching the Printing Press technology. This will increase your
   // visibility with ALL civilizations by one level."
   if (sx.research.techs.includes(VISIBILITY_TECH)) n += 1;
+  // CIV6 (Mary Katherine Goddard): "+1 level of Diplomatic visibility with
+  // all other civilizations" — a spent charge, permanent, target-blind.
+  n += gpPermOf(sx, 'visibilityAll');
   // The post and the alliance are ALTERNATIVES: "These two actions do not add
   // separate Diplomatic Visibility levels - it does no good to spy on your
   // allies!"

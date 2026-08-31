@@ -1731,7 +1731,7 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None) -> torch.Tensor:
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -1808,7 +1808,8 @@ class SimMasks:
         # and only the chassis that owns the fact ever writes one.
         # a reclaimed slot carries the dead occupant's FORMATION too, and a
         # freshly trained unit is always a single one.
-        getattr(self, f"{pre}_unit_formation")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_formation")[rows, slot] = (
+            formation[rows] if formation is not None else 0)
         getattr(self, f"{pre}_unit_escorted")[rows, slot] = False
         getattr(self, f"{pre}_unit_band_level")[rows, slot] = 0
         getattr(self, f"{pre}_unit_band_album")[rows, slot] = 0

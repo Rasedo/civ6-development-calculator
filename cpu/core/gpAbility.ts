@@ -29,6 +29,7 @@ import { nextRandom } from './rand';
 import { spawnUnit, disbandUnit } from './units';
 import { grantStockpile } from './stockpile';
 import { repairDrip, urbanDefensesFit } from './rules';
+import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH } from '../data/units';
 import { xpToNextLevel } from './promotions';
 
@@ -242,6 +243,24 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       const before = q.progress;
       q.progress += fx.wonderProduction * (dbl ? 2 : 1);
       repairDrip(state, city, before);
+    }
+  }
+  if (fx.wonderBuyout && city && owner) {
+    // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
+    // capped at half of your current treasury. Then reduces your Gold by
+    // twice the amount of purchased Production." The head is the wonder
+    // being worked; a charge spent with no wonder at the head buys nothing
+    // and costs nothing.
+    const q = city.queue[0];
+    if (q?.kind === 'wonder') {
+      const cost = itemCost(q, state, city);
+      const prod = Math.min(Math.max(0, cost - q.progress), owner.treasury / 2);
+      if (prod > 0) {
+        const before = q.progress;
+        q.progress += prod;
+        owner.treasury -= 2 * prod;
+        repairDrip(state, city, before);
+      }
     }
   }
   if (fx.spaceProduction && city) {

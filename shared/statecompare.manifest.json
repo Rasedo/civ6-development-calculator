@@ -207,12 +207,14 @@
           "covers": [
             "GameState.claimedGreatPeople",
             "GameState.gpOffer",
-            "GameState.gpPrice"
+            "GameState.gpPrice",
+            "GameState.gpPassedBy"
           ],
           "planes": [
             "gp_claimed",
             "gp_offer",
             "gp_price",
+            "gp_passed_by",
             "gp_earned"
           ],
           "note": "great people are drawn from ONE global pool on both engines: the CLAIMED set per class (roster indices), the FROZEN offer (-1 pending, -2 exhausted) and its frozen price. `gp_earned` stays a per-class recruit count off this set."

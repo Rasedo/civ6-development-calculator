@@ -406,8 +406,14 @@ class SimGp:
         """CIV6 (Imhotep and the other four): production into a WONDER under
         construction, doubled when that wonder's era is at or below the row's
         own `wonderEraDouble`."""
+        # CIV6 (Shah Jahan): "Grants Production towards wonder construction,
+        # capped at half of your current treasury. Then reduces your Gold by
+        # twice the amount of purchased Production." The flat charges
+        # (Brunelleschi, Eiffel) and the buyout share the site — the head must
+        # be a WONDER — so the gold arm rides the same body.
+        buyout = self._gp_fx(cls, at, "wonderBuyout").double()
         amt = self._gp_fx(cls, at, "wonderProduction").double()
-        if not bool(((amt != 0) & m).any()):
+        if not bool((((amt != 0) | (buyout != 0)) & m).any()):
             return
         cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
         wi = cur - self.WONDER_BASE
@@ -416,11 +422,20 @@ class SimGp:
         w_era = self._wonder_era[wi.clamp(min=0, max=max(self._wond_n - 1, 0))] if self._wond_n else torch.zeros_like(wi)
         mult = torch.where((dbl_to >= 0) & (w_era <= dbl_to), 2.0, 1.0).double()
         hit = m & is_w & (amt != 0)
-        if not bool(hit.any()):
+        buy = m & is_w & (buyout != 0)
+        if not bool((hit | buy).any()):
             return
         _drip = self.city_progress[:, row, :, 0].clone()
         r = hit.nonzero(as_tuple=True)[0]
         self.city_progress[r, row, cc[r], 0] += (amt[r] * mult[r]).to(self.city_progress.dtype)
+        if bool(buy.any()):
+            rb = buy.nonzero(as_tuple=True)[0]
+            cb = cc[rb]
+            need = (self.city_cost[rb, row, cb, 0].double()
+                    - self.city_progress[rb, row, cb, 0].double()).clamp(min=0)
+            prod = torch.minimum(need, self.civ_treasury[rb, row].double() / 2).clamp(min=0)
+            self.city_progress[rb, row, cb, 0] += prod.to(self.city_progress.dtype)
+            self.civ_treasury[rb, row] = (self.civ_treasury[rb, row].double() - 2 * prod).to(self.civ_treasury.dtype)
         self._repair_drip(row, _drip)
 
     def _gp_per_adjacent(self, row: int, m: torch.Tensor, cls: torch.Tensor,

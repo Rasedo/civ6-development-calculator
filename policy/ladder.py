@@ -462,6 +462,8 @@ def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project
 #: The driver is the fuzzer — the applier re-validates every pick — and this is
 #: the only thing that reaches the promote columns at all.
 REORDER_SHARE = 0.06
+FORM_SHARE = 0.05
+GP_PASS_SHARE = 0.04
 
 
 def pick_production(

@@ -47,7 +47,7 @@ from the list below.
 | B-22r World Congress | 1 | Luxury Policy has no carrier (outcome A publishes no number); the scored-competition catalog holds one row |
 | B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a REMOVED item's hammers bank where real Civ 6 remembers them against the item |
+| B-53r the great-person PASS | 1 | the PASS ships (fee, discount, lockout); what remains is the hammers bullet — a REMOVED item's progress banks where real Civ 6 remembers it against the item |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
@@ -56,12 +56,12 @@ from the list below.
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
-| B-61r the Great Person clauses with no carrier | 2 | 12 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, a diplomatic-visibility grant whose mechanic ships now, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
+| B-61r the Great Person clauses with no carrier | 2 | 10 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, barbarian conversion, ocean passage, Tupac Amaru's per-district undefended grant walk); Goddard's visibility grant and Shah Jahan's gold-buyout SHIP now; Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
-| B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
+| B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, the mission's mark on the relationship, demand and discuss, and the four agreements that need their own effect |
@@ -485,11 +485,16 @@ Civ 6 source or is recorded as unverifiable.
     veteran's own hit points — the same unit the sourced rule already keeps
     the promotions and experience of — and end its turn. Recorded as a
     stylization, not a sourced rule.
-  - **TRAINING A FORMATION DIRECTLY IS ABSENT.** Real Civ 6 lets a city with
-    a Military Academy (or a Seaport at sea) train a Corps or Army outright
-    rather than merging two units, at a reduced cost. Both buildings exist
-    here; the production queue carries no formation tier, so the only road
-    to a Corps is the merge.
+  - **A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE IS THE UNIT'S OWN.**
+    The queue tier SHIPS: a city holding the Military Academy (Seaport at
+    sea) trains a Corps or Army (Fleet or Armada) outright once the
+    formation's own civic is in, at 150% / 225% of the unit's cost and 25%
+    off for the enabling building (`FORMATION_COST_MULT`, the `formLo`
+    block, `_q_unit_of`; `tests/gpu/formation_train_test.py` is the bar,
+    the driver takes the column at `FORM_SHARE`). What no reached source
+    publishes is the STRATEGIC-RESOURCE charge of the direct order — it
+    ships at the single unit's own charge, the modelled minimum, and the
+    real figure is an owner question.
   - **AN ESCORT FORMATION IS A PAIR.** Real Civ 6 links up to THREE units of
     different classes — military, civilian and support. Support units are
     modelled here as civilians, and the drag takes ONE rider, so `escortUnit`
@@ -555,11 +560,14 @@ Civ 6 source or is recorded as unverifiable.
   gate, the frozen randomly-drawn offer and its frozen price
   (`ensureGpOffer` / `_gp_ensure_offer`, `gpCost`), and both patronage
   purses with the Oracle discount (`patronageCost` /
-  `_seat_patronage_cost`). OPEN:
-  - **NOBODY CAN PASS.** Real Civ 6 lets a player REJECT the standing
-    offer — the class's own points freeze and the passed person stays on
-    offer to everyone else. Needs a per-seat passed flag beside the
-    shared offer, and the rejoin rule when the next person stands.
+  `_seat_patronage_cost`). The PASS ships too (`passGreatPerson`, the
+  `gpPass` record field): a seat that could claim may reject the standing
+  person instead — it sacrifices 20% of the cost from its own points, the
+  price falls 20% for everyone else, and `gpPassedBy` locks the passer out
+  of THAT individual until another claims (recruit race and patronage
+  alike); accrual continues, one passer per person, and the claim clears
+  the stamp. The driver takes it at `GP_PASS_SHARE`;
+  `tests/gpu/gp_pass_test.py` is the bar. OPEN:
   - **A REMOVED ITEM'S HAMMERS BANK, WHERE CIV 6 HOLDS THEM AGAINST THE
     ITEM.** SWITCHING is faithful now: the queue holds the item after it
     stops being worked, so its hammers wait on its own entry and a reorder

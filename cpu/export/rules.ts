@@ -36,7 +36,7 @@ import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { NUKE_COLS, unitActionNames } from '../core/unitActions';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
-import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, ROCK_BAND_COST_STEP } from '../data/units';
+import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, ROCK_BAND_COST_STEP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, STORM_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
 import {
@@ -419,6 +419,7 @@ function gpFxRow(p: GreatPersonDef): number[] {
     suzerainSeize: fx.suzerainSeize ? 1 : 0,
     formation: fx.formation ?? 0,
     formationNaval: fx.formationNaval ? 1 : 0,
+    wonderBuyout: fx.wonderBuyout ? 1 : 0,
   };
   return [
     ...GP_FX.map((k) => v[k] ?? 0),
@@ -470,6 +471,8 @@ export function buildRules() {
     railroadCost: RAILROAD_COST.map(([id, n]: readonly [string, number]) => [STRATEGIC_IDS.indexOf(id), n]),
     embarkTransitionMp: EMBARK_TRANSITION_MP,
     shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
+    militaryAcademyBidx: buildingIdx.get(FORMATION_TRAIN_BUILDING.land) ?? -1,
+    seaportBidx: buildingIdx.get(FORMATION_TRAIN_BUILDING.naval) ?? -1,
     nuclearPlantBidx: buildingIdx.get('NUCLEAR_POWER_PLANT') ?? -1,
     ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
     worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
@@ -1117,6 +1120,8 @@ export function buildRules() {
       // Combat, Ranged and Bombard Strength, and the civic each tier waits on.
       formationCs: [...FORMATION_CS],
       formationCivic: FORMATION_CIVIC.map((c) => (c ? (civicIdx.get(c) ?? -1) : -1)),
+      formationCostMult: [...FORMATION_COST_MULT],
+      formationTrainDiscount: FORMATION_TRAIN_DISCOUNT,
       encampHp: ENCAMPMENT_HP, // the ENCAMPMENT garrison pool cap
       unitHealPerTurn: 10,
       barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // inert pending its hunt

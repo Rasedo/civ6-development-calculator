@@ -802,6 +802,10 @@ export const GP_PERM = [
   'tradeCapacity',       // extra simultaneous trade routes
   'policySlotEconomic',  // extra Economic policy slots
   'workshopCulture',     // CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture"
+  // CIV6 (Mary Katherine Goddard): "+1 level of Diplomatic visibility with
+  // all other civilizations" — appended LAST: the wire ships this list and
+  // the GPU plane indexes by position.
+  'visibilityAll',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
@@ -864,6 +868,10 @@ export interface GpEffect {
   /** production into a WONDER under construction in the activating city,
    *  doubled when that wonder's era is at or below `wonderEraDouble`. */
   wonderProduction?: number;
+  /** CIV6 (Shah Jahan): gold pays the WONDER at the head of the queue —
+   *  production = min(what the wonder still needs, treasury / 2), gold falls
+   *  by twice the production bought. */
+  wonderBuyout?: boolean;
   wonderEraDouble?: number;
   /** production into a SPACE RACE project in the activating city. */
   spaceProduction?: number;
@@ -904,7 +912,7 @@ export const GP_FX = [
   'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
   'strategicSlot', 'strategicAmount',
   'artifactScience', 'airSlotBonus', 'suzerainSeize',
-  'formation', 'formationNaval',
+  'formation', 'formationNaval', 'wonderBuyout',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -973,7 +981,10 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
   GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: 480 },
   GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'] },
-  GP_SHAH_JAHAN: { unmodelled: true },
+  // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
+  // capped at half of your current treasury. Then reduces your Gold by twice
+  // the amount of purchased Production."
+  GP_SHAH_JAHAN: { wonderBuyout: true },
   GP_ALVAR_AALTO: { cityPerm: { appeal: 1 } },
   GP_ROBERT_GODDARD: { eurekaTechs: ['ROCKETRY'], perm: { spaceProdPct: 20 } },
   GP_NIKOLA_TESLA: { unmodelled: true },
@@ -1001,7 +1012,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_STAMFORD_RAFFLES: { unmodelled: true },
   GP_JOHN_ROCKEFELLER: { strategic: { resource: 'OIL', amount: 1 } },
   GP_SARAH_BREEDLOVE: { unmodelled: true },
-  GP_MARY_KATHERINE_GODDARD: { unmodelled: true },
+  GP_MARY_KATHERINE_GODDARD: { perm: { visibilityAll: 1 } },
   GP_HELENA_RUBINSTEIN: { luxuryCopies: 2, luxuryAmenities: 4 },
   GP_LEVI_STRAUSS: { luxuryCopies: 2, luxuryAmenities: 4 },
   GP_MELITTA_BENTZ: { perm: { tradeCapacity: 1 } },

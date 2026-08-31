@@ -304,6 +304,8 @@ export function completeQueueItem(
       if (trained) {
         trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
         grantFreePromotion(trained, freePromo);
+        // a FORMATION entry arrives at its tier — the whole point of the order
+        if (item.formation) trained.formation = item.formation;
       }
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
@@ -313,6 +315,8 @@ export function completeQueueItem(
         if (twin) {
           twin.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
           grantFreePromotion(twin, freePromo);
+          // what was trained arrives twice, tier and all
+          if (item.formation) twin.formation = item.formation;
         }
       }
       break;
