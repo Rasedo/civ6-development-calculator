@@ -33,7 +33,6 @@ import { stateDigest, groupDump } from '../core/statecompare';
 import { availableBuildings, buildingCompletable, canBuildRoad, validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
-import { isWater } from '../../world/query';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -291,12 +290,13 @@ for (let t = 0; t < N_TURNS; t++) {
         const camps = campTiles(state);
         // `_job_mask_core`'s twin: the REPAIR arms take ANY owned pillaged
         // tile or district (a pillaged Harbor repairs from its own water
-        // tile); only the IMPROVE arm stays on land, because sea-resource
-        // improvements are out of roster on both engines.
+        // tile), and the IMPROVE arm asks no water question of its own —
+        // a sea RESOURCE takes an improvement, and `validImprovementsIn`
+        // is the one place that decides which ground carries what.
         const jobTiles = state.map.tiles.filter((t) =>
           owns(t)
           && (t.pillaged || t.districtPillaged
-            || (!isWater(t) && !t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
+            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];

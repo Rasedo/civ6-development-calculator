@@ -173,6 +173,14 @@ def main() -> None:
             assert p["obsoleteCivic"] == -1, f"{p['id']} is a dark card — no civic retires it"
             assert p["kind"] == 3, f"{p['id']} is a dark card — wildcard only"
             assert lo <= hi < n_era, f"{p['id']} has an era window outside the ladder"
+        elif p["legacy"] >= 0:
+            # a LEGACY card is granted by having BEEN in its government, so no
+            # civic reaches it either — and it names a real government row
+            assert hi == -1, f"{p['id']} carries half an era window"
+            assert p["unlockCivic"] == -1, f"{p['id']} is a legacy card — no civic grants it"
+            assert p["obsoleteCivic"] == -1, f"{p['id']} is a legacy card — no civic retires it"
+            assert p["kind"] == 3, f"{p['id']} is a legacy card — wildcard only"
+            assert p["legacy"] < len(rj["governments"]), f"{p['id']} names no government row"
         else:
             assert hi == -1, f"{p['id']} carries half an era window"
             assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"

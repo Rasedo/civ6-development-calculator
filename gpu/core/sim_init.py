@@ -619,6 +619,10 @@ class SimInit:
                        "routeStartFood", "industryAllSources", "envDamageImmune",
                        "goldPerFeature", "appealNearFeature", "firstPromoBonus"):
                 self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
+        # Whether ANY governor promotion can move `_tile_appeal` at all — the
+        # gate on the version bump `_governor_phase` owes that cache.
+        self._gov_appeal_any = bool(
+            self._gpromo and float(self._gpromo["appealNearFeature"].abs().sum()) > 0)
         self._water_works_housing = int(_er.get("waterWorksHousing", 2))
         self._water_works_amenities = int(_er.get("waterWorksAmenities", 1))
         self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))
@@ -1173,6 +1177,11 @@ class SimInit:
         self._gp_fx_names = list(rr.get("gpFx", []))
         self._gp_perm_names = list(rr.get("gpPermKeys", []))
         self._gp_city_perm_names = list(rr.get("gpCityPermKeys", []))
+        # A Great Person's city APPEAL grant moves `_tile_appeal`, which is
+        # `_eff_version`-cached — the claim has to say so, and only this
+        # column can make it necessary.
+        self._gp_appeal_col = (self._gp_city_perm_names.index("appeal")
+                               if "appeal" in self._gp_city_perm_names else -1)
         self._GPFX = {n: i for i, n in enumerate(self._gp_fx_names)}
         self._GP_PERM0 = len(self._gp_fx_names)
         self._GP_CPERM0 = self._GP_PERM0 + len(self._gp_perm_names)

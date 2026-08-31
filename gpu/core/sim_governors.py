@@ -66,14 +66,32 @@ class SimGovernors:
 
         titles = (self._governor_titles_earned(row) - self._governor_titles_spent(row)).clamp(min=0)
         titles = torch.where(live, titles, torch.zeros_like(titles))
+        _fp = self._governor_appeal_fingerprint(row)
         self._governor_spend(row, titles)
         self._governor_post_minor(row, live)
         self._governor_seat(row, live)
         self._governor_tick(row)
+        # Appointing, promoting, seating and the establishment clock all move
+        # `_gov_appeal_plane`, and `_tile_appeal` is version-cached — without
+        # this the appeal a governor grants arrives a turn late, and the
+        # Preserve band it pushes a tile into arrives with it. The fingerprint
+        # keeps a quiet turn from invalidating anything.
+        if self._gov_appeal_any and int(_fp) != int(self._governor_appeal_fingerprint(row)):
+            self._eff_version += 1
         # A posting is an envoy count, so the minors' stored answer moves with
         # it — `resolveSuzerains`' position.
         if self.S:
             self._cs_resolve_suzerain()
+
+    def _governor_appeal_fingerprint(self, row: int) -> torch.Tensor:
+        """A scalar that moves whenever this row's governors could grant a
+        different appeal: who is appointed, what they hold, where they sit and
+        how much of the establishment clock is left."""
+        return (self.civ_gov_appointed[:, row].long().sum()
+                + self.civ_gov_promos[:, row].sum()
+                + self.civ_gov_city[:, row].sum()
+                + self.civ_gov_minor[:, row].sum()
+                + self.civ_gov_establish[:, row].sum())
 
     def _governor_spend(self, row: int, titles: torch.Tensor) -> None:
         """Spend every available title: a title buys an appointment while one
@@ -288,6 +306,8 @@ class SimGovernors:
         self.civ_gov_minor[b, row, g] = -1
         self.civ_gov_establish[b, row, g] = 0
         self.civ_gov_out[b, row, g] = max(int(self.civ_gov_out[b, row, g].item()), turns)
+        if self._gov_appeal_any:
+            self._eff_version += 1  # the appeal it granted leaves with it
 
     # ------------------------------------------------------------- the read
 

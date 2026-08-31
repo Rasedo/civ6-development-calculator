@@ -293,6 +293,10 @@ class SimGp:
         if _nc and bool(has_city.any()):
             _r = has_city.nonzero(as_tuple=True)[0]
             self.city_gp_perm[_r, row, cc[_r]] += _rowfx[_r, self._GP_CPERM0:self._GP_CPERM0 + _nc].to(self.city_gp_perm.dtype)
+            # an APPEAL grant moves `_tile_appeal`, which is version-cached
+            if self._gp_appeal_col >= 0 and bool(
+                    (_rowfx[_r, self._GP_CPERM0 + self._gp_appeal_col] != 0).any()):
+                self._eff_version += 1
 
         # ---- a PROPHET's charge is what founds a religion, not the recruit
         if self._prophet_cls >= 0:
