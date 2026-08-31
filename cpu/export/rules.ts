@@ -78,6 +78,7 @@ import {
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
+  SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL,
 } from '../data/espionage';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind, type BuildingYieldBoost, type PolicyEffects } from '../data/policies';
@@ -560,6 +561,7 @@ export function buildRules() {
           offensive: m.offensive ? 1 : 0,
           certain: m.certain ? 1 : 0,
           athome: m.athome ? 1 : 0,
+          citystate: m.citystate ? 1 : 0,
           turns: m.turns,
           // 0 where the chassis' table publishes none — `certain` decides those
           successPct: m.successPct ?? 0,
@@ -580,6 +582,14 @@ export function buildRules() {
         sourcesTurns: SPY_SOURCES_TURNS,
         partisansMin: SPY_PARTISANS_MIN,
         partisansMax: SPY_PARTISANS_MAX,
+        escapeRoutes: SPY_ESCAPE_ROUTES.map((r) => ({
+          id: r.id,
+          district: r.district === null ? -1 : PLACEABLE_DISTRICTS.indexOf(r.district),
+          turns: r.turns,
+          basePct: r.basePct,
+        })),
+        scandalEnvoysBase: SPY_SCANDAL_ENVOYS_BASE,
+        scandalEnvoysPerLevel: SPY_SCANDAL_PER_LEVEL,
       },
       // Sky and Stars' Eurekas, one padded row per WORLD ERA, as TECH indices
       skyEurekas: ERAS.map((_, e) => {

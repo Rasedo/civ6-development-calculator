@@ -56,6 +56,8 @@ export interface SpyMissionDef {
   certain?: boolean;
   /** run in the spy's OWN city rather than a rival's. */
   athome?: boolean;
+  /** run in a CITY-STATE's city — the R&F target class. */
+  citystate?: boolean;
   /** CIV6 (Spy): the mission's own duration, from the chassis' mission table. */
   turns: number;
   /** CIV6 (Spy): the same table's success rate, at the Recruit level. A
@@ -68,8 +70,7 @@ export interface SpyMissionDef {
  * lists them. THE ORDER IS THE WIRE: column k of the MISSION head is the k-th
  * row here on both engines.
  *
- * Absent, and recorded: Fabricate Scandal (a city-state target) and Zombie
- * Outbreak (a game mode).
+ * Absent, and recorded: Zombie Outbreak (a game mode).
  */
 export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
@@ -84,6 +85,11 @@ export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 35 },
   { id: 'BREACH_DAM', district: 'DAM', offensive: true, turns: 8, successPct: 20 },
   { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true, turns: 16 },
+  // CIV6 (the chassis' mission table): "16 (Standard Speed)" turns at 56%;
+  // (Fabricate Scandal) performed "in a City-State that you are not Suzerain
+  // over". Appended LAST — the mission head is THE WIRE and every later verb
+  // column derives its base from this list's length on both engines.
+  { id: 'FABRICATE_SCANDAL', district: 'CITY_CENTER', offensive: true, turns: 16, successPct: 56, citystate: true },
 ];
 /** The operations the Espionage Pact can name: the OFFENSIVE ones, in catalog
  *  order — the only rows either of its outcomes can act on. */
@@ -103,6 +109,7 @@ export const SPY_M_FOMENT_UNREST = mi('FOMENT_UNREST');
 export const SPY_M_NEUTRALIZE_GOVERNOR = mi('NEUTRALIZE_GOVERNOR');
 export const SPY_M_BREACH_DAM = mi('BREACH_DAM');
 export const SPY_M_COUNTERSPY = mi('COUNTERSPY');
+export const SPY_M_FABRICATE_SCANDAL = mi('FABRICATE_SCANDAL');
 
 /** how many destinations the TRAVEL head offers, cities in centre-tile order. */
 export const SPY_TRAVEL_COLS = 8;
@@ -147,3 +154,32 @@ export const SPY_PARTISANS_MAX = 4;
 /** MODEL: "there is a much higher chance than normal that they will be
  *  caught" — the source names the effect, not the number. */
 export const SPY_COUNTERSPY_CATCH_PCT = 30;
+
+/**
+ * CIV6 (Espionage): a discovered spy "will need to escape from the target
+ * city" — by Airplane (needs an Aerodrome), Boat (a Harbor), Vehicle (a
+ * Commercial Hub) or on Foot, the faster the ride the likelier the catch,
+ * and a survivor reappears in the CAPITAL after the ride home. The gates and
+ * the return times (1/2/3/4 turns) are sourced; each route's base escape
+ * rate is a MODEL value under that sourced ordering. Listed FASTEST first:
+ * the model spy takes the first route whose district stands — soonest back
+ * in service, a recorded model choice where the real game asks the player.
+ */
+export interface SpyEscapeRoute {
+  id: string;
+  district: DistrictId | null;
+  turns: number;
+  basePct: number;
+}
+export const SPY_ESCAPE_ROUTES: readonly SpyEscapeRoute[] = [
+  { id: 'AIRPLANE', district: 'AERODROME', turns: 1, basePct: 40 },
+  { id: 'BOAT', district: 'HARBOR', turns: 2, basePct: 50 },
+  { id: 'VEHICLE', district: 'COMMERCIAL_HUB', turns: 3, basePct: 60 },
+  { id: 'FOOT', district: null, turns: 4, basePct: 70 },
+];
+
+/** CIV6 (Fabricate Scandal): "all other players lose a number of Envoys
+ *  determined by the Spy's level" — the SHAPE is sourced, the map is not:
+ *  base and per-level are MODEL values. */
+export const SPY_SCANDAL_ENVOYS_BASE = 2;
+export const SPY_SCANDAL_PER_LEVEL = 1;

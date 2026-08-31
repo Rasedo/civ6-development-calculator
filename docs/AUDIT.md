@@ -66,7 +66,7 @@ from the list below.
 | C-1 POWER | 1 | the Offshore Wind Farm's unlock tech is not in the tree; the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
-| C-16 the spy's second half | 2 | the escape sequence, a released spy's lost level, the same-mission gate, two carrier-less missions, three inert promotions |
+| C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here; no unit removes a tile improvement |
 | C-22 the district roster | 1 | the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
@@ -81,8 +81,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 2 | neither engine can add a feature after t0, and map-generation placement would refuse improvements no source refuses; Fire Goddess's Volcanic Soil half waits on it |
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **26** | |
-| **OPEN, TOTAL** | **49** | |
+| **C. Absent systems** | **25** | |
+| **OPEN, TOTAL** | **48** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -835,12 +835,18 @@ under their blocker so the dependency is readable, and both halves count.
   every own spy from home and Polygraph's 1 level off every intruder.
   Bodyguard of Lies rides Disguise's channel: the golden face's
   no-establish clause had never landed on either engine. OPEN:
-  - **THE ESCAPE SEQUENCE.** A discovered spy "will need to escape from
-    the target city" — by Airplane, Boat, Vehicle or Foot, each gated on
-    a district, each with its own danger and return time, a survivor
-    reappearing in the CAPITAL. Here a discovered spy dies on one roll,
-    so ACE_DRIVER ("a much higher chance of escape") ships INERT — there
-    is no escape roll for it to move.
+  - **THE ESCAPE SEQUENCE SHIPS.** A discovered spy "will need to escape
+    from the target city" — by Airplane (an Aerodrome, 1 turn home), Boat
+    (a Harbor, 2), Vehicle (a Commercial Hub, 3) or on Foot (always, 4),
+    a survivor reappearing in the CAPITAL on the existing travel
+    machinery, a lost escape splitting captured-vs-killed on the old
+    catch odds. The gates, the times and the "faster = more dangerous"
+    ordering are sourced; each route's base rate (`SPY_ESCAPE_ROUTES`)
+    is a MODEL value under that ordering, and the ROUTE CHOICE — the
+    real game asks the player — is a recorded model rule: the fastest
+    route whose district stands. ACE_DRIVER is LIVE with its own sourced
+    figure: "If caught on a mission, have a much higher chance of escape
+    (+4 levels)", riding the missions' per-level term on the escape roll.
   - **A RELEASED SPY IS A NEW SPY.** The cell itself ships: a caught spy
     is now "imprisoned, but not killed", held by the seat whose city made
     the catch, still counted against its owner's capacity ("if you've
@@ -849,22 +855,14 @@ under their blocker so the dependency is readable, and both halves count.
     table to arrive "immediately returned to the original owner's
     Capital". What a cell holds is a COUNT, keyed owner -> captor, so the
     spy that comes home has no level and no promotions. No source says
-    whether the real one keeps them; carrying them would need an
-    off-the-map LIVING unit, which is a new unit state every units walk on
-    both engines would have to tolerate.
-  - **THE SPY PROMOTION POOL** — the Civilopedia's Espionage class lists
-    SEVENTEEN promotions, three offered at random per level, and the Spy
-    page caps the chassis at three taken. The chassis has no promotion
-    class (C-32); nine of the seventeen are one shape ("<mission> as if
-    2 levels more experienced"), and the random offer needs a
-    shared-stream draw at a fixed position (the `ensureGpOffer` pattern).
-  - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
-    the mission mask asks nothing about other spies on the tile. NOT
-    SOURCED: neither the Spy chassis page nor the Spies and Espionage
-    concept page says anything about it, and the reachable statements are
-    community readings of the UI. It stays open as a suspected rule, not
-    as a transcription — implementing it either way would be an
-    invention.
+    whether the real one keeps them (re-searched 2026-08-31: still
+    nothing published) — carrying them would need an off-the-map LIVING
+    unit, a new unit state every units walk on both engines would have
+    to tolerate. UNSOURCED — ask.
+  - **THE SAME-MISSION GATE SHIPS**, now sourced — the Espionage page:
+    "a single city may contain more than one Spy, but no two Spies may
+    perform the same Mission in the same city." Read per OWNER (the one
+    scope a player's own mission list can see), a recorded model choice.
   - **A SPY STANDS ON THE CITY CENTRE AND NOWHERE ELSE.** The jump
     targets `city_center`, and the mission reads the district registry
     rather than the plot the spy holds, so a counterspy already defends
@@ -874,10 +872,17 @@ under their blocker so the dependency is readable, and both halves count.
     second has no geometry to measure. A spy that occupies the district
     it works out of is the missing mechanic.
 
-  - **FABRICATE SCANDAL** targets a city-state — R&F's ruleset; the
-    majors-only scan is vanilla-faithful. The minor city block CARRIES a
-    district registry now (C-38), so the verb has ground to stand on. SMEAR_CAMPAIGN, which runs that
-    mission "as if 2 levels more experienced", ships INERT on it.
+  - **FABRICATE SCANDAL SHIPS** — mission thirteen, appended LAST (the
+    mission head is the wire and every later verb column derives its
+    base from the list's length on both engines): "16 (Standard Speed)"
+    turns at 56% per the chassis' own table, performed "in a City-State
+    that you are not Suzerain over", the travel head offering minor
+    centres. On success "all other players lose a number of Envoys
+    determined by the Spy's level" — the SHAPE is sourced, the map is
+    not: `SPY_SCANDAL_ENVOYS_BASE` + 1 per effective level are MODEL
+    values. SMEAR_CAMPAIGN is LIVE on its bit. A minor keeps no cell, so
+    a spy its escape fails is killed, never imprisoned — a recorded
+    model choice (the diplomacy table has no minor seat to trade with).
   - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not
     the district; a per-building pillage flag is the difference.
   - **WHAT A LEVEL IS WORTH IS THIS MODEL'S OWN.** The Spy chassis'
@@ -885,13 +890,14 @@ under their blocker so the dependency is readable, and both halves count.
     for the Counterspy post) and its base success RATE (10% Recruit
     Partisans; 20% Great Work Heist, Disrupt Rocketry, Breach Dam; 35%
     Sabotage Production, Steal Tech Boost, Neutralize Governor; 56%
-    Siphon Funds, Foment Unrest), and both engines now carry that table
-    per mission. What it does NOT publish is how a LEVEL moves that rate
-    — only that it does, since nine promotions read "as if 2 levels more
-    experienced" — nor what a failure costs. `SPY_SUCCESS_PER_LEVEL_PCT`
-    and `SPY_CAPTURE_PCT` are those two, and they are stated model
-    values. The Intelligence Agency's success bonus has no published
-    figure either.
+    Siphon Funds, Foment Unrest; 56% Fabricate Scandal), and both
+    engines now carry that table per mission. What it does NOT publish
+    is how a LEVEL moves that rate — only that it does, since nine
+    promotions read "as if 2 levels more experienced" — nor what a
+    failure costs. `SPY_SUCCESS_PER_LEVEL_PCT` and `SPY_CAPTURE_PCT` are
+    those two, and the escape routes' base rates and the scandal's envoy
+    map join them as stated model values. The Intelligence Agency's
+    success bonus has no published figure either.
 - **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1. The Fort, the
   Airstrip, both routes and the 20% charge ship; gate reachability is ZERO
   (no seed trains the chassis) and `engineer_test.py` pokes every rule.

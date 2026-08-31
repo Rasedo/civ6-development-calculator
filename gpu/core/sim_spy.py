@@ -59,9 +59,8 @@ class SimSpy:
         order and cut to the head's width — `spyDestinations`.
 
         CIV6: "You may send a Spy to any city you have revealed (provided you
-        don't have an Alliance with that civilization)". Under the vanilla
-        ruleset a spy cannot act in a city-state, so only MAJOR centres are
-        offered — which is exactly what `centre_slot_at` registers."""
+        don't have an Alliance with that civilization)" — a MAJOR centre off
+        `centre_slot_at`, or a living minor's centre, the scandal's ground."""
         B, N = tc.shape
         W, dev = self._spy_travel_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
@@ -73,6 +72,8 @@ class SimSpy:
         allied = self.seat_ally_turns[:, row, : self.n_majors].gather(
             1, holder.clamp(min=0)) > 0
         ok = (holder >= 0) & ~allied
+        # a CITY-STATE centre is a destination too — the scandal's ground
+        ok = ok | (self._spy_minor_centres() >= 0)
         if self.fog_of_war:
             ok = ok & self.seat_explored[:, row]
         cand = ok.unsqueeze(1) & (
@@ -96,6 +97,24 @@ class SimSpy:
                 ).clamp(max=self._spy_travel_max)
 
     # ---- what a spy may start ---------------------------------------------
+    def _spy_minor_centres(self) -> torch.Tensor:
+        """[B, T] — the living minor whose CENTRE each tile is, -1 elsewhere.
+        Tile-keyed on purpose: the TS roster SHRINKS on capture, so the tile
+        is the one address the engines can share."""
+        out = torch.full((self.B, self.T), -1, dtype=torch.long, device=self.device)
+        if self.S > 0:
+            lv = self.citystate_alive & (self.citystate_center >= 0)
+            g, s = lv.nonzero(as_tuple=True)
+            out[g, self.citystate_center[g, s]] = s
+        return out
+
+    def _spy_minor_at(self, b: int, t: int) -> int:
+        for s in range(self.S):
+            if (bool(self.citystate_alive[b, s])
+                    and int(self.citystate_center[b, s]) == t):
+                return s
+        return -1
+
     def _spy_here(self, tc: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """(holder row, city column) for the major centre each spy stands on,
         -1/-1 where it stands on none — `spyCity`."""
@@ -140,15 +159,38 @@ class SimSpy:
         if not bool(base.any()):
             return out
         hrow, hcol = self._spy_here(tc[:, cols])
-        base = base & (hrow >= 0)
+        mcs = self._spy_minor_centres().gather(1, tc[:, cols].clamp(min=0))
+        if self.S > 0:
+            suz_mine = self.citystate_suzerain.gather(1, mcs.clamp(min=0)) == row
+        else:
+            suz_mine = torch.zeros_like(mcs, dtype=torch.bool)
+        # CIV6 (Espionage): "a single city may contain more than one Spy, but
+        # no two Spies may perform the same Mission in the same city" — read
+        # per OWNER, the one scope a player's own mission list can see.
+        slots = sc[:, cols].clamp(min=0)
+        own = (self.unit_alive.gather(1, slots)
+               & (self.unit_seat.gather(1, slots) == row)
+               & (utype[:, cols] == self._spy_idx))
+        tcc = tc[:, cols]
+        smn = self.unit_spy_mission.gather(1, slots)
+        pair = ((tcc.unsqueeze(2) == tcc.unsqueeze(1))
+                & own.unsqueeze(1) & own.unsqueeze(2)
+                & ~torch.eye(int(cols.numel()), dtype=torch.bool, device=dev).unsqueeze(0))
+        maj = base & (hrow >= 0)
         mine = hrow == row
         ban = self._congress_pact_ban().unsqueeze(1)
         for m, mdef in enumerate(self._spy_missions):
-            ok = base & (mine if mdef["athome"] else ~mine)
-            di = mdef["district"]
-            if di >= 0:
-                ok = ok & self._district_live(self._city_district_tile(hrow, hcol, di))
-            ok = ok & self._spy_mission_extra(row, m, hrow, hcol)
+            if mdef["citystate"]:
+                # CIV6 (Fabricate Scandal): performed "in a City-State that
+                # you are not Suzerain over".
+                ok = base & (mcs >= 0) & ~suz_mine
+            else:
+                ok = maj & (mine if mdef["athome"] else ~mine)
+                di = mdef["district"]
+                if di >= 0:
+                    ok = ok & self._district_live(self._city_district_tile(hrow, hcol, di))
+                ok = ok & self._spy_mission_extra(row, m, hrow, hcol)
+            ok = ok & ~(pair & (smn.unsqueeze(1) == m)).any(dim=2)
             # CIV6 (Espionage Pact, outcome B): "Target Operation is
             # unavailable."
             out[:, cols, m] = ok & (ban != m)
@@ -294,6 +336,9 @@ class SimSpy:
         m = int(self.unit_spy_mission[b, v])
         mdef = self._spy_missions[m]
         self.unit_spy_mission[b, v] = self._spy_idle
+        if mdef["citystate"]:
+            self._resolve_minor_mission(row, b, v, m)
+            return
         tile = self.unit_tile[b, v].reshape(1, 1)
         hrow, hcol = self._spy_here(tile)
         hr, hc = int(hrow[0, 0]), int(hcol[0, 0])
@@ -327,28 +372,99 @@ class SimSpy:
                 self._dedication_event(row, self._ded_bodyguard, one)
         if mdef["certain"]:
             return
-        # CIV6: "when enemy Spies are performing missions in those districts,
-        # there is a much higher chance than normal that they will be caught."
-        posted = (self._spies_of(hr)[b]
-                  & (self.unit_tile[b] == int(tile[0, 0]))
-                  & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(
-                      as_tuple=True)[0]
-        caught = self._spy_capture_pct + (
-            self._spy_counterspy_pct if posted.numel() else 0)
-        if not ok and self._spy_roll(b, caught):
-            self.unit_alive[b, v] = False
-            # CIV6 (Spies and Espionage): a spy "may gain levels from successful
-            # offensive operations, or capturing an enemy Spy" — the post that
-            # made the catch likelier is the one that earns it, and the first of
-            # them by slot is the captor on both engines.
+        if not ok:
+            self._spy_escape(row, b, v, hr, hc)
+
+    def _resolve_minor_mission(self, row: int, b: int, v: int, m: int) -> None:
+        """CIV6 (Fabricate Scandal): the one CITY-STATE mission. On success
+        "all other players lose a number of Envoys determined by the Spy's
+        level" — every rival's stake at this minor, MODEL-mapped as base + 1
+        per effective level. A failure runs the same escape sequence off the
+        minor's own registry (`resolveMinorMission`)."""
+        cs = self._spy_minor_at(b, int(self.unit_tile[b, v]))
+        if cs < 0:
+            return
+        mdef = self._spy_missions[m]
+        lvl = max(0, int(self.unit_spy_level[b, v]) + self._spy_op_levels(b, v, m)
+                  + self._quartermaster_levels(b, row) + self._congress_pact_levels(b, m))
+        ok = self._spy_roll(b, mdef["successPct"] + self._spy_success_per_level * lvl)
+        if ok:
+            if m == self._spy_m_scandal:
+                k = self._spy_scandal_base + self._spy_scandal_per_level * lvl
+                for o in range(self.n_majors):
+                    if o == row:
+                        continue
+                    have = int(self.seat_citystate_envoys[b, o, cs])
+                    if have > 0:
+                        self.seat_citystate_envoys[b, o, cs] = max(0, have - k)
+                self._cs_resolve_suzerain()
+                self._eff_version += 1
+            self._level_up_spy(b, v)
+            one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            one[b] = True
+            self._dedication_event(row, self._ded_bodyguard, one)
+            return
+        self._spy_escape(row, b, v, -1, -1, cs=cs)
+
+    def _spy_escape(self, row: int, b: int, v: int, hr: int, hc: int,
+                    cs: int = -1) -> None:
+        """CIV6 (Espionage): a discovered spy "will need to escape from the
+        target city" — by Airplane, Boat, Vehicle or on Foot, gated on the
+        city's own districts, the faster the ride the likelier the catch, and
+        a survivor reappears in the CAPITAL after the route's ride home. The
+        spy takes the FASTEST route whose district stands (a recorded model
+        choice where the real game asks the player), and (Ace Driver) "have a
+        much higher chance of escape (+4 levels)" rides the missions' own
+        per-level term. A failed escape is the catch: "imprisoned, but not
+        killed" where a MAJOR runs the prison — a minor keeps no cell, so its
+        catch ends the career (`spyEscape`)."""
+        rr = hr if hr >= 0 else self._CITY_MINOR0 + max(cs, 0)
+        cc = hc if hr >= 0 else 0
+        rrT = torch.full((1, 1), rr, dtype=torch.long, device=self.device)
+        ccT = torch.full((1, 1), cc, dtype=torch.long, device=self.device)
+        route = self._spy_escape_routes[-1]
+        for r in self._spy_escape_routes:
+            if r["district"] < 0 or bool(self._district_live(
+                    self._city_district_tile(rrT, ccT, r["district"]))[0, 0]):
+                route = r
+                break
+        posted = torch.zeros(0, dtype=torch.long, device=self.device)
+        if hr >= 0:
+            # CIV6: "when enemy Spies are performing missions in those
+            # districts, there is a much higher chance than normal that they
+            # will be caught" — the post now leans on the ESCAPE.
+            t0 = int(self.unit_tile[b, v])
+            posted = (self._spies_of(hr)[b]
+                      & (self.unit_tile[b] == t0)
+                      & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(
+                          as_tuple=True)[0]
+        lvl = int(self.unit_spy_level[b, v]) + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL")
+        pct = (route["basePct"] + self._spy_success_per_level * lvl
+               - (self._spy_counterspy_pct if posted.numel() else 0))
+        if self._spy_roll(b, pct):
+            cap = self.city_is_cap[b, row]
+            alv = self.city_alive[b, row]
+            if not bool(alv.any()):
+                self.unit_alive[b, v] = False
+                return
+            slot = int(cap.long().argmax()) if bool(cap.any()) else int(alv.long().argmax())
+            self.unit_spy_mission[b, v] = self._spy_travelling
+            self.unit_spy_target[b, v] = int(self.city_center[b, row, slot])
+            self.unit_spy_turns[b, v] = route["turns"]
+            return
+        if hr >= 0 and self._spy_roll(b, self._spy_capture_pct):
+            # CIV6 (Spies and Espionage): a spy "may gain levels from
+            # successful offensive operations, or capturing an enemy Spy" —
+            # the post that made the catch likelier is the one that earns it,
+            # and the first of them by slot is the captor on both engines.
             if posted.numel():
                 self._level_up_spy(b, int(posted[0]))
             # CIV6: captured spies "are imprisoned, but not killed", and the
             # owner "can then attempt to trade with the civilization who
-            # captured the Spy, securing their release". It leaves the map
-            # either way; a cell holds a COUNT, so the spy that comes home is a
-            # new one at level 1.
+            # captured the Spy, securing their release". A cell holds a
+            # COUNT, so the spy that comes home is a new one at level 1.
             self.seat_spy_held[b, row, hr] += 1
+        self.unit_alive[b, v] = False
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,
                        lvl: int) -> None:

@@ -17,7 +17,7 @@ import {
   SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST, SPY_M_SABOTAGE_PRODUCTION,
   SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS, SPY_M_DISRUPT_ROCKETRY,
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
-  SPY_M_COUNTERSPY,
+  SPY_M_COUNTERSPY, SPY_M_FABRICATE_SCANDAL,
 } from './espionage';
 
 export const PROMO_CLASSES = [
@@ -79,6 +79,7 @@ export const PROMO_KINDS = [
   'AIR_SLOTS',           // +v aircraft this hull bases
   'AIR_PILLAGE_ANY_HP',  // may air pillage at any health
   'SPY_OP_LEVEL',        // +v spy levels on the mission whose bit is in `mask`
+  'SPY_ESCAPE_LEVEL',    // +v levels on the ESCAPE roll alone
   'SPY_OP_SPEED',        // every mission's clock is v% shorter
   'SPY_NO_ESTABLISH',    // the spy arrives ready, with no travel clock at all
   'SPY_HOME_ALLY_LEVEL', // posted at home, every own spy operates at +v levels
@@ -323,7 +324,9 @@ export const PROMOTIONS: readonly PromoDef[] = [
   // they gain a level, which are chosen at random from the pool", and the
   // chassis' own page caps it at three taken. So the seventeen are ONE flat
   // pool: no tiers past the first, and no prerequisites to chain.
-  P('ACE_DRIVER', 'ESPIONAGE', 1, [], none),
+  // CIV6 (Ace Driver): "If caught on a mission, have a much higher chance
+  // of escape (+4 levels)" — the escape roll's own level term.
+  P('ACE_DRIVER', 'ESPIONAGE', 1, [], cs('SPY_ESCAPE_LEVEL', 4)),
   P('CAT_BURGLAR', 'ESPIONAGE', 1, [], op(SPY_M_GREAT_WORK_HEIST)),
   P('CON_ARTIST', 'ESPIONAGE', 1, [], op(SPY_M_SIPHON_FUNDS)),
   P('COVERT_ACTION', 'ESPIONAGE', 1, [], op(SPY_M_FOMENT_UNREST)),
@@ -337,7 +340,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('ROCKET_SCIENTIST', 'ESPIONAGE', 1, [], op(SPY_M_DISRUPT_ROCKETRY)),
   P('SATCHEL_CHARGES', 'ESPIONAGE', 1, [], op(SPY_M_BREACH_DAM)),
   P('SEDUCTION', 'ESPIONAGE', 1, [], op(SPY_M_COUNTERSPY)),
-  P('SMEAR_CAMPAIGN', 'ESPIONAGE', 1, [], none),
+  P('SMEAR_CAMPAIGN', 'ESPIONAGE', 1, [], op(SPY_M_FABRICATE_SCANDAL)),
   P('SURVEILLANCE', 'ESPIONAGE', 1, [], none),
   P('TECHNOLOGIST', 'ESPIONAGE', 1, [], op(SPY_M_STEAL_TECH_BOOST)),
 ];

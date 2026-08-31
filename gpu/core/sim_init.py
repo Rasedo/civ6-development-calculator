@@ -741,6 +741,12 @@ class SimInit:
         self._spy_sources_turns = int(_sp["sourcesTurns"])
         self._spy_partisans_min = int(_sp["partisansMin"])
         self._spy_partisans_max = int(_sp["partisansMax"])
+        self._spy_m_scandal = _mid.index("FABRICATE_SCANDAL")
+        self._spy_escape_routes = [
+            {k: int(v) for k, v in r.items() if k != "id"} for r in _sp["escapeRoutes"]
+        ]
+        self._spy_scandal_base = int(_sp["scandalEnvoysBase"])
+        self._spy_scandal_per_level = int(_sp["scandalEnvoysPerLevel"])
         self._n_spy_missions = len(self._spy_missions)
         # the operations the Espionage Pact can name — `SPY_OFFENSIVE_MISSIONS`
         self._spy_offensive = [i for i, m in enumerate(self._spy_missions) if m["offensive"]]

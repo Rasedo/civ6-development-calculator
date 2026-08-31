@@ -32,13 +32,15 @@ import {
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_COUNTERSPY,
-  SPY_M_LISTENING_POST,
+  SPY_M_LISTENING_POST, SPY_M_FABRICATE_SCANDAL, SPY_ESCAPE_ROUTES,
+  SPY_SCANDAL_ENVOYS_BASE,
 } from '../../../cpu/data/espionage';
+import { envoysOf } from '../../../cpu/core/cityStates';
 import { DED_BODYGUARD, CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS } from '../../../cpu/data/espionage';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { BARB_SEAT } from '../../../cpu/core/seats';
-import type { City, GameState } from '../../../cpu/core/types';
+import type { City, CityState, GameState } from '../../../cpu/core/types';
 
 /** `rngState` seeds whose FIRST draw clears the 50% success bar, and whose
  *  first two draws are fail-then-caught. Picked so no lane has to guard its
@@ -235,10 +237,11 @@ describe('the clock', () => {
 
   it('each mission carries the duration and the odds its own table publishes', () => {
     // CIV6 (Spy): the chassis' mission table — every operation is 8 turns
-    // except the two 16-turn posts, and each names its own success rate.
+    // except the counterspy post and Fabricate Scandal ("16 (Standard
+    // Speed)"), and each names its own success rate.
     expect(turnsOf(SPY_M_COUNTERSPY)).toBe(16);
     for (const m of SPY_MISSIONS) {
-      expect(m.turns).toBe(m.id === 'COUNTERSPY' ? 16 : 8);
+      expect(m.turns).toBe(m.id === 'COUNTERSPY' || m.id === 'FABRICATE_SCANDAL' ? 16 : 8);
       // the table publishes a rate for exactly the missions that ROLL: a
       // `certain` one succeeds outright, and the counterspy post never resolves
       const rolls = !m.certain && m.id !== 'COUNTERSPY';
@@ -419,13 +422,19 @@ describe('the espionage promotion pool', () => {
     expect(promoReady(spy)).toBe(false);
   });
 
-  it('the rows that ship inert, and say so', () => {
-    // Ace Driver waits on the escape sequence, Smear Campaign on Fabricate
-    // Scandal, and Surveillance on a spy that stands anywhere but the centre.
-    for (const id of ['ACE_DRIVER', 'SMEAR_CAMPAIGN', 'SURVEILLANCE']) {
-      const row = promoRows('ESPIONAGE').find((p) => p.id === id)!;
-      expect(row.effects).toEqual([{ kind: 'NONE' }]);
-    }
+  it('the rows that ship inert, and the two that came alive', () => {
+    // Surveillance still waits on a spy that stands anywhere but the centre.
+    const surv = promoRows('ESPIONAGE').find((p) => p.id === 'SURVEILLANCE')!;
+    expect(surv.effects).toEqual([{ kind: 'NONE' }]);
+    // CIV6 (Ace Driver): "If caught on a mission, have a much higher chance
+    // of escape (+4 levels)" — the escape roll's own level term.
+    const ace = promoRows('ESPIONAGE').find((p) => p.id === 'ACE_DRIVER')!;
+    expect(ace.effects).toEqual([{ kind: 'SPY_ESCAPE_LEVEL', v: 4, mask: 0 }]);
+    // Smear Campaign rides Fabricate Scandal's own bit now.
+    const smear = promoRows('ESPIONAGE').find((p) => p.id === 'SMEAR_CAMPAIGN')!;
+    expect(smear.effects).toEqual([
+      { kind: 'SPY_OP_LEVEL', v: SPY_OP_PROMO_LEVELS, mask: 1 << SPY_M_FABRICATE_SCANDAL },
+    ]);
   });
 });
 
@@ -459,38 +468,148 @@ describe('what a finished mission does', () => {
     expect(spy.spyLevel).toBe(1);
   });
 
-  it('a failed offensive mission puts the spy in a cell, and it still counts', () => {
-    const { state, theirs, mine } = spyState();
-    district(state, theirs, 'COMMERCIAL_HUB');
-    const spy = spyAt(state, 0, theirs);
-    const cap = spyCapacity(state, 0);
-    state.rngState = LOSES;
-    run(state, spy, SPY_M_SIPHON_FUNDS);
-    // CIV6: captured spies "are imprisoned, but not killed" — off the map, and
-    // held by the seat whose city made the catch.
-    expect(state.units.some((u) => u.id === spy.id)).toBe(false);
-    expect(spiesOf(state, 0)).toHaveLength(0);
-    expect(spyHeldWith(state, 0, theirs.seat)).toBe(1);
-    expect(spiesHeldOf(state, 0)).toBe(1);
-    // "if you've trained the maximum number of Spies possible, you cannot train
-    // a new Spy to replace one that gets captured."
-    expect(cap).toBe(1);
-    expect(canTrainSpy(state, 0)).toBe(false);
-    expect(mine.centerIndex).toBeGreaterThanOrEqual(0);
-  });
+  /** pin a mission to certain FAILURE and every escape route shut. */
+  function pinFailure<T>(body: () => T): T {
+    const row = SPY_MISSIONS[SPY_M_SIPHON_FUNDS] as { successPct?: number };
+    const saved = row.successPct;
+    const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
+    row.successPct = -1000;
+    for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = -1000;
+    try {
+      return body();
+    } finally {
+      row.successPct = saved;
+      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
+    }
+  }
 
-  it('the counterspy that makes the catch earns the level', () => {
+  it('a lost escape splits the career: the cell, or the grave', () => pinFailure(() => {
+    // CIV6: captured spies "are imprisoned, but not killed" — off the map and
+    // held by the seat whose city made the catch — and the other half of the
+    // split simply ends the career. Both halves surface under a seed walk.
+    let celled = false;
+    let killed = false;
+    for (let seed = 1; seed < 200 && !(celled && killed); seed++) {
+      const { state, theirs } = spyState();
+      district(state, theirs, 'COMMERCIAL_HUB');
+      const spy = spyAt(state, 0, theirs);
+      state.rngState = seed;
+      run(state, spy, SPY_M_SIPHON_FUNDS);
+      // the spy leaves the map either way — no escape route stands
+      expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+      if (spyHeldWith(state, 0, theirs.seat) === 1) {
+        // "if you've trained the maximum number of Spies possible, you cannot
+        // train a new Spy to replace one that gets captured."
+        expect(spiesHeldOf(state, 0)).toBe(1);
+        expect(spyCapacity(state, 0)).toBe(1);
+        expect(canTrainSpy(state, 0)).toBe(false);
+        celled = true;
+      } else {
+        expect(spiesHeldOf(state, 0)).toBe(0);
+        killed = true;
+      }
+    }
+    expect(celled && killed).toBe(true);
+  }));
+
+  it('the counterspy that makes the catch earns the level', () => pinFailure(() => {
     // CIV6 (Spies and Espionage): a spy "may gain levels from successful
     // offensive operations, or capturing an enemy Spy".
+    for (let seed = 1; seed < 200; seed++) {
+      const { state, theirs } = spyState();
+      district(state, theirs, 'COMMERCIAL_HUB');
+      const guard = spyAt(state, 1, theirs);
+      expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
+      const spy = spyAt(state, 0, theirs);
+      state.rngState = seed;
+      run(state, spy, SPY_M_SIPHON_FUNDS);
+      expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+      if (spyHeldWith(state, 0, theirs.seat) === 1) {
+        expect(guard.spyLevel).toBe(1);
+        return;
+      }
+    }
+    throw new Error('no seed landed the capture half of the split');
+  }));
+
+  it('the escape takes the fastest standing route home to the capital', () => {
+    // CIV6 (Espionage): a discovered spy "will need to escape from the target
+    // city" — by Airplane (an Aerodrome, 1 turn), Boat (a Harbor, 2), Vehicle
+    // (a Commercial Hub, 3) or on Foot (always, 4), a survivor reappearing in
+    // the CAPITAL.
+    const row = SPY_MISSIONS[SPY_M_FOMENT_UNREST] as { successPct?: number };
+    const saved = row.successPct;
+    const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
+    row.successPct = -1000;
+    for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = 1000;
+    try {
+      const { state, theirs, mine } = spyState();
+      const aero = district(state, theirs, 'AERODROME');
+      const spy = spyAt(state, 0, theirs);
+      run(state, spy, SPY_M_FOMENT_UNREST);
+      expect(spy.spyMission).toBe(SPY_TRAVELLING);
+      expect(spy.spyTarget).toBe(mine.centerIndex);
+      expect(spy.spyTurns).toBe(1);
+      tickSpies(state, 0);
+      expect(spy.tileIndex).toBe(mine.centerIndex);
+      expect(spy.spyMission).toBe(SPY_IDLE);
+      // the Aerodrome dark, the same failure walks out on FOOT
+      state.map.tiles[aero].districtPillaged = true;
+      const spy2 = spyAt(state, 0, theirs);
+      run(state, spy2, SPY_M_FOMENT_UNREST);
+      expect(spy2.spyTurns).toBe(4);
+    } finally {
+      row.successPct = saved;
+      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
+    }
+  });
+
+  it('Fabricate Scandal strips every rival stake at the minor', () => {
+    const { state, mine } = spyState();
+    const csTile = tileAtCoords(state.map, 2, 2).index;
+    const cs = {
+      id: 0, name: 'X', type: 'trade', centerIndex: csTile,
+      envoys: { 0: 3, 1: 5 }, hp: 150, pop: 3, questTurn: -1, quest: null,
+    } as unknown as CityState;
+    state.cityStates = [cs];
+    expect(mine.centerIndex).toBeGreaterThanOrEqual(0);
+    // the travel head offers the minor's centre
+    const scout = spyAt(state, 0, mine);
+    expect(spyDestinations(state, scout, 32)).toContain(csTile);
+    const spy = spawnUnit(state, SPY_UNIT, csTile, 0)!;
+    // a major's mission list has no ground at a minor
+    expect(missionOffered(state, spy, SPY_M_FOMENT_UNREST)).toBe(false);
+    // CIV6 (Fabricate Scandal): performed "in a City-State that you are not
+    // Suzerain over".
+    (cs as { suzerain?: number }).suzerain = 0;
+    expect(missionOffered(state, spy, SPY_M_FABRICATE_SCANDAL)).toBe(false);
+    (cs as { suzerain?: number }).suzerain = -1;
+    expect(missionOffered(state, spy, SPY_M_FABRICATE_SCANDAL)).toBe(true);
+    const row = SPY_MISSIONS[SPY_M_FABRICATE_SCANDAL] as { successPct?: number };
+    const saved = row.successPct;
+    row.successPct = 1000;
+    try {
+      run(state, spy, SPY_M_FABRICATE_SCANDAL);
+      // CIV6: "all other players lose a number of Envoys determined by the
+      // Spy's level" — MODEL-mapped as base + 1 per effective level.
+      expect(envoysOf(cs, 1)).toBe(5 - SPY_SCANDAL_ENVOYS_BASE);
+      expect(envoysOf(cs, 0)).toBe(3);
+      expect(spy.spyLevel).toBe(1);
+    } finally {
+      row.successPct = saved;
+    }
+  });
+
+  it('no two own spies run the same mission in the same city', () => {
+    // CIV6 (Espionage): "a single city may contain more than one Spy, but no
+    // two Spies may perform the same Mission in the same city."
     const { state, theirs } = spyState();
     district(state, theirs, 'COMMERCIAL_HUB');
-    const guard = spyAt(state, 1, theirs);
-    expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
-    const spy = spyAt(state, 0, theirs);
-    state.rngState = LOSES;
-    run(state, spy, SPY_M_SIPHON_FUNDS);
-    expect(state.units.some((u) => u.id === spy.id)).toBe(false);
-    expect(guard.spyLevel).toBe(1);
+    const a = spyAt(state, 0, theirs);
+    const b = spyAt(state, 0, theirs);
+    expect(beginMission(state, a, SPY_M_SIPHON_FUNDS)).toBe(true);
+    expect(missionOffered(state, b, SPY_M_SIPHON_FUNDS)).toBe(false);
+    expect(missionOffered(state, b, SPY_M_FOMENT_UNREST)).toBe(true);
   });
 
   it('a catch with nobody posted pays nobody', () => {

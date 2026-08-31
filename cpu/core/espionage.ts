@@ -23,8 +23,11 @@ import {
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
-  SPY_M_COUNTERSPY, SPY_M_LISTENING_POST,
+  SPY_M_COUNTERSPY, SPY_M_LISTENING_POST, SPY_M_FABRICATE_SCANDAL,
+  SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL,
+  type SpyMissionDef,
 } from '../data/espionage';
+import { envoysOf, resolveSuzerain, suzerainOf } from './cityStates';
 import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
@@ -38,7 +41,7 @@ import { nextRandom } from './rand';
 import { promoFlag, promoValue, promoValueFor, unitPromoRows, xpToNextLevel } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
 import { congressPactBanned, congressPactLevels } from './congress';
-import type { City, GameState, Seat, Unit } from './types';
+import type { City, CityState, GameState, Seat, Unit } from './types';
 
 export function isSpy(type: string): boolean {
   return type === SPY_UNIT;
@@ -100,7 +103,12 @@ export function spyDestinations(state: GameState, unit: Unit, width = SPY_TRAVEL
     if (tile.index === unit.tileIndex) continue;
     if (s.explored.length > 0 && s.explored[tile.index] !== 1) continue;
     const here = spyCityAt(state, tile.index);
-    if (!here || seatsAllied(state, unit.seat, here.holder)) continue;
+    if (here) {
+      if (seatsAllied(state, unit.seat, here.holder)) continue;
+    } else if (!spyMinorAt(state, tile.index)) {
+      // a CITY-STATE centre is a destination too — the scandal's ground
+      continue;
+    }
     out.push(tile.index);
     if (out.length >= width) break;
   }
@@ -113,6 +121,12 @@ function spyCityAt(state: GameState, tileIndex: number): { holder: number; city:
     if (city) return { holder: actor.seat, city };
   }
   return undefined;
+}
+
+/** the CITY-STATE whose centre this tile is — the minor's record IS its city
+ *  block, and capture removes the entry, so a match is a living minor. */
+function spyMinorAt(state: GameState, tileIndex: number): CityState | undefined {
+  return (state.cityStates ?? []).find((c) => c.centerIndex === tileIndex);
 }
 
 /** MODEL: the source names four travel modes with "their own travel time" and
@@ -155,6 +169,19 @@ export function beginTravel(state: GameState, unit: Unit, tileIndex: number): bo
 export function missionOffered(state: GameState, unit: Unit, m: number): boolean {
   const def = SPY_MISSIONS[m];
   if (!def || !isSpy(unit.type) || !spyIdle(unit)) return false;
+  // CIV6 (Espionage): "a single city may contain more than one Spy, but no
+  // two Spies may perform the same Mission in the same city" — read per
+  // OWNER, the one scope a player's own mission list can see.
+  if (spiesOf(state, unit.seat).some(
+    (o) => o !== unit && o.tileIndex === unit.tileIndex && o.spyMission === m,
+  )) return false;
+  if (def.citystate) {
+    const minor = spyMinorAt(state, unit.tileIndex);
+    // CIV6 (Fabricate Scandal): performed "in a City-State that you are not
+    // Suzerain over".
+    if (!minor || suzerainOf(minor) === unit.seat) return false;
+    return m !== congressPactBanned(state);
+  }
   const here = spyCity(state, unit);
   if (!here) return false;
   const mine = here.seat.seat === unit.seat;
@@ -383,7 +410,12 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   const def = SPY_MISSIONS[m];
   const here = spyCity(state, unit);
   unit.spyMission = SPY_IDLE;
-  if (!def || !here) return;
+  if (!def) return;
+  if (def.citystate) {
+    resolveMinorMission(state, unit, m, def);
+    return;
+  }
+  if (!here) return;
   if (m === SPY_M_COUNTERSPY || m === SPY_M_LISTENING_POST) {
     // Both stand their posts rather than ending: counter-espionage runs until
     // the spy is sent elsewhere, and CIV6 (Diplomatic Visibility) has the
@@ -406,25 +438,93 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     }
   }
   if (def.certain) return;
+  if (!ok) spyEscape(state, unit, here.city.districts, here.seat.seat);
+}
+
+/**
+ * CIV6 (Fabricate Scandal): the one CITY-STATE mission. On success "all other
+ * players lose a number of Envoys determined by the Spy's level" — every
+ * rival's stake at this minor, MODEL-mapped as base + 1 per effective level.
+ * A failure runs the same escape sequence off the minor's own registry.
+ */
+function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMissionDef): void {
+  const minor = spyMinorAt(state, unit.tileIndex);
+  if (!minor) return;
+  const lvl = Math.max(0, spyLevel(unit) + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
+    + quartermasterLevels(state, unit.seat) + congressPactLevels(state, m));
+  const ok = roll(state, (def.successPct ?? 0) + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
+  if (ok) {
+    if (m === SPY_M_FABRICATE_SCANDAL) {
+      const k = SPY_SCANDAL_ENVOYS_BASE + SPY_SCANDAL_PER_LEVEL * lvl;
+      for (const s of state.seats) {
+        if (s.seat === unit.seat) continue;
+        const have = envoysOf(minor, s.seat);
+        if (have > 0) minor.envoys[s.seat] = Math.max(0, have - k);
+      }
+      resolveSuzerain(state, minor);
+    }
+    levelUpSpy(state, unit);
+    dedicationEvent(state, unit.seat, DED_BODYGUARD);
+    return;
+  }
+  spyEscape(state, unit, minor.districts ?? [], -1);
+}
+
+/**
+ * CIV6 (Espionage): a discovered spy "will need to escape from the target
+ * city" — by Airplane, Boat, Vehicle or on Foot, gated on the city's own
+ * districts, the faster the ride the likelier the catch, and a survivor
+ * reappears in the CAPITAL after the route's ride home. The spy takes the
+ * FASTEST route whose district stands (a recorded model choice where the
+ * real game asks the player), and (Ace Driver) "have a much higher chance
+ * of escape (+4 levels)" rides the missions' own per-level term. A failed
+ * escape is the old catch: "imprisoned, but not killed" where a MAJOR runs
+ * the prison — a minor keeps no cell, so its catch ends the career.
+ */
+function spyEscape(state: GameState, unit: Unit,
+                   districts: { type: string; tileIndex: number }[], jailer: number): void {
+  const live = new Set<string>();
+  for (const d of districts) {
+    const dt = state.map.tiles[d.tileIndex];
+    if (dt?.districtComplete && !dt.districtPillaged) live.add(d.type);
+  }
+  const route = SPY_ESCAPE_ROUTES.find((r) => r.district === null || live.has(r.district))
+    ?? SPY_ESCAPE_ROUTES[SPY_ESCAPE_ROUTES.length - 1];
   // CIV6: "when enemy Spies are performing missions in those districts, there
-  // is a much higher chance than normal that they will be caught."
-  const posted = counterspiesAt(state, here.seat.seat, unit.tileIndex);
-  const caught = SPY_CAPTURE_PCT + (posted.length > 0 ? SPY_COUNTERSPY_CATCH_PCT : 0);
-  if (!ok && roll(state, caught)) {
+  // is a much higher chance than normal that they will be caught" — the post
+  // now leans on the ESCAPE.
+  const posted = jailer >= 0 ? counterspiesAt(state, jailer, unit.tileIndex) : [];
+  const lvl = spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL');
+  const pct = route.basePct + SPY_SUCCESS_PER_LEVEL_PCT * lvl
+    - (posted.length > 0 ? SPY_COUNTERSPY_CATCH_PCT : 0);
+  if (roll(state, pct)) {
+    const home = citiesOf(state, unit.seat).find((c) => c.isCapital)
+      ?? citiesOf(state, unit.seat)[0];
+    if (!home) {
+      disbandUnit(state, unit.id);
+      return;
+    }
+    unit.spyMission = SPY_TRAVELLING;
+    unit.spyTarget = home.centerIndex;
+    unit.spyTurns = route.turns;
+    return;
+  }
+  if (jailer >= 0 && roll(state, SPY_CAPTURE_PCT)) {
     // CIV6 (Spies and Espionage): a spy "may gain levels from successful
     // offensive operations, or capturing an enemy Spy" — the post that made
     // the catch likelier is the one that earns it, and the first of them by
     // slot is the captor on both engines.
     const captor = posted[0];
     if (captor) levelUpSpy(state, captor);
-    // CIV6: captured spies "are imprisoned, but not killed", and the owner "can
-    // then attempt to trade with the civilization who captured the Spy,
-    // securing their release". It leaves the map either way; what a cell holds
-    // is a COUNT, so the spy that comes home is a new one at level 1.
-    const jailer = here.seat.seat;
+    // CIV6: captured spies "are imprisoned, but not killed", and the owner
+    // "can then attempt to trade with the civilization who captured the Spy,
+    // securing their release". A cell holds a COUNT, so the spy that comes
+    // home is a new one at level 1.
     setSpyHeld(state, unit.seat, jailer, spyHeldWith(state, unit.seat, jailer) + 1);
     disbandUnit(state, unit.id);
+    return;
   }
+  disbandUnit(state, unit.id);
 }
 
 function applyMission(state: GameState, unit: Unit, m: number, city: City, holder: number, lvl: number): void {
