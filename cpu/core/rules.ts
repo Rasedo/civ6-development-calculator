@@ -85,9 +85,10 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
  */
 export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): boolean {
   if (isWater(tile) || isImpassable(tile)) return false;
-  // A NATURAL WONDER takes nothing built on it — the clause `canFoundCity`,
-  // `validImprovementsIn`, `canPlaceDistrictIn` and `wonderTerrainOk` each
-  // ask, and the engineer's ground is the last place that did not.
+  // CIV6 (Natural Wonder): a wonder tile cannot be improved — the engineer's
+  // roads and railroads included, and a PASSABLE wonder is ground to stand
+  // on, not to build on. `canFoundCity`, `validImprovementsIn`,
+  // `canPlaceDistrictIn` and `wonderTerrainOk` carry the same refusal.
   if (naturalWonderAt(tile)) return false;
   return ownsTile(tile) || tileSeat(tile) < 0;
 }

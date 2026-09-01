@@ -57,9 +57,8 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
-| B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **19** | |
+| **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -77,7 +76,7 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **41** | |
+| **OPEN, TOTAL** | **40** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -91,64 +90,61 @@ this ledger when the owner answers or a primary source is reached, and
 the answer lands in the ROW the entry points at (this list carries no
 detail of its own). "Meanwhile" states what both engines do today.
 
-1. **B-67 — a route across a natural wonder.** May a Military Engineer
-   lay a road or railroad on a PASSABLE natural-wonder tile? Meanwhile:
-   refused, following the four sourced pave clauses.
-2. **C-5 — the fuel-shortage penalty.** The CS penalty "proportional to
+1. **C-5 — the fuel-shortage penalty.** The CS penalty "proportional to
    the amount you're short" has no published magnitude. Meanwhile: the
    consumption is live and no penalty is applied.
-3. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
+2. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
    what a step through it costs, and whether it opens the mountain or
    joins two tunnels — no safe reading reached. Meanwhile: not built.
-4. **C-1 — the reactor's accident roll.** Severities open at ages
+3. **C-1 — the reactor's accident roll.** Severities open at ages
    10/20/30; NO source publishes the per-turn probability. Meanwhile: the
    age clock ships, no accident ever fires.
-5. **C-1 — the decommission projects' score.** A secondary source says
+4. **C-1 — the decommission projects' score.** A secondary source says
    100 competition points; no first-party page states any figure.
    Meanwhile: the projects are absent, the window counts emissions alone.
-6. **C-24 — the Flood Barrier's maintenance.** Published only as
+5. **C-24 — the Flood Barrier's maintenance.** Published only as
    "Variable". Meanwhile: 0.
-7. **C-31 — the nuke's last clauses.** Interception has no published
+6. **C-31 — the nuke's last clauses.** Interception has no published
    roll; the citizens a blast kills wait on a worked-tile selection
    neither engine exposes; whether a wonder in the blast is PILLAGED is
    unsourced. Meanwhile: no interception, no citizen deaths, the wonder
    rides through untouched.
-8. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
+7. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
    COSTS (movement? a turn?) is unsourced. Meanwhile: no Jump.
-9. **C-35 — what drowned ground still lends.** Does a submerged tile's
+8. **C-35 — what drowned ground still lends.** Does a submerged tile's
    FEATURE keep working for its neighbours, or is the ground stripped?
    Meanwhile: it lends (every ring fact reads terrain).
-10. **B-20r — the Naturalist's progressive cost; the park's vertical.**
+9. **B-20r — the Naturalist's progressive cost; the park's vertical.**
     The real faith cost RISES per purchase (magnitude unsourced), and
     Civ 6 fixes the park rhombus vertical where this hex frame has no
     canonical vertical. Meanwhile: the flat GS price; every rhombus
     offered.
-11. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
+10. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
     the city faster" is the whole primary text; two secondaries say 20%.
     Meanwhile: the +3 Gold half ships on the stored course; the
     border-cost site would take a multiplier the moment one is sourced.
-12. **B-63r — the grievance ceiling rows and the gang-up bar.** The
+11. **B-63r — the grievance ceiling rows and the gang-up bar.** The
     occupied/razed rows publish only "up to 50" / "up to 150"; no source
     publishes the AI's gang-up threshold. Meanwhile: the ceiling values;
     `GRIEVANCE_GANG` as a tuning knob.
-13. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+12. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
     whether it may act after forming are unpublished, and the
     direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
     Meanwhile: the veteran's own HP, the turn ends, the single unit's
     charge.
-14. **C-32 — the Rock Band's twelve rows.** Its promotion table is
+13. **C-32 — the Rock Band's twelve rows.** Its promotion table is
     unsourced here. Meanwhile: the chassis carries its own level and
     album state instead.
-15. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+14. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
     and what it does to a standing improvement. Meanwhile: the ADD
     carrier ships and nothing calls it.
-16. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+15. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
     five is a capacity choice (the GPU's tensor dimension). Is five
     acceptable, or name a depth? Meanwhile: 5 on both engines.
-17. **C-16 — the released spy's level.** What a released (ransomed) spy
+16. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-18. **C-2 — four diplomacy cells.** Military 2's Production clause and
+17. **C-2 — four diplomacy cells.** Military 2's Production clause and
     Religious 3's pressure clause have no published magnitude (the wiki's
     Alliances data page refuses automated readers — a manual read would
     settle both); Research 2's cadence ships at the analyst table's 20
@@ -156,11 +152,11 @@ detail of its own). "Meanwhile" states what both engines do today.
     the QUEUE-FRONT item is refused on both engines and real Civ 6
     likely allows it with progress banked. Meanwhile: nothing / nothing /
     20 / refused.
-19. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+18. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
     engines.
-20. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
+19. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
     so on" with no published limit; `ROUTE_CHAIN_MAX` (6) is a capacity
     choice (the GPU plane's width), C-45's pattern. Is six acceptable,
     or name a depth? Meanwhile: 6 on both engines, the reach walk and
@@ -535,17 +531,6 @@ Civ 6 source or is recorded as unverifiable.
   raises. OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and
   Macedon's Hypaspist raise flanking or support for themselves alone, and
   no civilization unique exists (C-26).
-- **B-67. A NATURAL WONDER'S ROUTE CLAUSE IS UNSOURCED.** Weight 1.
-  `engineerTileOk` now refuses a natural-wonder tile, so `canBuildRoad`
-  and `canBuildRailroad` refuse one too and the GPU's
-  `_seat_engineer_job_mask` (which always carried `~self.nwonder`) agrees.
-  That follows every other clause the engine DOES source — `canFoundCity`,
-  `validImprovementsIn`, `canPlaceDistrictIn` and `wonderTerrainOk` each
-  refuse the tile — but the Civilopedia's own Natural Wonder page speaks of
-  IMPROVEMENTS and districts, not routes, and a passable natural wonder is
-  ground a unit may stand on. Whether real Civ 6 lets a Military Engineer
-  lay a road across one is unsourced either way; an owner ruling would
-  either confirm the clause or delete it from both engines.
 
 - **B-66. FORMATIONS.** Weight 1 — the mechanic SHIPS; two tails stay open.
   Corps, Armies, Fleets and Armadas exist on both engines: one
