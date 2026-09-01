@@ -25,7 +25,10 @@ Proven here:
   * a building already on order is not offered twice — the rule a one-deep
     queue never had to state;
   * `_q_drop` removes entries from the middle and closes the gap in order;
-  * one promote column stands for each waiting entry and no more.
+  * one promote column stands for each waiting entry and no more;
+  * a CANCELLED entry banks its hammers against the ITEM (`_cancel_queue_item`)
+    and `_q_push` of the same column resumes them — the ledger pays ONCE;
+  * a cancelled DISTRICT vacates its plot and its registry entry.
 """
 
 from __future__ import annotations
@@ -221,6 +224,50 @@ def test_a_promote_column_stands_for_exactly_its_entry(rules, path) -> None:
     print(f"  8 columns OK — one legal promote per waiting entry, over depths 1..{sim.QD}")
 
 
+def test_a_cancel_banks_against_the_item(rules, path) -> None:
+    sim = build(rules, path)
+    j = a_city(sim)
+    load_queue(sim, j, [unit(sim, 0), unit(sim, 1)], costs=[100, 100], progs=[7, 3])
+    sim._cancel_queue_item(B0, ROW, j, 0)
+    assert q(sim, j)[:2] == [unit(sim, 1), -1], "the queue did not close the gap"
+    assert prg(sim, j)[0] == 3, "the survivor lost its own hammers"
+    assert float(sim.city_prod_bank[B0, ROW, j]) == 0, \
+        "a CANCEL banked into the city buffer — that is INVALIDATION's path"
+    ks = sim.city_item_bank[B0, ROW, j].tolist()
+    assert unit(sim, 0) in ks, "the ledger holds no entry for the cancelled item"
+    li = ks.index(unit(sim, 0))
+    assert float(sim.city_item_amt[B0, ROW, j, li]) == 7
+    hit = torch.ones(1, dtype=torch.bool)
+    sim._q_push(ROW, j, hit, torch.tensor([unit(sim, 0)]), torch.tensor([100.0]))
+    assert prg(sim, j)[1] == 7, "queueing the item again did not resume its hammers"
+    assert int(sim.city_item_bank[B0, ROW, j, li]) == -1, \
+        "the ledger entry survived the resume"
+    sim._q_push(ROW, j, hit, torch.tensor([unit(sim, 0)]), torch.tensor([100.0]))
+    assert prg(sim, j)[2] == 0, "the ledger paid TWICE"
+    print("  9 cancel OK — banked 7 against the item, resumed once, paid once")
+
+
+def test_a_cancelled_district_vacates_its_plot(rules, path) -> None:
+    sim = build(rules, path)
+    j = a_city(sim)
+    t2 = int((sim.district[B0] < 0).nonzero().flatten()[0])
+    di = 0
+    code = sim.DISTRICT_BASE + di
+    load_queue(sim, j, [code], costs=[100], progs=[11])
+    sim.city_qtile[B0, ROW, j, 0] = t2
+    sim.district[B0, t2] = di
+    sim.district_complete[B0, t2] = False
+    sim.city_dist_tile[B0, ROW, j, di] = t2
+    sim._cancel_queue_item(B0, ROW, j, 0)
+    assert int(sim.district[B0, t2]) == -1, "the plot still carries the district"
+    assert int(sim.city_dist_tile[B0, ROW, j, di]) == -1, \
+        "the registry still names the plot"
+    ks = sim.city_item_bank[B0, ROW, j].tolist()
+    assert code in ks and float(sim.city_item_amt[B0, ROW, j, ks.index(code)]) == 11, \
+        "the district's hammers did not bank against the item"
+    print("  10 district OK — plot and registry vacated, 11 hammers held")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -232,6 +279,8 @@ def main() -> int:
     test_a_queued_building_is_not_offered_twice(rules, path)
     test_a_drop_closes_the_gap(rules, path)
     test_a_promote_column_stands_for_exactly_its_entry(rules, path)
+    test_a_cancel_banks_against_the_item(rules, path)
+    test_a_cancelled_district_vacates_its_plot(rules, path)
     print("BATTERY OK production_queue")
     return 0
 

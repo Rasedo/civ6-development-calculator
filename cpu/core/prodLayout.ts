@@ -25,6 +25,7 @@
  * 0-7, one purchase per seat per turn), which every seat records and both
  * engines re-validate at the gold block's own phase position.
  */
+import type { City, QueueItem } from './types';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
@@ -105,4 +106,84 @@ export function prodLayout(): ProdLayout {
     promoteLo,
     width: promoteLo + PRODUCTION_QUEUE_MAX - 1,
   };
+}
+
+interface QColIdx {
+  L: ProdLayout;
+  b: Map<string, number>;
+  u: Map<string, number>;
+  d: Map<string, number>;
+  w: Map<string, number>;
+  p: Map<string, number>;
+}
+let QCOL: QColIdx | null = null;
+function qcolIdx(): QColIdx {
+  if (!QCOL) {
+    const L = prodLayout();
+    QCOL = {
+      L,
+      b: new Map(L.buildings.map((id, i) => [id, i])),
+      u: new Map(L.units.map((id, i) => [id, i])),
+      d: new Map(SCAFFOLD_DISTRICTS.map((sd, i) => [sd.id as string, i])),
+      w: new Map(L.wonders.map((id, i) => [id, i])),
+      p: new Map(L.projects.map((id, i) => [id, i])),
+    };
+  }
+  return QCOL;
+}
+
+/** One queue item as a PRODUCTION COLUMN in this layout — the space the
+ *  GPU's `city_current` stores and the key `City.itemBank` banks under.
+ *  -1 = no column (an empty slot, or an id the layout does not carry). */
+export function queueItemColumn(q: QueueItem | undefined): number {
+  if (!q) return -1;
+  const c = qcolIdx();
+  switch (q.kind) {
+    case 'building': {
+      const i = c.b.get(q.building);
+      return i === undefined ? -1 : i;
+    }
+    case 'settler':
+      return c.L.settlerCol;
+    case 'unit': {
+      const i = c.u.get(q.unit);
+      if (i === undefined) return -1;
+      // a FORMATION entry sits in its own block — corps first, then army —
+      // because that is the column that queued it and what the GPU stores
+      return q.formation ? c.L.formLo + (q.formation - 1) * c.L.NU + i : c.L.unitLo + i;
+    }
+    case 'district': {
+      const i = c.d.get(q.district);
+      return i === undefined ? -1 : c.L.districtLo + i;
+    }
+    case 'wonder': {
+      const i = c.w.get(q.wonder);
+      return i === undefined ? -1 : c.L.wonderLo + i;
+    }
+    case 'project': {
+      const i = c.p.get(q.project);
+      return i === undefined ? -1 : c.L.projectLo + i;
+    }
+  }
+}
+
+/** CIV6: production is never lost — a CANCELLED item keeps its own hammers,
+ *  held against the ITEM until it is queued again. Work lost to INVALIDATION
+ *  (a flipped or razed site) banks to `City.productionBank` instead. */
+export function bankItemProgress(city: City, item: QueueItem): void {
+  if (item.progress <= 0) return;
+  const col = queueItemColumn(item);
+  if (col < 0) return;
+  const bank = (city.itemBank ??= {});
+  bank[col] = (bank[col] ?? 0) + item.progress;
+}
+
+/** The hammers waiting for this item, REMOVED from the ledger — every queue
+ *  site adds them to the entry it is about to push. */
+export function takeItemBank(city: City, item: QueueItem): number {
+  const col = queueItemColumn(item);
+  const v = city.itemBank?.[col];
+  if (!v) return 0;
+  delete city.itemBank![col];
+  return v;
 }

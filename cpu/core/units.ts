@@ -4,8 +4,9 @@
  * training, maintenance, and builder actions. Military/combat land in 11b.
  */
 
-import type { GameState, City, Seat, Tile, Unit } from './types';
+import type { GameState, City, Seat, Tile, Unit, QueueItem } from './types';
 import { seatWonderSum } from './wonders';
+import { takeItemBank } from './prodLayout';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { FORMATION_CS } from '../data/units';
 
@@ -1379,11 +1380,12 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
     return ok;
   }
   chargeUnitResource(state, seat, unitType);
-  if (unitType === 'BUILDER') {
-    city.queue.push({ kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state, seat) });
-  } else {
-    city.queue.push({ kind: 'unit', unit: unitType, progress: 0 });
-  }
+  const qi: QueueItem =
+    unitType === 'BUILDER'
+      ? { kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state, seat) }
+      : { kind: 'unit', unit: unitType, progress: 0 };
+  qi.progress += takeItemBank(city, qi);
+  city.queue.push(qi);
   return ok;
 }
 

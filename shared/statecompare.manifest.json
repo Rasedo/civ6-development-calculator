@@ -1742,6 +1742,18 @@
           ]
         },
         {
+          "name": "itemBank",
+          "compare": "milli",
+          "covers": [
+            "City.itemBank"
+          ],
+          "note": "the per-item hammer ledger a CANCELLED entry banks into — [column, amount] pairs sorted by production column, resumed by the queue sites",
+          "planes": [
+            "city_item_bank",
+            "city_item_amt"
+          ]
+        },
+        {
           "name": "followedReligion",
           "compare": "exact",
           "covers": [

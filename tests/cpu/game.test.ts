@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { seatOf, tileCity } from '../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
 import { growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, maxSpecialtyDistricts } from '../../cpu/data/constants';
-import { foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile, itemCost } from '../../cpu/core/game';
+import { foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile, itemCost, cancelQueueItem } from '../../cpu/core/game';
 import { canFoundCity, canPlaceDistrict } from '../../cpu/core/rules';
 import { placeSeatDistrict } from '../../cpu/core/phase';
 import { computeUnlocksIn } from '../../cpu/core/effects';
@@ -239,6 +239,38 @@ describe('districts and buildings', () => {
     expect(queueBuilding(state, city.id, 'WATER_MILL', 0).ok).toBe(false);
     state.map.tiles[city.centerIndex].riverMask = 1;
     expect(queueBuilding(state, city.id, 'WATER_MILL', 0).ok).toBe(true);
+  });
+});
+
+describe('the item keeps its hammers', () => {
+  function settled() {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    return { state, city };
+  }
+
+  it('a cancelled item banks against ITSELF and resumes when queued again', () => {
+    const { state, city } = settled();
+    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    city.queue[0].progress = 12;
+    cancelQueueItem(state, city.id, 0, 0);
+    expect(city.queue.length).toBe(0);
+    expect(city.productionBank ?? 0).toBe(0);
+    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    expect(city.queue[0].progress).toBe(12);
+    expect(Object.values(city.itemBank ?? {}).filter((v) => v > 0).length).toBe(0);
+  });
+
+  it('the hammers wait for THAT item, not whatever queues next', () => {
+    const { state, city } = settled();
+    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    city.queue[0].progress = 9;
+    cancelQueueItem(state, city.id, 0, 0);
+    grantTechs(state, 'POTTERY');
+    expect(queueBuilding(state, city.id, 'GRANARY', 0).ok).toBe(true);
+    expect(city.queue[0].progress).toBe(0);
+    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    expect(city.queue[1].progress).toBe(9);
   });
 });
 

@@ -91,6 +91,10 @@ export interface City {
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
+  /** CIV6: production is never lost — a CANCELLED item keeps its own hammers,
+   *  keyed by its production column (`queueItemColumn`), and picks them back
+   *  up when it is queued again. Invalidated work banks to `productionBank`. */
+  itemBank?: Record<number, number>;
   loyalty?: number;
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */

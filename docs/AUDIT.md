@@ -47,7 +47,6 @@ from the list below.
 | B-22r World Congress | 1 | the Espionage Pact's and Luxury Policy's era windows are table readings; the scored-competition catalog holds one row |
 | B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system, and Land Acquisition's growth figure (the ledger's) |
 | B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six (the ledger's); the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person PASS | 1 | the PASS ships (fee, discount, lockout); what remains is the hammers bullet — a REMOVED item's progress banks where real Civ 6 remembers it against the item |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
@@ -60,7 +59,7 @@ from the list below.
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **20** | |
+| **B. Fidelity vs real Civ 6** | **19** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -78,7 +77,7 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **42** | |
+| **OPEN, TOTAL** | **41** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -654,28 +653,6 @@ Civ 6 source or is recorded as unverifiable.
   - **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
     city capture; the district's own pool rides through unchanged on both
     engines — no source says which is right.
-- **B-53r. The Great Person PASS.** All 205 people ship with the era
-  gate, the frozen randomly-drawn offer and its frozen price
-  (`ensureGpOffer` / `_gp_ensure_offer`, `gpCost`), and both patronage
-  purses with the Oracle discount (`patronageCost` /
-  `_seat_patronage_cost`). The PASS ships too (`passGreatPerson`, the
-  `gpPass` record field): a seat that could claim may reject the standing
-  person instead — it sacrifices 20% of the cost from its own points, the
-  price falls 20% for everyone else, and `gpPassedBy` locks the passer out
-  of THAT individual until another claims (recruit race and patronage
-  alike); accrual continues, one passer per person, and the claim clears
-  the stamp. The driver takes it at `GP_PASS_SHARE`;
-  `tests/gpu/gp_pass_test.py` is the bar. OPEN:
-  - **A REMOVED ITEM'S HAMMERS BANK, WHERE CIV 6 HOLDS THEM AGAINST THE
-    ITEM.** SWITCHING is faithful now: the queue holds the item after it
-    stops being worked, so its hammers wait on its own entry and a reorder
-    spends nothing. What still banks is REMOVAL — `cancelQueueItem`,
-    `dropQueuedBuilding` and `wipeConstruction` each pay `progress` into
-    `productionBank`. Real Civ 6 remembers the hammers against the ITEM
-    even once it leaves the queue, so queuing it again later resumes where
-    it stopped; that wants a per-item ledger the city does not have. Both
-    engines are alike here, and `cancelQueueItem` is reached by no engine
-    path, driver or scripted player.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49
@@ -1299,7 +1276,9 @@ under their blocker so the dependency is readable, and both halves count.
   `city_qtile`) and must be finite, so TS carries the same cap to keep the
   two engines answering alike. Raising it costs one constant and one
   re-export; removing the ceiling entirely would cost the GPU its dense
-  storage. Reach: the driven gate fills queues to the cap by the early
+  storage. The per-item hammer ledger a CANCELLED entry banks into
+  (`city_item_bank`, eight columns per city) is the same class of choice —
+  a full ledger banks nothing more. Reach: the driven gate fills queues to the cap by the early
   hundreds of turns, so the refusal itself is exercised.
 
 ## Reachability — what the green gate does NOT prove

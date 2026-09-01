@@ -1,6 +1,7 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
+import { bankItemProgress } from './prodLayout';
 import { greatPeopleEarned, relicSlotsIn } from './greatPeople';
 import { airTrainTile } from './air';
 import { placeRelic, GP_CLASSES } from '../data/greatPeople';
@@ -1125,17 +1126,17 @@ export function naturalistCost(state: GameState, seat: number): number {
 }
 
 /**
- * CIV6: production is never lost. Taking an item off the queue sends the
- * hammers already spent on it to the city's buffer, which is where this model
- * puts every carried-over hammer — real Civ 6 holds them against the ITEM, so
- * resuming it later resumes where it stopped, and that needs a queue deeper
- * than the one head both engines run.
+ * CIV6: production is never lost. A CANCELLED item keeps its own hammers —
+ * they wait in `City.itemBank` against the item's production column, and the
+ * queue sites resume them when it is queued again. Work lost to INVALIDATION
+ * (a flipped or razed site) banks to the city's buffer instead
+ * (`dropQueuedBuilding`, `wipeConstruction`).
  */
 export function cancelQueueItem(state: GameState, cityId: number, index: number, seat: number): void {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city || index < 0 || index >= city.queue.length) return;
   const item = city.queue[index];
-  city.productionBank = (city.productionBank ?? 0) + item.progress;
+  bankItemProgress(city, item);
   if (item.kind === 'district') {
     const tile = state.map.tiles[item.tileIndex];
     tile.district = null;

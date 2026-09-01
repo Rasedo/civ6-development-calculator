@@ -634,6 +634,17 @@ def _cty(plane: str):
     return get
 
 
+def _item_bank(sim, b, c, s):
+    """the per-item hammer ledger, [column, amount] pairs sorted by column —
+    the order the TS extractor emits after mapping its keys."""
+    ks = sim.city_item_bank[b, c, s].tolist()
+    vs = sim.city_item_amt[b, c, s].tolist()
+    out: list[float] = []
+    for k, v in sorted((int(k), float(v)) for k, v in zip(ks, vs) if k >= 0 and v > 0):
+        out.extend([float(k), v])
+    return out
+
+
 def _queue_cost(sim, b, rows):
     """`queueItemCost` over the WHOLE queue — a BUILDING's price is read live,
     which is what TS does, and it does it for a waiting entry as readily as for
@@ -710,6 +721,7 @@ CITY = {
     ],
     "queueProgress": _cty("city_progress"),
     "queueCost": _queue_cost,
+    "itemBank": lambda sim, b, rows: [_item_bank(sim, b, c, s) for c, s in rows],
     "followedReligion": _cty("city_followed"),
     "religionPressure": lambda sim, b, rows: [
         [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows

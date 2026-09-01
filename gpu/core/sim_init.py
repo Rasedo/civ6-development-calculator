@@ -2414,6 +2414,15 @@ class SimInit:
         # for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=dtype, device=device)
+        # CIV6: production is never lost — a CANCELLED item keeps its own
+        # hammers, held against the ITEM's production column until it is
+        # queued again (`_q_push` resumes them). Eight columns per city is a
+        # capacity choice like the queue's own depth; a full ledger banks
+        # nothing more.
+        self.city_item_bank = torch.full((B, self.n_majors + max(self.S, 1), self.RC, 8), -1,
+                                         dtype=torch.long, device=device)
+        self.city_item_amt = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, 8,
+                                         dtype=dtype, device=device)
         self.seat_science_total = torch.zeros(B, self.n_majors, dtype=dtype, device=device)
 
         self.units_mode = bool(f0.get("unitsMode", 0))

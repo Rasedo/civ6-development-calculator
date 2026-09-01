@@ -57,8 +57,8 @@ const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
-import { prodLayout } from './prodLayout';
-import { SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
+import { prodLayout, queueItemColumn } from './prodLayout';
+import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { effectiveSpecialists } from './city';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
@@ -167,8 +167,6 @@ const CIVIC_IDX = new Map(Object.keys(CIVICS).map((id, i) => [id, i]));
 const BUILDING_IDX = new Map(LAYOUT.buildings.map((id, i) => [id, i]));
 const UNIT_IDX = new Map(LAYOUT.units.map((id, i) => [id, i]));
 const WONDER_IDX = new Map(LAYOUT.wonders.map((id, i) => [id, i]));
-const PROJECT_IDX = new Map(LAYOUT.projects.map((id, i) => [id, i]));
-const SCAFFOLD_IDX = new Map(SCAFFOLD_DISTRICTS.map((d, i) => [d.id as string, i]));
 const GP_CLASS_OF = new Map<string, number>();
 for (const [cls, defs] of Object.entries(GREAT_PEOPLE)) {
   const ci = GP_CLASSES.indexOf(cls as (typeof GP_CLASSES)[number]);
@@ -189,40 +187,6 @@ const idx = (m: Map<string, number>, id: string | null | undefined): number =>
  *  cities. */
 function overQueue<T>(q: City['queue'], f: (it: City['queue'][number] | undefined) => T): T[] {
   return Array.from({ length: PRODUCTION_QUEUE_MAX }, (_, k) => f(q[k]));
-}
-
-/** One queue item as a PRODUCTION COLUMN in the shared layout
- *  (cpu/core/prodLayout.ts), which is the space the GPU's `city_current` uses.
- *  -1 = an empty queue, matching the GPU's idle slot. */
-function queueColumn(q: City['queue'][number] | undefined): number {
-  if (!q) return -1;
-  switch (q.kind) {
-    case 'building': {
-      const i = BUILDING_IDX.get(q.building);
-      return i === undefined ? -1 : i;
-    }
-    case 'settler':
-      return LAYOUT.settlerCol;
-    case 'unit': {
-      const i = UNIT_IDX.get(q.unit);
-      if (i === undefined) return -1;
-      // a FORMATION entry sits in its own block — corps first, then army —
-      // because that is the column that queued it and what the GPU stores
-      return q.formation ? LAYOUT.formLo + (q.formation - 1) * LAYOUT.NU + i : LAYOUT.unitLo + i;
-    }
-    case 'district': {
-      const i = SCAFFOLD_IDX.get(q.district);
-      return i === undefined ? -1 : LAYOUT.districtLo + i;
-    }
-    case 'wonder': {
-      const i = WONDER_IDX.get(q.wonder);
-      return i === undefined ? -1 : LAYOUT.wonderLo + i;
-    }
-    case 'project': {
-      const i = PROJECT_IDX.get(q.project);
-      return i === undefined ? -1 : LAYOUT.projectLo + i;
-    }
-  }
 }
 
 function queueTile(q: City['queue'][number] | undefined): number {
@@ -657,7 +621,7 @@ const CITY: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
-  queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueColumn(q), queueTile(q)]).flat()),
+  queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueItemColumn(q), queueTile(q)]).flat()),
   specialists: overCities((r, state) => {
     const eff = effectiveSpecialists(state, r.city);
     return PLACEABLE_DISTRICTS.map((type) => {
@@ -668,6 +632,13 @@ const CITY: Record<string, Extractor> = {
   specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
   queueProgress: overCities((r) => overQueue(r.city.queue, (q) => q?.progress ?? 0)),
   queueCost: overCities((r, state) => overQueue(r.city.queue, (q) => queueItemCost(state, r.city, q))),
+  itemBank: overCities((r) =>
+    Object.entries(r.city.itemBank ?? {})
+      .map(([k, v]) => [Number(k), v])
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => a[0] - b[0])
+      .flat(),
+  ),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),
   // The GPU's pressure vector is one column per RELIGION, and religions are
   // indexed in the civ-seat space, so the vector is exactly as wide as the

@@ -3,6 +3,7 @@ import type { City, GameState, QueueItem, Seat } from './types';
 import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
+import { takeItemBank } from './prodLayout';
 import { isSuzerain } from './cityStates';
 import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
 import { computeAdoption, inDarkAge } from './effects';
@@ -129,6 +130,7 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
 export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
   if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit, city);
   else if (item.kind === 'project') chargeProjectResource(state, seat, item.project);
+  item.progress += takeItemBank(city, item);
   city.queue.push(item);
   if (process.env.CIV6_ALOG) {
     const what =

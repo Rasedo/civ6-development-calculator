@@ -75,6 +75,18 @@ class SimSeats:
             else:
                 new = val.to(old.dtype)
             p[bidx, row, col, slot] = torch.where(take, new, old)
+        # CIV6: production is never lost — a CANCELLED item kept its hammers
+        # against its own column; queueing that column again resumes them.
+        lb = self.city_item_bank[bidx, row, col]
+        code_l = code if torch.is_tensor(code) else torch.full_like(depth, int(code))
+        m = take.unsqueeze(1) & (lb == code_l.long().unsqueeze(1))
+        if bool(m.any()):
+            amt = self.city_item_amt[bidx, row, col]
+            got = torch.where(m, amt, torch.zeros_like(amt)).sum(dim=1)
+            prog = self.city_progress[bidx, row, col, slot]
+            self.city_progress[bidx, row, col, slot] = prog + got.to(prog.dtype)
+            self.city_item_bank[bidx, row, col] = torch.where(m, torch.full_like(lb, -1), lb)
+            self.city_item_amt[bidx, row, col] = torch.where(m, torch.zeros_like(amt), amt)
 
     def _q_pop(self, row: int, col, hit: torch.Tensor) -> None:
         """`queue.shift()` — drop the head and close the gap, all four planes
@@ -121,6 +133,50 @@ class SimSeats:
         for p, _empty in self._q_planes():
             cur = p[bidx, row, col]
             p[bidx, row, col] = torch.where(live.unsqueeze(1), cur[:, order], cur)
+
+    def _cancel_queue_item(self, b: int, row: int, col: int, k: int) -> None:
+        """`cancelQueueItem`'s twin, poke-level — no engine path cancels (the
+        driver never uses the verb). The item keeps its own hammers
+        (`city_item_bank`, merged by column; a FULL ledger banks nothing
+        more), a district or wonder still going up vacates its plot and its
+        registry entry, and the queue closes the gap."""
+        code = int(self.city_current[b, row, col, k])
+        if code < 0:
+            return
+        amt = float(self.city_progress[b, row, col, k])
+        if amt > 0:
+            lb = self.city_item_bank[b, row, col]
+            at = (lb == code).nonzero(as_tuple=True)[0]
+            if not at.numel():
+                at = (lb < 0).nonzero(as_tuple=True)[0]
+            if at.numel():
+                li = int(at[0])
+                self.city_item_bank[b, row, col, li] = code
+                self.city_item_amt[b, row, col, li] += amt
+        t = int(self.city_qtile[b, row, col, k])
+        nD, nW = self.city_dist_tile.shape[3], self.city_wonder.shape[3]
+        bumped = False
+        if t >= 0 and self.DISTRICT_BASE <= code < self.DISTRICT_BASE + nD:
+            self.district[b, t] = -1
+            self.district_complete[b, t] = False
+            dreg = self.city_dist_tile[b, row, col]
+            self.city_dist_tile[b, row, col] = torch.where(
+                dreg == t, torch.full_like(dreg, -1), dreg)
+            bumped = True
+        if t >= 0 and self.WONDER_BASE <= code < self.WONDER_BASE + nW:
+            self.built_wonder[b, t] = -1
+            self.built_wonder_complete[b, t] = False
+            wreg = self.city_wonder[b, row, col]
+            self.city_wonder[b, row, col] = torch.where(
+                wreg == t, torch.full_like(wreg, -1), wreg)
+            bumped = True
+        rows = torch.tensor([b], dtype=torch.long, device=self.device)
+        gone = torch.zeros(1, self.QD, dtype=torch.bool, device=self.device)
+        gone[0, k] = True
+        self._q_drop(rows, row, col, gone)
+        if bumped:
+            self._claim_version += 1
+            self._eff_version += 1
 
     def _seat_production_mask(self, row: int) -> torch.Tensor:
         """[B, RC, W] — THE production decision space, for seat row `row`.
