@@ -86,6 +86,88 @@ RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
 not add a "done" column back.
 
+## THE QUESTION LEDGER — every open ask, one pass
+
+Each entry below is an OPEN bullet whose row says UNSOURCED, unpublished
+or "owner question". None is a licence to ship a branch; a bullet leaves
+this ledger when the owner answers or a primary source is reached, and
+the answer lands in the ROW the entry points at (this list carries no
+detail of its own). "Meanwhile" states what both engines do today.
+
+1. **B-67 — a route across a natural wonder.** May a Military Engineer
+   lay a road or railroad on a PASSABLE natural-wonder tile? Meanwhile:
+   refused, following the four sourced pave clauses.
+2. **C-5 — the fuel-shortage penalty.** The CS penalty "proportional to
+   the amount you're short" has no published magnitude. Meanwhile: the
+   consumption is live and no penalty is applied.
+3. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
+   what a step through it costs, and whether it opens the mountain or
+   joins two tunnels — no safe reading reached. Meanwhile: not built.
+4. **C-1 — the reactor's accident roll.** Severities open at ages
+   10/20/30; NO source publishes the per-turn probability. Meanwhile: the
+   age clock ships, no accident ever fires.
+5. **C-1 — the decommission projects' score.** A secondary source says
+   100 competition points; no first-party page states any figure.
+   Meanwhile: the projects are absent, the window counts emissions alone.
+6. **C-24 — the Flood Barrier's maintenance.** Published only as
+   "Variable". Meanwhile: 0.
+7. **C-31 — the nuke's last clauses.** Interception has no published
+   roll; the citizens a blast kills wait on a worked-tile selection
+   neither engine exposes; whether a wonder in the blast is PILLAGED is
+   unsourced. Meanwhile: no interception, no citizen deaths, the wonder
+   rides through untouched.
+8. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
+   COSTS (movement? a turn?) is unsourced. Meanwhile: no Jump.
+9. **C-35 — what drowned ground still lends.** Does a submerged tile's
+   FEATURE keep working for its neighbours, or is the ground stripped?
+   Meanwhile: it lends (every ring fact reads terrain).
+10. **C-43 — two 404 improvement pages.** The Seaside Resort's and
+    Airstrip's Civilopedia entries both 404, so their research raises
+    (if any) are unknown rather than absent. Meanwhile: zero, flagged as
+    absence of evidence.
+11. **B-20r — the Naturalist's progressive cost; the park's vertical.**
+    The real faith cost RISES per purchase (magnitude unsourced), and
+    Civ 6 fixes the park rhombus vertical where this hex frame has no
+    canonical vertical. Meanwhile: the flat GS price; every rhombus
+    offered.
+12. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
+    the city faster" is the whole primary text; two secondaries say 20%.
+    Meanwhile: unbuilt — the border-cost site would take a multiplier the
+    moment one is sourced.
+13. **B-63r — the grievance ceiling rows and the gang-up bar.** The
+    occupied/razed rows publish only "up to 50" / "up to 150"; no source
+    publishes the AI's gang-up threshold. Meanwhile: the ceiling values;
+    `GRIEVANCE_GANG` as a tuning knob.
+14. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+    whether it may act after forming are unpublished, and the
+    direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
+    Meanwhile: the veteran's own HP, the turn ends, the single unit's
+    charge.
+15. **C-32 — the Rock Band's twelve rows.** Its promotion table is
+    unsourced here. Meanwhile: the chassis carries its own level and
+    album state instead.
+16. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+    and what it does to a standing improvement. Meanwhile: the ADD
+    carrier ships and nothing calls it.
+17. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+    five is a capacity choice (the GPU's tensor dimension). Is five
+    acceptable, or name a depth? Meanwhile: 5 on both engines.
+18. **C-16 — the released spy's level.** What a released (ransomed) spy
+    keeps of its levels is unpublished. Meanwhile: the row's own recorded
+    reading stands.
+19. **C-2 — four diplomacy cells.** Military 2's Production clause and
+    Religious 3's pressure clause have no published magnitude (the wiki's
+    Alliances data page refuses automated readers — a manual read would
+    settle both); Research 2's cadence ships at the analyst table's 20
+    turns but one paraphrase says 30 (CONTESTED); the gold purchase of
+    the QUEUE-FRONT item is refused on both engines and real Civ 6
+    likely allows it with progress banked. Meanwhile: nothing / nothing /
+    20 / refused.
+20. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+    on a city capture; the Encampment's own pool rides through — no
+    source says which is right. Meanwhile: it rides through, both
+    engines.
+
 ## A. Engine vs engine — where the two implementations can answer differently
 
 THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS — both engines can be
