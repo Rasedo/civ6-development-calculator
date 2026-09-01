@@ -509,7 +509,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'NATURALIST',
       name: 'Naturalist',
-      cost: 600,
+      cost: 300,
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian
@@ -1279,7 +1279,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'ROCK_BAND',
       name: 'Rock Band',
-      cost: 500,
+      cost: 300,
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -1430,7 +1430,11 @@ export const ROCK_BAND_TIER_ODDS: readonly (readonly number[])[] = [
 export const ROCK_BAND_MAX_LEVEL = 4;
 /** CIV6: the faith "cost is progressive" — each band this seat has bought
  *  raises the next one's price by its base. */
-export const ROCK_BAND_COST_STEP = 1;
+/** CIV6 (Expansion2_Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): each copy
+ *  already bought raises the next one's FAITH price by a flat step — the
+ *  Rock Band and the Naturalist both pay 300 base + 50 per previous copy. */
+export const ROCK_BAND_COST_STEP = 50;
+export const NATURALIST_COST_STEP = 50;
 
 /**
  * THE GIANT DEATH ROBOT'S FUTURE-ERA UPGRADES. CIV6: the chassis "gains

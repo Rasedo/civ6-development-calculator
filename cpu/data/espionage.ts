@@ -137,12 +137,12 @@ export const BODYGUARD_OP_NUM = 3;
 export const BODYGUARD_OP_DEN = 4;
 
 // --- the sourced effect magnitudes -----------------------------------------
-/** CIV6 (Foment Unrest): "Base Loyalty reduction is 20, +5 per Spy level." */
-export const SPY_UNREST_LOYALTY = 20;
+/** CIV6 (ESPIONAGE_FOMENT_UNREST_BASE_LOYALTY_CHANGE -15, LEVEL -5). */
+export const SPY_UNREST_LOYALTY = 15;
 export const SPY_UNREST_PER_LEVEL = 5;
-/** CIV6 (Neutralize Governor): "Base duration is 7 turns, +1 per Spy level." */
-export const SPY_GOVERNOR_TURNS = 7;
-export const SPY_GOVERNOR_PER_LEVEL = 1;
+/** CIV6 (ESPIONAGE_NEUTRALIZE_GOVERNOR_BASE_TURNS 6) — the parameters
+ *  carry NO per-level row for this mission. */
+export const SPY_GOVERNOR_TURNS = 6;
 /** CIV6 (Gain Sources): "Spies in this city operate at 2 levels higher for 24
  *  turns." */
 export const SPY_SOURCES_LEVELS = 2;
@@ -178,8 +178,6 @@ export const SPY_ESCAPE_ROUTES: readonly SpyEscapeRoute[] = [
   { id: 'FOOT', district: null, turns: 4, basePct: 70 },
 ];
 
-/** CIV6 (Fabricate Scandal): "all other players lose a number of Envoys
- *  determined by the Spy's level" — the SHAPE is sourced, the map is not:
- *  base and per-level are MODEL values. */
+/** CIV6 (ESPIONAGE_FABRICATE_SCANDAL_BASE_ENVOYS_REMOVED 2, LEVEL 1). */
 export const SPY_SCANDAL_ENVOYS_BASE = 2;
 export const SPY_SCANDAL_PER_LEVEL = 1;

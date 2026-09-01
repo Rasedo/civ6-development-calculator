@@ -1240,7 +1240,7 @@ class SimSeats:
         spawn = torch.where(is_cap.any(dim=1), is_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
         live = (self.major_unit_alive & (self.major_unit_seat == row)
                 & (self.major_unit_type == self._naturalist_idx)).sum(dim=1)
-        cost = torch.full((B,), float(self._type_cost[self._naturalist_idx]), dtype=torch.float64, device=dev)
+        cost = self._naturalist_cost(row)
         ok = (
             active
             & alive.any(dim=1)
@@ -1276,9 +1276,16 @@ class SimSeats:
         return ok, slot
 
     def _rock_band_cost(self, row: int) -> torch.Tensor:
-        """[B] f64 — `rockBandCost`'s twin: base x (1 + bands already bought)."""
+        """[B] f64 — `rockBandCost`'s twin: base + a flat step per band."""
         base = float(self._type_cost[self._band_idx]) if getattr(self, "_band_idx", -1) >= 0 else 0.0
-        return base * (1 + self.civ_rock_bands[:, row].double() * self._band_cost_step)
+        return base + self.civ_rock_bands[:, row].double() * self._band_cost_step
+
+    def _naturalist_cost(self, row: int) -> torch.Tensor:
+        """[B] f64 — `naturalistCost`'s twin: the same progression shape."""
+        if getattr(self, "_naturalist_idx", -1) < 0:
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        base = float(self._type_cost[self._naturalist_idx])
+        return base + self.civ_naturalists[:, row].double() * self._naturalist_cost_step
 
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
@@ -1607,7 +1614,7 @@ class SimSeats:
             civ_i = int(self._type_civic[self._naturalist_idx])
             jn = n_j.clamp(min=0, max=self.RC - 1)
             at_n = self.city_center[bidx, row, jn].clamp(min=0)
-            n_price = torch.full((B,), float(self._type_cost[self._naturalist_idx]), dtype=torch.float64, device=dev)
+            n_price = self._naturalist_cost(row)
             base_n = active & ext & (n_j >= 0) & (n_kind == 10) & self.city_alive[bidx, row, jn]
             if civ_i >= 0:
                 base_n = base_n & self.civ_civics[:, row, civ_i]
@@ -1615,6 +1622,7 @@ class SimSeats:
             if bool(buy_n.any()):
                 landed_n = self._spawn_unit(row, buy_n, at_n, self._naturalist_idx)
                 self.civ_faith[:, row] = torch.where(landed_n, self.civ_faith[:, row] - n_price, self.civ_faith[:, row])
+                self.civ_naturalists[:, row] = self.civ_naturalists[:, row] + landed_n.long()
         if row in self._driven_buy_band and getattr(self, "_band_idx", -1) >= 0:
             b_j = self._driven_buy_band.pop(row)
             # CIV6 (Rock Band): FAITH only, behind Professional Sports, at a
@@ -6458,10 +6466,16 @@ class SimSeats:
         # city.ts form. Without beliefs the mult is 1 and js_round of the
         # integral base curve is exact, so the expression is unchanged.
         _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
+        # CIV6 (Land Acquisition): +20% culture toward border expansion —
+        # the governor divides the cost the way the city.ts twin does.
+        _gpct = self._governor_sum(row, "borderExpansionPct")[bidx, col].double()
 
         def _cost() -> torch.Tensor:
             base = self._border_cost(self.city_acquired[bidx, row, col])
-            return js_round(base * _bmul).to(base.dtype) if _bmul is not None else base
+            eff = base.double() * (100.0 / (100.0 + _gpct))
+            if _bmul is not None:
+                eff = eff * _bmul
+            return js_round(eff).to(base.dtype)
 
         # BORDER CONTROL outcome B: the box still fills, nothing is bought.
         act = act & ~self._congress_border_frozen(row)

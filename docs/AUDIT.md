@@ -42,10 +42,10 @@ from the list below.
 | Open item | Weight | What is open |
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
-| B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
+| B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 1 | the Espionage Pact's and Luxury Policy's era windows are table readings; the scored-competition catalog holds one row |
-| B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system, and Land Acquisition's growth figure (the ledger's) |
+| B-22r World Congress | 1 | the scored-competition catalog holds one row |
+| B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system |
 | B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six (the ledger's); the summed-yield key and one-candidate head are P8-surface |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
@@ -65,7 +65,6 @@ from the list below.
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
-| C-24 the climate arc | 1 | the Flood Barrier's maintenance is published only as "Variable" |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
 | C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
@@ -75,8 +74,8 @@ from the list below.
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district, its tier-1 building and the coastal Harbor ship; the yields of any of it and power are still absent |
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **40** | |
+| **C. Absent systems** | **21** | |
+| **OPEN, TOTAL** | **39** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -102,48 +101,40 @@ detail of its own). "Meanwhile" states what both engines do today.
 4. **C-1 — the decommission projects' score.** A secondary source says
    100 competition points; no first-party page states any figure.
    Meanwhile: the projects are absent, the window counts emissions alone.
-5. **C-24 — the Flood Barrier's maintenance.** Published only as
-   "Variable". Meanwhile: 0.
-6. **C-31 — the nuke's last clauses.** Interception has no published
+5. **C-31 — the nuke's last clauses.** Interception has no published
    roll; the citizens a blast kills wait on a worked-tile selection
    neither engine exposes; whether a wonder in the blast is PILLAGED is
    unsourced. Meanwhile: no interception, no citizen deaths, the wonder
    rides through untouched.
-7. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
+6. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
    COSTS (movement? a turn?) is unsourced. Meanwhile: no Jump.
-8. **C-35 — what drowned ground still lends.** Does a submerged tile's
+7. **C-35 — what drowned ground still lends.** Does a submerged tile's
    FEATURE keep working for its neighbours, or is the ground stripped?
    Meanwhile: it lends (every ring fact reads terrain).
-9. **B-20r — the Naturalist's progressive cost; the park's vertical.**
-    The real faith cost RISES per purchase (magnitude unsourced), and
-    Civ 6 fixes the park rhombus vertical where this hex frame has no
-    canonical vertical. Meanwhile: the flat GS price; every rhombus
-    offered.
-10. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
-    the city faster" is the whole primary text; two secondaries say 20%.
-    Meanwhile: the +3 Gold half ships on the stored course; the
-    border-cost site would take a multiplier the moment one is sourced.
-11. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
+8. **B-20r — the park's vertical.** Civ 6 fixes the park rhombus
+   vertical where this hex frame has no canonical vertical. Meanwhile:
+   every rhombus offered.
+9. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
     threshold. Meanwhile: `GRIEVANCE_GANG` as a tuning knob, two war
     bases' worth.
-12. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+10. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
     whether it may act after forming are unpublished, and the
     direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
     Meanwhile: the veteran's own HP, the turn ends, the single unit's
     charge.
-13. **C-32 — the Rock Band's twelve rows.** Its promotion table is
+11. **C-32 — the Rock Band's twelve rows.** Its promotion table is
     unsourced here. Meanwhile: the chassis carries its own level and
     album state instead.
-14. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+12. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
     and what it does to a standing improvement. Meanwhile: the ADD
     carrier ships and nothing calls it.
-15. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+13. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
     five is a capacity choice (the GPU's tensor dimension). Is five
     acceptable, or name a depth? Meanwhile: 5 on both engines.
-16. **C-16 — the released spy's level.** What a released (ransomed) spy
+14. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-17. **C-2 — four diplomacy cells.** Military 2's Production clause and
+15. **C-2 — four diplomacy cells.** Military 2's Production clause and
     Religious 3's pressure clause have no published magnitude (the wiki's
     Alliances data page refuses automated readers — a manual read would
     settle both); Research 2's cadence ships at the analyst table's 20
@@ -151,11 +142,11 @@ detail of its own). "Meanwhile" states what both engines do today.
     the QUEUE-FRONT item is refused on both engines and real Civ 6
     likely allows it with progress banked. Meanwhile: nothing / nothing /
     20 / refused.
-18. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+16. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
     engines.
-19. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
+17. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
     so on" with no published limit; `ROUTE_CHAIN_MAX` (6) is a capacity
     choice (the GPU plane's width), C-45's pattern. Is six acceptable,
     or name a depth? Meanwhile: 6 on both engines, the reach walk and
@@ -183,9 +174,6 @@ Civ 6 source or is recorded as unverifiable.
   parks, shipwrecks, both museums' theming, provenance across capture);
   `tests/gpu/parks_test.py` and `tests/cpu/culture/parks-theming.test.ts`
   are the bar where the gate is thin. Open:
-  - The NATURALIST's faith cost is PROGRESSIVE in real Civ 6; the
-    progression's magnitude is unsourced, so the flat GS price stands
-    (`naturalistCost`) and the progression is open.
   - A park's ORIENTATION. Civ 6 fixes the rhombus vertical; our hex frame
     has no canonical vertical, so every rhombus is offered.
 - **B-21r. City-state suzerain rows.** Eleven perks are RULES
@@ -253,12 +241,13 @@ Civ 6 source or is recorded as unverifiable.
   duplicates of a Resource. / B: This Luxury resource grants no
   Amenities." B silences the named luxury outright, Affluence copies
   included; A pays one extra full-reach amenity round per OWN improved
-  copy beyond the first (`luxuryAmenities` / `_luxury_amenities`). Three
+  copy beyond the first (`luxuryAmenities` / `_luxury_amenities`). Two
   cells are decisions, not transcriptions: A's REACH rides the
   machinery's own LUXURY_AMENITY_CITIES spread (the published line names
-  no cities); the DUPLICATE count reads the seat's own improved tiles,
-  the one count both engines already share; and the era window,
-  Renaissance through Industrial, is the published table's reading. The
+  no cities); and the DUPLICATE count reads the seat's own improved
+  tiles, the one count both engines already share. The game's own
+  congress table gives the row NO era window, and both engines carry
+  that. The
   free vote is A on the luxury the voter holds the most improved copies
   of.
 
@@ -275,16 +264,16 @@ Civ 6 source or is recorded as unverifiable.
     defaults that disagreed — TS picked a seat off the great-works counts
     where the GPU named the voter itself. Era 6 makes that unreachable in
     the gate, so it went unseen.)
-  - **THE ESPIONAGE PACT'S ERA WINDOW IS THIS MODEL'S OWN.** The row
+  - **THE ESPIONAGE PACT'S TARGET SPACE IS THIS MODEL'S OWN.** The row
     itself now ships — "A: All Spies function +2 levels higher for the
     Target Operation. / B: Target Operation is unavailable", carried by
     `congressPactLevels` / `congressPactBanned` and their `_congress_pact_*`
     twins, on the `SPY_OP_LEVEL` channel nine Espionage promotions already
-    use. Two things about it are decisions, not transcriptions: the
-    published table gives the resolution no era window, so the floor here
-    is the Renaissance, where the chassis page puts the unit; and the
+    use. One thing about it is a decision, not a transcription: the
     target space is `SPY_OFFENSIVE_MISSIONS`, the operations either
-    outcome can act on, since no source lists what the game offers.
+    outcome can act on, since no source lists what the game offers. The
+    era window is the game's own congress table: Industrial through
+    Atomic.
   - **THE COMPETITION CATALOG HOLDS ONE ROW.** The machinery takes a data
     row per competition; what is missing is the rows. WORLD'S FAIR is
     blocked on its own SOURCE: Silver is 50 Diplomatic Favor and Bronze a
@@ -404,13 +393,7 @@ Civ 6 source or is recorded as unverifiable.
       `Unit.promoBonus` / `unit_promo_bonus`, compared as `promoBonus`.
     No seed reaches a governed city holding any of the six, so
     `tests/gpu/gov_clauses_test.py` and
-    `tests/cpu/city/governor-clauses.test.ts` are the bar. STILL OPEN:
-    - **LAND ACQUISITION'S BORDER GROWTH HAS NO PUBLISHED FIGURE.**
-      "Acquire new tiles in the city faster" is the whole Civilopedia
-      text; two secondary summaries say 20% and no fetchable primary
-      source carries a number. The per-city border-cost site exists and
-      would take a multiplier the moment one is sourced. UNSOURCED
-      MAGNITUDE, so unbuilt — the owner's call, not this model's.
+    `tests/cpu/city/governor-clauses.test.ts` are the bar.
   - **NINE PROMOTION CLAUSES WAIT ON A NAMED ABSENT SYSTEM**: Contractor
     and Divine Architect (no district PURCHASE verb, gold or faith);
     Renewable Subsidizer and Industrialist (the power plants and
@@ -426,8 +409,10 @@ Civ 6 source or is recorded as unverifiable.
     Acquisition): "+3 Gold per turn from each foreign Trade Route
     passing through the city", `passRouteGold` read by `governorSum` /
     `_governor_pass_route_gold` over the stored course, the seat's own
-    routes never counted. The "faster" growth half stays the ledger's
-    question.
+    routes never counted. The "faster" growth half ships too: the
+    game's own governor-promotion table publishes 20, and
+    `borderExpansionPct` (`governorSum` / `_governor_sum`) cuts the
+    border cost at both consume sites.
   - ~~Grants' "+100% Great People points" has no per-city reader.~~
     CLOSED: the GPP walk is per-city on both engines
     (`greatPersonPointsPerTurn`'s city loop / `_advance_great_people`),
@@ -953,8 +938,8 @@ under their blocker so the dependency is readable, and both halves count.
     is how a LEVEL moves that rate — only that it does, since nine
     promotions read "as if 2 levels more experienced" — nor what a
     failure costs. `SPY_SUCCESS_PER_LEVEL_PCT` and `SPY_CAPTURE_PCT` are
-    those two, and the escape routes' base rates and the scandal's envoy
-    map join them as stated model values. The Intelligence Agency's
+    those two, and the escape routes' base rates join them as stated
+    model values. The Intelligence Agency's
     success bonus has no published figure either.
 - **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1. The Fort, the
   Airstrip, both routes and the 20% charge ship; gate reachability is ZERO
@@ -1156,13 +1141,6 @@ under their blocker so the dependency is readable, and both halves count.
   `_submerge` moves it with the wonders that need it. OPEN: whether real
   Civ 6 keeps a submerged tile's feature working for its neighbours, or
   strips the ground bare.
-- **C-24. THE CLIMATE ARC.** Weight 1. Emissions, the phase ladder, ice
-  melt, flooding, SUBMERSION, the Flood Barrier, warmed weather, Carbon
-  Recapture and the Global Energy Treaty all ship; NONE of it is
-  gate-reached (no seat's CO2 leaves zero in 12x250) — `climate_test.py` /
-  `climate.test.ts` are the whole bar. OPEN:
-  - **THE FLOOD BARRIER KEEPS FOR NOTHING** — its maintenance is
-    published only as "Variable"; the row carries 0.
 - **C-22. THE DISTRICT ROSTER.** Weight 1. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
   and Government Plaza ride the gate on 12/12 seeds, the Canal on none —

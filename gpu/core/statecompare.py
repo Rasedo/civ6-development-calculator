@@ -473,6 +473,7 @@ SEAT = {
     "tourismReligiousTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_rel_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
     "rockBandsBought": _civ_scalar("civ_rock_bands"),
+    "naturalistsBought": _civ_scalar("civ_naturalists"),
     "governorAppointed": _gov_row("civ_gov_appointed"),
     "governorCity": lambda sim, b, rows: [
         [int(sim.civ_gov_city[b, c, g]) if bool(sim.civ_gov_appointed[b, c, g]) else -1

@@ -26,7 +26,7 @@ import { governorAt, governorPhase, governorsOf, neutralizeGovernor } from '../.
 import { GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
 import {
   SPY_UNIT, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS,
-  SPY_SOURCES_TURNS, SPY_GOVERNOR_TURNS, SPY_GOVERNOR_PER_LEVEL,
+  SPY_SOURCES_TURNS, SPY_GOVERNOR_TURNS,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_PARTISANS_MIN,
   SPY_PARTISANS_MAX, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
@@ -631,7 +631,7 @@ describe('what a finished mission does', () => {
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(true);
 
     const g = governorsOf(them)[gi];
-    neutralizeGovernor(g, SPY_GOVERNOR_TURNS + SPY_GOVERNOR_PER_LEVEL * 0);
+    neutralizeGovernor(g, SPY_GOVERNOR_TURNS);
     // the clock is the PERSON's: he leaves the city, so the city has none
     expect(governorAt(state, theirs)).toBe(-1);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(false);

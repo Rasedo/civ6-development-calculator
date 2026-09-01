@@ -563,6 +563,7 @@ export interface Seat {
   tourismReligiousTo?: number[];
   /** how many Rock Bands this seat has bought — the progressive price. */
   rockBandsBought?: number;
+  naturalistsBought?: number;
   /** the RELIGIOUS half (relics + holy cities), banked apart because a
    *  rival's Enlightenment or a different religion halves it at the read
    *  (`cultureVictor`) — the general bank above is never diminished. */

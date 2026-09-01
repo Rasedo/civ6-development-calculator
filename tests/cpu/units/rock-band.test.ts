@@ -221,11 +221,11 @@ describe('the progressive faith price', () => {
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
     expect(own.faith).toBe(base * 10 - base);
     expect(own.rockBandsBought).toBe(1);
-    expect(rockBandCost(state, 0)).toBe(base * (1 + ROCK_BAND_COST_STEP));
+    expect(rockBandCost(state, 0)).toBe(base + ROCK_BAND_COST_STEP);
 
     const before = own.faith;
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
-    expect(own.faith).toBe(before - base * (1 + ROCK_BAND_COST_STEP));
+    expect(own.faith).toBe(before - (base + ROCK_BAND_COST_STEP));
     expect(own.rockBandsBought).toBe(2);
 
     const bought = state.units.filter((u) => u.type === 'ROCK_BAND' && u.seat === 0);

@@ -373,6 +373,17 @@
           "note": "how many Rock Bands this seat has bought — the progressive faith price reads it."
         },
         {
+          "name": "naturalistsBought",
+          "compare": "exact",
+          "covers": [
+            "Seat.naturalistsBought"
+          ],
+          "planes": [
+            "civ_naturalists"
+          ],
+          "note": "how many Naturalists this seat has bought - the progressive faith price reads it."
+        },
+        {
           "name": "governorAppointed",
           "compare": "exact",
           "covers": [

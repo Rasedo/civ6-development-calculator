@@ -27,7 +27,7 @@ import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ALLIANCE_RELIGIOUS, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP, NATURALIST_COST_STEP, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
@@ -1082,6 +1082,7 @@ export function purchaseNaturalist(state: GameState, cityId: number, seat: numbe
   const u = spawnUnit(state, 'NATURALIST', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
+  buyer.naturalistsBought = (buyer.naturalistsBought ?? 0) + 1;
   return { ok: true };
 }
 
@@ -1110,19 +1111,16 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
   return { ok: true };
 }
 
-/** the live faith price: base x (1 + bands already bought). */
+/** the live faith price: base + a flat step per band already bought. */
 export function rockBandCost(state: GameState, seat: number): number {
   const bought = seatOf(state, seat)?.rockBandsBought ?? 0;
-  return UNITS.ROCK_BAND.cost * (1 + bought * ROCK_BAND_COST_STEP);
+  return UNITS.ROCK_BAND.cost + bought * ROCK_BAND_COST_STEP;
 }
 
-/** the live faith price of a Naturalist. Real Civ 6 makes it
- *  PROGRESSIVE; the progression's own magnitude is unsourced, so the flat GS
- *  price stands and the progression is an open AUDIT residual. */
+/** the live faith price of a Naturalist — the same progression shape. */
 export function naturalistCost(state: GameState, seat: number): number {
-  void state;
-  void seat;
-  return UNITS.NATURALIST.cost;
+  const bought = seatOf(state, seat)?.naturalistsBought ?? 0;
+  return UNITS.NATURALIST.cost + bought * NATURALIST_COST_STEP;
 }
 
 /**

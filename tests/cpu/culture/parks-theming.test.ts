@@ -11,7 +11,7 @@ import { seatTourism, parkAmenities } from '../../../cpu/core/city';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { museumThemed, THEMING_MULT, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_TOURISM, artifactTourism } from '../../../cpu/data/greatPeople';
 import { PARK_MIN_APPEAL, PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../../../cpu/data/improvements';
-import { UNITS } from '../../../cpu/data/units';
+import { UNITS, NATURALIST_COST_STEP } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
 
 // NATIONAL PARKS, SHIPWRECKS and THEMING. Sourced from the Civ 6 wiki:
@@ -69,8 +69,12 @@ describe('the Naturalist and the National Park', () => {
     // ...and it is never a production option, at any tech level
     expect(trainableUnits(state, 0, city).some((u) => u.id === 'NATURALIST')).toBe(false);
     const before = seat.faith;
+    const price = naturalistCost(state, 0);
     expect(purchaseNaturalist(state, city.id, 0).ok).toBe(true);
-    expect(seat.faith).toBe(before - naturalistCost(state, 0));
+    expect(seat.faith).toBe(before - price);
+    // CIV6 (Naturalist): the faith cost is progressive — each one bought
+    // raises the next price by the game table's 50.
+    expect(naturalistCost(state, 0)).toBe(price + NATURALIST_COST_STEP);
     expect(state.units.some((u) => u.type === 'NATURALIST' && u.seat === 0)).toBe(true);
   });
 

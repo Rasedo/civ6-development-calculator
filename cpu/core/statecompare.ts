@@ -404,6 +404,7 @@ const SEAT: Record<string, Extractor> = {
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
   rockBandsBought: overSeats((s) => s.rockBandsBought ?? 0),
+  naturalistsBought: overSeats((s) => s.naturalistsBought ?? 0),
   governorAppointed: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? 1 : 0))),
   governorCity: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? g.cityId : -1))),
   governorEstablish: overSeats((s) => governorsOf(s).map((g) => g.establishTurns)),

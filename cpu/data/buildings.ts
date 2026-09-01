@@ -170,7 +170,9 @@ const rawList: BuildingDef[] = [
   // CIV6 (Flood Barrier): Atomic era, City Center, requires Computers, and
   // "Cannot be Purchased with Gold". Its cost and maintenance are both
   // "Variable" on the page, priced off the lowland tiles it covers.
-  { id: 'FLOOD_BARRIER', name: 'Flood Barrier', district: 'CITY_CENTER', cost: 80, maintenance: 0, noPurchase: true, floodBarrier: true },
+  // CIV6 (Expansion2_Buildings.xml): Maintenance 1; the BUILD cost scales
+  // per protected tile and per sea level (`floodBarrierCost`).
+  { id: 'FLOOD_BARRIER', name: 'Flood Barrier', district: 'CITY_CENTER', cost: 80, maintenance: 1, noPurchase: true, floodBarrier: true },
   { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1 },
 
   { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 90, yields: { science: 2 }, maintenance: 1 },

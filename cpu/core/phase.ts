@@ -2138,7 +2138,10 @@ export function seatPhase(state: GameState): void {
       // cannot grow via Culture." The box still fills; nothing is bought.
       const _frozen = congressBorderFrozen(state, actor.seat);
       const civCityBorderCost = () =>
-        Math.round(borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
+        Math.round(
+          (borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult * 100) /
+            (100 + governorSum(state, civCity, (e) => e.borderExpansionPct)),
+        );
       while (!_frozen && civCity.cultureBox >= civCityBorderCost()) {
         const next = pickBorderTile(state, civCity, makeYieldCtx(state, actor.seat));
         if (next === null) {

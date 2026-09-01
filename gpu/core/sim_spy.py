@@ -522,8 +522,7 @@ class SimSpy:
             # assigned again until it runs out.
             gi = int(self._governor_at(int(hr))[b, hc].item())
             if gi >= 0:
-                self.neutralize_governor(b, int(hr), gi,
-                                         self._spy_gov_turns + self._spy_gov_per_level * lvl)
+                self.neutralize_governor(b, int(hr), gi, self._spy_gov_turns)
         elif m == self._spy_m_breach:
             # CIV6 (Breach Dam): "damage (i.e., pillage) the district, causing a
             # Flood and leaving the city vulnerable to damage from Floods until

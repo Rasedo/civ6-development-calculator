@@ -369,7 +369,8 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // window; the floor here is where the chassis page puts the unit —
   // "Starting in the Renaissance era, Spies will become available" — because
   // neither outcome can act before a Spy can run an operation.
-  { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 3, maxEra: 99, target: 'spyMission' },
+  // CIV6 (Expansion2_Congress.xml): EarliestEra Industrial, LatestEra Atomic.
+  { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 4, maxEra: 6, target: 'spyMission' },
   // CIV6 (World Congress): a SCORED COMPETITION is enacted by a resolution in
   // a Regular Session, and those "start appearing from the Modern Era onward".
   // "If enacted, players who vote in favor of the Scored Competition will
@@ -387,7 +388,8 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // published table.) Outcome A's REACH — which cities a duplicate's +1
   // serves — is unpublished; it rides the luxury machinery's own
   // LUXURY_AMENITY_CITIES spread, a recorded model choice.
-  { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 3, maxEra: 4, target: 'luxury' },
+  // CIV6 (Expansion2_Congress.xml): the row carries NO era columns.
+  { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 0, maxEra: 99, target: 'luxury' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;

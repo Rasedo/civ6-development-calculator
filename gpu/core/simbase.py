@@ -757,6 +757,7 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_rock_bands",  # how many Rock Bands each seat has bought (the progressive price)
+    "civ_naturalists",  # how many Naturalists — the same progression shape
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus",

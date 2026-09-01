@@ -191,6 +191,7 @@ class SimInit:
         # tourism SENT per (from, to) major pair — real Civ 6 accrues toward
         # each foreign civ separately, through its own summed modifier
         self.civ_rock_bands = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_naturalists = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_tourism_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         self.civ_tourism_rel_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         # the RESOLVED suzerain contest (-1 none) and the minor's own research
@@ -672,7 +673,7 @@ class SimInit:
                        "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries",
                        "routeStartFood", "industryAllSources", "envDamageImmune",
                        "goldPerFeature", "appealNearFeature", "firstPromoBonus",
-                       "passRouteGold"):
+                       "passRouteGold", "borderExpansionPct"):
                 self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
         # Whether ANY governor promotion can move `_tile_appeal` at all — the
         # gate on the version bump `_governor_phase` owes that cache.
@@ -756,7 +757,6 @@ class SimInit:
         self._spy_unrest = int(_sp["unrestLoyalty"])
         self._spy_unrest_per_level = int(_sp["unrestPerLevel"])
         self._spy_gov_turns = int(_sp["governorTurns"])
-        self._spy_gov_per_level = int(_sp["governorPerLevel"])
         self._spy_sources_levels = int(_sp["sourcesLevels"])
         self._spy_sources_turns = int(_sp["sourcesTurns"])
         self._spy_partisans_min = int(_sp["partisansMin"])
@@ -1376,7 +1376,8 @@ class SimInit:
         self._band_tiers = torch.tensor(rr.get("rockBandTiers", []), dtype=torch.long, device=device)
         self._band_odds = torch.tensor(rr.get("rockBandOdds", []), dtype=torch.long, device=device)
         self._band_max_level = int(rr.get("rockBandMaxLevel", 4))
-        self._band_cost_step = int(rr.get("rockBandCostStep", 1))
+        self._band_cost_step = int(rr.get("rockBandCostStep", 50))
+        self._naturalist_cost_step = int(rr.get("naturalistCostStep", 50))
         self._holy_city_tour = int(rr.get("holyCityTourism", 8))
         self._enl_cidx = int(rr.get("enlightenmentCidx", -3))
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))

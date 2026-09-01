@@ -73,6 +73,9 @@ export interface GovernorEffects {
   /** gold per FOREIGN trade route whose chain passes this city (Land
    *  Acquisition). */
   passRouteGold?: number;
+  /** CIV6 (Land Acquisition): "+20%" culture toward this city's border
+   *  expansion — MODIFIER_SINGLE_CITY_CULTURE_BORDER_EXPANSION Amount 20. */
+  borderExpansionPct?: number;
   /** great-work tourism multiplier (Curator). */
   gwTourismMult?: number;
   /** religious pressure this city exerts, multiplied (Bishop). */
@@ -173,7 +176,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
   // ---- REYNA, the Financier ----
   G('LAND_ACQUISITION', 'REYNA', 0, 'Land Acquisition',
     'Acquire new tiles in the city faster. +3 Gold per turn from each foreign Trade Route passing through the city.',
-    { passRouteGold: 3 }),   // "faster" has no published figure — the question ledger's
+    { passRouteGold: 3, borderExpansionPct: 20 }),
   G('HARBORMASTER', 'REYNA', 1, 'Harbormaster',
     'Double adjacency bonuses from Commercial Hubs and Harbors in the city.',
     { adjacencyMult: { COMMERCIAL_HUB: 2, HARBOR: 2 } }),
