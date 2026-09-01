@@ -297,6 +297,48 @@ def test_cs_siege(rules, path):
     print(f"  cs siege OK (hp {hp0} -> {int(sim.citystate_hp[0, s])} on hit; capture: pop {pop_before} -> {int(sim.city_pop[0, 0, c_new])}, city {c_new})")
 
 
+def test_golden_war(rules, path):
+    """CIV6 (Golden Age War): To Arms! + a Golden age + a ripened
+    denouncement = a FORMAL war at a quarter of the warmonger price,
+    remembered per pair for the captures; peace forgets it."""
+    sim = build(rules, path)
+    for _ in range(20):
+        sim.step()
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    pct = sim._golden_war_pct
+    assert pct == 25, f"goldenWarGrievancePct should be 25, got {pct}"
+    sim.civ_age[0, 0] = 2
+    sim.ded_picks[0, 0, 0] = sim._ded_to_arms
+    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
+    g0 = float(sim.civ_grievance[0, 1, 0])
+    sim._declare_war_major(0, 1, one)
+    assert bool(sim.seat_warkind[0, 0, 1]), "the golden war is FORMAL"
+    assert bool(sim.seat_wargolden[0, 0, 1]) and bool(sim.seat_wargolden[0, 1, 0]), \
+        "golden must stand in BOTH cells"
+    want = int(sim._griev_war_formal * pct / 100 + 0.5)
+    assert float(sim.civ_grievance[0, 1, 0]) - g0 == want, \
+        f"the golden DoW should price {want}, moved {float(sim.civ_grievance[0, 1, 0]) - g0}"
+    g1 = float(sim.civ_grievance[0, 1, 0])
+    sim._grievance_city_taken(0, 0, 1, razed=False)
+    want_t = int(sim._griev_city_taken * pct / 100 + 0.5)
+    assert float(sim.civ_grievance[0, 1, 0]) - g1 == want_t, "the capture prices at a quarter"
+    g2 = float(sim.civ_grievance[0, 1, 0])
+    sim._grievance_city_taken(0, 0, 1, razed=True)
+    assert float(sim.civ_grievance[0, 1, 0]) - g2 == sim._griev_city_razed, \
+        "the razing row stays whole"
+    sim._make_peace(0, 1, one)
+    assert not bool(sim.seat_wargolden[0, 0, 1]) and not bool(sim.seat_wargolden[0, 1, 0]), \
+        "peace must forget the discount"
+    # WITHOUT the Golden age the same declaration is formal at full price
+    sim.civ_age[0, 0] = 1
+    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
+    g3 = float(sim.civ_grievance[0, 1, 0])
+    sim._declare_war_major(0, 1, one)
+    assert bool(sim.seat_warkind[0, 0, 1]) and not bool(sim.seat_wargolden[0, 0, 1])
+    assert float(sim.civ_grievance[0, 1, 0]) - g3 == sim._griev_war_formal
+    print(f"  golden-age war OK (DoW {want}, capture {want_t}, razing whole, peace forgets)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -305,6 +347,7 @@ def main() -> None:
     print(f"war_test on {path.name}")
     test_inert_when_off(rules, path)
     test_declare(rules, path)
+    test_golden_war(rules, path)
     test_peace(rules, path)
     test_capture_plunder(rules, path)
     test_cs_siege(rules, path)

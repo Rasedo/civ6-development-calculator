@@ -34,6 +34,10 @@ import { governorSum } from './governors';
  * technology in Civ 6; only Trading Posts extend it (`routeInRange`).
  */
 export const TRADE_ROUTE_RANGE_LAND = 15;
+/** the deepest post CHAIN either engine walks — a CAPACITY choice like the
+ *  queue's five (the GPU stores the chain in a fixed tensor axis); six hops
+ *  of 15+ tiles outruns any map here. */
+export const ROUTE_CHAIN_MAX = 6;
 export const TRADE_ROUTE_RANGE_SEA = 30;
 
 /**
@@ -90,12 +94,12 @@ export function tradeRouteRange(
  *  tiles, and so on" — a breadth-first walk over the seat's OWN posts (a
  *  civilization "cannot make use of Trading Posts established by other
  *  civilizations"), each leg at that leg's own land/sea range. */
-export function routeInRange(
+export function routeChain(
   state: GameState,
   seat: number,
   originCenter: number,
   destCenter: number,
-): boolean {
+): number[] | null {
   const legOk = (a: number, b: number): boolean => {
     const at = state.map.tiles[a];
     const bt = state.map.tiles[b];
@@ -103,19 +107,37 @@ export function routeInRange(
   };
   const posts = (seatOf(state, seat)?.tradingPosts ?? [])
     .filter((p) => p !== originCenter && centreHasCity(state, p));
-  const seen = new Set<number>([originCenter]);
+  const parent = new Map<number, number>([[originCenter, -1]]);
+  const depth = new Map<number, number>([[originCenter, 0]]);
   const queue = [originCenter];
   while (queue.length > 0) {
     const a = queue.shift()!;
-    if (legOk(a, destCenter)) return true;
+    if (legOk(a, destCenter)) {
+      // the CHAIN — origin excluded, in walk order (`posts` is sorted, the
+      // queue FIFO, so the first discovery is the one both engines make)
+      const chain: number[] = [];
+      for (let x = a; x !== originCenter; x = parent.get(x)!) chain.push(x);
+      return chain.reverse();
+    }
+    if (depth.get(a)! >= ROUTE_CHAIN_MAX) continue;
     for (const p of posts) {
-      if (!seen.has(p) && legOk(a, p)) {
-        seen.add(p);
+      if (!parent.has(p) && legOk(a, p)) {
+        parent.set(p, a);
+        depth.set(p, depth.get(a)! + 1);
         queue.push(p);
       }
     }
   }
-  return false;
+  return null;
+}
+
+export function routeInRange(
+  state: GameState,
+  seat: number,
+  originCenter: number,
+  destCenter: number,
+): boolean {
+  return routeChain(state, seat, originCenter, destCenter) !== null;
 }
 
 /** stamp one civ's Trading Post at a centre — sorted, append-once. */
@@ -128,11 +150,30 @@ export function stampTradingPost(owner: Seat, centerIndex: number): void {
 
 /** CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
  *  yields of every Trade Route which passes through this city" — the
- *  DESTINATION's post; the pass-through halves have no carrier because a
- *  route stores no path. Bandar Brunei's suzerain pays the same city again. */
+ *  DESTINATION's post, which `routeChainGold` cannot double because the
+ *  stored chain never holds the destination. Bandar Brunei's suzerain pays
+ *  the same city again. */
 export function routePostGold(state: GameState, seat: number, destCenter: number): number {
   if (!(seatOf(state, seat)?.tradingPosts ?? []).includes(destCenter)) return 0;
   return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
+}
+
+/** CIV6 (Trading Post): "Every Trading Post for your civilization through
+ *  which a route passes along its course adds +1 Gold to its total yield",
+ *  and "Each foreign Trading Post also adds +1 Gold to the yields of every
+ *  Trade Route which passes through this city" — the stored CHAIN is the
+ *  course: each chain city pays 1 (the owner's own post, which the chain
+ *  rides by construction) plus the OTHER civs' posts standing there. */
+export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
+  let g = 0;
+  for (const c of r.chain ?? []) {
+    if (!centreHasCity(state, c)) continue;
+    g += 1;
+    for (const sx of state.seats) {
+      if (sx.seat !== seat && (sx.tradingPosts ?? []).includes(c)) g += 1;
+    }
+  }
+  return g;
 }
 
 export const TRADE_ROUTE_DURATION = 20;
@@ -291,6 +332,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
     out.gold += routeGold;
+    out.gold += routeChainGold(state, seat, route);
     if (route.toCs !== undefined) {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
       if (cityState) {
@@ -399,6 +441,7 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   }
   route.expiresTurn = state.turn + tradeRouteMinDuration(state);
   route.createdTurn = state.turn;
+  route.chain = routeChain(state, seat, originCenter, destCenter) ?? [];
   route.walkTile = originCenter;
   // The walk runs at the seat's own water level: a pure land descent when it
   // has no Celestial Navigation, sea legs when it has. Only a pair NO descent

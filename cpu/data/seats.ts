@@ -920,6 +920,9 @@ export const ALLIANCE_REL3_FAITH_PER_POP = 1;
 export const GRIEVANCE_WAR_SURPRISE = 150;
 /** "Formal War declared" — the denouncement's casus belli. */
 export const GRIEVANCE_WAR_FORMAL = 100;
+/** CIV6 (Golden Age War, Casus Belli page): "To Arms! Dedication chosen,
+ *  denounce target — only 25% warmonger penalty for declaration/captures". */
+export const GOLDEN_WAR_GRIEVANCE_PCT = 25;
 /** "War declared on a Friend or Ally": 75, to the friend or ally. */
 export const GRIEVANCE_WAR_ON_FRIEND = 75;
 /** "War declared on a city-state a civ is the Suzerain over": 100. */

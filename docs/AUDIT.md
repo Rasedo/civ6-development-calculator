@@ -45,8 +45,8 @@ from the list below.
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the Espionage Pact's and Luxury Policy's era windows are table readings; the scored-competition catalog holds one row |
-| B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), To Arms!'s casus belli |
-| B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
+| B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system, and Land Acquisition's growth figure (the ledger's) |
+| B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six (the ledger's); the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the PASS ships (fee, discount, lockout); what remains is the hammers bullet — a REMOVED item's progress banks where real Civ 6 remembers it against the item |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
@@ -77,10 +77,9 @@ from the list below.
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district and the coastal Harbor ship; district BUILDINGS, the yields of any of it, and power are still absent |
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
-| C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **23** | |
-| **OPEN, TOTAL** | **44** | |
+| **C. Absent systems** | **22** | |
+| **OPEN, TOTAL** | **43** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -121,41 +120,37 @@ detail of its own). "Meanwhile" states what both engines do today.
 9. **C-35 — what drowned ground still lends.** Does a submerged tile's
    FEATURE keep working for its neighbours, or is the ground stripped?
    Meanwhile: it lends (every ring fact reads terrain).
-10. **C-43 — two 404 improvement pages.** The Seaside Resort's and
-    Airstrip's Civilopedia entries both 404, so their research raises
-    (if any) are unknown rather than absent. Meanwhile: zero, flagged as
-    absence of evidence.
-11. **B-20r — the Naturalist's progressive cost; the park's vertical.**
+10. **B-20r — the Naturalist's progressive cost; the park's vertical.**
     The real faith cost RISES per purchase (magnitude unsourced), and
     Civ 6 fixes the park rhombus vertical where this hex frame has no
     canonical vertical. Meanwhile: the flat GS price; every rhombus
     offered.
-12. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
+11. **B-24r — Land Acquisition's growth figure.** "Acquire new tiles in
     the city faster" is the whole primary text; two secondaries say 20%.
-    Meanwhile: unbuilt — the border-cost site would take a multiplier the
-    moment one is sourced.
-13. **B-63r — the grievance ceiling rows and the gang-up bar.** The
+    Meanwhile: the +3 Gold half ships on the stored course; the
+    border-cost site would take a multiplier the moment one is sourced.
+12. **B-63r — the grievance ceiling rows and the gang-up bar.** The
     occupied/razed rows publish only "up to 50" / "up to 150"; no source
     publishes the AI's gang-up threshold. Meanwhile: the ceiling values;
     `GRIEVANCE_GANG` as a tuning knob.
-14. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+13. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
     whether it may act after forming are unpublished, and the
     direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
     Meanwhile: the veteran's own HP, the turn ends, the single unit's
     charge.
-15. **C-32 — the Rock Band's twelve rows.** Its promotion table is
+14. **C-32 — the Rock Band's twelve rows.** Its promotion table is
     unsourced here. Meanwhile: the chassis carries its own level and
     album state instead.
-16. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+15. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
     and what it does to a standing improvement. Meanwhile: the ADD
     carrier ships and nothing calls it.
-17. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+16. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
     five is a capacity choice (the GPU's tensor dimension). Is five
     acceptable, or name a depth? Meanwhile: 5 on both engines.
-18. **C-16 — the released spy's level.** What a released (ransomed) spy
+17. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-19. **C-2 — four diplomacy cells.** Military 2's Production clause and
+18. **C-2 — four diplomacy cells.** Military 2's Production clause and
     Religious 3's pressure clause have no published magnitude (the wiki's
     Alliances data page refuses automated readers — a manual read would
     settle both); Research 2's cadence ships at the analyst table's 20
@@ -163,10 +158,15 @@ detail of its own). "Meanwhile" states what both engines do today.
     the QUEUE-FRONT item is refused on both engines and real Civ 6
     likely allows it with progress banked. Meanwhile: nothing / nothing /
     20 / refused.
-20. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+19. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
     engines.
+20. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
+    so on" with no published limit; `ROUTE_CHAIN_MAX` (6) is a capacity
+    choice (the GPU plane's width), C-45's pattern. Is six acceptable,
+    or name a depth? Meanwhile: 6 on both engines, the reach walk and
+    the stored course alike.
 
 ## A. Engine vs engine — where the two implementations can answer differently
 
@@ -426,9 +426,15 @@ Civ 6 source or is recorded as unverifiable.
     C-31); Aquaculture and Parks and Recreation (the Fishery and City
     Park improvements, which the improvement catalog does not carry);
     Foreign Investor (a minor that accumulates strategic resources,
-    above). Land Acquisition's
-    "+3 Gold from each foreign Trade Route passing through" is blocked on
-    the stored route PATH, exactly as B-31r's pass-through gold is.
+    above).
+  - ~~Land Acquisition's "+3 Gold from each foreign Trade Route passing
+    through" is blocked on the stored route PATH.~~ CLOSED: the route
+    stores its course now (see B-31r) and the channel ships — CIV6 (Land
+    Acquisition): "+3 Gold per turn from each foreign Trade Route
+    passing through the city", `passRouteGold` read by `governorSum` /
+    `_governor_pass_route_gold` over the stored course, the seat's own
+    routes never counted. The "faster" growth half stays the ledger's
+    question.
   - ~~Grants' "+100% Great People points" has no per-city reader.~~
     CLOSED: the GPP walk is per-city on both engines
     (`greatPersonPointsPerTurn`'s city loop / `_advance_great_people`),
@@ -463,9 +469,16 @@ Civ 6 source or is recorded as unverifiable.
     key, ties by array position). Real Civ 6 leaves all three to the
     player; the two engines mirror the heuristic exactly, and it is
     P8-surface work to make them decisions.
-  - **To Arms!'s special Casus Belli.** The denouncement it rides on
-    ships now (C-2); what is missing is the casus-belli KIND itself — a
-    war declaration variant the war table does not carry.
+  - ~~To Arms!'s special Casus Belli.~~ CLOSED: CIV6 (Golden Age War,
+    civilopedia diplo_3): "To Arms! Dedication chosen, denounce the
+    intended target of your war" — "Only 25% warmonger penalty for
+    declaring this war or capturing cities during it." A formal DoW by a
+    To Arms! dedicant in a Golden age marks the pair (`Seat.goldenWars` /
+    `seat_wargolden`, statecompare-compared), prices the declaration and
+    its captures at `GOLDEN_WAR_GRIEVANCE_PCT` (25%) of the formal
+    figures — 100 becomes 25, a taken city's 50 becomes 13 — leaves the
+    razing rows at their own published figures, and peace clears the
+    mark.
   - ~~Per-civ tech-era drift — eras are global 50-turn blocks.~~ CLOSED,
     with the claim CORRECTED: real Civ 6's era clock is GLOBAL too (the
     World Era advances on a turn schedule; `ERA_LENGTH` is this model's
@@ -483,10 +496,18 @@ Civ 6 source or is recorded as unverifiable.
   city-state's complete Harbor is a second water anchor
   (`centreMaritime`'s minor arm / the maritime plane's minor scatter).
   OPEN:
-  - **The PASS-THROUGH half of the post gold** ("+1 Gold to the yields of
-    every Trade Route which passes through this city") has no carrier — a
-    route stores endpoints and a walking Trader, never the cities it
-    passes; blocked on a stored route PATH.
+  - ~~The PASS-THROUGH half of the post gold has no carrier.~~ CLOSED: a
+    route stores its COURSE at commit — `TradeRoute.chain` /
+    `seat_route_chain`, statecompare-compared, `routeChain`'s FIFO walk
+    over the seat's own posts (first discovery wins; `ROUTE_CHAIN_MAX` 6
+    deep, a capacity choice, the ledger's) on both engines. CIV6
+    (Trading Post): "Every Trading Post for your civilization through
+    which a route passes along its course adds +1 Gold", and "Each
+    foreign Trading Post also adds +1 Gold to the yields of every Trade
+    Route which passes through this city" — `routeChainGold` / the
+    `_seat_route_income` chain term pays each live course city 1 plus
+    the other civs' posts standing there, and the reach walk carries the
+    same depth cap.
   - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
     the real base magnitude.
   - **The destination is ONE candidate row plus a take/skip.** The single
@@ -1273,20 +1294,6 @@ under their blocker so the dependency is readable, and both halves count.
     carrier's own envelope refuses a tile already improved. No source
     reached says Volcanic Soil refuses an improvement, and inventing
     either answer is what this file exists to stop. ASK THE OWNER.
-- **C-43. TWO IMPROVEMENT PAGES WERE NEVER REACHED.** Weight 1. Thirteen
-  research raises ship, each transcribed from its own Civilopedia
-  "(requires X)" line, and the channel behind them takes any row: the wire
-  carries `techImpY` / `civicImpY` and the engines read them
-  (`modifiersFromResearch` / `_mod_imp_yields`). The OIL WELL, FORT and
-  MISSILE SILO pages were read and state no raise, so their zero is a fact.
-  The SEASIDE RESORT and AIRSTRIP pages BOTH 404 at the source used for the
-  other eleven, so their zero is an absence of evidence — and this file has
-  been burned by that before: sixteen wonder rows once read as silent and
-  carried twelve invented yields between them. Re-source those two before
-  treating either zero as settled. The CIVILIZATION-unique adjacencies the
-  Pasture and Farm pages name (Outback Station, Observatory) are C-26,
-  parked.
-
 - **C-45. THE QUEUE'S DEPTH IS A FIXED FIVE.** Weight 1. A city holds
   `PRODUCTION_QUEUE_MAX` items and refuses the sixth. Real Civ 6 publishes
   no ceiling on its queue, and the number here is a CAPACITY choice, not a

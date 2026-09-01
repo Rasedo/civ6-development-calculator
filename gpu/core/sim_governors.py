@@ -448,6 +448,25 @@ class SimGovernors:
         cnt.scatter_add_(1, slot.clamp(min=0), live.long())
         return per * cnt.double()
 
+    def _governor_pass_route_gold(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — CIV6 (Land Acquisition): "+3 Gold per turn from each
+        foreign Trade Route passing through the city" — a foreign route passes
+        through where its stored course (`seat_route_chain`) holds this
+        centre."""
+        per = self._governor_sum(row, "passRouteGold")
+        if not bool((per != 0).any()):
+            return per
+        B, T = self.B, self.T
+        cnt = torch.zeros(B, T, dtype=torch.long, device=self.device)
+        for r2 in range(self.n_majors):
+            if r2 == row:
+                continue
+            ch = self.seat_route_chain[:, r2]  # [B, K, CMAX]
+            live = (self.seat_routes[:, r2, :, 0] >= 0).unsqueeze(2) & (ch >= 0)
+            cnt.scatter_add_(1, ch.clamp(min=0).reshape(B, -1), live.reshape(B, -1).long())
+        centres = self.city_center[:, row]
+        return per * cnt.gather(1, centres.clamp(min=0)).double()
+
     def _patron_saint(self, row: int, landed: torch.Tensor, col: torch.Tensor) -> None:
         """CIV6 (Patron Saint): "Apostles and Warrior Monks trained in the
         city receive 1 extra Promotion when receiving their first promotion" —
@@ -518,7 +537,7 @@ class SimGovernors:
         out = out + (self._governor_vec(row, "perCitizen")
                      + gov_percit.double().unsqueeze(1) * seated) * pop.double().unsqueeze(2)
         out[:, :, 5] = out[:, :, 5] + self._governor_sum(row, "faithPerSpecialty") * spec.double()
-        out[:, :, 2] = out[:, :, 2] + self._governor_feature_gold(row)
+        out[:, :, 2] = out[:, :, 2] + self._governor_feature_gold(row) + self._governor_pass_route_gold(row)
         return out
 
     def _governor_ymult(self, row: int, gov_ymult: torch.Tensor) -> torch.Tensor:

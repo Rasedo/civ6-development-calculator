@@ -109,12 +109,19 @@ class SimGriev:
                                 friend.long() * self._griev_friend_share)
             self._add_grievance(s, transgressor, (share * n).div(100, rounding_mode="floor"), m)
 
-    def _grievance_war_declared(self, declarer: int, target: int, m, formal) -> None:
-        """"Surprise War declared: 150" / "Formal War declared: 100", and
-        "War declared on a Friend or Ally: 75" to each of the target's."""
+    def _grievance_war_declared(self, declarer: int, target: int, m, formal, golden=None) -> None:
+        """"Surprise War declared: 150" / "Formal War declared: 100" — CIV6
+        (Golden Age War): "Only 25% warmonger penalty" scales the formal
+        figure — and "War declared on a Friend or Ally: 75" to each of the
+        target's."""
         surprise = m & ~formal
+        gld = golden if golden is not None else torch.zeros_like(surprise)
         self._spread_grievance(target, declarer, self._griev_war_surprise, surprise)
-        self._spread_grievance(target, declarer, self._griev_war_formal, m & formal)
+        self._spread_grievance(target, declarer, self._griev_war_formal, m & formal & ~gld)
+        self._spread_grievance(
+            target, declarer,
+            int(self._griev_war_formal * self._golden_war_pct / 100 + 0.5),
+            m & formal & gld)
         for s in range(self.n_majors):
             if s in (declarer, target):
                 continue
@@ -124,7 +131,13 @@ class SimGriev:
     def _grievance_city_taken(self, b: int, taker: int, loser: int, razed: bool) -> None:
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
-        self._spread_grievance(loser, taker, self._griev_city_razed if razed else self._griev_city_taken, one)
+        n = self._griev_city_razed if razed else self._griev_city_taken
+        # CIV6 (Golden Age War): captures at a quarter too; the razing rows
+        # are their own published figures and stay whole.
+        if (not razed and taker < self.n_majors and loser < self.n_majors
+                and bool(self.seat_wargolden[b, taker, loser])):
+            n = int(n * self._golden_war_pct / 100 + 0.5)
+        self._spread_grievance(loser, taker, n, one)
 
     def _grievance_world(self, transgressor: int, n: int, m) -> None:
         """the three rows every civ reads: the last city of a civilization, a

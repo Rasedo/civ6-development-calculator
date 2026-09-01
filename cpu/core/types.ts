@@ -628,6 +628,9 @@ export interface Seat {
    */
   wars: number[];
   formalWars: number[];
+  /** CIV6 (Golden Age War): wars this seat declared under the To Arms
+   *  casus belli — 25% grievances on the declaration and on captures. */
+  goldenWars?: number[];
   /** Directed denouncement stamps keyed by absolute seat: `denounced[b] = t`
    *  means this seat denounced b at turn t. The stamp IS the clock: the
    *  denouncement is live while `turn - t` is under AGREEMENT_TURNS, and the
@@ -658,6 +661,9 @@ export interface TradeRoute {
   walkTile?: number;
   /** -1 parked at origin (sea route), 0 walking out, 1 walking home */
   walkLeg?: number;
+  /** the OWN-post centres the route passes, origin and destination
+   *  excluded, in walk order — `routeChain`'s BFS, `ROUTE_CHAIN_MAX` deep. */
+  chain?: number[];
 }
 
 export interface ReligionState {

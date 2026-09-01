@@ -417,7 +417,7 @@ def _centre_of(sim, b: int, row: int, city_id: int) -> int:
 
 def _routes_of(sim, b: int, seat: int) -> list[int]:
     """Every live route of `seat`, as flattened [fromTile, destTile, kind,
-    exp, born, walkTile, leg] rows sorted ascending — the `routes`
+    exp, born, walkTile, leg, chain x routeChainMax] rows sorted ascending — the `routes`
     extractor's twin. Kind: 0 domestic, 1 city-state, 2 international.
     `seat_routes[..., 1]` carries the domestic destination city id, or
     -(2 + city-state index), or -1 for international (whose destination is
@@ -431,6 +431,7 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
     bo = sim.seat_route_born[b, row].tolist()
     wk = sim.seat_route_walk[b, row].tolist()
     lg = sim.seat_route_leg[b, row].tolist()
+    ch = sim.seat_route_chain[b, row].tolist()
     out: list[list[int]] = []
     for k, pair in enumerate(rr):
         frm = int(pair[0])
@@ -447,7 +448,8 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
         else:
             kind = 2
             dest = _centre_of(sim, b, d_seat, d_city) if d_seat >= 0 else -1
-        out.append([_centre_of(sim, b, row, frm), dest, kind, int(ex[k]), int(bo[k]), int(wk[k]), int(lg[k])])
+        out.append([_centre_of(sim, b, row, frm), dest, kind, int(ex[k]), int(bo[k]),
+                    int(wk[k]), int(lg[k])] + [int(x) for x in ch[k]])
     out.sort()
     return [x for t in out for x in t]
 
@@ -556,6 +558,7 @@ SEAT = {
     "nextCityId": _civ_scalar("civ_next_city_id"),
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
     "formalWars": _seat_pair_relation("seat_warkind", lambda v: bool(v)),
+    "goldenWars": _seat_pair_relation("seat_wargolden", lambda v: bool(v)),
     "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
     "friendTurns": _seat_pair_clock("seat_friend_turns"),
     "allyTurns": _seat_pair_clock("seat_ally_turns"),

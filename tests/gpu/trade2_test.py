@@ -461,9 +461,85 @@ def main() -> None:
     assert not bool(s11.trading_post[0, 0].any()), "a route cut short must stamp nothing"
     print("  completion stamps both endpoints; a dest-dead drop stamps nothing")
 
+    # --- 12) the stored course: reach == walk, chain gold, Land Acquisition --
+    s12 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert "seat_route_chain" in _MUTABLE, "the course must ride snapshot/restore"
+    CM = int(rj["seats"]["routeChainMax"])
+    assert CM == 6 and s12._route_chain_max == CM, "routeChainMax should wire as 6"
+    assert tuple(s12.seat_route_chain.shape) == (s12.B, s12.seat_routes.shape[1], s12.seat_routes.shape[2], CM)
+    # posts at every OTHER living centre; the vectorized reach must agree with
+    # the python course walk on EVERY tile (two independent bodies, the cap in
+    # both) — and some tile must be reachable only THROUGH a post
+    o = int(s12.city_center[0, 0, 0])
+    assert bool(s12.city_alive[0, 0, 0])
+    for c in s12._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist():
+        if int(c) != o:
+            s12.trading_post[0, 0, int(c)] = True
+    reach = s12._route_reach_from(0)[0, 0]
+    mb = s12._centre_maritime_map()[0]
+    sb = bool(s12._trade_water_level(0)[0] > 0)
+
+    def _leg(a, c):
+        rng = s12._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else s12._trade_range
+        return int(s12.pair_dist[a, c]) <= rng
+
+    chained = 0
+    for d in range(s12.T):
+        direct = _leg(o, d)
+        want = direct or bool(s12._route_chain_of(0, 0, o, d))
+        assert bool(reach[d]) == want, f"reach[{d}]={bool(reach[d])} but the walk says {want}"
+        chained += int(want and not direct)
+    assert chained > 0, "no tile reachable only through a post — the cross-check proved nothing"
+    print(f"  reach == course walk on every tile ({chained} tiles only a post reaches)")
+
+    # chain gold: each live course city pays 1 + the other civs' posts there
+    s13 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    fid = int(s13.city_id[0, 0, 0])
+    assert bool(s13.city_alive[0, 1, 0])
+    mid_c = int(s13.city_center[0, 1, 0])
+    s13.seat_routes[0, 0, 0, 0] = fid
+    s13.seat_routes[0, 0, 0, 1] = fid
+    g_a = float(s13._seat_route_income(0)[0, 0, 2])
+    s13.seat_route_chain[0, 0, 0, 0] = mid_c
+    s13._eff_version += 1
+    g_b = float(s13._seat_route_income(0)[0, 0, 2])
+    assert g_b - g_a == 1.0, f"one own-post course city should pay 1, paid {g_b - g_a}"
+    s13.trading_post[0, 1, mid_c] = True
+    s13._eff_version += 1
+    g_c = float(s13._seat_route_income(0)[0, 0, 2])
+    assert g_c - g_a == 2.0, "the rival's post at the course city should pay 1 more"
+    dead_t = int((~s13._centre_city_map()[0]).nonzero(as_tuple=True)[0][0])
+    s13.seat_route_chain[0, 0, 0, 1] = dead_t
+    s13._eff_version += 1
+    assert float(s13._seat_route_income(0)[0, 0, 2]) - g_a == 2.0, \
+        "a course entry with no living city must pay nothing"
+    print("  chain gold OK (1 per live course city, +1 per rival post, dead entries dark)")
+
+    # CIV6 (Land Acquisition): +3 per FOREIGN route whose course crosses the
+    # city — Reyna's BASE ability, own routes never counted, dead routes dark
+    s14 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s14.civ_gov_appointed[0, 0, 0] = True  # REYNA at the capital
+    s14.civ_gov_city[0, 0, 0] = int(s14.city_id[0, 0, 0])
+    s14.civ_gov_establish[0, 0, 0] = 0
+    ctr = int(s14.city_center[0, 0, 0])
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0
+    fid1 = int(s14.city_id[0, 1, 0])
+    s14.seat_routes[0, 1, 0, 0] = fid1
+    s14.seat_routes[0, 1, 0, 1] = fid1
+    s14.seat_route_chain[0, 1, 0, 0] = ctr
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "one foreign crossing pays 3"
+    s14.seat_routes[0, 0, 0, 0] = int(s14.city_id[0, 0, 0])
+    s14.seat_routes[0, 0, 0, 1] = int(s14.city_id[0, 0, 0])
+    s14.seat_route_chain[0, 0, 0, 0] = ctr
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "the seat's OWN route never counts"
+    s14.seat_routes[0, 1, 0, 0] = -1
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a dead route's stale course is dark"
+    print("  Land Acquisition OK (+3 per foreign crossing, own/dead routes dark)")
+
     print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
           "round-trip expiry, walk + plunder, candidate/apply spend, "
-          "(seat, city) dest keying incl. a capture, sea legs, trading posts, _MUTABLE round-trip")
+          "(seat, city) dest keying incl. a capture, sea legs, trading posts, "
+          "the stored course (reach parity, chain gold, Land Acquisition), _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

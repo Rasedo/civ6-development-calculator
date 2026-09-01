@@ -555,7 +555,7 @@ describe('civ CS trade routes', () => {
     expect(civ.tradeRoutes![0]).toEqual({
       from: civCity.id, to: -1, toCs: cityState.id,
       expiresTurn: state.turn + 20, createdTurn: state.turn, // route duration, era 0
-      walkTile: civCity.centerIndex, walkLeg: 0,
+      walkTile: civCity.centerIndex, walkLeg: 0, chain: [],
     });
     const y1 = computeCityStats(state, civCity).total;
     // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the

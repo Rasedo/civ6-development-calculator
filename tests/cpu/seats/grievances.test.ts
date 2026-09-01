@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
-import { seatOf, setFriendTurnsWith, setWar } from '../../../cpu/core/seats';
+import { seatOf, setFriendTurnsWith, setWar, setWarGolden, warIsGolden } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { grantCivics, settleFirstCity } from '../helpers';
@@ -9,7 +9,8 @@ import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORM
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
   GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
   GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX } from '../../../cpu/data/seats';
-import { addGrievance, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
+import { addGrievance, grievanceCityTaken, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
+import { DED_TO_ARMS, GOLDEN_WAR_GRIEVANCE_PCT, GRIEVANCE_CITY_RAZED } from '../../../cpu/data/seats';
 import { diplomaticFavorPerTurn, occupiedCapitals } from '../../../cpu/core/seatTurn';
 import { foundCityAt } from '../../../cpu/core/game';
 import { transferCity } from '../../../cpu/core/phase';
@@ -222,5 +223,50 @@ describe('grievances', () => {
     declareWar(state, (state.seats[2] as Seat).seat, 0);
     expect(grievancesAgainst(state, 0)).toBe(2 * GRIEVANCE_WAR_SURPRISE);
     expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
+  });
+});
+describe('golden age war', () => {
+  // CIV6 (Golden Age War, civilopedia diplo_3): "To Arms! Dedication chosen,
+  // denounce target — Only 25% warmonger penalty for declaration/captures."
+  it('declareWar under To Arms! in a Golden age prices the DoW and the captures at a quarter', () => {
+    const state = newGame(1);
+    const foe = (state.seats[1] as Seat).seat;
+    const s0 = seatOf(state, 0)!;
+    s0.denounced[foe] = state.turn - FORMAL_WAR_MIN_TURNS;
+    s0.age = 2;
+    (s0.dedicationPicks ??= []).push(DED_TO_ARMS);
+    declareWar(state, foe, 0); // seat 0 declares on foe
+    expect(warIsGolden(state, 0, foe)).toBe(true);
+    expect(warIsGolden(state, foe, 0)).toBe(true);
+    expect(grievanceWith(state, foe, 0))
+      .toBe(Math.round((GRIEVANCE_WAR_FORMAL * GOLDEN_WAR_GRIEVANCE_PCT) / 100));
+    const b = grievanceWith(state, foe, 0);
+    grievanceCityTaken(state, 0, foe, false);
+    expect(grievanceWith(state, foe, 0) - b)
+      .toBe(Math.round((GRIEVANCE_CITY_TAKEN * GOLDEN_WAR_GRIEVANCE_PCT) / 100));
+    // the razing rows are their own published figures and stay whole
+    const b2 = grievanceWith(state, foe, 0);
+    grievanceCityTaken(state, 0, foe, true);
+    expect(grievanceWith(state, foe, 0) - b2).toBe(GRIEVANCE_CITY_RAZED);
+  });
+
+  it('a formal war WITHOUT the Golden age stays full price', () => {
+    const state = newGame(1);
+    const foe = (state.seats[1] as Seat).seat;
+    seatOf(state, 0)!.denounced[foe] = state.turn - FORMAL_WAR_MIN_TURNS;
+    declareWar(state, foe, 0); // seat 0 declares on foe
+    expect(warIsGolden(state, 0, foe)).toBe(false);
+    expect(grievanceWith(state, foe, 0)).toBe(GRIEVANCE_WAR_FORMAL);
+  });
+
+  it('setWarGolden writes both cells and clears both', () => {
+    const state = newGame(1);
+    const foe = (state.seats[1] as Seat).seat;
+    setWarGolden(state, 0, foe, true);
+    expect(warIsGolden(state, 0, foe)).toBe(true);
+    expect(warIsGolden(state, foe, 0)).toBe(true);
+    setWarGolden(state, 0, foe, false);
+    expect(warIsGolden(state, 0, foe)).toBe(false);
+    expect(warIsGolden(state, foe, 0)).toBe(false);
   });
 });

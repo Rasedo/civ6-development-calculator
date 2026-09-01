@@ -382,6 +382,9 @@ class SimInit:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
         _pw = self.n_majors
         self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
+        # CIV6 (Golden Age War): the To Arms! declaration's quarter-priced
+        # war, remembered per pair for the captures it discounts.
+        self.seat_wargolden = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         # THE DIPLOMATIC AGREEMENT CLOCKS, turns LEFT. Friendship and the
         # alliance are symmetric; the Open Borders grant is DIRECTED - row a,
@@ -526,6 +529,7 @@ class SimInit:
         self._griev_favor_step = int(_er2["grievanceFavorStep"])
         self._griev_favor_max = int(_er2["grievanceFavorMax"])
         self._griev_gang = int(_er2["grievanceGang"])
+        self._golden_war_pct = int(_er2["goldenWarGrievancePct"])
         self._favor_per_suz = int(_er2["diplomaticFavorPerSuzerain"])
         self._congress_interval = int(_er2["congressInterval"])
         self._congress_min_era = int(_er2["congressMinEra"])
@@ -660,7 +664,8 @@ class SimInit:
                        "spyLevelPenalty", "noSiege", "stockpilePerTurn", "resourceDiscountPct",
                        "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries",
                        "routeStartFood", "industryAllSources", "envDamageImmune",
-                       "goldPerFeature", "appealNearFeature", "firstPromoBonus"):
+                       "goldPerFeature", "appealNearFeature", "firstPromoBonus",
+                       "passRouteGold"):
                 self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
         # Whether ANY governor promotion can move `_tile_appeal` at all — the
         # gate on the version bump `_governor_phase` owes that cache.
@@ -814,6 +819,14 @@ class SimInit:
         self.seat_route_born = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_walk = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_leg = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        # the stored COURSE (`TradeRoute.chain`): the Trading-Post centres the
+        # route rides through, walk order, -1-padded — `routeChain` computes it
+        # ONCE at commit on both engines, the pass-through gold reads it every
+        # turn, and a freed slot is wiped at its next commit.
+        self._route_chain_max = max(int(self.rules.seats.get("routeChainMax", 6)), 1)
+        self.seat_route_chain = torch.full(
+            (B, self.n_majors + s_pad + 1, k_routes, self._route_chain_max), -1,
+            dtype=torch.long, device=device)
         # CIV6 (Trading Post): one bool per (major row, CENTRE tile) — the row
         # holds a Trading Post there. Stamped at both endpoints when a route
         # runs its FULL term; the chain and gold readers gate on a living city

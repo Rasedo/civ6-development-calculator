@@ -12,11 +12,11 @@
  * against one seat), so no caller ever touches the key.
  */
 import type { GameState } from './types';
-import { citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
+import { warIsGolden, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
 import { getModifiers } from './effects';
-import {
+import { GOLDEN_WAR_GRIEVANCE_PCT,
   GRIEVANCE_ALLY_SHARE,
   GRIEVANCE_CITY_RAZED,
   GRIEVANCE_CITY_TAKEN,
@@ -132,8 +132,12 @@ export function decayGrievances(state: GameState, seat: number): void {
  * "Formal War declared: 100", and every friend or ally of the target
  * "War declared on a Friend or Ally: 75".
  */
-export function grievanceWarDeclared(state: GameState, declarer: number, target: number, formal: boolean): void {
-  spreadGrievance(state, target, declarer, formal ? GRIEVANCE_WAR_FORMAL : GRIEVANCE_WAR_SURPRISE);
+export function grievanceWarDeclared(state: GameState, declarer: number, target: number, formal: boolean, golden = false): void {
+  // CIV6 (Golden Age War): "only 25% warmonger penalty for
+  // declaration/captures" — a formal-war declaration at a quarter.
+  const base = formal ? GRIEVANCE_WAR_FORMAL : GRIEVANCE_WAR_SURPRISE;
+  spreadGrievance(state, target, declarer,
+    golden ? Math.round((base * GOLDEN_WAR_GRIEVANCE_PCT) / 100) : base);
   for (const s of state.seats) {
     if (s.seat === declarer || s.seat === target) continue;
     if (seatsAllied(state, s.seat, target) || friendTurnsWith(state, s.seat, target) > 0) {
@@ -164,7 +168,12 @@ export function grievanceCityStateWar(
 
 /** "City Occupied (capturing a city during war)", and its 3x razed row. */
 export function grievanceCityTaken(state: GameState, taker: number, loser: number, razed: boolean): void {
-  spreadGrievance(state, loser, taker, razed ? GRIEVANCE_CITY_RAZED : GRIEVANCE_CITY_TAKEN);
+  const base = razed ? GRIEVANCE_CITY_RAZED : GRIEVANCE_CITY_TAKEN;
+  // CIV6 (Golden Age War): captures at a quarter too; the razing rows are
+  // their own published figures and stay whole.
+  const golden = !razed && warIsGolden(state, taker, loser);
+  spreadGrievance(state, loser, taker,
+    golden ? Math.round((base * GOLDEN_WAR_GRIEVANCE_PCT) / 100) : base);
 }
 
 /**

@@ -3,7 +3,9 @@ import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfC
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, stampTradingPost, routePostGold, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, stampTradingPost, routePostGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { computeCityStats } from '../../../cpu/core/city';
+import { GOVERNORS } from '../../../cpu/data/governors';
 import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAST } from '../../../cpu/core/units';
 import { isWater } from '../../../world/query';
 import { hexDistance } from '../../../world/hex';
@@ -508,5 +510,94 @@ describe('trading posts', () => {
     addNamedCs(state, 'Bandar Brunei', 'trade', 3, 3, { [civ.seat]: 3 });
     expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(2);
     expect(gold()).toBe(bare + 2);
+  });
+
+  it('routeChain returns the course: first discovery, endpoints excluded, and the commit stores it', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    const mid = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
+    const mid2 = foundCity(state, tileAtCoords(state.map, 13, 10).index, 0).city!;
+    const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
+    origin.buildings.push('MARKET');
+    // a direct leg has no course; an unreachable pair has no chain at all
+    expect(routeChain(state, 0, origin.centerIndex, mid.centerIndex)).toEqual([]);
+    expect(routeChain(state, 0, origin.centerIndex, far.centerIndex)).toBeNull();
+    stampTradingPost(state.seats[0], mid.centerIndex);
+    stampTradingPost(state.seats[0], mid2.centerIndex);
+    // both posts bridge; the FIFO walk over the SORTED list makes the lower
+    // centre the first discovery — the course both engines must store
+    const lower = Math.min(mid.centerIndex, mid2.centerIndex);
+    expect(routeChain(state, 0, origin.centerIndex, far.centerIndex)).toEqual([lower]);
+    expect(addTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
+    expect(state.seats[0].tradeRoutes![0].chain).toEqual([lower]);
+  });
+
+  it('the course is capped at ROUTE_CHAIN_MAX posts', () => {
+    const state = makeState(makeMap(80, 8));
+    state.sandbox = true;
+    // nine centres in a 9-tile-apart row — a seat holds at most six cities,
+    // so rivals own the middle ones; the POSTS are seat 0's regardless
+    const a = addCiv(state, 11, 4, { seat: 1 });
+    const b = addCiv(state, 65, 4, { seat: 2 });
+    const centres: number[] = [];
+    for (let k = 0; k <= 8; k++) {
+      const x = 2 + 9 * k;
+      if (k === 0 || k === 8) centres.push(foundCity(state, tileAtCoords(state.map, x, 4).index, 0).city!.centerIndex);
+      else if (k === 1) centres.push(a.cities[0].centerIndex);
+      else if (k === 7) centres.push(b.cities[0].centerIndex);
+      else centres.push(foundCity(state, tileAtCoords(state.map, x, 4).index, a.seat).city!.centerIndex);
+    }
+    for (let k = 1; k <= 7; k++) stampTradingPost(state.seats[0], centres[k]);
+    // six posts deep is the longest legal course; the seventh hop is refused
+    const chain = routeChain(state, 0, centres[0], centres[7]);
+    expect(chain).toEqual([1, 2, 3, 4, 5, 6].map((k) => centres[k]));
+    expect(chain!.length).toBe(ROUTE_CHAIN_MAX);
+    expect(routeChain(state, 0, centres[0], centres[8])).toBeNull();
+  });
+
+  it('routeChainGold pays each LIVE chain city: the own post plus the other civs standing there', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    const mid = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
+    const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
+    origin.buildings.push('MARKET');
+    stampTradingPost(state.seats[0], mid.centerIndex);
+    expect(addTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
+    const r = state.seats[0].tradeRoutes![0];
+    expect(r.chain).toEqual([mid.centerIndex]);
+    expect(routeChainGold(state, 0, r)).toBe(1);
+    const gold0 = cityTradeYields(state, origin, 0).gold;
+    const civ = addCiv(state, 21, 10);
+    stampTradingPost(civ, mid.centerIndex); // a rival's post at the SAME chain city
+    expect(routeChainGold(state, 0, r)).toBe(2);
+    expect(cityTradeYields(state, origin, 0).gold).toBe(gold0 + 1);
+    // the chain city dies: its entry pays nothing
+    state.seats[0].cities = state.seats[0].cities.filter((c) => c.id !== mid.id);
+    expect(routeChainGold(state, 0, r)).toBe(0);
+  });
+
+  // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade Route
+  // passing through the city" — the stored course is what "passing through"
+  // reads; the seat's own routes never count.
+  it('Land Acquisition pays +3 per FOREIGN route whose course crosses the city', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const mine = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
+    const civ = addCiv(state, 2, 6);
+    const rfar = foundCity(state, tileAtCoords(state.map, 20, 6).index, civ.seat).city!;
+    civ.cities[0].buildings.push('MARKET');
+    stampTradingPost(civ, mine.centerIndex); // the rival's own post at MY centre
+    expect(addTradeRoute(state, civ.cities[0].id, rfar.id, civ.seat).ok).toBe(true);
+    expect(civ.tradeRoutes![0].chain).toEqual([mine.centerIndex]);
+    const bare = computeCityStats(state, mine).breakdown.bonuses.gold;
+    // Reyna established at `mine` — Land Acquisition is her BASE ability
+    seatOf(state, 0)!.governors = GOVERNORS.map((_, i) => (
+      { appointed: i === 0, cityId: i === 0 ? mine.id : -1, minorId: -1, establishTurns: 0, outTurns: 0, promotions: 0 }));
+    expect(computeCityStats(state, mine).breakdown.bonuses.gold).toBe(bare + 3);
+    // ...and the seat's own route through its own city counts for nothing
+    civ.tradeRoutes = [];
+    expect(computeCityStats(state, mine).breakdown.bonuses.gold).toBe(bare);
   });
 });

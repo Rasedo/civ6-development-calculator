@@ -983,7 +983,8 @@
             "TradeRoute.expiresTurn",
             "TradeRoute.createdTurn",
             "TradeRoute.walkTile",
-            "TradeRoute.walkLeg"
+            "TradeRoute.walkLeg",
+            "TradeRoute.chain"
           ],
           "planes": [
             "seat_routes",
@@ -992,9 +993,10 @@
             "seat_route_exp",
             "seat_route_born",
             "seat_route_walk",
-            "seat_route_leg"
+            "seat_route_leg",
+            "seat_route_chain"
           ],
-          "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
+          "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg, chain x routeChainMax], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
         },
         {
           "name": "tradingPosts",
@@ -1096,6 +1098,16 @@
           ],
           "planes": [
             "seat_warkind"
+          ]
+        },
+        {
+          "name": "goldenWars",
+          "compare": "exact",
+          "covers": [
+            "Seat.goldenWars"
+          ],
+          "planes": [
+            "seat_wargolden"
           ]
         },
         {

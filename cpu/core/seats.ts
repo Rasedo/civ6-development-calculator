@@ -228,6 +228,27 @@ export function warIsFormal(state: GameState, a: number, b: number): boolean {
   return seatOf(state, a)?.formalWars.includes(b) ?? false;
 }
 
+export function warIsGolden(state: GameState, a: number, b: number): boolean {
+  return seatOf(state, a)?.goldenWars?.includes(b) ?? false;
+}
+
+export function setWarGolden(state: GameState, a: number, b: number, on: boolean): void {
+  if (a === b) return;
+  const sa = seatOf(state, a);
+  const sb = seatOf(state, b);
+  if (!sa || !sb) return;
+  const put = (s: Seat, other: number) => {
+    const g = (s.goldenWars ??= []);
+    if (on) {
+      if (!g.includes(other)) g.push(other);
+    } else {
+      s.goldenWars = g.filter((x) => x !== other);
+    }
+  };
+  put(sa, b);
+  put(sb, a);
+}
+
 export function setWarFormal(state: GameState, a: number, b: number, on: boolean): void {
   if (a === b) return;
   const sa = seatOf(state, a);

@@ -70,6 +70,9 @@ export interface GovernorEffects {
   growthMult?: number;
   /** great-person points multiplier (Grants). */
   gppMult?: number;
+  /** gold per FOREIGN trade route whose chain passes this city (Land
+   *  Acquisition). */
+  passRouteGold?: number;
   /** great-work tourism multiplier (Curator). */
   gwTourismMult?: number;
   /** religious pressure this city exerts, multiplied (Bishop). */
@@ -170,7 +173,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
   // ---- REYNA, the Financier ----
   G('LAND_ACQUISITION', 'REYNA', 0, 'Land Acquisition',
     'Acquire new tiles in the city faster. +3 Gold per turn from each foreign Trade Route passing through the city.',
-    {}),   // both halves unsourced here: no figure for "faster", no stored route PATH
+    { passRouteGold: 3 }),   // "faster" has no published figure — the question ledger's
   G('HARBORMASTER', 'REYNA', 1, 'Harbormaster',
     'Double adjacency bonuses from Commercial Hubs and Harbors in the city.',
     { adjacencyMult: { COMMERCIAL_HUB: 2, HARBOR: 2 } }),

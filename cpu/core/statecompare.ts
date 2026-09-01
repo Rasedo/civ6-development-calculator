@@ -47,6 +47,7 @@ import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citi
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
+import { ROUTE_CHAIN_MAX } from './trade';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile, MP_SCALE } from '../data/constants';
@@ -538,7 +539,8 @@ const SEAT: Record<string, Extractor> = {
             ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
             : centreOf(s.seat, r.to ?? -1);
       return [centreOf(s.seat, r.from), dest, kind, r.expiresTurn ?? -1,
-        r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1];
+        r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
+        ...Array.from({ length: ROUTE_CHAIN_MAX }, (_, i) => (r.chain ?? [])[i] ?? -1)];
     });
     rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
     return rows.flat();
@@ -557,6 +559,7 @@ const SEAT: Record<string, Extractor> = {
   scienceTotal: overSeats((s) => s.scienceTotal),
   nextCityId: overSeats((s) => s.nextCityId),
   formalWars: overSeats((s) => [...s.formalWars].sort((a, b) => a - b)),
+  goldenWars: overSeats((s) => [...(s.goldenWars ?? [])].sort((a, b) => a - b)),
   denounced: overSeats((s) =>
     Object.keys(s.denounced)
       .map(Number)

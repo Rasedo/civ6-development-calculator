@@ -395,6 +395,8 @@ class SimSeats:
         # the ended war's KIND clears; the grudge stamp is permanent
         self.seat_warkind[:, row, tgt] &= ~peace
         self.seat_warkind[:, tgt, row] &= ~peace
+        self.seat_wargolden[:, row, tgt] &= ~peace
+        self.seat_wargolden[:, tgt, row] &= ~peace
         self._ww_peace(peace, row, tgt)  # -2000 on the treaty
         # both sides shed the city-states the other dragged in
         self._citystate_suzerain_release(row, tgt, peace)
@@ -492,9 +494,16 @@ class SimSeats:
                 declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
                 self.seat_delegation[:, _g, _h])
         _formal = declare & self._denounce_casus_belli(row, tgt)
+        # CIV6 (Golden Age War): "To Arms! Dedication chosen, denounce the
+        # intended target of your war" — "Only 25% warmonger penalty for
+        # declaring this war or capturing cities during it". The declarer's
+        # dedication, remembered per pair for the captures.
+        _golden = _formal & self._golden_ded(row, self._ded_to_arms)
         self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
         self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
-        self._grievance_war_declared(row, tgt, declare, _formal)
+        self.seat_wargolden[:, row, tgt] = torch.where(declare, _golden, self.seat_wargolden[:, row, tgt])
+        self.seat_wargolden[:, tgt, row] = torch.where(declare, _golden, self.seat_wargolden[:, tgt, row])
+        self._grievance_war_declared(row, tgt, declare, _formal, _golden)
         self._defensive_pact(row, tgt, declare)
 
     def _declare_war_minor(self, row: int, s: int, declare: torch.Tensor) -> None:
@@ -5210,6 +5219,23 @@ class SimSeats:
             if bool(_hit.any()):
                 inc.scatter_add_(1, from_j * 6 + _yc.clamp(min=0),
                                  self._al_route_to[_aty.clamp(min=0)].double() * _hit.double())
+        # CIV6 (Trading Post): "Every Trading Post for your civilization
+        # through which a route passes along its course adds +1 Gold", and
+        # "Each foreign Trading Post also adds +1 Gold to the yields of every
+        # Trade Route which passes through this city" — `routeChainGold`: each
+        # live chain city pays 1 plus the OTHER civs' posts standing there, to
+        # the ORIGIN column.
+        ch = self.seat_route_chain[:, row]  # [B, K, CMAX]
+        if bool((ch >= 0).any()):
+            chf = ch.clamp(min=0).reshape(B, -1)
+            live_c = self._centre_city_map().gather(1, chf).reshape(ch.shape) & (ch >= 0)
+            cg = live_c.double().sum(dim=2)
+            for r2 in range(self.n_majors):
+                if r2 == row:
+                    continue
+                cg = cg + (self.trading_post[:, r2].gather(1, chf).reshape(ch.shape)
+                           & live_c).double().sum(dim=2)
+            inc.scatter_add_(1, from_j * 6 + 2, cg * (act & has_from).double())
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
             # CIV6 (Letters of Marque): "Trade Route yields -50%."
@@ -8949,8 +8975,9 @@ class SimSeats:
         further 15 tiles, and so on" — and a civilization "cannot make use of
         Trading Posts established by other civilizations", so the walk is over
         this row's posts alone, each leg at that leg's own land/sea range, a
-        post at the origin's own centre excluded. Post hops run per batch row,
-        gated on the row holding any post at a living city."""
+        post at the origin's own centre excluded. The walk is `routeChain`'s:
+        breadth-first, at most `routeChainMax` posts deep. Post hops run per
+        batch row, gated on the row holding any post at a living city."""
         RC, T, dev = self.RC, self.T, self.device
         centers = self.city_center[:, row].clamp(min=0)  # [B, RC]
         mar_t = self._centre_maritime_map()  # [B, T]
@@ -8977,17 +9004,57 @@ class SimSeats:
                 o = int(centers[b, i])
                 use = [p for p in posts if p != o]
                 reached: list[int] = []
+                depth = {o: 0}
                 frontier = [o]
                 while frontier:
-                    a = frontier.pop()
+                    a = frontier.pop(0)
+                    if depth[a] >= self._route_chain_max:
+                        continue
                     for p in use:
-                        if p not in reached and leg_ok(a, p):
+                        if p not in depth and leg_ok(a, p):
+                            depth[p] = depth[a] + 1
                             reached.append(p)
                             frontier.append(p)
                 for p in reached:
                     rp = sea_t if sb and bool(mb[p]) else land_t
                     ok[b, i] |= self.pair_dist[p].to(torch.long) <= rp
         return ok
+
+    def _route_chain_of(self, b: int, row: int, origin: int, dest: int) -> list[int]:
+        """`routeChain` for ONE game row — the FIFO walk over the seat's own
+        posts in ascending centre order, at most `routeChainMax` deep, first
+        discovery wins; the list is the course the commit stores (origin
+        excluded, walk order, never the destination)."""
+        posts = [int(p) for p in (self.trading_post[b, row]
+                                  & self._centre_city_map()[b]).nonzero(as_tuple=True)[0].tolist()
+                 if int(p) != origin]
+        mb = self._centre_maritime_map()[b]
+        sb = bool(self._trade_water_level(row)[b] > 0)
+
+        def leg_ok(a: int, c: int) -> bool:
+            rng = self._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else self._trade_range
+            return int(self.pair_dist[a, c]) <= rng
+
+        parent = {origin: -1}
+        depth = {origin: 0}
+        queue = [origin]
+        while queue:
+            a = queue.pop(0)
+            if leg_ok(a, dest):
+                chain: list[int] = []
+                x = a
+                while x != origin:
+                    chain.append(x)
+                    x = parent[x]
+                return list(reversed(chain))
+            if depth[a] >= self._route_chain_max:
+                continue
+            for p in posts:
+                if p not in parent and leg_ok(a, p):
+                    parent[p] = a
+                    depth[p] = depth[a] + 1
+                    queue.append(p)
+        return []
 
     def _route_post_gold(self, row: int, dest_ct: torch.Tensor) -> torch.Tensor:
         """`routePostGold`, shaped like `dest_ct` ([B, ...] CENTRE tiles) —
@@ -9285,6 +9352,12 @@ class SimSeats:
         self.seat_route_exp[rows, row, slot] = int(self.turn) + md[rows]
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
+        # the stored course — `_route_chain_of` at commit, exactly TS's walk
+        self.seat_route_chain[rows, row, slot] = -1
+        for _i, _b in enumerate(rows.tolist()):
+            _ch = self._route_chain_of(_b, row, int(o_ct[_b]), int(dest_ct[_b]))
+            for _j, _c in enumerate(_ch[:self._route_chain_max]):
+                self.seat_route_chain[_b, row, int(slot[_i]), _j] = _c
         # The walk runs at the seat's own water level: a pure land descent
         # without Celestial Navigation, sea legs with it. Only a pair NO descent
         # reaches parks its Trader at the origin.

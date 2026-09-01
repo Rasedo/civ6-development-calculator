@@ -98,7 +98,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat } from './seats';
+import { NO_SEAT, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -250,8 +250,12 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   // CIV6: war cancels every route between the two civs; the Traders return.
   cancelRoutesBetween(state, actor.seat, seat);
   const formal = denounceCasusBelli(state, seat, actor.seat);
+  // CIV6 (Golden Age War): "To Arms! Dedication chosen, denounce target —
+  // only 25% warmonger penalty for declaration/captures."
+  const golden = formal && goldenDedication(state, seat, DED_TO_ARMS);
   setWarFormal(state, actor.seat, seat, formal);
-  grievanceWarDeclared(state, seat, actor.seat, formal);
+  setWarGolden(state, actor.seat, seat, golden);
+  grievanceWarDeclared(state, seat, actor.seat, formal, golden);
   state.eventLog.push(`War declared on ${actor.name}!`);
   return ok;
 }
@@ -307,6 +311,7 @@ function defensivePact(state: GameState, aggressor: number, victim: number): voi
 function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWar(state, actor.seat, foe, false);
   setWarFormal(state, actor.seat, foe, false);
+  setWarGolden(state, actor.seat, foe, false);
   warWearinessPeace(state, foe, actor.seat);
   setWarTurnsWith(state, actor.seat, foe, 0);
   setTreatyTurnsWith(state, actor.seat, foe, PEACE_TREATY_TURNS);
@@ -997,8 +1002,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // out" — the pair loses both halves, not the declarer's.
         clearDelegations(state, actor.seat, foe);
         const formal = denounceCasusBelli(state, actor.seat, foe);
+        const golden = formal && goldenDedication(state, actor.seat, DED_TO_ARMS);
         setWarFormal(state, actor.seat, foe, formal);
-        grievanceWarDeclared(state, actor.seat, foe, formal);
+        setWarGolden(state, actor.seat, foe, golden);
+        grievanceWarDeclared(state, actor.seat, foe, formal, golden);
         state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
         defensivePact(state, actor.seat, foe);
       } else if (!declaring && civsAtWar(state, actor.seat, foe)) {
