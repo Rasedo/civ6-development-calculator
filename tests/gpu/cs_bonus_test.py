@@ -8,9 +8,10 @@ the surface the gate reaches only partially (seat 0 rarely passes ~5 envoys
 in-gate, so the 6-envoy tier-2 building lane and the suzerain contest edges are
 exercised HERE):
 
-  1. Catalog: _citystate_b1idx / _citystate_b2idx map each CS type to its tier-1 / tier-2
-     BUILDING catalog index (cityStateEnvoyBonuses), _citystate_suz_amt == 3, and the per-CS
-     suzerain channel (citystate_suz_key) round-trips from the fixture.
+  1. Catalog: _citystate_t1idx / _citystate_t2idx map each CS type to its
+     tier-1 / tier-2 BUILDING rows (either member of an exclusive pair),
+     _citystate_suz_amt == 3, and the per-CS suzerain channel
+     (citystate_suz_key) round-trips from the fixture.
   2. Seat-0 envoy BUILDING bonus: a city holding the CS type's tier-1 building
      collects +districtBonus in the CS channel at >=3 envoys; the tier-2
      building collects a second +districtBonus at >=6; the bonus lands in the
@@ -54,8 +55,10 @@ def _force_scientific_cs0(sim) -> None:
     """Make CS slot 0 a scientific CS (LIBRARY / UNIVERSITY / science channel)
     by overriding the derived per-CS index tensors — deterministic regardless
     of the fixture's placed type."""
-    sim._citystate_b1idx[0, 0] = bidx("LIBRARY")
-    sim._citystate_b2idx[0, 0] = bidx("UNIVERSITY")
+    sim._citystate_t1idx[0, 0, :] = -1
+    sim._citystate_t1idx[0, 0, 0] = bidx("LIBRARY")
+    sim._citystate_t2idx[0, 0, :] = -1
+    sim._citystate_t2idx[0, 0, 0] = bidx("UNIVERSITY")
     sim._citystate_yidx[0, 0] = SCIENCE
     sim.citystate_alive[0, 0] = True
     sim.seat_citystate_met[0, 0, 0] = True
@@ -64,18 +67,22 @@ def _force_scientific_cs0(sim) -> None:
 def test_catalog(rules, path) -> None:
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     cs = rules.citystate
-    # per-type tier indices match the rules export
-    for t in range(len(cs["typeB1Idx"])):
-        # find a CS of type t (if any) and verify its derived index
-        want1, want2 = cs["typeB1Idx"][t], cs["typeB2Idx"][t]
-        assert want1 >= 0, f"type {t} tier-1 building absent from roster"
-        assert want2 >= 0, f"type {t} tier-2 building absent from roster"
+    # per-type tier lists match the rules export, every member in the roster
+    for t in range(len(cs["typeT1Idx"])):
+        assert all(x >= 0 for x in cs["typeT1Idx"][t]), f"type {t} tier-1 building absent from roster"
+        assert all(x >= 0 for x in cs["typeT2Idx"][t]), f"type {t} tier-2 building absent from roster"
     # scientific = type 0 → LIBRARY / UNIVERSITY
-    assert cs["typeB1Idx"][0] == bidx("LIBRARY"), "scientific tier-1 must be LIBRARY"
-    assert cs["typeB2Idx"][0] == bidx("UNIVERSITY"), "scientific tier-2 must be UNIVERSITY"
+    assert cs["typeT1Idx"][0] == [bidx("LIBRARY")], "scientific tier-1 must be LIBRARY"
+    assert cs["typeT2Idx"][0] == [bidx("UNIVERSITY")], "scientific tier-2 must be UNIVERSITY"
     # religious = type 5 → SHRINE / TEMPLE
-    assert cs["typeB1Idx"][5] == bidx("SHRINE"), "religious tier-1 must be SHRINE"
-    assert cs["typeB2Idx"][5] == bidx("TEMPLE"), "religious tier-2 must be TEMPLE"
+    assert cs["typeT1Idx"][5] == [bidx("SHRINE")], "religious tier-1 must be SHRINE"
+    assert cs["typeT2Idx"][5] == [bidx("TEMPLE")], "religious tier-2 must be TEMPLE"
+    # CIV6 (R&F): militaristic keys Barracks OR Stable at 3 envoys, ARMORY at
+    # 6 — the exclusive pair, never the other tier-1; cultural tier 2 is
+    # either museum.
+    assert cs["typeT1Idx"][4] == [bidx("BARRACKS"), bidx("STABLE")], "militaristic tier-1 must be the pair"
+    assert cs["typeT2Idx"][4] == [bidx("ARMORY")], "militaristic tier-2 must be ARMORY"
+    assert cs["typeT2Idx"][1] == [bidx("MUSEUM"), bidx("ARCHAEOLOGICAL_MUSEUM")], "cultural tier-2 is either museum"
     assert float(sim._citystate_suz_amt) == 3.0, f"suzerain amount = {float(sim._citystate_suz_amt)}, want 3"
     # per-CS suzerain channel round-trips from the fixture
     f = load_fixture(path)
@@ -188,6 +195,44 @@ def test_building_pillage(rules, path) -> None:
     )
     print(f"  pillage-dark OK: 1->3 envoy step {live_delta:.2f} live -> {dark_delta:.2f} pillaged "
           "(the remainder is the suzerain yield)")
+
+
+def test_stable_alternative(rules, path) -> None:
+    """CIV6 (R&F): the militaristic 3-envoy bonus keys BARRACKS OR STABLE —
+    a city holding only the STABLE half of the exclusive pair still
+    collects, and the 6-envoy tier lands on the ARMORY."""
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    for _ in range(6):
+        sim.step()
+    PROD = 1
+    sim._citystate_t1idx[0, 0, :] = -1
+    sim._citystate_t1idx[0, 0, 0] = bidx("BARRACKS")
+    sim._citystate_t1idx[0, 0, 1] = bidx("STABLE")
+    sim._citystate_t2idx[0, 0, :] = -1
+    sim._citystate_t2idx[0, 0, 0] = bidx("ARMORY")
+    sim._citystate_yidx[0, 0] = PROD
+    sim.citystate_alive[0, 0] = True
+    sim.seat_citystate_met[0, 0, 0] = True
+    sim.citystate_suz_key[0, 0] = -1  # keep the suzerain crossing out of the read
+    if sim.S > 1:
+        sim.citystate_alive[0, 1:] = False
+    sim.city_bldg[0, 0, 0, bidx("STABLE")] = True
+
+    def prod0(envoys: int) -> float:
+        sim.seat_citystate_envoys[0, 0, 0] = envoys
+        sim._eff_version += 1
+        total, _, _, _ = sim._city_totals()
+        return float(total[0, 0, PROD])
+
+    p1, p3 = prod0(1), prod0(3)
+    assert p3 > p1 + 1e-9, f"the STABLE did not carry the 3-envoy bonus ({p1}->{p3})"
+    p6 = prod0(6)
+    assert abs(p6 - p3) < 1e-9, f"6 envoys paid without an ARMORY ({p3}->{p6})"
+    sim.city_bldg[0, 0, 0, bidx("ARMORY")] = True
+    sim._eff_version += 1
+    p6b = prod0(6)
+    assert p6b > p6 + 1e-9, "the ARMORY did not collect the 6-envoy tier"
+    print(f"  militaristic pair OK: STABLE pays at 3 ({p1:.2f}->{p3:.2f}), ARMORY at 6 ({p6:.2f}->{p6b:.2f})")
 
 
 def test_suzerain(rules, path) -> None:
@@ -354,6 +399,7 @@ def main() -> None:
     test_catalog(rules, p)
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)
+    test_stable_alternative(rules, p)
     test_suzerain(rules, p)
     test_faith_class(rules, p)
     test_walls_faith_only(rules, p)

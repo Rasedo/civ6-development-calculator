@@ -3755,11 +3755,12 @@ class SimEconomy:
                     bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab("bldgY", fol_id))
             if self.S > 0:
                 env, acs, nB = self._seat_envoys(row), self.citystate_alive.double(), selb.shape[2]
-                per3 = (env >= 3).double() * self._citystate_district_bonus * acs * (self._citystate_b1idx >= 0).double()
-                per6 = (env >= 6).double() * self._citystate_district_bonus * acs * (self._citystate_b2idx >= 0).double()
                 csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
-                csf.scatter_add_(1, self._citystate_b1idx.clamp(min=0) * 6 + self._citystate_yidx, per3)
-                csf.scatter_add_(1, self._citystate_b2idx.clamp(min=0) * 6 + self._citystate_yidx, per6)
+                for _bar, _tidx in ((3, self._citystate_t1idx), (6, self._citystate_t2idx)):
+                    _perk = (env >= _bar).double() * self._citystate_district_bonus * acs
+                    for _k in range(_tidx.shape[2]):
+                        _bt = _tidx[:, :, _k]
+                        csf.scatter_add_(1, _bt.clamp(min=0) * 6 + self._citystate_yidx, _perk * (_bt >= 0).double())
                 bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf.reshape(B, nB, 6))
             if bool((selb & self._b_pow_y_any.reshape(1, 1, -1)).any()):
                 # GS POWER: the second half of a late building's yields, paid
@@ -3818,6 +3819,15 @@ class SimEconomy:
                                      torch.where(_sl >= 0, self.tile_flood_ct,
                                                  torch.zeros_like(self.tile_flood_ct)))
                     bld_y[:, :, 5] = bld_y[:, :, 5] + _ffw * _fc[:, :bld_y.shape[1]].double()
+            # CIV6 (University of Sankore): "+2 Science for every Trade Route
+            # to this city. Domestic Trade Routes give an additional +1 Faith
+            # to this city."
+            _psci = compw.double() @ self._wond_routes_sci
+            _pfai = compw.double() @ self._wond_routes_faithdom
+            if bool((_psci != 0).any()) or bool((_pfai != 0).any()):
+                _allin, _domin = self._routes_ending_at(row)
+                bld_y[:, :, 3] = bld_y[:, :, 3] + _psci * _allin[:, sl].double()
+                bld_y[:, :, 5] = bld_y[:, :, 5] + _pfai * _domin[:, sl].double()
             _impy = self._wonder_improvement_yields(row)
             if _impy is not None:
                 bld_y = bld_y + _impy[:, sl]

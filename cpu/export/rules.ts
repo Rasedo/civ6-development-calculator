@@ -20,7 +20,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
@@ -641,8 +641,8 @@ export function buildRules() {
       typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CITY_STATE_TYPE_YIELD[t])),
       typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CITY_STATE_TYPE_DISTRICT[t])),
       districtBonus: CITY_STATE_DISTRICT_BONUS,
-      typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][0]) ?? -1),
-      typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][1]) ?? -1),
+      typeT1Idx: CITY_STATE_TYPES.map((t) => CITY_STATE_TYPE_TIER1[t].map((b) => buildingIdx.get(b) ?? -1)),
+      typeT2Idx: CITY_STATE_TYPES.map((t) => CITY_STATE_TYPE_TIER2[t].map((b) => buildingIdx.get(b) ?? -1)),
       suzerainYield: CITY_STATE_SUZERAIN_YIELD,
       // Suzerain perks modeled as RULES — `effects` is the code order the
       // per-CS `suzCode` plane indexes.
@@ -961,6 +961,11 @@ export function buildRules() {
         faithPerFlood: w.effects?.faithPerFlood ?? 0,
         dvp: w.effects?.dvp ?? 0,
         grantUnit: w.effects?.grantUnit ? Object.values(UNITS).findIndex((u) => u.id === w.effects!.grantUnit) : -1,
+        bonusResRouteGold: w.effects?.bonusResRouteGold ?? 0,
+        routesToSci: w.effects?.routesToCityScience ?? 0,
+        routesToFaithDom: w.effects?.domesticRoutesToCityFaith ?? 0,
+        routesToSenderSci: w.effects?.foreignRoutesToCitySender?.science ?? 0,
+        routesToSenderGold: w.effects?.foreignRoutesToCitySender?.gold ?? 0,
         grantProphet: w.effects?.grantProphet ? 1 : 0,
         rivalSciBoost: w.effects?.rivalScientistBoost ? 1 : 0,
         religionSite: w.effects?.religionSite ? 1 : 0,

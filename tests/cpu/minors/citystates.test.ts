@@ -265,6 +265,19 @@ describe('civ envoys and the suzerain contest', () => {
     expect(b1.capital.science).toBe(2);
     expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
   });
+
+  // CIV6 (R&F): the militaristic tiers are the exclusive Barracks/Stable
+  // pair at 3 envoys (either member collects) and the ARMORY at 6.
+  it('the militaristic pair: Barracks OR Stable at 3 envoys, Armory at 6', () => {
+    const state = makeState();
+    const cityState = addCs(state, 8, 8, { type: 'militaristic' });
+    cityState.envoys = { [1]: 6 };
+    const b = cityStateEnvoyBonuses(state, 1);
+    expect(b.buildingAdd.BARRACKS?.production).toBe(2);
+    expect(b.buildingAdd.STABLE?.production).toBe(2);
+    expect(b.buildingAdd.ARMORY?.production).toBe(2);
+    expect(b.buildingAdd.MILITARY_ACADEMY).toBeUndefined();
+  });
 });
 
 describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {

@@ -5,10 +5,12 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo } from './seats';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
-import { hexDistance } from '../../world/hex';
+import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isWater } from '../../world/query';
+import { RESOURCES } from '../../world/resources';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { tradeWalkReachable, tradeWaterLevel, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
 import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
@@ -176,6 +178,42 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
   return g;
 }
 
+/** CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold for
+ *  every Bonus resource within 3 tiles of the city and in this city's
+ *  territory" — a flat Gold add on every OUTGOING route, counted over the
+ *  standing bonus resources the city owns within 3 of its centre. */
+export function wonderRouteOriginGold(state: GameState, city: City): number {
+  let per = 0;
+  for (const w of city.wonders ?? []) {
+    if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+    per += BUILT_WONDERS[w.id]?.effects?.bonusResRouteGold ?? 0;
+  }
+  if (!per) return 0;
+  const centre = state.map.tiles[city.centerIndex];
+  let n = 0;
+  for (const t of tilesWithin(state.map, centre.col, centre.row, 3)) {
+    if (t.resource && RESOURCES[t.resource]?.category === 'bonus' && tileBelongsTo(t, city)) n += 1;
+  }
+  return per * n;
+}
+
+/** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to this
+ *  city provide +1 Science and +1 Gold for them" — the DESTINATION's wonder
+ *  pays the foreign SENDER. */
+export function wonderRouteSenderYields(state: GameState, dest: City): { science: number; gold: number } {
+  let science = 0;
+  let gold = 0;
+  for (const w of dest.wonders ?? []) {
+    if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+    const fx = BUILT_WONDERS[w.id]?.effects?.foreignRoutesToCitySender;
+    if (fx) {
+      science += fx.science;
+      gold += fx.gold;
+    }
+  }
+  return { science, gold };
+}
+
 export const TRADE_ROUTE_DURATION = 20;
 
 /**
@@ -329,10 +367,12 @@ export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
 export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
   const seat = city.seat;
   const out = emptyYields();
+  const originWonderGold = wonderRouteOriginGold(state, city);
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
     out.gold += routeGold;
     out.gold += routeChainGold(state, seat, route);
+    out.gold += originWonderGold;
     if (route.toCs !== undefined) {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
       if (cityState) {
@@ -367,6 +407,11 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
           out[ALLIANCE_ROUTE_YKEY[aty] as YieldKey] += ALLIANCE_ROUTE_TO[aty];
         }
         out.gold += routePostGold(state, seat, civCity.centerIndex);
+        // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
+        // to this city provide +1 Science and +1 Gold for them."
+        const snd = wonderRouteSenderYields(state, civCity);
+        out.science += snd.science;
+        out.gold += snd.gold;
         // TRADE POLICY outcome A pays the SENDER for every route that ends at
         // the named seat.
         out.gold += congressTradeGold(state, route.toSeat);

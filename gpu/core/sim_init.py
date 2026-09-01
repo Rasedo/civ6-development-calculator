@@ -262,13 +262,20 @@ class SimInit:
         citystate_didx = rules.citystate.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
         self._citystate_district_bonus = float(rules.citystate.get("districtBonus", 2))  # per-district amount at each of the 3-/6-envoy thresholds
-        # The 3/6-envoy bonus lands on the type's tier-1 (>=3) / tier-2 (>=6)
-        # BUILDING catalog index; -1 = building absent from the roster (no
-        # bonus). Constant, derived from citystate_type.
-        citystate_b1 = rules.citystate.get("typeB1Idx", [-1] * 6)
-        citystate_b2 = rules.citystate.get("typeB2Idx", [-1] * 6)
-        self._citystate_b1idx = torch.tensor(citystate_b1, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
-        self._citystate_b2idx = torch.tensor(citystate_b2, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
+        # CIV6 (Rise and Fall): the 3-/6-envoy bonus lands on the type's
+        # TIER-1 / TIER-2 building rows — either member of an exclusive pair
+        # (a city holds at most one); -1 pads the narrower types. Constant,
+        # derived from citystate_type.
+        _t1 = rules.citystate["typeT1Idx"]
+        _t2 = rules.citystate["typeT2Idx"]
+        _w1 = max(max((len(x) for x in _t1), default=1), 1)
+        _w2 = max(max((len(x) for x in _t2), default=1), 1)
+        _t1p = torch.tensor([list(x) + [-1] * (_w1 - len(x)) for x in _t1], dtype=torch.long, device=device)
+        _t2p = torch.tensor([list(x) + [-1] * (_w2 - len(x)) for x in _t2], dtype=torch.long, device=device)
+        self._citystate_t1idx = _t1p[self.citystate_type.clamp(min=0)]  # [B, S, w1]
+        self._citystate_t2idx = _t2p[self.citystate_type.clamp(min=0)]  # [B, S, w2]
+        # the minor's own build ladder raises the FIRST tier-1 member
+        self._citystate_t1b = self._citystate_t1idx[:, :, 0]  # [B, S]
         self._citystate_suz_amt = float(rules.citystate.get("suzerainYield", 3))  # flat suzerain capital-yield amount
         # Suzerain perks modeled as RULES — `effects` is the code order the
         # per-CS `suzCode` plane indexes; -1 = the perk is not in this build.
@@ -1155,6 +1162,11 @@ class SimInit:
             self._wond_faithflood = torch.tensor([float(w.get("faithPerFlood", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
             self._wond_grant_unit = torch.tensor([int(w.get("grantUnit", -1)) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
+            self._wond_bonusres_gold = torch.tensor([float(w["bonusResRouteGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] gold per bonus resource on outgoing routes
+            self._wond_routes_sci = torch.tensor([float(w["routesToSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] science per route TO the city
+            self._wond_routes_faithdom = torch.tensor([float(w["routesToFaithDom"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] faith per own DOMESTIC route to it
+            self._wond_sender_sci = torch.tensor([float(w["routesToSenderSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] the foreign SENDER's science
+            self._wond_sender_gold = torch.tensor([float(w["routesToSenderGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] ...and gold
             self._wond_grant_prophet = torch.tensor([bool(w.get("grantProphet", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_rival_sci = torch.tensor([bool(w.get("rivalSciBoost", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_religion_site = torch.tensor([bool(w.get("religionSite", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)

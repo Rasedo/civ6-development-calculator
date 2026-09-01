@@ -483,7 +483,8 @@ export function empireGrowthMult(state: GameState, seat: number): number {
 }
 
 /** The flat amenities and housing a city's OWN complete wonders pay it. */
-function wonderCityFlat(state: GameState, city: City, key: 'cityAmenities' | 'cityHousing'): number {
+function wonderCityFlat(state: GameState, city: City,
+  key: 'cityAmenities' | 'cityHousing' | 'routesToCityScience' | 'domesticRoutesToCityFaith'): number {
   let n = 0;
   for (const w of completedWonders(state, city)) n += w.def.effects?.[key] ?? 0;
   return n;
@@ -929,6 +930,25 @@ export function computeCityStats(
       }
     }
     bonuses.gold += perPass * n;
+  }
+  // CIV6 (University of Sankore): "+2 Science for every Trade Route to this
+  // city. Domestic Trade Routes give an additional +1 Faith to this city."
+  const perIn = wonderCityFlat(state, city, 'routesToCityScience');
+  const perDom = wonderCityFlat(state, city, 'domesticRoutesToCityFaith');
+  if (perIn || perDom) {
+    let all = 0;
+    let dom = 0;
+    for (const sx of state.seats) {
+      for (const r of sx.tradeRoutes ?? []) {
+        if (sx.seat === city.seat ? r.to === city.id
+          : r.toSeat === city.seat && r.toSeatCity === city.id) {
+          all += 1;
+          if (sx.seat === city.seat) dom += 1;
+        }
+      }
+    }
+    bonuses.science += perIn * all;
+    bonuses.faith += perDom * dom;
   }
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')

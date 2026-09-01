@@ -5209,8 +5209,23 @@ class SimSeats:
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
+            # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
+            # to this city provide +1 Science and +1 Gold for them" — the
+            # DESTINATION's wonder registry pays the sender.
+            snd_s = None
+            if getattr(self, "_wond_sender_gold", None) is not None and (
+                    bool((self._wond_sender_gold != 0).any()) or bool((self._wond_sender_sci != 0).any())):
+                _nwW = self.city_wonder.shape[3]
+                _wr4 = self.city_wonder.gather(1, _rx.unsqueeze(3).expand(B, K_i, RCw, _nwW))
+                _wr = _wr4.gather(2, _col.unsqueeze(3).expand(B, K_i, 1, _nwW)).squeeze(2)  # [B, K, nW]
+                _wcp = (_wr >= 0) & self.built_wonder_complete.gather(
+                    1, _wr.clamp(min=0).reshape(B, -1)).reshape_as(_wr)
+                gold_i = gold_i + _wcp.double() @ self._wond_sender_gold
+                snd_s = _wcp.double() @ self._wond_sender_sci
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            if snd_s is not None and bool((snd_s != 0).any()):
+                inc.scatter_add_(1, from_j * 6 + 3, snd_s * pays_i.double())
             # CIV6 (Alliance, level 1): the typed alliance pays its route
             # bonus on every paying leg - the sender half.
             _aty = self.seat_alliance_type[:, row].gather(1, dr)
@@ -5225,6 +5240,19 @@ class SimSeats:
         # Trade Route which passes through this city" — `routeChainGold`: each
         # live chain city pays 1 plus the OTHER civs' posts standing there, to
         # the ORIGIN column.
+        # CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2
+        # Gold for every Bonus resource within 3 tiles of the city and in
+        # this city's territory" — a flat add on every outgoing route.
+        if getattr(self, "_wond_bonusres_gold", None) is not None and bool((self._wond_bonusres_gold != 0).any()):
+            _pw = self._city_wonder_flat(row, self._wond_bonusres_gold)[:, :cols]  # [B, cols]
+            if bool((_pw != 0).any()):
+                _slw = self.city_slot_at(row)  # [B, T]
+                _ctrw = self.city_center[:, row, :cols].clamp(min=0)
+                _d3 = self.pair_dist[_ctrw] <= 3  # [B, cols, T]
+                _ownc = _slw.unsqueeze(1) == torch.arange(cols, device=self.device).reshape(1, cols, 1)
+                _cntw = (_d3 & _ownc & (self.res_cat == 1).unsqueeze(1)).sum(dim=2).double()
+                inc.scatter_add_(1, from_j * 6 + 2,
+                                 (_pw * _cntw).gather(1, from_j) * (act & has_from).double())
         ch = self.seat_route_chain[:, row]  # [B, K, CMAX]
         if bool((ch >= 0).any()):
             chf = ch.clamp(min=0).reshape(B, -1)
@@ -5244,6 +5272,28 @@ class SimSeats:
                 inc = torch.floor(inc * _cut.reshape(B, 1, 1))
         self._seat_route_cache = (key, inc)
         return inc
+
+    def _routes_ending_at(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B, RC], [B, RC]) long — every live route ENDING at each of this
+        row's cities (any sender), and the row's own DOMESTIC ones among
+        them. Endpoints resolve by persistent id among living cities, the
+        way `_seat_route_income` resolves its own."""
+        cols = self.RC
+        ids = self.city_id[:, row, :cols]
+        alive = self.city_alive[:, row, :cols]
+        rr = self.seat_routes[:, row]
+        dom = (((rr[:, :, 0] >= 0) & (rr[:, :, 1] >= 0)).unsqueeze(2)
+               & (rr[:, :, 1].unsqueeze(2) == ids.unsqueeze(1))).sum(dim=1)
+        allc = dom.clone()
+        for r2 in range(self.n_majors):
+            if r2 == row:
+                continue
+            hit = (((self.seat_routes[:, r2, :, 0] >= 0)
+                    & (self.seat_route_dseat[:, r2] == row)).unsqueeze(2)
+                   & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
+            allc = allc + hit.sum(dim=1)
+        z = torch.zeros_like(dom)
+        return torch.where(alive, allc, z), torch.where(alive, dom, z)
 
     def _bldg_dark(self, dt_reg: torch.Tensor) -> torch.Tensor:
         """Given a city district-tile registry [..., nD] (tile per district type,

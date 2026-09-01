@@ -122,6 +122,7 @@ class SimMinors:
             site_s = self._minor_district_site(s)
             ladder: list[tuple[str, object]] = [("b", walls_by_tier[0] if walls_by_tier else -1),
                                                 ("d", self._citystate_didx[:, s]),
+                                                ("t", self._citystate_t1b[:, s]),
                                                 ("d", int(self._harbor_didx))]
             ladder += [("b", bi) for bi in walls_by_tier[1:]]
             for kind, code in ladder:
@@ -153,6 +154,32 @@ class SimMinors:
                         self._bldg_version += 1
                         self._eff_version += 1
                     halt = halt | avail
+                    continue
+                if kind == "t":
+                    # the type district's TIER-1 building — the ladder rung
+                    # after the district itself; its gates are the rules a
+                    # major pays (the minor's own unlock, the COMPLETE
+                    # district standing).
+                    bvt = code  # [B] tier-1 building row per game
+                    for bi in sorted(set(int(x) for x in bvt[~halt].tolist())):  # type: ignore[index]
+                        if bi < 0:
+                            continue
+                        gate = ~halt & (bvt == bi)
+                        ut_b, uc_b = int(rd.b_unlock[bi]), int(rd.b_unlock_civic[bi])
+                        unlock = (self.citystate_techs[:, s, ut_b] if ut_b >= 0
+                                  else (self.citystate_civics[:, s, uc_b] if uc_b >= 0 else ones_b))
+                        dvt2 = self._citystate_didx[:, s]
+                        dt2 = self.city_dist_tile[:, row, 0].gather(1, dvt2.clamp(min=0).unsqueeze(1)).squeeze(1)
+                        held_d = (dt2 >= 0) & self.district_complete.gather(1, dt2.clamp(min=0).unsqueeze(1)).squeeze(1)
+                        avail = gate & ~self.city_bldg[:, row, 0, bi] & unlock & held_d
+                        pay = avail & (self.citystate_prod[:, s] >= float(rd.b_cost[bi]))
+                        if bool(pay.any()):
+                            rr2 = pay.nonzero(as_tuple=True)[0]
+                            self.city_bldg[rr2, row, 0, bi] = True
+                            self.citystate_prod[rr2, s] -= float(rd.b_cost[bi])
+                            self._bldg_version += 1
+                            self._eff_version += 1
+                        halt = halt | avail
                     continue
                 dvt = code if torch.is_tensor(code) else torch.full((self.B,), int(code), dtype=torch.long, device=self.device)  # type: ignore[arg-type]
                 for dv in sorted(set(int(x) for x in dvt[~halt].tolist())):

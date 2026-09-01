@@ -16,7 +16,7 @@ import { CIVICS } from '../data/civics';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -305,11 +305,10 @@ export interface CsBonuses {
 }
 
 function cityStateTierBuildings(type: GameState['cityStates'][number]['type']): {
-  tier1?: string;
-  tier2?: string;
+  tier1: readonly string[];
+  tier2: readonly string[];
 } {
-  const list = CITY_STATE_TYPE_BUILDINGS[type];
-  return { tier1: list[0], tier2: list[1] };
+  return { tier1: CITY_STATE_TYPE_TIER1[type], tier2: CITY_STATE_TYPE_TIER2[type] };
 }
 
 export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses {
@@ -320,13 +319,12 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
     const key = CITY_STATE_TYPE_YIELD[cityState.type];
     if (mine >= 1) capital[key] = (capital[key] ?? 0) + CITY_STATE_CAPITAL_BONUS;
     const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-    if (mine >= 3 && tier1) {
-      const cur = (buildingAdd[tier1] ??= {});
-      cur[key] = (cur[key] ?? 0) + CITY_STATE_DISTRICT_BONUS;
-    }
-    if (mine >= 6 && tier2) {
-      const cur = (buildingAdd[tier2] ??= {});
-      cur[key] = (cur[key] ?? 0) + CITY_STATE_DISTRICT_BONUS;
+    for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
+      if (mine < bar) continue;
+      for (const b of blds) {
+        const cur = (buildingAdd[b] ??= {});
+        cur[key] = (cur[key] ?? 0) + CITY_STATE_DISTRICT_BONUS;
+      }
     }
   }
   return { capital, buildingAdd };
@@ -354,10 +352,10 @@ export function envoyBonusDelta(state: GameState, cityState: CityState, seat: nu
   if (now < 1 && next >= 1) delta[key] += CITY_STATE_CAPITAL_BONUS;
   // a doubled posting can cross BOTH building tiers on one envoy
   const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-  for (const [bar, bld] of [[3, tier1], [6, tier2]] as const) {
-    if (now >= bar || next < bar || !bld) continue;
+  for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
+    if (now >= bar || next < bar) continue;
     let count = 0;
-    for (const c of citiesOf(state, seat)) if (c.buildings.includes(bld)) count += 1;
+    for (const c of citiesOf(state, seat)) if (blds.some((b) => c.buildings.includes(b))) count += 1;
     delta[key] += CITY_STATE_DISTRICT_BONUS * count;
   }
   return delta;

@@ -53,6 +53,14 @@ def grant_walls_tech(sim, s: int, bi: int) -> None:
         sim.citystate_techs[B0, s, ut] = True
 
 
+def grant_building_research(sim, s: int, bi: int) -> None:
+    ut, uc = int(sim.rules_dev.b_unlock[bi]), int(sim.rules_dev.b_unlock_civic[bi])
+    if ut >= 0:
+        sim.citystate_techs[B0, s, ut] = True
+    if uc >= 0:
+        sim.citystate_civics[B0, s, uc] = True
+
+
 def grant_district_tech(sim, s: int, dv: int) -> None:
     for (di, ut, uc, _plc, _fc) in sim._scaffold:
         if int(di) != dv:
@@ -252,6 +260,32 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     print("  7 encampment OK — the minor's district fights at its centre's strength")
 
 
+def test_the_tier1_building_follows_the_district(rules, path) -> None:
+    """The type district's TIER-1 building is the ladder rung after the
+    district itself — never before it stands, one item a tick."""
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    dv = int(sim._citystate_didx[B0, s])
+    bi = int(sim._citystate_t1b[B0, s])
+    assert bi >= 0, "the type names no tier-1 building"
+    anc = walls_rows(sim)[0]
+    grant_walls_tech(sim, s, anc)
+    sim.city_bldg[B0, row, 0, anc] = True
+    sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
+    grant_district_tech(sim, s, dv)
+    grant_building_research(sim, s, bi)
+    sim.citystate_prod[B0, s] = 100_000.0
+    sim._minor_build()
+    if int(sim.city_dist_tile[B0, row, 0, dv]) < 0:
+        print("  7 tier-1 building SKIPPED — no legal plot for the type district")
+        return
+    assert not bool(sim.city_bldg[B0, row, 0, bi]), "the building landed the same tick as its district"
+    sim._minor_build()
+    assert bool(sim.city_bldg[B0, row, 0, bi]), "the tier-1 building did not follow its district"
+    print(f"  7 tier-1 building OK — row {bi} follows district {dv}, one item a tick")
+
+
 def test_a_dead_minor_builds_nothing(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
@@ -273,6 +307,7 @@ def main() -> int:
     test_walls_first_and_only_once(rules, path)
     test_the_type_district_lands_on_the_first_plot(rules, path)
     test_the_landlocked_minor_never_harbors(rules, path)
+    test_the_tier1_building_follows_the_district(rules, path)
     test_damaged_walls_block_the_higher_tier(rules, path)
     test_the_conquest_carries_the_build(rules, path)
     test_the_minor_encampment_fights_as_its_centre(rules, path)

@@ -8,12 +8,12 @@
  * City-state / Suzerain pages. CORRECT: the SUZERAIN rule (most envoys AND at
  * least 3) and the 3-/6-envoy THRESHOLDS.
  *
- * The ENVOY LADDER is the real one, checked per city-state against the GS
- * Civilopedia: Geneva reads "+2 Science in your Capital / +2 Science in every
- * Campus district / Additional +2", Kumasi the same shape in Culture. What
- * stays degraded is the 3-/6-envoy step's KEY — real Civ 6 counts the
- * district's BUILDING TIERS, this model counts the district (see
- * CITY_STATE_TYPE_BUILDINGS, the catalog for that round).
+ * The ENVOY LADDER is the real one: 1 envoy in the Capital, then the 3-/6-
+ * envoy steps. The Civilopedia's own city-state pages still print the
+ * vanilla "in every Campus district" wording, but Rise and Fall re-keyed
+ * both steps to the district's BUILDING TIERS (tier 1 at 3 envoys, tier 2
+ * at 6) — the CITY_STATE_TYPE_TIER1/TIER2 tables, live through
+ * `cityStateEnvoyBonuses`.
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
@@ -45,22 +45,25 @@ export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
   religious: 'HOLY_SITE',
 };
 
-// The real GS 3-/6-envoy bonuses key to the DISTRICT's BUILDING TIERS,
-// not the district itself (a Campus with a Library + University earns the
-// scientific bonus TWICE in real Civ 6). This table records those real building
-// tiers per type, restricted to buildings that EXIST in this roster. The LIVE
-// envoy-bonus channel (cityStateEnvoyBonuses/envoyBonusDelta + the GPU district-bonus
-// term) stays DISTRICT-keyed ("suzerain/quest logic stays as
-// is") — this is the catalog data for a future building-keyed wiring round.
-// Inert in the parity gate regardless: the scripted scenario never lifts a
-// city-state past 1 envoy, so the 3-envoy threshold is unreachable there.
-export const CITY_STATE_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
-  scientific: ['LIBRARY', 'UNIVERSITY', 'RESEARCH_LAB'],
-  cultural: ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'],
-  trade: ['MARKET', 'BANK', 'STOCK_EXCHANGE'],
-  industrial: ['WORKSHOP', 'FACTORY', 'COAL_POWER_PLANT'],
-  militaristic: ['BARRACKS', 'STABLE', 'ARMORY', 'MILITARY_ACADEMY'],
-  religious: ['SHRINE', 'TEMPLE'],
+// CIV6 (Rise and Fall): the 3-/6-envoy bonuses key to the type district's
+// TIER-1 / TIER-2 building. Either member of an exclusive pair carries the
+// bonus (a city holds at most one of the pair), and the minor's own build
+// ladder takes the FIRST tier-1 member — a model choice.
+export const CITY_STATE_TYPE_TIER1: Record<CityStateType, readonly string[]> = {
+  scientific: ['LIBRARY'],
+  cultural: ['AMPHITHEATER'],
+  trade: ['MARKET'],
+  industrial: ['WORKSHOP'],
+  militaristic: ['BARRACKS', 'STABLE'],
+  religious: ['SHRINE'],
+};
+export const CITY_STATE_TYPE_TIER2: Record<CityStateType, readonly string[]> = {
+  scientific: ['UNIVERSITY'],
+  cultural: ['MUSEUM', 'ARCHAEOLOGICAL_MUSEUM'],
+  trade: ['BANK'],
+  industrial: ['FACTORY'],
+  militaristic: ['ARMORY'],
+  religious: ['TEMPLE'],
 };
 
 /**

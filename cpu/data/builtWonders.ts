@@ -98,6 +98,20 @@ export interface BuiltWonderDef {
     /** CIV6 (Pyramids): "Grants a free Builder" — the unit id spawned at
      *  the completing city, free. */
     grantUnit?: string;
+    /** CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold
+     *  for every Bonus resource within 3 tiles of the city and in this
+     *  city's territory." */
+    bonusResRouteGold?: number;
+    /** CIV6 (University of Sankore): "+2 Science for every Trade Route to
+     *  this city." */
+    routesToCityScience?: number;
+    /** CIV6 (University of Sankore): "Domestic Trade Routes give an
+     *  additional +1 Faith to this city." */
+    domesticRoutesToCityFaith?: number;
+    /** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to
+     *  this city provide +1 Science and +1 Gold for them" — the SENDER's
+     *  yields, paid by the destination's wonder. */
+    foreignRoutesToCitySender?: { science: number; gold: number };
     /** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle
      *  if no Prophets are available)" — the class offer claimed FREE at
      *  completion, with the page's Apostle fallback. */
@@ -260,8 +274,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'SHIPBUILDING',
       placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
       cityYields: { gold: 3 },
-      effects: { gpPoints: { ADMIRAL: 1 } },
-      description: '+3 gold, +1 Admiral point per turn. Coastal water adjacent to a Harbor.',
+      effects: { gpPoints: { ADMIRAL: 1 }, grantUnit: 'TRADER' },
+      description: '+3 gold, +1 Admiral point per turn, +1 Trade Route capacity, and a free Trader. Coastal water adjacent to a Harbor.',
     }),
     W({
       id: 'GREAT_ZIMBABWE',
@@ -271,8 +285,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'BANKING',
       placement: { adjacentResource: 'CATTLE', adjacentDistrict: 'COMMERCIAL_HUB', adjacentDistrictBuilding: 'MARKET' },
       cityYields: { gold: 5 },
-      effects: { gpPoints: { MERCHANT: 2 } },
-      description: '+5 gold, +2 Merchant points per turn. Flat land adjacent to a Commercial Hub.',
+      effects: { gpPoints: { MERCHANT: 2 }, bonusResRouteGold: 2 },
+      description: '+5 gold, +2 Merchant points per turn, +1 Trade Route capacity, and +2 Gold on every outgoing route per bonus resource this city holds within 3 tiles. Flat land adjacent to a Commercial Hub.',
     }),
     W({
       id: 'FORBIDDEN_CITY',
@@ -385,8 +399,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'UNIVERSITY_OF_SANKORE', name: 'University of Sankoré', code: 'US', cost: 710,
       requiresTech: 'EDUCATION', placement: { terrains: ['DESERT'], adjacentDistrict: 'CAMPUS', adjacentDistrictBuilding: 'UNIVERSITY' },
       cityYields: { science: 3, faith: 1 },
-      effects: { gpPoints: { SCIENTIST: 2 } },
-      description: '+3 science, +1 faith, +2 Scientist points per turn.',
+      effects: {
+        gpPoints: { SCIENTIST: 2 },
+        routesToCityScience: 2,
+        domesticRoutesToCityFaith: 1,
+        foreignRoutesToCitySender: { science: 1, gold: 1 },
+      },
+      description: '+3 science, +1 faith, +2 Scientist points per turn; +2 science per route to this city, +1 faith per domestic one, and foreign senders earn +1 science +1 gold.',
     }),
     W({
       id: 'VENETIAN_ARSENAL', name: 'Venetian Arsenal', code: 'VA', cost: 920,

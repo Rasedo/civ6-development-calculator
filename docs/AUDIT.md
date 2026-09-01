@@ -51,7 +51,6 @@ from the list below.
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
-| B-45r sourced-sweep finds in the other rows | 1 | B-31r's route yields carry the last effect family |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
@@ -61,7 +60,7 @@ from the list below.
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **21** | |
+| **B. Fidelity vs real Civ 6** | **20** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -75,11 +74,11 @@ from the list below.
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
-| C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district and the coastal Harbor ship; district BUILDINGS, the yields of any of it, and power are still absent |
+| C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district, its tier-1 building and the coastal Harbor ship; the yields of any of it and power are still absent |
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **43** | |
+| **OPEN, TOTAL** | **42** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -532,19 +531,6 @@ Civ 6 source or is recorded as unverifiable.
   shield. OPEN, each blocked: Apadana's "+2 Great Work slots (any type)"
   and the Hermitage's LANDSCAPE-only art slots, both waiting on the
   per-work TYPE B-20r names.
-- **B-45r. The effects the SOURCED sweep found in the other rows.** Seven
-  of eight have channels (`cityYieldPerImprovement`,
-  `boostTechsThroughEra`, `districtGpPoints`, the completion unit grant
-  `grantUnit` / `_wond_grant_unit`, Stonehenge's free Prophet +
-  `religionSite` founding gate, the Oracle's `patronageFaithPct`, and the
-  Great Library's `rivalScientistBoost` / `_wond_rival_sci` — a rival's
-  SCIENTIST claim hands every holder of a COMPLETE carrier one random
-  unresearched-unboosted tech boost, drawn on the shared stream in
-  ascending seat order).
-  OPEN — the one with nowhere to live:
-  - The Colossus' and Great Zimbabwe's +1 route capacity and free Trader,
-    Great Zimbabwe's per-bonus-resource route gold and Sankoré's three
-    route-yield terms: all wait on B-31r's route-yield work.
 - **B-54r. Flanking and support against their own page.** Every rule on
   the page ships, plus the four higher stacks a promotion or Great Person
   raises. OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and
@@ -1269,11 +1255,22 @@ under their blocker so the dependency is readable, and both halves count.
   CARRIES buildings, registry and perimeter into the captured city.
   `tests/gpu/minor_builds_test.py` is the bar; the LADDER's order and the
   one-item-a-turn pace are MODEL choices, recorded. Still absent:
-  - **district BUILDINGS** — the minor's Campus holds no Library, so the
-    real 3/6-envoy building-tier bonuses stay district-keyed (B-45r's
-    family) and a levied garrison earns no barracks experience;
+  - ~~district BUILDINGS — the minor's Campus holds no Library.~~ CLOSED,
+    with a stale claim CORRECTED: the majors' 3-/6-envoy bonuses were
+    ALREADY building-keyed here (`cityStateEnvoyBonuses` / the
+    `_citystate_t1idx` scatter) — this file's "stay district-keyed"
+    reading had rotted, and the militaristic column really was mis-keyed
+    (tier 2 read the STABLE). CIV6 (R&F): the pair Barracks OR Stable at
+    3 envoys and the ARMORY at 6; cultural tier 2 is either museum — the
+    `CITY_STATE_TYPE_TIER1`/`CITY_STATE_TYPE_TIER2` tables carry it on
+    both engines. The minor itself now raises its type district's tier-1
+    building: the rung after the district in `minorLadder` /
+    `_minor_build`, gated on the COMPLETE district and the minor's own
+    unlock; the first pair member, a model choice.
   - **the yields of any of it** — a minor's districts produce nothing for
-    the minor (its research runs on population, not on the Campus);
+    the minor (its research runs on population, not on the Campus), and a
+    levied garrison earns no barracks experience from the building now
+    standing;
   - **power** (C-1) — a minor's cities still draw and supply nothing.
 - **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 1. The row ships with the
   name its page gives ("This land adjacent to a volcano has suffered from a

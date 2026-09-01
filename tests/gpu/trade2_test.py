@@ -536,6 +536,78 @@ def main() -> None:
     assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a dead route's stale course is dark"
     print("  Land Acquisition OK (+3 per foreign crossing, own/dead routes dark)")
 
+    # --- 15) the wonders' route terms: Great Zimbabwe, Sankore ---------------
+    WROWS = rj["wonders"]["rows"]
+    UIDS = [u["id"] for u in rj["units"]]
+    assert any(int(w.get("grantUnit", -1)) == UIDS.index("TRADER") for w in WROWS), \
+        "no wonder grants a Trader (Colossus)"
+    gz_wi = next(i for i, w in enumerate(WROWS) if w.get("bonusResRouteGold"))
+    sk_wi = next(i for i, w in enumerate(WROWS) if w.get("routesToSci"))
+    s15 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    fid = int(s15.city_id[0, 0, 0])
+    ctr = int(s15.city_center[0, 0, 0])
+    s15.seat_routes[0, 0, 0, 0] = fid
+    s15.seat_routes[0, 0, 0, 1] = fid
+    wt15 = int((~s15._centre_city_map()[0]).nonzero(as_tuple=True)[0][0])
+    s15.city_wonder[0, 0, 0, gz_wi] = wt15
+    s15.built_wonder_complete[0, wt15] = True
+    s15.res_cat[0] = torch.where(s15.res_cat[0] == 1, torch.zeros_like(s15.res_cat[0]), s15.res_cat[0])
+    s15._eff_version += 1
+    g0 = float(s15._seat_route_income(0)[0, 0, 2])
+    cand = ((s15.city_slot_at(0)[0] == 0) & (s15.pair_dist[ctr] <= 3)).nonzero(as_tuple=True)[0]
+    assert len(cand) >= 2, "the capital owns fewer than two tiles within 3"
+    s15.res_cat[0, cand[0]] = 1
+    s15.res_cat[0, cand[1]] = 1
+    s15._eff_version += 1
+    g1 = float(s15._seat_route_income(0)[0, 0, 2])
+    assert g1 - g0 == 4.0, f"Great Zimbabwe should pay 2 x 2 bonus resources, paid {g1 - g0}"
+    far = ((s15.city_slot_at(0)[0] == 0) & (s15.pair_dist[ctr] > 3)).nonzero(as_tuple=True)[0]
+    if len(far):
+        s15.res_cat[0, far[0]] = 1
+        s15._eff_version += 1
+        assert float(s15._seat_route_income(0)[0, 0, 2]) - g0 == 4.0, "a far bonus resource paid"
+    print("  Great Zimbabwe OK (+2 per owned bonus resource within 3, per route)")
+
+    # Sankore: the dest wonder pays the SENDER, and the city reads its
+    # incoming routes in the walk
+    s16 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert s16.n_majors >= 2
+    cap0, cap1 = int(s16.city_id[0, 0, 0]), int(s16.city_id[0, 1, 0])
+    wt16 = int((~s16._centre_city_map()[0]).nonzero(as_tuple=True)[0][0])
+    s16.city_wonder[0, 0, 0, sk_wi] = wt16
+    s16.built_wonder_complete[0, wt16] = True
+    s16._eff_version += 1
+    a0, d0 = s16._routes_ending_at(0)
+    base_all, base_dom = int(a0[0, 0]), int(d0[0, 0])
+    tot_a, _, _, _ = s16._city_totals()
+    sci_a, fai_a = float(tot_a[0, 0, 3]), float(tot_a[0, 0, 5])
+    s16.seat_routes[0, 1, 0, 0] = cap1
+    s16.seat_routes[0, 1, 0, 1] = -1
+    s16.seat_route_dseat[0, 1, 0] = 0
+    s16.seat_route_dcity[0, 1, 0] = cap0
+    s16.seat_routes[0, 0, 0, 0] = cap0
+    s16.seat_routes[0, 0, 0, 1] = cap0
+    s16._eff_version += 1
+    a1, d1 = s16._routes_ending_at(0)
+    assert int(a1[0, 0]) - base_all == 2 and int(d1[0, 0]) - base_dom == 1, \
+        f"incoming counts read {int(a1[0, 0])}/{int(d1[0, 0])}"
+    # the walk: +2 sci per incoming (x2), +1 faith on the domestic one — the
+    # amenity tier scales the columns, so band the deltas like the TS tests
+    tot_b, _, _, _ = s16._city_totals()
+    dsci = float(tot_b[0, 0, 3]) - sci_a
+    dfai = float(tot_b[0, 0, 5]) - fai_a
+    assert 4.0 <= dsci < 5.0, f"the incoming science moved {dsci}, want ~4"
+    assert 1.0 <= dfai < 1.5, f"the domestic faith moved {dfai}, want ~1"
+    # the SENDER: row 1's intl leg earns +1 sci +1 gold from the dest wonder
+    inc_w = s16._seat_route_income(1)
+    sci_w, gold_w = float(inc_w[0, 0, 3]), float(inc_w[0, 0, 2])
+    s16.built_wonder_complete[0, wt16] = False
+    s16._eff_version += 1
+    inc_n = s16._seat_route_income(1)
+    assert sci_w - float(inc_n[0, 0, 3]) == 1.0, "the sender science did not ride the dest wonder"
+    assert gold_w - float(inc_n[0, 0, 2]) == 1.0, "the sender gold did not ride the dest wonder"
+    print("  Sankore OK (incoming x2 sci + domestic faith in the walk; sender +1/+1 on the intl leg)")
+
     print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
           "round-trip expiry, walk + plunder, candidate/apply spend, "
           "(seat, city) dest keying incl. a capture, sea legs, trading posts, "

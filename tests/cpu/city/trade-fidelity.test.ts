@@ -3,8 +3,9 @@ import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfC
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, stampTradingPost, routePostGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, stampTradingPost, routePostGold, wonderRouteOriginGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
 import { computeCityStats } from '../../../cpu/core/city';
+import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { GOVERNORS } from '../../../cpu/data/governors';
 import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAST } from '../../../cpu/core/units';
 import { isWater } from '../../../world/query';
@@ -599,5 +600,61 @@ describe('trading posts', () => {
     // ...and the seat's own route through its own city counts for nothing
     civ.tradeRoutes = [];
     expect(computeCityStats(state, mine).breakdown.bonuses.gold).toBe(bare);
+  });
+});
+describe('wonder route terms', () => {
+  it('Colossus grants a Trader at completion', () => {
+    expect(BUILT_WONDERS.COLOSSUS.effects?.grantUnit).toBe('TRADER');
+  });
+
+  // CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold for
+  // every Bonus resource within 3 tiles of the city and in this city's
+  // territory."
+  it('Great Zimbabwe pays +2 per owned bonus resource within 3 on every outgoing route', () => {
+    const { state, origin, dest } = twoCitySandbox();
+    const wt = tileAtCoords(state.map, 7, 7);
+    wt.builtWonder = 'GREAT_ZIMBABWE';
+    wt.builtWonderComplete = true;
+    origin.wonders.push({ id: 'GREAT_ZIMBABWE', tileIndex: wt.index });
+    addTradeRoute(state, origin.id, dest.id, 0);
+    expect(wonderRouteOriginGold(state, origin)).toBe(0);
+    const bare = cityTradeYields(state, origin, 0).gold;
+    tileAtCoords(state.map, 6, 7).resource = 'WHEAT';
+    tileAtCoords(state.map, 7, 6).resource = 'DEER';
+    tileAtCoords(state.map, 1, 1).resource = 'WHEAT'; // out of range AND territory
+    expect(wonderRouteOriginGold(state, origin)).toBe(4);
+    expect(cityTradeYields(state, origin, 0).gold).toBe(bare + 4);
+    // incomplete wonder: nothing
+    wt.builtWonderComplete = false;
+    expect(wonderRouteOriginGold(state, origin)).toBe(0);
+  });
+
+  // CIV6 (University of Sankore): "+2 Science for every Trade Route to this
+  // city. Domestic Trade Routes give an additional +1 Faith to this city."
+  // and "Other Civilizations' Trade Routes to this city provide +1 Science
+  // and +1 Gold for them."
+  it('University of Sankore reads its incoming routes and pays the foreign sender', () => {
+    const { state, origin, dest } = twoCitySandbox();
+    const wt = tileAtCoords(state.map, 11, 7);
+    wt.builtWonder = 'UNIVERSITY_OF_SANKORE';
+    wt.builtWonderComplete = true;
+    dest.wonders.push({ id: 'UNIVERSITY_OF_SANKORE', tileIndex: wt.index });
+    const b0 = computeCityStats(state, dest).breakdown.bonuses;
+    addTradeRoute(state, origin.id, dest.id, 0); // one DOMESTIC incoming route
+    const b1 = computeCityStats(state, dest).breakdown.bonuses;
+    expect(b1.science - b0.science).toBe(2);
+    expect(b1.faith - b0.faith).toBe(1);
+    // a rival's route to the same city: the SENDER earns +1 science +1 gold
+    const civ = addCiv(state, 14, 10);
+    civ.cities[0].buildings.push('MARKET');
+    expect(addIntlTradeRoute(state, civ.cities[0].id, 0, dest.id, civ.seat).ok).toBe(true);
+    const withW = cityTradeYields(state, civ.cities[0], 0);
+    const b2 = computeCityStats(state, dest).breakdown.bonuses;
+    expect(b2.science - b0.science).toBe(4); // two routes to it now
+    expect(b2.faith - b0.faith).toBe(1);     // only one is domestic
+    dest.wonders = [];
+    const withoutW = cityTradeYields(state, civ.cities[0], 0);
+    expect(withW.science - withoutW.science).toBe(1);
+    expect(withW.gold - withoutW.gold).toBe(1);
   });
 });

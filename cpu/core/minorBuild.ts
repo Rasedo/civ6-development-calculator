@@ -15,7 +15,7 @@
  */
 import type { City, CityState, DistrictId, GameState, Tile } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1 } from '../data/cityStates';
 import { ENCAMPMENT_HP } from '../data/units';
 import { canPlaceDistrictIn, outerPool, wallsMax } from './rules';
 import { districtCostIn } from './game';
@@ -25,12 +25,16 @@ import { tilesWithin } from '../../world/hex';
 
 const MINOR_WALLS: readonly string[] = ['ANCIENT_WALLS', 'MEDIEVAL_WALLS', 'RENAISSANCE_WALLS'];
 
-type MinorItem = { kind: 'walls'; id: string } | { kind: 'district'; district: DistrictId };
+type MinorItem = { kind: 'walls'; id: string } | { kind: 'district'; district: DistrictId }
+  | { kind: 'building'; id: string };
 
 function minorLadder(cityState: CityState): MinorItem[] {
   return [
     { kind: 'walls', id: MINOR_WALLS[0] },
     { kind: 'district', district: CITY_STATE_TYPE_DISTRICT[cityState.type] },
+    // the type district's TIER-1 building follows it — the ladder position
+    // is the model's; the building's own gates are the rules a major pays
+    { kind: 'building', id: CITY_STATE_TYPE_TIER1[cityState.type][0] },
     { kind: 'district', district: 'HARBOR' },
     { kind: 'walls', id: MINOR_WALLS[1] },
     { kind: 'walls', id: MINOR_WALLS[2] },
@@ -91,6 +95,18 @@ function minorBuild(state: GameState, cityState: CityState): void {
         const t = state.map.tiles[d.tileIndex];
         if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = cityState.outerHp;
       }
+      return;
+    }
+    if (item.kind === 'building') {
+      const def = BUILDINGS[item.id];
+      if (!def || held.includes(item.id)) continue;
+      if (!unlocks.buildings.has(item.id)) continue;
+      // the building wants its own COMPLETE district standing
+      if (!(cityState.districts ?? []).some(
+        (d) => d.type === def.district && state.map.tiles[d.tileIndex]?.districtComplete)) continue;
+      if (cityState.prodProgress < def.cost) return;
+      cityState.prodProgress -= def.cost;
+      cityState.buildings = [...held, item.id];
       return;
     }
     const site = minorDistrictSite(state, cityState, item.district, unlocks);
