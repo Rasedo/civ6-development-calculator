@@ -9,10 +9,10 @@ the world seed and the fixture export.
 Lanes then run concurrently:
 
     vitest + serve_a : the TS suite, then the decision-server gate's first
-                       shard — a sixth of the fixture seeds in one GPU sim
+                       shard — its share of the fixture seeds in one GPU sim
                        against one TS child each, with per-turn
                        obs/job/spread/buy equality and a state-digest compare
-    serve_b..serve_f : the gate's other five sixths, the same shape
+    serve_b..        : the gate's other shards, the same shape
     pokes            : the per-mechanic GPU self-tests, through a bounded pool
 
 Wall-clock is stage 0 plus the slowest lane, and the serve shards are that
@@ -244,10 +244,10 @@ def main() -> int:
         # spend total CPU to buy wall — the trade this box has cores for.
         _seeds = sorted(int(q.stem[4:]) for q in (ROOT / "seeder" / "worlds").glob("seed*.json")
                         if q.stem[4:].isdigit())
-        _k = min(6, len(_seeds))
+        _k = min(8, len(_seeds))
         _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
-        _shards = [("serve_" + "abcdef"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
+        _shards = [("serve_" + "abcdefgh"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
         _serve_names = [s[0] for s in _shards]
         print("lanes (parallel): vitest+" + _shards[0][0] + " | "

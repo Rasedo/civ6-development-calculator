@@ -33,7 +33,7 @@ export interface WorldPreset {
 
 export const WORLD_PRESETS: Record<string, WorldPreset> = {
   baseline: {
-    nSeeds: 12, firstSeed: 9001, width: 44, height: 26, civCount: 3, cityStateMax: 3,
+    nSeeds: 24, firstSeed: 9001, width: 44, height: 26, civCount: 3, cityStateMax: 3,
     layout: 'continents', landFraction: 0.35, resourceMult: 1, resourceWeights: [0.45, 0.35, 0.2],
   },
   'duel-pangaea': {
