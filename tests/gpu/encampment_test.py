@@ -514,6 +514,49 @@ def test_district_ranged(rules, path) -> None:
     print("  district ranged OK: both shot bodies take the pool to 0, neither conquers")
 
 
+def test_citystate_encampment(rules, path) -> None:
+    """A CITY-STATE's Encampment (its type's district) blocks and takes the
+    SNIPE exactly like a major's: the owner is whoever holds the ground.
+    ORACLE: `encampmentBlocks` asks `unitsHostile(unit, tileOwnerSide(tile))`
+    over any owning seat."""
+    sim, _enc, atk, _sh, _ = _assault_scene(rules, path, ranged=True)
+    cs = next(s for s in range(sim.S) if bool(sim.citystate_alive[0, s]))
+    cs_seat, cs_row = 100 + cs, sim.n_majors + cs
+    ctr = int(sim.city_center[0, cs_row, 0])
+    assert ctr >= 0, "the city-state has no centre"
+    dfc = sim.pair_dist[ctr].to(torch.long)
+    owned = ((sim.tile_seat[0] == cs_seat) & (sim.district[0] < 0) & (dfc == 1)
+             & (sim.military_at[0] < 0)).nonzero(as_tuple=True)[0]
+    assert len(owned) > 0, "no free city-state ring-1 tile"
+    enc = int(owned[0])
+    sim.district[0, enc] = sim._encamp_didx
+    sim.district_complete[0, enc] = True
+    sim.district_pillaged[0, enc] = False
+    sim.district_dead[0, enc] = False
+    sim.city_dist_tile[0, cs_row, 0, sim._encamp_didx] = enc
+    sim.encamp_hp[0, enc] = 1
+    tile = torch.full((sim.B,), enc, dtype=torch.long, device=sim.device)
+    sim.war[0, 1, cs_row] = False
+    sim.war[0, cs_row, 1] = False
+    assert not bool(sim._encamp_block(tile.unsqueeze(1), 1)[0, 0]),         "a city-state's Encampment blocked a major at PEACE with it"
+    assert not bool(sim._encamp_block_plane(1)[0, enc]), "the plane form disagrees at peace"
+    sim.war[0, 1, cs_row] = True
+    sim.war[0, cs_row, 1] = True
+    assert bool(sim._encamp_block(tile.unsqueeze(1), 1)[0, 0]),         "a city-state's Encampment never blocked a major at WAR with it"
+    assert bool(sim._encamp_block_plane(1)[0, enc]), "the plane form disagrees at war"
+    # the attacker moves beside the city-state's district and SNIPES it
+    free = ((sim.pair_dist[enc].to(torch.long) == 1) & (sim.military_at[0] < 0)
+            & (sim.civilian_at[0] < 0) & sim.passable[0]).nonzero(as_tuple=True)[0]
+    assert len(free) > 0, "no free tile beside the city-state's Encampment"
+    sim.military_at[0, int(sim.major_unit_tile[0, atk])] = -1
+    sim.major_unit_tile[0, atk] = int(free[0])
+    sim.military_at[0, int(free[0])] = atk + sim.POOL_LO["major"]
+    sim.city_outer_hp[0, cs_row, 0] = 0
+    sim._hostile_ranged_strike(torch.tensor([True], device=sim.device), tile, "major", atk)
+    assert int(sim.encamp_hp[0, enc]) == 0, "the SNIPE never reached the city-state's pool"
+    print("  city-state encampment OK: blocks at war, open at peace, the SNIPE reaches its pool")
+
+
 def test_pillage_never_offers_the_district(rules, path) -> None:
     """The verb the conquest replaces: with the pool shot to 0 the block lifts
     and a hostile unit can stand on the district, but PILLAGE is still not on
@@ -555,6 +598,7 @@ def main() -> None:
     test_district_shelter(rules, paths[0])
     test_district_conquest(rules, paths[0])
     test_district_ranged(rules, paths[0])
+    test_citystate_encampment(rules, paths[0])
     test_pillage_never_offers_the_district(rules, paths[0])
     test_civ_encamp_prod_mult(rules, paths[0])
     print("ENCAMPMENT OK")

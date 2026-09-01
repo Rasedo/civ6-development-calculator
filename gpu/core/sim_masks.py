@@ -1352,11 +1352,9 @@ class SimMasks:
         live = self._encamp_live()
         if not torch.is_tensor(seat) and seat == BARB_SEAT:
             return live
-        owner_seat = torch.where(
-            (self.tile_seat >= 0) & (self.tile_seat < self.n_majors),
-            self.tile_seat, torch.full_like(self.tile_seat, -1),
-        )
-        return live & self._seats_hostile(seat, owner_seat)
+        # the owner is WHOEVER holds the ground — a city-state's Encampment
+        # (its type's district) blocks and defends like a major's.
+        return live & self._seats_hostile(seat, self.tile_seat)
 
     def _encamp_block(self, tiles: torch.Tensor, seat) -> torch.Tensor:
         """[B, N] — the same predicate as `_encamp_block_plane`, but evaluated
@@ -1374,9 +1372,7 @@ class SimMasks:
         )
         if not torch.is_tensor(seat) and seat == BARB_SEAT:
             return live
-        ow = self.tile_seat.gather(1, t)
-        owner_seat = torch.where((ow >= 0) & (ow < self.n_majors), ow, torch.full_like(ow, -1))
-        return live & self._seats_hostile(seat, owner_seat)
+        return live & self._seats_hostile(seat, self.tile_seat.gather(1, t))
 
     def _border_closed(self, tiles: torch.Tensor, row: int,
                        utype: torch.Tensor | None = None) -> torch.Tensor:
