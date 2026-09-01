@@ -785,6 +785,26 @@
           ]
         },
         {
+          "name": "darkAges",
+          "compare": "exact",
+          "covers": [
+            "Seat.darkAges"
+          ],
+          "planes": [
+            "dark_ages"
+          ]
+        },
+        {
+          "name": "goldenAges",
+          "compare": "exact",
+          "covers": [
+            "Seat.goldenAges"
+          ],
+          "planes": [
+            "golden_ages"
+          ]
+        },
+        {
           "name": "dedications",
           "compare": "exact",
           "covers": [

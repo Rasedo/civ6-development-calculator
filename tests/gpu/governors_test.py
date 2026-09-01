@@ -185,10 +185,14 @@ def poke_boundary(rules, path):
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
     dark, gold, elen = sim._era_dark, sim._era_gold, sim._era_len
+    # the bars are PER SEAT: base + cities at the boundary (the drift
+    # counters are zero on a fresh sim)
+    ncity = int(sim.city_alive[0, 0].long().sum())
+    dark_b, gold_b = dark + ncity, dark + ncity + (gold - dark)
     sim.turn = elen - 1
     snap = sim.snapshot()
     # (score, expected age): the four threshold edges
-    cases = [(dark - 1, 0), (dark, 1), (gold - 1, 1), (gold, 2)]
+    cases = [(dark_b - 1, 0), (dark_b, 1), (gold_b - 1, 1), (gold_b, 2)]
     for score, exp_age in cases:
         sim.restore(snap)
         sim.turn = elen - 1
@@ -204,7 +208,11 @@ def poke_boundary(rules, path):
         assert int(sim.era_score[0, 0]) == 0, (
             f"fresh window must be empty, got {int(sim.era_score[0, 0])}"
         )
-    print(f"  b boundary OK (darkT {dark}, goldenT {gold}: {dark-1}→Dark, {dark}→Normal, {gold-1}→Normal, {gold}→Golden; window reset)")
+        # the drift's memory ticks with the age just entered
+        assert int(sim.dark_ages[0, 0]) == (1 if exp_age == 0 else 0)
+        assert int(sim.golden_ages[0, 0]) == (1 if exp_age == 2 else 0)
+    print(f"  b boundary OK (bars {dark_b}/{gold_b} over {ncity} cities: "
+          f"{dark_b-1}→Dark, {dark_b}→Normal, {gold_b-1}→Normal, {gold_b}→Golden; window reset)")
 
 
 def poke_age_pressure(rules, path):
@@ -318,16 +326,17 @@ def poke_seat0_golden(rules, path):
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
     elen, gold = sim._era_len, sim._era_gold
+    gold_b = gold + int(sim.city_alive[0, 0].long().sum())  # the per-seat bar
     sim.turn = elen - 1
     snap0 = sim.snapshot()
     sim.era_score[:] = 0
-    sim.era_score[0, 0] = gold - 1
+    sim.era_score[0, 0] = gold_b - 1
     sim.step()
     assert int(sim.civ_age[0, 0]) == 1, "goldenT-1 keeps seat 0 Normal"
     sim.restore(snap0)
     sim.turn = elen - 1
     sim.era_score[:] = 0
-    sim.era_score[0, 0] = gold
+    sim.era_score[0, 0] = gold_b
     sim.step()
     assert int(sim.civ_age[0, 0]) == 2, "goldenT flips seat 0 to Golden (the gate-unreachable axis)"
 

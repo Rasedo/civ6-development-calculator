@@ -194,8 +194,15 @@ export const ERA_SCORE_GP = 1; // earned a Great Person
 /** CIV6 (Taj Mahal): the wonder pays only for moments "usually worth 2 or
  *  more Era Score", so the threshold is a rule, not a tuning knob. */
 export const ERA_SCORE_MOMENT_MIN = 2;
-export const ERA_DARK_T = 3;
-export const ERA_GOLDEN_T = 10;
+/** CIV6 (Ages): the era-score bars are PER CIV and MOVE — the Dark bar is
+ *  "12 + city number when era begin - 5 * dark ages you entered before
+ *  + 5 * golden/hero ages you entered before", the Golden bar the same
+ *  with 24 (so the gap is a fixed 12). The score window resets each era
+ *  here, which is the real game's cumulative "current points" term folded
+ *  away. No speed scaling is published for either bar. */
+export const ERA_DARK_T = 12;
+export const ERA_GOLDEN_T = 24;
+export const AGE_PREV_STEP = 5;
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
 /**
  * The CULTURE VICTORY constants, verified against the Gathering

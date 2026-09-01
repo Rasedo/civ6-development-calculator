@@ -45,7 +45,7 @@ from the list below.
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the Espionage Pact's and Luxury Policy's era windows are table readings; the scored-competition catalog holds one row |
-| B-24r Ages/governors | 2 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
+| B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, ten promotion clauses with no channel (nine on an absent system, one on an unpublished magnitude), To Arms!'s casus belli |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the PASS ships (fee, discount, lockout); what remains is the hammers bullet — a REMOVED item's progress banks where real Civ 6 remembers it against the item |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
@@ -61,7 +61,7 @@ from the list below.
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-67 a natural wonder's ROUTE clause | 1 | both engines now refuse a road on one, following every other "cannot build on a natural wonder" rule they source; whether real Civ 6 refuses it is unsourced |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
-| **B. Fidelity vs real Civ 6** | **22** | |
+| **B. Fidelity vs real Civ 6** | **21** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
@@ -80,7 +80,7 @@ from the list below.
 | C-43 two improvement pages were never reached | 1 | the Seaside Resort's and Airstrip's Civilopedia entries both 404 — their research raises, if any, are unknown rather than absent |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | **C. Absent systems** | **23** | |
-| **OPEN, TOTAL** | **45** | |
+| **OPEN, TOTAL** | **44** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -347,12 +347,15 @@ Civ 6 source or is recorded as unverifiable.
     above). Land Acquisition's
     "+3 Gold from each foreign Trade Route passing through" is blocked on
     the stored route PATH, exactly as B-31r's pass-through gold is.
-  - **GRANTS' "+100% Great People points" HAS NO PER-CITY READER.** GPP
-    accrues on the SEAT (`greatPeople.ts` reads
-    `getModifiers(state, seat).gppMult`), so a per-CITY governor
-    multiplier has nowhere to land and the channel is deliberately not
-    folded into `withGovernor`. Closing it needs the GPP walk to become
-    per-city on both engines.
+  - ~~Grants' "+100% Great People points" has no per-city reader.~~
+    CLOSED: the GPP walk is per-city on both engines
+    (`greatPersonPointsPerTurn`'s city loop / `_advance_great_people`),
+    and the governor's `gppMult` multiplies everything his city GENERATES
+    — the district term and the wonders standing in that city alike
+    (`governorMult` / `_governor_mult(row, "gppMult")`); the seat-level
+    government and Congress factors stay outside it. Reachability is
+    poke-level: Grants is a tier-2 Pingala row no scripted lane promotes
+    to.
   - **THE GREEDY SLOT FILL NEVER REACHES A DARK AGE CARD.** Both engines
     fill slots by walking the card table in order, so a government's
     WILDCARD slots are spent on ordinary overflow before the dark rows —
@@ -381,7 +384,18 @@ Civ 6 source or is recorded as unverifiable.
   - **To Arms!'s special Casus Belli.** The denouncement it rides on
     ships now (C-2); what is missing is the casus-belli KIND itself — a
     war declaration variant the war table does not carry.
-  - **Per-civ tech-era drift** — eras are global 50-turn blocks.
+  - ~~Per-civ tech-era drift — eras are global 50-turn blocks.~~ CLOSED,
+    with the claim CORRECTED: real Civ 6's era clock is GLOBAL too (the
+    World Era advances on a turn schedule; `ERA_LENGTH` is this model's
+    recorded stand-in for that schedule) — what is per-civ at the boundary
+    is the BARS, and those now drift: CIV6 (Ages, corroborated formula) —
+    the Dark bar is 12 + cities when the era begins - 5 per past Dark age
+    + 5 per past Golden or Heroic age, the Golden bar the same with 24
+    (`eraBoundary` / the `sim_step` boundary, over the new
+    `Seat.darkAges`/`goldenAges` — `dark_ages`/`golden_ages` — counters,
+    compared by statecompare). The old flat 3/10 pair was this model's
+    own and is gone. A civ's TECH era (`civEraIndex`) already serves the
+    sites that ask it.
 - **B-31r. Trade-route tails.** The Trader unit, sea legs, trading posts,
   chained reach and the whole-destination-set candidate all ship, and a
   city-state's complete Harbor is a second water anchor

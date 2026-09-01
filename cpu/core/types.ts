@@ -593,6 +593,10 @@ export interface Seat {
   camps: number[];
   gpEarned: string[];
   eraScore?: number;
+  /** how many DARK / GOLDEN-or-HEROIC ages this civ has entered — the
+   *  per-civ threshold drift's memory. */
+  darkAges?: number;
+  goldenAges?: number;
   age?: number;
   /** the seven GOVERNORS, one slot per catalog row; see `governors.ts`. */
   governors?: Governor[];

@@ -102,12 +102,20 @@ class SimStep:
             # civ_age is written IN PLACE below — a bare reference would read
             # back the NEW age and the Dark->Golden test could never fire.
             _was = self.civ_age.clone()
+            # CIV6 (Ages): the bars are THIS CIV's — cities counted as the
+            # era begins, past dark ages lowering them and past golden or
+            # heroic ages raising them, the Golden bar a fixed gap above.
+            _nc = self.city_alive[:, :self.n_majors].long().sum(dim=2)
+            _dt = self._era_dark + _nc + self._age_step * (self.golden_ages - self.dark_ages)
+            _gt = _dt + (self._era_gold - self._era_dark)
             self.civ_age.copy_(torch.where(
-                sc < self._era_dark,
+                sc < _dt,
                 torch.zeros_like(self.civ_age),
-                torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
+                torch.where(sc >= _gt, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
             ))
             self.prev_age.copy_(_was)
+            self.dark_ages += (self.civ_age == 0).long()
+            self.golden_ages += (self.civ_age == 2).long()
             self._eff_version += 1  # a new AGE is a new Dark-Age card pool
             self.dedications.copy_(torch.where(
                 (_was == 0) & (self.civ_age == 2),

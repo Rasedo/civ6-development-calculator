@@ -468,6 +468,10 @@ class SimInit:
         # endTurn eraBoundary mirror). Loaded from the fixture's t0 snapshot.
         # _MUTABLE for snapshot/restore.
         self.era_score = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # CIV6 (Ages): how many DARK and GOLDEN/HEROIC ages each civ has
+        # entered — the per-civ threshold drift's memory.
+        self.dark_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.golden_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.ded_picks = torch.full((B, self.n_majors, max(int(rules.eras.get("heroicDedications", 3)), 1)), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             esi = f.get("eraScoreInit", [])
@@ -620,8 +624,9 @@ class SimInit:
         self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
-        self._era_dark = int(_er.get("darkT", 3))
-        self._era_gold = int(_er.get("goldenT", 10))
+        self._era_dark = int(_er.get("darkT", 12))
+        self._era_gold = int(_er.get("goldenT", 24))
+        self._age_step = int(_er.get("agePrevStep", 5))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
         # THE GOVERNOR CATALOG. `governors` order IS the governor index; the
         # thirteen title civics, the neutralize clock and the Governance

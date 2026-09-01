@@ -1,4 +1,4 @@
-import { seatOf } from '../../../cpu/core/seats';
+import { seatOf, citiesOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
 import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
 import { dedicationEvent } from '../../../cpu/core/eras';
@@ -9,7 +9,7 @@ import { addEraScore, eraBoundary, agePressureFactor } from '../../../cpu/core/e
 import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent, hasPromotion } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
 import type { GameState, City, Governor, Seat } from '../../../cpu/core/types';
 
 // -- local builders (the geopolitics.test.ts / the other civs.test.ts pattern) --------
@@ -175,14 +175,21 @@ describe('governors / era score', () => {
     const state = makeState();
     addCiv(state, 5, 5); // one civ → civs 0 (seat 0) and 1
     state.turn = ERA_LENGTH; // a boundary turn
-    [ERA_DARK_T - 1, ERA_GOLDEN_T].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; }); // seat 0 just-below-Dark, civ at Golden
+    // the bars are PER SEAT now: base + cities +-5 per past dark/golden age
+    const bar = (i: number) => ERA_DARK_T + citiesOf(state, i).length
+      + AGE_PREV_STEP * ((seatOf(state, i)?.goldenAges ?? 0) - (seatOf(state, i)?.darkAges ?? 0));
+    const gap = ERA_GOLDEN_T - ERA_DARK_T;
+    [bar(0) - 1, bar(1) + gap].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; }); // seat 0 just-below-Dark, civ at Golden
     eraBoundary(state);
     expect([0, 1].map((i) => seatOf(state, i)?.age)).toEqual([0, 2]); // Dark, Golden
     expect([0, 1].map((i) => seatOf(state, i)?.eraScore ?? 0)).toEqual([0, 0]); // window reset
+    // ...and the drift's memory ticks
+    expect(seatOf(state, 0)?.darkAges).toBe(1);
+    expect(seatOf(state, 1)?.goldenAges).toBe(1);
 
-    // the Normal band: darkT → Normal, goldenT-1 → Normal
+    // the Normal band: the (drifted) dark bar → Normal, golden bar - 1 → Normal
     state.turn = 2 * ERA_LENGTH;
-    [ERA_DARK_T, ERA_GOLDEN_T - 1].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; });
+    [bar(0), bar(1) + gap - 1].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; });
     eraBoundary(state);
     expect([0, 1].map((i) => seatOf(state, i)?.age)).toEqual([1, 1]);
   });

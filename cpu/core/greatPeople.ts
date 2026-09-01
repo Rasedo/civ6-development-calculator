@@ -11,6 +11,7 @@ import { TECHS } from '../data/techs';
 import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY, ERA_SCORE_GP } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
+import { governorMult } from './governors';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
 
@@ -123,6 +124,9 @@ export function greatPersonPointsPerTurn(
   const gppFlat = getModifiers(state, seat).gppFlat;
   out.PROPHET += goldenProphetPoints(state, seat);
   for (const city of citiesOf(state, seat)) {
+    // CIV6 (Grants): "+100% Great People points generated per turn in the
+    // city" — a PER-CITY factor over everything this city generates.
+    const cityMult = governorMult(state, city, (e) => e.gppMult);
     // CIV6 (Oracle): "Districts in this city provide +2 Great Person points
     // of their type" — the HOLDING city's districts only.
     const distGpp = completedWonders(state, city)
@@ -141,15 +145,16 @@ export function greatPersonPointsPerTurn(
           !state.map.tiles[d.tileIndex].districtPillaged,
       );
       if (!inst) continue;
-      out[cls] += 1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed
-        + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
+      out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed
+        + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length) * cityMult;
     }
-  }
-  // CIV6: a wonder's per-turn Great Person points are the owner's, paid
-  // whether or not the holding city has the class's district.
-  for (const w of seatWonders(state, seat)) {
-    for (const [cls, pts] of Object.entries(w.def.effects?.gpPoints ?? {})) {
-      out[cls as GreatPersonClass] += pts;
+    // CIV6: a wonder's per-turn Great Person points are the owner's, paid
+    // whether or not the holding city has the class's district — and
+    // generated IN the holding city, so Grants reaches them.
+    for (const w of completedWonders(state, city)) {
+      for (const [cls, pts] of Object.entries(w.def.effects?.gpPoints ?? {})) {
+        out[cls as GreatPersonClass] += pts * cityMult;
+      }
     }
   }
   // CIV6 (Patronage resolution): the factor covers every source, the golden

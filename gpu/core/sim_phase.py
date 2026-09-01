@@ -1276,6 +1276,10 @@ class SimPhase:
                 hit = ((self.seat_routes[:, row, :, 0].unsqueeze(2) == ids.unsqueeze(1))
                        & to_ally.unsqueeze(2)).any(dim=1)
                 c2 = (hit & self.city_alive[:, row]).double() * float(self._al_c2_gpp)
+        # CIV6 (Grants): "+100% Great People points generated per turn in
+        # the city" — a PER-CITY factor over everything the city generates.
+        gm = (self._governor_mult(row, "gppMult") if self.n_governors
+              else torch.ones(B, self.RC, dtype=torch.float64, device=dev))
         for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
             comp_c = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
@@ -1297,15 +1301,16 @@ class SimPhase:
                     _pg = self._gov_mods(row)[12]["gpp"]
                     if cls < _pg.shape[1]:
                         gflat = gflat + _pg[:, cls].unsqueeze(1)
-                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + c2)).sum(dim=1)
+                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + c2) * gm).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:
                 pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
             # CIV6: a wonder's per-turn points are the OWNER's, paid whether or
-            # not the holding city has the class's district.
+            # not the holding city has the class's district — and generated IN
+            # the holding city, so Grants reaches them.
             if self._wond_n and cls < self._wond_gpp.shape[1] and float(self._wond_gpp[:, cls].sum()) != 0.0:
-                pts = pts + self._seat_wonder_sum(row, self._wond_gpp[:, cls])
+                pts = pts + (self._city_wonder_flat(row, self._wond_gpp[:, cls]).double() * gm).sum(dim=1)
             # CIV6 (Patronage resolution): the factor covers every per-turn
             # source, the golden prophet term included.
             pts = pts * self._congress_gpp_factor(cls)

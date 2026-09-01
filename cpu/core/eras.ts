@@ -1,6 +1,6 @@
 import type { GameState } from './types';
 import { civEraIndex } from './city';
-import { seatOf, isBarbSeat, isCiv } from './seats';
+import { seatOf, citiesOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
@@ -10,7 +10,7 @@ import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
 import { GW_BUILDINGS } from '../data/greatPeople';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
-import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
 /** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
@@ -56,7 +56,13 @@ export function eraBoundary(state: GameState): void {
     if (!seat) continue;
     const s = seat.eraScore ?? 0;
     const was = seat.age ?? 1; // era 0 is Normal for everyone
-    const now = s < ERA_DARK_T ? 0 : s >= ERA_GOLDEN_T ? 2 : 1;
+    // CIV6 (Ages): the bars are THIS CIV's — cities counted as the era
+    // begins, past dark ages lowering them and past golden/heroic ages
+    // raising them, the Golden bar a fixed 12 above the Dark one.
+    const darkT = ERA_DARK_T + citiesOf(state, c).length
+      + AGE_PREV_STEP * ((seat.goldenAges ?? 0) - (seat.darkAges ?? 0));
+    const goldT = darkT + (ERA_GOLDEN_T - ERA_DARK_T);
+    const now = s < darkT ? 0 : s >= goldT ? 2 : 1;
     // DEDICATIONS. Each civ commits to one dedication per era —
     // except the HEROIC AGE, real Civ 6's reward for climbing straight out of
     // a DARK age into a GOLDEN one, which grants THREE. That test is why the
@@ -64,6 +70,8 @@ export function eraBoundary(state: GameState): void {
     // Heroic Age from an ordinary Golden one.
     seat.prevAge = was;
     seat.age = now;
+    if (now === 0) seat.darkAges = (seat.darkAges ?? 0) + 1;
+    else if (now === 2) seat.goldenAges = (seat.goldenAges ?? 0) + 1;
     seat.dedications = was === 0 && now === 2 ? HEROIC_DEDICATIONS : 1;
     // Commit to NAMED dedications. Real Civ 6 lets each civ pick from the
     // WINDOW its world era offers; there is no chooser on either seat and a

@@ -513,6 +513,8 @@ SEAT = {
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
     "prevAge": _civ_scalar("prev_age"),
+    "darkAges": _civ_scalar("dark_ages"),
+    "goldenAges": _civ_scalar("golden_ages"),
     "dedications": _civ_scalar("dedications"),
     "dedicationPicks": lambda sim, b, rows: [sorted(int(x) for x in sim.ded_picks[b, c].tolist() if x >= 0) for c in rows],
     "capitalTile": _capital_tile,

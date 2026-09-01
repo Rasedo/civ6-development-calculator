@@ -504,6 +504,8 @@ const SEAT: Record<string, Extractor> = {
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
   prevAge: overSeats((s) => s.prevAge ?? 1),
+  darkAges: overSeats((s) => s.darkAges ?? 0),
+  goldenAges: overSeats((s) => s.goldenAges ?? 0),
   dedications: overSeats((s) => s.dedications ?? 1),
   dedicationPicks: overSeats((s) => [...(s.dedicationPicks ?? [])].sort((a, b) => a - b)),
   capitalTile: overSeats((s) => s.capitalTile ?? -1),
