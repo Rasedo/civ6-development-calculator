@@ -61,6 +61,11 @@ ROWS = [
     ("FISHING_BOATS", "tech", "PLASTICS", {"food": 1}),
     ("CAMP", "tech", "SYNTHETIC_MATERIALS", {"gold": 1}),
     ("CAMP", "civic", "MERCANTILISM", {"production": 1, "food": 1}),
+    # CIV6 (Predictive Systems): "+1 Production to Quarry, Oil Well, and
+    # Oil Rig improvements" — the Oil Rig waits on an improvement the
+    # catalog does not hold.
+    ("QUARRY", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
+    ("OIL_WELL", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
 ]
 
 
@@ -116,16 +121,27 @@ def test_paid_per_seat(rules, path) -> None:
     sim = fresh(rules, path)
     assert sim.n_majors >= 2, "this lane needs a second seat to hold the research against"
     t = dry_land(sim)
+    researched: set[tuple[str, str]] = set()
     for imp, kind, rid, ys in ROWS:
         sim.improvement[B0, t] = IMPS.index(imp)
         sim.pillaged[B0, t] = False
         sim._eff_version += 1
         before = add_at(sim, ROW, t)
+        fresh_rid = (kind, rid) not in researched
         research(sim, ROW, kind, rid)
+        researched.add((kind, rid))
         after = add_at(sim, ROW, t)
         want = list(before)
-        for y, amt in ys.items():
-            want[Y.index(y)] += amt
+        if fresh_rid:
+            for y, amt in ys.items():
+                want[Y.index(y)] += amt
+        else:
+            # the rid came in with an EARLIER row (Predictive Systems raises
+            # two improvements) — its raise is already standing in `before`
+            std = [0.0] * 6
+            for y, amt in ys.items():
+                std[Y.index(y)] += float(amt)
+            assert all(b >= s for b, s in zip(before, std)),                 f"{imp} at {rid}: standing raise {std} missing from {before}"
         assert after == want, f"{imp} at {rid}: {after} != {want}"
         # the OTHER seat holds none of it, on the identical tile
         assert add_at(sim, 1, t) == [0.0] * 6, f"{rid} paid a seat that never researched it"
