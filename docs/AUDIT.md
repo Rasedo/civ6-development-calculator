@@ -55,7 +55,7 @@ from the list below.
 | B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
 | B-61r the Great Person clauses with no carrier | 2 | 10 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, barbarian conversion, ocean passage, Tupac Amaru's per-district undefended grant walk); Goddard's visibility grant and Shah Jahan's gold-buyout SHIP now; Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
-| B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
+| B-63r the grievance ledger's magnitudes | 1 | the gang-up bar is a heuristic — no source publishes the AI threshold |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **18** | |
@@ -123,10 +123,9 @@ detail of its own). "Meanwhile" states what both engines do today.
     the city faster" is the whole primary text; two secondaries say 20%.
     Meanwhile: the +3 Gold half ships on the stored course; the
     border-cost site would take a multiplier the moment one is sourced.
-11. **B-63r — the grievance ceiling rows and the gang-up bar.** The
-    occupied/razed rows publish only "up to 50" / "up to 150"; no source
-    publishes the AI's gang-up threshold. Meanwhile: the ceiling values;
-    `GRIEVANCE_GANG` as a tuning knob.
+11. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
+    threshold. Meanwhile: `GRIEVANCE_GANG` as a tuning knob, two war
+    bases' worth.
 12. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
     whether it may act after forming are unpublished, and the
     direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
@@ -463,16 +462,14 @@ Civ 6 source or is recorded as unverifiable.
     key, ties by array position). Real Civ 6 leaves all three to the
     player; the two engines mirror the heuristic exactly, and it is
     P8-surface work to make them decisions.
-  - ~~To Arms!'s special Casus Belli.~~ CLOSED: CIV6 (Golden Age War,
-    civilopedia diplo_3): "To Arms! Dedication chosen, denounce the
-    intended target of your war" — "Only 25% warmonger penalty for
-    declaring this war or capturing cities during it." A formal DoW by a
-    To Arms! dedicant in a Golden age marks the pair (`Seat.goldenWars` /
-    `seat_wargolden`, statecompare-compared), prices the declaration and
-    its captures at `GOLDEN_WAR_GRIEVANCE_PCT` (25%) of the formal
-    figures — 100 becomes 25, a taken city's 50 becomes 13 — leaves the
-    razing rows at their own published figures, and peace clears the
-    mark.
+  - ~~To Arms!'s special Casus Belli.~~ CLOSED: CIV6 (DiplomaticActions.xml,
+    the game's own casus belli table): the Golden Age War row carries
+    percent columns 25/25/300 (declare/capture/raze) and requires NO
+    denouncement, so ANY DoW by a To Arms! dedicant in a Golden age is a
+    formal war (FORMALWAR group) that marks the pair (`Seat.goldenWars` /
+    `seat_wargolden`, statecompare-compared). Every kind prices its own
+    columns off `WAR_GRIEVANCE_PCT` — surprise 150/150/450, formal
+    100/100/300 — and peace clears the mark.
   - ~~Per-civ tech-era drift — eras are global 50-turn blocks.~~ CLOSED,
     with the claim CORRECTED: real Civ 6's era clock is GLOBAL too (the
     World Era advances on a turn schedule; `ERA_LENGTH` is this model's
@@ -691,9 +688,6 @@ Civ 6 source or is recorded as unverifiable.
 - **B-63r. The grievance ledger's two unpublished magnitudes.** The
   mechanic is whole (every published row pays, the spread, the decay, the
   favor ladder, PUBLIC RELATIONS). OPEN, neither closable from a source:
-  - **THE OCCUPIED AND RAZED ROWS SHIP AT THEIR CEILING** — the table
-    publishes "up to 50" / "up to 150" without the scale that walks up to
-    it.
   - **THE GANG-UP BAR IS A HEURISTIC** — `GRIEVANCE_GANG` is a tuning
     knob wearing a sourced unit; no source publishes an AI threshold.
 

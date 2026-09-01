@@ -550,11 +550,12 @@ class SimSeats:
                 declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
                 self.seat_delegation[:, _g, _h])
         _formal = declare & self._denounce_casus_belli(row, tgt)
-        # CIV6 (Golden Age War): "To Arms! Dedication chosen, denounce the
-        # intended target of your war" — "Only 25% warmonger penalty for
-        # declaring this war or capturing cities during it". The declarer's
-        # dedication, remembered per pair for the captures.
-        _golden = _formal & self._golden_ded(row, self._ded_to_arms)
+        # CIV6 (Golden Age War row, DiplomaticActions.xml): the To Arms!
+        # dedicant's casus belli requires NO denouncement and sits in the
+        # FORMALWAR group, so a golden declaration is a formal war either
+        # way; the pair remembers it for the captures.
+        _golden = declare & self._golden_ded(row, self._ded_to_arms)
+        _formal = _formal | _golden
         self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
         self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
         self.seat_wargolden[:, row, tgt] = torch.where(declare, _golden, self.seat_wargolden[:, row, tgt])

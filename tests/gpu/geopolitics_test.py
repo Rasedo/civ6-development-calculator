@@ -484,7 +484,8 @@ def poke_dow_gates(rules, path):
     re-validates whoever asks: ALLIES are never declared on, an existing war
     is a no-op, and one declaration buys exactly one grievance."""
     sim, _, _ = controlled_pair(rules, path)
-    dow = int(sim._griev_war_surprise)  # no denouncement stands, so it is a SURPRISE war
+    # no denouncement stands, so it is a SURPRISE war
+    dow = int(sim._griev_war_base * sim._war_griev_pct["surprise"][0] / 100 + 0.5)
 
     sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 30
     head_war(sim, 1, 2)

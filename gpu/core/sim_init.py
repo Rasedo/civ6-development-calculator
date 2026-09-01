@@ -514,13 +514,14 @@ class SimInit:
         # scalars ride it); reading it off rules.seats returned {} and every
         # .get below silently DEFAULTED — hard reads keep that from recurring.
         _er2 = rules.eras
-        self._griev_war_surprise = int(_er2["grievanceWarSurprise"])
-        self._griev_war_formal = int(_er2["grievanceWarFormal"])
+        _wgp = _er2["warGrievancePct"]
+        self._war_griev_pct = {k: tuple(int(x) for x in _wgp[k])
+                               for k in ("surprise", "formal", "golden")}
+        self._griev_war_base = int(_er2["grievanceWarBase"])
         self._griev_war_on_friend = int(_er2["grievanceWarOnFriend"])
         self._griev_war_on_suzerain = int(_er2["grievanceWarOnSuzerain"])
         self._griev_war_on_cs_friend = int(_er2["grievanceWarOnCsFriend"])
         self._griev_city_taken = int(_er2["grievanceCityTaken"])
-        self._griev_city_razed = int(_er2["grievanceCityRazed"])
         self._griev_last_city = int(_er2["grievanceLastCity"])
         self._griev_cs_conquered = int(_er2["grievanceCsConquered"])
         self._griev_cs_razed = int(_er2["grievanceCsRazed"])
@@ -536,7 +537,6 @@ class SimInit:
         self._griev_favor_step = int(_er2["grievanceFavorStep"])
         self._griev_favor_max = int(_er2["grievanceFavorMax"])
         self._griev_gang = int(_er2["grievanceGang"])
-        self._golden_war_pct = int(_er2["goldenWarGrievancePct"])
         self._favor_per_suz = int(_er2["diplomaticFavorPerSuzerain"])
         self._congress_interval = int(_er2["congressInterval"])
         self._congress_min_era = int(_er2["congressMinEra"])

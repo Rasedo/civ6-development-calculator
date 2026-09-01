@@ -249,10 +249,12 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   setWarTurnsWith(state, actor.seat, seat, 0);
   // CIV6: war cancels every route between the two civs; the Traders return.
   cancelRoutesBetween(state, actor.seat, seat);
-  const formal = denounceCasusBelli(state, seat, actor.seat);
-  // CIV6 (Golden Age War): "To Arms! Dedication chosen, denounce target —
-  // only 25% warmonger penalty for declaration/captures."
-  const golden = formal && goldenDedication(state, seat, DED_TO_ARMS);
+  const denounced = denounceCasusBelli(state, seat, actor.seat);
+  // CIV6 (Golden Age War row, DiplomaticActions.xml): the To Arms!
+  // dedicant's casus belli requires NO denouncement and sits in the
+  // FORMALWAR group, so a golden declaration is a formal war either way.
+  const golden = goldenDedication(state, seat, DED_TO_ARMS);
+  const formal = denounced || golden;
   setWarFormal(state, actor.seat, seat, formal);
   setWarGolden(state, actor.seat, seat, golden);
   grievanceWarDeclared(state, seat, actor.seat, formal, golden);
@@ -1001,8 +1003,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // CIV6: "when war is declared, delegations and ambassadors are kicked
         // out" — the pair loses both halves, not the declarer's.
         clearDelegations(state, actor.seat, foe);
-        const formal = denounceCasusBelli(state, actor.seat, foe);
-        const golden = formal && goldenDedication(state, actor.seat, DED_TO_ARMS);
+        const denounced = denounceCasusBelli(state, actor.seat, foe);
+        // CIV6 (Golden Age War row): NO denouncement required, FORMALWAR group.
+        const golden = goldenDedication(state, actor.seat, DED_TO_ARMS);
+        const formal = denounced || golden;
         setWarFormal(state, actor.seat, foe, formal);
         setWarGolden(state, actor.seat, foe, golden);
         grievanceWarDeclared(state, actor.seat, foe, formal, golden);

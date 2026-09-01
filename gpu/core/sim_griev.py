@@ -110,18 +110,17 @@ class SimGriev:
             self._add_grievance(s, transgressor, (share * n).div(100, rounding_mode="floor"), m)
 
     def _grievance_war_declared(self, declarer: int, target: int, m, formal, golden=None) -> None:
-        """"Surprise War declared: 150" / "Formal War declared: 100" — CIV6
-        (Golden Age War): "Only 25% warmonger penalty" scales the formal
-        figure — and "War declared on a Friend or Ally: 75" to each of the
-        target's."""
-        surprise = m & ~formal
-        gld = golden if golden is not None else torch.zeros_like(surprise)
-        self._spread_grievance(target, declarer, self._griev_war_surprise, surprise)
-        self._spread_grievance(target, declarer, self._griev_war_formal, m & formal & ~gld)
-        self._spread_grievance(
-            target, declarer,
-            int(self._griev_war_formal * self._golden_war_pct / 100 + 0.5),
-            m & formal & gld)
+        """The casus belli's own DECLARATION column — surprise, formal or
+        golden percent of the war base — and "War declared on a Friend or
+        Ally: 75" to each of the target's."""
+        gld = golden if golden is not None else torch.zeros_like(m)
+        base, pct = self._griev_war_base, self._war_griev_pct
+        self._spread_grievance(target, declarer,
+                               int(base * pct["surprise"][0] / 100 + 0.5), m & ~formal & ~gld)
+        self._spread_grievance(target, declarer,
+                               int(base * pct["formal"][0] / 100 + 0.5), m & formal & ~gld)
+        self._spread_grievance(target, declarer,
+                               int(base * pct["golden"][0] / 100 + 0.5), m & gld)
         for s in range(self.n_majors):
             if s in (declarer, target):
                 continue
@@ -129,14 +128,18 @@ class SimGriev:
             self._add_grievance(s, declarer, self._griev_war_on_friend, m & near)
 
     def _grievance_city_taken(self, b: int, taker: int, loser: int, razed: bool) -> None:
+        """a capture or a raze, priced by the pair's OWN casus belli
+        columns off the city base."""
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
-        n = self._griev_city_razed if razed else self._griev_city_taken
-        # CIV6 (Golden Age War): captures at a quarter too; the razing rows
-        # are their own published figures and stay whole.
-        if (not razed and taker < self.n_majors and loser < self.n_majors
-                and bool(self.seat_wargolden[b, taker, loser])):
-            n = int(n * self._golden_war_pct / 100 + 0.5)
+        kind = "surprise"
+        if taker < self.n_majors and loser < self.n_majors:
+            if bool(self.seat_wargolden[b, taker, loser]):
+                kind = "golden"
+            elif bool(self.seat_warkind[b, taker, loser]):
+                kind = "formal"
+        pct = self._war_griev_pct[kind][2 if razed else 1]
+        n = int(self._griev_city_taken * pct / 100 + 0.5)
         self._spread_grievance(loser, taker, n, one)
 
     def _grievance_world(self, transgressor: int, n: int, m) -> None:

@@ -916,13 +916,21 @@ export const ALLIANCE_REL3_FAITH_PER_POP = 1;
  *
  * Every magnitude below is the Grievances page's own table row.
  */
-/** "Surprise War declared" — a declaration with no casus belli. */
-export const GRIEVANCE_WAR_SURPRISE = 150;
-/** "Formal War declared" — the denouncement's casus belli. */
-export const GRIEVANCE_WAR_FORMAL = 100;
-/** CIV6 (Golden Age War, Casus Belli page): "To Arms! Dedication chosen,
- *  denounce target — only 25% warmonger penalty for declaration/captures". */
-export const GOLDEN_WAR_GRIEVANCE_PCT = 25;
+/** CIV6 (DiplomaticActions.xml, the casus belli rows): each war kind
+ *  carries its OWN three percent columns — declaration, city capture,
+ *  raze — applied to the bases below. SURPRISE 150/150/450; FORMAL
+ *  100/100/300 (a standing denouncement); GOLDEN AGE 25/25/300, the
+ *  To Arms! dedicant's war, whose row requires NO denouncement
+ *  (DenouncementTurnsRequired 0). */
+export const WAR_GRIEVANCE_PCT: Readonly<
+  Record<'surprise' | 'formal' | 'golden', readonly [number, number, number]>
+> = {
+  surprise: [150, 150, 450],
+  formal: [100, 100, 300],
+  golden: [25, 25, 300],
+};
+/** the declaration base the percent columns scale. */
+export const GRIEVANCE_WAR_BASE = 100;
 /** "War declared on a Friend or Ally": 75, to the friend or ally. */
 export const GRIEVANCE_WAR_ON_FRIEND = 75;
 /** "War declared on a city-state a civ is the Suzerain over": 100. */
@@ -930,13 +938,10 @@ export const GRIEVANCE_WAR_ON_SUZERAIN = 100;
 /** "War declared on a city-state friend or ally": 50, "to every civ that has
  *  at least 1 Envoy in that city-state, but is not its Suzerain". */
 export const GRIEVANCE_WAR_ON_CS_FRIEND = 50;
-/** "City Occupied (capturing a city during war): Max 50 base value". The
- *  page publishes the CEILING and says it "varies by city population and type
- *  of war" without publishing either scale, so the ceiling is the value. */
+/** CIV6 (DiplomaticActions.xml): the CITY-EVENT base the capture and raze
+ *  percent columns scale — WARMONGER_CITY_PERCENT_OF_DOW's half of the
+ *  declaration base. */
 export const GRIEVANCE_CITY_TAKEN = 50;
-/** "City Razed (destroying a captured city): Max 150 base value ... (3x cost
- *  of capturing the city)" — which is exactly 3x the row above. */
-export const GRIEVANCE_CITY_RAZED = 3 * GRIEVANCE_CITY_TAKEN;
 /** "Captured the final city of a civilization: 150 (all remaining civs gain
  *  Grievances against you)". */
 export const GRIEVANCE_LAST_CITY = 150;
@@ -991,7 +996,7 @@ export const GRIEVANCE_FAVOR_MAX = 10;
  * formal wars' worth — so it moves with the sourced magnitudes rather than
  * standing on a number of its own.
  */
-export const GRIEVANCE_GANG = 2 * GRIEVANCE_WAR_FORMAL;
+export const GRIEVANCE_GANG = 2 * GRIEVANCE_WAR_BASE;
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
 }
