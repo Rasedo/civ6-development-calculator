@@ -13,7 +13,7 @@ import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
 import { governorMult } from './governors';
 import { getModifiers } from './effects';
-import { spawnUnit } from './units';
+import { spawnUnit, extraCharges } from './units';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -291,7 +291,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
     const u = spawnUnit(state, cls, where, seat);
     if (u) {
       u.gpAt = at;
-      u.charges = gpChargesOf(person);
+      u.charges = gpChargesOf(person) + extraCharges(state, seat, cls, state.map.tiles[where]);
     }
   }
 

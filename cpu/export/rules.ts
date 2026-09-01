@@ -9,7 +9,7 @@
  */
 
 
-import { TURN_LIMIT } from '../core/game';
+import { TURN_LIMIT, unitFaithCost } from '../core/game';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
@@ -283,7 +283,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
-  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60
+  mcost: unitFaithCost('MISSIONARY', def.effects.missionaryCostMult ?? 1),  // Holy Order 63, base 90
   impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),
   impRes: (() => {
     const rows = [0, 1, 2, 3].map(() => YIELD_KEYS.map(() => 0 as number));
@@ -846,13 +846,13 @@ export function buildRules() {
     beliefs: {
       // the missionary chassis anchors (read via rules.beliefs, like the
       // enhancer rows). Base values double as the GPU pad row (unenhanced civ):
-      // cost round(100·GAME_SPEED)=60 faith, lump SPREAD_PRESSURE=10, cap 2.
+      // cost `unitFaithCost` = 90 faith, lump SPREAD_PRESSURE=10, cap 2.
       missionaryIdx: Object.values(UNITS).findIndex((u) => u.id === 'MISSIONARY'),
-      missionaryCost: UNITS.MISSIONARY.cost,
+      missionaryCost: unitFaithCost('MISSIONARY'),
       spreadPressure: SPREAD_PRESSURE,
       missionaryCap: MISSIONARY_CAP,
       apostleIdx: Object.values(UNITS).findIndex((u) => u.id === 'APOSTLE'),
-      apostleCost: UNITS.APOSTLE.cost,
+      apostleCost: unitFaithCost('APOSTLE'),
       apostleCap: APOSTLE_CAP,
       relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
       cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // DEBT-2: inert pending its hunt
@@ -862,13 +862,13 @@ export function buildRules() {
       theoHolyGround: THEO_HOLY_GROUND_STRENGTH,
       theoHolyCity: THEO_HOLY_CITY_STRENGTH,
       inquisitorIdx: Object.values(UNITS).findIndex((u) => u.id === 'INQUISITOR'),
-      inquisitorCost: UNITS.INQUISITOR.cost,
+      inquisitorCost: unitFaithCost('INQUISITOR'),
       // CIV6 (Warrior Monk): bought with Faith only, "in a city that has a
       // majority religion with the Warrior Monks Follower Belief and a Holy
       // Site with a Temple". The belief is the CITY's, so the GPU needs its
       // catalog row and not just the buyer's own.
       warriorMonkIdx: Object.values(UNITS).findIndex((u) => u.id === 'WARRIOR_MONK'),
-      warriorMonkCost: UNITS.WARRIOR_MONK.cost,
+      warriorMonkCost: unitFaithCost('WARRIOR_MONK'),
       warriorMonkFollower: Object.keys(FOLLOWER_BELIEFS).indexOf('WARRIOR_MONKS'),
       inquisitorCap: INQUISITOR_CAP,
       apostlePromoOffer: APOSTLE_PROMO_OFFER,

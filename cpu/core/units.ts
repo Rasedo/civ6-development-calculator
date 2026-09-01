@@ -1390,23 +1390,25 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
 }
 
 /** CIV6: the Pyramids give every Builder an extra build charge, Serfdom and
- *  Public Works give it two more, and the Hagia Sophia gives every Missionary
- *  and Apostle an extra spread. All are paid at CREATION, so a unit that
- *  predates the wonder or the card keeps its own count. */
-function extraCharges(state: GameState, seat: number, unitType: string, at: Tile): number {
+ *  Public Works give it two more, the Hagia Sophia gives every Missionary
+ *  and Apostle an extra spread, and the Mausoleum gives the GREAT Engineer
+ *  one more (the game's clause matches the Great Person class, so a Military
+ *  Engineer gets nothing). All are paid at CREATION, so a unit that predates
+ *  the wonder or the card keeps its own count. */
+export function extraCharges(state: GameState, seat: number, unitType: string, at: Tile): number {
   if (unitType === 'BUILDER') {
     return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges
       + governorTileSum(state, at, (e) => e.builderCharges);
   }
   if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
-  if (isEngineer(unitType)) return seatWonderSum(state, seat, 'engineerCharges');
+  if (isGreatEngineer(unitType)) return seatWonderSum(state, seat, 'engineerCharges');
   return 0;
 }
 
-/** The two chassis the Mausoleum's clause names: the Great Engineer and the
- *  Military Engineer. */
-export function isEngineer(unitType: string): boolean {
-  return unitType === 'ENGINEER' || unitType === 'MILITARY_ENGINEER';
+/** CIV6 (Mausoleum): "Great Engineers have an additional charge" — the one
+ *  chassis the clause reaches. */
+export function isGreatEngineer(unitType: string): boolean {
+  return unitType === 'ENGINEER';
 }
 
 export function spawnUnit(

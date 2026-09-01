@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MP_SCALE } from '../../../cpu/data/constants';
+import { MP_SCALE, FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { spawnUnit, concertVenue, performConcert } from '../../../cpu/core/units';
@@ -211,7 +211,7 @@ describe('the progressive faith price', () => {
   it('needs the civic, charges faith, and each band raises the next price', () => {
     const { state, mine } = twoSeatGame();
     const own = seatOf(state, 0)!;
-    const base = UNITS.ROCK_BAND.cost;
+    const base = UNITS.ROCK_BAND.cost * FAITH_PURCHASE_MULT; // Cost 300 -> 600 faith at Standard
     own.faith = base * 10;
 
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(false); // no civic yet
@@ -221,11 +221,11 @@ describe('the progressive faith price', () => {
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
     expect(own.faith).toBe(base * 10 - base);
     expect(own.rockBandsBought).toBe(1);
-    expect(rockBandCost(state, 0)).toBe(base + ROCK_BAND_COST_STEP);
+    expect(rockBandCost(state, 0)).toBe(base + ROCK_BAND_COST_STEP * FAITH_PURCHASE_MULT);
 
     const before = own.faith;
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
-    expect(own.faith).toBe(before - (base + ROCK_BAND_COST_STEP));
+    expect(own.faith).toBe(before - (base + ROCK_BAND_COST_STEP * FAITH_PURCHASE_MULT));
     expect(own.rockBandsBought).toBe(2);
 
     const bought = state.units.filter((u) => u.type === 'ROCK_BAND' && u.seat === 0);

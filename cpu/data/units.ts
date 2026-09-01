@@ -365,7 +365,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'MISSIONARY',
       name: 'Missionary',
-      cost: 100, // ×GAME_SPEED → 60 faith (faith-only; never a production cost)
+      cost: 75, // Units.xml Cost; faith-only, priced by `unitFaithCost`
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -415,7 +415,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'APOSTLE',
       name: 'Apostle',
-      cost: 400, // ×GAME_SPEED → 240 faith (faith-only; never a production cost)
+      cost: 200, // Units.xml Cost; faith-only, priced by `unitFaithCost`
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian: never garrisons, flanks, supports or fights normal combat
@@ -503,8 +503,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     // The NATURALIST, sourced from the GS Civilopedia via the wiki — a MODERN
     // civilian behind the CONSERVATION civic, 4 moves, bought with FAITH ONLY
-    // ("It can only be purchased with Faith in any city"), 600 faith at GS
-    // prices and progressive, consumed when it designates a National Park.
+    // ("It can only be purchased with Faith in any city"), Cost 300 at GS
+    // (600 faith) and progressive, consumed when it designates a National Park.
     // APPENDED LAST (roster order is the GPU's unit index).
     U({
       id: 'NATURALIST',
@@ -591,7 +591,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'INQUISITOR',
       name: 'Inquisitor',
-      cost: 100, // ×GAME_SPEED faith (faith-only; never a production cost)
+      cost: 75, // Units.xml Cost; faith-only, priced by `unitFaithCost`
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -1265,7 +1265,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'WARRIOR_MONK',
       name: 'Warrior Monk',
-      cost: 200,
+      cost: 100, // Units.xml Cost; faith-only, priced by `unitFaithCost`
       maintenance: 2,
       moves: 3,
       combat: 40,
@@ -1428,13 +1428,13 @@ export const ROCK_BAND_TIER_ODDS: readonly (readonly number[])[] = [
   [163, 214, 251, 214, 116, 42],
 ];
 export const ROCK_BAND_MAX_LEVEL = 4;
-/** CIV6: the faith "cost is progressive" — each band this seat has bought
- *  raises the next one's price by its base. */
 /** CIV6 (Expansion2_Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): each copy
- *  already bought raises the next one's FAITH price by a flat step — the
- *  Rock Band and the Naturalist both pay 300 base + 50 per previous copy. */
-export const ROCK_BAND_COST_STEP = 50;
-export const NATURALIST_COST_STEP = 50;
+ *  already bought raises the next one's Cost by a flat 50 — the Rock Band's
+ *  and the Naturalist's, both at Cost 300. The FAITH price is that Cost at
+ *  `FAITH_PURCHASE_MULT`, so a seat pays 600, then 700, then 800 at Standard
+ *  speed; the step rides `GAME_SPEED` exactly as the base does. */
+export const ROCK_BAND_COST_STEP = Math.round(50 * GAME_SPEED);
+export const NATURALIST_COST_STEP = Math.round(50 * GAME_SPEED);
 
 /**
  * THE GIANT DEATH ROBOT'S FUTURE-ERA UPGRADES. CIV6: the chassis "gains

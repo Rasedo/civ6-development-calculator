@@ -59,6 +59,7 @@ def main() -> None:
     apadana = _find(rows, lambda r: r["envoysPerWonder"] > 0, "wonder paying envoys per wonder")
     hagia = _find(rows, lambda r: r["spreadCharges"] > 0, "wonder granting spread charges")
     pyramids = _find(rows, lambda r: r["buildCharges"] > 0, "wonder granting build charges")
+    mausoleum = _find(rows, lambda r: r["engineerCharges"] > 0, "wonder granting engineer charges")
     arsenal = _find(rows, lambda r: r["dupNaval"], "wonder duplicating a naval train")
     basils = _find(rows, lambda r: r["relicTourismMult"] != 1, "wonder doubling relic tourism")
     cristo = _find(rows, lambda r: r["resortTourismMult"] != 1, "wonder doubling resort tourism")
@@ -186,7 +187,15 @@ def main() -> None:
     plant(s8, 0, 0, hagia)
     assert int(s8._extra_charges(0, ti_a)[0]) == 1, "the Hagia Sophia gives every Apostle one more spread"
     assert int(s8._extra_charges(1, ti_a)[0]) == 0, "and only to its owner"
-    print("  charges OK — builder and spread, per owner, at creation")
+    # CIV6 (Mausoleum): "Great Engineers have an additional charge" — the
+    # Great Person, never the Military Engineer chassis
+    ti_gp = torch.full((s8.B,), int(s8._gp_class_unit[s8._gp_engineer_cls]), dtype=torch.long)
+    ti_mil = torch.full((s8.B,), s8._eng_idx, dtype=torch.long)
+    assert int(s8._extra_charges(0, ti_gp)[0]) == 0, "no Mausoleum, no extra charge"
+    plant(s8, 0, 0, mausoleum)
+    assert int(s8._extra_charges(0, ti_gp)[0]) == 1, "the Mausoleum gives the Great Engineer one more charge"
+    assert int(s8._extra_charges(0, ti_mil)[0]) == 0, "and the Military Engineer nothing"
+    print("  charges OK — builder, spread and Great Engineer, per owner, at creation")
 
     # --- 9) free research completes the FIRST available rows ----------------
     s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))

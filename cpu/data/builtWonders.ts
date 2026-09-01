@@ -372,7 +372,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 400,
       requiresCivic: 'DEFENSIVE_TACTICS', placement: { adjacentDistrict: 'HARBOR' },
       effects: { tileYields: [{ terrain: 'COAST', yields: { science: 1, faith: 1, culture: 1 } }], engineerCharges: 1 },
-      description: "+1 science, +1 faith and +1 culture on this city's Coast tiles. Every Engineer gains a charge.",
+      description: "+1 science, +1 faith and +1 culture on this city's Coast tiles. Great Engineers have an additional charge.",
     }),
 
     W({

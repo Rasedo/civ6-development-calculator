@@ -21,7 +21,7 @@ import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from '../core/trade';
 import { isExplored } from '../core/fog';
-import { buildingFaithCost, endTurn, engineerFinishCity, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitPurchaseCost } from '../core/game';
+import { buildingFaithCost, endTurn, engineerFinishCity, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost, goldBuyableUnits } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
@@ -176,18 +176,18 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         && city.buildings.includes('TEMPLE') && hsOk(city));
       const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
       const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
-      const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
+      const mCost = unitFaithCost('MISSIONARY', eb?.missionaryCostMult ?? 1);
       if (shrineCity && liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
         religKind = 5;
         religC = shrineCity.centerIndex;
       } else if (templeCity) {
         const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
         const liveQ = state.units.filter((u) => u.seat === actor.seat && u.type === 'INQUISITOR').length;
-        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
+        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, unitFaithCost('APOSTLE'))) {
           religKind = 6;
           religC = templeCity.centerIndex;
         } else if (actor.religion.inquisition && liveQ < INQUISITOR_CAP
-          && goldAffordable(actor.faith ?? 0, Math.round(UNITS.INQUISITOR.cost))) {
+          && goldAffordable(actor.faith ?? 0, unitFaithCost('INQUISITOR'))) {
           religKind = 11;
           religC = templeCity.centerIndex;
         }

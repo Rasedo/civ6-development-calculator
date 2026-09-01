@@ -1061,18 +1061,18 @@ class SimInit:
         # both engines read the identical value; the pad row (index 0 = no
         # enhancer) carries the BASE cost/lump, unlike the additive zero pads of
         # the other channels.
-        _mcost0 = float(_bl.get("missionaryCost", 60))
+        _mcost0 = float(_bl["missionaryCost"])
         _mlump0 = int(_bl.get("spreadPressure", 10))
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
-        self._apostle_cost = float(_bl.get("apostleCost", 200))
+        self._apostle_cost = float(_bl["apostleCost"])
         self._apostle_cap = int(_bl.get("apostleCap", 1))
         self._inquisitor_idx = int(_bl.get("inquisitorIdx", -1))
-        self._inquisitor_cost = float(_bl.get("inquisitorCost", 100))
+        self._inquisitor_cost = float(_bl["inquisitorCost"])
         self._inquisitor_cap = int(_bl.get("inquisitorCap", 2))
         self._monk_idx = int(_bl.get("warriorMonkIdx", -1))
-        self._monk_cost = float(_bl.get("warriorMonkCost", 200))
+        self._monk_cost = float(_bl["warriorMonkCost"])
         self._monk_follower = int(_bl.get("warriorMonkFollower", -1))
         self._apostle_promo_offer = int(_bl.get("apostlePromoOffer", 3))
         self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))

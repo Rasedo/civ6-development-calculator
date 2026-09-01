@@ -1276,16 +1276,17 @@ class SimSeats:
         return ok, slot
 
     def _rock_band_cost(self, row: int) -> torch.Tensor:
-        """[B] f64 — `rockBandCost`'s twin: base + a flat step per band."""
+        """[B] f64 — `rockBandCost`'s twin: (base + a flat step per band) at
+        the faith purchase multiplier."""
         base = float(self._type_cost[self._band_idx]) if getattr(self, "_band_idx", -1) >= 0 else 0.0
-        return base + self.civ_rock_bands[:, row].double() * self._band_cost_step
+        return (base + self.civ_rock_bands[:, row].double() * self._band_cost_step) * self.rules.faith_purchase_mult
 
     def _naturalist_cost(self, row: int) -> torch.Tensor:
         """[B] f64 — `naturalistCost`'s twin: the same progression shape."""
         if getattr(self, "_naturalist_idx", -1) < 0:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         base = float(self._type_cost[self._naturalist_idx])
-        return base + self.civ_naturalists[:, row].double() * self._naturalist_cost_step
+        return (base + self.civ_naturalists[:, row].double() * self._naturalist_cost_step) * self.rules.faith_purchase_mult
 
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
@@ -6940,15 +6941,10 @@ class SimSeats:
         cur[rows] += 1
 
     def _engineer_types(self, type_idx: torch.Tensor) -> torch.Tensor:
-        """the two chassis the Mausoleum's clause names — the GREAT ENGINEER
-        and the MILITARY ENGINEER. `isEngineer`'s twin."""
-        out = torch.zeros_like(type_idx, dtype=torch.bool)
+        """CIV6 (Mausoleum): "Great Engineers have an additional charge" — the
+        one chassis the clause reaches. `isGreatEngineer`'s twin."""
         gi = int(self._gp_class_unit[self._gp_engineer_cls]) if self._gp_engineer_cls >= 0 else -1
-        if gi >= 0:
-            out = out | (type_idx == gi)
-        if getattr(self, "_eng_idx", -1) >= 0:
-            out = out | (type_idx == self._eng_idx)
-        return out
+        return type_idx == gi if gi >= 0 else torch.zeros_like(type_idx, dtype=torch.bool)
 
     def _no_settlers(self, row: int) -> torch.Tensor:
         """[B] bool — CIV6 (Isolationism): "Can't train or buy Settlers nor

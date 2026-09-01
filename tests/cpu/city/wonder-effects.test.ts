@@ -6,7 +6,10 @@ import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { computeCityStats, computeHousing, seatTourism, seatTourismReligious } from '../../../cpu/core/city';
-import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
+import { greatPersonPointsPerTurn, patronizeGreatPerson } from '../../../cpu/core/greatPeople';
+import { GREAT_PEOPLE, GP_CLASSES, gpChargesOf } from '../../../cpu/data/greatPeople';
+import { spawnUnit } from '../../../cpu/core/units';
+import { UNITS } from '../../../cpu/data/units';
 import { wonderExtraSlots } from '../../../cpu/core/effects';
 import { terrainDefense } from '../../../cpu/core/combat';
 import { seatWonderSum, seatWonderFlag } from '../../../cpu/core/wonders';
@@ -227,6 +230,35 @@ describe('wonder effects, sourced', () => {
     expect(greatPersonPointsPerTurn(state, 0).SCIENTIST).toBe(before + 2);
     // a class whose district the city does NOT hold is paid nothing
     expect(greatPersonPointsPerTurn(state, 0).MERCHANT).toBe(0);
+  });
+
+  it('the Mausoleum’s charge reaches the GREAT Engineer only — standing or recruited', () => {
+    // CIV6 (Mausoleum at Halicarnassus): "Great Engineers have an additional
+    // charge." The game's clause matches the Great Person class, so the
+    // Military Engineer chassis keeps its own two.
+    expect(BUILT_WONDERS.MAUSOLEUM_AT_HALICARNASSUS.effects?.engineerCharges).toBe(1);
+    const { state, city } = oneCity();
+    const seat = seatOf(state, 0)!;
+    const gp = spawnUnit(state, 'ENGINEER', tileAtCoords(state.map, 7, 8).index, 0)!;
+    gp.gpAt = 0;
+    gp.charges = gpChargesOf(GREAT_PEOPLE.ENGINEER[0]);
+    const mil = spawnUnit(state, 'MILITARY_ENGINEER', tileAtCoords(state.map, 8, 7).index, 0)!;
+    expect(mil.charges).toBe(UNITS.MILITARY_ENGINEER.charges);
+    const wt = stand(state, city, 'MAUSOLEUM_AT_HALICARNASSUS', 9, 8);
+    completeQueueItem(state, city,
+      { kind: 'wonder', wonder: 'MAUSOLEUM_AT_HALICARNASSUS', tileIndex: wt, progress: 0 }, 0);
+    expect(gp.charges).toBe(gpChargesOf(GREAT_PEOPLE.ENGINEER[0]) + 1);
+    expect(mil.charges).toBe(UNITS.MILITARY_ENGINEER.charges);
+    // a Great Engineer recruited AFTER the wonder stands is born with the extra
+    const ci = GP_CLASSES.indexOf('ENGINEER');
+    (state.gpOffer ??= GP_CLASSES.map(() => -1))[ci] = 1;
+    (state.gpPrice ??= GP_CLASSES.map(() => 0))[ci] = 0;
+    seat.faith = 10_000;
+    expect(patronizeGreatPerson(state, 0, ci, 'faith').ok).toBe(true);
+    const born = state.units.find((u) => u.type === 'ENGINEER' && u.gpAt === 1)!;
+    expect(born.charges).toBe(gpChargesOf(GREAT_PEOPLE.ENGINEER[1]) + 1);
+    const trained = spawnUnit(state, 'MILITARY_ENGINEER', tileAtCoords(state.map, 8, 9).index, 0)!;
+    expect(trained.charges).toBe(UNITS.MILITARY_ENGINEER.charges);
   });
 
   it('the Great Library boosts every Ancient and Classical technology', () => {

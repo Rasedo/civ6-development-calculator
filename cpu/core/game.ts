@@ -538,10 +538,13 @@ export function faithBuysLandUnits(state: GameState, seat: number): boolean {
   return citiesOf(state, seat).some((c) => c.buildings.some((b) => BUILDINGS[b]?.faithBuyUnits));
 }
 
-/** the faith price of a land combat unit — the one published faith rate, the
- *  same `FAITH_PURCHASE_MULT` a building is bought at. */
-export function unitFaithCost(unitType: string): number {
-  return (UNITS[unitType]?.cost ?? 0) * FAITH_PURCHASE_MULT;
+/** the faith price of a unit — its Cost at the one published faith rate, the
+ *  same `FAITH_PURCHASE_MULT` a building is bought at. CIV6: the faith-only
+ *  chassis (Missionary, Apostle, Inquisitor, Warrior Monk) price the same
+ *  way — Cost 75/200/75/100 buys at 150/400/150/200 on Standard speed. Holy
+ *  Order's discount rides the Missionary's. */
+export function unitFaithCost(unitType: string, mult = 1): number {
+  return Math.round((UNITS[unitType]?.cost ?? 0) * FAITH_PURCHASE_MULT * mult);
 }
 
 /** CIV6 (Flower Power): "The cost of producing and purchasing land units
@@ -960,9 +963,7 @@ export function purchaseReligiousUnit(
   const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
   if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
-  const cost = unitType === 'MISSIONARY'
-    ? Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1))
-    : Math.round(UNITS[unitType].cost);
+  const cost = unitFaithCost(unitType, unitType === 'MISSIONARY' ? (eb?.missionaryCostMult ?? 1) : 1);
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   // CIV6 (Missionary / Apostle / Inquisitor): purchased "in a city that has a
   // majority religion and a Holy Site" with the tier's building — the
@@ -1007,7 +1008,7 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = Math.round(UNITS.WARRIOR_MONK.cost);
+  const cost = unitFaithCost('WARRIOR_MONK');
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1111,16 +1112,17 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
   return { ok: true };
 }
 
-/** the live faith price: base + a flat step per band already bought. */
+/** the live faith price: (base + a flat step per band already bought) at
+ *  the faith purchase multiplier. */
 export function rockBandCost(state: GameState, seat: number): number {
   const bought = seatOf(state, seat)?.rockBandsBought ?? 0;
-  return UNITS.ROCK_BAND.cost + bought * ROCK_BAND_COST_STEP;
+  return (UNITS.ROCK_BAND.cost + bought * ROCK_BAND_COST_STEP) * FAITH_PURCHASE_MULT;
 }
 
 /** the live faith price of a Naturalist — the same progression shape. */
 export function naturalistCost(state: GameState, seat: number): number {
   const bought = seatOf(state, seat)?.naturalistsBought ?? 0;
-  return UNITS.NATURALIST.cost + bought * NATURALIST_COST_STEP;
+  return (UNITS.NATURALIST.cost + bought * NATURALIST_COST_STEP) * FAITH_PURCHASE_MULT;
 }
 
 /**

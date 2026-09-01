@@ -7,6 +7,7 @@ import {
 } from '../../../cpu/core/units';
 import { markAntiquitySite, markShipwreck } from '../../../cpu/core/combat';
 import { purchaseNaturalist, naturalistCost } from '../../../cpu/core/game';
+import { FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { seatTourism, parkAmenities } from '../../../cpu/core/city';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { museumThemed, THEMING_MULT, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_TOURISM, artifactTourism } from '../../../cpu/data/greatPeople';
@@ -74,7 +75,7 @@ describe('the Naturalist and the National Park', () => {
     expect(seat.faith).toBe(before - price);
     // CIV6 (Naturalist): the faith cost is progressive — each one bought
     // raises the next price by the game table's 50.
-    expect(naturalistCost(state, 0)).toBe(price + NATURALIST_COST_STEP);
+    expect(naturalistCost(state, 0)).toBe(price + NATURALIST_COST_STEP * FAITH_PURCHASE_MULT);
     expect(state.units.some((u) => u.type === 'NATURALIST' && u.seat === 0)).toBe(true);
   });
 

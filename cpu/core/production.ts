@@ -8,7 +8,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
-import { isEngineer } from './units';
+import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
 import { governorFlag, governorSum } from './governors';
 import { DISTRICTS } from '../data/districts';
@@ -250,7 +250,7 @@ export function completeQueueItem(
       // not just the ones born after it.
       if (fx?.engineerCharges) {
         for (const u of state.units) {
-          if (unitSeat(u) === owner.seat && isEngineer(u.type)) u.charges = (u.charges ?? 0) + fx.engineerCharges;
+          if (unitSeat(u) === owner.seat && isGreatEngineer(u.type)) u.charges = (u.charges ?? 0) + fx.engineerCharges;
         }
       }
       // CIV6 (Apadana): +2 envoys each time ANY wonder completes in its city,

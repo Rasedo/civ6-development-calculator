@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { allCities, seatOf, setWar, emptySeat } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs, expandBorders } from '../helpers';
-import { purchaseReligiousUnit } from '../../../cpu/core/game';
+import { purchaseReligiousUnit, unitFaithCost } from '../../../cpu/core/game';
 import { spawnUnit, trainableUnits, unitVisibleTo } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, siegeAssist, ASSIST_RAM } from '../../../cpu/core/combat';
 import { refreshUnits } from '../../../cpu/core/units';
@@ -204,7 +204,7 @@ describe('the Warrior Monk itself', () => {
     seatOf(state, 0)!.religion.follower = 'WARRIOR_MONKS';
     const faith0 = seatOf(state, 0)!.faith!;
     expect(purchaseReligiousUnit(state, city.id, 'WARRIOR_MONK', 0).ok).toBe(true);
-    expect(seatOf(state, 0)!.faith).toBe(faith0 - UNITS.WARRIOR_MONK.cost);
+    expect(seatOf(state, 0)!.faith).toBe(faith0 - unitFaithCost('WARRIOR_MONK'));
     expect(state.units.some((u) => u.type === 'WARRIOR_MONK' && u.seat === 0)).toBe(true);
   });
 

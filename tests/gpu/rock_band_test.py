@@ -281,16 +281,17 @@ def test_concert(rules) -> None:
 
 
 def test_progressive_price(rules) -> None:
-    """`rockBandCost`'s twin: base + a step per band already bought, and the
-    candidate needs the civic and the purse."""
+    """`rockBandCost`'s twin: (base + a step per band already bought) at the
+    faith purchase multiplier, and the candidate needs the civic and the purse."""
     sim = build(rules)
-    base = float(sim._type_cost[sim._band_idx])
+    fm = sim.rules.faith_purchase_mult
+    base = float(sim._type_cost[sim._band_idx]) * fm
     civ_i = int(sim._type_civic[sim._band_idx])
     assert civ_i >= 0, "the chassis names no enabling civic"
     sim.civ_rock_bands.zero_()
     assert float(sim._rock_band_cost(0)[0]) == base
     sim.civ_rock_bands[0, 0] = 2
-    assert float(sim._rock_band_cost(0)[0]) == base + 2 * sim._band_cost_step, (
+    assert float(sim._rock_band_cost(0)[0]) == base + 2 * sim._band_cost_step * fm, (
         "the price is not progressive")
 
     sim.civ_rock_bands.zero_()
@@ -305,7 +306,7 @@ def test_progressive_price(rules) -> None:
     sim.civ_faith[0, 0] = base - 1
     ok, _ = sim._seat_rock_band_candidate(0, one)
     assert not bool(ok[0]), "a purse short of the live price still bought"
-    print(f"  progressive price OK: base {base:.0f}, +{sim._band_cost_step} faith per band bought")
+    print(f"  progressive price OK: base {base:.0f}, +{sim._band_cost_step * fm:.0f} faith per band bought")
 
 
 def main() -> None:
