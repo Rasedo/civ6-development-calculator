@@ -2739,6 +2739,19 @@ class SimInit:
         self._py_amt = _col(3, dtype)
         self._py_terr, self._py_hills, self._py_imp, self._py_feat = _col(4, torch.long), _col(5, torch.long), _col(6, torch.long), _col(7, torch.long)
         self._py_anyimp, self._py_civic, self._py_mtn, self._py_era = _col(8, torch.long), _col(9, torch.long), _col(10, torch.long), _col(11, torch.long)
+        # the roster's other data families (`PROD_MULT_ROWS`, `DISTRICT_ADJ_ROWS`,
+        # `INTL_ROUTE_YIELD_ROWS`, `ROUTE_CAPACITY_ROWS`): python lists of
+        # tuples, each site reads the columns it needs
+        _pcl = list(rules.promo_classes)
+        self._prod_mult_rows: list[tuple[int, int, int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), int(r[3]), (_pcl.index(r[4]) if r[4] in _pcl else -1), float(r[5]))
+            for r in _uq["prodMults"]]
+        self._district_adj_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["districtAdj"]]
+        self._intl_route_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
+        self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
         # the naval MELEE line (`navalMelee`): a hull with no ranged strength
         # that is neither a raider nor a carrier
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)

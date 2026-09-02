@@ -17,7 +17,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocksIn, isCivicComplete, type Unlocks } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocksIn, isCivicComplete, type Unlocks , prodMultFor } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -2094,6 +2094,8 @@ export function seatPhase(state: GameState): void {
         // towards buildings in this district."
         const _udtD = congressUdtProdDistrict(state);
         if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
+        // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
+        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { building: q.building, district: BUILDINGS[q.building]?.district });
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
@@ -2108,6 +2110,8 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         // melee units."
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
+        // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
+        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { promoClass: promoClassOf(q.unit) });
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
         // CIV6 (Iteru): "+15% Production towards Districts and Wonders built

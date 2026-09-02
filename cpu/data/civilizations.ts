@@ -4,6 +4,7 @@
  * rule body that spends each lives beside the mechanic it touches.
  */
 import type { ImprovementId, TerrainId, FeatureId } from '../../world/types';
+import type { DistrictId } from '../core/types';
 import type { YieldKey } from '../core/types';
 import type { Era } from './techs';
 import type { CivId, LeaderId } from './seats';
@@ -113,3 +114,88 @@ export const PLOT_YIELD_ROWS: readonly PlotYieldRow[] = [
   { civ: 'RUSSIA', yield: 'faith', amount: 1, terrain: 'TUNDRA', hills: true },
   { civ: 'RUSSIA', yield: 'production', amount: 1, terrain: 'TUNDRA', hills: true },
 ];
+
+/**
+ * CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION / EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION):
+ * a percentage on the city's Production toward an item — a named building,
+ * every building of a district, or every unit of a promotion class (the
+ * Ottomans' Siege line, every era). Multiplicative on the seat's stack, the
+ * way the Iteru and Thunderbolt clauses are.
+ */
+export interface ProdMultRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  building?: string;
+  district?: DistrictId;
+  promoClass?: string;
+  pct: number;
+}
+export const PROD_MULT_ROWS: readonly ProdMultRow[] = [
+  // CIV6 (Workshop of the World): "+20% Production towards Industrial Zone buildings."
+  { civ: 'ENGLAND', district: 'INDUSTRIAL_ZONE', pct: 20 },
+  // CIV6 (Strength in Unity): "+50% Production towards walls" — the three tiers
+  { civ: 'GEORGIA', building: 'ANCIENT_WALLS', pct: 50 },
+  { civ: 'GEORGIA', building: 'MEDIEVAL_WALLS', pct: 50 },
+  { civ: 'GEORGIA', building: 'RENAISSANCE_WALLS', pct: 50 },
+  // CIV6 (Grote Rivieren): "+50% Production towards the Flood Barrier."
+  { civ: 'NETHERLANDS', building: 'FLOOD_BARRIER', pct: 50 },
+  // CIV6 (Great Turkish Bombard): "+50% Production towards siege units."
+  { civ: 'OTTOMAN', promoClass: 'SIEGE', pct: 50 },
+];
+
+/** CIV6 (EFFECT_DISTRICT_ADJACENCY, Meiji Restoration): "+1 standard adjacency
+ *  bonus to all districts from adjacent districts" — the district's own yield,
+ *  +amount per adjacent district. */
+export interface DistrictAdjRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  district: DistrictId;
+  amount: number;
+}
+export const DISTRICT_ADJ_ROWS: readonly DistrictAdjRow[] = [
+  { civ: 'JAPAN', district: 'HOLY_SITE', amount: 1 },
+  { civ: 'JAPAN', district: 'CAMPUS', amount: 1 },
+  { civ: 'JAPAN', district: 'HARBOR', amount: 1 },
+  { civ: 'JAPAN', district: 'COMMERCIAL_HUB', amount: 1 },
+  { civ: 'JAPAN', district: 'THEATER_SQUARE', amount: 1 },
+  { civ: 'JAPAN', district: 'INDUSTRIAL_ZONE', amount: 1 },
+];
+
+/** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): a flat yield on
+ *  the seat's own international routes. Cleopatra's +4 Gold rides its own
+ *  clause; the Intercontinental rows (Spain) wait on a continent model. */
+export interface RouteYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  amount: number;
+}
+export const INTL_ROUTE_YIELD_ROWS: readonly RouteYieldRow[] = [
+  // CIV6 (Radio Oranje): "+2 Culture from international Trade Routes."
+  { leader: 'WILHELMINA', yield: 'culture', amount: 2 },
+];
+
+/** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): +1 Trade Route capacity under a
+ *  clause — a tech held with a capital standing (Nîhithaw), the Government
+ *  Plaza and each of its building tiers (Founder of Carthage). */
+export interface RouteCapacityRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  tech?: string;
+  needsCapital?: boolean;
+  govPlaza?: boolean;
+  govTier?: number;
+}
+export const ROUTE_CAPACITY_ROWS: readonly RouteCapacityRow[] = [
+  { civ: 'CREE', amount: 1, tech: 'POTTERY', needsCapital: true },
+  { leader: 'DIDO', amount: 1, govPlaza: true },
+  { leader: 'DIDO', amount: 1, govTier: 1 },
+  { leader: 'DIDO', amount: 1, govTier: 2 },
+  { leader: 'DIDO', amount: 1, govTier: 3 },
+];
+
+/** Does a roster row name this seat? */
+export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | null, leader: string | null): boolean {
+  return row.civ !== undefined ? row.civ === civ : row.leader === leader;
+}

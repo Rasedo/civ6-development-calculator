@@ -2131,6 +2131,12 @@ class SimEconomy:
         for _bi, _civ, _vdi, _src, _amt in self._bvar_adj:
             if _vdi == di:
                 raw = raw + _amt * self._bvar_bldg_plane(_bi, _civ).to(self.dtype) * self._adj_woods_count().to(self.dtype)
+        # CIV6 (Meiji Restoration): "+1 standard adjacency bonus to all
+        # districts from adjacent districts" — the roster's district rows,
+        # on the tiles a matching seat owns (`DISTRICT_ADJ_ROWS`)
+        for _rc, _rl, _rdi, _ramt in self._district_adj_rows:
+            if _rdi == di:
+                raw = raw + _ramt * self._who_tile_plane(_rc, _rl).to(self.dtype) * adjc
         if float(self._dyn_bwonder[di]) != 0:
             nbw = self.neigh
             nbwc = nbw.clamp(min=0)

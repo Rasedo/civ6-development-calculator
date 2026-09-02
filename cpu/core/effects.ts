@@ -1,6 +1,6 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
-import { PLOT_YIELD_ROWS, type PlotYieldRow } from '../data/civilizations';
+import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
@@ -141,6 +141,10 @@ export interface Modifiers {
   /** the roster's plot rows this seat holds NOW — its civilization's or
    *  leader's, with the civic and world-era gates already applied */
   plotYields: readonly PlotYieldRow[];
+  /** the roster's production percentages this seat holds */
+  prodMults: readonly ProdMultRow[];
+  /** the roster's international route yields this seat holds */
+  intlRouteYields: readonly RouteYieldRow[];
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -244,12 +248,26 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
   });
 }
 
+/** The product of a seat's production percentages that name this item. */
+export function prodMultFor(rows: readonly ProdMultRow[], item: { building?: string; district?: string; promoClass?: string }): number {
+  let m = 1;
+  for (const r of rows) {
+    const hit = r.building !== undefined ? r.building === item.building
+      : r.district !== undefined ? r.district === item.district
+      : r.promoClass !== undefined ? r.promoClass === item.promoClass : false;
+    if (hit) m *= 1 + r.pct / 100;
+  }
+  return m;
+}
+
 export function defaultModifiers(): Modifiers {
   return {
     improvementYields: {},
     civ: null,
     leader: null,
     plotYields: [],
+    prodMults: [],
+    intlRouteYields: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -442,6 +460,13 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.civ = civOf(state, seat);
   mods.leader = leaderOf(state, seat);
   mods.plotYields = plotYieldRowsFor(state, seat, mods.civ, mods.leader);
+  mods.prodMults = PROD_MULT_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
+  mods.intlRouteYields = INTL_ROUTE_YIELD_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
+  // CIV6 (Meiji Restoration): the district rows join the adjacency adds the
+  // cards write, so `districtAdjacency` reads one list
+  for (const r of DISTRICT_ADJ_ROWS) {
+    if (rowIsFor(r, mods.civ, mods.leader)) (mods.districtAdjacencyAdd[r.district] ??= []).push({ source: 'DISTRICT', amount: r.amount });
+  }
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
     applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);

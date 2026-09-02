@@ -5,8 +5,9 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
+import { BUILDINGS } from '../data/buildings';
 import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf } from './seats';
-import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD } from '../data/civilizations';
+import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isWater } from '../../world/query';
@@ -350,7 +351,26 @@ export function tradeCapacity(state: GameState, seat: number): number {
     }
   }
   return cap + cityStateTradeCapacityBonus(state, seat) + congressRouteCapacity(state, seat)
-    + gpPermOf(s, 'tradeCapacity');
+    + gpPermOf(s, 'tradeCapacity') + rosterRouteCapacity(state, seat);
+}
+
+/** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): the roster's capacity rows. */
+export function rosterRouteCapacity(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  if (!s) return 0;
+  const civ = civOf(state, seat);
+  const leader = leaderOf(state, seat);
+  const cities = citiesOf(state, seat);
+  let cap = 0;
+  for (const r of ROUTE_CAPACITY_ROWS) {
+    if (!rowIsFor(r, civ, leader)) continue;
+    if (r.tech !== undefined && !s.research.techs.includes(r.tech)) continue;
+    if (r.needsCapital && !cities.some((c) => c.isCapital)) continue;
+    if (r.govPlaza && !cities.some((c) => c.districts.some((d) => d.type === 'GOVERNMENT_PLAZA' && state.map.tiles[d.tileIndex].districtComplete))) continue;
+    if (r.govTier !== undefined && !cities.some((c) => c.buildings.some((b) => BUILDINGS[b]?.govTier === r.govTier))) continue;
+    cap += r.amount;
+  }
+  return cap;
 }
 
 export function specialtyDistricts(state: GameState, city: City): number {
@@ -386,6 +406,8 @@ export function routeYieldsInternational(state: GameState, dest: City, seat: num
   // "+2 Food for them" on anyone's route in.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INTL_ROUTE_GOLD;
   if (leaderOf(state, dest.seat) === 'CLEOPATRA') out.food += CLEOPATRA_INCOMING_ROUTE_FOOD;
+  // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
+  for (const r of getModifiers(state, seat).intlRouteYields) out[r.yield] += r.amount;
   return out;
 }
 

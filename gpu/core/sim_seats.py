@@ -984,6 +984,22 @@ class SimSeats:
         civ_at = self.row_civ.gather(1, r).reshape(seat.shape)
         return (seat >= 0) & (seat < self.n_majors) & (civ_at == i)
 
+    def _row_is(self, row: int, civ: int, leader: int) -> torch.Tensor:
+        """[B] bool — `rowIsFor`: the seat row plays civilization `civ`, or
+        roster row `leader` where the rule names a leader."""
+        if civ >= 0:
+            return self._row_plays_idx(row, civ)
+        if leader < 0 or row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.row_leader[:, row] == leader
+
+    def _who_tile_plane(self, civ: int, leader: int) -> torch.Tensor:
+        """[B, T] bool — tiles owned by a major that `_row_is` answers for."""
+        NM = self.n_majors
+        r = self.tile_seat.clamp(min=0, max=NM - 1)
+        key = self.row_civ.gather(1, r) if civ >= 0 else self.row_leader.gather(1, r)
+        return (self.tile_seat >= 0) & (self.tile_seat < NM) & (key == (civ if civ >= 0 else leader))
+
     def _leader_idx(self, leader: str) -> int:
         return self._pair_leader.index(leader) if leader in self._pair_leader else -1
 
@@ -5598,6 +5614,11 @@ class SimSeats:
                 snd_s = _wcp.double() @ self._wond_sender_sci
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
+            for _rc, _rl, _ry, _ra in self._intl_route_rows:
+                _who = self._row_is(row, _rc, _rl)
+                if bool(_who.any()):
+                    inc.scatter_add_(1, from_j * 6 + _ry, _ra * (pays_i & _who.unsqueeze(1)).double())
             if bool(_cleo_d.any()):
                 inc.scatter_add_(1, from_j * 6 + 0, self._cleo_in_food * (pays_i & _cleo_d).double())
             if snd_s is not None and bool((snd_s != 0).any()):
@@ -9707,7 +9728,34 @@ class SimSeats:
             trade_ti = int(self.rules.citystate.get("tradeIdx", -1))
             cap = cap + (self._suzerain_mask(row)[:, :S] & (self.citystate_type[:, :S] == trade_ti)).sum(dim=1)
         cap = cap + self._congress_route_capacity(row)
+        cap = cap + self._roster_route_capacity(row)
         return cap + self._gp_perm(row, "tradeCapacity").long()
+
+    def _roster_route_capacity(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): the roster's
+        capacity rows (`rosterRouteCapacity`): a tech held with a capital
+        standing, the Government Plaza, each plaza building tier."""
+        B, dev = self.B, self.device
+        cap = torch.zeros(B, dtype=torch.long, device=dev)
+        if not self._route_cap_rows:
+            return cap
+        alive = self.city_alive[:, row]
+        for _c, _l, _amt, _tech, _capn, _plaza, _tier in self._route_cap_rows:
+            who = self._row_is(row, _c, _l)
+            if _tech >= 0:
+                who = who & self.civ_techs[:, row, _tech]
+            if _capn:
+                who = who & (self.city_is_cap[:, row] & alive).any(dim=1)
+            if _plaza:
+                if self._govplaza_didx < 0:
+                    continue
+                pt = self.city_dist_tile[:, row, :, self._govplaza_didx]
+                who = who & ((pt >= 0) & alive & self.district_complete.gather(1, pt.clamp(min=0))).any(dim=1)
+            if _tier >= 0:
+                who = who & (self.city_bldg[:, row] & alive.unsqueeze(2)
+                             & (self._b_gov_tier == _tier).reshape(1, 1, -1)).any(dim=2).any(dim=1)
+            cap = cap + who.long() * _amt
+        return cap
 
     def _free_trader(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """The seat's FREE Trader on the LOWEST tile — `freeTrader`'s twin.
@@ -10143,6 +10191,8 @@ class SimSeats:
             # CIV6 (Mediterranean's Bride): the driver values Egypt's own +4 Gold
             # and the +2 Food a route INTO Egypt pays (`routeYieldsInternational`)
             ysum_ip = ysum_ip + int(self._cleo_intl_gold) * self._row_leads(row, "CLEOPATRA").long().unsqueeze(1)
+            for _rc, _rl, _ry, _ra in self._intl_route_rows:
+                ysum_ip = ysum_ip + int(_ra) * self._row_is(row, _rc, _rl).long().unsqueeze(1)
             ysum_ip = ysum_ip + int(self._cleo_in_food) * self._leads_vec("CLEOPATRA").gather(1, drow).long()
             key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
                                  torch.full((B, RC, D), -1, dtype=torch.long, device=dev))

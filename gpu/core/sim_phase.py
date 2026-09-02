@@ -533,6 +533,17 @@ class SimPhase:
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
             & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
         _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
+        # CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows —
+        # a named building or every building of a district
+        for _rc, _rl, _rb, _rd, _rp, _pct in self._prod_mult_rows:
+            if _rp >= 0:
+                continue
+            _who = self._row_is(row, _rc, _rl)
+            if not bool(_who.any()):
+                continue
+            _is_b = (cur >= 0) & (cur < self.NB)
+            _hit = (cur == _rb) if _rb >= 0 else (_is_b & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _rd))
+            _emall = torch.where(_hit & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
         # Project."
         if self._proj_rows:
@@ -581,6 +592,15 @@ class SimPhase:
         _hard = self._row_leads(row, "HARDRADA")
         if bool(_hard.any()):
             _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
+        # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
+        for _rc, _rl, _rb, _rd, _rp, _pct in self._prod_mult_rows:
+            if _rp < 0:
+                continue
+            _who = self._row_is(row, _rc, _rl)
+            if not bool(_who.any()):
+                continue
+            _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _rp)
+            _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
         _egypt = self._row_plays(row, "EGYPT")
