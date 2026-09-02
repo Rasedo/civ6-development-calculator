@@ -46,7 +46,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 
@@ -105,7 +105,15 @@ export function districtCost(state: GameState, seat: number, type?: DistrictId):
   // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
   if (type !== undefined && DISTRICTS[type]?.fixedCost) return Math.round(DISTRICTS[type].cost * GAME_SPEED);
   const base = districtCostIn(seatOf(state, seat)!.research);
-  return type !== undefined && districtDiscounted(state, seat, type) ? Math.floor(base * 0.6) : base;
+  const cost = type !== undefined && districtDiscounted(state, seat, type) ? Math.floor(base * 0.6) : base;
+  return type !== undefined ? districtVariantCost(state, seat, type, cost) : cost;
+}
+
+/** CIV6 (Bath): a civilization's unique district is "cheaper to build" —
+ *  the replaced row's price, scaled by the two Districts rows' Cost. */
+export function districtVariantCost(state: GameState, seat: number, type: DistrictId, cost: number): number {
+  const v = civVariantOf(state, seat, DISTRICTS[type]?.civVariants);
+  return v ? Math.floor(cost * v.cost / DISTRICTS[type].cost) : cost;
 }
 
 export function createGame(

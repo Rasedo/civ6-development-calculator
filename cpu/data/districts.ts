@@ -13,6 +13,7 @@
  */
 
 import type { PlunderRow, DistrictId, YieldKey } from '../core/types';
+import type { CivId } from './seats';
 
 export type AdjacencySource =
   | 'MOUNTAIN' // +amount per adjacent mountain
@@ -47,8 +48,20 @@ export interface AdjacencyRule {
   amount: number;
 }
 
+/** CIV6 (DistrictReplaces): a civilization's UNIQUE DISTRICT standing in for
+ *  this row — the same district in storage, with its own price, and the
+ *  flat Housing and Amenity its Districts row adds on top (the Bath). */
+export interface DistrictVariant {
+  civ: CivId;
+  name: string;
+  cost: number;
+  housing: number;
+  amenities: number;
+}
+
 export interface DistrictDef {
   id: DistrictId;
+  civVariants?: DistrictVariant[];
   /** an AMENITY this district pays per adjacent tile of one kind, which no
    *  other channel carries (the Aqueduct's Geothermal Fissure). */
   amenityAdjacent?: AdjacencyRule;
@@ -309,7 +322,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     name: 'Aqueduct',
     code: 'AQ',
     color: '#6fb8d8',
-    cost: 54,
+    cost: 36, // CIV6 (Districts.xml): 36, not the specialty districts' 54
+    // CIV6 (Bath): "Replaces the Aqueduct district and cheaper to build" —
+    // Cost 18, Housing 2, Entertainment 1 on top of the Aqueduct's water.
+    civVariants: [{ civ: 'ROME', name: 'Bath', cost: 18, housing: 2, amenities: 1 }],
     countsTowardLimit: false,
     adjacency: [],
     housing: 0, // housing handled specially (depends on existing fresh water)

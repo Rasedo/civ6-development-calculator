@@ -341,6 +341,8 @@ def main() -> int:
                 ("power", [py, "tests/gpu/power_test.py"], 4),  # GS POWER: demand, the plant's reach, Cardiff, the powered halves
                 ("climate", [py, "tests/gpu/climate_test.py"], 4),  # GS CLIMATE: carbon, the seven phases, the sea, the barrier, a warmed world's weather
                 ("engineer", [py, "tests/gpu/engineer_test.py"], 4),  # the Military Engineer: fort, airstrip, road, the 20% charge
+                ("uniques", [py, "tests/gpu/uniques_test.py"], 4),  # the roster's UNIQUE UNITS: who trains what, the chariots, the start-tile Movement, the Legion's Fort
+                ("uniques_infra", [py, "tests/gpu/uniques_infra_test.py"], 4),  # the UNIQUE INFRASTRUCTURE: the Bath, the Stave Church, the Sphinx, the Ziggurat
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

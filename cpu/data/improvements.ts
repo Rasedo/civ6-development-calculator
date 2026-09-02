@@ -9,6 +9,7 @@
 
 import type { DistrictId, ImprovementId, PlunderRow, Yields, YieldKey } from '../core/types';
 import type { Elevation, FeatureId, TerrainId } from '../../world/types';
+import type { CivId } from './seats';
 
 /**
  * What a neighbour pays a SUZERAIN improvement. Each row counts the
@@ -23,6 +24,8 @@ export interface ImpAdjacency {
   district?: DistrictId;
   /** count a neighbour holding ANY completed district. */
   anyDistrict?: boolean;
+  /** CIV6 (REQUIREMENT_PLOT_ADJACENT_TO_WONDER): per adjacent COMPLETED world wonder. */
+  builtWonder?: boolean;
   /** count a neighbour carrying one of these live features. */
   features?: FeatureId[];
   per: number;
@@ -43,6 +46,15 @@ export interface ImprovementDef {
   description: string;
   /** the CITY-STATE whose SUZERAIN may build it (a `CITY_STATE_SUZERAIN_BONUS` key). */
   suzerainOf?: string;
+  /** CIV6 (Civilizations.xml): a UNIQUE IMPROVEMENT — this civilization's
+   *  Builders alone lay it (`validImprovementsIn` / `_uniq_improvement_ok`). */
+  uniqueTo?: CivId;
+  /** CIV6 (Improvement_ValidFeatures): the ONLY features the row may stand
+   *  on; absent leaves the feature unchecked, as the older rows are. */
+  features?: FeatureId[];
+  /** CIV6 (a SINGLE_PLOT modifier): extra yields while standing on one of
+   *  these features (the Sphinx's Floodplains Culture). */
+  featureYields?: { features: FeatureId[]; yields: Partial<Yields> };
   /** terrain it may stand on; absent = any land. */
   terrains?: TerrainId[];
   /** terrain it refuses. */
@@ -402,5 +414,47 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     power: 2,
     terrains: ['COAST', 'LAKE'],
     description: 'Coast or Lake. Supplies 2 Power to its city from the wind.',
+  },
+  // CIV6 (Civilizations.xml): the roster's UNIQUE IMPROVEMENTS, each read off
+  // the install's Improvements tables.
+  SPHINX: {
+    id: 'SPHINX',
+    name: 'Sphinx',
+    code: 'Sx',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { faith: 1, culture: 1 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'EGYPT',
+    terrains: ['DESERT', 'TUNDRA', 'PLAINS', 'GRASSLAND'],
+    elevations: ['FLAT', 'HILLS'],
+    features: ['FLOODPLAINS'],
+    noAdjacentSame: true,
+    // CIV6 (SPHINX_WONDERADJACENCY_FAITH): "+2 Faith if next to a wonder"
+    adjacency: [{ builtWonder: true, per: 1, yields: { faith: 2 } }],
+    // CIV6 (SPHINX_FLOODPLAINS_CULTURE): "+1 Culture if built on Floodplains"
+    featureYields: { features: ['FLOODPLAINS'], yields: { culture: 1 } },
+    appealAdjacent: 2,
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +2 appeal around. Not beside another Sphinx.',
+  },
+  ZIGGURAT: {
+    id: 'ZIGGURAT',
+    name: 'Ziggurat',
+    code: 'Zg',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { science: 2 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'SUMERIA',
+    terrains: ['DESERT', 'TUNDRA', 'PLAINS', 'GRASSLAND', 'SNOW'],
+    elevations: ['FLAT'],
+    features: ['FLOODPLAINS'],
+    // CIV6 (ZIGGURAT_RIVERADJACENCY_CULTURE): "+1 Culture if next to River"
+    riverYields: { culture: 1 },
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+2 science, +1 culture beside a river. Flat ground, floodplains allowed.',
   },
 };

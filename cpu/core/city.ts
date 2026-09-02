@@ -29,7 +29,7 @@ import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
-import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
+import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -279,6 +279,32 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   return y;
 }
 
+/** CIV6 (Bath): the flat Amenity a civilization's unique district adds — per
+ *  complete, unpillaged instance ("Entertainment 1"). */
+export function districtVariantAmenities(state: GameState, city: City): number {
+  let n = 0;
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (!t.districtComplete || t.districtPillaged) continue;
+    n += civVariantOf(state, city.seat, DISTRICTS[d.type].civVariants)?.amenities ?? 0;
+  }
+  return n;
+}
+
+/** CIV6 (Stave Church): the yields a civilization's unique building pays on
+ *  every Coast tile of the city that carries a resource, summed over the
+ *  buildings the city holds. */
+export function buildingVariantCoastYields(state: GameState, city: City): Partial<Yields> | null {
+  let out: Partial<Yields> | null = null;
+  for (const id of city.buildings) {
+    const y = civVariantOf(state, city.seat, BUILDINGS[id]?.civVariants)?.coastResourceYields;
+    if (!y) continue;
+    out = out ?? {};
+    for (const k of Object.keys(y) as (keyof Yields)[]) out[k] = (out[k] ?? 0) + (y[k] ?? 0);
+  }
+  return out;
+}
+
 export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
   const m = mods ?? getModifiers(state, city.seat);
   const map = state.map;
@@ -298,6 +324,8 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   );
   if (hasAqueduct) {
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
+    // CIV6 (Bath): its Districts row adds "Housing 2" on top of the water
+    water += civVariantOf(state, city.seat, DISTRICTS.AQUEDUCT.civVariants)?.housing ?? 0;
   }
 
   const pillaged = pillagedDistrictTypes(map, city.districts);
@@ -799,7 +827,11 @@ export function computeCityStats(
   const hasLighthouse = city.buildings.includes('LIGHTHOUSE');
   const lighthouseBonus = (t: Tile) => {
     if (hasLighthouse && (t.terrain === 'COAST' || t.terrain === 'LAKE')) tiles.food += 1;
+    // CIV6 (Stave Church): "+1 Production to each coastal resource tile in
+    // this city" — a Coast tile carrying a resource, the same way.
+    if (coastResY && t.terrain === 'COAST' && t.resource !== null) addYields(tiles, coastResY);
   };
+  const coastResY = buildingVariantCoastYields(state, city);
   wonderTileBonus(center, true);
   waterMillBonus(center);
   lighthouseBonus(center);
@@ -955,6 +987,7 @@ export function computeCityStats(
     + gpCityPermOf(city, 'housing');
   let have =
     localAmenities(state, city) +
+    districtVariantAmenities(state, city) +
     parkAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +

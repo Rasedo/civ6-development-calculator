@@ -48,7 +48,7 @@ from the list below.
 | B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system |
 | B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six (the ledger's); the summed-yield key and one-candidate head are P8-surface |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
-| B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
+| B-67 the district price curve | 1 | `districtCostIn` prices EVERY district off the specialty base (54) and one GAME_PROGRESS-shaped curve, where the install gives each row its own base (Aqueduct 36, Canal and Dam 81, Government Plaza 30) and two progression models (AVG_PLUS_TECH 40 for the specialty rows, GAME_PROGRESS 1000 for the Neighborhood, Aqueduct, Canal and Dam); the unique districts scale off the replaced row's price, so they inherit the gap |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
@@ -65,7 +65,7 @@ from the list below.
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel — SOURCED (Chemistry, an adjacent mountain, a portal between tunnels at 2 Movement) and unbuilt: a movement portal is a new pathing class on both engines |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
-| C-26 civilization uniques | 4 | UNIQUE UNITS SHIP (Legion, Maryannu Chariot Archer, Berserker, Longship, War-Cart — every clause off the install's Units.xml / UnitAbilities; the Legion's Roman Fort rides the FORT row; a chariot class is cavalry but no anti-cavalry target). OPEN: the unique infrastructure (Bath, Stave Church, Sphinx, Ziggurat), the four civ abilities, the four leader abilities, and the agendas (DLL-scored, and neither engine holds an opinion scale); the Rock Band's four unique-district venue clauses wait here. REACH: the fixtures seat Rome, Egypt and Norway, so no gate lane reaches the War-Cart, and the driver never orders a Legion's Fort |
+| C-26 civilization uniques | 3 | UNIQUE INFRASTRUCTURE SHIPS (the Bath as Rome's Aqueduct — half price, +2 Housing, +1 Amenity; the Stave Church as Norway's Temple — a full Holy Site adjacency per Woods and +1 Production on coastal resource tiles; the Sphinx and the Ziggurat as Builder rows with every clause off the install's tables, the Sphinx's +2 Appeal included). UNIQUE UNITS SHIP (Legion, Maryannu Chariot Archer, Berserker, Longship, War-Cart — every clause off the install's Units.xml / UnitAbilities; the Legion's Roman Fort rides the FORT row; a chariot class is cavalry but no anti-cavalry target). OPEN: the four civ abilities, the four leader abilities, and the agendas (DLL-scored, and neither engine holds an opinion scale); the Rock Band's four unique-district venue clauses wait here. REACH: the fixtures seat Rome, Egypt and Norway, so no gate lane reaches the War-Cart or the Ziggurat, and the driver never orders a Legion's Fort; the engine has no resource VISIBILITY, so the Stave Church counts every coastal resource where the install counts the visible ones |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
@@ -74,8 +74,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
-| **C. Absent systems** | **20** | |
-| **OPEN, TOTAL** | **38** | |
+| **C. Absent systems** | **19** | |
+| **OPEN, TOTAL** | **37** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -485,12 +485,6 @@ Civ 6 source or is recorded as unverifiable.
   - Climate change ending fertilization at Phase IV, the Egyptian
     ability, the Soothsayer and COASTAL floods all wait on systems that
     do not exist here.
-- **B-36r. Appeal adjacency terms.** Every district AND improvement term
-  ships off one catalog column (`DistrictDef.appealAdjacent` /
-  `_appeal_adj`, `ImprovementDef.appealAdjacent` / `_imp_appeal_adj`), and
-  a Great Person can grant city-tile appeal (`gpAppealResolver` /
-  `_gp_appeal_plane`). OPEN: the CIVILIZATION-unique improvements' terms
-  (C-26).
 - **B-39r. Wonder effects still dropped.** The sourced sweep shipped
   fourteen channels, the Mausoleum's engineer charge and Cristo Redentor's
   shield. OPEN, each blocked: Apadana's "+2 Great Work slots (any type)"
@@ -1151,7 +1145,7 @@ under their blocker so the dependency is readable, and both halves count.
   unit and a unique piece of infrastructure; none of the five exists.
   Waiting on it: the Impi and Hypaspist stacks (B-54r), the Gauls'
   OPPIDUM, Ambiorix's and Saladin's leader terms, the Nihang's embarked
-  CS, America's Film Studio, the unique-improvement appeal terms (B-36r)
+  CS, America's Film Studio, the unique-improvement appeal terms (shipped with the Sphinx)
   and suzerain rows (B-21r), and the ROCK BAND's four unique-district
   venue clauses (Expansion2_UnitPromotions.xml: Arena Rock also reads the
   Street Carnival, Reggae Rock the Copacabana, Glam Rock the Acropolis,

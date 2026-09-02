@@ -2543,6 +2543,8 @@ class SimMasks:
                     _ok = here_ok & self._seaside_ok().gather(1, tc) & _unl
                 elif self._imp_suz[_k]:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
+                elif self._imp_uniq[_k] >= 0:
+                    _ok = here_ok & self._uniq_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_eng[_k]:
                     _who = (utype == self._eng_idx) & _unl
                     if _k == self.FORT:

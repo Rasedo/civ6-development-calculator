@@ -5,7 +5,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { seatOf, citiesOf, campTiles, isCiv } from './seats';
+import { civOf, seatOf, citiesOf, campTiles, isCiv } from './seats';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
@@ -33,7 +33,7 @@ export interface Unlocks {
 }
 
 const BASELINE = {
-  improvements: ['FARM'],
+  improvements: ['FARM', 'ZIGGURAT'], // CIV6 (Ziggurat): no prerequisite
   buildings: ['MONUMENT'],
 };
 
@@ -131,6 +131,8 @@ export interface Modifiers {
   farmAdjTier: number;
   /** the civics a suzerain improvement's adjacency rule may name. */
   impUpgrades: Set<string>;
+  /** the civilization the seat plays (`civOf`), for the unique rows' overlays */
+  civ: string | null;
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -220,6 +222,7 @@ export interface Modifiers {
 export function defaultModifiers(): Modifiers {
   return {
     improvementYields: {},
+    civ: null,
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -409,6 +412,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   const rel = s.religion;
 
   const mods = modifiersFromResearch(s.research);
+  mods.civ = civOf(state, seat);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
     applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);

@@ -31,6 +31,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'SURVEY' },
     ]),
     C('CRAFTSMANSHIP', 'Craftsmanship', 'Ancient', 40, ['CODE_OF_LAWS'], [
+      { kind: 'unlockImprovement', improvement: 'SPHINX' }, // CIV6 (Sphinx): PrereqCivic
       { kind: 'unlockPolicy', policy: 'AGOGE' },
       { kind: 'unlockPolicy', policy: 'ILKUM' },
     ]),
@@ -140,6 +141,10 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'WATER_PARK' },
       { kind: 'unlockBuilding', building: 'FERRIS_WHEEL' },
       { kind: 'unlockBuilding', building: 'AQUARIUM' },
+      // CIV6 (Improvement_BonusYieldChanges): the Sphinx and the Ziggurat
+      // each gain +1 Culture at Natural History.
+      { kind: 'improvementYields', improvement: 'SPHINX', yields: { culture: 1 } },
+      { kind: 'improvementYields', improvement: 'ZIGGURAT', yields: { culture: 1 } },
     ]),
     C('URBANIZATION', 'Urbanization', 'Industrial', 1210, ['CIVIL_ENGINEERING', 'NATIONALISM'], [
       { kind: 'unlockDistrict', district: 'NEIGHBORHOOD' },

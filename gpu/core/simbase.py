@@ -141,6 +141,7 @@ class Rules:
     b_river: torch.Tensor  # bool
     b_farmbonus: torch.Tensor  # bool — Water Mill: farm-improved BONUS resources gain +1 food
     b_coastfood: torch.Tensor  # bool — Lighthouse: +1 food on every Coast/Lake tile the city works
+    b_variants: list  # per building: [{civ, adjDist, adjSrc, adjAmt, coastResY}] — the unique building standing in for the row
     b_maxloy_culture: torch.Tensor  # bool — Monument: +1 culture while the city sits at max loyalty
     b_loyalty: torch.Tensor  # f64 — flat loyalty per turn while the building stands
     b_unlock: torch.Tensor  # tech index or -1
@@ -338,6 +339,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
         b_farmbonus=torch.tensor([b.get("farmBonusFood", 0) for b in B], dtype=torch.bool),
         b_coastfood=torch.tensor([b.get("coastFood", 0) for b in B], dtype=torch.bool),
+        b_variants=[list(b["variants"]) for b in B],
         b_maxloy_culture=torch.tensor([b.get("cultureAtMaxLoyalty", 0) for b in B], dtype=torch.bool),
         b_loyalty=torch.tensor([float(b.get("loyalty", 0)) for b in B], dtype=torch.float64),
         b_unlock=torch.tensor([b["unlockTech"] for b in B], dtype=torch.long),

@@ -1367,6 +1367,15 @@ export function buildRules() {
           // names which minor); the rest is its own ground rule and its
           // neighbours' payout, all catalog columns.
           suz: def.suzerainOf ? 1 : 0,
+          // THE UNIQUE ROWS: whose, and the civic (beside `unlock`'s tech) that opens them
+          uniq: def.uniqueTo ? CIV_IDS.indexOf(def.uniqueTo) : -1,
+          unlockCivic: civicList.findIndex((c) =>
+            c.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === id),
+          ),
+          feats: (def.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
+          featY: def.featureYields
+            ? { feats: def.featureYields.features.map((f) => FEAT_IDS.indexOf(f)), y: YIELD_KEYS.map((k) => def.featureYields!.yields[k] ?? 0) }
+            : null,
           terr: (def.terrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
           xterr: (def.excludeTerrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
           // 0 = FLAT, 1 = HILLS; MOUNTAIN is never improvable
@@ -1382,6 +1391,7 @@ export function buildRules() {
             bres: r.bonusResource ? 1 : 0,
             dist: r.district ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,
             anyd: r.anyDistrict ? 1 : 0,
+            bw: r.builtWonder ? 1 : 0,
             feats: (r.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
             per: r.per,
             y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
@@ -1470,6 +1480,10 @@ export function buildRules() {
         housing: d.housing,
         maintenance: d.maintenance,
         amenities: d.amenities ?? 0,
+        // a civilization's UNIQUE DISTRICT standing in for this row (the Bath)
+        variants: (d.civVariants ?? []).map((v) => ({
+          civ: CIV_IDS.indexOf(v.civ), costMult: v.cost / d.cost, housing: v.housing, amenities: v.amenities,
+        })),
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
         allowMultiple: d.allowMultiple ? 1 : 0,
         onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
@@ -1529,6 +1543,14 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
+      // a civilization's UNIQUE BUILDING standing in for this row (the Stave Church)
+      variants: (b.civVariants ?? []).map((v) => ({
+        civ: CIV_IDS.indexOf(v.civ),
+        adjDist: v.districtAdjacency ? PLACEABLE_DISTRICTS.indexOf(v.districtAdjacency.district) : -1,
+        adjSrc: v.districtAdjacency?.source ?? '',
+        adjAmt: v.districtAdjacency?.amount ?? 0,
+        coastResY: YIELD_KEYS.map((k) => v.coastResourceYields?.[k] ?? 0),
+      })),
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',

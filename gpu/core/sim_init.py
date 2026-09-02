@@ -1612,6 +1612,16 @@ class SimInit:
         # what its neighbours pay it, and the three tails (housing civic,
         # religious healing, tourism) it carries.
         self._imp_suz = [bool(r.get("suz", 0)) for r in imp["rows"]]
+        # THE UNIQUE ROWS (`uniqueTo`): the civilization index, the civic that
+        # opens the row beside `_imp_unlock`'s tech, the features it may stand
+        # on, and the yields it pays while standing on one of `featY`'s.
+        self._imp_uniq = [int(r["uniq"]) for r in imp["rows"]]
+        self._imp_unlock_civic = [int(r["unlockCivic"]) for r in imp["rows"]]
+        self._imp_feats_ok = [list(r["feats"]) for r in imp["rows"]]
+        self._imp_feat_list = [list(r["featY"]["feats"]) if r["featY"] else [] for r in imp["rows"]]
+        self._imp_feat_y = torch.tensor(
+            [list(r["featY"]["y"]) if r["featY"] else [0.0] * 6 for r in imp["rows"]], dtype=dtype, device=device)
+        self._imp_feat_any = any(self._imp_feat_list)
         self._imp_terr = [list(r.get("terr", [])) for r in imp["rows"]]
         self._imp_xterr = [list(r.get("xterr", [])) for r in imp["rows"]]
         self._imp_elev = [list(r.get("elev", [])) for r in imp["rows"]]
@@ -2158,6 +2168,9 @@ class SimInit:
         # with, its appeal-based housing, its flood shield, and what it takes
         # off an enemy spy's level.
         self._d_amenity = torch.tensor([float(d.get("amenities", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        # CIV6 (DistrictReplaces): a civilization's unique district standing in
+        # for a row — {district idx: [{civ, costMult, housing, amenities}]}
+        self._d_variants = {i: list(d["variants"]) for i, d in enumerate(self.districts_cat) if d.get("variants")}
         self._d_loyalty = torch.tensor([float(d.get("loyalty", 0)) for d in self.districts_cat], dtype=dtype, device=device)
         self._d_gov_title = torch.tensor([int(d.get("governorTitle", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_envoy_centre = torch.tensor([int(d.get("envoysNextToCenter", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
@@ -2419,6 +2432,16 @@ class SimInit:
                 self._b_gwslot[_k] = True
         self._worship_bidx = [int(x) for x in rules.worship_bidx]
         self._temple_bidx = int(rules.temple_bidx)
+        # CIV6 (BuildingReplaces): a civilization's unique building standing in
+        # for a row — its district adjacency rule and its coast-resource yields.
+        self._bvar_adj: list[tuple[int, int, int, str, float]] = [
+            (bi, int(v["civ"]), int(v["adjDist"]), str(v["adjSrc"]), float(v["adjAmt"]))
+            for bi, vs in enumerate(rules.b_variants) for v in vs if int(v["adjDist"]) >= 0]
+        for _bv in self._bvar_adj:
+            assert _bv[3] == "WOODS", f"a building's adjacency source the GPU cannot count: {_bv[3]}"
+        self._bvar_coast: list[tuple[int, int, torch.Tensor]] = [
+            (bi, int(v["civ"]), torch.tensor([float(x) for x in v["coastResY"]], dtype=dtype, device=device))
+            for bi, vs in enumerate(rules.b_variants) for v in vs if any(float(x) for x in v["coastResY"])]
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
         self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm

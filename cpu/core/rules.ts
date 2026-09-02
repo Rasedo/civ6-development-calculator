@@ -25,7 +25,7 @@ import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../
 import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { gpCityPermOf } from '../data/greatPeople';
-import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
+import { allCities, campTiles, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 import { getModifiers } from './effects';
 import { irradiated } from './nuclear';
 
@@ -120,6 +120,8 @@ export function validImprovementsIn(
     builder?: string;
     /** the city-states this seat is SUZERAIN of, by name. */
     suzerain?: ReadonlySet<string>;
+    /** the civilization the seat plays (`civOf`), for the UNIQUE rows */
+    civ?: string | null;
   },
 ): ImprovementId[] {
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -179,7 +181,10 @@ export function validImprovementsIn(
   // named city-state's suzerainty, and each carries its own ground rules —
   // terrain, elevation, and the ban on standing beside its own kind.
   for (const def of Object.values(IMPROVEMENTS)) {
-    if (!def.suzerainOf || !opts.suzerain?.has(def.suzerainOf)) continue;
+    if (!def.suzerainOf && !def.uniqueTo) continue;
+    if (def.suzerainOf && !opts.suzerain?.has(def.suzerainOf)) continue;
+    if (def.uniqueTo && (def.uniqueTo !== opts.civ || !unlocked(def.id))) continue;
+    if (def.features && tile.feature !== null && !def.features.includes(tile.feature)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -252,6 +257,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     camps: campTiles(state),
     gpAppeal: cityAppealResolver(state),
     suzerain: suzerainNames(state, seat),
+    civ: civOf(state, seat),
   });
 }
 

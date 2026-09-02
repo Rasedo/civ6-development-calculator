@@ -790,6 +790,9 @@ class SimOrders:
                         elif self._imp_suz[_k]:
                             _valid = self._suz_improvement_ok(row, _k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
+                        elif self._imp_uniq[_k] >= 0:
+                            _valid = self._uniq_improvement_ok(row, _k).gather(
+                                1, hc.unsqueeze(1)).squeeze(1)
                         elif self._imp_eng[_k]:
                             _valid = (_unl | (fort_ok & (_k == self.FORT))) & self._imp_ground_ok(_k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)

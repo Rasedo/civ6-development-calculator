@@ -125,6 +125,12 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
 
 /** the civilization a seat plays (`CIV_IDS`), or null for a seat without
  *  one — a city-state, the barbarians, a bare `emptySeat`. */
+/** the entry of `variants` that belongs to the civilization this seat plays */
+export function civVariantOf<T extends { civ: string }>(state: GameState, seat: number, variants: readonly T[] | undefined): T | undefined {
+  const c = civOf(state, seat);
+  return c ? variants?.find((v) => v.civ === c) : undefined;
+}
+
 export function civOf(state: GameState, seat: number): CivId | null {
   const s = seatOf(state, seat);
   const civ = s && 'civ' in s ? (s as Seat).civ : -1;

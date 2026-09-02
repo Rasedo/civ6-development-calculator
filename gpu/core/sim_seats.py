@@ -1897,6 +1897,10 @@ class SimSeats:
                     else:
                         disc = self._district_discounted(row, di)
                         d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
+                        # CIV6 (Bath): the unique district is "cheaper to build"
+                        for _v in self._d_variants.get(di, []):
+                            if int(self.row_civ[row]) == int(_v["civ"]):
+                                d_cost_si = torch.floor(d_cost_si * float(_v["costMult"]))
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self._q_push(row, j, placed,
@@ -2646,6 +2650,13 @@ class SimSeats:
             ok &= allow
         if self._imp_no_feat[k]:
             ok &= ~((self.feat_id >= 0) & ~self.feat_stripped)
+        feats = self._imp_feats_ok[k]
+        if feats:
+            live = (self.feat_id >= 0) & ~self.feat_stripped
+            allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+            for f in feats:
+                allow |= self.feat_id == f
+            ok &= ~live | allow
         if self._imp_no_adj_same[k]:
             nb = self.neigh
             nbc = nb.clamp(min=0)
@@ -2662,6 +2673,22 @@ class SimSeats:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         held = (self._suzerain_mask(row) & (self.citystate_suz_imp[:, : self.S] == k)).any(dim=1)
         return held.unsqueeze(1) & self._imp_ground_ok(k)
+
+    def _uniq_improvement_ok(self, row: int, k: int) -> torch.Tensor:
+        """[B, T] — may seat `row` lay UNIQUE improvement `k` here? CIV6
+        (Civilizations.xml): the row plays the civilization, holds the row's
+        own tech or civic, and the ground clause passes (`validImprovementsIn`'s
+        unique arm)."""
+        c = self._imp_uniq[k]
+        if c < 0 or int(self.row_civ[row]) != c:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        ut, uc = int(self._imp_unlock[k]), self._imp_unlock_civic[k]
+        if ut >= 0:
+            ok = ok & self.civ_techs[:, row, ut]
+        if uc >= 0:
+            ok = ok & self.civ_civics[:, row, uc]
+        return ok.unsqueeze(1) & self._imp_ground_ok(k)
 
     def _eng_finish_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose head a charge spent at each of
@@ -5041,6 +5068,8 @@ class SimSeats:
                 if int(r.get("bres", 0)):
                     hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
                 di = int(r.get("dist", -1))
+                if int(r.get("bw", 0)):
+                    hit |= (self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc]
                 if int(r.get("anyd", 0)):
                     hit |= (self.district[:, nbc] >= 0) & self.district_complete[:, nbc]
                 elif di >= 0:
@@ -5101,6 +5130,9 @@ class SimSeats:
             riv = self._imp_river_plane()
             if riv is not None:
                 plane = plane + riv * self._tile_add_live()
+            fy = self._imp_feat_plane()
+            if fy is not None:
+                plane = plane + fy * self._tile_add_live()
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
@@ -5127,6 +5159,9 @@ class SimSeats:
         riv = self._imp_river_plane()
         if riv is not None:
             plane = plane + riv
+        fy = self._imp_feat_plane()
+        if fy is not None:
+            plane = plane + fy
         plane = plane * self._tile_add_live()
         pres = self._preserve_plane(row)
         if pres is not None:
@@ -5173,6 +5208,21 @@ class SimSeats:
                  + torch.einsum("bc,cik->bik", self._seat_civics(row).to(self.dtype), self._civic_imp_y))
             out = r if out is None else out + r
         return out
+
+    def _imp_feat_plane(self) -> torch.Tensor | None:
+        """[B, T, 6] — what an improvement pays extra for standing on one of
+        its `featureYields` features (the Sphinx on Floodplains), None where
+        no row carries the column."""
+        if not self._imp_feat_any:
+            return None
+        live = (self.feat_id >= 0) & ~self.feat_stripped
+        on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for k, feats in enumerate(self._imp_feat_list):
+            if feats:
+                on |= (self.improvement == k) & live & torch.isin(
+                    self.feat_id, torch.tensor(feats, dtype=torch.long, device=self.device))
+        return (self._imp_gather(self._imp_feat_y.unsqueeze(0).expand(self.B, -1, -1))
+                * on.unsqueeze(2).to(self.dtype))
 
     def _imp_river_plane(self) -> torch.Tensor | None:
         """[B, T, 6] — what an improvement pays extra for standing on a
@@ -5956,6 +6006,10 @@ class SimSeats:
                             torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
                 wh,
             )
+            # CIV6 (Bath): its Districts row adds "Housing 2" on top of the water
+            for _v in self._d_variants.get(self._aqueduct_idx, []):
+                if int(self.row_civ[row]) == int(_v["civ"]) and float(_v["housing"]):
+                    water = water + has_aq.to(water.dtype) * float(_v["housing"])
         else:
             water = wh
         selb_h = bldg & ~self._bldg_dark(dreg)
@@ -6068,6 +6122,11 @@ class SimSeats:
         have = have + torch.einsum("bjn,n->bj",
                                    self._dist_counts(row)[:, :cols].double(),
                                    self._d_amenity.double())
+        # CIV6 (Bath): "Entertainment 1" — the unique district's own flat Amenity
+        for _di, _vs in self._d_variants.items():
+            for _v in _vs:
+                if int(self.row_civ[row]) == int(_v["civ"]) and float(_v["amenities"]):
+                    have = have + self._dist_counts(row)[:, :cols, _di].double() * float(_v["amenities"])
         # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
         # per adjacent tile, and dark while the district stands pillaged.
         if self._d_amen_adj_any:

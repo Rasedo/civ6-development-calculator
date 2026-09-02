@@ -43,6 +43,7 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (r.bonusResource && nb.resource !== null && RESOURCES[nb.resource].category === 'bonus') ||
         (r.anyDistrict && nb.district !== null && nb.districtComplete) ||
         (!!r.district && nb.district === r.district && nb.districtComplete) ||
+        (!!r.builtWonder && nb.builtWonder !== null && nb.builtWonderComplete) ||
         (!!r.features && nb.feature !== null && r.features.includes(nb.feature));
       if (hit) n += 1;
     }
@@ -86,6 +87,8 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     const imp = tile.improvement as ImprovementId;
     addYields(out, IMPROVEMENTS[imp].yields);
     if (IMPROVEMENTS[imp].riverYields && hasRiver(tile)) addYields(out, IMPROVEMENTS[imp].riverYields!);
+    const fy = IMPROVEMENTS[imp].featureYields;
+    if (fy && tile.feature !== null && fy.features.includes(tile.feature)) addYields(out, fy.yields);
     // The Seaside Resort's gold IS the tile's appeal (real Civ 6),
     // so it cannot live in the static roster row. Negative appeal pays nothing.
     if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile, ctx.camps, ctx.gpAppeal));
@@ -193,8 +196,8 @@ export function districtAdjacency(
   return Math.floor(sum);
 }
 
-export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId): number {
-  return districtAdjacency(ctx.map, tile, type, ctx.mods.districtAdjacencyAdd?.[type] ?? [])
+export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
+  return districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra])
     * (ctx.mods.adjacencyMult[type] ?? 1);
 }
 
@@ -215,6 +218,18 @@ export function pillagedDistrictTypes(
   return out;
 }
 
+/** CIV6 (Stave Church): the adjacency rule a civilization's unique building
+ *  adds to one district type of its city (EFFECT_FEATURE_ADJACENCY). */
+export function buildingVariantAdjacency(civ: string | null, city: City, type: DistrictId): AdjacencyRule[] {
+  if (!civ) return [];
+  const out: AdjacencyRule[] = [];
+  for (const id of city.buildings) {
+    const r = BUILDINGS[id]?.civVariants?.find((v) => v.civ === civ)?.districtAdjacency;
+    if (r && r.district === type) out.push({ source: r.source, amount: r.amount });
+  }
+  return out;
+}
+
 export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
   for (const d of city.districts) {
@@ -224,7 +239,7 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
     if (cityStateAdd) addYields(out, cityStateAdd);
     if (def.adjacencyYield) {
-      const adj = effectiveAdjacency(ctx, tile, d.type);
+      const adj = effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
       out[def.adjacencyYield] += adj;
       if (d.type === 'HOLY_SITE' && ctx.mods.workEthic) out.production += adj;
     }

@@ -2089,8 +2089,37 @@ class SimEconomy:
             out = add if out is None else out + add
         return out
 
+    def _bvar_bldg_plane(self, bi: int, civ: int) -> torch.Tensor:
+        """[B, T] bool — tiles owned by a row playing civilization `civ` whose
+        owning city holds building `bi` (a unique building's city)."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for r in range(self.n_majors):
+            if int(self.row_civ[r]) != civ:
+                continue
+            slot = self.city_slot_at(r)
+            has = self.city_bldg[:, r, :, bi].gather(1, slot.clamp(min=0)) & (slot >= 0)
+            out |= has
+        return out
+
+    def _adj_woods_count(self) -> torch.Tensor:
+        """[B, T] long — live Woods among each tile's neighbours."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        fid = self.feat_id[:, nbc]
+        live = ~self.feat_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
+        hit = torch.zeros_like(live)
+        for f in self._woods_feats.tolist():
+            hit |= fid == f
+        return (hit & live).sum(dim=2)
+
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc
+        # CIV6 (Stave Church): "Holy Site districts get an additional standard
+        # adjacency bonus from Woods" — where the owning city holds the
+        # unique building (`buildingVariantAdjacency`).
+        for _bi, _civ, _vdi, _src, _amt in self._bvar_adj:
+            if _vdi == di:
+                raw = raw + _amt * self._bvar_bldg_plane(_bi, _civ).to(self.dtype) * self._adj_woods_count().to(self.dtype)
         if float(self._dyn_bwonder[di]) != 0:
             nbw = self.neigh
             nbwc = nbw.clamp(min=0)
@@ -3706,6 +3735,22 @@ class SimEconomy:
             tiles_y[:, :, 0] = (tiles_y[:, :, 0]
                                 + ((wet_w & take) & has_lh.unsqueeze(2)).sum(dim=2).double()
                                 + (wet_c & has_lh).double())
+        # CIV6 (Stave Church): "+1 Production to each coastal resource tile in
+        # this city" — a Coast tile carrying a resource, worked or the centre,
+        # the Lighthouse's way (`buildingVariantCoastYields`).
+        for _bi, _civ, _y6 in self._bvar_coast:
+            if int(self.row_civ[row]) != _civ:
+                continue
+            sv = bldg[:, :, _bi]
+            if not (sv.numel() and bool(sv.any())):
+                continue
+            _tw = self.terrain.gather(1, stf).reshape(B, n, M)
+            _rw = self.res_id.gather(1, stf).reshape(B, n, M) >= 0
+            _tc = self.terrain.gather(1, ctr)
+            _rc = self.res_id.gather(1, ctr) >= 0
+            _hw = ((_tw == self._coast_terr) & _rw & take & sv.unsqueeze(2)).sum(dim=2).double()
+            _hc = ((_tc == self._coast_terr) & _rc & sv).double()
+            tiles_y = tiles_y + (_hw + _hc).unsqueeze(2) * _y6.double().view(1, 1, 6)
 
         # ================= bucket 2: DISTRICTS ==============================
         # THE DISTRICT REGISTRY IS THE ONE READ, on every seat row: TS walks

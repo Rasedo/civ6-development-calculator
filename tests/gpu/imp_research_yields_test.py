@@ -61,6 +61,9 @@ ROWS = [
     ("FISHING_BOATS", "tech", "PLASTICS", {"food": 1}),
     ("CAMP", "tech", "SYNTHETIC_MATERIALS", {"gold": 1}),
     ("CAMP", "civic", "MERCANTILISM", {"production": 1, "food": 1}),
+    # CIV6 (Improvement_BonusYieldChanges): the two unique rows at Natural History
+    ("SPHINX", "civic", "NATURAL_HISTORY", {"culture": 1}),
+    ("ZIGGURAT", "civic", "NATURAL_HISTORY", {"culture": 1}),
     # CIV6 (Predictive Systems): "+1 Production to Quarry, Oil Well, and
     # Oil Rig improvements" — the Oil Rig waits on an improvement the
     # catalog does not hold.
@@ -157,9 +160,11 @@ def test_river_column(rules, path) -> None:
     sim = fresh(rules, path)
     lm = IMPS.index("LUMBER_MILL")
     assert sim._imp_river_any
-    nz = sim._imp_river_y.nonzero().tolist()
-    assert nz == [[lm, 1]] and float(sim._imp_river_y[lm, 1]) == 1.0, \
-        f"the river column reads {nz}"
+    # CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column
+    zg = IMPS.index("ZIGGURAT")
+    nz = sorted(sim._imp_river_y.nonzero().tolist())
+    assert nz == sorted([[lm, 1], [zg, 4]]) and float(sim._imp_river_y[lm, 1]) == 1.0 \
+        and float(sim._imp_river_y[zg, 4]) == 1.0, f"the river column reads {nz}"
     wet = int((sim.tile_river[B0] & ~sim.water[B0] & (sim.district[B0] < 0)
                & (sim.centre_slot_at[B0] < 0)).nonzero()[0])
     dry = dry_land(sim)

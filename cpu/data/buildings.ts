@@ -9,11 +9,26 @@
  */
 
 import type { DistrictId, Yields } from '../core/types';
+import type { AdjacencySource } from './districts';
+import type { CivId } from './seats';
 import type { PromoClass } from './promotions';
 import { GAME_SPEED } from './constants';
 
+/** CIV6 (BuildingReplaces): a civilization's UNIQUE BUILDING standing in for
+ *  this row — the same building in storage, plus the clauses only it
+ *  carries (the Stave Church). */
+export interface BuildingVariant {
+  civ: CivId;
+  name: string;
+  /** EFFECT_FEATURE_ADJACENCY: one more adjacency rule for a district of the city */
+  districtAdjacency?: { district: DistrictId; source: AdjacencySource; amount: number };
+  /** extra yields on every Coast tile of the city that carries a resource */
+  coastResourceYields?: Partial<Yields>;
+}
+
 export interface BuildingDef {
   id: string;
+  civVariants?: BuildingVariant[];
   name: string;
   district: DistrictId;
   cost: number;
@@ -180,7 +195,17 @@ const rawList: BuildingDef[] = [
   { id: 'RESEARCH_LAB', name: 'Research Lab', district: 'CAMPUS', cost: 440, requiresAny: ['UNIVERSITY'], yields: { science: 3 }, power: 3, poweredYields: { science: 5 }, maintenance: 3 },
 
   { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 70, yields: { faith: 2 }, maintenance: 1 },
-  { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2 },
+  {
+    id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2,
+    // CIV6 (Stave Church): "Holy Site districts get an additional standard
+    // adjacency bonus from Woods. +1 Production to each coastal resource tile
+    // in this city." — the Temple's own numbers otherwise.
+    civVariants: [{
+      civ: 'NORWAY', name: 'Stave Church',
+      districtAdjacency: { district: 'HOLY_SITE', source: 'WOODS', amount: 1 },
+      coastResourceYields: { production: 1 },
+    }],
+  },
   { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true },
   { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true },
   { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true },

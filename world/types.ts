@@ -65,6 +65,8 @@ export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 // ordered roster whose position is the GPU's improvement index and the build
 // column's number, so a new id appends THERE.
 export type ImprovementId =
+  | 'SPHINX'
+  | 'ZIGGURAT'
   | 'BATEY'
   | 'COLOSSAL_HEADS'
   | 'MONASTERY'
