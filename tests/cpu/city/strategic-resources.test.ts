@@ -4,8 +4,9 @@ import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpe
 import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit, refreshUnits, spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
-import { accrueStockpiles, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
-import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING } from '../../../cpu/data/constants';
+import { accrueStockpiles, chargeUnitUpkeep, fuelShortCS, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
+import { stackDefenceCS } from '../../../cpu/core/combat';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, FUEL_SHORT_CS } from '../../../cpu/data/constants';
 
 /** Units-mode game with the capital at (8,8), and a resource tile inside
  * borders that the caller can configure. Returns the state, city and the tile. */
@@ -238,6 +239,56 @@ describe('the heal a lost source denies', () => {
     expect(civHasStrategic(state, BARB_SEAT, 'HORSES')).toBe(false);
     refreshUnits(state);
     expect(u.hp).toBeGreaterThan(40);
+  });
+});
+
+describe('the fuel bill marks the slot, and the unit fights twenty weaker', () => {
+  // CIV6 (Resource, GS): the combat preview's "-20 Insufficient <resource>"
+  // (COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL) on every unit whose seat
+  // could not meet its fuel bill at the last upkeep pass.
+  const OIL = STRATEGIC_IDS.indexOf('OIL');
+  const COAL = STRATEGIC_IDS.indexOf('COAL');
+  const setup = () => {
+    const { state } = resState('OIL', 'OIL_WELL', 'REPLACEABLE_PARTS');
+    const a = spawnUnit(state, 'INFANTRY', tileAtCoords(state.map, 6, 6).index, 0)!;
+    const b = spawnUnit(state, 'INFANTRY', tileAtCoords(state.map, 6, 7).index, 0)!;
+    const w = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 8).index, 0)!;
+    const other = spawnUnit(state, 'INFANTRY', tileAtCoords(state.map, 12, 12).index, 1)!;
+    const bank = seatOf(state, 0)!.stockpile!;
+    return { state, a, b, w, other, bank };
+  };
+
+  it('a met bill marks nothing; one Oil for two Infantry marks Oil short for every Oil unit of the seat', () => {
+    const { state, a, b, w, other, bank } = setup();
+    const rate = UNITS.INFANTRY.resourceUpkeep!;
+    bank[OIL] = 2 * rate;
+    chargeUnitUpkeep(state, 0);
+    expect(bank[OIL]).toBe(0);
+    expect(seatOf(state, 0)!.fuelShort).toBe(0);
+    expect(fuelShortCS(state, a)).toBe(0);
+    bank[OIL] = rate;
+    chargeUnitUpkeep(state, 0);
+    expect(seatOf(state, 0)!.fuelShort).toBe(1 << OIL);
+    expect(fuelShortCS(state, a)).toBe(FUEL_SHORT_CS);
+    expect(fuelShortCS(state, b)).toBe(FUEL_SHORT_CS);
+    expect(fuelShortCS(state, w)).toBe(0);
+    expect(fuelShortCS(state, other)).toBe(0);
+    expect(stackDefenceCS(state, a)).toBe(UNITS.INFANTRY.combat - FUEL_SHORT_CS);
+    expect(stackDefenceCS(state, w)).toBe(UNITS.WARRIOR.combat);
+  });
+
+  it('the mark is per slot, another seat reads none of it, and a met bill clears it', () => {
+    const { state, a, other, bank } = setup();
+    bank[OIL] = 0;
+    bank[COAL] = 0;
+    chargeUnitUpkeep(state, 0);
+    expect((seatOf(state, 0)!.fuelShort! >> COAL) & 1).toBe(0);
+    expect(fuelShortCS(state, a)).toBe(FUEL_SHORT_CS);
+    expect(fuelShortCS(state, other)).toBe(0); // no seat record, no bill, no mark
+    bank[OIL] = 50;
+    chargeUnitUpkeep(state, 0);
+    expect(seatOf(state, 0)!.fuelShort).toBe(0);
+    expect(fuelShortCS(state, a)).toBe(0);
   });
 });
 

@@ -2372,6 +2372,7 @@ class SimInit:
         self._n_strategic = len(self._strat_rid)
         self._strat_slot_of = torch.tensor([int(x) for x in _st["slotOf"]], dtype=torch.long, device=device)
         self._stock_cap_base = int(_st["capBase"])
+        self._fuel_short_cs_val = int(_st["fuelShortCs"])
         self._stock_cap_per_enc = int(_st["capPerEncampmentBuilding"])
         self._encampment_didx = int(_st["encampmentDidx"])
         # SPECIALISTS (data/greatPeople.ts SPECIALIST_YIELDS / SPECIALIST_TIERS,
@@ -2463,6 +2464,7 @@ class SimInit:
         # GS: the strategic banks, and the POWERED flag the grid resolves to
         # once a turn (every yield reader takes the flag, not a live scan).
         self.civ_stockpile = torch.zeros(B, self.n_majors, max(self._n_strategic, 1), dtype=torch.long, device=device)
+        self.civ_fuel_short = torch.zeros(B, self.n_majors, max(self._n_strategic, 1), dtype=torch.bool, device=device)
         self.city_powered = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)

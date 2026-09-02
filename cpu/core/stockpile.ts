@@ -6,7 +6,7 @@
  *
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
-import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, RAILROAD_COST, emptyStockpile } from '../data/constants';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile } from '../data/constants';
 import { UNITS } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
@@ -18,7 +18,7 @@ import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
-import type { City, GameState, Seat, Tile } from './types';
+import type { City, GameState, Seat, Tile, Unit } from './types';
 
 export function strategicSlot(resourceId: string | undefined): number {
   return resourceId ? STRATEGIC_IDS.indexOf(resourceId) : -1;
@@ -129,25 +129,38 @@ export function unitResourceCost(unitType: string): { id: string; n: number } | 
  * turn, the unit will consume a certain amount of that resource as fuel".
  * One pass over the seat's living units, after the turn's income and before
  * the plants burn, because a unit's fuel and a plant's come out of one bank.
- * A bill the bank cannot meet takes what is there and leaves it at zero; the
- * Combat Strength penalty real Civ 6 charges for the shortfall is a magnitude
- * no source publishes.
+ * A bill the bank cannot meet takes what is there, leaves it at zero and marks
+ * the slot short until the next pass — `fuelShortCS` is the penalty.
  */
 export function chargeUnitUpkeep(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
   const bk = bank(s);
   const cells = powerCells(state, seat);
+  let short = 0;
   for (const u of state.units) {
     if (u.seat !== seat) continue;
     const def = UNITS[u.type];
     const k = strategicSlot(def?.requiresResource);
     if (k < 0 || !def?.resourceUpkeep) continue;
+    if (bk[k] < def.resourceUpkeep) short |= 1 << k;
     bk[k] = Math.max(0, bk[k] - def.resourceUpkeep);
     // CIV6 (Climate): a unit burning Coal, Oil or Uranium discharges carbon
     // too. `unitCarbon` is zero for every other slot.
     emitCarbon(state, seat, unitCarbon(k, def.resourceUpkeep, cells));
   }
+  s.fuelShort = short;
+}
+
+/**
+ * CIV6 (Resource, GS): "-20 Insufficient <resource>" on every strength read of
+ * a unit whose seat could not meet its fuel bill at the last upkeep pass.
+ */
+export function fuelShortCS(state: GameState, u: Unit): number {
+  const def = UNITS[u.type];
+  const k = strategicSlot(def?.requiresResource);
+  if (k < 0 || !def?.resourceUpkeep) return 0;
+  return ((seatOf(state, u.seat)?.fuelShort ?? 0) >> k) & 1 ? FUEL_SHORT_CS : 0;
 }
 
 /**

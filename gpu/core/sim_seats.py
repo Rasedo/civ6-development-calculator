@@ -2483,10 +2483,12 @@ class SimSeats:
         consume a certain amount of that resource as fuel". One pass over this
         seat's living units, between the turn's income and the plants' burn,
         because both come out of one bank. A bill the bank cannot meet takes
-        what is there."""
+        what is there and marks the slot short until the next pass —
+        `_fuel_short_cs` is the penalty."""
         if not self._upkeep_units or not self._n_strategic:
             return
         stock = self.civ_stockpile[:, row]
+        bill = torch.zeros_like(stock)
         for pre in ("barb", "major"):
             alive = getattr(self, f"{pre}_unit_alive")
             seat = getattr(self, f"{pre}_unit_seat")
@@ -2497,8 +2499,7 @@ class SimSeats:
             for u_idx, slot, rate in self._upkeep_units:
                 n = (mine & (typ == u_idx)).sum(dim=1)
                 if bool((n > 0).any()):
-                    col = stock[:, slot]
-                    col.copy_((col - n * rate).clamp(min=0))
+                    bill[:, slot] += n * rate
                     # CIV6 (Climate): a unit drawing Coal, Oil or Uranium
                     # discharges "only half of Power Plants per unit of
                     # resource", over half a resource unit, halved again by
@@ -2509,6 +2510,8 @@ class SimSeats:
                                       * self._carbon_per_resource[slot]
                                       * self._carbon_unit_share
                                       * self._power_cells(row))
+        self.civ_fuel_short[:, row] = bill > stock
+        stock.copy_((stock - bill).clamp(min=0))
 
     def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int,
                               at: int | None = None) -> None:
@@ -2825,6 +2828,29 @@ class SimSeats:
         return torch.where(
             alive,
             self._convoy_cs(torch.full((self.B,), lo + u, dtype=torch.long, device=self.device)),
+            torch.zeros(self.B, dtype=torch.long, device=self.device))
+
+    def _fuel_short_cs(self, slot: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Resource, GS): "-20 Insufficient <resource>" on every strength
+        read of a unit whose seat could not meet its fuel bill at the last
+        upkeep pass (`fuelShortCS`) — the amount TAKEN OFF, never signed."""
+        s = slot.clamp(min=0).unsqueeze(1)
+        ty = self.unit_type.gather(1, s).squeeze(1).clamp(min=0, max=self.NU - 1)
+        seat = self.unit_seat.gather(1, s).squeeze(1)
+        k = self._type_res_slot[ty]
+        major = (seat >= 0) & (seat < self.n_majors)
+        short = self.civ_fuel_short[torch.arange(self.B, device=self.device),
+                                    seat.clamp(min=0, max=self.n_majors - 1), k.clamp(min=0)]
+        hit = major & (k >= 0) & (self._type_res_upkeep[ty] > 0) & short
+        return hit.long() * self._fuel_short_cs_val
+
+    def _fuel_short_cs_pool(self, atk_kind: str, u: int) -> torch.Tensor:
+        """the same term for unit `u` of one POOL, whose index is pool-local."""
+        lo = self.POOL_LO[atk_kind]
+        alive = getattr(self, f"{atk_kind}_unit_alive")[:, u]
+        return torch.where(
+            alive,
+            self._fuel_short_cs(torch.full((self.B,), lo + u, dtype=torch.long, device=self.device)),
             torch.zeros(self.B, dtype=torch.long, device=self.device))
 
     def _form_tier(self, slot: torch.Tensor) -> torch.Tensor:
@@ -6693,7 +6719,7 @@ class SimSeats:
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_lo = self.POOL_LO[atk_kind]
         atk_cs_all = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
-                      + self._convoy_cs_pool(atk_kind, u))
+                      + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u))
         major = POOL_CLASS[atk_kind] == "major"
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
@@ -6729,7 +6755,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             a_promos = self._promo_pool(atk_kind)[0][:, u]
             _true = torch.ones_like(mslot_raw, dtype=torch.bool)
@@ -7669,7 +7695,7 @@ class SimSeats:
                             torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
         atk_e = (self._city_ranged_strength(at0, a_seat[:, u], outer) + self._form_cs_pool(atk_kind, u)
-                 + self._convoy_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
                  + rel.to(def_cs.dtype)
@@ -7703,7 +7729,7 @@ class SimSeats:
         TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
-                  + self._convoy_cs_pool(atk_kind, u)
+                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                   + self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                   + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
@@ -8116,7 +8142,7 @@ class SimSeats:
             def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
+                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
@@ -8271,7 +8297,7 @@ class SimSeats:
         )
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
-                 + self._convoy_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, here)
                  - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
@@ -8449,7 +8475,7 @@ class SimSeats:
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
-                  + self._convoy_cs_pool(atk_kind, u))
+                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u))
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[ut0] | _emb_p[:, u]
@@ -8479,7 +8505,7 @@ class SimSeats:
                 def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
-                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
+                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                      - self._wound(a_hp)
                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
@@ -8539,7 +8565,7 @@ class SimSeats:
                 + self._walls_tier_cs[cs_tier]
             )
             atk_cs = (self._city_ranged_strength(ut0, a_seat, cs_outer)
-                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
+                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
                       - self._wound(a_hp)
                       + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
@@ -8598,7 +8624,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
             _t = torch.ones_like(mslot, dtype=torch.bool)
             atk_e = atk_rs - self._wound(a_hp) + self._promo_cs(
@@ -8707,7 +8733,7 @@ class SimSeats:
         a_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_rs0 = self._type_ranged_strength[at0]
         atk_base = (atk_rs0 + self._form_cs_pool(atk_kind, u)
-                    + self._convoy_cs_pool(atk_kind, u) - self._wound(a_hp[:, u]))
+                    + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) - self._wound(a_hp[:, u]))
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
                                + self._gov_unit_cs(at0, aseat)).to(atk_base.dtype)
@@ -8820,7 +8846,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             _t = torch.ones_like(mslot, dtype=torch.bool)
             def_e = def_cs - self._wound(def_hp)

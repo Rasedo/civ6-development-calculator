@@ -61,7 +61,7 @@ from the list below.
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%, blocked on C-46's scale), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |
-| C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
+| C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
@@ -75,8 +75,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
-| **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **40** | |
+| **C. Absent systems** | **21** | |
+| **OPEN, TOTAL** | **39** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -90,61 +90,58 @@ this ledger when the owner answers or a primary source is reached, and
 the answer lands in the ROW the entry points at (this list carries no
 detail of its own). "Meanwhile" states what both engines do today.
 
-1. **C-5 — the fuel-shortage penalty.** The CS penalty "proportional to
-   the amount you're short" has no published magnitude. Meanwhile: the
-   consumption is live and no penalty is applied.
-2. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
+1. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
    what a step through it costs, and whether it opens the mountain or
    joins two tunnels — no safe reading reached. Meanwhile: not built.
-3. **C-1 — the reactor's accident roll.** Severities open at ages
+2. **C-1 — the reactor's accident roll.** Severities open at ages
    10/20/30; NO source publishes the per-turn probability. Meanwhile: the
    age clock ships, no accident ever fires.
-4. **C-1 — the decommission projects' score.** A secondary source says
+3. **C-1 — the decommission projects' score.** A secondary source says
    100 competition points; no first-party page states any figure.
    Meanwhile: the projects are absent, the window counts emissions alone.
-5. **C-31 — the nuke's last clauses.** Interception has no published
+4. **C-31 — the nuke's last clauses.** Interception has no published
    roll; the citizens a blast kills wait on a worked-tile selection
    neither engine exposes; whether a wonder in the blast is PILLAGED is
    unsourced. Meanwhile: no interception, no citizen deaths, the wonder
    rides through untouched.
-6. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
+5. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
    COSTS (movement? a turn?) is unsourced. Meanwhile: no Jump.
-7. **C-35 — what drowned ground still lends.** Does a submerged tile's
+6. **C-35 — what drowned ground still lends.** Does a submerged tile's
    FEATURE keep working for its neighbours, or is the ground stripped?
    Meanwhile: it lends (every ring fact reads terrain).
-8. **B-20r — the park's vertical.** Civ 6 fixes the park rhombus
+7. **B-20r — the park's vertical.** Civ 6 fixes the park rhombus
    vertical where this hex frame has no canonical vertical. Meanwhile:
    every rhombus offered.
-9. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
+8. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
     threshold. Meanwhile: `GRIEVANCE_GANG` as a tuning knob, two war
     bases' worth.
-10. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+9. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
     whether it may act after forming are unpublished, and the
     direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
     Meanwhile: the veteran's own HP, the turn ends, the single unit's
     charge.
-11. **C-32 — the Rock Band's twelve rows.** Its promotion table is
+10. **C-32 — the Rock Band's twelve rows.** Its promotion table is
     unsourced here. Meanwhile: the chassis carries its own level and
     album state instead.
-12. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+11. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
     and what it does to a standing improvement. Meanwhile: the ADD
     carrier ships and nothing calls it.
-13. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+12. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
     five is a capacity choice (the GPU's tensor dimension). Is five
     acceptable, or name a depth? Meanwhile: 5 on both engines.
-14. **C-16 — the released spy's level.** What a released (ransomed) spy
+13. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-15. **C-2 — two diplomacy cells.** The gold purchase of the QUEUE-FRONT
+14. **C-2 — two diplomacy cells.** The gold purchase of the QUEUE-FRONT
     item is refused on both engines and real Civ 6 likely allows it with
     progress banked; and the alliance table's ALLIANCE_POINTS_FOR_DEAL
     (2) maps to no published text — is it alliance points banked when
     the allies close a deal? Meanwhile: refused / nothing.
-16. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+15. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
     engines.
-17. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
+16. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
     so on" with no published limit; `ROUTE_CHAIN_MAX` (6) is a capacity
     choice (the GPU plane's width), C-45's pattern. Is six acceptable,
     or name a depth? Meanwhile: 6 on both engines, the reach walk and
@@ -798,7 +795,7 @@ under their blocker so the dependency is readable, and both halves count.
       `RELIGION_PRESSURE_PER_TURN`), so +20% of 1 floors to nothing —
       BLOCKED on C-46's pressure scale.
     - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with
-      no published text behind it. UNSOURCED meaning — ask (ledger 15).
+      no published text behind it. UNSOURCED meaning — ask (ledger 14).
     - The GOLD purchase of the item UNDER PRODUCTION (queue front) is
       refused on both engines — `goldPurchasableBuildings` holds the
       shared reading. Real Civ 6 likely allows it with the progress
@@ -859,13 +856,19 @@ under their blocker so the dependency is readable, and both halves count.
     each still needing its own effect: a war declared by two seats at
     once, a seat joining one already running, the Research Agreement's
     unpublished science, and the promise above.
-- **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; two tails.**
-  Weight 2. The bank, the ceiling, the charges, the plant fuel and the
-  heal denial all ship. OPEN:
-  - **THE SHORTAGE PENALTY** — a seat short of fuel takes a CS penalty
-    "proportional to the amount you're short"; the consumption is live
-    (`chargeUnitUpkeep` / `_seat_charge_upkeep`), the magnitude is
-    unpublished.
+- **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; one tail.**
+  Weight 1. The bank, the ceiling, the charges, the plant fuel, the heal
+  denial and the shortage penalty all ship. The penalty is the game's own
+  FLAT 20 — Expansion2_GlobalParameters
+  COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL, shown in the combat
+  preview as "-20 Insufficient <resource>"; the wiki's "proportional to
+  the amount you're short" was a paraphrase. The upkeep pass marks a slot
+  SHORT when the seat's whole bill exceeds the bank (`chargeUnitUpkeep` /
+  `_seat_charge_upkeep`), and every strength read of a unit drawing that
+  slot takes the 20 (`fuelShortCS` / `_fuel_short_cs`) until the next pass
+  meets the bill (`fuel_short_test.py`, `strategic-resources.test.ts`).
+  Reach: the driven gate reaches Oil units only in the late hundreds of
+  turns — poke-proven, gate reach unmeasured. OPEN:
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the twelve-mission catalog, the counterspy post, the capture roll,

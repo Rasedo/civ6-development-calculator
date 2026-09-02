@@ -356,6 +356,7 @@ def main() -> int:
                 ("appeal_cache", [py, "tests/gpu/appeal_cache_test.py"], 4),  # the version contract `_tile_appeal` is cached on, which two mid-game writers owed it
                 ("advance_borders", [py, "tests/gpu/advance_borders_test.py"], 4),  # a melee victor advancing is ENTERING the tile, so the border binds it
                 ("stockpile_ceiling", [py, "tests/gpu/stockpile_ceiling_test.py"], 4),  # the stockpile maximum, on the one way IN that had no clamp of its own
+                ("fuel_short", [py, "tests/gpu/fuel_short_test.py"], 4),  # the fuel bill marks the slot short, and the unit fights 20 weaker
                 ("improvement_food", [py, "tests/gpu/improvement_food_test.py"], 4),  # the tile-food column's improvement arm, which knew only the FARM
                 ("production_queue", [py, "tests/gpu/production_queue_test.py"], 4),  # the city's queue: the head, the overflow carry and the reorder
                 ("formation_train", [py, "tests/gpu/formation_train_test.py"], 4),  # the corps/army queue tier: gates, price, apply refusals, the tiered spawn

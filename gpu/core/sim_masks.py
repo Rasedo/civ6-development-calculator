@@ -995,10 +995,10 @@ class SimMasks:
         if ranged:
             m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
             cs_m = (self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
-                    + self._form_cs(mslot) + self._convoy_cs(mslot))
+                    + self._form_cs(mslot) + self._convoy_cs(mslot) - self._fuel_short_cs(mslot))
             take = take | (e_mil & ok_m
                            & (self._embarked_def_cs(e_seat) + self._form_cs(eslot)
-                              + self._convoy_cs(eslot) > cs_m))
+                              + self._convoy_cs(eslot) - self._fuel_short_cs(eslot) > cs_m))
         e_pax = ok_e & e_civ
         take_c = e_pax & ~ok_c
         return (torch.where(take, eslot, mslot),

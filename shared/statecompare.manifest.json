@@ -971,6 +971,16 @@
           ]
         },
         {
+          "name": "fuelShort",
+          "compare": "exact",
+          "covers": [
+            "Seat.fuelShort"
+          ],
+          "planes": [
+            "civ_fuel_short"
+          ]
+        },
+        {
           "name": "routeCount",
           "compare": "exact",
           "covers": [

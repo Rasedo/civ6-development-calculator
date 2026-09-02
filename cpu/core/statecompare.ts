@@ -434,6 +434,7 @@ const SEAT: Record<string, Extractor> = {
   // the GS stockpiles, dense over STRATEGIC_IDS, and the POWERED flag the
   // whole grid resolves to
   stockpile: overSeats((s) => [...(s.stockpile ?? emptyStockpile())]),
+  fuelShort: overSeats((s) => s.fuelShort ?? 0),
   techs: overSeats((s) => s.research.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b)),
   civics: overSeats((s) => s.research.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b)),
   // TS keeps ONE `boosted` list mixing tech and civic ids; the GPU keeps two

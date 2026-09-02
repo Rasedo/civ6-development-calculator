@@ -595,6 +595,9 @@ export interface Seat {
   orbitalLasers?: number;
   /** GS strategic stockpiles, dense over `STRATEGIC_IDS`. */
   stockpile?: number[];
+  /** bitmask over `STRATEGIC_IDS`: the slots whose unit fuel bill the bank
+   *  could not meet at this seat's last upkeep pass. */
+  fuelShort?: number;
   camps: number[];
   gpEarned: string[];
   eraScore?: number;

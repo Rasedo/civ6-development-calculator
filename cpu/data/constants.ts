@@ -218,6 +218,11 @@ export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING = 10;
  *  say so on their own page. */
 export const UNIT_RESOURCE_COST = 20;
 
+/** CIV6 (Resource, GS): a unit whose seat could not meet its fuel bill this
+ *  turn fights at "-20 Insufficient <resource>" (the combat preview's line) —
+ *  GlobalParameters COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL, a flat 20. */
+export const FUEL_SHORT_CS = 20;
+
 export function maxSpecialtyDistricts(pop: number): number {
   return Math.floor((pop - 1) / 3) + 1;
 }

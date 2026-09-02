@@ -539,6 +539,9 @@ SEAT = {
         int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows
     ],
     "stockpile": lambda sim, b, rows: [[int(x) for x in sim.civ_stockpile[b, c].tolist()] for c in rows],
+    "fuelShort": lambda sim, b, rows: [
+        sum(1 << k for k, x in enumerate(sim.civ_fuel_short[b, c].tolist()) if x) for c in rows
+    ],
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
