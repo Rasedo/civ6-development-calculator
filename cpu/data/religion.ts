@@ -204,7 +204,7 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
       combatVsUnitInFollowing: 10,
     }),
     B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
-      missionaryCostMult: 0.7, // 60 → 42 faith
+      missionaryCostMult: 0.7,
     }),
     B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {
       tradeReligionYields: { gold: 2, faith: 2 },
