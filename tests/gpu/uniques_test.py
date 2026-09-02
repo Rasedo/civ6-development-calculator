@@ -111,8 +111,11 @@ def main() -> None:
     t_foe = own_flat(sim, egypt)
     clear_tile(sim, t_foe)
     stand(sim, egypt, U["WARRIOR"], t_foe)
-    dest = next(int(x) for x in sim.neigh[t_foe].tolist()
-                if x >= 0 and not bool(sim.water[0, x]) and bool(sim.passable[0, x]))
+    # CIV6 (Zone of Control): rivers block ZOC — the step must not cross one
+    rm = sim.river_mask[0, t_foe] if sim.river_mask.dim() == 2 else sim.river_mask[t_foe]
+    dest = next(int(x) for d, x in enumerate(sim.neigh[t_foe].tolist())
+                if x >= 0 and not bool(sim.water[0, x]) and bool(sim.passable[0, x])
+                and not ((int(rm) >> d) & 1))
     ra, rb = sim._seat_row[rome], sim._seat_row[egypt]
     sim.war[0, ra, rb] = sim.war[0, rb, ra] = True
     sim._gen_ver += 1
