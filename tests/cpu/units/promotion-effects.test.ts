@@ -56,7 +56,7 @@ describe('promotion effects that are not Combat Strength', () => {
     expect(moveCostInto(state, t, t, { type: 'SCOUT', promos: 1 << kw })).toBe(plain);
   });
 
-  it('Auxiliary Ships heal on foreign ground at the own-ground rate', () => {
+  it('Auxiliary Ships heal a hull on foreign ground, where it otherwise heals nothing', () => {
     const state = makeState(makeMap(12, 12));
     state.unitsMode = true;
     state.seats.push(emptySeat(1));
@@ -69,10 +69,14 @@ describe('promotion effects that are not Combat Strength', () => {
     u.hp = 40;
     // the promotion lives on a NAVAL list, so hand the column to this chassis
     // directly: the rate is what this test is about, not who may earn it.
+    // CIV6 (COMBAT_HEAL_NAVAL_ENEMY 0): a hull heals nothing on foreign
+    // ground; Supply Fleet's +5 is all it gets there.
     u.type = 'GALLEY';
+    refreshUnits(state);
+    expect(u.hp - 40).toBe(0);
     hold(u, 'HEAL_ANYWHERE');
     refreshUnits(state);
-    expect(u.hp - 40).toBe(15);
+    expect(u.hp - 40).toBe(5);
   });
 
   it('the Chaplain heals an adjacent military unit and never a civilian', () => {

@@ -1019,7 +1019,9 @@ class SimEconomy:
             return
         tc = tile.clamp(min=0)
         seat_at = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        raw = hit & ~mit
+        # CIV6 (Iteru, TRAIT_AVOID_*_FLOOD): Egypt's ground takes no flood
+        # damage; the fertility half still lands.
+        raw = hit & ~mit & ~self._seat_plays(seat_at, "EGYPT")
 
         rows = raw.nonzero(as_tuple=True)[0]
         if rows.numel():
@@ -2825,8 +2827,8 @@ class SimEconomy:
         """What this pool's units heal — the refreshUnits rule.
 
         ONE rule for every seat: this seat's own city centre 20, its own land
-        15, its own CAMP 20, neutral ground 10, anyone else's land 5 — or 15
-        with the promotion that heals outside friendly territory.
+        15, its own CAMP 20, neutral ground 10, anyone else's land 5. A HULL
+        reads the naval table instead (`navalHeal`).
 
         It reads as three rules only if you look at which terms are non-empty
         per class. A major holds no camps, so its camp term never fires; the
@@ -2843,13 +2845,24 @@ class SimEconomy:
         # one, and the one-owner invariant makes a centre tile its own seat's.
         center = self.centre_slot_at.gather(1, t) >= 0
         camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
-        # CIV6 (Auxiliary Ships / Supply Fleet): "Heal outside of friendly
-        # territory" — the foreign-ground rate becomes the own-ground one.
-        foreign = torch.where(self._promo_pool_flag(pre, "HEAL_ANYWHERE"),
-                              torch.full_like(t, 15), torch.full_like(t, 5))
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
-               torch.where(here != NO_SEAT, foreign, torch.full_like(t, 10))))
+               torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
+        # CIV6 (GlobalParameters COMBAT_HEAL_NAVAL_FRIENDLY 20 / NAVAL_NEUTRAL 0
+        # / NAVAL_ENEMY 0): a hull heals in its own waters alone. (Auxiliary
+        # Ships / Supply Fleet / Supercarrier): +10 in neutral and +5 in enemy
+        # territory. (Knarr): naval melee +10 in neutral territory.
+        _ty = getattr(self, f"{pre}_unit_type").clamp(min=0)
+        _hull = self.unit_naval[_ty]
+        if bool(_hull.any()):
+            _ha = self._promo_pool_flag(pre, "HEAL_ANYWHERE")
+            _knarr = (self._seat_plays(seat, "NORWAY") & (self._type_ranged_strength[_ty] == 0)
+                      & ~self._type_raider[_ty] & (self._type_air_slots[_ty] == 0))
+            _neutral = torch.where(_ha, torch.full_like(t, 10), torch.zeros_like(t)) \
+                + torch.where(_knarr, torch.full_like(t, self._knarr_heal), torch.zeros_like(t))
+            _enemy = torch.where(_ha, torch.full_like(t, 5), torch.zeros_like(t))
+            _nav = torch.where(home, torch.full_like(t, 20), torch.where(here != NO_SEAT, _enemy, _neutral))
+            heal = torch.where(_hull, _nav, heal)
         # CIV6 (Laying On Of Hands): "All Governor's units heal fully in one
         # turn in tiles of this city."
         if self.n_governors:

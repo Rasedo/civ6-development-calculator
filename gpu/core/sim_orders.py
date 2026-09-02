@@ -514,8 +514,7 @@ class SimOrders:
                     )
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
                 _canal = self._canal_pass().gather(1, tc.unsqueeze(1)).squeeze(1)
-                cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
-                        else torch.zeros(B, dtype=torch.bool, device=dev))
+                cart = self._row_ocean_open(row)
                 _wet = self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
                 _hull = (_wet & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | cart)) | _canal
                 if self._embark_live:

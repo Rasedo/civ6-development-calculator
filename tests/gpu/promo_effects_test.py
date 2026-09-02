@@ -206,9 +206,11 @@ def test_heal_anywhere(sim) -> None:
     else:
         t = int(foreign.nonzero(as_tuple=True)[0][0])
     slot = place(sim, t, ty, ROW, hp=50)
-    assert int(sim._seat_heal("major")[0, slot]) == 5, "foreign ground does not pay 5"
+    # CIV6 (COMBAT_HEAL_NAVAL_ENEMY 0): a hull heals nothing on foreign
+    # ground; Auxiliary Ships' +5 is all it gets there.
+    assert int(sim._seat_heal("major")[0, slot]) == 0, "foreign ground paid a hull"
     sim.major_unit_promos[0, slot] = 1 << k
-    assert int(sim._seat_heal("major")[0, slot]) == 15, "Auxiliary Ships did not heal outside"
+    assert int(sim._seat_heal("major")[0, slot]) == 5, "Auxiliary Ships did not heal outside"
     sim.major_unit_alive[0, slot] = False
     print("  HEAL_ANYWHERE OK — 5 on foreign ground, 15 with the promotion")
 

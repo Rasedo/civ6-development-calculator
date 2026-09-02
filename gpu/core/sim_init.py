@@ -2703,6 +2703,11 @@ class SimInit:
             if int(_u["uniq"]) >= 0 and int(_u["repl"]) >= 0:
                 self._civ_repl[int(_u["uniq"]), int(_u["repl"])] = _i
         self.row_civ = torch.tensor(_row_civ, dtype=torch.long, device=device)
+        _ab = _uq["abilities"]
+        self._iteru_mult = float(_ab["iteruProdMult"])
+        self._knarr_heal = int(_ab["knarrNeutralHeal"])
+        self._epic_levy_mult = float(_ab["epicQuestLevyMult"])
+        self._rome_post_gold = float(_ab["romeOwnPostGold"])
         self._row_civ_i = torch.where(self.row_civ >= 0, self.row_civ, torch.full_like(self.row_civ, _nc))
         self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
         # SCOUT is a military explorer (combat 10) but never in the civ roster

@@ -1586,6 +1586,16 @@ class SimMasks:
         bidx = torch.arange(self.B, device=self.device)
         return (seat >= 0) & (seat < self.n_majors) & self.civ_techs[bidx, rows, tech]
 
+    def _ocean_open(self, seat: torch.Tensor) -> torch.Tensor:
+        """[B] bool — may the seat named per game put a hull on OCEAN: its
+        Cartography, or CIV6 (Knarr) Norway's Shipbuilding."""
+        return self._seat_tech(seat, self._cartography_tech) | (
+            self._seat_plays(seat, "NORWAY") & self._seat_tech(seat, self._shipbuilding_tech))
+
+    def _row_ocean_open(self, row: int) -> torch.Tensor:
+        """[B] bool — `_ocean_open` for one seat row."""
+        return self._ocean_open(torch.full((self.B,), row, dtype=torch.long, device=self.device))
+
     def _gdr_has(self, utype: torch.Tensor, seat: torch.Tensor, k: int) -> torch.Tensor:
         """bool — `gdrHas`: the chassis is the robot AND its seat holds the
         Future-Era tech behind upgrade `k`. CIV6 (Giant Death Robot): the
@@ -1656,7 +1666,7 @@ class SimMasks:
         land_ok = self.passable.gather(1, dc).squeeze(1)
         water_ok = self.wpass.gather(1, dc).squeeze(1) & (
             ~self.ocean_tile.gather(1, dc).squeeze(1)
-            | self._seat_tech(u_seat, self._cartography_tech)
+            | self._ocean_open(u_seat)
         )
         hull_ok = water_ok | self._canal_pass().gather(1, dc).squeeze(1)
         out = torch.where(self.unit_naval[ut], hull_ok, land_ok)
@@ -1762,8 +1772,7 @@ class SimMasks:
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
         no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
         naval_m = self.unit_naval[ti_n] & mask
-        techs2 = self.civ_techs[:, row]
-        cart = techs2[:, self._cartography_tech] if self._cartography_tech >= 0 else None
+        cart = self._row_ocean_open(row) if self._cartography_tech >= 0 else None
         found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart)
         if bool(no_hold.any()):
             found = torch.where(no_hold, at_tile >= 0, found)
@@ -2361,8 +2370,7 @@ class SimMasks:
         is_civ = (self._type_civilian[utype.clamp(min=0)]).unsqueeze(2)
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
         is_nav = self.unit_naval[ut].unsqueeze(2)
-        cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
-                else torch.zeros(B, dtype=torch.bool, device=dev)).view(B, 1, 1)
+        cart = self._row_ocean_open(row).view(B, 1, 1)
         # a HULL floats over enterable water and through a Canal's passage;
         # the OCEAN gate is the seat's Cartography and the passage asks none.
         hull = ((self.wpass.gather(1, nbc).reshape(B, N, 6)

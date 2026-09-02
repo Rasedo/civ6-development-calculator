@@ -65,7 +65,7 @@ from the list below.
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel — SOURCED (Chemistry, an adjacent mountain, a portal between tunnels at 2 Movement) and unbuilt: a movement portal is a new pathing class on both engines |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
-| C-26 civilization uniques | 3 | UNIQUE INFRASTRUCTURE SHIPS (the Bath as Rome's Aqueduct — half price, +2 Housing, +1 Amenity; the Stave Church as Norway's Temple — a full Holy Site adjacency per Woods and +1 Production on coastal resource tiles; the Sphinx and the Ziggurat as Builder rows with every clause off the install's tables, the Sphinx's +2 Appeal included). UNIQUE UNITS SHIP (Legion, Maryannu Chariot Archer, Berserker, Longship, War-Cart — every clause off the install's Units.xml / UnitAbilities; the Legion's Roman Fort rides the FORT row; a chariot class is cavalry but no anti-cavalry target). OPEN: the four civ abilities, the four leader abilities, and the agendas (DLL-scored, and neither engine holds an opinion scale); the Rock Band's four unique-district venue clauses wait here. REACH: the fixtures seat Rome, Egypt and Norway, so no gate lane reaches the War-Cart or the Ziggurat, and the driver never orders a Legion's Fort; the engine has no resource VISIBILITY, so the Stave Church counts every coastal resource where the install counts the visible ones |
+| C-26 civilization uniques | 2 | UNIQUE INFRASTRUCTURE SHIPS (the Bath as Rome's Aqueduct — half price, +2 Housing, +1 Amenity; the Stave Church as Norway's Temple — a full Holy Site adjacency per Woods and +1 Production on coastal resource tiles; the Sphinx and the Ziggurat as Builder rows with every clause off the install's tables, the Sphinx's +2 Appeal included). UNIQUE UNITS SHIP (Legion, Maryannu Chariot Archer, Berserker, Longship, War-Cart — every clause off the install's Units.xml / UnitAbilities; the Legion's Roman Fort rides the FORT row; a chariot class is cavalry but no anti-cavalry target). CIVILIZATION ABILITIES SHIP (All Roads Lead to Rome — a Trading Post and, within Trade Route range of the capital, a road along the Trader's course at every founding and conquest, +1 Gold per own-city post on a route's chain; Iteru — +15% Production for district and wonder items on river tiles, no flood damage on Egypt's ground; Knarr — Ocean at Shipbuilding, no embark/disembark cost, naval melee +10 heal in neutral waters; Epic Quest — half-price levies). OPEN: the four leader abilities and the agendas (DLL-scored, and neither engine holds an opinion scale); Epic Quest's Tribal Village on an outpost capture waits on C-47; Iteru's flood AVOID is a whole-EVENT modifier and whether the DLL also skips the fertility half is unread (the fertility ships); whether the Knarr's Ocean clause reaches a TRADER's course is unread (`tradeWaterLevel` stays Cartography-gated); the Rock Band's four unique-district venue clauses wait here. REACH: the fixtures seat Rome, Egypt and Norway, so no gate lane reaches the War-Cart or the Ziggurat, and the driver never orders a Legion's Fort; the engine has no resource VISIBILITY, so the Stave Church counts every coastal resource where the install counts the visible ones |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
@@ -73,6 +73,7 @@ from the list below.
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district, its tier-1 building and the coastal Harbor ship; the yields of any of it and power are still absent |
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
+| C-47 Tribal Villages | 1 | TS holds a six-outcome stub (`claimGoodyHut`) the exporter refuses to ship a world for, the GPU holds nothing; an outpost capture is a plain kill on both; Epic Quest's clause waits on the mechanic |
 | C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
 | **C. Absent systems** | **19** | |
 | **OPEN, TOTAL** | **37** | |
@@ -1139,20 +1140,31 @@ under their blocker so the dependency is readable, and both halves count.
   - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
     `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; no source can close the middle.
-- **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
-  colour and a city list (`CIV_LEADERS`). Real Civ 6 gives every
-  civilization an ability, its leader an ability and an agenda, a unique
-  unit and a unique piece of infrastructure; none of the five exists.
-  Waiting on it: the Impi and Hypaspist stacks (B-54r), the Gauls'
+- **C-26. CIVILIZATION UNIQUES.** Weight 2. A major seat plays one of the
+  roster's civilizations (`CIV_IDS`, `Seat.civ` / `row_civ`); its unique
+  unit, unique infrastructure and civilization ability ship from the
+  install's own XML (Units, Districts, Buildings, Improvements, Traits and
+  their Modifiers). OPEN: the leader abilities and the agendas — the
+  agendas are DLL-scored and neither engine holds an opinion scale. The
+  roster is four civilizations; widening it is data (a `CivId`, a
+  `CIV_LEADERS` row, the unique rows' `uniqueTo`) and the seeder's
+  `leader` draw, which today seats civilization i at seat i.
+  Waiting on the wider roster: the Impi and Hypaspist stacks (B-54r), the Gauls'
   OPPIDUM, Ambiorix's and Saladin's leader terms, the Nihang's embarked
   CS, America's Film Studio, the unique-improvement appeal terms (shipped with the Sphinx)
   and suzerain rows (B-21r), and the ROCK BAND's four unique-district
   venue clauses (Expansion2_UnitPromotions.xml: Arena Rock also reads the
   Street Carnival, Reggae Rock the Copacabana, Glam Rock the Acropolis,
   Surf Band the Royal Navy Dockyard — each a `BAND_VENUE_BIT` the
-  district does not exist to raise). UNPARKED by the owner 2026-09-01:
-  the five are to be sourced from the game's own XML (Civilizations,
-  Leaders, Traits, Modifiers) rather than the Civilopedia.
+  district does not exist to raise).
+- **C-47. TRIBAL VILLAGES.** Weight 1. TS holds a six-outcome stub
+  (`claimGoodyHut`, a `tile.goodyHut` flag the mapgen can set), the GPU
+  holds nothing, and the exporter refuses a world carrying a hut — so no
+  gate lane reaches the stub and an outpost capture is a plain kill on
+  both engines. CIV6 (Epic Quest): "Receive a Tribal Village reward each
+  time you capture a barbarian outpost" — the clause waits on the
+  mechanic, and the reward TABLE (Expansion2_GoodyHuts.xml) is the source
+  to seed both engines from; the stub's six arms are unsourced.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1. The minor
   BUILDS now (`minorBuildPhase` / `_minor_build`): a production pot takes
   POPULATION points a turn — the `minorResearch` pacing stylization, since

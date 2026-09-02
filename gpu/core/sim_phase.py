@@ -567,6 +567,18 @@ class SimPhase:
             if bool((_pm != 1).any()) and self._proj_rows:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
+        # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
+        # next to a River."
+        if self._row_plays(row, "EGYPT"):
+            _nw = self._wonder_era.shape[0]
+            _d_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
+            _w_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
+            # a wonder's plot lives in the `city_wonder` registry, a district's
+            # rides the queue entry
+            _wplot = self.city_wonder[bidx, row, col, (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)]
+            _plot = torch.where(_w_i, _wplot, qt0)
+            _riv = (_plot >= 0) & self.tile_river[bidx, _plot.clamp(min=0)]
+            _emall = torch.where((_d_i | _w_i) & _riv, _emall * self._iteru_mult, _emall)
         # The slotted production cards: CIV6 stacks production modifiers
         # ADDITIVELY, so two cards that both name the item pay their
         # percentages summed rather than compounded.

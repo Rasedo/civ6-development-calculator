@@ -45,6 +45,7 @@ import {
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
+import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
   GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
   MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP,
@@ -128,7 +129,11 @@ export function waterEnterable(
   tile: Tile,
   unit: { seat: number },
 ): boolean {
-  if (tile.terrain === 'OCEAN') return ownerHasTech(state, unit, 'CARTOGRAPHY');
+  // CIV6 (Knarr): "Units gain the ability to enter Ocean tiles" at Shipbuilding.
+  if (tile.terrain === 'OCEAN') {
+    return ownerHasTech(state, unit, 'CARTOGRAPHY')
+      || (civOf(state, unit.seat) === 'NORWAY' && ownerHasTech(state, unit, 'SHIPBUILDING'));
+  }
   return true;
 }
 
@@ -220,6 +225,26 @@ export function riverCharge(state: GameState, from: Tile, to: Tile): number {
 export const TRADE_WATER_NONE = 0;
 export const TRADE_WATER_COAST = 1;
 export const TRADE_WATER_OCEAN = 2;
+
+/** The naval MELEE line: a hull with no ranged strength that is neither a
+ *  raider nor a carrier. */
+export function navalMelee(def: UnitDef | undefined): boolean {
+  return !!def?.naval && !def.ranged && !def.raider && !(def.airSlots ?? 0);
+}
+
+/**
+ * CIV6 (GlobalParameters COMBAT_HEAL_NAVAL_FRIENDLY 20 / NAVAL_NEUTRAL 0 /
+ * NAVAL_ENEMY 0): a hull heals in its own waters alone. (Auxiliary Ships /
+ * Supply Fleet / Supercarrier): +10 in neutral and +5 in enemy territory.
+ * (Knarr): naval melee +10 in neutral territory.
+ */
+export function navalHeal(state: GameState, unit: Unit, home: boolean, neutral: boolean): number {
+  if (home) return 20;
+  const promo = promoFlag(unit, 'HEAL_ANYWHERE');
+  if (!neutral) return promo ? 5 : 0;
+  const knarr = civOf(state, unit.seat) === 'NORWAY' && navalMelee(UNITS[unit.type]);
+  return (promo ? 10 : 0) + (knarr ? KNARR_NAVAL_MELEE_NEUTRAL_HEAL : 0);
+}
 
 export function tradeWaterLevel(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
@@ -914,8 +939,10 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const wEnd = isWater(to) ? to : from;
   const lEnd = isWater(to) ? from : to;
+  // CIV6 (Knarr): "No movement penalty for embarking and disembarking."
   const easyDock = wEnd.district === 'HARBOR'
-    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd));
+    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
+    || civOf(state, unit.seat) === 'NORWAY';
   const cost = transition
     ? moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP)
     : moveCostInto(state, from, to, unit) + riverCharge(state, from, to); // roads
@@ -1689,13 +1716,11 @@ export function refreshUnits(state: GameState): void {
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
         ? religiousHeal(state, unit, yctx(unit.seat))
+        : UNITS[unit.type]?.naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
         : (home && tile.district === 'CITY_CENTER' ? 20
           : home ? 15
           : onCamp ? 20
           : tileSeat(tile) === NO_SEAT ? 10
-          // CIV6 (Auxiliary Ships / Supply Fleet): "Heal outside of friendly
-          // territory" — the foreign-ground rate becomes the own-ground one.
-          : promoFlag(unit, 'HEAL_ANYWHERE') ? 15
           : 5)
           // a won Military Emergency heals its members in that seat's ground
           + emergencyHeal(state, unit.seat, tileSeat(tile))

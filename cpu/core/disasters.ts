@@ -4,7 +4,7 @@ import type { GameMap } from '../../world/types';
 import { neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatOf, tileSeat } from './seats';
+import { seatOf, tileSeat, civOf } from './seats';
 import { DISTRICTS } from '../data/districts';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { cityAtIndex } from './units';
@@ -134,7 +134,7 @@ export function floodRiver(state: GameState, start: Tile): Tile[] {
  * depended on what stood there would have to be mirrored
  * condition-for-condition on the other engine.
  */
-function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean): void {
+export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean): void {
   // the tile REMEMBERS each flood episode — the Great Bath's faith counts
   // them (`Tile.floodCount`), mitigated floods included
   tile.floodCount = (tile.floodCount ?? 0) + 1;
@@ -149,7 +149,10 @@ function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean
   const seat = tileSeat(tile);
   const col = floodTerrainColumn(tile.terrain);
 
-  if (!mitigated) {
+  // CIV6 (Iteru, TRAIT_AVOID_*_FLOOD): Egypt's ground takes no flood damage;
+  // the fertility half still lands.
+  const immune = civOf(state, seat) === 'EGYPT';
+  if (!mitigated && !immune) {
     scorch(state, tile);
     if (rDestroy < FLOOD_DESTROY_P[sev] && tile.improvement && !envImmune(state, tile)) {
       tile.improvement = null;

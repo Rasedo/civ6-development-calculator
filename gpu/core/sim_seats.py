@@ -957,6 +957,29 @@ class SimSeats:
                 self._fit_encamp_outer(wm, row, jj[wm], _wf)
         self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
 
+    def _civ_idx(self, civ: str) -> int:
+        return self._civ_ids.index(civ) if civ in self._civ_ids else -1
+
+    def _row_plays(self, row: int, civ: str) -> bool:
+        """`civOf(state, seat) === civ` for one seat row."""
+        i = self._civ_idx(civ)
+        return i >= 0 and row < self.n_majors and int(self.row_civ[row]) == i
+
+    def _seat_plays(self, seat: torch.Tensor, civ: str) -> torch.Tensor:
+        """bool, `seat`'s shape — `_row_plays` per absolute seat; anything
+        outside the major rows plays nothing."""
+        i = self._civ_idx(civ)
+        if i < 0:
+            return torch.zeros_like(seat, dtype=torch.bool)
+        r = seat.clamp(min=0, max=self.n_majors - 1)
+        return (seat >= 0) & (seat < self.n_majors) & (self.row_civ[r] == i)
+
+    def _levy_cost(self, row: int) -> float:
+        """`levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
+        city-state costs 50% less Gold." """
+        base = float(self.rules.citystate["levyGoldCost"])
+        return base * (self._epic_levy_mult if self._row_plays(row, "SUMERIA") else 1.0)
+
     def _civ_unit_ok(self, row: int) -> torch.Tensor:
         """[NU] bool `civUnitAllowed` — CIV6 (Civilizations.xml): a UNIQUE UNIT
         trains for its civilization alone, and stands IN PLACE of the chassis
@@ -1321,7 +1344,7 @@ class SimSeats:
             return ok, cs
         Sl = self.S
         mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
-        levy_cost = float(self.rules.citystate.get("levyGoldCost", 120))
+        levy_cost = self._levy_cost(row)
         ready = (self.turn - self.citystate_last_levy[:, :Sl]) >= self._levy_cooldown
         elig = active.unsqueeze(1) & (self.citystate_type[:, :Sl] == mil_idx) & self._suzerain_mask(row)[:, :Sl] & ready \
             & self._afford(self.civ_treasury[:, row], levy_cost).unsqueeze(1)
@@ -1751,7 +1774,7 @@ class SimSeats:
             lv = self._driven_levy.pop(row)
             Sl = self.S
             mil_idx_l = int(self.rules.citystate.get("militaristicIdx", -1))
-            levy_cost = float(self.rules.citystate.get("levyGoldCost", 120))
+            levy_cost = self._levy_cost(row)
             levy_units_n = int(self.rules.citystate.get("levyUnits", 2))
             want_l = active & ext & (lv >= 0) & (lv < Sl)
             if bool(want_l.any()):
@@ -2192,7 +2215,7 @@ class SimSeats:
         wet_ok = (
             self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1)
             & (~self.ocean_tile.gather(1, dc.unsqueeze(1)).squeeze(1)
-               | self._seat_tech(seat, self._cartography_tech))
+               | self._ocean_open(seat))
             & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
         )
         # a hull comes ashore only in a Canal's passage, and a water-walking
@@ -5455,6 +5478,12 @@ class SimSeats:
             chf = ch.clamp(min=0).reshape(B, -1)
             live_c = self._centre_city_map().gather(1, chf).reshape(ch.shape) & (ch >= 0)
             cg = live_c.double().sum(dim=2)
+            # CIV6 (All Roads Lead to Rome): "+1 Gold for passing through
+            # Trading Posts in your own cities" — a chain hop IS one of the
+            # seat's posts.
+            if self._row_plays(row, "ROME"):
+                own_c = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) == row)
+                cg = cg + own_c.double().sum(dim=2) * self._rome_post_gold
             for r2 in range(self.n_majors):
                 if r2 == row:
                     continue
@@ -6377,6 +6406,9 @@ class SimSeats:
         self.city_id[b, dst_row, col] = new_id
         self.civ_next_city_id[b, dst_row] += 1
         self.centre_slot_at[b, c_t] = col
+        if conquest:
+            _one = torch.tensor([b], dtype=torch.long, device=self.device)
+            self._all_roads_lead_to_rome(_one, dst_row, torch.tensor([c_t], dtype=torch.long, device=self.device))
         self.city_pop[b, dst_row, col] = max(1, (old_pop * 3) // 4)
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
@@ -6805,8 +6837,44 @@ class SimSeats:
             self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]
             self._tile_owner_ver += 1
+        self._all_roads_lead_to_rome(rows, row, s_idx)
         self._eff_version += 1
         return found
+
+    def _all_roads_lead_to_rome(self, rows: torch.Tensor, row: int, centre: torch.Tensor) -> None:
+        """CIV6 (All Roads Lead to Rome): "All cities you found or conquer start
+        with a Trading Post and, if within Trade Route range of your Capital, a
+        road to it." `rows` are the games, `centre` the new city's tile per
+        game. The road is the Trader's own course (`_trade_walk_step`), laid
+        on every land tile of the descent (`allRoadsLeadToRome`)."""
+        if rows.numel() == 0 or not self._row_plays(row, "ROME"):
+            return
+        self.trading_post[rows, row, centre] = True
+        capm = self.city_is_cap[rows, row] & self.city_alive[rows, row]
+        cap_t = self.city_center[rows, row].gather(1, capm.long().argmax(dim=1, keepdim=True)).squeeze(1)
+        has = capm.any(dim=1) & (cap_t >= 0) & (cap_t != centre)
+        if not bool(has.any()):
+            return
+        cap_c = cap_t.clamp(min=0)
+        dist = self.pair_dist[centre, cap_c].to(torch.long)
+        mar = self._centre_maritime_map()
+        sea = (self._trade_water_level(row) > 0)[rows] & mar[rows, centre] & mar[rows, cap_c]
+        rng = torch.where(sea, torch.full_like(dist, self._trade_sea_range), torch.full_like(dist, self._trade_range))
+        water = self._trade_water_level(row)[rows]
+        ok = has & (dist <= rng) & self._trade_walk_ok(rows, centre, cap_c, water)
+        sel = ok.nonzero(as_tuple=True)[0]
+        if sel.numel() == 0:
+            return
+        rr, cur, tgt, w = rows[sel], centre[sel], cap_c[sel], water[sel]
+        land = ~self.water[rr, cur]
+        self.road[rr[land], cur[land]] = True
+        for _ in range(TRADE_ROAD_MAX_STEPS):
+            walking = cur != tgt
+            if not bool(walking.any()):
+                break
+            cur = self._trade_walk_step(rr, cur, tgt, w)
+            land = walking & ~self.water[rr, cur]
+            self.road[rr[land], cur[land]] = True
 
     def _grant_new_city_unit(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
         """CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant
@@ -7570,7 +7638,9 @@ class SimSeats:
             )
             cost = torch.where(
                 transition,
-                base_step + torch.where(easy_dock, torch.zeros_like(land_cost),
+                # CIV6 (Knarr): "No movement penalty for embarking and
+                # disembarking." `seat` is the mover's row here.
+                base_step + torch.where(easy_dock | self._row_plays(int(seat), "NORWAY"), torch.zeros_like(land_cost),
                                         torch.full_like(land_cost, self._embark_transition_mp)),
                 base_step,
             )

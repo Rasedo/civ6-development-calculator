@@ -19,7 +19,7 @@ function capital(state: GameState, col = 6, row = 6): City {
   return settleAt(state, t.index, 0);
 }
 
-function placeDistrict(state: GameState, city: City, type: 'AQUEDUCT' | 'HOLY_SITE', tile: Tile): void {
+function placeDistrict(city: City, type: 'AQUEDUCT' | 'HOLY_SITE', tile: Tile): void {
   tile.district = type;
   tile.districtComplete = true;
   city.districts.push({ type, tileIndex: tile.index } as City['districts'][number]);
@@ -30,7 +30,7 @@ describe('the Bath (Rome, replaces the Aqueduct)', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     const city = capital(state);
     const aq = neighbors(state.map, state.map.tiles[city.centerIndex])[0];
-    placeDistrict(state, city, 'AQUEDUCT', aq);
+    placeDistrict(city, 'AQUEDUCT', aq);
     const bare = computeCityStats(state, city);
     state.seats[0].civ = 0; // Rome
     const rome = computeCityStats(state, city);
@@ -64,7 +64,7 @@ describe('the Stave Church (Norway, replaces the Temple)', () => {
     const city = capital(state);
     const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
     const hs = around[0];
-    placeDistrict(state, city, 'HOLY_SITE', hs);
+    placeDistrict(city, 'HOLY_SITE', hs);
     const woods = neighbors(state.map, hs).filter((t) => t.index !== city.centerIndex).slice(0, 2);
     for (const w of woods) w.feature = 'WOODS';
     city.buildings.push('SHRINE', 'TEMPLE');

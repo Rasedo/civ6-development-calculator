@@ -6,7 +6,8 @@ import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
+import { isWater, isImpassable, naturalWonderAt, hasRiver } from '../../world/query';
+import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
@@ -21,7 +22,7 @@ import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
-import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
@@ -335,6 +336,11 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
   state.eventLog.push(`Peace with ${actor.name}.`);
 }
 
+/** CIV6 (Epic Quest): "Levying units from a city-state costs 50% less Gold." */
+export function levyGoldCost(state: GameState, seat: number): number {
+  return LEVY_GOLD_COST * (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_MULT : 1);
+}
+
 export function levyUnits(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!cityState) return no('No such city-state.');
@@ -345,8 +351,9 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
   }
   if (!state.sandbox) {
-    if (!goldAffordable(seatOf(state, seat)!.treasury, LEVY_GOLD_COST)) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
-    seatOf(state, seat)!.treasury -= LEVY_GOLD_COST;
+    const cost = levyGoldCost(state, seat);
+    if (!goldAffordable(seatOf(state, seat)!.treasury, cost)) return no(`Levy costs ${cost} gold.`);
+    seatOf(state, seat)!.treasury -= cost;
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   for (let i = 0; i < LEVY_UNITS; i++) {
@@ -869,6 +876,7 @@ export function transferCity(
   // walls kept, outer pool 0 — a captured city stands behind a breach
   if (keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
   to.cities.push(flipped);
+  if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
   // nation; it must be Liberated!" The seat that LOST it is the affected one.
   if (why === 'conquered' && isCiv(fromSeat) && isCiv(to.seat)) {
@@ -2095,6 +2103,11 @@ export function seatPhase(state: GameState): void {
         if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
+        // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
+        // next to a River."
+        if ((q.kind === 'district' || q.kind === 'wonder') && seatMods.civ === 'EGYPT' && hasRiver(state.map.tiles[q.tileIndex])) {
+          _em *= ITERU_RIVER_PROD_MULT;
+        }
         // CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
         // this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
         // bonus Production in all Cities for 5 turns". Both are percentages, so

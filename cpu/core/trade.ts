@@ -5,13 +5,14 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat } from './seats';
+import { ROME_OWN_POST_GOLD } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { tradeWalkReachable, tradeWaterLevel, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
+import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
 import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
@@ -150,6 +151,32 @@ export function stampTradingPost(owner: Seat, centerIndex: number): void {
   posts.sort((a, b) => a - b);
 }
 
+/**
+ * CIV6 (All Roads Lead to Rome): "All cities you found or conquer start with
+ * a Trading Post and, if within Trade Route range of your Capital, a road to
+ * it." The road is the Trader's own course (`tradeWalkStep`), laid on every
+ * land tile of the descent, capital excluded when it is the city itself.
+ */
+export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: number): void {
+  const owner = seatOf(state, seat);
+  if (!owner || civOf(state, seat) !== 'ROME') return;
+  stampTradingPost(owner, centerIndex);
+  const cap = owner.cities.find((c) => c.isCapital && c.centerIndex !== centerIndex);
+  if (!cap) return;
+  const tiles = state.map.tiles;
+  const here = tiles[centerIndex];
+  const there = tiles[cap.centerIndex];
+  if (hexDistance(here.col, here.row, there.col, there.row) > tradeRouteRange(state, seat, centerIndex, cap.centerIndex)) return;
+  const water = tradeWaterLevel(state, seat);
+  if (!tradeWalkReachable(state, centerIndex, cap.centerIndex, water)) return;
+  if (!isWater(here)) here.road = true;
+  let at = centerIndex;
+  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== cap.centerIndex; step++) {
+    at = tradeWalkStep(state, at, cap.centerIndex, water);
+    if (!isWater(tiles[at])) tiles[at].road = true;
+  }
+}
+
 /** CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
  *  yields of every Trade Route which passes through this city" — the
  *  DESTINATION's post, which `routeChainGold` cannot double because the
@@ -171,6 +198,9 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
   for (const c of r.chain ?? []) {
     if (!centreHasCity(state, c)) continue;
     g += 1;
+    // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
+    // Posts in your own cities" — a chain hop IS one of the seat's posts.
+    if (civOf(state, seat) === 'ROME' && tileSeat(state.map.tiles[c]) === seat) g += ROME_OWN_POST_GOLD;
     for (const sx of state.seats) {
       if (sx.seat !== seat && (sx.tradingPosts ?? []).includes(c)) g += 1;
     }

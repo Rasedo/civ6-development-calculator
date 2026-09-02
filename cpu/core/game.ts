@@ -49,6 +49,7 @@ import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from 
 import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
+import { allRoadsLeadToRome } from './trade';
 
 export const TURN_LIMIT = 250;
 
@@ -238,6 +239,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const owner = seatOf(state, seat);
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
+  allRoadsLeadToRome(state, seat, tile.index);
   revealAround(state, seat, tile.index, 3);
   // CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant is
   // the SEAT's, so the first city — founded before any Plaza stands — never
