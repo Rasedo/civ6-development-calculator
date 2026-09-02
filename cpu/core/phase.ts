@@ -5,7 +5,7 @@ import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from '../data/greatPeople';
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
-import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
+import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt, hasRiver } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
 import { nextRandom } from './rand';
@@ -1194,12 +1194,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         return;
       }
       if (a >= A_FORM_UP && a < A_FORM_UP + 6) {
-        const nb = neighbors(state.map, here)[a - A_FORM_UP];
+        const nb = neighborTile(state.map, here, a - A_FORM_UP);
         if (nb) formUp(state, unit, nb.index);
         return;
       }
       if (a >= A_CONDEMN && a < A_CONDEMN + 6) {
-        const nb = neighbors(state.map, here)[a - A_CONDEMN];
+        const nb = neighborTile(state.map, here, a - A_CONDEMN);
         if (nb) condemnHeretic(state, unit, nb.index);
         return;
       }
@@ -1293,8 +1293,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         return;
       }
       if (a < 6) {
-        const nb = neighbors(state.map, here);
-        const to = nb[a];
+        // a DIRECTION keeps its slot at the map's edge: the compacted
+        // neighbour list would shift every later direction by one (the GPU's
+        // `neigh` plane keeps the -1)
+        const to = neighborTile(state.map, here, a);
         // t43: the WALKERS' OWN candidate gate, at the REPLAY surface —
         // refusal parity with the GPU's _apply_seat_unit_actions. stepUnit
         // re-validates cost/cliffs but neither STACKING nor the EMBARK tech
@@ -1320,8 +1322,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // ATTACK — safe to replay now BECAUSE the walkers stand down for
         // driven seats (no double-resolution). The SAME combat calls the
         // walkers make; both re-validate their target.
-        const nb = neighbors(state.map, here);
-        const to = nb[a - 6];
+        const to = neighborTile(state.map, here, a - 6);
         if (to) {
           // The ORDERED ranged attack is `rangedAttack`, not the autonomous
           // strike, dispatched by unit TYPE alone (the GPU applier's arm).
@@ -1431,7 +1432,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           }
         }
       } else if (a >= A_SPREAD && a < A_SPREAD + 7) {
-        const toS = a === A_SPREAD ? here : neighbors(state.map, here)[a - A_SPREAD - 1];
+        const toS = a === A_SPREAD ? here : neighborTile(state.map, here, a - A_SPREAD - 1);
         if (toS) spreadFromUnit(state, unit, actor, toS);
       } else if (a >= A_SNIPE && a < A_SNIPE + 12) {
         const rt = snipeRing(state, here)[a - A_SNIPE];
