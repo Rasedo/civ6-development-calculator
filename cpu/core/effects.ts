@@ -1,11 +1,14 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
+import { PLOT_YIELD_ROWS, type PlotYieldRow } from '../data/civilizations';
+import { worldEraIndex } from './eras';
+import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { civOf, seatOf, citiesOf, campTiles, isCiv } from './seats';
+import { civOf, seatOf, citiesOf, campTiles, isCiv , leaderOf } from './seats';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
@@ -133,6 +136,11 @@ export interface Modifiers {
   impUpgrades: Set<string>;
   /** the civilization the seat plays (`civOf`), for the unique rows' overlays */
   civ: string | null;
+  /** the leader the seat plays (`leaderOf`) */
+  leader: string | null;
+  /** the roster's plot rows this seat holds NOW — its civilization's or
+   *  leader's, with the civic and world-era gates already applied */
+  plotYields: readonly PlotYieldRow[];
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -219,10 +227,29 @@ export interface Modifiers {
   militaryMaintenanceAdd: number;
 }
 
+/** The plot rows a seat holds now — `PLOT_YIELD_ROWS` narrowed to its
+ *  civilization or leader, the civic it holds and the world era. */
+export function plotYieldRowsFor(state: GameState, seat: number, civ: string | null, leader: string | null): readonly PlotYieldRow[] {
+  if (civ === null && leader === null) return [];
+  const civics = seatOf(state, seat)?.research.civics ?? [];
+  let era = -2;
+  return PLOT_YIELD_ROWS.filter((r) => {
+    if (r.civ !== undefined ? r.civ !== civ : r.leader !== leader) return false;
+    if (r.civic !== undefined && !civics.includes(r.civic)) return false;
+    if (r.eraAtLeast !== undefined) {
+      if (era === -2) era = worldEraIndex(state);
+      if (era < ERAS.indexOf(r.eraAtLeast)) return false;
+    }
+    return true;
+  });
+}
+
 export function defaultModifiers(): Modifiers {
   return {
     improvementYields: {},
     civ: null,
+    leader: null,
+    plotYields: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -413,6 +440,8 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
 
   const mods = modifiersFromResearch(s.research);
   mods.civ = civOf(state, seat);
+  mods.leader = leaderOf(state, seat);
+  mods.plotYields = plotYieldRowsFor(state, seat, mods.civ, mods.leader);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
     applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);

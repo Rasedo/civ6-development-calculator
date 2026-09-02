@@ -5221,7 +5221,7 @@ class SimSeats:
         return bool(
             self._seat_has_beliefs(row) or self._b_appeal_rows
             or self._research_imp_y_any or self._imp_river_any
-            or self._gov_has_effects or self._imp_adj_live
+            or self._gov_has_effects or self._imp_adj_live or self._plot_rows_any
         )
 
     def _seat_tile_add(self, row: int) -> torch.Tensor:
@@ -5256,6 +5256,9 @@ class SimSeats:
             fy = self._imp_feat_plane()
             if fy is not None:
                 plane = plane + fy * self._tile_add_live()
+            py = self._plot_yield_plane(row)
+            if py is not None:
+                plane = plane + py * self._tile_add_live()
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
@@ -5285,12 +5288,58 @@ class SimSeats:
         fy = self._imp_feat_plane()
         if fy is not None:
             plane = plane + fy
+        py = self._plot_yield_plane(row)
+        if py is not None:
+            plane = plane + py
         plane = plane * self._tile_add_live()
         pres = self._preserve_plane(row)
         if pres is not None:
             plane = plane + pres * self._preserve_live()
         self._belief_feat_cache = (key, plane)
         return plane
+
+    def _plot_yield_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows
+        this seat holds (`plotYieldRowsFor` + the plot clause in `tileYields`):
+        its civilization's or leader's, gated on the civic it holds and the
+        WORLD era, paid where the plot's terrain/hills/mountain/feature/
+        improvement clauses match. The consumer masks impassable ground the
+        way `tileYields` leaves it."""
+        if not self._plot_rows_any:
+            return None
+        B, T, dev = self.B, self.T, self.device
+        civ, lead = self.row_civ[:, row], self.row_leader[:, row]
+        imp_live = (self.improvement >= 0) & ~self.pillaged
+        feat_live = (self.feat_id >= 0) & ~self.feat_stripped
+        hills = self.hills.bool()
+        era = self._world_era()
+        out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+        for k in range(int(self._py_civ.numel())):
+            c, ld = int(self._py_civ[k]), int(self._py_leader[k])
+            who = (civ == c) if c >= 0 else (lead == ld)
+            cv, er = int(self._py_civic[k]), int(self._py_era[k])
+            if cv >= 0:
+                who = who & self.civ_civics[:, row, cv]
+            if er >= 0:
+                who = who & (era >= er)
+            if not bool(who.any()):
+                continue
+            m = who.unsqueeze(1).expand(B, T)
+            tr, hl, im, ft = int(self._py_terr[k]), int(self._py_hills[k]), int(self._py_imp[k]), int(self._py_feat[k])
+            if tr >= 0:
+                m = m & (self.terrain == tr)
+            if hl >= 0:
+                m = m & (hills == bool(hl))
+            if int(self._py_mtn[k]):
+                m = m & self.tile_mountain
+            if ft >= 0:
+                m = m & feat_live & (self.feat_id == ft)
+            if im >= 0:
+                m = m & imp_live & (self.improvement == im)
+            if int(self._py_anyimp[k]):
+                m = m & imp_live
+            out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
+        return out
 
     def _dist_counts(self, row: int, pillage_gate: bool = True) -> torch.Tensor:
         """[B, RC, nD] COMPLETE district instances per (city, type), counted

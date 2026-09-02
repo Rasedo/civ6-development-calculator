@@ -2730,6 +2730,15 @@ class SimInit:
         self._enkidu_cs = int(_la["enkiduWarCs"])
         self._enkidu_qp = int(_la["enkiduCommonFoeQp"])
         self._enkidu_range = int(_la["enkiduShareRange"])
+        # CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows, one tensor
+        # per column (`PLOT_YIELD_ROWS`)
+        _py = [[int(x) if i != 3 else float(x) for i, x in enumerate(r)] for r in _uq["plotYields"]]
+        self._plot_rows_any = len(_py) > 0
+        _col = lambda i, dt: torch.tensor([r[i] for r in _py] or [0], dtype=dt, device=device)  # noqa: E731
+        self._py_civ, self._py_leader, self._py_yield = _col(0, torch.long), _col(1, torch.long), _col(2, torch.long)
+        self._py_amt = _col(3, dtype)
+        self._py_terr, self._py_hills, self._py_imp, self._py_feat = _col(4, torch.long), _col(5, torch.long), _col(6, torch.long), _col(7, torch.long)
+        self._py_anyimp, self._py_civic, self._py_mtn, self._py_era = _col(8, torch.long), _col(9, torch.long), _col(10, torch.long), _col(11, torch.long)
         # the naval MELEE line (`navalMelee`): a hull with no ranged strength
         # that is neither a raider nor a carrier
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)

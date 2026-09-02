@@ -83,6 +83,17 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   }
   if (tile.resource) addYields(out, RESOURCES[tile.resource].yields);
 
+  // CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows — the seat's
+  // civilization or leader pays a flat yield where the plot matches.
+  for (const r of ctx.mods.plotYields) {
+    if (r.terrain !== undefined && tile.terrain !== r.terrain) continue;
+    if (r.hills !== undefined && (tile.elevation === 'HILLS') !== r.hills) continue;
+    if (r.mountain && tile.elevation !== 'MOUNTAIN') continue;
+    if (r.feature !== undefined && tile.feature !== r.feature) continue;
+    if (r.improvement !== undefined && (tile.improvement !== r.improvement || tile.pillaged)) continue;
+    if (r.anyImprovement && (!tile.improvement || tile.pillaged)) continue;
+    out[r.yield] += r.amount;
+  }
   if (tile.improvement && !tile.pillaged) {
     const imp = tile.improvement as ImprovementId;
     addYields(out, IMPROVEMENTS[imp].yields);

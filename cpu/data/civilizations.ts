@@ -3,7 +3,10 @@
  * Traits / TraitModifiers / Modifiers). One constant per sourced number; the
  * rule body that spends each lives beside the mechanic it touches.
  */
-import type { ImprovementId } from '../../world/types';
+import type { ImprovementId, TerrainId, FeatureId } from '../../world/types';
+import type { YieldKey } from '../core/types';
+import type { Era } from './techs';
+import type { CivId, LeaderId } from './seats';
 
 /** CIV6 (Iteru, TRAIT_RIVER_FASTER_BUILDTIME_DISTRICT / _WONDER): "+15%
  *  Production towards Districts and Wonders built next to a River." */
@@ -51,3 +54,62 @@ export const HARDRADA_PILLAGE: readonly { improvement: ImprovementId; kind: 'sci
 export const ENKIDU_WAR_CS = 5;
 export const ENKIDU_COMMON_FOE_QP = 8;
 export const ENKIDU_SHARE_RANGE = 5;
+
+/**
+ * CIV6 (EFFECT_ADJUST_PLOT_YIELD): a civilization's or leader's flat yield on
+ * every plot the row's requirement set admits — off the install's
+ * TraitModifiers, one row per modifier. `hills` is the XML's own split
+ * (TERRAIN_TUNDRA is the flat tundra, TERRAIN_TUNDRA_HILLS the hills); a
+ * `civic` row waits on the seat's civic, an `eraAtLeast` row on the WORLD
+ * era (REQUIREMENT_GAME_ERA_ATLEAST_EXPANSION). Both engines pay these
+ * inside the tile walk, so an impassable plot (a mountain) pays nothing
+ * until the seat can work it.
+ */
+export interface PlotYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  amount: number;
+  terrain?: TerrainId;
+  hills?: boolean;
+  improvement?: ImprovementId;
+  feature?: FeatureId;
+  anyImprovement?: boolean;
+  civic?: string;
+  mountain?: boolean;
+  eraAtLeast?: Era;
+}
+
+export const PLOT_YIELD_ROWS: readonly PlotYieldRow[] = [
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'TUNDRA', improvement: 'MINE', hills: false },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'TUNDRA', improvement: 'MINE', hills: true },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'SNOW', improvement: 'MINE', hills: false },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'SNOW', improvement: 'MINE', hills: true },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'TUNDRA', improvement: 'CAMP', hills: false },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'TUNDRA', improvement: 'CAMP', hills: true },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'SNOW', improvement: 'CAMP', hills: false },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'SNOW', improvement: 'CAMP', hills: true },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'TUNDRA', improvement: 'FARM', hills: false },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'TUNDRA', improvement: 'FARM', hills: true },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'SNOW', improvement: 'FARM', hills: false },
+  { leader: 'LAURIER', yield: 'food', amount: 2, terrain: 'SNOW', improvement: 'FARM', hills: true },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'TUNDRA', improvement: 'LUMBER_MILL', hills: false },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'TUNDRA', improvement: 'LUMBER_MILL', hills: true },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'SNOW', improvement: 'LUMBER_MILL', hills: false },
+  { leader: 'LAURIER', yield: 'production', amount: 2, terrain: 'SNOW', improvement: 'LUMBER_MILL', hills: true },
+  { civ: 'INCA', yield: 'production', amount: 2, mountain: true },
+  { civ: 'INCA', yield: 'production', amount: 1, eraAtLeast: 'Industrial', mountain: true },
+  { civ: 'MALI', yield: 'production', amount: -1, improvement: 'MINE' },
+  { civ: 'MALI', yield: 'gold', amount: 4, improvement: 'MINE' },
+  { civ: 'MAORI', yield: 'production', amount: 1, feature: 'WOODS', anyImprovement: true },
+  { civ: 'MAORI', yield: 'production', amount: 1, feature: 'RAINFOREST', anyImprovement: true },
+  { civ: 'MAORI', yield: 'production', amount: 1, feature: 'RAINFOREST', civic: 'MERCANTILISM', anyImprovement: true },
+  { civ: 'MAORI', yield: 'production', amount: 1, feature: 'WOODS', civic: 'MERCANTILISM', anyImprovement: true },
+  { civ: 'MAORI', yield: 'production', amount: 2, feature: 'RAINFOREST', civic: 'CONSERVATION', anyImprovement: true },
+  { civ: 'MAORI', yield: 'production', amount: 2, feature: 'WOODS', civic: 'CONSERVATION', anyImprovement: true },
+  { civ: 'MAORI', yield: 'food', amount: 1, improvement: 'FISHING_BOATS' },
+  { civ: 'RUSSIA', yield: 'faith', amount: 1, terrain: 'TUNDRA', hills: false },
+  { civ: 'RUSSIA', yield: 'production', amount: 1, terrain: 'TUNDRA', hills: false },
+  { civ: 'RUSSIA', yield: 'faith', amount: 1, terrain: 'TUNDRA', hills: true },
+  { civ: 'RUSSIA', yield: 'production', amount: 1, terrain: 'TUNDRA', hills: true },
+];
