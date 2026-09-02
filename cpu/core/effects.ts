@@ -1,6 +1,6 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
-import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow } from '../data/civilizations';
+import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
@@ -145,6 +145,12 @@ export interface Modifiers {
   prodMults: readonly ProdMultRow[];
   /** the roster's international route yields this seat holds */
   intlRouteYields: readonly RouteYieldRow[];
+  /** the roster's combat-strength rows this seat holds, class masks resolved */
+  combatCs: readonly { amount: number; when: CombatCsWhen; classMask: number }[];
+  /** the roster's heal on eliminating a unit */
+  postKillHeal: number;
+  embarkMoves: readonly EmbarkMoveRow[];
+  ignoreShores: readonly IgnoreShoresRow[];
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -268,6 +274,10 @@ export function defaultModifiers(): Modifiers {
     plotYields: [],
     prodMults: [],
     intlRouteYields: [],
+    combatCs: [],
+    postKillHeal: 0,
+    embarkMoves: [],
+    ignoreShores: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -462,6 +472,11 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.plotYields = plotYieldRowsFor(state, seat, mods.civ, mods.leader);
   mods.prodMults = PROD_MULT_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   mods.intlRouteYields = INTL_ROUTE_YIELD_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
+  mods.combatCs = COMBAT_CS_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader))
+    .map((r) => ({ amount: r.amount, when: r.when, classMask: (r.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0) }));
+  mods.postKillHeal = POST_KILL_HEAL_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader)).reduce((s, r) => s + r.amount, 0);
+  mods.embarkMoves = EMBARK_MOVE_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
+  mods.ignoreShores = IGNORE_SHORES_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   // CIV6 (Meiji Restoration): the district rows join the adjacency adds the
   // cards write, so `districtAdjacency` reads one list
   for (const r of DISTRICT_ADJ_ROWS) {

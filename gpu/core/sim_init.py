@@ -2752,6 +2752,14 @@ class SimInit:
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
+        self._combat_cs_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["combatCs"]]  # type: ignore[misc]
+        self._post_kill_heal_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["postKillHeal"]]  # type: ignore[misc]
+        self._embark_move_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["embarkMoves"]]  # type: ignore[misc]
+        self._ignore_shores_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["ignoreShores"]]  # type: ignore[misc]
         # the naval MELEE line (`navalMelee`): a hull with no ranged strength
         # that is neither a raider nor a carrier
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)

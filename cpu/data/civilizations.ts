@@ -199,3 +199,66 @@ export const ROUTE_CAPACITY_ROWS: readonly RouteCapacityRow[] = [
 export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | null, leader: string | null): boolean {
   return row.civ !== undefined ? row.civ === civ : row.leader === leader;
 }
+
+/**
+ * CIV6 (EFFECT_GRANT_ABILITY -> MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH): a flat
+ * Combat Strength a civilization's or leader's units carry under a clause —
+ * against a city-state's units (Barbarossa), against a wounded unit
+ * (Tomyris), for a class (Genghis Khan's cavalry), on a coastal tile (Hojo's
+ * land units on coastal land, his hulls on Coast), against a city or
+ * district (the Great Turkish Bombard). `classes` names TARGET_CLASSES; an
+ * empty list is every combat unit.
+ */
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast';
+export interface CombatCsRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  when: CombatCsWhen;
+  classes?: readonly string[];
+}
+export const COMBAT_CS_ROWS: readonly CombatCsRow[] = [
+  { leader: 'BARBAROSSA', amount: 7, when: 'foeMinor' },
+  { leader: 'TOMYRIS', amount: 5, when: 'foeWounded' },
+  { leader: 'GENGHIS_KHAN', amount: 3, when: 'always', classes: ['LIGHT_CAV', 'HEAVY_CAV'] },
+  { leader: 'HOJO', amount: 5, when: 'onCoast', classes: ['RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
+  { leader: 'HOJO', amount: 5, when: 'onCoast', classes: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'NAVAL_CARRIER'] },
+  { civ: 'OTTOMAN', amount: 5, when: 'foeCity', classes: ['SIEGE'] },
+];
+
+/** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_HEAL, Tomyris): "Heal after
+ *  defeating a unit" — on the same hook the War Department's heal rides. */
+export interface PostKillHealRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const POST_KILL_HEAL_ROWS: readonly PostKillHealRow[] = [
+  { leader: 'TOMYRIS', amount: 30 },
+];
+
+/** CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT under UNIT_EMBARKED): extra Movement
+ *  while embarked — Mana's land units, Mediterranean Colonies' Settlers. */
+export interface EmbarkMoveRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  settlerOnly?: boolean;
+}
+export const EMBARK_MOVE_ROWS: readonly EmbarkMoveRow[] = [
+  { civ: 'MAORI', amount: 2 },
+  { civ: 'PHOENICIA', amount: 2, settlerOnly: true },
+];
+
+/** CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): "No movement penalty for
+ *  embarking and disembarking" — the Knarr's every unit, the Mediterranean
+ *  Colonies' Settlers. */
+export interface IgnoreShoresRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  settlerOnly?: boolean;
+}
+export const IGNORE_SHORES_ROWS: readonly IgnoreShoresRow[] = [
+  { civ: 'NORWAY' },
+  { civ: 'PHOENICIA', settlerOnly: true },
+];

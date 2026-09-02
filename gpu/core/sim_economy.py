@@ -3144,8 +3144,11 @@ class SimEconomy:
         naval = self.unit_naval[typ]
         emb = getattr(self, f"{pre}_unit_emb") if self._embark_live else torch.zeros_like(naval)
         if self._embark_live:
+            # CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's rows
             base = torch.where(
-                emb & ~naval, torch.full_like(base, self._embark_moves), base
+                emb & ~naval,
+                torch.full_like(base, self._embark_moves) + self._roster_embark_mp(getattr(self, f"{pre}_unit_seat"), typ),
+                base,
             )
         base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
         # ONE multiply, at the end: every figure above is in WHOLE points, and

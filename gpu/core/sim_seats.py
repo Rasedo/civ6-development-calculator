@@ -7235,6 +7235,7 @@ class SimSeats:
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._ally_war_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
+                atk_e = atk_e + self._roster_cs(a_seat[:, u], a_type[:, u], here, d_seat_m, def_hp, False).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
@@ -7243,6 +7244,7 @@ class SimSeats:
             def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + self._vis_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + self._ally_war_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
+            def_e = def_e + self._roster_cs(def_civ_u, d_type, ttc, a_seat[:, u], a_hp[:, u], False).to(def_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, a_type[:, u])
@@ -7866,9 +7868,9 @@ class SimSeats:
             )
             cost = torch.where(
                 transition,
-                # CIV6 (Knarr): "No movement penalty for embarking and
-                # disembarking." `seat` is the mover's row here.
-                base_step + torch.where(easy_dock | self._row_plays(int(seat), "NORWAY"), torch.zeros_like(land_cost),
+                # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
+                # Mediterranean Colonies' Settlers. `seat` is the mover's row here.
+                base_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
                                         torch.full_like(land_cost, self._embark_transition_mp)),
                 base_step,
             )
@@ -8788,6 +8790,8 @@ class SimSeats:
         atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
                          + self._congress_unit_cs(at0, a_seat[:, u])
                          + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
+        atk_e = atk_e + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
+                                        self.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         self._spend_one_attack(atk_kind, u, att)
@@ -8882,12 +8886,17 @@ class SimSeats:
         to 20 hit points when they eliminate a unit." The victor's OWN seat
         holds the building, so a barbarian's or a city-state's kill heals
         nothing, and a city is not a unit."""
-        if not self._heal_kill_live:
+        if not self._heal_kill_live and not self._post_kill_heal_rows:
             return hp
         cap = int(self.rules.combat.get("unitHp", 100))
         ok = won & (row >= 0) & (row < self.n_majors)
-        tab = self._bsum_by_row("healkill", self._b_heal_kill)
-        amt = tab.gather(1, row.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
+        amt = torch.zeros(row.shape, dtype=torch.long, device=self.device)
+        if self._heal_kill_live:
+            tab = self._bsum_by_row("healkill", self._b_heal_kill)
+            amt = amt + tab.gather(1, row.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1).long()
+        # CIV6 (Tomyris): "heal after defeating a unit" — the roster's row
+        for civ, lead, a in self._post_kill_heal_rows:
+            amt = amt + self._seat_is(row, civ, lead).long() * a
         return torch.where(ok & (amt > 0), (hp + amt.to(hp.dtype)).clamp(max=cap), hp)
 
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
@@ -9137,6 +9146,8 @@ class SimSeats:
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
             def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
             atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
+            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False).to(def_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False).to(atk_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, ut0)
@@ -9358,6 +9369,8 @@ class SimSeats:
             atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
             def_e = def_e + (self._vis_cs(d_seat, aseat) + self._ally_war_cs(d_seat, aseat)).to(def_e.dtype)
             atk_e = atk_e + (self._vis_cs(aseat, d_seat) + self._ally_war_cs(aseat, d_seat)).to(atk_e.dtype)
+            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, aseat, a_hp[:, u], False).to(def_e.dtype)
+            atk_e = atk_e + self._roster_cs(aseat, at0, a_tile[:, u], d_seat, def_hp, False).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
                              + self._gov_unit_cs(d_type, _ucs_seat)

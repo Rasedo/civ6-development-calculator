@@ -347,6 +347,7 @@ def main() -> int:
                 ("leader_abilities", [py, "tests/gpu/leader_abilities_test.py"], 4),  # the LEADER ABILITIES: Trajan's Column, Mediterranean's Bride, Thunderbolt of the North, Adventures of Enkidu
                 ("plot_yields", [py, "tests/gpu/plot_yields_test.py"], 4),  # the roster's PLOT YIELD rows: Laurier, Inca, Mali, the Maori, Russia
                 ("roster_rows", [py, "tests/gpu/roster_rows_test.py"], 4),  # the roster's production, adjacency, route-yield and capacity rows
+                ("combat_rows", [py, "tests/gpu/combat_rows_test.py"], 4),  # the roster's combat-strength, kill-heal, embark-movement and shore rows
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

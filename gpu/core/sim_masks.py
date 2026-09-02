@@ -903,6 +903,68 @@ class SimMasks:
             return adv
         return adv + torch.where(utype == self._monk_idx, self._congress_relig_cs(seat), z)
 
+    def _seat_is(self, seat: torch.Tensor, civ: int, leader: int) -> torch.Tensor:
+        """bool, `seat`'s shape — `rowIsFor` per absolute seat."""
+        NM = self.n_majors
+        r = seat.clamp(min=0, max=NM - 1).reshape(self.B, -1)
+        key = (self.row_civ if civ >= 0 else self.row_leader).gather(1, r).reshape(seat.shape)
+        return (seat >= 0) & (seat < NM) & (key == (civ if civ >= 0 else leader))
+
+    def _roster_cs(self, seat: torch.Tensor, utype: torch.Tensor, tile: torch.Tensor,
+                   foe_seat: torch.Tensor, foe_hp: torch.Tensor | None, foe_city: bool) -> torch.Tensor:
+        """[B] long — `rosterCS`: the flat Combat Strength a unit's
+        civilization or leader adds under its row's clause (`COMBAT_CS_ROWS`):
+        against a city-state's unit, a wounded one, a city or district, for a
+        class, on a coastal tile (a hull on Coast, a land unit on coastal
+        land, never embarked)."""
+        z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
+        if not self._combat_cs_rows:
+            return z
+        t = utype.clamp(min=0, max=self.NU - 1)
+        combat = (utype >= 0) & (self._type_combat[t] > 0)
+        bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class[t].clamp(min=0)]
+        tc = tile.clamp(min=0).reshape(self.B, -1)
+        naval = self.unit_naval[t]
+        on_coast = torch.where(naval,
+                               (self.water.gather(1, tc) & ~self.ocean_tile.gather(1, tc)).reshape(seat.shape),
+                               self.coastal_land.gather(1, tc).reshape(seat.shape))
+        cap = int(self.rules.combat.get("unitHp", 100))
+        out = z
+        for civ, lead, amt, mask, when in self._combat_cs_rows:
+            who = self._seat_is(seat, civ, lead) & combat
+            if mask:
+                who = who & ((bit & mask) != 0)
+            if when == 1:
+                who = who & (foe_seat >= 100) & (foe_seat < BARB_SEAT)
+            elif when == 2:
+                who = who & (foe_hp < cap) if foe_hp is not None else torch.zeros_like(who)
+            elif when == 3:
+                who = who if foe_city else torch.zeros_like(who)
+            elif when == 4:
+                who = who & on_coast
+            out = out + who.long() * amt
+        return out
+
+    def _roster_embark_mp(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """[B, U] long — `rosterEmbarkMoves`: extra Movement while embarked."""
+        out = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
+        for civ, lead, amt, settler in self._embark_move_rows:
+            who = self._seat_is(seat, civ, lead)
+            if settler:
+                who = who & (utype == self._settler_idx)
+            out = out + who.long() * amt
+        return out
+
+    def _ignore_shores(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """bool — `ignoresShores`: no embark/disembark penalty for this unit."""
+        out = torch.zeros(utype.shape, dtype=torch.bool, device=self.device)
+        for civ, lead, settler in self._ignore_shores_rows:
+            who = self._seat_is(seat, civ, lead)
+            if settler:
+                who = who & (utype == self._settler_idx)
+            out = out | who
+        return out
+
     def _gov_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """[B] long — `governmentUnitCS`' twin, the adopted government's flat
         Combat Strength for one unit. CIV6 (Oligarchy): "All land melee,

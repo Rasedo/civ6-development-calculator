@@ -246,6 +246,23 @@ export function navalHeal(state: GameState, unit: Unit, home: boolean, neutral: 
   return (promo ? 10 : 0) + (knarr ? KNARR_NAVAL_MELEE_NEUTRAL_HEAL : 0);
 }
 
+/** CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's extra
+ *  Movement for this embarked unit — `EMBARK_MOVE_ROWS`. */
+export function rosterEmbarkMoves(state: GameState, unit: { type: string; seat: number }): number {
+  let m = 0;
+  for (const r of getModifiers(state, unit.seat).embarkMoves) {
+    if (!r.settlerOnly || unit.type === 'SETTLER') m += r.amount;
+  }
+  return m;
+}
+
+/** CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): "No movement penalty for
+ *  embarking and disembarking" — the Knarr's every unit, the Mediterranean
+ *  Colonies' Settlers (`IGNORE_SHORES_ROWS`). */
+export function ignoresShores(state: GameState, unit: { type: string; seat: number }): boolean {
+  return getModifiers(state, unit.seat).ignoreShores.some((r) => !r.settlerOnly || unit.type === 'SETTLER');
+}
+
 export function tradeWaterLevel(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
   if (!techs?.includes('CELESTIAL_NAVIGATION')) return TRADE_WATER_NONE;
@@ -895,7 +912,7 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const promo = promoValue(unit, 'MOVES');
   const atSea = seaMoveBonus(state, unit.seat);
   if (unit.embarked && !def?.naval) {
-    return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo);
+    return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo + rosterEmbarkMoves(state, unit));
   }
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
@@ -939,10 +956,9 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const wEnd = isWater(to) ? to : from;
   const lEnd = isWater(to) ? from : to;
-  // CIV6 (Knarr): "No movement penalty for embarking and disembarking."
   const easyDock = wEnd.district === 'HARBOR'
     || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
-    || civOf(state, unit.seat) === 'NORWAY';
+    || ignoresShores(state, unit);
   const cost = transition
     ? moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP)
     : moveCostInto(state, from, to, unit) + riverCharge(state, from, to); // roads

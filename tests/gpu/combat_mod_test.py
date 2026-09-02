@@ -87,6 +87,12 @@ def find_melee(rules, paths):
     Returns (sim, p, code, name)."""
     for path in paths:
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        # the reference model below knows no roster clause: every seat plays
+        # a civilization with no combat-strength row (the fixture's trio is
+        # the seeder's draw, which may seat Tomyris or Genghis Khan)
+        sim.row_civ[0, :] = -1
+        sim.row_leader[0, :] = -1
+        sim._eff_version += 1
         _mcls = rules.promo_classes.index("MELEE")
         bty = next(i for i in range(sim.NU)
                    if float(sim._type_combat[i]) > 0

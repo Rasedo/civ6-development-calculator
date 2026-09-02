@@ -8,7 +8,7 @@ import { routeYieldsInternational, tradeCapacity, rosterRouteCapacity } from '..
 import { neighbors } from '../../../world/hex';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, ROUTE_CAPACITY_ROWS } from '../../../cpu/data/civilizations';
-import type { City, GameState, Tile } from '../../../cpu/core/types';
+import type { City, Tile } from '../../../cpu/core/types';
 
 /**
  * THE ROSTER'S DATA ROWS (CIV6, the install's TraitModifiers): production
@@ -18,7 +18,7 @@ import type { City, GameState, Tile } from '../../../cpu/core/types';
  */
 const seatRow = (civ: string) => CIV_LEADERS.findIndex((l) => l.civ === civ);
 
-function placeDistrict(state: GameState, city: City, type: 'HOLY_SITE' | 'CAMPUS' | 'GOVERNMENT_PLAZA', tile: Tile): void {
+function placeDistrict(city: City, type: 'HOLY_SITE' | 'CAMPUS' | 'GOVERNMENT_PLAZA', tile: Tile): void {
   tile.district = type;
   tile.districtComplete = true;
   city.districts.push({ type, tileIndex: tile.index } as City['districts'][number]);
@@ -61,9 +61,9 @@ describe('Meiji Restoration', () => {
       const city = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
       const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
       const hs = around[0];
-      placeDistrict(state, city, 'HOLY_SITE', hs);
+      placeDistrict(city, 'HOLY_SITE', hs);
       const beside = neighbors(state.map, hs).find((t) => t.index !== city.centerIndex && !t.district)!;
-      placeDistrict(state, city, 'CAMPUS', beside);
+      placeDistrict(city, 'CAMPUS', beside);
       expect(getModifiers(state, 0).districtAdjacencyAdd.HOLY_SITE?.length ?? 0).toBe(civ === 'JAPAN' ? 1 : 0);
       // the centre is an adjacent district too: +1 per neighbour holding one
       const n = neighbors(state.map, hs).filter((t) => t.district === 'CITY_CENTER' || (t.district && t.districtComplete)).length;
@@ -104,7 +104,7 @@ describe('the capacity rows', () => {
     expect(getModifiers(dido, 0).leader).toBe('DIDO');
     const city = settleAt(dido, tileAtCoords(dido.map, 6, 6).index, 0);
     expect(rosterRouteCapacity(dido, 0)).toBe(0);
-    placeDistrict(dido, city, 'GOVERNMENT_PLAZA', neighbors(dido.map, dido.map.tiles[city.centerIndex])[0]);
+    placeDistrict(city, 'GOVERNMENT_PLAZA', neighbors(dido.map, dido.map.tiles[city.centerIndex])[0]);
     expect(rosterRouteCapacity(dido, 0)).toBe(1);
     city.buildings.push('ANCESTRAL_HALL');
     expect(rosterRouteCapacity(dido, 0)).toBe(2);
