@@ -26,7 +26,7 @@ import type { GameMap, Tile } from '../world/types';
 import { hexDistance, tilesWithin } from '../world/hex';
 import { isWater, isImpassable, naturalWonderAt } from '../world/query';
 import { mulberry32, deriveSeed, randInt, type Rng } from '../world/rng';
-import { CIV_LEADERS } from '../cpu/data/seats';
+import { CIV_LEADERS } from '../world/roster';
 import type { WorldCiv, WorldCityState } from '../world/file';
 
 export const PLACEMENT_VERSION = 'spaced-balanced@1';
