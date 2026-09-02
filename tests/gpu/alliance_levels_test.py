@@ -14,10 +14,12 @@ Proven here:
   * the sender and receiver route halves pay the typed yield;
   * Military 1 (+5 vs common enemies) and Religious 2 (+10 theological)
     answer per pair, and never for the ally itself;
-  * Military 2 folds the two explored maps together;
+  * Military 2 folds the two explored maps together and pays +15%
+    Production toward military units while either side is at war;
   * Religious 1 zeroes the ally's religious pressure; Religious 3 pays
     +1 Faith per citizen following the ally's religion;
-  * Research 2 boosts the lowest mutual unresearched tech on the cadence;
+  * Research 2 hands each side, on the 30-turn cadence, a Eureka for the
+    first tech its ally has researched or boosted and it has not;
     Research 3 and Cultural 3 read the ally's stored output rates;
   * Cultural 2 pays +1 GPP on class districts in routed cities;
   * Economic 2 pays envoy points per ally-suzerained minor and Economic 3
@@ -193,6 +195,45 @@ def test_shared_visibility(rules, path) -> None:
     print("  5 visibility OK — the explored maps fold together at level 2")
 
 
+def test_military_production(rules, path) -> None:
+    sim = build(rules, path)
+    warr = int((~sim.unit_naval & ~sim._type_civilian).long().argmax())
+    col = int(sim.city_alive[B0, 0].long().argmax())
+    act = torch.zeros(sim.B, dtype=torch.bool)
+    act[B0] = True
+    colv = torch.full((sim.B,), col, dtype=torch.long)
+    prod = torch.full((sim.B,), 10.0, dtype=torch.float64)
+
+    def run(cur_code: int) -> float:
+        sim.city_current[B0, 0, col, 0] = cur_code
+        sim.city_cost[B0, 0, col, 0] = 100000
+        sim.city_progress[B0, 0, col, 0] = 0
+        sim.city_prod_bank[B0, 0, col] = 0
+        sim._seat_city_produce(0, colv, act, prod.clone())
+        return float(sim.city_progress[B0, 0, col, 0])
+
+    pct = float(sim._al_m2_mil_prod_pct) / 100
+    base = run(sim.UNIT_BASE + warr)
+    civ_base = run(sim.SETTLER)
+    ally_pair(sim, 0, 1, MILITARY, qp=int(sim._al_l2_qp))
+    assert abs(run(sim.UNIT_BASE + warr) - base) < 1e-9, "the bonus paid with nobody at war"
+    foe = sim.n_majors if sim.S > 0 else 2  # the first minor, else a third major
+    sim.war[B0, 1, foe] = True
+    sim.war[B0, foe, 1] = True
+    got = run(sim.UNIT_BASE + warr)
+    assert abs(got - base * (1 + pct)) < 1e-9, f"the ally's war paid {got}, wanted {base * (1 + pct)}"
+    assert abs(run(sim.SETTLER) - civ_base) < 1e-9, "the bonus reached a civilian head"
+    sim.war[B0, 1, foe] = False
+    sim.war[B0, foe, 1] = False
+    sim.war[B0, 0, foe] = True
+    sim.war[B0, foe, 0] = True
+    got = run(sim.UNIT_BASE + warr)
+    assert abs(got - base * (1 + pct)) < 1e-9, f"the own war paid {got}, wanted {base * (1 + pct)}"
+    ally_pair(sim, 0, 1, MILITARY, qp=0)
+    assert abs(run(sim.UNIT_BASE + warr) - base) < 1e-9, "level 1 paid the level-2 bonus"
+    print("  5b production OK — +15% toward military units under either side's war, level 2 only")
+
+
 def test_religious_pressure_and_faith(rules, path) -> None:
     sim = build(rules, path)
     # both seats found a religion at their capitals
@@ -235,15 +276,27 @@ def test_research_cadence_and_rates(rules, path) -> None:
     sim = build(rules, path)
     ally_pair(sim, 0, 1, RESEARCH, qp=int(sim._al_l2_qp))
     n = int(sim._al_r2_boost_turns)
+    assert n == 30, "the cadence is the alliance table's 30"
     sim.turn = n  # the tick reads the pre-increment turn, the congress alignment
-    both = (~sim.civ_techs[B0, 0] & ~sim.civ_techs[B0, 1])
-    pick = int(both.long().argmax())
-    b0 = bool(sim.civ_tech_boosted[B0, 0, pick])
-    b1 = bool(sim.civ_tech_boosted[B0, 1, pick])
+    # level the two sides first (the warm-up hands out Eurekas unevenly), then
+    # seat 1 knows two techs seat 0 lacks: one researched, one merely boosted;
+    # seat 0 knows one seat 1 lacks. Each side takes the FIRST in catalog order.
+    for plane in (sim.civ_techs, sim.civ_tech_boosted):
+        both = plane[B0, 0] | plane[B0, 1]
+        plane[B0, 0] = both
+        plane[B0, 1] = both
+    NT = sim.civ_techs.shape[2]
+    fresh = [t for t in range(NT) if not bool(sim.civ_techs[B0, 0, t]) and not bool(sim.civ_techs[B0, 1, t])
+             and not bool(sim.civ_tech_boosted[B0, 0, t]) and not bool(sim.civ_tech_boosted[B0, 1, t])]
+    ta, tb, tc = fresh[-3], fresh[-2], fresh[-1]
+    sim.civ_tech_boosted[B0, 1, ta] = True   # the ally's boost counts as "researched or boosted"
+    sim.civ_techs[B0, 1, tb] = True
+    sim.civ_techs[B0, 0, tc] = True
     sim.step()
-    assert not (b0 or b1), "the probe tech was boosted before the cadence"
-    assert bool(sim.civ_tech_boosted[B0, 0, pick]) and bool(sim.civ_tech_boosted[B0, 1, pick]), \
-        "the shared boost did not land on the lowest mutual tech"
+    assert bool(sim.civ_tech_boosted[B0, 0, ta]) and not bool(sim.civ_tech_boosted[B0, 0, tb]), \
+        "seat 0 did not take the first tech its ally holds"
+    assert bool(sim.civ_tech_boosted[B0, 1, tc]), "seat 1 did not take the tech seat 0 holds"
+    assert not bool(sim.civ_tech_boosted[B0, 0, tc]), "the boost landed on a tech the side already knows"
 
     # Research 3 reads the ally's stored science rate under co-research
     deltas = {}
@@ -265,7 +318,7 @@ def test_research_cadence_and_rates(rules, path) -> None:
     got = deltas[True][0] - deltas[False][0]
     want = float(s2._al_r3_sci_pct) * 100.0
     assert abs(got - want) < 1e-6, f"Research 3 paid {got}, wanted {want}"
-    print("  8 research OK — the 20-turn boost and the +10% co-research read")
+    print("  8 research OK — the 30-turn Eureka from the ally's techs and the +10% co-research read")
 
 
 def test_cultural_dividends(rules, path) -> None:
@@ -358,6 +411,7 @@ def main() -> int:
     test_route_halves(rules, path)
     test_combat_terms(rules, path)
     test_shared_visibility(rules, path)
+    test_military_production(rules, path)
     test_religious_pressure_and_faith(rules, path)
     test_research_cadence_and_rates(rules, path)
     test_cultural_dividends(rules, path)

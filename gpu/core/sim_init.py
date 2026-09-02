@@ -502,6 +502,7 @@ class SimInit:
         self._al_route_from = torch.tensor([int(x) for x in rules.seats["allianceRouteFrom"]], dtype=torch.long, device=device)
         self._al_route_ycol = torch.tensor([int(x) for x in rules.seats["allianceRouteYcol"]], dtype=torch.long, device=device)
         self._al_m1_cs = int(rules.seats["allianceM1Cs"])
+        self._al_m2_mil_prod_pct = int(rules.seats["allianceM2MilProdPct"])
         self._al_r2_boost_turns = int(rules.seats["allianceR2BoostTurns"])
         self._al_r3_sci_pct = float(rules.seats["allianceR3SciPct"])
         self._al_c2_gpp = int(rules.seats["allianceC2Gpp"])

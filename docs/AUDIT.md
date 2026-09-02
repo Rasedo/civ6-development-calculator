@@ -60,7 +60,7 @@ from the list below.
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, and two alliance clauses with no published magnitude |
+| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%, blocked on C-46's scale), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | the shortage penalty's magnitude is unpublished |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here |
@@ -74,8 +74,9 @@ from the list below.
 | C-38 a city-state's city develops HALFWAY | 1 | walls (with the combat split), the type's district, its tier-1 building and the coastal Harbor ship; the yields of any of it and power are still absent |
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
-| **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **39** | |
+| C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
+| **C. Absent systems** | **22** | |
+| **OPEN, TOTAL** | **40** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -134,14 +135,11 @@ detail of its own). "Meanwhile" states what both engines do today.
 14. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-15. **C-2 — four diplomacy cells.** Military 2's Production clause and
-    Religious 3's pressure clause have no published magnitude (the wiki's
-    Alliances data page refuses automated readers — a manual read would
-    settle both); Research 2's cadence ships at the analyst table's 20
-    turns but one paraphrase says 30 (CONTESTED); the gold purchase of
-    the QUEUE-FRONT item is refused on both engines and real Civ 6
-    likely allows it with progress banked. Meanwhile: nothing / nothing /
-    20 / refused.
+15. **C-2 — two diplomacy cells.** The gold purchase of the QUEUE-FRONT
+    item is refused on both engines and real Civ 6 likely allows it with
+    progress banked; and the alliance table's ALLIANCE_POINTS_FOR_DEAL
+    (2) maps to no published text — is it alliance points banked when
+    the allies close a deal? Meanwhile: refused / nothing.
 16. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
@@ -728,7 +726,7 @@ under their blocker so the dependency is readable, and both halves count.
     `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous
     while it stands: a minor holds no building that asks for Power and no
     plant that supplies one — blocked on C-38.
-- **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. The 30-turn agreement clock,
+- **C-2. DIPLOMATIC AGREEMENTS.** Weight 2. The 30-turn agreement clock,
   friendship, the alliance with its defensive pact, the denouncement, open
   and CLOSED borders, the Great Work gift, the DELEGATION and Resident
   Embassy, and DIPLOMATIC VISIBILITY all ship on the wire, and the
@@ -760,47 +758,54 @@ under their blocker so the dependency is readable, and both halves count.
   from t4, and every level of the ladder is entered — Limited 12/12 from
   t4, Open 12/12 from t105, Secret 9/12 from t115, Top Secret 2/12 from
   t187. OPEN:
-  - **ALLIANCE TYPES AND LEVELS SHIP.** The numbers ARE published — the
-    wiki's Alliance page (reached through search extracts, corroborated)
-    and the Well of Souls analyst table carry them. Five types ride the
+  - **ALLIANCE TYPES AND LEVELS SHIP.** The numbers are the game's own —
+    Expansion1_Alliances.xml's effect table, read against the wiki's
+    Alliance page and the Well of Souls analyst table. Five types ride the
     wire (`allyType` beside `ally` in the record), one alliance per pair,
     its TYPE chosen at formation and cleared when the clock runs out.
     POINTS accrue on the pair tick — 1 per turn, "+0.25 for sending at
     least one Trade Route to the ally" and +0.25 for receiving one,
     QUARTER-points so both engines bank integers — and LEVELS land at "80
     to reach Level 2 and 160 more to reach Level 3" on Standard; each
-    alliance pays Favor "per turn per level". THIRTEEN of the fifteen
-    effects ship with sourced text (`alliance_levels_test.py` is the bar):
+    alliance pays Favor "per turn per level". FOURTEEN of the fifteen
+    effects ship with sourced text (`alliance_levels_test.py` and the
+    dividends block of `agreements.test.ts` are the bar):
     the four route halves (+2/+1 Science, Culture, Faith; +4/+2 Gold, the
     sender and receiver sides), Cultural 1 (no Loyalty pressure between
     allies) / 2 (+1 GPP per class district in cities routed to the ally) /
     3 (+10% of the ally's Culture and +20% of its Tourism), Research 2
-    (the 20-turn shared boost) / 3 (+10% of the ally's Science while
-    researching a tech the ally completed or is on), Military 1 (+5 vs
-    common enemies, unit-vs-unit like the intel term) / 2 (shared
-    visibility — the two explored maps fold together) / 3 (a free
+    ("Every 30 turns", a Eureka for a tech the ally "has researched or
+    boosted, but you have not" — ALLIANCE_RESEARCH_AGREEMENT, 30) / 3
+    (+10% of the ally's Science while researching a tech the ally
+    completed or is on), Military 1 (+5 vs common enemies, unit-vs-unit
+    like the intel term) / 2 (shared visibility — the two explored maps
+    fold together — and "+15% Production toward military units when you
+    or your ally are at war", ALLIANCE_INCREASE_PRODUCTION_WHEN_WAR, 15,
+    stacked into the production percent beside To Arms!) / 3 (a free
     promotion on trained units), Religious 1 (no religious pressure
     between allies) / 2 (+10 theological strength vs non-ally religions) /
     3 (+1 Faith per citizen following the ally's religion), Economic 2
     (+1 Envoy point per turn per ally-suzerained minor) / 3 (the named
     Suzerain bonus shared). Still OPEN, each with its blocker:
-    - **Military 2's PRODUCTION clause** ("bonus Production toward
-      military units when either ally is at war") ships nothing — no
-      reachable source publishes the magnitude; the wiki's
-      Module:Data/Civ6/GS/Alliances data page would settle it and every
-      mirror of it refuses automated readers. UNSOURCED — ask.
     - **Religious 3's SECOND clause** (bonus Religious Pressure to the
-      ally's religion) is unpublished the same way. UNSOURCED — ask.
-    - Research 2's CADENCE is 20 turns per the analyst table read
-      verbatim; one search paraphrase of the wiki said 30 — the shipped
-      cell is sourced but CONTESTED, flagged for the question ledger.
+      ally's religion) is SOURCED and UNBUILT: ALLIANCE_RELIGIOUS_PRESSURE
+      -> EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on
+      the owner's cities. The table gives the unit nowhere in text; the
+      sibling pressure effect (the Bishop's
+      EFFECT_ADJUST_CITY_RELIGION_PRESSURE, Amount 100 = "100% stronger")
+      says pressure Amounts are PERCENTS. Both engines' accumulator is an
+      INTEGER at 1 per following city per turn (`city_pressure`, long;
+      `RELIGION_PRESSURE_PER_TURN`), so +20% of 1 floors to nothing —
+      BLOCKED on C-46's pressure scale.
+    - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with
+      no published text behind it. UNSOURCED meaning — ask (ledger 15).
     - The GOLD purchase of the item UNDER PRODUCTION (queue front) is
       refused on both engines — `goldPurchasableBuildings` holds the
       shared reading. Real Civ 6 likely allows it with the progress
       banked, but no source in reach settles it. UNSOURCED — ask.
     - The model's OWN choices, recorded: points are ONE per-pair pool
-      that persists when an alliance lapses; the shared boost lands on
-      the LOWEST tech neither side has researched; the level-3 percentage
+      that persists when an alliance lapses; each side's Research 2
+      Eureka is the FIRST qualifying tech in catalog order; the level-3 percentage
       terms read the ally's most recently STORED per-turn output
       (`sciRate` / `culRate` / `tourRate`, compared state on both
       engines) so the two reads never compound.
@@ -1237,6 +1242,27 @@ under their blocker so the dependency is readable, and both halves count.
   (`city_item_bank`, eight columns per city) is the same class of choice —
   a full ledger banks nothing more. Reach: the driven gate fills queues to the cap by the early
   hundreds of turns, so the refusal itself is exercised.
+- **C-46. RELIGIOUS PRESSURE IS A STYLIZED INTEGER.** Weight 1. Both
+  engines accumulate pressure as a whole number — every following city
+  within `RELIGION_PRESSURE_RANGE` adds `RELIGION_PRESSURE_PER_TURN` (1),
+  the Holy City x4, a Holy Site city x2, a missionary lump of
+  `SPREAD_PRESSURE` (10, x1.5 under Scripture), the theological swings —
+  and the declared stylization in `cpu/data/religion.ts` says so. The
+  game's own model is SOURCED now (Base GlobalParameters):
+  RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 within
+  RELIGION_SPREAD_ADJACENT_CITY_DISTANCE 10, HOLY_CITY_PRESSURE_MULTIPLIER
+  4 and HOLY_SITE_PRESSURE_MULTIPLIER 2 (the three the engines carry),
+  plus HOLY_CITY_PRESSURE_PER_POP 200, ATHEISM_PRESSURE_PER_POP 50,
+  STRENGTH_MULTIPLIER 200, COMBAT_VICTORY 250 within range 6,
+  UNIT_CAPTURE 125 within range 6, and TRADE_ROUTE_PRESSURE 1.0 at the
+  destination / 0.5 at the origin. The scale is the gap: at 1 per turn,
+  every PERCENTAGE pressure modifier the game publishes floors to nothing
+  — the Religious alliance's +20% (C-2); the Bishop's +100% lands only
+  because its site multiplies the whole per-turn sum before the cast.
+  Moving to the game's scale is one cutover on both engines
+  (`spreadReligiousPressure` / `_spread_religious_pressure`, the
+  missionary lump, the two swings, and every test that pins a raw value)
+  — after it the alliance clause is a one-line multiplier.
 
 ## Reachability — what the green gate does NOT prove
 

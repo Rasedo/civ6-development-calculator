@@ -854,8 +854,7 @@ export const ALLIANCE_CIVIC = 'CIVIL_SERVICE';
 /**
  * GS pays a standing Alliance in favor.
  * CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1 Diplomatic
- * Favor per turn per level." Alliance LEVELS are not modeled, so every live
- * alliance pays its level-1 rate.
+ * Favor per turn per level." — `allianceLevels` sums the live levels.
  */
 export const FAVOR_PER_ALLIANCE = 1;
 
@@ -885,9 +884,14 @@ export const ALLIANCE_ROUTE_YKEY = ['science', 'culture', 'gold', '', 'faith'] a
 /** CIV6 (Military alliance 1): "+5 Combat Strength against units of players
  *  at war with you and your ally." */
 export const ALLIANCE_M1_CS = 5;
-/** CIV6 (Research alliance 2): the shared tech boost lands "every 20 turns"
- *  on Standard. */
-export const ALLIANCE_R2_BOOST_TURNS = 20;
+/** CIV6 (Military alliance 2): "+15% Production toward military units when
+ *  you or your ally are at war" — the alliance table's
+ *  ALLIANCE_INCREASE_PRODUCTION_WHEN_WAR, Amount 15. */
+export const ALLIANCE_M2_MIL_PROD_PCT = 15;
+/** CIV6 (Research alliance 2): "Every 30 turns (on Standard), you unlock a
+ *  Eureka for a tech that your ally has researched or boosted, but you have
+ *  not" — the alliance table's ALLIANCE_RESEARCH_AGREEMENT, Amount 30. */
+export const ALLIANCE_R2_BOOST_TURNS = 30;
 /** CIV6 (Research alliance 3): "+10% of your ally's Science" while
  *  researching a tech the ally completed, or the tech the ally is on. */
 export const ALLIANCE_R3_SCI_PCT = 0.1;

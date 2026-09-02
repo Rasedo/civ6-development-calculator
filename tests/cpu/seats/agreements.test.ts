@@ -25,7 +25,8 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import {
   allyTurnsWith, borderTurnsFrom, delegationWith, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
-  friendTurnsWith, seatsAllied, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith,
+  friendTurnsWith, seatsAllied, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom,
+  setFriendTurnsWith,
   setTileOwner, setWar, tileSeat, visibilityCS, warIsFormal,
 } from '../../../cpu/core/seats';
 import {
@@ -38,8 +39,10 @@ import { borderClosedTo, spawnUnit, tileFreeForUnit } from '../../../cpu/core/un
 import { diplomaticFavorPerTurn, allianceLevels } from '../../../cpu/core/seatTurn';
 import { gwCount } from '../../../cpu/data/greatPeople';
 import {
-  AGREEMENT_TURNS, ALLIANCE_CIVIC, FAVOR_PER_ALLIANCE, FORMAL_WAR_MIN_TURNS, OPEN_BORDERS_CIVIC,
+  AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_L2_QP, ALLIANCE_MILITARY, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_RESEARCH,
+  FAVOR_PER_ALLIANCE, FORMAL_WAR_MIN_TURNS, OPEN_BORDERS_CIVIC,
 } from '../../../cpu/data/seats';
+import { TECHS } from '../../../cpu/data/techs';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat, SeatActionRecord } from '../../../cpu/core/types';
 import { grievanceWith } from '../../../cpu/core/grievance';
@@ -439,5 +442,56 @@ describe('a Great Work changes hands', () => {
     from.greatWorksArt = 0;
     play(state, { 1: { gift: [[1, 2]] } });
     expect(gwCount(home, 1)).toBe(0);
+  });
+});
+
+describe('the alliance levels pay their dividends', () => {
+  /** Seats 1 and 2 in a `ty` alliance at `qp` quarter-points. */
+  const allied = (state: GameState, ty: number, qp: number): void => {
+    setAllyTurnsWith(state, 1, 2, AGREEMENT_TURNS);
+    setAllianceTypeWith(state, 1, 2, ty);
+    setAlliancePtsWith(state, 1, 2, qp);
+  };
+
+  it('Research 2 hands each side, every 30 turns, the first tech its ally holds and it does not', () => {
+    const [ta, tb, tc] = Object.keys(TECHS);
+    const run = (turn: number): [string[], string[]] => {
+      const state = table();
+      state.turn = turn;
+      allied(state, ALLIANCE_RESEARCH, ALLIANCE_L2_QP);
+      state.seats[2].research.boosted.push(ta);   // the ally's boost counts as "researched or boosted"
+      state.seats[2].research.techs.push(tb);
+      state.seats[1].research.techs.push(tc);
+      play(state, {});
+      return [state.seats[1].research.boosted, state.seats[2].research.boosted];
+    };
+    const [b1, b2] = run(ALLIANCE_R2_BOOST_TURNS);
+    expect(b1).toContain(ta);
+    expect(b1).not.toContain(tb);
+    expect(b1).not.toContain(tc);
+    expect(b2).toContain(tc);
+    expect(b2).not.toContain(tb);
+    const [o1, o2] = run(ALLIANCE_R2_BOOST_TURNS - 1);
+    expect(o1).not.toContain(ta);
+    expect(o2).not.toContain(tc);
+  });
+
+  it('Military 2 pays +15% toward military units while either side is at war, at level 2 only', () => {
+    const run = (unit: string, qp: number, warring: number | null): number => {
+      const state = table();
+      allied(state, ALLIANCE_MILITARY, qp);
+      if (warring !== null) setWar(state, warring, 0, true);
+      const city = state.seats[1].cities[0];
+      city.queue = [{ kind: 'unit', unit, progress: 0, cost: 100000 }];
+      play(state, {});
+      return city.queue[0]?.kind === 'unit' ? city.queue[0].progress : -1;
+    };
+    const base = run('WARRIOR', ALLIANCE_L2_QP, null);
+    expect(base).toBeGreaterThan(0);
+    expect(run('WARRIOR', ALLIANCE_L2_QP, 2)).toBeCloseTo(base * 1.15, 9);   // the ally's war
+    expect(run('WARRIOR', ALLIANCE_L2_QP, 1)).toBeCloseTo(base * 1.15, 9);   // the seat's own war
+    expect(run('WARRIOR', 0, 2)).toBeCloseTo(base, 9);                       // level 1 pays nothing
+    const settler = run('SETTLER', ALLIANCE_L2_QP, null);
+    expect(run('SETTLER', ALLIANCE_L2_QP, 2)).toBeCloseTo(settler, 9);        // a civilian head
   });
 });

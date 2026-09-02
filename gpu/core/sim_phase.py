@@ -297,19 +297,23 @@ class SimPhase:
                         _m = m2[:, _o].unsqueeze(1)
                         self.seat_explored[:, row] = torch.where(_m, _u, self.seat_explored[:, row])
                         self.seat_explored[:, _o] = torch.where(_m, _u, self.seat_explored[:, _o])
-                    # CIV6 (Research alliance 2): the shared tech boost lands
-                    # "every 20 turns" - the lowest tech neither side has
-                    # researched, both sides.
+                    # CIV6 (Research alliance 2): "Every 30 turns (on
+                    # Standard), you unlock a Eureka for a tech that your ally
+                    # has researched or boosted, but you have not" - each side
+                    # takes the first such tech in catalog order. A side's
+                    # pick is a tech the other already holds, so the two
+                    # picks never feed each other.
                     if self._al_r2_boost_turns > 0 and int(self.turn) % self._al_r2_boost_turns == 0:
                         r2 = (run & (self.seat_alliance_type[:, row, :NM] == 0)
                               & (self.seat_alliance_pts[:, row, :NM] >= self._al_l2_qp))
                         for _o in r2.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-                            both = ~self.civ_techs[:, row] & ~self.civ_techs[:, _o]
-                            has = both.any(dim=1) & r2[:, _o]
-                            pick = both.long().argmax(dim=1, keepdim=True)
-                            for _pr in (row, _o):
-                                cur = self.civ_tech_boosted[:, _pr].gather(1, pick)
-                                self.civ_tech_boosted[:, _pr].scatter_(1, pick, cur | has.unsqueeze(1))
+                            for _me, _al in ((row, _o), (_o, row)):
+                                cand = ((self.civ_techs[:, _al] | self.civ_tech_boosted[:, _al])
+                                        & ~self.civ_techs[:, _me] & ~self.civ_tech_boosted[:, _me])
+                                has = cand.any(dim=1) & r2[:, _o]
+                                pick = cand.long().argmax(dim=1, keepdim=True)
+                                cur = self.civ_tech_boosted[:, _me].gather(1, pick)
+                                self.civ_tech_boosted[:, _me].scatter_(1, pick, cur | has.unsqueeze(1))
                 plane[:, row] -= run.long()
                 plane[:, :, row] -= run.long()
                 if plane is self.seat_ally_turns:
@@ -603,6 +607,16 @@ class SimPhase:
             _cqp = self._seat_building_sum(row, self._b_conquest_pct) / 100
             _add = _add + torch.where(self.conquest_turns[:, row] > 0,
                                       _cqp, torch.zeros_like(_cqp)).to(_add.dtype)
+        # CIV6 (Military alliance 2): "+15% Production toward military units
+        # when you or your ally are at war."
+        if self._al_m2_mil_prod_pct:
+            _m2 = self._allied_type(row, 3, 2)
+            if bool(_m2.any()):
+                _anyw = self.war.any(dim=2)                          # [B, NS]
+                _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
+                _m2i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
+                    & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+                _add = _add + (_m2w & _m2i).to(_add.dtype) * (self._al_m2_mil_prod_pct / 100)
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
         _emall = _emall * (1 + _add)

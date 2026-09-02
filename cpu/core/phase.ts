@@ -92,7 +92,7 @@ const A_BUILD_RAILROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_RAILROAD;
 const A_CLEAN_FALLOUT = unitActionIndex(IMPROVEMENT_IDS).CLEAN_FALLOUT;
 const A_REMOVE_IMP = unitActionIndex(IMPROVEMENT_IDS).REMOVE_IMPROVEMENT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
@@ -2029,6 +2029,11 @@ export function seatPhase(state: GameState): void {
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
     for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
+    // CIV6 (Military alliance 2): "+15% Production toward military units
+    // when you or your ally are at war."
+    const milAllyWarPct = state.seats.some((x) => x.seat !== actor.seat
+      && alliedAtLevel(state, actor.seat, x.seat, ALLIANCE_MILITARY, 2)
+      && (atWarWithAny(state, actor.seat) || atWarWithAny(state, x.seat))) ? ALLIANCE_M2_MIL_PROD_PCT / 100 : 0;
     // The seat's science/turn off the SAME loop-top snapshot, folded in city
     // order — the Moon Landing lump reads it, and the GPU folds the identical
     // walk columns in slot order, so the f64 association agrees.
@@ -2095,6 +2100,7 @@ export function seatPhase(state: GameState): void {
         if ((actor.conquestProdTurns ?? 0) > 0) {
           _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
         }
+        if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         q.progress += production * _em;
@@ -2506,16 +2512,19 @@ export function seatPhase(state: GameState): void {
             }
           }
         }
-        // CIV6 (Research alliance 2): the shared tech boost lands "every 20
-        // turns" - the lowest tech neither side has researched, both sides.
+        // CIV6 (Research alliance 2): "Every 30 turns (on Standard), you
+        // unlock a Eureka for a tech that your ally has researched or
+        // boosted, but you have not" - each side takes the first such tech
+        // in catalog order. A side's pick is a tech the other already
+        // holds, so the two picks never feed each other.
         if (state.turn % ALLIANCE_R2_BOOST_TURNS === 0
           && alliedAtLevel(state, actor.seat, other, ALLIANCE_RESEARCH, 2)) {
           const ra = actor.research;
           const rb = seatOf(state, other)!.research;
-          const pick = Object.keys(TECHS).find((tid) => !ra.techs.includes(tid) && !rb.techs.includes(tid));
-          if (pick) {
-            if (!ra.boosted.includes(pick)) ra.boosted.push(pick);
-            if (!rb.boosted.includes(pick)) rb.boosted.push(pick);
+          for (const [me, al] of [[ra, rb], [rb, ra]] as const) {
+            const pick = Object.keys(TECHS).find((tid) => (al.techs.includes(tid) || al.boosted.includes(tid))
+              && !me.techs.includes(tid) && !me.boosted.includes(tid));
+            if (pick) me.boosted.push(pick);
           }
         }
         setAllyTurnsWith(state, actor.seat, other, al - 1);
