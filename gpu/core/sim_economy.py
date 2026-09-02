@@ -1983,11 +1983,12 @@ class SimEconomy:
 
     def _ally_war_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """CIV6 (Military alliance 1): "+5 Combat Strength against units of
-        players at war with you and your ally." Any war the matrix carries
-        qualifies; a barbarian is hostile, not at war, and pays nothing."""
+        players at war with you and your ally", plus Gilgamesh's own +5 on any
+        alliance. Any war the matrix carries qualifies; a barbarian is
+        hostile, not at war, and pays nothing."""
         z = torch.zeros_like(own, dtype=self.dtype)
         NM = self.n_majors
-        if NM < 2 or self._al_m1_cs == 0:
+        if NM < 2:
             return z
         sh = own.shape
         o_f = own.clamp(min=0, max=NM - 1).reshape(self.B, -1)          # [B, N]
@@ -1999,9 +2000,17 @@ class SimEconomy:
                   & (self.seat_ally_turns[:, :NM, :NM] > 0))            # [B, NM, NM]
         wx = self.war[:, :NM].gather(2, rf_f.unsqueeze(1).expand(self.B, NM, rf_f.shape[1]))  # [B, NM, N]
         mp = m_pair.gather(1, o_f.unsqueeze(2).expand(self.B, o_f.shape[1], NM))              # [B, N, NM]
-        hit = ((own >= 0) & (own < NM)).reshape(self.B, -1) & (foe >= 0).reshape(self.B, -1)
-        hit = hit & mine & (mp & wx.transpose(1, 2)).any(dim=2)
-        return torch.where(hit.reshape(sh), torch.full_like(z, float(self._al_m1_cs)), z)
+        base = ((own >= 0) & (own < NM)).reshape(self.B, -1) & (foe >= 0).reshape(self.B, -1) & mine
+        hit = base & (mp & wx.transpose(1, 2)).any(dim=2)
+        out = torch.where(hit.reshape(sh), torch.full_like(z, float(self._al_m1_cs)), z)
+        # CIV6 (Adventures of Enkidu): "+5 Combat Strength against units of
+        # civilizations their allies are at war with" — any alliance where one
+        # side plays Gilgamesh, on top (`allianceWarCS`).
+        lead = self._leads_vec("GILGAMESH")
+        e_pair = (self.seat_ally_turns[:, :NM, :NM] > 0) & (lead.view(1, NM, 1) | lead.view(1, 1, NM))
+        ep = e_pair.gather(1, o_f.unsqueeze(2).expand(self.B, o_f.shape[1], NM))     # [B, N, NM]
+        hit_e = base & (ep & wx.transpose(1, 2)).any(dim=2)
+        return out + torch.where(hit_e.reshape(sh), torch.full_like(z, float(self._enkidu_cs)), z)
 
     def _ally_theo_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """CIV6 (Religious alliance 2): "+10 Religious Combat Strength against

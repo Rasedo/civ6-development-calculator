@@ -51,11 +51,15 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
  *  order — `Seat.civ` indexes both. */
 export type CivId = 'ROME' | 'EGYPT' | 'NORWAY' | 'SUMERIA';
 export const CIV_IDS: readonly CivId[] = ['ROME', 'EGYPT', 'NORWAY', 'SUMERIA'];
-export const CIV_LEADERS: { civ: CivId; name: string; color: string; cityNames: string[] }[] = [
-  { civ: 'ROME', name: 'Rome', color: '#8e3db8', cityNames: ['Roma', 'Ostia', 'Ravenna', 'Neapolis', 'Capua', 'Verona'] },
-  { civ: 'EGYPT', name: 'Egypt', color: '#3db88e', cityNames: ['Thebes', 'Memphis', 'Giza', 'Elephantine', 'Sais', 'Tanis'] },
-  { civ: 'NORWAY', name: 'Norway', color: '#3d6ab8', cityNames: ['Nidaros', 'Bergen', 'Oslo', 'Tunsberg', 'Hamar', 'Stavanger'] },
-  { civ: 'SUMERIA', name: 'Sumeria', color: '#b8823d', cityNames: ['Uruk', 'Ur', 'Eridu', 'Lagash', 'Nippur', 'Kish'] },
+/** CIV6 (Leaders.xml): the leader each roster row plays — its leader
+ *  ability is keyed here, never on the civilization, so a second leader for
+ *  a civilization is one more row. */
+export type LeaderId = 'TRAJAN' | 'CLEOPATRA' | 'HARDRADA' | 'GILGAMESH';
+export const CIV_LEADERS: { civ: CivId; leader: LeaderId; name: string; color: string; cityNames: string[] }[] = [
+  { civ: 'ROME', leader: 'TRAJAN', name: 'Rome', color: '#8e3db8', cityNames: ['Roma', 'Ostia', 'Ravenna', 'Neapolis', 'Capua', 'Verona'] },
+  { civ: 'EGYPT', leader: 'CLEOPATRA', name: 'Egypt', color: '#3db88e', cityNames: ['Thebes', 'Memphis', 'Giza', 'Elephantine', 'Sais', 'Tanis'] },
+  { civ: 'NORWAY', leader: 'HARDRADA', name: 'Norway', color: '#3d6ab8', cityNames: ['Nidaros', 'Bergen', 'Oslo', 'Tunsberg', 'Hamar', 'Stavanger'] },
+  { civ: 'SUMERIA', leader: 'GILGAMESH', name: 'Sumeria', color: '#b8823d', cityNames: ['Uruk', 'Ur', 'Eridu', 'Lagash', 'Nippur', 'Kish'] },
 ];
 
 export const MAX_CITIES_PER_SEAT = 6;

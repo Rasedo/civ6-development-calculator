@@ -177,6 +177,10 @@ def test_a_queued_building_is_not_offered_twice(rules, path) -> None:
     sim = build(rules, path)
     j = a_city(sim)
     load_queue(sim, j, [], costs=[10_000] * sim.QD)
+    # CIV6 (Trajan's Column): Rome's capital starts with its Monument — hand
+    # it back, so the city has something to build
+    sim.city_bldg[B0, ROW, j, :] = False
+    sim._bldg_version += 1
     sim._eff_version += 1
     open_b = sim._seat_buildable(ROW)[B0, j].nonzero().flatten().tolist()
     assert open_b, "this city may build nothing at all — the poke proves nothing"

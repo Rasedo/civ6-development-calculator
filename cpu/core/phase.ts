@@ -7,10 +7,10 @@ import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt, hasRiver } from '../../world/query';
-import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT } from '../data/civilizations';
+import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee } from './units';
 import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -99,7 +99,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -1370,11 +1370,14 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           !!t.districtComplete && !t.districtPillaged;
         if (here.improvement && !here.pillaged && hereOwned) {
           here.pillaged = true;
-          pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder);
+          pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
           spendPillage();
         } else if (hereOwned && districtWreckable(here)) {
           wreckDistrict(here);
-        } else if (UNITS[unit.type]?.raider && isWater(here) && unit.movesLeft >= 3 * MP_SCALE) {
+        } else if ((UNITS[unit.type]?.raider || (leaderOf(state, unit.seat) === 'HARDRADA' && navalMelee(UNITS[unit.type])))
+          && isWater(here) && unit.movesLeft >= 3 * MP_SCALE) {
+          // CIV6 (Thunderbolt of the North): "coastal raiding for all naval
+          // melee units"
           // CIV6 (Coastal Raid): the raider "must be next to the land
           // improvement or district, and must have at least 3 Movement
           // points remaining." One deterministic target: the lowest-index
@@ -1387,7 +1390,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const impT = cand.find((t) => t.improvement && !t.pillaged);
           if (impT) {
             impT.pillaged = true;
-            pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder);
+            pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, impT.improvement ?? undefined, tileSeat(impT));
             spendPillage();
             raidGold();
           } else {
@@ -2101,6 +2104,9 @@ export function seatPhase(state: GameState): void {
         // this model pays as a slower fill rather than a moved queue cost.
         if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
         if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
+        // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
+        // melee units."
+        if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
         // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
@@ -2515,10 +2521,19 @@ export function seatPhase(state: GameState): void {
       if (al > 0) {
         // CIV6 (Alliance): points accrue "every turn", faster when the pair
         // trades - either direction pays its own quarter-point.
+        // CIV6 (Mediterranean's Bride): "Trading with Allies earns twice as
+        // many bonus Alliance Points"; (Adventures of Enkidu): "Their
+        // Alliances gain Alliance Points for being at war with a common foe."
+        const tradeQp = ALLIANCE_QP_ROUTE
+          * (leaderOf(state, actor.seat) === 'CLEOPATRA' || leaderOf(state, other) === 'CLEOPATRA' ? CLEOPATRA_TRADE_QP_MULT : 1);
+        const enkidu = leaderOf(state, actor.seat) === 'GILGAMESH' || leaderOf(state, other) === 'GILGAMESH';
+        const commonFoe = enkidu && [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]
+          .some((f) => f !== actor.seat && f !== other && civsAtWar(state, actor.seat, f) && civsAtWar(state, other, f));
         setAlliancePtsWith(state, actor.seat, other, alliancePtsWith(state, actor.seat, other)
           + ALLIANCE_QP_TURN
-          + (hasRouteToSeat(state, actor.seat, other) ? ALLIANCE_QP_ROUTE : 0)
-          + (hasRouteToSeat(state, other, actor.seat) ? ALLIANCE_QP_ROUTE : 0));
+          + (hasRouteToSeat(state, actor.seat, other) ? tradeQp : 0)
+          + (hasRouteToSeat(state, other, actor.seat) ? tradeQp : 0)
+          + (commonFoe ? ENKIDU_COMMON_FOE_QP : 0));
         // CIV6 (Military alliance 2): "Allies share visibility" - each
         // side's explored map folds into the other's, the fog this model keeps.
         if (alliedAtLevel(state, actor.seat, other, ALLIANCE_MILITARY, 2)) {

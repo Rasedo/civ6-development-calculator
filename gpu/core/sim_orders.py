@@ -881,7 +881,9 @@ class SimOrders:
                 # land infrastructure, holding 3+ MP, raids the adjacent tile
                 # — the same column, fired only when the tile underfoot
                 # offers nothing.
-                _rd = (act & (a == self._A_PILLAGE) & self._type_raider[utp.clamp(min=0)]
+                _rd = (act & (a == self._A_PILLAGE)
+                       & (self._type_raider[utp.clamp(min=0)]
+                          | (self._type_naval_melee[utp.clamp(min=0)] & self._row_leads(row, "HARDRADA")))
                        & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
                        & (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3 * self._mp_scale)
                        & ~(_en & (_hi | _hd)))
@@ -971,6 +973,41 @@ class SimOrders:
                             _m2 = _kk == _kv
                             if bool(_m2.any()):
                                 _purse[_br[_m2], row] += _lump[_m2]
+                    _shares = [(_br, _tt[_bk], _kk, _lump)] if bool(_bk.any()) else []
+                    # CIV6 (Thunderbolt of the North): Science from a Mine,
+                    # Culture from a Quarry, Pasture, Plantation or Camp — on
+                    # top of the row, scaled the same.
+                    if self._row_leads(row, "HARDRADA") and bool(_pi.any()):
+                        _hk = torch.where(_pi, self._hard_plun_kind[_iv], torch.zeros_like(_kind))
+                        _hm = _hk > 0
+                        if bool(_hm.any()):
+                            _hr = _r[_hm]
+                            _psc_h = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
+                                                               civics.sum(dim=1).double() / 50.0)
+                            _mult_h = torch.ones(len(_hr), dtype=torch.float64, device=self.device)
+                            if self._gov_has_effects:
+                                _mult_h = self._fx_at_seat("pillm", torch.full_like(_hr, row), _hr).double()
+                            _lump_h = js_round(self._hard_plun_amt[_iv[_hm]].double() * _psc_h[_hr] * _mult_h).to(self.dtype)
+                            for _kv, _purse in ((4, self.civ_tech_prog), (5, self.civ_civic_prog)):
+                                _m3 = _hk[_hm] == _kv
+                                if bool(_m3.any()):
+                                    _purse[_hr[_m3], row] += _lump_h[_m3]
+                            _shares.append((_hr, _tt[_hm], _hk[_hm], _lump_h))
+                    # CIV6 (Adventures of Enkidu): an ally at war with the
+                    # tile's owner, with a unit within 5 of the wrecker, takes
+                    # the same lumps (`pillagePlunder`).
+                    for _sr, _st, _sk, _sl in _shares:
+                        _foe = self.tile_seat[_sr, _st]
+                        _part = self._enkidu_allies(_sr, torch.full_like(_sr, row), _foe)  # [n, NM]
+                        for _A in _part.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                            _pm = _part[:, _A] & self._units_within(_sr, _st, _A, self._enkidu_range)
+                            if not bool(_pm.any()):
+                                continue
+                            for _kv, _purse in ((2, self.civ_treasury), (3, self.civ_faith),
+                                                (4, self.civ_tech_prog), (5, self.civ_civic_prog)):
+                                _m4 = _pm & (_sk == _kv)
+                                if bool(_m4.any()):
+                                    _purse[_sr[_m4], _A] += _sl[_m4]
                     # CIV6 (Loot): "+50 Gold from coastal raids", flat and on
                     # top of whatever the wrecked target's plunder row pays.
                     _lg = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "RAID_GOLD")

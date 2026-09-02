@@ -5,8 +5,8 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat } from './seats';
-import { ROME_OWN_POST_GOLD } from '../data/civilizations';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf } from './seats';
+import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isWater } from '../../world/query';
@@ -379,10 +379,26 @@ export const CITY_STATE_ROUTE_SPEC = 1;
  * domestic-only channel). Exported for the GPU rules dump. */
 export const INTL_ROUTE_GOLD = 3;
 
-export function routeYieldsInternational(state: GameState, dest: City): Yields {
+export function routeYieldsInternational(state: GameState, dest: City, seat: number): Yields {
   const out = emptyYields();
   out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
+  // CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own routes out;
+  // "+2 Food for them" on anyone's route in.
+  if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INTL_ROUTE_GOLD;
+  if (leaderOf(state, dest.seat) === 'CLEOPATRA') out.food += CLEOPATRA_INCOMING_ROUTE_FOOD;
   return out;
+}
+
+/** The international routes OTHER seats run into this city. */
+export function incomingIntlRoutes(state: GameState, city: City): number {
+  let n = 0;
+  for (const s of state.seats) {
+    if (s.seat === city.seat) continue;
+    for (const r of s.tradeRoutes ?? []) {
+      if (r.toSeat === city.seat && r.toSeatCity === city.id) n += 1;
+    }
+  }
+  return n;
 }
 
 export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
@@ -397,6 +413,9 @@ export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
 export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
   const seat = city.seat;
   const out = emptyYields();
+  // CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
+  // civilization's route INTO this city.
+  if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD * incomingIntlRoutes(state, city);
   const originWonderGold = wonderRouteOriginGold(state, city);
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
@@ -429,7 +448,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civSeat = seatOf(state, route.toSeat);
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
-        addYields(out, routeYieldsInternational(state, civCity));
+        addYields(out, routeYieldsInternational(state, civCity, seat));
         // CIV6 (Alliance, level 1): the typed alliance pays its route bonus
         // on every paying leg - the sender half.
         const aty = allianceTypeWith(state, seat, route.toSeat);

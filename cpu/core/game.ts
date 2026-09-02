@@ -46,7 +46,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome } from './trade';
@@ -201,6 +201,29 @@ function cityName(id: number): string {
   return round === 0 ? base : `${base} ${round + 1}`;
 }
 
+/**
+ * CIV6 (Trajan's Column, EFFECT_GRANT_CHEAPEST_BUILDING_IN_CITY): "All cities
+ * start with an additional City Center building" — the cheapest completable
+ * one, ties by catalog order, built the way a purchase builds it.
+ */
+export function trajansColumn(state: GameState, seat: number, city: City): void {
+  if (leaderOf(state, seat) !== 'TRAJAN') return;
+  let best: string | null = null;
+  let bestCost = Infinity;
+  for (const def of availableBuildings(state, city)) {
+    if (def.district !== 'CITY_CENTER' || !buildingCompletable(state, city, def.id)) continue;
+    const cost = buildingCostIn(state, city, def.id);
+    if (cost < bestCost) {
+      best = def.id;
+      bestCost = cost;
+    }
+  }
+  if (!best) return;
+  city.buildings.push(best);
+  buildingDedications(state, seat, best);
+  if (BUILDINGS[best]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
+}
+
 export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: Seat | null): City {
   const list: City[] = owner ? owner.cities : seatOf(state, seat)!.cities;
   const id = owner ? owner.nextCityId++ : seatOf(state, seat)!.nextCityId++;
@@ -240,6 +263,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
   allRoadsLeadToRome(state, seat, tile.index);
+  trajansColumn(state, seat, city);
   revealAround(state, seat, tile.index, 3);
   // CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant is
   // the SEAT's, so the first city — founded before any Plaza stands — never

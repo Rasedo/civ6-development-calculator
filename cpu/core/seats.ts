@@ -1,8 +1,9 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
-import type { CivId, SeatCaps, SeatClass } from '../data/seats';
+import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
+import { ENKIDU_WAR_CS } from '../data/civilizations';
 import { CIV_IDS, AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
-  VISIBILITY_CS_PER_LEVEL } from '../data/seats';
+  VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES } from '../../world/resources';
@@ -135,6 +136,28 @@ export function civOf(state: GameState, seat: number): CivId | null {
   const s = seatOf(state, seat);
   const civ = s && 'civ' in s ? (s as Seat).civ : -1;
   return civ >= 0 ? CIV_IDS[civ] ?? null : null;
+}
+
+/** The leader this seat plays (`CIV_LEADERS[Seat.civ].leader`), null for a
+ *  seat that plays no civilization. */
+export function leaderOf(state: GameState, seat: number): LeaderId | null {
+  const s = seatOf(state, seat);
+  const civ = s && 'civ' in s ? (s as Seat).civ : -1;
+  return civ >= 0 ? CIV_LEADERS[civ]?.leader ?? null : null;
+}
+
+/** CIV6 (Adventures of Enkidu): the allies a seat SHARES a war with — an
+ *  alliance of any type where one side plays Gilgamesh and the ally is at war
+ *  with `foe`. */
+export function enkiduAllies(state: GameState, seat: number, foe: number): number[] {
+  if (!isCiv(seat) || foe < 0) return [];
+  const out: number[] = [];
+  for (const o of state.seats) {
+    if (o.seat === seat || allyTurnsWith(state, seat, o.seat) <= 0) continue;
+    if (leaderOf(state, seat) !== 'GILGAMESH' && leaderOf(state, o.seat) !== 'GILGAMESH') continue;
+    if (civsAtWar(state, o.seat, foe)) out.push(o.seat);
+  }
+  return out;
 }
 
 /**
@@ -409,11 +432,15 @@ export function visibilityCS(state: GameState, own: number, foe: number): number
  *  barbarian is hostile, not at war, and pays nothing. */
 export function allianceWarCS(state: GameState, own: number, foe: number): number {
   if (!isCiv(own) || !civsAtWar(state, own, foe)) return 0;
+  let cs = 0;
   for (const o of state.seats) {
     if (o.seat !== own && alliedAtLevel(state, own, o.seat, ALLIANCE_MILITARY, 1)
-      && civsAtWar(state, o.seat, foe)) return ALLIANCE_M1_CS;
+      && civsAtWar(state, o.seat, foe)) { cs += ALLIANCE_M1_CS; break; }
   }
-  return 0;
+  // CIV6 (Adventures of Enkidu): "+5 Combat Strength against units of
+  // civilizations their allies are at war with" — any alliance, on top.
+  if (enkiduAllies(state, own, foe).length > 0) cs += ENKIDU_WAR_CS;
+  return cs;
 }
 
 /** CIV6 (Military alliance 3): "Units start with a free Promotion." */

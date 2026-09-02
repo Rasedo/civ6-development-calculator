@@ -1,7 +1,9 @@
 
-import { seatOf, tileSeat, cityAtTile, citiesOf, isCiv, unitSeat } from './seats';
+import { seatOf, tileSeat, cityAtTile, citiesOf, isCiv, unitSeat , leaderOf, enkiduAllies, unitsOf, NO_SEAT } from './seats';
+import { HARDRADA_PILLAGE, ENKIDU_SHARE_RANGE } from '../data/civilizations';
+import { hexDistance } from '../../world/hex';
 
-import type { City, GameState, PlunderRow, ResearchState, Tile, Unit, YieldKey } from './types';
+import type { City, GameState, PlunderKind, PlunderRow, ResearchState, Seat, Tile, Unit, YieldKey } from './types';
 import { getModifiers } from './effects';
 import { UNIT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -66,7 +68,19 @@ export function chopValue(state: GameState, seat: number, at?: Tile): number {
  * still heals; only a major banks. The Grand Master's Chapel's flat faith
  * rides EVERY wreck a major makes, whatever the plunder row says.
  */
-export function pillagePlunder(state: GameState, unit: Unit, row: PlunderRow | undefined, district = false): void {
+function payPlunder(s: Seat, kind: PlunderKind, lump: number): void {
+  if (kind === 'gold') s.treasury += lump;
+  else if (kind === 'faith') s.faith += lump;
+  else if (kind === 'science') s.research.techProgress += lump;
+  else s.research.civicProgress += lump;
+}
+
+/** `improvement` and `foe` (the wrecked tile's owner) feed the leader clauses:
+ *  Hardrada's extra purses and Gilgamesh's shared plunder. */
+export function pillagePlunder(
+  state: GameState, unit: Unit, row: PlunderRow | undefined, district = false,
+  improvement?: string, foe: number = NO_SEAT,
+): void {
   const seat = unitSeat(unit);
   if (isCiv(seat)) {
     const cs = seatOf(state, seat);
@@ -81,19 +95,37 @@ export function pillagePlunder(state: GameState, unit: Unit, row: PlunderRow | u
       if (chap) cs.faith += chap;
     }
   }
-  if (!row || row.amount <= 0) return;
-  if (row.kind === 'heal') {
+  if (row && row.amount > 0 && row.kind === 'heal') {
     unit.hp = Math.min(UNIT_HP, unit.hp + row.amount);
     return;
   }
   if (!isCiv(seat)) return;
   const s = seatOf(state, seat);
   if (!s) return;
-  const lump = Math.round(row.amount * progressScale(s.research) * getModifiers(state, seat).pillageMult);
-  if (row.kind === 'gold') s.treasury += lump;
-  else if (row.kind === 'faith') s.faith += lump;
-  else if (row.kind === 'science') s.research.techProgress += lump;
-  else s.research.civicProgress += lump;
+  const scale = progressScale(s.research) * getModifiers(state, seat).pillageMult;
+  const lumps: { kind: PlunderKind; lump: number }[] = [];
+  if (row && row.amount > 0) lumps.push({ kind: row.kind, lump: Math.round(row.amount * scale) });
+  // CIV6 (Thunderbolt of the North): Science from a Mine, Culture from a
+  // Quarry, Pasture, Plantation or Camp — on top of the row, scaled the same.
+  if (improvement && leaderOf(state, seat) === 'HARDRADA') {
+    for (const x of HARDRADA_PILLAGE) {
+      if (x.improvement === improvement) lumps.push({ kind: x.kind, lump: Math.round(x.amount * scale) });
+    }
+  }
+  for (const l of lumps) payPlunder(s, l.kind, l.lump);
+  // CIV6 (Adventures of Enkidu): "they and their allies share pillage
+  // rewards ... if within 5 tiles" — an ally at war with the tile's owner
+  // with a unit within range of the wrecker takes the same lumps.
+  if (lumps.length === 0) return;
+  const at = state.map.tiles[unit.tileIndex];
+  for (const o of enkiduAllies(state, seat, foe)) {
+    const near = unitsOf(state, o).some((u) => {
+      const ut = state.map.tiles[u.tileIndex];
+      return u.hp > 0 && hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE;
+    });
+    const os = seatOf(state, o);
+    if (near && os) for (const l of lumps) payPlunder(os, l.kind, l.lump);
+  }
 }
 
 export interface LumpGrant {

@@ -2613,7 +2613,9 @@ class SimMasks:
             _nland = ~self.water.gather(1, _nbc)
             _raidable = ((_nb >= 0).reshape(B, -1) & _nland & _nwar
                          & (_nimp | _ndis)).reshape(B, N, 6).any(dim=2)
-            raid = (present & self._type_raider[utype]
+            # CIV6 (Thunderbolt of the North): "coastal raiding for all naval
+            # melee units"
+            raid = (present & (self._type_raider[utype] | (self._type_naval_melee[utype] & self._row_leads(row, "HARDRADA")))
                     & self.water.gather(1, tc)
                     & (self.unit_mp.gather(1, sc) >= 3 * self._mp_scale)
                     & _raidable)

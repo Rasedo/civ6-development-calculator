@@ -974,6 +974,61 @@ class SimSeats:
         r = seat.clamp(min=0, max=self.n_majors - 1)
         return (seat >= 0) & (seat < self.n_majors) & (self.row_civ[r] == i)
 
+    def _row_leads(self, row: int, leader: str) -> bool:
+        """`leaderOf(state, seat) === leader` for one seat row."""
+        if row >= self.n_majors:
+            return False
+        c = int(self.row_civ[row])
+        return 0 <= c < len(self._civ_leader) and self._civ_leader[c] == leader
+
+    def _leads_vec(self, leader: str) -> torch.Tensor:
+        """[n_majors] bool — `_row_leads` per row."""
+        return torch.tensor([self._row_leads(r, leader) for r in range(self.n_majors)],
+                            dtype=torch.bool, device=self.device)
+
+    def _enkidu_allies(self, rows: torch.Tensor, seat: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """[n, n_majors] bool — `enkiduAllies`: the allies (any type) of the
+        seat per game where one side plays Gilgamesh and the ally is at war
+        with `foe` (an absolute seat)."""
+        NM = self.n_majors
+        lead = self._leads_vec("GILGAMESH")
+        srow = seat.clamp(min=0, max=NM - 1)
+        frow = self._seat_row[foe.clamp(min=0)]
+        okm = (seat >= 0) & (seat < NM) & (foe >= 0)
+        ally = self.seat_ally_turns[rows, srow][:, :NM] > 0                      # [n, NM]
+        war_f = self.war[rows][:, :NM].gather(2, frow.view(-1, 1, 1).expand(-1, NM, 1)).squeeze(2)  # [n, NM]
+        other = torch.arange(NM, device=self.device).view(1, -1) != srow.view(-1, 1)
+        return okm.view(-1, 1) & ally & (lead[srow].view(-1, 1) | lead.view(1, -1)) & war_f & other
+
+    def _units_within(self, rows: torch.Tensor, tile: torch.Tensor, seat_row: int, rng: int) -> torch.Tensor:
+        """[n] bool — does seat row `seat_row` field a living unit within
+        `rng` of `tile`, per game."""
+        d = self.pair_dist[tile.clamp(min=0)].to(torch.long)                        # [n, T]
+        near = d.gather(1, self.unit_tile[rows].clamp(min=0)) <= rng                 # [n, U]
+        return (near & self.unit_alive[rows] & (self.unit_seat[rows] == seat_row)).any(dim=1)
+
+    def _share_joint_xp(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor,
+                        foe: torch.Tensor, gain: torch.Tensor) -> None:
+        """`shareJointWarXp` — CIV6 (Adventures of Enkidu): every eligible unit
+        of an ally at war with the foe, within range of the earner, banks the
+        same gain. All arguments are [B]."""
+        rows = (mask & (gain > 0)).nonzero(as_tuple=True)[0]
+        if rows.numel() == 0 or self.n_majors < 2:
+            return
+        part = self._enkidu_allies(rows, seat[rows], foe[rows])                     # [n, NM]
+        if not bool(part.any()):
+            return
+        d = self.pair_dist[tile[rows].clamp(min=0)].to(torch.long)                  # [n, T]
+        near = d.gather(1, self.unit_tile[rows].clamp(min=0)) <= self._enkidu_range  # [n, U]
+        elig = near & self.unit_alive[rows] & self._xp_eligible(self.unit_type[rows])
+        take = elig & part.gather(1, self.unit_seat[rows].clamp(min=0, max=self.n_majors - 1)) \
+            & (self.unit_seat[rows] >= 0) & (self.unit_seat[rows] < self.n_majors)
+        ii, uu = take.nonzero(as_tuple=True)
+        if ii.numel() == 0:
+            return
+        gr, gu = rows[ii], uu
+        self.unit_xp[gr, gu] = self._bank_xp(self.unit_xp[gr, gu], self.unit_level[gr, gu], gain[gr])
+
     def _levy_cost(self, row: int) -> float:
         """`levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
         city-state costs 50% less Gold." """
@@ -5313,7 +5368,8 @@ class SimSeats:
             return self._seat_route_cache[1]
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
-        if not bool(act.any()):
+        # Cleopatra's destination gold pays a city with no route of its own
+        if not bool(act.any()) and not self._row_leads(row, "CLEOPATRA"):
             self._seat_route_cache = (key, None)
             return None
         B = self.B
@@ -5417,6 +5473,11 @@ class SimSeats:
             _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, n_majors, RC]
             spec_dest = _spec_all.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
+            # CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own
+            # routes out; "+2 Food for them" on anyone's route in.
+            if self._row_leads(row, "CLEOPATRA"):
+                gold_i = gold_i + self._cleo_intl_gold
+            _cleo_d = self._leads_vec("CLEOPATRA")[dr]  # [B, K]
             # CIV6 (Reform the Coinage, Golden face): "International Trade
             # Routes provide +3 Gold per specialty district in the foreign
             # city."
@@ -5444,6 +5505,8 @@ class SimSeats:
                 snd_s = _wcp.double() @ self._wond_sender_sci
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            if bool(_cleo_d.any()):
+                inc.scatter_add_(1, from_j * 6 + 0, self._cleo_in_food * (pays_i & _cleo_d).double())
             if snd_s is not None and bool((snd_s != 0).any()):
                 inc.scatter_add_(1, from_j * 6 + 3, snd_s * pays_i.double())
             # CIV6 (Alliance, level 1): the typed alliance pays its route
@@ -5490,6 +5553,20 @@ class SimSeats:
                 cg = cg + (self.trading_post[:, r2].gather(1, chf).reshape(ch.shape)
                            & live_c).double().sum(dim=2)
             inc.scatter_add_(1, from_j * 6 + 2, cg * (act & has_from).double())
+        # CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
+        # civilization's route INTO the city (`incomingIntlRoutes`).
+        if self._row_leads(row, "CLEOPATRA"):
+            _cid = self.city_id[:, row, :cols]
+            _cnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
+            for r2 in range(self.n_majors):
+                if r2 == row:
+                    continue
+                _hit = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                        & (self.seat_route_dcity[:, r2].unsqueeze(2) == _cid.unsqueeze(1)))  # [B, K, cols]
+                _cnt = _cnt + _hit.sum(dim=1).double()
+            _addc = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
+            _addc[:, :, 2] = (self._cleo_in_gold * _cnt * self.city_alive[:, row, :cols].double()).to(inc.dtype)
+            inc = inc + _addc.reshape(B, -1)
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
             # CIV6 (Letters of Marque): "Trade Route yields -50%."
@@ -6838,8 +6915,32 @@ class SimSeats:
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]
             self._tile_owner_ver += 1
         self._all_roads_lead_to_rome(rows, row, s_idx)
+        self._trajans_column(rows, row, slot)
         self._eff_version += 1
         return found
+
+    def _trajans_column(self, rows: torch.Tensor, row: int, slot: torch.Tensor) -> None:
+        """CIV6 (Trajan's Column): "All cities start with an additional City
+        Center building" — the cheapest completable one, ties by catalog
+        order, built the way a purchase builds it (`trajansColumn`)."""
+        if rows.numel() == 0 or not self._row_leads(row, "TRAJAN"):
+            return
+        self._eff_version += 1  # the city founded above must be in the walk
+        B, dev = self.B, self.device
+        cost = self.rules_dev.b_cost
+        NB = cost.shape[0]
+        elig = self._seat_buildable(row, True)[rows, slot] & (self._b_req_district < 0).unsqueeze(0)
+        key = torch.where(elig, (cost * 1024 + torch.arange(NB, device=dev, dtype=cost.dtype)).unsqueeze(0).expand(len(rows), -1),
+                          torch.tensor(float("inf"), dtype=cost.dtype, device=dev))
+        best = key.argmin(dim=1)
+        has = torch.isfinite(key.gather(1, best.unsqueeze(1)).squeeze(1))
+        can = torch.zeros(B, dtype=torch.bool, device=dev)
+        can[rows] = has
+        jj = torch.zeros(B, dtype=torch.long, device=dev)
+        jj[rows] = slot
+        bb = torch.zeros(B, dtype=torch.long, device=dev)
+        bb[rows] = best
+        self._seat_buy_building(row, can, jj, bb, torch.zeros(B, dtype=self.civ_treasury.dtype, device=dev))
 
     def _all_roads_lead_to_rome(self, rows: torch.Tensor, row: int, centre: torch.Tensor) -> None:
         """CIV6 (All Roads Lead to Rome): "All cities you found or conquer start
@@ -8260,6 +8361,9 @@ class SimSeats:
             a_xp_p = self._pool_of(a_kind)[3]
             a_xp_p[:, u] = torch.where(
                 ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
+            _dsc = d_slot.clamp(min=0)
+            self._share_joint_xp(ok & (d_slot >= 0), getattr(self, f"{a_kind}_unit_tile")[:, u], a_seat,
+                                 self.unit_seat[self._bidx, _dsc], gain)
         okd = live & ~d_died & ~d_is_barb & (d_slot >= 0) & self._xp_eligible(d_type)
         rows = okd.nonzero(as_tuple=True)[0]
         if len(rows) == 0:
@@ -8273,6 +8377,10 @@ class SimSeats:
             ranged=ranged, initiated=False, foe_died=a_died[rows], foe_is_barb=a_barb[rows])
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gd)
+        _gd = torch.zeros(self.B, dtype=gd.dtype, device=self.device)
+        _gd[rows] = gd
+        _dsc = d_slot.clamp(min=0)
+        self._share_joint_xp(okd, self.unit_tile[self._bidx, _dsc], self.unit_seat[self._bidx, _dsc], a_seat, _gd)
 
     def _award_city_xp(self, live: torch.Tensor, a_kind: str, u: int,
                        a_type: torch.Tensor, a_seat: torch.Tensor,
@@ -9926,6 +10034,11 @@ class SimSeats:
                 & want.reshape(B, 1, 1)
             )
             ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec + self._route_post_gold(row, dctr)  # [B, D]
+            # CIV6 (Mediterranean's Bride): the driver values Egypt's own +4 Gold
+            # and the +2 Food a route INTO Egypt pays (`routeYieldsInternational`)
+            if self._row_leads(row, "CLEOPATRA"):
+                ysum_ip = ysum_ip + int(self._cleo_intl_gold)
+            ysum_ip = ysum_ip + int(self._cleo_in_food) * self._leads_vec("CLEOPATRA")[drow].long()
             key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
                                  torch.full((B, RC, D), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_ip], dim=2)

@@ -279,17 +279,6 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   return y;
 }
 
-/** CIV6 (Bath): the flat Amenity a civilization's unique district adds — per
- *  complete, unpillaged instance ("Entertainment 1"). */
-export function districtVariantAmenities(state: GameState, city: City): number {
-  let n = 0;
-  for (const d of city.districts) {
-    const t = state.map.tiles[d.tileIndex];
-    if (!t.districtComplete || t.districtPillaged) continue;
-    n += civVariantOf(state, city.seat, DISTRICTS[d.type].civVariants)?.amenities ?? 0;
-  }
-  return n;
-}
 
 /** CIV6 (Stave Church): the yields a civilization's unique building pays on
  *  every Coast tile of the city that carries a resource, summed over the
@@ -987,7 +976,6 @@ export function computeCityStats(
     + gpCityPermOf(city, 'housing');
   let have =
     localAmenities(state, city) +
-    districtVariantAmenities(state, city) +
     parkAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +

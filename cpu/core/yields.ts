@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, seatOf, tileBelongsTo } from './seats';
+import { citiesOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
 import type { YieldCtx } from './effects';
@@ -464,6 +464,13 @@ export function cityDistrictSum(
 export function localAmenities(state: GameState, city: City): number {
   const pillaged = pillagedDistrictTypes(state.map, city.districts);
   let n = cityDistrictSum(state, city, 'amenities');
+  // CIV6 (Bath): the unique district's own flat Amenity, in the base the
+  // luxury ranking sorts on — where the Aqueduct's own would sit.
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (!t.districtComplete || t.districtPillaged) continue;
+    n += civVariantOf(state, city.seat, DISTRICTS[d.type].civVariants)?.amenities ?? 0;
+  }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def || def.regional) continue;

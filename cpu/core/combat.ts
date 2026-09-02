@@ -1,5 +1,6 @@
 
 import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from './types';
+import { ENKIDU_SHARE_RANGE } from '../data/civilizations';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -42,7 +43,7 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -196,6 +197,22 @@ export function awardBattleXp(
         pct: seatXpPct(state, self), mult: xpMult(state, self, initiated),
       });
     bankXp(self, gain);
+    shareJointWarXp(state, self, foe.seat, gain);
+  }
+}
+
+/** CIV6 (Adventures of Enkidu): "they and their allies ... share combat
+ *  experience gains if within 5 tiles" — every eligible unit of an ally at
+ *  war with the foe, within range of the earner, banks the same gain. */
+function shareJointWarXp(state: GameState, earner: Unit, foe: number, gain: number): void {
+  if (gain <= 0) return;
+  const at = state.map.tiles[earner.tileIndex];
+  for (const o of enkiduAllies(state, earner.seat, foe)) {
+    for (const u of unitsOf(state, o)) {
+      if (u.hp <= 0 || !xpEligible(u)) continue;
+      const ut = state.map.tiles[u.tileIndex];
+      if (hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE) bankXp(u, gain);
+    }
   }
 }
 
@@ -2114,7 +2131,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
-    pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder);
+    pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
     unit.movesLeft = 0;
     return;
   }

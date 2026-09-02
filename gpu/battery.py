@@ -344,6 +344,7 @@ def main() -> int:
                 ("uniques", [py, "tests/gpu/uniques_test.py"], 4),  # the roster's UNIQUE UNITS: who trains what, the chariots, the start-tile Movement, the Legion's Fort
                 ("uniques_infra", [py, "tests/gpu/uniques_infra_test.py"], 4),  # the UNIQUE INFRASTRUCTURE: the Bath, the Stave Church, the Sphinx, the Ziggurat
                 ("civ_abilities", [py, "tests/gpu/civ_abilities_test.py"], 4),  # the CIVILIZATION ABILITIES: Rome's roads and posts, Iteru, the Knarr, Epic Quest, and the naval heal table
+                ("leader_abilities", [py, "tests/gpu/leader_abilities_test.py"], 4),  # the LEADER ABILITIES: Trajan's Column, Mediterranean's Bride, Thunderbolt of the North, Adventures of Enkidu
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

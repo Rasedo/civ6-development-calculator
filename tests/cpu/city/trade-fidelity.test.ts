@@ -105,14 +105,14 @@ describe('international route yields', () => {
   it('routeYieldsInternational pays INTL_ROUTE_GOLD + 1 gold per completed specialty district, gold only', () => {
     const { state, dest } = twoCitySandbox();
     expect(specialtyDistricts(state, dest)).toBe(0);
-    let y = routeYieldsInternational(state, dest);
+    let y = routeYieldsInternational(state, dest, 0);
     expect(y.gold).toBe(INTL_ROUTE_GOLD);
     expect(y.food).toBe(0);
     expect(y.production).toBe(0);
 
     addCompletedCampus(state, dest, 11, 6);
     expect(specialtyDistricts(state, dest)).toBe(1);
-    y = routeYieldsInternational(state, dest);
+    y = routeYieldsInternational(state, dest, 0);
     expect(y.gold).toBe(INTL_ROUTE_GOLD + 1);
     expect(y.food).toBe(0);
   });

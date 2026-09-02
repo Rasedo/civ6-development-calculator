@@ -285,7 +285,16 @@ class SimPhase:
                     to_o = (self.seat_route_dseat[:, row, :].unsqueeze(2)
                             == torch.arange(NM, device=self.device).view(1, 1, NM)).any(dim=1)
                     from_o = (self.seat_route_dseat[:, :NM] == row).any(dim=2)
-                    add = run.long() * (self._al_qp_turn + self._al_qp_route * (to_o.long() + from_o.long()))
+                    # CIV6 (Mediterranean's Bride): "Trading with Allies earns
+                    # twice as many bonus Alliance Points"; (Adventures of
+                    # Enkidu): "Their Alliances gain Alliance Points for being
+                    # at war with a common foe."
+                    _cl = self._leads_vec("CLEOPATRA") | self._row_leads(row, "CLEOPATRA")
+                    _qpr = self._al_qp_route * torch.where(_cl, self._cleo_trade_qp_mult, 1).view(1, -1)
+                    _gl = self._leads_vec("GILGAMESH") | self._row_leads(row, "GILGAMESH")
+                    _common = (self.war[:, row, :].unsqueeze(1) & self.war[:, :NM, :]).any(dim=2)  # [B, NM]
+                    add = run.long() * (self._al_qp_turn + _qpr * (to_o.long() + from_o.long())
+                                        + self._enkidu_qp * (_common & _gl.view(1, -1)).long())
                     self.seat_alliance_pts[:, row] += add
                     self.seat_alliance_pts[:, :, row] += add
                     # CIV6 (Military alliance 2): "Allies share visibility" -
@@ -567,6 +576,10 @@ class SimPhase:
             if bool((_pm != 1).any()) and self._proj_rows:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
+        # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
+        # melee units."
+        if self._row_leads(row, "HARDRADA"):
+            _emall = torch.where(_is_unit & self._type_naval_melee[_ut], _emall * self._hard_naval_prod, _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
         if self._row_plays(row, "EGYPT"):

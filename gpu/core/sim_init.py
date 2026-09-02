@@ -2708,6 +2708,26 @@ class SimInit:
         self._knarr_heal = int(_ab["knarrNeutralHeal"])
         self._epic_levy_mult = float(_ab["epicQuestLevyMult"])
         self._rome_post_gold = float(_ab["romeOwnPostGold"])
+        self._civ_leader: list[str] = list(_uq["leaders"])
+        _la = _uq["leaderAbilities"]
+        self._cleo_intl_gold = float(_la["cleopatraIntlGold"])
+        self._cleo_in_food = float(_la["cleopatraIncomingFood"])
+        self._cleo_in_gold = float(_la["cleopatraIncomingGold"])
+        self._cleo_trade_qp_mult = int(_la["cleopatraTradeQpMult"])
+        self._hard_naval_prod = float(_la["hardradaNavalMeleeProdMult"])
+        _ni = len(rules.improvements["ids"])
+        self._hard_plun_kind = torch.zeros(_ni, dtype=torch.long, device=device)
+        self._hard_plun_amt = torch.zeros(_ni, dtype=torch.long, device=device)
+        for _ii, _k, _a in _la["hardradaPillage"]:
+            self._hard_plun_kind[int(_ii)] = int(_k)
+            self._hard_plun_amt[int(_ii)] = int(_a)
+        self._enkidu_cs = int(_la["enkiduWarCs"])
+        self._enkidu_qp = int(_la["enkiduCommonFoeQp"])
+        self._enkidu_range = int(_la["enkiduShareRange"])
+        # the naval MELEE line (`navalMelee`): a hull with no ranged strength
+        # that is neither a raider nor a carrier
+        self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)
+                                  & ~self._type_raider & (self._type_air_slots == 0))
         self._row_civ_i = torch.where(self.row_civ >= 0, self.row_civ, torch.full_like(self.row_civ, _nc))
         self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
         # SCOUT is a military explorer (combat 10) but never in the civ roster

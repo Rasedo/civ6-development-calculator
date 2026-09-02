@@ -93,7 +93,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
         if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
         if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
         if (!routeInRange(state, actor.seat, from.centerIndex, pc.centerIndex)) continue;
-        const py = routeYieldsInternational(state, pc);
+        const py = routeYieldsInternational(state, pc, actor.seat);
         const ySum = py.food + py.production + py.gold + py.science + py.culture + py.faith
           + routePostGold(state, actor.seat, pc.centerIndex);
         if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: pc.centerIndex, ySum };

@@ -80,7 +80,9 @@ def main() -> None:
     inc = sim._seat_route_income(1)
     assert inc is not None, "income must resolve with an active route"
     gold = float(inc[0, 0, 2])
-    assert abs(gold - 3.0) < 1e-9, f"peace intl income should be intlGold=3, got {gold}"
+    # CIV6 (Mediterranean's Bride): an Egyptian sender takes +4 on the leg
+    cleo = sim._cleo_intl_gold if sim._row_leads(1, "CLEOPATRA") else 0.0
+    assert abs(gold - (3.0 + cleo)) < 1e-9, f"peace intl income should be intlGold=3 (+{cleo}), got {gold}"
     # gold ONLY — no food/prod/sci/cul/faith on the international leg
     for col, name in [(0, "food"), (1, "prod"), (3, "sci"), (4, "cul"), (5, "faith")]:
         assert abs(float(inc[0, 0, col])) < 1e-9, f"intl route must not pay {name}"
@@ -116,7 +118,7 @@ def main() -> None:
         sim._eff_version += 1
         sim._seat_route_cache = None
         inc = sim._seat_route_income(1)
-        assert abs(float(inc[0, 0, 2]) - 4.0) < 1e-9, f"one dest specialty → 3+1 gold, got {float(inc[0, 0, 2])}"
+        assert abs(float(inc[0, 0, 2]) - (4.0 + cleo)) < 1e-9, f"one dest specialty → 3+1 gold (+{cleo}), got {float(inc[0, 0, 2])}"
 
     # --- 3) duration expiry: due route dropped, future route kept ----------
     s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
