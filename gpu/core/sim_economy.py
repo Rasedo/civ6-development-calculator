@@ -2113,15 +2113,14 @@ class SimEconomy:
         return out
 
     def _adj_woods_count(self) -> torch.Tensor:
-        """[B, T] long — live Woods among each tile's neighbours."""
+        """[B, T] long — live Woods among each tile's neighbours: the Woods
+        FEATURE (`neighbor.feature === 'WOODS'`), not the movement rule's
+        woods list, which admits Rainforest."""
         nb = self.neigh
         nbc = nb.clamp(min=0)
         fid = self.feat_id[:, nbc]
         live = ~self.feat_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
-        hit = torch.zeros_like(live)
-        for f in self._woods_feats.tolist():
-            hit |= fid == f
-        return (hit & live).sum(dim=2)
+        return ((fid == self._woods_feat) & live).sum(dim=2)
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc

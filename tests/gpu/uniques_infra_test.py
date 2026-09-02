@@ -182,9 +182,12 @@ def main() -> None:
     sim.city_dist_tile[0, norway, 0, hs] = site
     woods = [int(x) for x in sim.neigh[site].tolist() if x >= 0 and x != ctr and not bool(sim.water[0, x])][:2]
     assert len(woods) == 2, "the scene wants two land neighbours for its Woods"
-    wf = int(sim._woods_feats[0])
-    for x in woods:
-        sim.feat_id[0, x] = wf
+    # one Woods and one RAINFOREST: the movement rule's woods list admits
+    # both, the Stave Church's source is the Woods FEATURE alone
+    wf = sim._woods_feat
+    rf = next(int(f) for f in sim._woods_feats.tolist() if int(f) != wf)
+    for x, f in zip(woods, (wf, rf)):
+        sim.feat_id[0, x] = f
         sim.feat_stripped[0, x] = False
     # the static adjacency table was exported with the map's own features, so
     # count the Woods the tile already had beside the two planted here
@@ -194,7 +197,8 @@ def main() -> None:
     sim._eff_version += 1
     stave = float(sim._district_adj_floor(hs)[0, site])
     n_woods = int(sim._adj_woods_count()[0, site])
-    assert n_woods >= 2
+    manual = sum(1 for x in sim.neigh[site].tolist() if x >= 0 and int(sim.feat_id[0, x]) == wf and not bool(sim.feat_stripped[0, x]))
+    assert n_woods == manual >= 1, (n_woods, manual)
     assert stave - base == float(n_woods), f"CIV6 (Stave Church): +1 per adjacent Woods ({base} -> {stave}, {n_woods} Woods)"
     sim.row_civ[norway] = -1
     sim._eff_version += 1  # a test-only toggle; in play the row's civilization never changes

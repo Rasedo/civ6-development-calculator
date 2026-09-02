@@ -65,8 +65,10 @@ describe('the Stave Church (Norway, replaces the Temple)', () => {
     const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
     const hs = around[0];
     placeDistrict(city, 'HOLY_SITE', hs);
-    const woods = neighbors(state.map, hs).filter((t) => t.index !== city.centerIndex).slice(0, 2);
+    const around2 = neighbors(state.map, hs).filter((t) => t.index !== city.centerIndex);
+    const woods = around2.slice(0, 2);
     for (const w of woods) w.feature = 'WOODS';
+    around2[2].feature = 'RAINFOREST'; // not Woods: the Stave Church ignores it
     city.buildings.push('SHRINE', 'TEMPLE');
     const plain = computeCityStats(state, city).breakdown.districts.faith; // 2 Woods x 0.5 = 1
     state.seats[0].civ = 2; // Norway

@@ -2417,6 +2417,7 @@ class SimInit:
         self._pc_siege = rules.promo_classes.index("SIEGE") if "SIEGE" in rules.promo_classes else -1
         self._choke_feats = torch.tensor([int(x) for x in rules.choke_features if int(x) >= 0], dtype=torch.long, device=device)
         self._woods_feats = torch.tensor([int(x) for x in rules.woods_features if int(x) >= 0], dtype=torch.long, device=device)
+        self._woods_feat = int(rules.woods_feature)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         # What `_building_dedications` reads besides the era: Free Inquiry pays
         # for a building that provides SCIENCE, Pen Brush and Voice for one

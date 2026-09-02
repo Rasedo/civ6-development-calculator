@@ -216,6 +216,7 @@ class Rules:
     promo_class_bit: torch.Tensor  # long [NPC] — the bit a class presents to a `CS_VS_*` mask, 0 = never a target
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
     woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
+    woods_feature: int  # the Woods feature itself — the Stave Church's adjacency source
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     workshop_bidx: int  # WORKSHOP row (Leonardo's culture perm), -1 if absent
@@ -411,6 +412,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         promo_class_bit=torch.tensor(_P.get("classBit", []), dtype=torch.long),
         choke_features=list(_P.get("chokeFeatures", [])),
         woods_features=list(_P.get("woodsFeatures", [])),
+        woods_feature=int(_P["woodsFeature"]),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
         workshop_bidx=int(r.get("workshopBidx", -1)),

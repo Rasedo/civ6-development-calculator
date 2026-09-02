@@ -989,44 +989,54 @@ class SimSeats:
     def _enkidu_allies(self, rows: torch.Tensor, seat: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """[n, n_majors] bool — `enkiduAllies`: the allies (any type) of the
         seat per game where one side plays Gilgamesh and the ally is at war
-        with `foe` (an absolute seat)."""
-        NM = self.n_majors
+        with `foe` (an absolute seat). `seat` and `foe` are [n], one per row
+        in `rows`; every gather runs over the whole batch and narrows after."""
+        B, NM = self.B, self.n_majors
         lead = self._leads_vec("GILGAMESH")
-        srow = seat.clamp(min=0, max=NM - 1)
-        frow = self._seat_row[foe.clamp(min=0)]
-        okm = (seat >= 0) & (seat < NM) & (foe >= 0)
-        ally = self.seat_ally_turns[rows, srow][:, :NM] > 0                      # [n, NM]
-        war_f = self.war[rows][:, :NM].gather(2, frow.view(-1, 1, 1).expand(-1, NM, 1)).squeeze(2)  # [n, NM]
+        seat_b = torch.zeros(B, dtype=torch.long, device=self.device)
+        foe_b = torch.full((B,), -1, dtype=torch.long, device=self.device)
+        seat_b[rows] = seat
+        foe_b[rows] = foe
+        srow = seat_b.clamp(min=0, max=NM - 1)
+        frow = self._seat_row[foe_b.clamp(min=0)]
+        okm = (seat_b >= 0) & (seat_b < NM) & (foe_b >= 0)
+        ally = self.seat_ally_turns[self._bidx, srow][:, :NM] > 0                 # [B, NM]
+        war_f = self.war[:, :NM].gather(2, frow.view(-1, 1, 1).expand(B, NM, 1)).squeeze(2)  # [B, NM]
         other = torch.arange(NM, device=self.device).view(1, -1) != srow.view(-1, 1)
-        return okm.view(-1, 1) & ally & (lead[srow].view(-1, 1) | lead.view(1, -1)) & war_f & other
+        out = okm.view(-1, 1) & ally & (lead[srow].view(-1, 1) | lead.view(1, -1)) & war_f & other
+        return out[rows]
 
     def _units_within(self, rows: torch.Tensor, tile: torch.Tensor, seat_row: int, rng: int) -> torch.Tensor:
         """[n] bool — does seat row `seat_row` field a living unit within
-        `rng` of `tile`, per game."""
-        d = self.pair_dist[tile.clamp(min=0)].to(torch.long)                        # [n, T]
-        near = d.gather(1, self.unit_tile[rows].clamp(min=0)) <= rng                 # [n, U]
-        return (near & self.unit_alive[rows] & (self.unit_seat[rows] == seat_row)).any(dim=1)
+        `rng` of `tile` ([n], one per row in `rows`), per game."""
+        tile_b = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        tile_b[rows] = tile.clamp(min=0)
+        d = self.pair_dist[tile_b].to(torch.long)                                    # [B, T]
+        near = d.gather(1, self.unit_tile.clamp(min=0)) <= rng                       # [B, U]
+        hit = near & self.unit_alive & (self.unit_seat == seat_row)
+        return hit.any(dim=1)[rows]
 
     def _share_joint_xp(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor,
                         foe: torch.Tensor, gain: torch.Tensor) -> None:
         """`shareJointWarXp` — CIV6 (Adventures of Enkidu): every eligible unit
         of an ally at war with the foe, within range of the earner, banks the
         same gain. All arguments are [B]."""
+        B, NM = self.B, self.n_majors
         rows = (mask & (gain > 0)).nonzero(as_tuple=True)[0]
-        if rows.numel() == 0 or self.n_majors < 2:
+        if rows.numel() == 0 or NM < 2:
             return
         part = self._enkidu_allies(rows, seat[rows], foe[rows])                     # [n, NM]
         if not bool(part.any()):
             return
-        d = self.pair_dist[tile[rows].clamp(min=0)].to(torch.long)                  # [n, T]
-        near = d.gather(1, self.unit_tile[rows].clamp(min=0)) <= self._enkidu_range  # [n, U]
-        elig = near & self.unit_alive[rows] & self._xp_eligible(self.unit_type[rows])
-        take = elig & part.gather(1, self.unit_seat[rows].clamp(min=0, max=self.n_majors - 1)) \
-            & (self.unit_seat[rows] >= 0) & (self.unit_seat[rows] < self.n_majors)
-        ii, uu = take.nonzero(as_tuple=True)
-        if ii.numel() == 0:
+        part_b = torch.zeros(B, NM, dtype=torch.bool, device=self.device)
+        part_b[rows] = part
+        d = self.pair_dist[tile.clamp(min=0)].to(torch.long)                         # [B, T]
+        near = d.gather(1, self.unit_tile.clamp(min=0)) <= self._enkidu_range         # [B, U]
+        elig = near & self.unit_alive & self._xp_eligible(self.unit_type)
+        take = elig & part_b.gather(1, self.unit_seat.clamp(min=0, max=NM - 1))             & (self.unit_seat >= 0) & (self.unit_seat < NM) & (mask & (gain > 0)).unsqueeze(1)
+        gr, gu = take.nonzero(as_tuple=True)
+        if gr.numel() == 0:
             return
-        gr, gu = rows[ii], uu
         self.unit_xp[gr, gu] = self._bank_xp(self.unit_xp[gr, gu], self.unit_level[gr, gu], gain[gr])
 
     def _levy_cost(self, row: int) -> float:

@@ -1255,6 +1255,8 @@ export function buildRules() {
       // RANGER names Woods and Jungle for its 1-MP step; MARSH is nobody's,
       // so this list is the choke one MINUS the marsh.
       woodsFeatures: ['WOODS', 'RAINFOREST'].map((f) => featIdx.get(f) ?? -1),
+      // the Woods FEATURE itself — the Stave Church's adjacency source (Rainforest is not Woods)
+      woodsFeature: featIdx.get('WOODS') ?? -1,
     },
     // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
     // marks builder-type units (charges) — they hold the civilian stacking
