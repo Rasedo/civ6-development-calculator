@@ -79,6 +79,8 @@ describe('the combat-strength rows', () => {
     expect(rosterCS(state, shore, 1, 100, false)).toBe(5);
     const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 8, 3).index, 0)!;
     expect(rosterCS(state, galley, 1, 100, false)).toBe(5);
+    tileAtCoords(state.map, 8, 3).terrain = 'LAKE';
+    expect(rosterCS(state, galley, 1, 100, false)).toBe(5); // a lake is shallow water
     tileAtCoords(state.map, 8, 3).terrain = 'OCEAN';
     expect(rosterCS(state, galley, 1, 100, false)).toBe(0);
   });

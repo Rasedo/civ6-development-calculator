@@ -862,7 +862,9 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeMinor' ? isCityStateSeat(foeSeat)
       : r.when === 'foeWounded' ? foeHp !== null && foeHp < UNIT_HP
       : r.when === 'foeCity' ? foeIsCity
-      : def.naval ? tile.terrain === 'COAST' : (!own.embarked && isCoastalLand(state.map, tile));
+      // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
+      // a lake is shallow water to a hull.
+      : def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile));
     if (hit) cs += r.amount;
   }
   return cs;

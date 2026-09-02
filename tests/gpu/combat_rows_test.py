@@ -106,6 +106,9 @@ def test_genghis_hojo_ottoman(rules, path) -> None:
     play(sim, 0, "JAPAN")
     assert cs(sim, 0, "WARRIOR", inland, 1, 100, False) == 0 and cs(sim, 0, "WARRIOR", shore, 1, 100, False) == 5, "Hojo's coastal land"
     assert cs(sim, 0, "GALLEY", coast, 1, 100, False) == 5 and cs(sim, 0, "GALLEY", ocean, 1, 100, False) == 0, "Hojo's shallow water"
+    lake = next((t for t in range(sim.T) if int(sim.terrain[B0, t]) == 6), None)  # `TERRAIN_IDS`[6] is LAKE
+    if lake is not None:
+        assert cs(sim, 0, "GALLEY", lake, 1, 100, False) == 5, "a lake is shallow water"
     play(sim, 0, "OTTOMAN")
     assert cs(sim, 0, "CATAPULT", inland, 1, None, True) == 5 and cs(sim, 0, "CATAPULT", inland, 1, 100, False) == 0, "the Bombard on a city"
     assert cs(sim, 0, "WARRIOR", inland, 1, None, True) == 0, "siege alone"
