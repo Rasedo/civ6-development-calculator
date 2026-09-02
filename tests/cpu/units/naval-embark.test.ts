@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
+import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { purchaseUnit } from '../../../cpu/core/game';
@@ -10,7 +10,7 @@ import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
 import { UNITS } from '../../../cpu/data/units';
 import { isWater } from '../../../world/query';
 import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive, EMBARK_MOVES, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../../../cpu/data/constants';
-import type { GameState, City, Seat, Tile, Unit } from '../../../cpu/core/types';
+import type { CityState, GameState, City, Seat, Tile, Unit } from '../../../cpu/core/types';
 
 // the MOVEMENT + EMBARKATION model. Every water step on both engines rides the
 // `embarkState.live` master switch, which SHIPS ON; the tests below poke it OFF
@@ -316,6 +316,15 @@ describe('N2 naval spawn + combat', () => {
     civ.research.civics.push('EXPLORATION');
     expect(embarkedDefenseCS(state, civ.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
     expect(defenderCS(state, embarked, water.index)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
+    // a city-state's transport reads the minor's OWN tree, never a major's
+    const minor = {
+      ...emptySeat(seatOfCityState(7)), id: 7, name: 'Kandy', type: 'scientific',
+      centerIndex: water.index, population: 1, envoys: {}, met: [],
+    } as CityState;
+    state.cityStates.push(minor);
+    expect(embarkedDefenseCS(state, minor.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[0]);
+    minor.research.civics.push('EXPLORATION');
+    expect(embarkedDefenseCS(state, minor.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
     // grounded, the override is gone: the unit's own 20 plus the two turns of
     // fortification the flat CS was ignoring
     embarked.embarked = false;

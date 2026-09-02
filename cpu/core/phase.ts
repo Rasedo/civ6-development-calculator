@@ -2248,7 +2248,11 @@ export function seatPhase(state: GameState): void {
           const defCSa = defCS + generalAuraCS(state, defender, bestTile)
             + gdrBeamCS(state, defender)
             + congressUnitCS(state, defender) + governmentUnitCS(state, defender); // the cstk mirror
-          const atkCS = cityStrikeStrength(state, civCity);
+          // CIV6 (Expansion1_Emergencies.xml): the target's City Strike reward
+          // is gated on COMBAT_DISTRICT_VS_UNIT — the Encampment's shot is a
+          // district's too, so it pays the same +2 the centre's does.
+          const atkCS = cityStrikeStrength(state, civCity)
+            + emergencyStrikeCS(state, civCity.seat, defender.seat);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
           awardDefenseXp(state, defender);
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,

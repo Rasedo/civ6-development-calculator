@@ -975,11 +975,15 @@ class SimMasks:
 
     def _embarked_def_cs(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] long `embarkedDefenseCS` — the normalized CS an embarked unit of
-        this seat defends at, off the OWNER's technological era. A seat that
-        researches nothing of its own reads era 0."""
+        this seat defends at, off the OWNER's technological era: a major's own
+        tree, or a city-state's own (`citystate_techs` / `citystate_civics`).
+        The barbarians research nothing and read era 0."""
         era = torch.zeros_like(seat)
         for r in range(self.n_majors):
             era = torch.where(seat == r, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]), era)
+        for s in range(self.S):
+            era = torch.where(seat == 100 + s,
+                              self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]), era)
         return self._embarked_def_by_era[era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1)]
 
     def _stack_fold(self, tc: torch.Tensor, seat, mslot: torch.Tensor,

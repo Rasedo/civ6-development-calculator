@@ -7,6 +7,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { trainXpPct } from '../../../cpu/core/combat';
 import { citySpecialistSlots } from '../../../cpu/core/city';
 import { SPECIALIST_YIELDS } from '../../../cpu/data/greatPeople';
+import { EMERGENCY_TARGET_STRIKE_CS } from '../../../cpu/data/seats';
 
 // Encampment residuals — the TS twin of gpu/encampment_test.py.
 // Scripted parity (gpu/parity_test.py, 24 seeds) is the primary correctness
@@ -68,8 +69,8 @@ describe('Encampment', () => {
     expect(u.xpPct).toBe(25);
   });
 
-  /** The strike keys a `seatPhase` fires at a raider standing next to the city. */
-  function strikeKeys(state: any, city: any): string[] {
+  /** The roll-log lines a `seatPhase` fires at a raider standing next to the city. */
+  function strikeLog(state: any, city: any): string[] {
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
     // a barbarian is hostile with no war bookkeeping and holds still through
@@ -84,7 +85,14 @@ describe('Encampment', () => {
       delete (globalThis as any).__cbLog;
     }
     expect(raider.xp).toBeUndefined(); // barbarians never accrue XP (capsOf)
-    return log.map((e) => e.split(' ')[0]).filter((k) => k === 'k:cstk' || k === 'k:estk');
+    return log.filter((e) => e.startsWith('k:cstk ') || e.startsWith('k:estk '));
+  }
+  const strikeKeys = (state: any, city: any): string[] => strikeLog(state, city).map((e) => e.split(' ')[0]);
+  /** each strike key's logged strength diff, in the log's tenths */
+  function strikeDiffs(state: any, city: any): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const line of strikeLog(state, city)) out[line.split(' ')[0]] = Number(/ diff(-?\d+) /.exec(line)![1]);
+    return out;
   }
 
   it('walls + Encampment rolls twice, walls first', () => {
@@ -95,6 +103,24 @@ describe('Encampment', () => {
     expect(ks).toContain('k:cstk');
     expect(ks).toContain('k:estk');
     expect(ks.indexOf('k:cstk')).toBeLessThan(ks.indexOf('k:estk')); // walls before Encampment
+  });
+
+  it('CIV6: a survived Military Emergency pays its +2 on the Encampment shot as on the centre', () => {
+    // Expansion1_Emergencies.xml gates the reward on COMBAT_DISTRICT_VS_UNIT.
+    // Each shot is measured ALONE at a full-HP raider: the centre's harder
+    // hit would otherwise step the integer wound penalty the district reads.
+    const diffs = (survived: boolean, encampmentOnly: boolean) => {
+      const { state, city } = battlefield();
+      city.buildings.push('ANCIENT_WALLS');
+      if (encampmentOnly) {
+        city.outerHp = 0; // the CITY perimeter beaten down; the district's own stands
+        addEncampment(state, city, 10, 9);
+      }
+      if (survived) seatOf(state, 0)!.emgStrike = Object.assign([], { [BARB_SEAT]: 1 });
+      return strikeDiffs(state, city);
+    };
+    expect(diffs(true, false)['k:cstk'] - diffs(false, false)['k:cstk']).toBe(EMERGENCY_TARGET_STRIKE_CS * 10);
+    expect(diffs(true, true)['k:estk'] - diffs(false, true)['k:estk']).toBe(EMERGENCY_TARGET_STRIKE_CS * 10);
   });
 
   it('control: an incomplete Encampment strikes nothing', () => {

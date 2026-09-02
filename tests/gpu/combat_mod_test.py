@@ -204,10 +204,21 @@ def test_embarked_defense_by_era(sim) -> None:
     sim.civ_civics[:, 0, ren] = True
     assert int(sim._embarked_def_cs(seat)[0]) == tbl[3], "one Renaissance CIVIC must move the tier"
     sim.civ_civics[:, 0] = was
-    # a seat that researches nothing of its own reads the Ancient row
+    # a city-state reads its OWN tree, never a major's
+    if sim.S:
+        cs = torch.full((sim.B,), 100, dtype=torch.long, device=sim.device)
+        was_c, was_t = sim.citystate_civics[:, 0].clone(), sim.citystate_techs[:, 0].clone()
+        sim.citystate_civics[:, 0] = False
+        sim.citystate_techs[:, 0] = False
+        assert int(sim._embarked_def_cs(cs)[0]) == tbl[0], "a city-state with an empty tree is the Ancient row"
+        sim.citystate_civics[:, 0, ren] = True
+        assert int(sim._embarked_def_cs(cs)[0]) == tbl[3], "a city-state's own Renaissance civic must move ITS tier"
+        assert int(sim._embarked_def_cs(seat)[0]) == tbl[0], "the minor's civic must not move a major's tier"
+        sim.citystate_civics[:, 0], sim.citystate_techs[:, 0] = was_c, was_t
+    # the barbarians research nothing and read the Ancient row
     barb = torch.full((sim.B,), 200, dtype=torch.long, device=sim.device)
     assert int(sim._embarked_def_cs(barb)[0]) == tbl[0]
-    print(f"  G. embarked defence OK: {tbl[0]} Ancient..Medieval, {tbl[3]} on one Renaissance civic")
+    print(f"  G. embarked defence OK: {tbl[0]} Ancient..Medieval, {tbl[3]} on one Renaissance civic (a major's or a city-state's own)")
 
 
 def test_support_in_district(sim) -> None:
