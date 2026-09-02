@@ -274,7 +274,17 @@ def case_unit(sim, base, row: int) -> None:
     assert abs(float(sim.civ_treasury[0, row]) - price) < 1e-6, (
         f"row {row}: a refused spawn still charged {price - float(sim.civ_treasury[0, row])} gold"
     )
-    print(f"  row {row}: unit buy OK ({price:.0f} gold, quota {quota} holds, refund on no spot)")
+    # CIV6 (Warrior Monk): "can only be purchased with Faith" — a faith-only
+    # chassis never reaches the gold rung, whatever the treasury holds
+    fo = sim._type_faith_only.nonzero().flatten().tolist()
+    if fo:
+        sim.restore(base)
+        prep(sim, row)
+        sim.civ_treasury[0, row] = 1e6
+        tr = sim._seat_trainable_units(row)
+        assert not bool(tr[0, fo].any()), f"row {row}: a faith-only chassis in the seat's trainable set"
+        assert not bool(sim._seat_buy_unit_candidates(row, tr)[0, fo].any()), f"row {row}: a faith-only chassis on the gold rung"
+    print(f"  row {row}: unit buy OK ({price:.0f} gold, quota {quota} holds, refund on no spot, no faith-only chassis)")
 
 
 # ---------------------------------------------------------------------------

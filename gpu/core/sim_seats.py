@@ -959,14 +959,17 @@ class SimSeats:
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
         """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
-        -1 = ungated) AND strategic-resource access in ITS territory. The
-        city-free half of `trainableUnits` — the gold UNIT rung spawns at the
-        capital and TS's arm asks no city question either."""
+        -1 = ungated) AND strategic-resource access in ITS territory, minus the
+        chassis `trainableUnits` refuses on every path — faith-only (CIV6
+        Warrior Monk: "can only be purchased with Faith"), spawn-only and the
+        Settler's own column. The city-free half of `trainableUnits` — the gold
+        UNIT rung spawns at the capital and TS's arm asks no city question
+        either."""
         B = self.B
         return (
             (self._type_tech.unsqueeze(0) < 0)
             | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
-        ) & self._res_avail_mask(self.tile_seat == row, row)
+        ) & self._res_avail_mask(self.tile_seat == row, row)             & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor, faith: bool = False) -> torch.Tensor:
         # No hull and no plane on the GOLD rung: it spawns at the capital and
