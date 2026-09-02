@@ -151,7 +151,9 @@ def main() -> None:
     held = (sim._suzerain_mask(row) & (sim.citystate_suz_imp[:, : sim.S] == k)).any(dim=1)
     assert bool(held[0]), "99 envoys and nobody else's must make this seat suzerain"
     ok = sim._suz_improvement_ok(row, k)[0]
-    ground = sim._imp_ground_ok(k)[0]
+    # the row's own clause on a Builder's plain ground — a resourced or water
+    # tile answers its own rows (`validImprovementsIn` leaves before the loop)
+    ground = sim._imp_ground_ok(k)[0] & sim._builder_ground()[0]
     assert bool((ok == ground).all()), (
         "with the suzerainty held, the offer is exactly the ground clause")
     assert bool(ground.any()) and not bool(ground.all()), (

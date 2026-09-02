@@ -91,6 +91,7 @@ def own_flat(sim, row, avoid=()):
     for t in range(sim.T):
         if (int(sim.tile_seat[0, t]) == row and not bool(sim.water[0, t])
                 and bool(sim.passable[0, t]) and not bool(sim.hills[0, t])
+                and int(sim.res_imp[0, t]) < 0  # a resourced tile answers its own row alone
                 and int(sim.centre_slot_at[0, t]) < 0 and t not in avoid):
             return t
     raise AssertionError(f"row {row} owns no flat plot")

@@ -2752,6 +2752,12 @@ class SimSeats:
             ok &= ~same
         return ok
 
+    def _builder_ground(self) -> torch.Tensor:
+        """[B, T] — the ground `validImprovementsIn` reaches its catalog rows
+        on: a resourced tile offers its resource's improvement alone, a water
+        tile the water-only rows alone, and impassable ground nothing."""
+        return ~self.water & self.passable & (self.res_imp < 0)
+
     def _suz_improvement_ok(self, row: int, k: int) -> torch.Tensor:
         """[B, T] — may seat row `row` build suzerain improvement `k` here?
         The suzerainty is a per-GAME pairing (the seeder draws which minors a
@@ -2760,7 +2766,7 @@ class SimSeats:
         if not self._imp_suz[k]:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         held = (self._suzerain_mask(row) & (self.citystate_suz_imp[:, : self.S] == k)).any(dim=1)
-        return held.unsqueeze(1) & self._imp_ground_ok(k)
+        return held.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
 
     def _uniq_improvement_ok(self, row: int, k: int) -> torch.Tensor:
         """[B, T] — may seat `row` lay UNIQUE improvement `k` here? CIV6
@@ -2776,7 +2782,7 @@ class SimSeats:
             ok = ok & self.civ_techs[:, row, ut]
         if uc >= 0:
             ok = ok & self.civ_civics[:, row, uc]
-        return ok.unsqueeze(1) & self._imp_ground_ok(k)
+        return ok.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
 
     def _eng_finish_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose head a charge spent at each of

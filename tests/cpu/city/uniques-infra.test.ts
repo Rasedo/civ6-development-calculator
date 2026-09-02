@@ -119,6 +119,13 @@ describe('the Sphinx and the Ziggurat', () => {
     snow.terrain = 'SNOW';
     expect(validImprovementsIn(snow, opts('SUMERIA'))).toContain('ZIGGURAT');
     expect(validImprovementsIn(snow, opts('EGYPT'))).not.toContain('SPHINX');
+    // a water tile and a resourced tile answer their own rows, never a unique
+    const sea = tileAtCoords(map, 2, 6);
+    sea.terrain = 'COAST';
+    expect(validImprovementsIn(sea, opts('EGYPT'))).not.toContain('SPHINX');
+    const stone = tileAtCoords(map, 3, 6);
+    stone.resource = 'STONE';
+    expect(validImprovementsIn(stone, opts('SUMERIA'))).not.toContain('ZIGGURAT');
     // Improvement_ValidFeatures: Floodplains yes, Woods no
     const flood = tileAtCoords(map, 5, 2);
     flood.feature = 'FLOODPLAINS';
