@@ -11,7 +11,8 @@ class SimOrders:
         tail every Builder and Military Engineer verb shares."""
         self.unit_charges[r, sc[r]] -= 1
         self.unit_mp[r, sc[r]] = 0  # the turn is spent (TS movesLeft = 0)
-        gone = self.unit_charges[r, sc[r]] <= 0
+        # CIV6 (Legion): a military chassis outlives its last charge.
+        gone = (self.unit_charges[r, sc[r]] <= 0) & self._type_civilian[self.unit_type[r, sc[r]].clamp(min=0, max=self.NU - 1)]
         if bool(gone.any()):
             d = r[gone]
             self.unit_alive[d, sc[d]] = False
@@ -757,6 +758,15 @@ class SimOrders:
                     & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
                     & _paved
                 ) if self._eng_idx >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                # CIV6 (Legion): the Roman Fort — the FORT row on the engineer's
+                # ground, with the chassis' own charge and no tech.
+                fort_ok = (
+                    act & self._type_fort_builder[utp.clamp(min=0, max=self.NU - 1)] & (u_charges > 0)
+                    & (own_tile | (self.tile_seat < 0)).gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & _paved
+                )
                 _rq = self.res_imp.gather(1, hc.unsqueeze(1)).squeeze(1)
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
                 for _k in range(self._imp_unlock.numel()):
@@ -781,7 +791,7 @@ class SimOrders:
                             _valid = self._suz_improvement_ok(row, _k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
                         elif self._imp_eng[_k]:
-                            _valid = _unl & self._imp_ground_ok(_k).gather(
+                            _valid = (_unl | (fort_ok & (_k == self.FORT))) & self._imp_ground_ok(_k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
                         elif self._imp_water[_k]:
                             _valid = (
@@ -799,7 +809,7 @@ class SimOrders:
                             )
                         else:
                             _valid = (_rq == _k) & _unl
-                    _base = eng_ok if self._imp_eng[_k] else here_ok
+                    _base = ((eng_ok | fort_ok) if _k == self.FORT else eng_ok) if self._imp_eng[_k] else here_ok
                     _ok = _base & (a == _col) & _valid
                     if bool(_ok.any()):
                         _r = _ok.nonzero(as_tuple=True)[0]

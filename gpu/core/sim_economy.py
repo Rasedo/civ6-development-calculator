@@ -1367,6 +1367,7 @@ class SimEconomy:
         _ctr_clean = ~self._fallout().gather(1, self.city_center[:, row].clamp(min=0))
         _ctr_clean = _ctr_clean & (self.city_center[:, row] >= 0)
         ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
+        ok = ok & self._civ_unit_ok(row).reshape(1, -1)
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True) & _ctr_clean.unsqueeze(2)
         if bool(self.unit_naval.any()):
             out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
@@ -3067,7 +3068,8 @@ class SimEconomy:
         # to the type pool and then OVERRIDDEN by the embark pool below —
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
-        base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre)
+        base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre) \
+            + self._start_tile_mp(pre, typ)
         # CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2
         # Movement."
         if self._gov_has_effects:
@@ -3094,6 +3096,32 @@ class SimEconomy:
         # own sum and refreshUnits adds the aura on top).
         return (self._mp_scale * (base + self._promo_pool_val(pre, "MOVES"))
                 + getattr(self, f"{pre}_unit_aura_mp"))
+
+    def _start_tile_mp(self, pre: str, typ: torch.Tensor) -> torch.Tensor:
+        """[B, U] long `startTileMoves` — the Movement a chassis draws from the
+        tile under it at the turn's start: CIV6 (Heavy Chariot / Maryannu
+        Chariot Archer / War-Cart) "+N Movement if starting in Desert, Plains,
+        Grassland, or Tundra" — flat ground; (Berserker Movement) "+2 Movement
+        if this unit starts in enemy territory"; (Longship Movement) "+1
+        Movement while in coastal waters". The barbarian pool trains no
+        unique, and the Heavy Chariot's term reads the same for every pool."""
+        tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+        out = torch.zeros_like(typ)
+        terr = self.terrain.gather(1, tile)
+        if bool((self._type_open_mp > 0).any()):
+            flat = ~self.hills.gather(1, tile) & ~self.water.gather(1, tile) & self.passable.gather(1, tile)
+            out = out + self._type_open_mp[typ] * (flat & torch.isin(terr, self._open_terr)).long()
+        if pre == "major" and bool((self._type_enemy_mp > 0).any()):
+            seat = getattr(self, f"{pre}_unit_seat")
+            owner = self.tile_seat.gather(1, tile)
+            ra = self._seat_row[seat.clamp(min=0)]
+            rb = self._seat_row[owner.clamp(min=0)]
+            at_war = self.war[torch.arange(self.B, device=self.device).unsqueeze(1), ra, rb]
+            enemy = (owner >= 0) & (owner != seat) & (seat >= 0) & at_war
+            out = out + self._type_enemy_mp[typ] * enemy.long()
+        if bool((self._type_coast_mp > 0).any()):
+            out = out + self._type_coast_mp[typ] * (terr == self._coast_terr).long()
+        return out
 
     def _attacks_after_moving(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
         """`attacksAfterMoving`, in `promos`' shape. CIV6 (Sweeping Wind / Elite

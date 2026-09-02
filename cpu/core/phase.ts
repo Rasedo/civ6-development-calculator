@@ -188,6 +188,7 @@ export function placeSeats(state: GameState, count?: number): void {
       name: leader.name,
       color: leader.color,
       aggression: 0.3 + nextRandom(state) * 0.6,
+      civ: i % CIV_LEADERS.length,
     };
     foundCityAt(state, actor.seat, tile, actor);  // one founding mutation, every seat
     // Push BEFORE the starting warrior spawns, so spawnUnit's bestMeleeCS
@@ -1413,7 +1414,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             here.improvement = imp;
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
-            if (unit.charges <= 0) disbandUnit(state, unit.id);
+            // CIV6 (Legion): a military chassis outlives its last charge.
+            if (unit.charges <= 0 && unitDomain(unit.type) === 'civilian') disbandUnit(state, unit.id);
           }
         }
       } else if (a >= A_SPREAD && a < A_SPREAD + 7) {

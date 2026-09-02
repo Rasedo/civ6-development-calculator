@@ -1236,11 +1236,16 @@ class SimInit:
         _nwn = self.neigh.reshape(1, -1).expand(B, -1).clamp(min=0)
         _nwv = (self.nwonder.gather(1, _nwn) & (self.neigh.reshape(1, -1) >= 0)).reshape(B, T, 6)
         self.wonder_near = self.nwonder | _nwv.any(dim=2)
+        # CIV6: the civilization each seat plays (`Seat.civ`), fixed at seed time
+        _row_civ = [-1] * self.NS
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
                 row = int(cv["seat"])
                 self.civ_alive[b, row] = True
                 self.civ_aggression[b, row] = cv.get("aggression", 0.0)
+                _lead = int(cv["leader"])
+                assert _row_civ[row] in (-1, _lead), "a seat plays one civilization in every game"
+                _row_civ[row] = _lead
                 # Nothing is pre-founded — `cities` is [] and every city arrives
                 # through a FOUND verb; the loop stays for the shape.
                 for j, rc in enumerate(cv.get("cities", [])):
@@ -2652,6 +2657,30 @@ class SimInit:
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         self._settler_idx = next((i for i, u in enumerate(ru) if bool(u.get("settler", 0))), -1)
         self._type_settler = torch.tensor([bool(u.get("settler", 0)) for u in ru], dtype=torch.bool, device=device)
+        # THE UNIQUE UNITS (`uniqueTo` / `replaces` and the chassis terms only
+        # a unique carries): `_civ_unit_ok` hands each to its civilization.
+        self._type_uniq = torch.tensor([int(u["uniq"]) for u in ru], dtype=torch.long, device=device)
+        self._type_repl = torch.tensor([int(u["repl"]) for u in ru], dtype=torch.long, device=device)
+        self._type_chariot = torch.tensor([bool(u["chariot"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_open_mp = torch.tensor([int(u["openMoves"]) for u in ru], dtype=torch.long, device=device)
+        self._type_enemy_mp = torch.tensor([int(u["enemyMoves"]) for u in ru], dtype=torch.long, device=device)
+        self._type_coast_mp = torch.tensor([int(u["coastMoves"]) for u in ru], dtype=torch.long, device=device)
+        self._type_atk_cs = torch.tensor([int(u["atkCs"]) for u in ru], dtype=torch.long, device=device)
+        self._type_def_melee_cs = torch.tensor([int(u["defMeleeCs"]) for u in ru], dtype=torch.long, device=device)
+        self._type_fort_builder = torch.tensor([bool(u["fortBuilder"]) for u in ru], dtype=torch.bool, device=device)
+        _uq = rules.uniques
+        self._civ_ids: list[str] = list(_uq["civs"])
+        self._open_terr = torch.tensor([int(t) for t in _uq["openTerrains"]], dtype=torch.long, device=device)
+        self._coast_terr = int(_uq["coastTerrain"])
+        # `civReplacement` as a table: row c = civilization c's unique standing
+        # in for each base chassis (-1 where none); the LAST row plays none.
+        _nc = len(self._civ_ids)
+        self._civ_repl = torch.full((_nc + 1, self.NU), -1, dtype=torch.long, device=device)
+        for _i, _u in enumerate(ru):
+            if int(_u["uniq"]) >= 0 and int(_u["repl"]) >= 0:
+                self._civ_repl[int(_u["uniq"]), int(_u["repl"])] = _i
+        self.row_civ = torch.tensor(_row_civ, dtype=torch.long, device=device)
+        self._row_civ_i = torch.where(self.row_civ >= 0, self.row_civ, torch.full_like(self.row_civ, _nc))
         self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
         # SCOUT is a military explorer (combat 10) but never in the civ roster
         # (BUY_UNITS and the ladder exclude it). The production ladder

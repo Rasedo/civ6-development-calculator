@@ -65,7 +65,7 @@ from the list below.
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel — SOURCED (Chemistry, an adjacent mountain, a portal between tunnels at 2 Movement) and unbuilt: a movement portal is a new pathing class on both engines |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
-| C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — UNPARKED 2026-09-01, sourced from the game's own XML; the Rock Band's four unique-district venue clauses wait here |
+| C-26 civilization uniques | 4 | UNIQUE UNITS SHIP (Legion, Maryannu Chariot Archer, Berserker, Longship, War-Cart — every clause off the install's Units.xml / UnitAbilities; the Legion's Roman Fort rides the FORT row; a chariot class is cavalry but no anti-cavalry target). OPEN: the unique infrastructure (Bath, Stave Church, Sphinx, Ziggurat), the four civ abilities, the four leader abilities, and the agendas (DLL-scored, and neither engine holds an opinion scale); the Rock Band's four unique-district venue clauses wait here. REACH: the fixtures seat Rome, Egypt and Norway, so no gate lane reaches the War-Cart, and the driver never orders a Legion's Fort |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
@@ -74,8 +74,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
-| **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **39** | |
+| **C. Absent systems** | **20** | |
+| **OPEN, TOTAL** | **38** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -272,7 +272,7 @@ Civ 6 source or is recorded as unverifiable.
     competition scorer reads yet; BORDER DISPUTE, CATASTROPHE and
     MILITARY COMPETITION each want a scored quantity of their own. THE
     NOBEL PRIZE competitions are Sweden-only, so they sit behind C-26,
-    which is PARKED.
+    which covers the roster's four civilizations alone.
   - **CLIMATE ACCORDS SCORES ONLY HALF ITS INPUTS.** The source scores the
     Decommission Coal/Oil/Nuclear Power Plant projects alongside the
     emission gap; those projects have no carrier (C-1), so the window
@@ -301,7 +301,7 @@ Civ 6 source or is recorded as unverifiable.
   cards ship with their era windows, wildcard-only, adoptable only by a
   seat actually in a Dark Age (`computeAdoption(.., dark)` /
   `_slotted_policies(.., dark, era)`). Ibrahim is Ottoman-exclusive and
-  therefore C-26, parked by owner decision, not an omission. OPEN:
+  therefore C-26, outside the roster's four civilizations, not an omission. OPEN:
   - ~~No governor can be assigned to a city-state.~~ CLOSED: CIV6 (Amani)
     "Can be assigned to a City-state, where she acts as 2 Envoys", and the
     catalog's `cityStates` flag says she is the only one. She is posted at

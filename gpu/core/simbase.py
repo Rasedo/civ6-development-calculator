@@ -100,6 +100,7 @@ class Rules:
     disasters: dict  # the Flood (Civ6) severity tables + the base per-turn chances
     climate: dict  # the Climate (Civ6) arc: carbon rates, the seven phases, the deforestation bands
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
+    uniques: dict  # {civs, openTerrains, coastTerrain} — the unique-unit wire (cpu/export/rules.ts)
     citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
     beliefs: dict  # dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
@@ -296,6 +297,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         disasters=r["disasters"],
         climate=r["climate"],
         units=r.get("units", []),
+        uniques=r["uniques"],
         citystate=r["cityState"],
         seats=r["seats"],  # the seat bag (cpu/data/seats.ts)
         beliefs=r.get("beliefs", {}),

@@ -34,7 +34,7 @@ import { nextRandom } from './rand';
 import { artifactFree } from './greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
+import { OPEN_TERRAINS, civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
   BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
@@ -57,7 +57,7 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
+import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -316,7 +316,10 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
 export function unitDomain(type: string): 'civilian' | 'military' | 'air' | 'spy' {
   if (UNITS[type]?.air !== undefined) return 'air';
   if (isSpy(type)) return 'spy';
-  return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
+  const d = UNITS[type];
+  // CIV6 (Legion): a charge-carrier that fights is a military unit — the
+  // charge is what it builds with, not what it is.
+  return d?.charges !== undefined && !((d.combat ?? 0) > 0) ? 'civilian' : 'military';
 }
 
 /** CIV6 (To Arms!, Golden face): "+15% Production towards military units."
@@ -469,7 +472,7 @@ export function inEnemyZoc(
 ): boolean {
   // CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
   // units ignore it too.
-  if (mover.type !== undefined && (UNITS[mover.type]?.ignoresZoc || UNITS[mover.type]?.cavalry)) return false;
+  if (mover.type !== undefined && (UNITS[mover.type]?.ignoresZoc || (UNITS[mover.type]?.cavalry && !UNITS[mover.type]?.chariot))) return false;
   const tile = state.map.tiles[tileIndex];
   // CIV6 (Zone of Control): "Religious units exert ZOC against other religious
   // units" — so a religious mover walks through a military zone, and a
@@ -841,6 +844,25 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
   return !!unit && isMountain(tile) && gdrHas(state, unit, 'ENHANCED_MOBILITY');
 }
 
+/** the Movement a chassis draws from the tile under it at the turn's start:
+ *  CIV6 (Heavy Chariot / Maryannu Chariot Archer / War-Cart) "+N Movement if
+ *  starting in Desert, Plains, Grassland, or Tundra" — flat ground;
+ *  (Berserker Movement) "+2 Movement if this unit starts in enemy
+ *  territory"; (Longship Movement) "+1 Movement while in coastal waters". */
+export function startTileMoves(state: GameState, unit: { type: string; seat: number; tileIndex?: number }): number {
+  const def = UNITS[unit.type];
+  if (!def || unit.tileIndex === undefined) return 0;
+  const tile = state.map.tiles[unit.tileIndex];
+  let m = 0;
+  if (def.openTerrainMoves && tile.elevation === 'FLAT' && OPEN_TERRAINS.includes(tile.terrain)) m += def.openTerrainMoves;
+  if (def.enemyTerritoryMoves) {
+    const owner = tileSeat(tile);
+    if (owner >= 0 && owner !== unit.seat && civsAtWar(state, unit.seat, owner)) m += def.enemyTerritoryMoves;
+  }
+  if (def.coastMoves && tile.terrain === 'COAST') m += def.coastMoves;
+  return m;
+}
+
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
@@ -854,6 +876,7 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
   return MP_SCALE * (
     (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
+    + startTileMoves(state, unit)
     // CIV6 (Enhanced Mobility): "+3 Moves."
     + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)
     // an emergency member marches faster on its target's ground
@@ -1074,6 +1097,7 @@ export function trainableUnits(
     // The SETTLER trains through its own escalating-cost column
     // (queueSettler/purchaseSettler), never the generic unit columns.
     if (d.settler) return false;
+    if (!civUnitAllowed(civOf(state, seat), d.id)) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
     if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic, seat)) return false;
     // An ARCHAEOLOGIST may only be trained where its city still has a FREE
@@ -1148,7 +1172,7 @@ export function goldBuyableUnits(state: GameState, seat: number): UnitDef[] {
  * this spends the rest of the turn, like every other verb here.
  */
 export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): boolean {
-  const next = UNITS[unit.type]?.upgradesTo;
+  const next = civUpgradeTarget(civOf(state, seat), unit.type);
   if (!next || unit.seat !== seat || unit.movesLeft <= 0) return false;
   const def = UNITS[next];
   if (!def) return false;
@@ -1157,16 +1181,16 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
   const tile = state.map.tiles[unit.tileIndex];
   if (tileSeat(tile) !== seat) return false;
   if (!canPayUpgradeGold(state, seat, unit.type)) return false;
-  const c = upgradeResourceCost(unit.type);
+  const c = upgradeResourceCost(state, seat, unit.type);
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
 
 export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleResult {
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
-  const next = UNITS[unit.type]!.upgradesTo!;
+  const next = civUpgradeTarget(civOf(state, seat), unit.type)!;
   const s = seatOf(state, seat)!;
   s.treasury -= upgradeGoldCost(state, seat, unit.type);
-  const c = upgradeResourceCost(unit.type);
+  const c = upgradeResourceCost(state, seat, unit.type);
   if (c) spendStockpile(state, seat, c.id, c.n);
   unit.type = next;
   unit.movesLeft = 0;
@@ -1511,7 +1535,8 @@ export function spawnUnit(
     seat,
     tileIndex: spot.index,
     movesLeft: MP_SCALE * (def.moves + (def.raider ? getModifiers(state, seat).navalRaiderMoves : 0)
-      + goldenMoveBonus(state, { type: unitType, seat })),
+      + goldenMoveBonus(state, { type: unitType, seat })
+      + startTileMoves(state, { type: unitType, seat, tileIndex: spot.index })),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
     path: null,

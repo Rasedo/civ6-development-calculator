@@ -1,7 +1,7 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
-import type { SeatCaps, SeatClass } from '../data/seats';
-import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
+import type { CivId, SeatCaps, SeatClass } from '../data/seats';
+import { CIV_IDS, AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
@@ -96,7 +96,7 @@ export function emptySeat(seat: number): Seat {
   return {
     seat,
     cities: [], nextCityId: 0,
-    name: '', color: '', aggression: 0,
+    name: '', color: '', aggression: 0, civ: -1,
     ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
     wars: [], formalWars: [], denounced: {},
     influencePoints: 0, envoysAvailable: 0,
@@ -121,6 +121,14 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
   }
   if (isBarbSeat(seat)) return state.barbSeat;
   return state.seats[seat];
+}
+
+/** the civilization a seat plays (`CIV_IDS`), or null for a seat without
+ *  one — a city-state, the barbarians, a bare `emptySeat`. */
+export function civOf(state: GameState, seat: number): CivId | null {
+  const s = seatOf(state, seat);
+  const civ = s && 'civ' in s ? (s as Seat).civ : -1;
+  return civ >= 0 ? CIV_IDS[civ] ?? null : null;
 }
 
 /**

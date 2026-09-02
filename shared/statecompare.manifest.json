@@ -2594,6 +2594,10 @@
         "why": "a personality constant read only by the scripted picker, which the decision server replaces."
       },
       {
+        "path": "Seat.civ",
+        "why": "a roster constant fixed at seed time — the fixture's `leader` — that both engines read off the same file."
+      },
+      {
         "path": "Seat.government",
         "why": "the container; `held` is covered and the other two are excluded one by one — they are STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
       },

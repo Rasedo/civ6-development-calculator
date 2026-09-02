@@ -21,7 +21,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
-import { URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
+import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { gpCityPermOf } from '../data/greatPeople';
@@ -135,11 +135,13 @@ export function validImprovementsIn(
   // chooser would take the Farm every time, since a Fort yields nothing. Its
   // rows sit ABOVE the ownership gate and the resource early return, because
   // both of the Civ 6 pages read "in your own or neutral territory".
-  if (opts.builder === 'MILITARY_ENGINEER') {
+  const fortBuilder = opts.builder !== undefined && opts.builder !== 'MILITARY_ENGINEER' && !!UNITS[opts.builder]?.fortBuilder;
+  if (opts.builder === 'MILITARY_ENGINEER' || fortBuilder) {
     if (!engineerTileOk(tile, opts.ownsTile) || tile.improvement) return [];
     const out: ImprovementId[] = [];
     for (const def of Object.values(IMPROVEMENTS)) {
-      if (!def.engineer || !unlocked(def.id)) continue;
+      // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech.
+      if (fortBuilder ? def.id !== 'FORT' : (!def.engineer || !unlocked(def.id))) continue;
       if (def.noFeature && tile.feature) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.excludeTerrains?.includes(tile.terrain)) continue;

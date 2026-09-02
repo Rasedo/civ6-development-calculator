@@ -957,6 +957,21 @@ class SimSeats:
                 self._fit_encamp_outer(wm, row, jj[wm], _wf)
         self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
 
+    def _civ_unit_ok(self, row: int) -> torch.Tensor:
+        """[NU] bool `civUnitAllowed` — CIV6 (Civilizations.xml): a UNIQUE UNIT
+        trains for its civilization alone, and stands IN PLACE of the chassis
+        it replaces there; a seat playing no civilization trains no unique."""
+        c = int(self._row_civ_i[row])
+        return ((self._type_uniq < 0) | (self._type_uniq == int(self.row_civ[row]))) & (self._civ_repl[c] < 0)
+
+    def _up_to_row(self, row: int) -> torch.Tensor:
+        """[NU] long `civUpgradeTarget` — what each chassis upgrades INTO for
+        this seat: the catalog's successor, or the civilization's unique
+        standing in for it."""
+        up = self._type_up_to
+        rep = self._civ_repl[int(self._row_civ_i[row])][up.clamp(min=0)]
+        return torch.where((up >= 0) & (rep >= 0), rep, up)
+
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
         """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
         -1 = ungated) AND strategic-resource access in ITS territory, minus the
@@ -969,7 +984,9 @@ class SimSeats:
         return (
             (self._type_tech.unsqueeze(0) < 0)
             | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
-        ) & self._res_avail_mask(self.tile_seat == row, row)             & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0)
+        ) & self._res_avail_mask(self.tile_seat == row, row) \
+            & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0) \
+            & self._civ_unit_ok(row).unsqueeze(0)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor, faith: bool = False) -> torch.Tensor:
         # No hull and no plane on the GOLD rung: it spawns at the capital and
@@ -2453,7 +2470,7 @@ class SimSeats:
         chassis, pay the gold and the new chassis' resource, and spend the rest
         of the turn. CIV6: promotions and experience ride along, and "units do
         not Heal upon upgrading"."""
-        nxt = self._type_up_to[utp.clamp(min=0)]
+        nxt = self._up_to_row(row)[utp.clamp(min=0)]
         ok = hit & (nxt >= 0) & (utp >= 0)
         if not bool(ok.any()):
             return
@@ -2852,6 +2869,12 @@ class SimSeats:
             self.unit_type.gather(1, s).squeeze(1).clamp(min=0, max=self.NU - 1),
             self.unit_promos.gather(1, s).squeeze(1), "CS_IN_FORMATION")
         return torch.where(self._carrying(slot), v, torch.zeros_like(v))
+
+    def _chassis_atk_cs_pool(self, atk_kind: str, u: torch.Tensor) -> torch.Tensor:
+        """[B] long `chassisAttackCS` — CIV6 (Berserker Rage): "+10 Combat
+        Strength when attacking", every attack the chassis makes."""
+        typ = getattr(self, f"{atk_kind}_unit_type")[:, u].clamp(min=0, max=self.NU - 1)
+        return self._type_atk_cs[typ]
 
     def _convoy_cs_pool(self, atk_kind: str, u: int) -> torch.Tensor:
         """the same term for unit `u` of one POOL, whose index is pool-local."""
@@ -6751,7 +6774,7 @@ class SimSeats:
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_lo = self.POOL_LO[atk_kind]
         atk_cs_all = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
-                      + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u))
+                      + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
         major = POOL_CLASS[atk_kind] == "major"
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
@@ -6787,7 +6810,8 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0) \
+                + self._type_def_melee_cs[d_type]  # CIV6 (Berserker Rage): melee defence
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             a_promos = self._promo_pool(atk_kind)[0][:, u]
             _true = torch.ones_like(mslot_raw, dtype=torch.bool)
@@ -7621,7 +7645,9 @@ class SimSeats:
         riv = (self.river_mask.gather(1, dest.clamp(min=0).unsqueeze(1))
                >> torch.arange(6, device=self.device).unsqueeze(0)) & 1
         halt = ((dn >= 0) & (riv == 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
-        ign = self._type_zoc_ignore | self._type_cavalry
+        # CIV6 (ABILITY_IGNORE_ZOC): light, heavy and ranged cavalry — a chariot
+        # class is not on the list unless it carries the ability itself.
+        ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
         return halt & ~ign[mover_type.clamp(min=0, max=self.NU - 1)]
 
     def _war_march_targets(self, hcs: torch.Tensor, row: int):
@@ -7782,7 +7808,7 @@ class SimSeats:
                             torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
         atk_e = (self._city_ranged_strength(at0, a_seat[:, u], outer) + self._form_cs_pool(atk_kind, u)
-                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
                  + rel.to(def_cs.dtype)
@@ -7816,7 +7842,7 @@ class SimSeats:
         TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
-                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                   + self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                   + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
@@ -8229,7 +8255,7 @@ class SimSeats:
             def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
@@ -8384,7 +8410,7 @@ class SimSeats:
         )
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
-                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, here)
                  - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
@@ -8562,7 +8588,7 @@ class SimSeats:
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
-                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u))
+                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[ut0] | _emb_p[:, u]
@@ -8592,7 +8618,7 @@ class SimSeats:
                 def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
-                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                      - self._wound(a_hp)
                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
@@ -8652,7 +8678,7 @@ class SimSeats:
                 + self._walls_tier_cs[cs_tier]
             )
             atk_cs = (self._city_ranged_strength(ut0, a_seat, cs_outer)
-                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u)
+                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                       - self._wound(a_hp)
                       + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
@@ -8820,7 +8846,7 @@ class SimSeats:
         a_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_rs0 = self._type_ranged_strength[at0]
         atk_base = (atk_rs0 + self._form_cs_pool(atk_kind, u)
-                    + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) - self._wound(a_hp[:, u]))
+                    + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u) - self._wound(a_hp[:, u]))
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
                                + self._gov_unit_cs(at0, aseat)).to(atk_base.dtype)

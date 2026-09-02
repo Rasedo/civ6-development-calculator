@@ -8,6 +8,7 @@
 import { GAME_SPEED } from './constants';
 import { TECHS, ERAS } from './techs';
 import { CIVICS } from './civics';
+import type { CivId } from './seats';
 
 /**
  * FORMATIONS, indexed by tier: 0 a lone unit, 1 a Corps (a Fleet at sea), 2 an
@@ -181,6 +182,31 @@ export interface UnitDef {
   spy?: boolean;
   /** CIV6 (Spy): "Cannot be purchased with Gold." */
   noGold?: boolean;
+  /** CIV6 (Civilizations.xml): a UNIQUE UNIT — trainable by this
+   *  civilization alone, standing in place of `replaces` where it names
+   *  a chassis (`civUnitAllowed`, `civUpgradeTarget`). */
+  uniqueTo?: CivId;
+  replaces?: string;
+  /** CIV6 (CLASS_HEAVY_CHARIOT / CLASS_LIGHT_CHARIOT): a chariot is
+   *  cavalry for its promotion class and the production cards, but the
+   *  install's ANTI_CAVALRY_OPPONENT_REQUIREMENTS and ABILITY_IGNORE_ZOC
+   *  name only the light, heavy and ranged cavalry tags. */
+  chariot?: boolean;
+  /** CIV6 (EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT): extra Movement
+   *  when the turn starts on flat Desert, Plains, Grassland or Tundra. */
+  openTerrainMoves?: number;
+  /** CIV6 (Berserker Movement): extra Movement when the turn starts in
+   *  enemy territory. */
+  enemyTerritoryMoves?: number;
+  /** CIV6 (Longship Movement): extra Movement while in coastal waters. */
+  coastMoves?: number;
+  /** CIV6 (Berserker Rage): Combat Strength when attacking, and when
+   *  defending against a melee attack. */
+  attackCS?: number;
+  defendMeleeCS?: number;
+  /** CIV6 (Legion): "Can build a Roman Fort" — a Fort in every stat,
+   *  laid with the chassis' own charge and no tech. */
+  fortBuilder?: boolean;
   description: string;
 }
 
@@ -611,6 +637,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 2,
       combat: 28,
       cavalry: true,
+      chariot: true,
+      // CIV6 (Heavy Chariot): "+1 Movement if starting in Desert, Plains,
+      // Grassland, or Tundra."
+      openTerrainMoves: 1,
       requiresTech: 'WHEEL',
       upgradesTo: 'KNIGHT',
       description: 'Ancient heavy cavalry.',
@@ -1288,6 +1318,100 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresCivic: 'COLD_WAR',
       description: 'Performs a concert at a foreign venue for a tourism burst (faith purchase only).',
     }),
+    // CIV6 (Civilizations.xml): the roster's UNIQUE UNITS — each a chassis
+    // of its own that `civUnitAllowed` hands to one civilization.
+    U({
+      id: 'LEGION',
+      name: 'Legion',
+      cost: 110,
+      maintenance: 2,
+      moves: 2,
+      combat: 40,
+      melee: true,
+      charges: 1,
+      fortBuilder: true,
+      requiresTech: 'IRON_WORKING',
+      requiresResource: 'IRON',
+      upgradesTo: 'MAN_AT_ARMS',
+      uniqueTo: 'ROME',
+      replaces: 'SWORDSMAN',
+      description: 'Roman Classical melee unit; can build a Roman Fort.',
+    }),
+    U({
+      id: 'MARYANNU_CHARIOT_ARCHER',
+      name: 'Maryannu Chariot Archer',
+      cost: 90,
+      maintenance: 1,
+      moves: 2,
+      combat: 25,
+      ranged: { strength: 35, range: 2 },
+      // CIV6: CLASS_LIGHT_CHARIOT + CLASS_RANGED_CAVALRY — the ranged-cavalry
+      // tag keeps it an anti-cavalry target and lets it ignore ZOC.
+      cavalry: true,
+      // CIV6 (Maryannu Chariot Archer): "+2 Movement if starting in Desert,
+      // Plains, Grassland, or Tundra."
+      openTerrainMoves: 2,
+      requiresTech: 'WHEEL',
+      upgradesTo: 'CROSSBOWMAN',
+      uniqueTo: 'EGYPT',
+      description: 'Egyptian ranged cavalry.',
+    }),
+    U({
+      id: 'BERSERKER',
+      name: 'Berserker',
+      cost: 160,
+      maintenance: 3,
+      moves: 2,
+      combat: 48,
+      melee: true,
+      // CIV6 (Berserker Rage): "+10 Combat Strength when attacking, -5 when
+      // defending against melee attacks."
+      attackCS: 10,
+      defendMeleeCS: -5,
+      // CIV6 (Berserker Movement): "+2 Movement if this unit starts in
+      // enemy territory."
+      enemyTerritoryMoves: 2,
+      requiresTech: 'MILITARY_TACTICS',
+      requiresResource: 'IRON',
+      upgradesTo: 'MUSKETMAN',
+      uniqueTo: 'NORWAY',
+      replaces: 'MAN_AT_ARMS',
+      description: 'Norwegian Medieval melee unit.',
+    }),
+    U({
+      id: 'LONGSHIP',
+      name: 'Longship',
+      cost: 65,
+      maintenance: 1,
+      moves: 3,
+      combat: 35,
+      naval: true,
+      // CIV6 (Longship Movement): "+1 Movement while in coastal waters."
+      coastMoves: 1,
+      ignoresZoc: true, // CIV6: ABILITY_IGNORE_ZOC carries CLASS_LONGSHIP
+      requiresTech: 'SAILING',
+      upgradesTo: 'CARAVEL',
+      uniqueTo: 'NORWAY',
+      replaces: 'GALLEY',
+      description: 'Norwegian naval melee unit.',
+    }),
+    U({
+      id: 'WAR_CART',
+      name: 'War-Cart',
+      cost: 55,
+      maintenance: 0,
+      moves: 3,
+      combat: 30,
+      cavalry: true, // PROMOTION_CLASS_HEAVY_CAVALRY
+      chariot: true, // CLASS_HEAVY_CHARIOT — but CLASS_WAR_CART ignores ZOC
+      ignoresZoc: true,
+      // CIV6 (War-Cart): "+1 Movement if starting in Desert, Plains,
+      // Grassland, or Tundra."
+      openTerrainMoves: 1,
+      upgradesTo: 'KNIGHT',
+      uniqueTo: 'SUMERIA',
+      description: 'Sumerian Ancient heavy cavalry, available from the start.',
+    }),
   ].map((u) => [u.id, u]),
 );
 
@@ -1297,6 +1421,36 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
  *  "ranged units", however loudly their ranged strength reads. */
 export const UNIT_CLASSES = ['melee', 'ranged', 'antiCavalry', 'cavalry', 'naval', 'recon', 'settler', 'builder'] as const;
 export type UnitClass = (typeof UNIT_CLASSES)[number];
+
+/** CIV6 (EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT): the open terrains
+ *  a chariot's start-of-turn Movement reads. */
+export const OPEN_TERRAINS: readonly string[] = ['DESERT', 'PLAINS', 'GRASSLAND', 'TUNDRA'];
+
+/** may this civilization train the chassis? A unique unit trains for its
+ *  civilization alone, and the chassis it replaces is gone there. */
+export function civUnitAllowed(civ: string | null, id: string): boolean {
+  const d = UNITS[id];
+  if (!d) return false;
+  if (d.uniqueTo) return d.uniqueTo === civ;
+  return !civReplacement(civ, id);
+}
+
+/** the civilization's unique standing in for a base chassis, if any */
+export function civReplacement(civ: string | null, id: string): string | undefined {
+  if (!civ) return undefined;
+  for (const u of Object.values(UNITS)) {
+    if (u.uniqueTo === civ && u.replaces === id) return u.id;
+  }
+  return undefined;
+}
+
+/** what the chassis upgrades INTO for this civilization: the catalog's
+ *  successor, or the civilization's unique standing in for it. */
+export function civUpgradeTarget(civ: string | null, id: string): string | undefined {
+  const next = UNITS[id]?.upgradesTo;
+  if (!next) return undefined;
+  return civReplacement(civ, next) ?? next;
+}
 
 export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {
   switch (cls) {

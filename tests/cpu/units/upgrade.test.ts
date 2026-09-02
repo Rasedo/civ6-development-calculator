@@ -74,24 +74,25 @@ describe('the upgrade ladder', () => {
   });
 
   it('the new chassis charges its own resource, and nothing when both ask for the same one', () => {
+    const state = makeState(makeMap(8, 8));
     // CIV6 (Unit, GS): the upgrade needs "the same [resources] you would
     // normally need to produce the next-level unit (unless the unit you're
     // upgrading also requires the same resource, in which case you don't need
     // any)".
     expect(UNITS.SWORDSMAN.requiresResource).toBe('IRON');
     expect(UNITS.MAN_AT_ARMS.requiresResource).toBe('IRON');
-    expect(upgradeResourceCost('SWORDSMAN')).toBeUndefined(); // Iron -> Iron
+    expect(upgradeResourceCost(state, 0, 'SWORDSMAN')).toBeUndefined(); // Iron -> Iron
 
     expect(UNITS.MUSKETMAN.requiresResource).toBe('NITER');
     expect(UNITS.LINE_INFANTRY.requiresResource).toBe('NITER');
-    expect(upgradeResourceCost('MUSKETMAN')).toBeUndefined();
+    expect(upgradeResourceCost(state, 0, 'MUSKETMAN')).toBeUndefined();
 
     // Knight (Iron) -> Cuirassier (Iron) is also free; Crossbowman (none) ->
     // Field Cannon (none) has nothing to charge either. The Horseman's rung
     // is the one that pays: Horses -> Horses is free, but Warrior -> Swordsman
     // moves from nothing to Iron.
     expect(UNITS.WARRIOR.requiresResource).toBeUndefined();
-    expect(upgradeResourceCost('WARRIOR')).toEqual({ id: 'IRON', n: 20 });
+    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 20 });
   });
 
   it('the bank has to cover the new chassis, and the upgrade draws it down', () => {

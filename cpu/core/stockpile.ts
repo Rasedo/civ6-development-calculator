@@ -7,13 +7,13 @@
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile } from '../data/constants';
-import { UNITS } from '../data/units';
+import { UNITS, civUpgradeTarget } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
-import { citiesOf, seatOf, tileOwnedByCiv } from './seats';
+import { citiesOf, civOf, seatOf, tileOwnedByCiv } from './seats';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
@@ -176,7 +176,7 @@ export function fuelShortCS(state: GameState, u: Unit): number {
  * numbers the pages do give, with no free constant.
  */
 export function upgradeGoldCost(state: GameState, seat: number, unitType: string): number {
-  const next = UNITS[unitType]?.upgradesTo;
+  const next = civUpgradeTarget(civOf(state, seat), unitType);
   if (!next) return 0;
   return Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
 }
@@ -189,8 +189,8 @@ export function canPayUpgradeGold(state: GameState, seat: number, unitType: stri
 
 /** what the UPGRADE draws out of the bank: the new chassis' own charge, or
  *  nothing at all when both rungs ask for the same resource. */
-export function upgradeResourceCost(unitType: string): { id: string; n: number } | undefined {
-  const next = UNITS[unitType]?.upgradesTo;
+export function upgradeResourceCost(state: GameState, seat: number, unitType: string): { id: string; n: number } | undefined {
+  const next = civUpgradeTarget(civOf(state, seat), unitType);
   if (!next) return undefined;
   const c = unitResourceCost(next);
   return c && c.id !== UNITS[unitType]?.requiresResource ? c : undefined;

@@ -306,6 +306,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     civs: state.seats.map((s) => ({
       seat: s.seat,
       aggression: s.aggression,
+      leader: s.civ,
       treasury: 0,
       cities: s.cities.map((civCity) => ({ id: civCity.id, center: civCity.centerIndex, pop: civCity.population })),
       units: state.units

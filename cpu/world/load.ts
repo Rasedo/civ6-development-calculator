@@ -80,6 +80,7 @@ export function loadWorld(world: WorldFile): GameState {
     seat.name = leader.name;
     seat.color = leader.color;
     seat.aggression = civ.aggression;
+    seat.civ = civ.leader % CIV_LEADERS.length;
     for (const u of civ.units) {
       if (!UNITS[u.type]) throw new Error(`world file names unit type '${u.type}' the engine does not know`);
       const spawned = spawnUnit(state, u.type, u.tile, i);

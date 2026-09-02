@@ -969,7 +969,7 @@ class SimMasks:
         out = torch.zeros_like(o)
         out = torch.where(self._type_melee[o] & self._type_anticav[f],
                           torch.full_like(out, self._class_melee_vs_anticav), out)
-        out = torch.where((out == 0) & self._type_anticav[o] & self._type_cavalry[f],
+        out = torch.where((out == 0) & self._type_anticav[o] & self._type_cavalry[f] & ~self._type_chariot[f],
                           torch.full_like(out, self._class_anticav_vs_cav), out)
         return out
 
@@ -2517,8 +2517,16 @@ class SimMasks:
             & self.passable.gather(1, tc)
             & ~self.water.gather(1, tc)
         )
+        # CIV6 (Legion): "Can build a Roman Fort" — the FORT row on the
+        # engineer's ground, with the chassis' own charge and no tech.
+        fort_ground = (
+            present & self._type_fort_builder[utype.clamp(min=0, max=self.NU - 1)] & (u_charges > 0)
+            & (own_tile | (self.tile_seat < 0)).gather(1, tc)
+            & self.passable.gather(1, tc)
+            & ~self.water.gather(1, tc)
+        )
         eng_here = (
-            eng_ground
+            (eng_ground | fort_ground)
             & (self.centre_slot_at.gather(1, tc) < 0)
             & (self.improvement.gather(1, tc) < 0)
             & (self.district.gather(1, tc) < 0)
@@ -2536,7 +2544,10 @@ class SimMasks:
                 elif self._imp_suz[_k]:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_eng[_k]:
-                    _ok = eng_here & _unl & self._imp_ground_ok(_k).gather(1, tc)
+                    _who = (utype == self._eng_idx) & _unl
+                    if _k == self.FORT:
+                        _who = _who | fort_ground
+                    _ok = eng_here & _who & self._imp_ground_ok(_k).gather(1, tc)
                 elif self._imp_water[_k]:
                     # WATER-ONLY (the Offshore Wind Farm): the row's own
                     # terrain list is the whole ground rule, on a water plot
@@ -3141,7 +3152,7 @@ class SimMasks:
         need any"."""
         B, N = utype.shape
         dev = self.device
-        nxt = self._type_up_to[utype.clamp(min=0)]
+        nxt = self._up_to_row(row)[utype.clamp(min=0)]
         ok = (nxt >= 0) & (utype >= 0)
         if not bool(ok.any()):
             return torch.zeros(B, N, dtype=torch.bool, device=dev)

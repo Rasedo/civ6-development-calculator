@@ -623,6 +623,9 @@ export interface Seat {
   name: string;
   color: string;
   aggression: number;
+  /** CIV6: the civilization this seat plays — an index into `CIV_LEADERS`
+   *  (its unique units and abilities); -1 plays none. */
+  civ: number;
   peaceTurns: number;
   /**
    * WAR. Every seat this one is fighting, as ABSOLUTE SEAT IDS — the single

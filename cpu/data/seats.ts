@@ -47,11 +47,15 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 // rules.json, where the denounce decider reads it.
 // ---------------------------------------------------------------------------
 
-export const CIV_LEADERS: { name: string; color: string; cityNames: string[] }[] = [
-  { name: 'Rome', color: '#8e3db8', cityNames: ['Roma', 'Ostia', 'Ravenna', 'Neapolis', 'Capua', 'Verona'] },
-  { name: 'Egypt', color: '#3db88e', cityNames: ['Thebes', 'Memphis', 'Giza', 'Elephantine', 'Sais', 'Tanis'] },
-  { name: 'Norway', color: '#3d6ab8', cityNames: ['Nidaros', 'Bergen', 'Oslo', 'Tunsberg', 'Hamar', 'Stavanger'] },
-  { name: 'Sumeria', color: '#b8823d', cityNames: ['Uruk', 'Ur', 'Eridu', 'Lagash', 'Nippur', 'Kish'] },
+/** CIV6 (Civilizations.xml): the roster's civilizations, in `CIV_LEADERS`
+ *  order — `Seat.civ` indexes both. */
+export type CivId = 'ROME' | 'EGYPT' | 'NORWAY' | 'SUMERIA';
+export const CIV_IDS: readonly CivId[] = ['ROME', 'EGYPT', 'NORWAY', 'SUMERIA'];
+export const CIV_LEADERS: { civ: CivId; name: string; color: string; cityNames: string[] }[] = [
+  { civ: 'ROME', name: 'Rome', color: '#8e3db8', cityNames: ['Roma', 'Ostia', 'Ravenna', 'Neapolis', 'Capua', 'Verona'] },
+  { civ: 'EGYPT', name: 'Egypt', color: '#3db88e', cityNames: ['Thebes', 'Memphis', 'Giza', 'Elephantine', 'Sais', 'Tanis'] },
+  { civ: 'NORWAY', name: 'Norway', color: '#3d6ab8', cityNames: ['Nidaros', 'Bergen', 'Oslo', 'Tunsberg', 'Hamar', 'Stavanger'] },
+  { civ: 'SUMERIA', name: 'Sumeria', color: '#b8823d', cityNames: ['Uruk', 'Ur', 'Eridu', 'Lagash', 'Nippur', 'Kish'] },
 ];
 
 export const MAX_CITIES_PER_SEAT = 6;

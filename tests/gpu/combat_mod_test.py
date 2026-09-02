@@ -163,7 +163,7 @@ def test_class_matchup(sim) -> None:
     """CIV6 (Combat, "Unit class modifiers"): "Melee units receive a +5 CS bonus
     against anti-cavalry units. Anti-cavalry units receive a +10 CS bonus
     against light cavalry, heavy cavalry, or ranged cavalry units." Nothing
-    else in the roster pairs."""
+    else in the roster pairs — and a chariot class is not on the list."""
     mel = [i for i in range(sim.NU) if bool(sim._type_melee[i])]
     anti = [i for i in range(sim.NU) if bool(sim._type_anticav[i])]
     cav = [i for i in range(sim.NU) if bool(sim._type_cavalry[i])]
@@ -176,9 +176,12 @@ def test_class_matchup(sim) -> None:
         for a in anti:
             assert cs(m, a) == sim._class_melee_vs_anticav, f"melee {m} vs anti-cav {a}"
             assert cs(a, m) == 0, "an anti-cavalry unit gains nothing against melee"
+    # CIV6 (ANTI_CAVALRY_OPPONENT_REQUIREMENTS): light, heavy and ranged
+    # cavalry — a chariot class is cavalry and NOT a target.
     for a in anti:
         for c in cav:
-            assert cs(a, c) == sim._class_anticav_vs_cav, f"anti-cav {a} vs cavalry {c}"
+            want = 0 if bool(sim._type_chariot[c]) else sim._class_anticav_vs_cav
+            assert cs(a, c) == want, f"anti-cav {a} vs cavalry {c}"
             assert cs(c, a) == 0, "a cavalry unit gains nothing against anti-cavalry"
     for m in mel:
         for c in cav:
