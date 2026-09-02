@@ -8,10 +8,11 @@
 import type { GameState, Tile, Unit } from './types';
 import { neighbors } from '../../world/hex';
 import {
-  PROMOTIONS, PROMO_INDEX, UNIT_PROMO_CLASS, classBitOf, promoRows,
+  PROMOTIONS, PROMO_INDEX, PROMO_OFFER_DRAW, UNIT_PROMO_CLASS, classBitOf, promoRows,
   type PromoDef, type PromoKind,
 } from '../data/promotions';
 import { UNIT_HP } from '../data/units';
+import { nextRandom } from './rand';
 
 /** CIV6: "A unit will require an amount of XP equal to 15 times the level it
  *  is currently on to reach the next level (a brand new unit starts at level
@@ -172,6 +173,35 @@ export function promoAvailable(
   const req = rows[k].requires;
   if (req.length === 0) return true;
   return req.some((id) => hasPromo(unit, id));
+}
+
+/** the promotions a unit holds, counted. */
+export function promoCount(unit: { promos?: number }): number {
+  let n = 0;
+  for (let h = unit.promos ?? 0; h !== 0; h >>>= 1) n += h & 1;
+  return n;
+}
+
+/** CIV6 (Apostle, Spy, Rock Band): "three promotions randomly chosen from
+ *  the pool" — PROMO_OFFER_DRAW distinct UNHELD columns of the unit's own
+ *  class list, drawn without replacement, so the stream is exactly that many
+ *  numbers however the picks land. The offer IS a level to spend, so the
+ *  unit leaves armed with its next level's XP. */
+export function drawPromoOffer(state: GameState, unit: Unit): void {
+  const rows = unitPromoRows(unit);
+  const held = unit.promos ?? 0;
+  const avail = rows.length - promoCount(unit);
+  let offer = 0;
+  for (let j = 0; j < PROMO_OFFER_DRAW && j < avail; j++) {
+    let pick = Math.floor(nextRandom(state) * (avail - j));
+    for (let k = 0; k < rows.length; k++) {
+      if ((held | offer) & (1 << k)) continue;
+      if (pick === 0) { offer |= 1 << k; break; }
+      pick -= 1;
+    }
+  }
+  unit.promoOffer = offer;
+  unit.xp = xpToNextLevel(unit);
 }
 
 /** every effect the unit's held promotions carry. */

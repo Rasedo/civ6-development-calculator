@@ -167,7 +167,8 @@ class SimOrders:
 
             if _rk_perform[n] and _pfc >= 0:
                 pfm = act & (a == _pfc) & self._perform_ok(
-                    row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    row, here.unsqueeze(1), utp.unsqueeze(1),
+                    self.unit_promos.gather(1, sc.unsqueeze(1))).squeeze(1)
                 if bool(pfm.any()):
                     self._do_concert(row, pfm, here, sc)
 

@@ -10,9 +10,11 @@
  * promotion at purchase and never levels.
  *
  * `kind` NONE marks a row this engine sources but cannot carry; the AUDIT
- * names the blocker for each.
+ * names the blocker for each. The Espionage and Rock Band lists are flat
+ * pools drawn three at a time, from the game's own tables.
  */
 
+import type { DistrictId } from '../core/types';
 import {
   SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST, SPY_M_SABOTAGE_PRODUCTION,
   SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS, SPY_M_DISRUPT_ROCKETRY,
@@ -24,6 +26,7 @@ export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE', 'MONK',
   'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER', 'ESPIONAGE',
+  'ROCK_BAND',
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
@@ -45,6 +48,30 @@ export const MASK_NAVAL = CLASS_BIT.NAVAL_MELEE | CLASS_BIT.NAVAL_RANGED
   | CLASS_BIT.NAVAL_RAIDER | CLASS_BIT.NAVAL_CARRIER;
 export const MASK_CAVALRY = CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV;
 export const MASK_AIR = CLASS_BIT.AIR_FIGHTER | CLASS_BIT.AIR_BOMBER;
+
+/** CIV6 (Rock Band promotions, Expansion2_UnitPromotions): the VENUE KINDS
+ *  the band's rows name — the bit a concert tile presents to a `BAND_LEVEL`
+ *  or `BAND_VENUE` mask. A district counts only complete. The Street
+ *  Carnival, Acropolis, Royal Navy Dockyard and Water Street Carnival
+ *  clauses arrive with the unique districts. */
+export const BAND_VENUE_BIT = {
+  WONDER: 1, ENTERTAINMENT_COMPLEX: 2, THEATER_SQUARE: 4, WATER_PARK: 8,
+  NATIONAL_PARK: 16, NATURAL_WONDER: 32, SPACEPORT: 64, CAMPUS: 128,
+  SEASIDE_RESORT: 256, HARBOR: 512,
+} as const;
+/** the venue kinds that are DISTRICTS, by catalog id. */
+export const BAND_VENUE_DISTRICTS: readonly (keyof typeof BAND_VENUE_BIT & DistrictId)[] = [
+  'ENTERTAINMENT_COMPLEX', 'THEATER_SQUARE', 'WATER_PARK', 'SPACEPORT', 'CAMPUS', 'HARBOR',
+];
+/** CIV6 (Goes to 11): "Civilizations within 10 tiles receive 50% of the
+ *  Tourism from this concert" — TOURISM_BOMB_RANGE Range 10. */
+export const CONCERT_SHARE_RANGE = 10;
+/** CIV6 GlobalParameters ROCK_BAND_MAX_PROMOTIONS. */
+export const ROCK_BAND_MAX_PROMOTIONS = 4;
+/** CIV6 (Rock Band, Expansion2_Units): InitialLevel 2, NumRandomChoices 3 —
+ *  one promotion at purchase, chosen from three drawn at random; the Apostle's
+ *  own pair in Units.xml reads the same. */
+export const PROMO_OFFER_DRAW = 3;
 
 export const PROMO_KINDS = [
   'NONE',
@@ -104,6 +131,12 @@ export const PROMO_KINDS = [
   'ZOC_EXERT',           // a RANGED-class unit exerts zone of control
   'ESCORT_SPEED',        // an escorted unit is dragged free of its own MP
   'CS_IN_FORMATION',     // +v Combat Strength while this unit escorts one
+  'BAND_LEVEL',          // a concert on a venue kind in `mask` plays v levels higher
+  'BAND_VENUE',          // +v venue value on a tile whose venue kind is in `mask`
+  'CONCERT_SHARE_NEAR',  // every civilization within CONCERT_SHARE_RANGE tiles takes v% of the concert
+  'CONCERT_LOYALTY',     // the host city loses v Loyalty
+  'CONCERT_GOLD_PCT',    // v% of the concert's Tourism arrives as Gold
+  'CONCERT_CONVERT',     // the host city converts to the performer's religion
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -343,6 +376,32 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('SMEAR_CAMPAIGN', 'ESPIONAGE', 1, [], op(SPY_M_FABRICATE_SCANDAL)),
   P('SURVEILLANCE', 'ESPIONAGE', 1, [], none),
   P('TECHNOLOGIST', 'ESPIONAGE', 1, [], op(SPY_M_STEAL_TECH_BOOST)),
+
+  // ---- ROCK BAND ------------------------------------------------------
+  // CIV6 (Expansion2_UnitPromotions, PROMOTION_CLASS_ROCK_BAND): twelve
+  // Level-1 rows, one flat pool — a band is bought with one of them and holds
+  // at most ROCK_BAND_MAX_PROMOTIONS. "Performs as if N levels more
+  // experienced on <venue> tiles" is BAND_LEVEL over the venue kind; "Performs
+  // at <venue> for +V Tourism" is BAND_VENUE, which ADDS to whatever the tile
+  // already pays (a Campus with a University reads 500 + 500).
+  P('ALBUM_COVER_ART', 'ROCK_BAND', 1, [], cs('BAND_LEVEL', 1, BAND_VENUE_BIT.WONDER)),
+  P('ARENA_ROCK', 'ROCK_BAND', 1, [], cs('BAND_LEVEL', 2, BAND_VENUE_BIT.ENTERTAINMENT_COMPLEX)),
+  P('GLAM_ROCK', 'ROCK_BAND', 1, [], cs('BAND_LEVEL', 2, BAND_VENUE_BIT.THEATER_SQUARE)),
+  P('GOES_TO_11', 'ROCK_BAND', 1, [], cs('CONCERT_SHARE_NEAR', 50)),
+  P('INDIE', 'ROCK_BAND', 1, [], cs('CONCERT_LOYALTY', 40)),
+  P('MUSIC_FESTIVAL', 'ROCK_BAND', 1, [],
+    cs('BAND_VENUE', 1000, BAND_VENUE_BIT.NATIONAL_PARK | BAND_VENUE_BIT.NATURAL_WONDER),
+    cs('BAND_LEVEL', 1, BAND_VENUE_BIT.NATIONAL_PARK | BAND_VENUE_BIT.NATURAL_WONDER)),
+  P('POP_STAR', 'ROCK_BAND', 1, [], cs('CONCERT_GOLD_PCT', 25)),
+  P('REGGAE_ROCK', 'ROCK_BAND', 1, [], cs('BAND_LEVEL', 2, BAND_VENUE_BIT.WATER_PARK)),
+  P('RELIGIOUS_ROCK', 'ROCK_BAND', 1, [], { kind: 'CONCERT_CONVERT' }),
+  P('ROADIES', 'ROCK_BAND', 1, [], cs('MOVES', 4)),
+  P('SPACE_ROCK', 'ROCK_BAND', 1, [],
+    cs('BAND_VENUE', 500, BAND_VENUE_BIT.SPACEPORT | BAND_VENUE_BIT.CAMPUS),
+    cs('BAND_LEVEL', 1, BAND_VENUE_BIT.SPACEPORT | BAND_VENUE_BIT.CAMPUS)),
+  P('SURF_BAND', 'ROCK_BAND', 1, [],
+    cs('BAND_VENUE', 500, BAND_VENUE_BIT.SEASIDE_RESORT | BAND_VENUE_BIT.HARBOR),
+    cs('BAND_LEVEL', 1, BAND_VENUE_BIT.SEASIDE_RESORT | BAND_VENUE_BIT.HARBOR)),
 ];
 
 /** the promotions of one class, in catalog order — the ORDER IS THE WIRE:
@@ -383,6 +442,7 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   NUCLEAR_SUBMARINE: 'NAVAL_RAIDER',
   AIRCRAFT_CARRIER: 'NAVAL_CARRIER',
   SPY: 'ESPIONAGE',
+  ROCK_BAND: 'ROCK_BAND',
 };
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */

@@ -570,6 +570,25 @@ class SimMasks:
         cls = rd.u_promo_class[utype.clamp(min=0)]
         return ((promos & rd.promo_flag_bits[k][cls.clamp(min=0)]) != 0) & (cls >= 0)
 
+    def _promo_val_for(self, utype: torch.Tensor, promos: torch.Tensor, kind: str,
+                       bit: torch.Tensor) -> torch.Tensor:
+        """`promoValueFor` — the summed value of one kind over the slots whose
+        mask is open (0) or names `bit`, in `promos`' shape."""
+        k = self._pk.get(kind, -1)
+        if k < 0:
+            return torch.zeros_like(promos)
+        kinds, vs, masks, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
+        b = bit.reshape(-1, 1, 1)
+        hit = live & (kinds == k) & ((masks == 0) | ((masks & b) != 0))
+        return torch.where(hit, vs, torch.zeros_like(vs)).sum(dim=(1, 2)).reshape(promos.shape)
+
+    def _promo_count(self, promos: torch.Tensor) -> torch.Tensor:
+        """`promoCount` — the promotions held, in `promos`' shape."""
+        n = torch.zeros_like(promos)
+        for k in range(int(self.rules_dev.promo_cols)):
+            n = n + ((promos >> k) & 1)
+        return n
+
     def _promo_mult(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
         """the flanking/support multiplier a promotion grants; 1 without."""
         k = self._pk.get(kind, -1)
@@ -2020,19 +2039,40 @@ class SimMasks:
         one_city = (city == city[:, :, :, :1]).all(dim=3) & (city[:, :, :, 0] >= 0)
         return (quad >= 0).all(dim=3) & good.all(dim=3) & one_city
 
-    def _concert_venue(self, tc: torch.Tensor) -> torch.Tensor:
+    def _venue_bits(self, tc: torch.Tensor) -> torch.Tensor:
+        """[B, N] long — `concertVenueBits`: the venue KINDS a tile is, as
+        the bits a band promotion's mask names."""
+        vb = self._band_venue_bits
+        bits = torch.zeros_like(tc)
+        wnd = (self.built_wonder.gather(1, tc) >= 0) & self.built_wonder_complete.gather(1, tc)
+        bits = bits | wnd.long() * vb["WONDER"]
+        di = self.district.gather(1, tc)
+        dc = self.district_complete.gather(1, tc)
+        for bit, didx in self._band_venue_districts:
+            bits = bits | ((di == didx) & dc).long() * bit
+        bits = bits | (self.park.gather(1, tc) >= 0).long() * vb["NATIONAL_PARK"]
+        bits = bits | self.nwonder.gather(1, tc).long() * vb["NATURAL_WONDER"]
+        if self.SEASIDE >= 0:
+            bits = bits | (self.improvement.gather(1, tc) == self.SEASIDE).long() * vb["SEASIDE_RESORT"]
+        return bits
+
+    def _concert_venue(self, tc: torch.Tensor, utype: torch.Tensor | None = None,
+                       promos: torch.Tensor | None = None) -> torch.Tensor:
         """[B, N] long — the tile's VENUE value, 0 where a Rock Band cannot
-        play. `concertVenue`'s twin: a completed World Wonder is 1000, and a
+        play. `concertVenue`'s twin: a completed World Wonder is 1000, a
         completed DISTRICT tile is worth the best venue building its own city
-        holds in that district."""
+        holds in that district, and the band's own promotions ADD the venues
+        they open (`BAND_VENUE` against the tile's `_venue_bits`)."""
         out = torch.zeros_like(tc)
         wnd = (self.built_wonder.gather(1, tc) >= 0) & self.built_wonder_complete.gather(1, tc)
         out = torch.where(wnd, torch.full_like(out, self._band_wonder_venue), out)
+        extra = (self._promo_val_for(utype, promos, "BAND_VENUE", self._venue_bits(tc))
+                 if utype is not None and promos is not None else torch.zeros_like(tc))
         di = self.district.gather(1, tc)
         dc = self.district_complete.gather(1, tc)
         live = ~wnd & (di >= 0) & dc
         if not bool(live.any()):
-            return out
+            return out + extra
         best = torch.zeros_like(tc)
         for r in range(self.n_majors):
             sl = self.city_slot_at(r).gather(1, tc)          # owning city SLOT, -1 = not this row's
@@ -2044,16 +2084,17 @@ class SimMasks:
                 has = self.city_bldg[:, r, :, bi].gather(1, slc)
                 best = torch.where(hit & has & (di == dix) & (best < v),
                                    torch.full_like(best, v), best)
-        return torch.where(live, best, out)
+        return torch.where(live, best, out) + extra
 
-    def _perform_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+    def _perform_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor,
+                    promos: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the PERFORM column: CIV6 "Rock Bands must always
         perform in foreign lands", on a tile carrying a venue."""
         if getattr(self, "_band_idx", -1) < 0:
             return torch.zeros_like(tc, dtype=torch.bool)
         owner = self.tile_seat.gather(1, tc)
         foreign = (owner >= 0) & (owner < self.n_majors) & (owner != row)
-        return (utype == self._band_idx) & foreign & (self._concert_venue(tc) > 0)
+        return (utype == self._band_idx) & foreign & (self._concert_venue(tc, utype, promos) > 0)
 
     def _boost_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor,
                   u_charges: torch.Tensor) -> torch.Tensor:
@@ -2614,7 +2655,7 @@ class SimMasks:
 
         _pc: list[torch.Tensor] = []
         if getattr(self, "_A_PERFORM", -1) >= 0:
-            _pc = [(present & self._perform_ok(row, tc, utype)).unsqueeze(2)]
+            _pc = [(present & self._perform_ok(row, tc, utype, self.unit_promos.gather(1, sc))).unsqueeze(2)]
 
         _bp: list[torch.Tensor] = []
         if getattr(self, "_A_BOOST", -1) >= 0:

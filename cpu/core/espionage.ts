@@ -18,7 +18,7 @@ import {
   SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT,
   SPY_CAPTURE_PCT, SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
-  SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS, SPY_PROMO_OFFER,
+  SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
@@ -38,7 +38,7 @@ import { BUILDINGS } from '../data/buildings';
 import { governorSum } from './governors';
 import { floodRiver } from './disasters';
 import { nextRandom } from './rand';
-import { promoFlag, promoValue, promoValueFor, unitPromoRows, xpToNextLevel } from './promotions';
+import { drawPromoOffer, promoFlag, promoValue, promoValueFor } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
 import { congressPactBanned, congressPactLevels } from './congress';
 import type { City, CityState, GameState, Seat, Unit } from './types';
@@ -242,25 +242,12 @@ export function beginMission(state: GameState, unit: Unit, m: number): boolean {
 
 /** CIV6 (Spy): a spy "may gain levels from successful offensive operations, or
  *  capturing an enemy Spy", and on each level is "able to choose one of three
- *  promotions ... chosen at random from the pool". The draw takes three
- *  DISTINCT columns without replacement, so the stream is exactly three
- *  numbers however the offer lands. */
+ *  promotions ... chosen at random from the pool" — `drawPromoOffer`. */
 export function levelUpSpy(state: GameState, unit: Unit): void {
   const before = spyLevel(unit);
   unit.spyLevel = Math.min(SPY_MAX_LEVEL, before + 1);
   if (unit.spyLevel === before) return;
-  const rows = unitPromoRows(unit);
-  let offer = 0;
-  for (let j = 0; j < SPY_PROMO_OFFER && j < rows.length; j++) {
-    let pick = Math.floor(nextRandom(state) * (rows.length - j));
-    for (let k = 0; k < rows.length; k++) {
-      if (offer & (1 << k)) continue;
-      if (pick === 0) { offer |= 1 << k; break; }
-      pick -= 1;
-    }
-  }
-  unit.promoOffer = offer;
-  unit.xp = xpToNextLevel(unit);
+  drawPromoOffer(state, unit);
 }
 
 export function spyLevel(unit: Unit): number {

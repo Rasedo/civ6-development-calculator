@@ -58,9 +58,9 @@ def test_catalog(sim) -> None:
         assert rows >= MAX_LEVEL - 1 or rd.promo_classes[c] == "APOSTLE", \
             f"class {rd.promo_classes[c]} holds {rows} rows, fewer than the 7 a unit can earn"
         assert rows <= rd.promo_cols, f"class {rd.promo_classes[c]} overflows the PROMOTE head"
-    # every civilian chassis promotes from nothing
+    # every civilian chassis but the Apostle's and the Rock Band's promotes from nothing
     for t in range(sim.NU):
-        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, getattr(sim, "_inquisitor_idx", -1)):
+        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, getattr(sim, "_inquisitor_idx", -1), sim._band_idx):
             assert int(rd.u_promo_class[t]) < 0, f"unit type {t} is a civilian with a promotion tree"
     print(f"  catalog OK — {n} classes, {int(rd.promo_rows.sum())} rows, head {rd.promo_cols} wide")
 
@@ -208,12 +208,12 @@ def test_apostle_offer(sim) -> None:
         sim._offer_apostle_promos(0, torch.tensor([True]))
         assert int(sim.rng_state[0]) != before, "the offer drew nothing"
         off = int(sim.major_unit_promo_offer[0, slot])
-        assert bin(off).count("1") == sim._apostle_promo_offer, \
-            f"the offer holds {bin(off).count('1')} columns, want {sim._apostle_promo_offer}"
+        assert bin(off).count("1") == sim._promo_offer_n, \
+            f"the offer holds {bin(off).count('1')} columns, want {sim._promo_offer_n}"
         assert off < (1 << n), "the offer names a column the apostle list does not have"
         assert int(sim.major_unit_xp[0, slot]) == XP_PER_LEVEL, "the apostle cannot take its one rung"
         seen |= {k for k in range(n) if (off >> k) & 1}
-    assert len(seen) > sim._apostle_promo_offer, "24 draws never left the same three columns"
+    assert len(seen) > sim._promo_offer_n, "24 draws never left the same three columns"
     print(f"  apostle OK — three distinct columns a draw, {len(seen)}/{n} rows reached over 24")
 
 

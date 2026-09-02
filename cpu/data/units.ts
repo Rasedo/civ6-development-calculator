@@ -1285,7 +1285,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 1,
       faithOnly: true,
-      requiresCivic: 'PROFESSIONAL_SPORTS',
+      requiresCivic: 'COLD_WAR',
       description: 'Performs a concert at a foreign venue for a tourism burst (faith purchase only).',
     }),
   ].map((u) => [u.id, u]),

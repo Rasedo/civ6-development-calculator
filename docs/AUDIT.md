@@ -63,11 +63,10 @@ from the list below.
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%, blocked on C-46's scale), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, a released spy's lost level, and the model values a published number would replace |
-| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's clauses are unsourced here |
+| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel — SOURCED (Chemistry, an adjacent mountain, a portal between tunnels at 2 Movement) and unbuilt: a movement portal is a new pathing class on both engines |
 | C-22 the district roster | 1 | the Preserve table is a stylization |
-| C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
+| C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — UNPARKED 2026-09-01, sourced from the game's own XML; the Rock Band's four unique-district venue clauses wait here |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills wait on a worked-tile selection neither engine exposes; whether a wonder in the blast is pillaged is unsourced |
-| C-32 the classes with no promotion tree | 1 | only the ROCK BAND is offered no promotion, and its twelve rows are unsourced here |
 | C-33 the Giant Death Robot's remaining abilities | 1 | every published clause ships; what the Jump action COSTS is unsourced |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; the promotion term in the sortie and the parked weapon's cover ship |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
@@ -75,8 +74,8 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
-| **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **39** | |
+| **C. Absent systems** | **20** | |
+| **OPEN, TOTAL** | **38** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -90,58 +89,52 @@ this ledger when the owner answers or a primary source is reached, and
 the answer lands in the ROW the entry points at (this list carries no
 detail of its own). "Meanwhile" states what both engines do today.
 
-1. **C-20 — the Mountain Tunnel.** Its tech, whether it spends a charge,
-   what a step through it costs, and whether it opens the mountain or
-   joins two tunnels — no safe reading reached. Meanwhile: not built.
-2. **C-1 — the reactor's accident roll.** Severities open at ages
+1. **C-1 — the reactor's accident roll.** Severities open at ages
    10/20/30; NO source publishes the per-turn probability. Meanwhile: the
    age clock ships, no accident ever fires.
-3. **C-1 — the decommission projects' score.** A secondary source says
+2. **C-1 — the decommission projects' score.** A secondary source says
    100 competition points; no first-party page states any figure.
    Meanwhile: the projects are absent, the window counts emissions alone.
-4. **C-31 — the nuke's last clauses.** Interception has no published
+3. **C-31 — the nuke's last clauses.** Interception has no published
    roll; the citizens a blast kills wait on a worked-tile selection
    neither engine exposes; whether a wonder in the blast is PILLAGED is
    unsourced. Meanwhile: no interception, no citizen deaths, the wonder
    rides through untouched.
-5. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
+4. **C-33 — the Jump action's cost.** What the Giant Death Robot's Jump
    COSTS (movement? a turn?) is unsourced. Meanwhile: no Jump.
-6. **C-35 — what drowned ground still lends.** Does a submerged tile's
+5. **C-35 — what drowned ground still lends.** Does a submerged tile's
    FEATURE keep working for its neighbours, or is the ground stripped?
    Meanwhile: it lends (every ring fact reads terrain).
-7. **B-20r — the park's vertical.** Civ 6 fixes the park rhombus
+6. **B-20r — the park's vertical.** Civ 6 fixes the park rhombus
    vertical where this hex frame has no canonical vertical. Meanwhile:
    every rhombus offered.
-8. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
-    threshold. Meanwhile: `GRIEVANCE_GANG` as a tuning knob, two war
-    bases' worth.
-9. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
-    whether it may act after forming are unpublished, and the
-    direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
-    Meanwhile: the veteran's own HP, the turn ends, the single unit's
-    charge.
-10. **C-32 — the Rock Band's twelve rows.** Its promotion table is
-    unsourced here. Meanwhile: the chassis carries its own level and
-    album state instead.
-11. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
-    and what it does to a standing improvement. Meanwhile: the ADD
-    carrier ships and nothing calls it.
-12. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
+7. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
+   threshold. Meanwhile: `GRIEVANCE_GANG` as a tuning knob, two war
+   bases' worth.
+8. **B-66 — what a merge leaves.** The merged unit's HIT POINTS and
+   whether it may act after forming are unpublished, and the
+   direct-trained formation's STRATEGIC-RESOURCE charge is unstated.
+   Meanwhile: the veteran's own HP, the turn ends, the single unit's
+   charge.
+9. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands
+   and what it does to a standing improvement. Meanwhile: the ADD
+   carrier ships and nothing calls it.
+10. **C-45 — the queue's depth.** Real Civ 6 publishes no queue ceiling;
     five is a capacity choice (the GPU's tensor dimension). Is five
     acceptable, or name a depth? Meanwhile: 5 on both engines.
-13. **C-16 — the released spy's level.** What a released (ransomed) spy
+11. **C-16 — the released spy's level.** What a released (ransomed) spy
     keeps of its levels is unpublished. Meanwhile: the row's own recorded
     reading stands.
-14. **C-2 — two diplomacy cells.** The gold purchase of the QUEUE-FRONT
+12. **C-2 — two diplomacy cells.** The gold purchase of the QUEUE-FRONT
     item is refused on both engines and real Civ 6 likely allows it with
     progress banked; and the alliance table's ALLIANCE_POINTS_FOR_DEAL
     (2) maps to no published text — is it alliance points banked when
     the allies close a deal? Meanwhile: refused / nothing.
-15. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
+13. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes
     on a city capture; the Encampment's own pool rides through — no
     source says which is right. Meanwhile: it rides through, both
     engines.
-16. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
+14. **B-31r — the course's depth.** Real Civ 6 chains Trading Posts "and
     so on" with no published limit; `ROUTE_CHAIN_MAX` (6) is a capacity
     choice (the GPU plane's width), C-45's pattern. Is six acceptable,
     or name a depth? Meanwhile: 6 on both engines, the reach walk and
@@ -956,13 +949,22 @@ under their blocker so the dependency is readable, and both halves count.
   **"Can clean Nuclear Fallout"** — `CLEAN_FALLOUT` / `_rk_clean`, offered
   to any chassis holding a build charge, because the charge is the whole
   gate the page states. What the silo is FOR is C-31's item. OPEN:
-  - **THE MOUNTAIN TUNNEL.** No longer blocked on a plane: `passable` is
-    state now (C-35's family), so a tile can start impassable and stop
-    being so. What blocks it is the SOURCE — this repo has no reading of
-    the improvement's own clauses (its tech, whether it spends a charge,
-    what a step through it costs, and whether it makes the mountain itself
-    passable or joins two tunnels) that is safe to build on. ASK THE OWNER
-    before any of it is written; no branch ships on a guess.
+  - **THE MOUNTAIN TUNNEL** — SOURCED (Expansion2_Improvements.xml):
+    `IMPROVEMENT_MOUNTAIN_TUNNEL`, PrereqTech CHEMISTRY, built by the
+    Military Engineer alone (`Improvement_ValidBuildUnits`) on a Mountain
+    tile of any of the five mountain terrains from an ADJACENT plot
+    (`BuildOnAdjacentPlot`), `CanBuildOutsideTerritory`, `PlunderType`
+    NONE and `DisasterResistant` ("Cannot be pillaged or removed"), and
+    `AllowImpassableMovement`. Its description: "Acts as a movement portal
+    on a mountain range, allowing units to move into it and exit from
+    another portal at the cost of 2 Movement. Trade Routes traveling
+    through it can multiply the Gold they get from districts at their
+    destination." UNBUILT: a portal between two improvements is a new
+    pathing class (every mover walks `neigh`; a tunnel pair is an edge
+    the geometry does not hold) on both engines, and the trade-route gold
+    multiplier's MAGNITUDE lives in `EFFECT_MOUNTAIN_PORTAL`, DLL-side.
+    Whether the build spends a charge is the general rule (no
+    per-improvement exemption exists in the table).
   - **"Can Remove Tile Improvements (costs no charge)" SHIPS** — the
     Builder's and the Military Engineer's pages carry the ability verbatim,
     and `REMOVE_IMPROVEMENT` is one appended column for both chassis on an
@@ -1023,36 +1025,6 @@ under their blocker so the dependency is readable, and both halves count.
     Districts and buildings and says nothing about a wonder, so neither
     engine touches `built_wonder` / `city_wonder`. That is UNSOURCED
     rather than decided. ASK THE OWNER.
-- **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
-  AIR BOMBER, NAVAL RAIDER and NAVAL CARRIER hold seven sourced rows
-  each and ESPIONAGE seventeen (C-16), and with them: the chassis map
-  (`UNIT_PROMO_CLASS` /
-  `u_promo_class`), the two new roll conditions `CS_DEF_VS_AIR` and
-  `CS_DEF_VS_AA`, the carrier deck's `AIR_SLOTS` — three rows saying
-  "+1 additional aircraft slot", summed into `airSlotsAt` /
-  `_air_slots_at` — the Hangar's "+25%" and the Airport's "+50%"
-  experience lines, the Shipyard's and Seaport's "for all naval units"
-  widened to the raider, an aircraft that banks XP at all
-  (`xpEligible` / `_xp_eligible`), and Sky and Stars'
-  "+100% XP earned for all Air Units". `PROMO_COLS` is the Espionage
-  pool's seventeen now, so the PROMOTE head — and the unit action enum
-  with it — is eight columns wider. TWO CORRECTIONS
-  to this row's own earlier text: the Civilopedia's promotion index lists
-  no SUPPORT class at all, so the support chassis was never a gap; and
-  the GDR's four rows (Drone Air Defense, Enhanced Mobility, Particle Beam
-  Siege Cannon, Reinforced Armor Plating) are its Future-era upgrades,
-  which is C-33's item, not this one. What is left:
-  - **THE ROCK BAND's twelve promotions** — the chassis carries its own
-    level and album state instead (C-28); no `PROMO_CLASSES` entry, and
-    the twelve rows are unsourced here.
-
-  GATE REACHABILITY IS ZERO for the four military trees: no seed trains
-  an aircraft, a Privateer, a Submarine or a carrier inside 250 turns, so
-  that pass is proved by `tests/gpu/air_promo_test.py` and
-  `tests/cpu/units/air-promotions.test.ts` and by nothing the battery's
-  serve lane runs. The Espionage pool's reach is unmeasured for the same
-  reason C-16's is: a level needs a spy fielded, sent, and carried through
-  a successful offensive operation.
 - **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1. Every
   published clause on the chassis now ships. The water walk — it moves
   and fights on Coast and Ocean "as it would on land" (`waterWalks` /
@@ -1180,8 +1152,13 @@ under their blocker so the dependency is readable, and both halves count.
   Waiting on it: the Impi and Hypaspist stacks (B-54r), the Gauls'
   OPPIDUM, Ambiorix's and Saladin's leader terms, the Nihang's embarked
   CS, America's Film Studio, the unique-improvement appeal terms (B-36r)
-  and suzerain rows (B-21r). PARKED BY OWNER DECISION — no round starts
-  it; the row stays open on purpose.
+  and suzerain rows (B-21r), and the ROCK BAND's four unique-district
+  venue clauses (Expansion2_UnitPromotions.xml: Arena Rock also reads the
+  Street Carnival, Reggae Rock the Copacabana, Glam Rock the Acropolis,
+  Surf Band the Royal Navy Dockyard — each a `BAND_VENUE_BIT` the
+  district does not exist to raise). UNPARKED by the owner 2026-09-01:
+  the five are to be sourced from the game's own XML (Civilizations,
+  Leaders, Traits, Modifiers) rather than the Civilopedia.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1. The minor
   BUILDS now (`minorBuildPhase` / `_minor_build`): a production pot takes
   POPULATION points a turn — the `minorResearch` pacing stylization, since
@@ -1362,7 +1339,11 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
   Warrior Monk and its tree (whether AKKAD lands is a seeder draw), the
   climate arc (CO2 never leaves zero), the Military Engineer (0/12), the
   space race (Information-era techs), the emergencies' CITY_STATE trigger,
-  the ROCK BAND and its concert (Professional Sports is Information-era),
+  the ROCK BAND, its concert and its twelve-row tree (Cold War is an
+  Atomic-era civic; `rock_band_test.py` and `rock-band.test.ts` hold every
+  rule), the four AIR and NAVAL promotion trees (no seed trains an
+  aircraft, a Privateer, a Submarine or a carrier inside 250 turns;
+  `air_promo_test.py` / `air-promotions.test.ts` hold them),
   and the DARK AGE CARD POOL — the age is reached on 10/12 seeds but the
   greedy slot fill spends every wildcard on ordinary overflow first, so
   `governor_roster_test` poke f and the TS `dark-policies` lane are the

@@ -729,7 +729,6 @@ class SimInit:
         self._spy_idle = int(_sp["idle"])
         self._spy_travelling = int(_sp["travelling"])
         self._spy_travel_cols = int(_sp["travelCols"])
-        self._spy_promo_offer = int(_sp["promoOffer"])
         self._spy_missions = [
             {k: int(v) for k, v in m.items() if k != "id"} for m in _sp["missions"]
         ]
@@ -1075,7 +1074,6 @@ class SimInit:
         self._monk_idx = int(_bl.get("warriorMonkIdx", -1))
         self._monk_cost = float(_bl["warriorMonkCost"])
         self._monk_follower = int(_bl.get("warriorMonkFollower", -1))
-        self._apostle_promo_offer = int(_bl.get("apostlePromoOffer", 3))
         self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
         self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
         self._launch_inquisition_charges = int(_bl.get("launchInquisitionCharges", 3))
@@ -1377,6 +1375,12 @@ class SimInit:
         self._band_tiers = torch.tensor(rr.get("rockBandTiers", []), dtype=torch.long, device=device)
         self._band_odds = torch.tensor(rr.get("rockBandOdds", []), dtype=torch.long, device=device)
         self._band_max_level = int(rr.get("rockBandMaxLevel", 4))
+        self._band_max_promos = int(rr["rockBandMaxPromotions"])
+        # the venue KIND bits a band promotion's mask names, and the districts
+        # among them as (bit, district idx)
+        self._band_venue_bits = {str(_k): int(_v) for _k, _v in rr["bandVenueBits"].items()}
+        self._band_venue_districts = [(int(_b), int(_d)) for _b, _d in rr["bandVenueDistricts"] if int(_d) >= 0]
+        self._concert_share_range = int(rr["concertShareRange"])
         self._band_cost_step = int(rr["rockBandCostStep"])
         self._naturalist_cost_step = int(rr["naturalistCostStep"])
         self._holy_city_tour = int(rr.get("holyCityTourism", 8))
@@ -2388,6 +2392,7 @@ class SimInit:
             * (self._b_req_district >= 0).double().unsqueeze(1)
         )  # [NB, nD] building -> its district column
         self._pk = {n: i for i, n in enumerate(rules.promo_kinds)}
+        self._promo_offer_n = int(rules.promo_offer_draw)
         # the two promo classes the ZOC exert test names — CIV6 (Zone of
         # Control): "Ranged and Bombard class units do not exert ZOC"
         self._pc_ranged = rules.promo_classes.index("RANGED") if "RANGED" in rules.promo_classes else -1

@@ -249,11 +249,6 @@ export const CITY_RELIGION_ADDER_LIVE = true;
 export const THEO_PRESSURE_RANGE = 10;
 export const THEO_PRESSURE_SWING = 15;
 
-/** CIV6 (Apostle): "The player may choose between three promotions randomly
- *  chosen from the pool. If the player is the Suzerain of Yerevan, they are
- *  free to choose from the entire pool." */
-export const APOSTLE_PROMO_OFFER = 3;
-
 /** CIV6 (Inquisitor): the Apostle's "Launch Inquisition" needs friendly
  *  territory and "at least 3 charges", and consumes the unit. */
 export const LAUNCH_INQUISITION_CHARGES = 3;

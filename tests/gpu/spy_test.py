@@ -369,7 +369,7 @@ def main() -> None:
     sim._level_up_spy(0, x)
     assert int(sim.unit_spy_level[0, x]) == 1
     off = int(sim.unit_promo_offer[0, x])
-    assert bin(off).count("1") == sim._spy_promo_offer == 3
+    assert bin(off).count("1") == sim._promo_offer_n == 3
     assert off >> int(rd.promo_rows[ec]) == 0, "the draw offered a column the pool lacks"
     assert int(sim.unit_xp[0, x]) == int(sim._xp_to_next(sim.unit_level[0, x:x + 1])[0])
 

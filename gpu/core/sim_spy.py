@@ -605,32 +605,16 @@ class SimSpy:
     def _level_up_spy(self, b: int, v: int) -> None:
         """CIV6 (Spy): a spy "may gain levels from successful offensive
         operations, or capturing an enemy Spy", and on each level is "able to
-        choose one of three promotions ... chosen at random from the pool".
-        The draw takes three DISTINCT columns without replacement, so the
-        stream is exactly three numbers however the offer lands."""
+        choose one of three promotions ... chosen at random from the pool" —
+        `_promo_offer_draw`."""
         before = int(self.unit_spy_level[b, v])
         after = min(self._spy_max_level, before + 1)
         self.unit_spy_level[b, v] = after
         if after == before:
             return
-        rd = self.rules_dev
-        ty = int(self.unit_type[b, v])
-        c = int(rd.u_promo_class[min(max(ty, 0), self.NU - 1)])
-        rows = int(rd.promo_rows[c]) if c >= 0 else 0
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
-        offer = 0
-        for j in range(min(self._spy_promo_offer, rows)):
-            pick = int(self._next_random(one)[b] * (rows - j))
-            for k in range(rows):
-                if (offer >> k) & 1:
-                    continue
-                if pick == 0:
-                    offer |= 1 << k
-                    break
-                pick -= 1
-        self.unit_promo_offer[b, v] = offer
-        self.unit_xp[b, v] = int(self._xp_to_next(self.unit_level[b, v:v + 1])[0])
+        self._promo_offer_draw(one, torch.full((self.B,), v, dtype=torch.long, device=self.device))
 
     def _counter_levels(self, b: int, hr: int, hc: int) -> int:
         """CIV6 (Diplomatic Quarter): "Enemy Spies operate at 2 levels below

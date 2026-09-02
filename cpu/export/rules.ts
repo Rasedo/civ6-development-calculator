@@ -26,7 +26,7 @@ import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_PROV_W, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ROUTE_CHAIN_MAX, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
@@ -49,7 +49,8 @@ import {
 import { CARBON_PER_RESOURCE } from '../core/climate';
 import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import {
-  CLASS_BIT, PROMO_CLASSES, PROMO_COLS, PROMO_KINDS, UNIT_PROMO_CLASS, promoRows,
+  BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CLASS_BIT, CONCERT_SHARE_RANGE, PROMO_CLASSES, PROMO_COLS,
+  PROMO_KINDS, PROMO_OFFER_DRAW, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS, promoRows,
 } from '../data/promotions';
 
 /** the widest effect list any promotion carries. */
@@ -71,7 +72,7 @@ import { ENGINEER_FINISH_FRACTION } from '../core/game';
 import { TECHS, ERAS, MODERN_ERA_INDEX, type ResearchEffect } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL, SPY_SECRET_AGENT_LEVEL,
-  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_PROMO_OFFER,
+  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN, SPY_TRAVEL_TURNS_MAX,
   SPY_SUCCESS_PER_LEVEL_PCT, SPY_CAPTURE_PCT,
   SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
@@ -558,7 +559,6 @@ export function buildRules() {
         idle: SPY_IDLE,
         travelling: SPY_TRAVELLING,
         travelCols: SPY_TRAVEL_COLS,
-        promoOffer: SPY_PROMO_OFFER,
         missions: SPY_MISSIONS.map((m) => ({
           id: m.id,
           district: m.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(m.district),
@@ -734,7 +734,13 @@ export function buildRules() {
       rockBandTiers: ROCK_BAND_TIERS.map((r) => [r.album, r.bomb, r.promote ? 1 : 0, r.dies ? 1 : 0]),
       rockBandOdds: ROCK_BAND_TIER_ODDS.map((r) => [...r]),
       rockBandMaxLevel: ROCK_BAND_MAX_LEVEL,
+      rockBandMaxPromotions: ROCK_BAND_MAX_PROMOTIONS,
       rockBandCostStep: ROCK_BAND_COST_STEP,
+      // the venue KIND bits a band promotion's mask names, and the districts
+      // among them as [bit, PLACEABLE_DISTRICTS index]
+      bandVenueBits: { ...BAND_VENUE_BIT },
+      bandVenueDistricts: BAND_VENUE_DISTRICTS.map((d) => [BAND_VENUE_BIT[d], PLACEABLE_DISTRICTS.indexOf(d)]),
+      concertShareRange: CONCERT_SHARE_RANGE,
       naturalistCostStep: NATURALIST_COST_STEP,
       tourismOpenBordersPct: TOURISM_OPEN_BORDERS_PCT,
       tourismRoutePct: TOURISM_ROUTE_PCT,
@@ -872,7 +878,6 @@ export function buildRules() {
       warriorMonkCost: unitFaithCost('WARRIOR_MONK'),
       warriorMonkFollower: Object.keys(FOLLOWER_BELIEFS).indexOf('WARRIOR_MONKS'),
       inquisitorCap: INQUISITOR_CAP,
-      apostlePromoOffer: APOSTLE_PROMO_OFFER,
       inquisitorHomeStrength: INQUISITOR_HOME_STRENGTH,
       removeHeresyPct: REMOVE_HERESY_PCT,
       launchInquisitionCharges: LAUNCH_INQUISITION_CHARGES,
@@ -1225,6 +1230,7 @@ export function buildRules() {
       classBit: PROMO_CLASSES.map((c) => CLASS_BIT[c] ?? 0),
       kinds: [...PROMO_KINDS],
       cols: PROMO_COLS,
+      offerDraw: PROMO_OFFER_DRAW,
       slots: PROMO_SLOTS,
       ids: PROMO_CLASSES.map((c) => promoRows(c).map((p) => p.id)),
       req: PROMO_CLASSES.map((c) => {

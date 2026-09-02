@@ -35,13 +35,16 @@ import { artifactFree } from './greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
-import { UNIT_PROMO_CLASS } from '../data/promotions';
+import {
+  BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
+} from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
-  attacksLeftOf, attacksPerTurn, promoFirstUse, promoFlag, promoValue, stepAttacksLeft,
+  attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
+  promoValue, promoValueFor, stepAttacksLeft,
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
-import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
+import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import {
   GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
   MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP,
@@ -1297,25 +1300,49 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
 }
 
 /**
+ * The venue KINDS a tile is, as `BAND_VENUE_BIT` bits — what a band
+ * promotion's mask names: a finished wonder, a finished district of the six
+ * the promotions know, a National Park, a Natural Wonder, a Seaside Resort.
+ */
+export function concertVenueBits(state: GameState, tileIndex: number): number {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return 0;
+  let bits = 0;
+  if (tile.builtWonder && tile.builtWonderComplete) bits |= BAND_VENUE_BIT.WONDER;
+  if (tile.district && tile.districtComplete) {
+    for (const d of BAND_VENUE_DISTRICTS) if (tile.district === d) bits |= BAND_VENUE_BIT[d];
+  }
+  if ((tile.park ?? -1) >= 0) bits |= BAND_VENUE_BIT.NATIONAL_PARK;
+  if (naturalWonderAt(tile)) bits |= BAND_VENUE_BIT.NATURAL_WONDER;
+  if (tile.improvement === 'SEASIDE_RESORT') bits |= BAND_VENUE_BIT.SEASIDE_RESORT;
+  return bits;
+}
+
+/**
  * The tile's VENUE value, 0 where a Rock Band cannot play. CIV6 lists a World
  * Wonder at 1000, the Broadcast Center and Stadium at 750, the University and
  * Shipyard at 500 and the Amphitheater and Arena at 250 — a building venue
- * being the DISTRICT tile whose city holds it.
+ * being the DISTRICT tile whose city holds it — and the band's own
+ * promotions open more (Music Festival, Space Rock, Surf Band), their value
+ * ADDING to whatever the tile already paid.
  */
-export function concertVenue(state: GameState, tileIndex: number): number {
+export function concertVenue(state: GameState, tileIndex: number, unit?: Unit): number {
   const tile = state.map.tiles[tileIndex];
   if (!tile) return 0;
-  if (tile.builtWonder && tile.builtWonderComplete) return ROCK_BAND_WONDER_VENUE;
-  if (!tile.district || !tile.districtComplete) return 0;
-  const city = cityAtTile(state, tile);
-  if (!city) return 0;
   let best = 0;
-  for (const bid of Object.keys(ROCK_BAND_VENUES)) {
-    const value = ROCK_BAND_VENUES[bid];
-    if (!city.buildings.includes(bid)) continue;
-    if (BUILDINGS[bid]?.district !== tile.district) continue;
-    if (value > best) best = value;
+  if (tile.builtWonder && tile.builtWonderComplete) best = ROCK_BAND_WONDER_VENUE;
+  else if (tile.district && tile.districtComplete) {
+    const city = cityAtTile(state, tile);
+    if (city) {
+      for (const bid of Object.keys(ROCK_BAND_VENUES)) {
+        const value = ROCK_BAND_VENUES[bid];
+        if (!city.buildings.includes(bid)) continue;
+        if (BUILDINGS[bid]?.district !== tile.district) continue;
+        if (value > best) best = value;
+      }
+    }
   }
+  if (unit) best += promoValueFor(unit, 'BAND_VENUE', concertVenueBits(state, tileIndex));
   return best;
 }
 
@@ -1333,10 +1360,15 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   if (unit.type !== 'ROCK_BAND') return no('Only a Rock Band can perform.');
   const owner = tileSeat(state.map.tiles[unit.tileIndex]);
   if (!isCiv(owner) || owner === seat) return no('A Rock Band performs only in foreign lands.');
-  const venue = concertVenue(state, unit.tileIndex);
+  const venue = concertVenue(state, unit.tileIndex, unit);
   if (venue <= 0) return no('No venue on this tile.');
   const level = Math.min(ROCK_BAND_MAX_LEVEL, Math.max(1, unit.bandLevel ?? 1));
-  const odds = ROCK_BAND_TIER_ODDS[level - 1];
+  // CIV6 (Album Cover Art, Arena Rock, ...): "+N level when performing at
+  // <venue kind>" — the tier ROLL reads the raised level; the band's own
+  // level does not move.
+  const bits = concertVenueBits(state, unit.tileIndex);
+  const rollLevel = Math.min(ROCK_BAND_MAX_LEVEL, Math.max(1, level + promoValueFor(unit, 'BAND_LEVEL', bits)));
+  const odds = ROCK_BAND_TIER_ODDS[rollLevel - 1];
   const roll = Math.floor(nextRandom(state) * 1000);
   let acc = 0;
   let tier = odds.length - 1;
@@ -1348,6 +1380,7 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   const album = unit.bandAlbum ?? 0;
   const lump = Math.floor(venue * (100 + row.bomb + album) / 100);
   const band = seatOf(state, seat);
+  const here = state.map.tiles[unit.tileIndex];
   if (band && lump > 0) {
     band.tourismTo ??= [];
     band.tourismTo[owner] = (band.tourismTo[owner] ?? 0) + lump;
@@ -1361,9 +1394,54 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
         band.tourismTo[other.seat] = (band.tourismTo[other.seat] ?? 0) + Math.floor(lump * share);
       }
     }
+    // CIV6 (Goes to 11): "Civilizations within 10 tiles of the concert
+    // receive 50% of its Tourism" — a civ is within reach through any city
+    // centre of its own.
+    const near = promoValueFor(unit, 'CONCERT_SHARE_NEAR', 0);
+    if (near > 0) {
+      for (const other of state.seats) {
+        if (other.seat === seat || other.seat === owner || !isCiv(other.seat)) continue;
+        const reached = other.cities.some((c) => {
+          const cc = state.map.tiles[c.centerIndex];
+          return hexDistance(cc.col, cc.row, here.col, here.row) <= CONCERT_SHARE_RANGE;
+        });
+        if (reached) band.tourismTo[other.seat] = (band.tourismTo[other.seat] ?? 0) + Math.floor(lump * near / 100);
+      }
+    }
+    // CIV6 (Pop Star): "Gains Gold equal to 25% of the Tourism generated."
+    const goldPct = promoValueFor(unit, 'CONCERT_GOLD_PCT', 0);
+    if (goldPct > 0) band.treasury += Math.floor(lump * goldPct / 100);
+  }
+  const host = cityAtTile(state, here);
+  // CIV6 (Indie): "-40 Loyalty in the city where the concert is performed."
+  const drop = promoValueFor(unit, 'CONCERT_LOYALTY', 0);
+  if (host && drop > 0) host.loyalty = Math.max(0, (host.loyalty ?? LOYALTY_MAX) - drop);
+  // CIV6 (Religious Rock): "Converts the city to the Rock Band's Religion" —
+  // the band's civ's own, and only once it has one; its pressure rises to
+  // one past the strongest other, so the city follows it on either engine.
+  if (host && promoFlag(unit, 'CONCERT_CONVERT') && band?.religion.founded) {
+    const n = state.seats.length;
+    let pres = host.religionPressure;
+    if (!pres || pres.length !== n) {
+      pres = new Array(n).fill(0);
+      host.religionPressure = pres;
+    }
+    let top = 0;
+    for (let g = 0; g < n; g++) if (g !== seat && pres[g] > top) top = pres[g];
+    pres[seat] = Math.max(pres[seat], top + 1);
   }
   unit.bandAlbum = album + row.album;
-  if (row.promote) unit.bandLevel = Math.min(ROCK_BAND_MAX_LEVEL, level + 1);
+  if (row.promote) {
+    unit.bandLevel = Math.min(ROCK_BAND_MAX_LEVEL, level + 1);
+    // CIV6 (RockBandResults ExtraPromotion): the two best tiers also grant a
+    // promotion, up to ROCK_BAND_MAX_PROMOTIONS held or owed; a band still
+    // holding an unspent offer banks the grant as a re-arm instead.
+    const owed = promoCount(unit) + (promoReady(unit) ? 1 : 0) + (unit.promoBonus ?? 0);
+    if (owed < ROCK_BAND_MAX_PROMOTIONS) {
+      if (promoReady(unit)) unit.promoBonus = (unit.promoBonus ?? 0) + 1;
+      else drawPromoOffer(state, unit);
+    }
+  }
   unit.movesLeft = 0;
   if (row.dies) disbandUnit(state, unit.id);
   return ok;

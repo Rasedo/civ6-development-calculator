@@ -1252,9 +1252,9 @@ class SimSeats:
         return ok, slot
 
     def _seat_rock_band_candidate(self, row: int, active: torch.Tensor):
-        """Buy-kind 16: the ROCK BAND. CIV6: it "can only be purchased with
-        Faith" behind Professional Sports, and its "Faith cost is
-        progressive". Returns (ok [B], slot [B])."""
+        """Buy-kind 16: the ROCK BAND. CIV6 (Expansion2_Units.xml): it "can
+        only be purchased with Faith" behind the Cold War civic, and its
+        "Faith cost is progressive". Returns (ok [B], slot [B])."""
         B, dev = self.B, self.device
         ok = torch.zeros(B, dtype=torch.bool, device=dev)
         slot = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -1626,7 +1626,7 @@ class SimSeats:
                 self.civ_naturalists[:, row] = self.civ_naturalists[:, row] + landed_n.long()
         if row in self._driven_buy_band and getattr(self, "_band_idx", -1) >= 0:
             b_j = self._driven_buy_band.pop(row)
-            # CIV6 (Rock Band): FAITH only, behind Professional Sports, at a
+            # CIV6 (Rock Band): FAITH only, behind the Cold War civic, at a
             # PROGRESSIVE price — each band already bought raises the next.
             civ_b = int(self._type_civic[self._band_idx])
             jb = b_j.clamp(min=0, max=self.RC - 1)
@@ -1647,6 +1647,13 @@ class SimSeats:
                     if bool(_ok.any()):
                         self.unit_band_level[lb[_ok], _sb[_ok]] = 1
                         self.unit_band_album[lb[_ok], _sb[_ok]] = 0
+                        # CIV6 (Rock Band): InitialLevel 2, NumRandomChoices 3
+                        # — bought with one promotion to pick from three.
+                        _bo = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                        _bo[lb[_ok]] = True
+                        _bs = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                        _bs[lb[_ok]] = _sb[_ok]
+                        self._promo_offer_draw(_bo, _bs)
         if row in self._driven_buy_cls and self._suz_c_faith_bldg >= 0:
             cj, cb = self._driven_buy_cls.pop(row)
             jc = cj.clamp(min=0, max=self.RC - 1)
@@ -2743,15 +2750,46 @@ class SimSeats:
             out = out | (unpaved & unl & self._imp_ground_ok(k))
         return out | self._eng_finish_at(row)
 
+    def _promo_offer_draw(self, landed: torch.Tensor, slot: torch.Tensor) -> None:
+        """`drawPromoOffer` — CIV6 (Apostle, Spy, Rock Band): "three
+        promotions randomly chosen from the pool", `_promo_offer_n` DISTINCT
+        UNHELD columns of the unit's own class list drawn without replacement,
+        so the stream is exactly that many numbers however the picks land. The
+        offer IS a level to spend: the unit leaves armed with its next
+        level's XP. `landed` [B] names the games, `slot` [B] the unit."""
+        if not bool(landed.any()):
+            return
+        rd = self.rules_dev
+        ar = torch.arange(self.B, device=self.device)
+        sl = slot.clamp(min=0)
+        cls = rd.u_promo_class[self.unit_type[ar, sl].clamp(min=0, max=self.NU - 1)]
+        n = torch.where(cls >= 0, rd.promo_rows[cls.clamp(min=0)], torch.zeros_like(cls))
+        held = self.unit_promos[ar, sl]
+        avail = n - self._promo_count(held)
+        ncol = int(rd.promo_cols)
+        offer = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for jd in range(self._promo_offer_n):
+            draw = landed & (jd < avail)
+            if not bool(draw.any()):
+                break
+            pick = (self._next_random(draw) * (avail - jd)).floor().long()
+            done = torch.zeros_like(draw)
+            for k in range(ncol):
+                free_k = ((((offer | held) >> k) & 1) == 0) & (k < n)
+                take = draw & ~done & free_k & (pick == 0)
+                offer = torch.where(take, offer | (1 << k), offer)
+                done = done | take
+                pick = torch.where(draw & ~done & free_k, pick - 1, pick)
+        rows = landed.nonzero(as_tuple=True)[0]
+        self.unit_promo_offer[rows, sl[rows]] = offer[rows]
+        self.unit_xp[rows, sl[rows]] = self._xp_to_next(self.unit_level[rows, sl[rows]])
+
     def _offer_apostle_promos(self, row: int, landed: torch.Tensor) -> None:
         """`offerApostlePromotions` — CIV6 (Apostle): "Acquire 1 Religious
         Promotion at the time of purchase ... The player may choose between
         three promotions randomly chosen from the pool. If the player is the
         Suzerain of Yerevan, they are free to choose from the entire pool."
-
-        THREE draws without replacement, and the stream takes all three however
-        the picks land. The unit is banked one level's XP because it is the one
-        rung it will ever climb: "the Apostle cannot in fact earn XP in any way".
+        The draw is `_promo_offer_draw`'s, taken before Yerevan widens it.
         """
         if not bool(landed.any()):
             return
@@ -2760,23 +2798,14 @@ class SimSeats:
         n = int(rd.promo_rows[cls]) if cls >= 0 else 0
         if n <= 0:
             return
-        offer = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for jd in range(self._apostle_promo_offer):
-            pick = (self._next_random(landed) * (n - jd)).floor().long()
-            done = torch.zeros_like(landed)
-            for k in range(n):
-                free_k = ((offer >> k) & 1) == 0
-                take = landed & ~done & free_k & (pick == 0)
-                offer = torch.where(take, offer | (1 << k), offer)
-                done = done | take
-                pick = torch.where(landed & ~done & free_k, pick - 1, pick)
+        slot_all = getattr(self, self.POOL_NEXT["major"]) - 1
+        self._promo_offer_draw(landed, slot_all)
         rows = landed.nonzero(as_tuple=True)[0]
-        slot = getattr(self, self.POOL_NEXT["major"])[rows] - 1
+        slot = slot_all[rows]
         free = self._suz_effect(row, self._suz_c_apostle)[rows] if self._suz_c_apostle >= 0 \
             else torch.zeros_like(rows, dtype=torch.bool)
         self.major_unit_promo_offer[rows, slot] = torch.where(
-            free, torch.full_like(offer[rows], (1 << n) - 1), offer[rows])
-        self.major_unit_xp[rows, slot] = self._promo_xp_per_level
+            free, torch.full_like(slot, (1 << n) - 1), self.major_unit_promo_offer[rows, slot])
         # CIV6 (Mont St. Michel): "all Apostles automatically receive the Martyr
         # promotion in addition to another one they choose normally."
         if self._wond_n and bool(self._wond_martyr.any()) and "MARTYR" in self._pk:
@@ -7193,10 +7222,19 @@ class SimSeats:
         if not bool(mask.any()) or getattr(self, "_band_idx", -1) < 0:
             return
         tc = tile.clamp(min=0)
-        venue = self._concert_venue(tc.unsqueeze(1)).squeeze(1)
+        s1 = slot.unsqueeze(1)
+        utype = self.unit_type.gather(1, s1).clamp(min=0, max=self.NU - 1)
+        promos = self.unit_promos.gather(1, s1)
+        venue = self._concert_venue(tc.unsqueeze(1), utype, promos).squeeze(1)
+        bits = self._venue_bits(tc.unsqueeze(1))
         roll = (self._next_random(mask) * 1000).long()
-        lvl = self.unit_band_level.gather(1, slot.unsqueeze(1)).squeeze(1).clamp(min=1, max=self._band_max_level)
-        odds = self._band_odds[lvl - 1]                      # [B, 6]
+        lvl = self.unit_band_level.gather(1, s1).squeeze(1).clamp(min=1, max=self._band_max_level)
+        # CIV6 (Album Cover Art, Arena Rock, ...): "+N level when performing
+        # at <venue kind>" — the tier ROLL reads the raised level; the band's
+        # own level does not move.
+        lvl_roll = (lvl + self._promo_val_for(utype, promos, "BAND_LEVEL", bits).squeeze(1)) \
+            .clamp(min=1, max=self._band_max_level)
+        odds = self._band_odds[lvl_roll - 1]                 # [B, 6]
         cum = odds.cumsum(dim=1)
         tier = (roll.unsqueeze(1) >= cum).long().sum(dim=1).clamp(max=self._band_tiers.shape[0] - 1)
         rowt = self._band_tiers[tier]                        # [B, 4] album, bomb, promote, dies
@@ -7208,24 +7246,70 @@ class SimSeats:
         # +100% of the Tourism from your Concerts."
         share = self._gov_mods(row)[12]["concert"].double() if self._gov_has_effects \
             else torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        zero = torch.zeros_like(promos)
+        near = self._promo_val_for(utype, promos, "CONCERT_SHARE_NEAR", zero).squeeze(1)
+        gold_pct = self._promo_val_for(utype, promos, "CONCERT_GOLD_PCT", zero).squeeze(1)
+        drop = self._promo_val_for(utype, promos, "CONCERT_LOYALTY", zero).squeeze(1)
+        convert = self._promo_flag(utype, promos, "CONCERT_CONVERT").squeeze(1) & self.civ_religion_done[:, row]
+        nrow = self.n_majors
         for r in rows.tolist():
             o = int(owner[r])
-            if 0 <= o < self.n_majors and o != row:
-                self.civ_tourism_to[r, row, o] += int(lump[r])
-            sh = float(share[r])
-            if sh > 0:
-                for other in range(self.n_majors):
-                    if other == row or other == o:
-                        continue
-                    if bool(self.war[r, row, other]):
-                        continue
-                    self.civ_tourism_to[r, row, other] += int(lump[r] * sh)
+            lp = int(lump[r])
+            if lp > 0 and 0 <= o < nrow and o != row:
+                self.civ_tourism_to[r, row, o] += lp
+                sh = float(share[r])
+                if sh > 0:
+                    for other in range(nrow):
+                        if other == row or other == o:
+                            continue
+                        if bool(self.war[r, row, other]):
+                            continue
+                        self.civ_tourism_to[r, row, other] += int(lp * sh)
+                # CIV6 (Goes to 11): "Civilizations within 10 tiles of the
+                # concert receive 50% of its Tourism" — reached through any
+                # city centre of their own.
+                if int(near[r]) > 0:
+                    reach = ((self.pair_dist[self.city_center[r, :nrow].clamp(min=0).reshape(-1), tc[r]]
+                              .reshape(nrow, self.RC) <= self._concert_share_range)
+                             & self.city_alive[r, :nrow]).any(dim=1)
+                    for other in range(nrow):
+                        if other == row or other == o or not bool(reach[other]):
+                            continue
+                        self.civ_tourism_to[r, row, other] += lp * int(near[r]) // 100
+                # CIV6 (Pop Star): "Gains Gold equal to 25% of the Tourism generated."
+                if int(gold_pct[r]) > 0:
+                    self.civ_treasury[r, row] += lp * int(gold_pct[r]) // 100
+            host = int(self.city_slot_at(o)[r, tc[r]]) if 0 <= o < nrow else -1
+            if host >= 0:
+                # CIV6 (Indie): "-40 Loyalty in the city where the concert is performed."
+                if int(drop[r]) > 0:
+                    self.city_loyalty[r, o, host] = max(0.0, float(self.city_loyalty[r, o, host]) - int(drop[r]))
+                # CIV6 (Religious Rock): "Converts the city to the Rock Band's
+                # Religion" — its pressure rises to one past the strongest other.
+                if bool(convert[r]):
+                    pres = self.city_pressure[r, o, host]
+                    others = pres.clone()
+                    others[row] = 0
+                    top = int(others.max()) if others.numel() else 0
+                    pres[row] = max(int(pres[row]), top + 1)
         sc = slot[rows]
         self.unit_band_album[rows, sc] = album[rows] + rowt[rows, 0]
         promo = rowt[rows, 2] > 0
         self.unit_band_level[rows, sc] = torch.where(
             promo, (lvl[rows] + 1).clamp(max=self._band_max_level), lvl[rows])
         self.unit_mp[rows, sc] = 0
+        # CIV6 (RockBandResults ExtraPromotion): the two best tiers also grant
+        # a promotion, up to `_band_max_promos` held or owed; a band still
+        # holding an unspent offer banks the grant as a re-arm instead.
+        need = self._xp_to_next(self.unit_level[rows, sc])
+        ready = (need > 0) & (self.unit_xp[rows, sc] >= need)
+        owed = self._promo_count(self.unit_promos[rows, sc]) + ready.long() + self.unit_promo_bonus[rows, sc]
+        grant = promo & (owed < self._band_max_promos)
+        bank = grant & ready
+        self.unit_promo_bonus[rows, sc] = self.unit_promo_bonus[rows, sc] + bank.long()
+        draw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        draw[rows[grant & ~ready]] = True
+        self._promo_offer_draw(draw, slot)
         dies = rowt[rows, 3] > 0
         if bool(dies.any()):
             dr = rows[dies]

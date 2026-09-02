@@ -201,6 +201,7 @@ class Rules:
     promo_classes: list
     promo_kinds: list
     promo_cols: int
+    promo_offer_draw: int  # `PROMO_OFFER_DRAW` — columns a promotion offer holds
     promo_req: torch.Tensor  # long [NPC, PCOL]
     promo_kind: torch.Tensor  # long [NPC, PCOL, PSLOT]
     promo_v: torch.Tensor  # long [NPC, PCOL, PSLOT]
@@ -393,6 +394,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),
         promo_cols=int(_P.get("cols", 0)),
+        promo_offer_draw=int(_P["offerDraw"]),
         promo_req=torch.tensor(_P.get("req", [[]]), dtype=torch.long),
         promo_kind=torch.tensor(_P.get("kind", [[[]]]), dtype=torch.long),
         promo_v=torch.tensor(_P.get("v", [[[]]]), dtype=torch.long),

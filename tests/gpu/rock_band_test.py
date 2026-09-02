@@ -1,6 +1,7 @@
 """Tourism with an address, and the Rock Band, on the GPU: the summed
 international percent, the per-rival bank, the culture read, the venue, the
-concert's tier walk and the progressive faith price.
+concert's tier walk, the band's twelve promotions and the progressive faith
+price.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/rock_band_test.py
@@ -72,8 +73,9 @@ def stage_venue(sim, row: int):
     return tile, int(val)
 
 
-def place_band(sim, row: int, tile: int) -> int:
-    """Stand a fresh level-1 Rock Band of `row` on `tile`, and return its slot."""
+def place_band(sim, row: int, tile: int, promos: int = 0) -> int:
+    """Stand a fresh level-1 Rock Band of `row` on `tile`, holding `promos`,
+    and return its slot."""
     slot = int(sim.unit_next[0])
     sim.major_unit_alive[0, slot] = True
     sim.major_unit_seat[0, slot] = row
@@ -83,9 +85,36 @@ def place_band(sim, row: int, tile: int) -> int:
     sim.major_unit_mp[0, slot] = 4
     sim.unit_band_level[0, slot] = 1
     sim.unit_band_album[0, slot] = 0
+    sim.unit_level[0, slot] = 1
+    sim.unit_xp[0, slot] = 0
+    sim.unit_promos[0, slot] = promos
+    sim.unit_promo_offer[0, slot] = 0
+    sim.unit_promo_bonus[0, slot] = 0
     sim.civilian_at[0, tile] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
     return slot
+
+
+def band_col(sim, kind: str, bit: int = 0) -> int:
+    """The band-class column carrying `kind` (masked onto `bit` when given)."""
+    rd = sim.rules_dev
+    cls = int(rd.u_promo_class[sim._band_idx])
+    k = sim._pk[kind]
+    for c in range(int(rd.promo_rows[cls])):
+        for s in range(rd.promo_kind.shape[2]):
+            if int(rd.promo_kind[cls, c, s]) == k and (bit == 0 or int(rd.promo_mask[cls, c, s]) & bit):
+                return c
+    raise AssertionError(f"no band column carries {kind}")
+
+
+def free_tile(sim, row: int) -> int:
+    """A bare land tile of `row`'s, no district, wonder or unit on it."""
+    for t in range(sim.T):
+        if (int(sim.tile_seat[0, t]) == row and bool(sim.passable[0, t]) and not bool(sim.water[0, t])
+                and int(sim.district[0, t]) < 0 and int(sim.built_wonder[0, t]) < 0
+                and int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0):
+            return t
+    raise AssertionError(f"row {row} owns no bare tile")
 
 
 def test_intl_pct(rules) -> None:
@@ -217,7 +246,26 @@ def test_venue(rules) -> None:
     assert int(sim._concert_venue(tc)[0, 0]) == sim._band_wonder_venue, "a wonder does not outrank"
     sim.built_wonder_complete[0, tile] = False
     assert int(sim._concert_venue(tc)[0, 0]) == val, "an unfinished wonder still paid"
-    print(f"  venue OK: district {val}, wonder {sim._band_wonder_venue}")
+
+    # CIV6 (Music Festival): a National Park is a 1000 venue for a band that
+    # holds it, and nothing for one that does not; (Surf Band): +500 ADDS to a
+    # Harbor tile's own value.
+    vb = sim._band_venue_bits
+    band = torch.tensor([[sim._band_idx]], device=sim.device)
+    park = free_tile(sim, 1)
+    sim.park[0, park] = park
+    pt = torch.tensor([[park]], device=sim.device)
+    fest = torch.tensor([[1 << band_col(sim, "BAND_VENUE", vb["NATIONAL_PARK"])]], device=sim.device)
+    assert int(sim._concert_venue(pt, band, torch.zeros_like(fest))[0, 0]) == 0, "a park paid a band without the promotion"
+    assert int(sim._concert_venue(pt, band, fest)[0, 0]) == 1000, "Music Festival's park is not a 1000 venue"
+    assert int(sim._concert_venue(tc, band, fest)[0, 0]) == val, "Music Festival paid at a district"
+    surf = torch.tensor([[1 << band_col(sim, "BAND_VENUE", vb["HARBOR"])]], device=sim.device)
+    hb = [d for b, d in sim._band_venue_districts if b == vb["HARBOR"]][0]
+    sim.district[0, tile] = hb
+    assert int(sim._concert_venue(tc, band, surf)[0, 0]) == 500 + int(sim._concert_venue(tc)[0, 0]), \
+        "Surf Band's 500 does not ADD to the Harbor's own venue"
+    sim.park[0, park] = -1
+    print(f"  venue OK: district {val}, wonder {sim._band_wonder_venue}, a park at 1000 for Music Festival")
 
 
 def test_perform_mask(rules) -> None:
@@ -227,14 +275,23 @@ def test_perform_mask(rules) -> None:
     tc = torch.tensor([[tile]], device=sim.device)
     band = torch.tensor([[sim._band_idx]], device=sim.device)
     other = torch.tensor([[(sim._band_idx + 1) % sim.NU]], device=sim.device)
-    assert bool(sim._perform_ok(0, tc, band)[0, 0]), "a band on a foreign venue is refused"
-    assert not bool(sim._perform_ok(0, tc, other)[0, 0]), "another chassis was offered the verb"
-    assert not bool(sim._perform_ok(1, tc, band)[0, 0]), "a band was offered its OWN borders"
+    none = torch.zeros_like(band)
+    assert bool(sim._perform_ok(0, tc, band, none)[0, 0]), "a band on a foreign venue is refused"
+    assert not bool(sim._perform_ok(0, tc, other, none)[0, 0]), "another chassis was offered the verb"
+    assert not bool(sim._perform_ok(1, tc, band, none)[0, 0]), "a band was offered its OWN borders"
     home, _ = stage_venue(sim, 0)
-    assert not bool(sim._perform_ok(0, torch.tensor([[home]], device=sim.device), band)[0, 0]), (
+    assert not bool(sim._perform_ok(0, torch.tensor([[home]], device=sim.device), band, none)[0, 0]), (
         "a band performed at home")
+    # a venue only the band's promotion opens
+    park = free_tile(sim, 1)
+    sim.park[0, park] = park
+    pt = torch.tensor([[park]], device=sim.device)
+    fest = torch.tensor([[1 << band_col(sim, "BAND_VENUE", sim._band_venue_bits["NATIONAL_PARK"])]], device=sim.device)
+    assert not bool(sim._perform_ok(0, pt, band, none)[0, 0]), "a bare park offered PERFORM"
+    assert bool(sim._perform_ok(0, pt, band, fest)[0, 0]), "Music Festival's park refused PERFORM"
+    sim.park[0, park] = -1
     assert sim._A_PERFORM >= 0, "the PERFORM column is not in the action interface"
-    print("  perform mask OK: foreign venue only, band only")
+    print("  perform mask OK: foreign venue only, band only, a park for Music Festival")
 
 
 def test_concert(rules) -> None:
@@ -271,13 +328,136 @@ def test_concert(rules) -> None:
     sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
     assert int(sim.unit_band_level[0, slot]) == sim._band_max_level, "a band promoted past the ceiling"
 
-    # exactly ONE draw
+    # exactly ONE draw where no promotion is granted
     slot = place_band(sim, 0, tile)
     sim.rng_state[0] = seed_for_tier(sim, 1, 2)
     before = int(sim.rng_state[0])
     sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
     assert int(sim.rng_state[0]) == (before + 0x6D2B79F5) & M32, "the concert is not a one-draw verb"
     print(f"  concert OK: {len(tiers)} tiers walked at venue {val}, one draw each")
+
+
+def test_band_promotions(rules) -> None:
+    """The band's tree: the top tiers grant a promotion (three columns drawn,
+    the level's XP banked; a pending offer banks a re-arm instead; four is the
+    ceiling), and the held ones bend the concert — Album Cover Art rolls a level
+    higher at a wonder, Goes to 11 shares with the majors in reach, Pop Star
+    pays gold, Indie drops the host's loyalty, Religious Rock converts it."""
+    sim = build(rules)
+    tile, val = stage_venue(sim, 1)
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    tv = torch.tensor([tile], device=sim.device)
+    vb = sim._band_venue_bits
+    n = sim._promo_offer_n
+    xp1 = int(sim._xp_to_next(torch.tensor([1]))[0])
+
+    def concert(slot, level=1, tier=0):
+        sim.rng_state[0] = seed_for_tier(sim, level, tier)
+        before = int(sim.rng_state[0])
+        sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
+        after = int(sim.rng_state[0])
+        return next(k for k in range(8) if (before + k * 0x6D2B79F5) & M32 == after)
+
+    # the grant: three distinct columns, the level's XP, four draws in all
+    slot = place_band(sim, 0, tile)
+    assert concert(slot) == 1 + n, "the granting tier did not draw the offer after the tier roll"
+    off = int(sim.unit_promo_offer[0, slot])
+    assert bin(off).count("1") == n and off < (1 << 12), f"offer {off:b}"
+    assert int(sim.unit_xp[0, slot]) == xp1, "the band left without its level's XP"
+    assert int(sim.unit_promo_bonus[0, slot]) == 0
+    # a second grant on top of the unspent offer banks a re-arm, no draw
+    assert concert(slot, level=2) == 1, "a pending offer drew again"
+    assert int(sim.unit_promo_bonus[0, slot]) == 1, "the pending band did not bank the grant"
+    # the ceiling: four held, nothing more
+    slot = place_band(sim, 0, tile, promos=0b1111)
+    assert concert(slot) == 1 and int(sim.unit_promo_offer[0, slot]) == 0, "a full band was granted a fifth"
+    slot = place_band(sim, 0, tile, promos=0b111)
+    sim.unit_level[0, slot] = 4
+    assert concert(slot) == 1 + n, "three held and none owed did not draw the fourth"
+    assert int(sim.unit_promo_offer[0, slot]) & 0b111 == 0, "the offer named a held column"
+    assert bin(int(sim.unit_promo_offer[0, slot])).count("1") == n
+    sim.unit_alive[0, slot] = False
+
+    # Album Cover Art: a level-1 band at a WONDER rolls off the level-2 row —
+    # a roll past level 1's two promoting tiers but inside level 2's
+    o1, o2 = sim._band_odds[0].tolist(), sim._band_odds[1].tolist()
+    seed = next(s for s in range(1, 2_000_000) if o1[0] + o1[1] <= roll_of(s) < o2[0] + o2[1])
+    sim.built_wonder[0, tile] = 0
+    sim.built_wonder_complete[0, tile] = True
+    for promos, want in ((0, 1), (1 << band_col(sim, "BAND_LEVEL", vb["WONDER"]), 2)):
+        slot = place_band(sim, 0, tile, promos=promos)
+        sim.rng_state[0] = seed
+        sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
+        assert int(sim.unit_band_level[0, slot]) == want, f"promos {promos:b}: the roll read level {want}"
+        sim.unit_alive[0, slot] = False
+        sim.civilian_at[0, tile] = -1
+    sim.built_wonder[0, tile] = -1
+    sim.built_wonder_complete[0, tile] = False
+    # ... and the band's OWN level stays put in the roll: Arena Rock elsewhere pays nothing here
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "BAND_LEVEL", vb["ENTERTAINMENT_COMPLEX"]))
+    sim.district[0, tile] = [d for b, d in sim._band_venue_districts if b == vb["THEATER_SQUARE"]][0]
+    sim.rng_state[0] = seed
+    sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
+    assert int(sim.unit_band_level[0, slot]) == 1, "Arena Rock raised the roll at a Theater Square"
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+    tile, val = stage_venue(sim, 1)
+
+    # the concert's effects, one held promotion each, at tier 2 (no grant, no death)
+    assert int(sim._band_tiers[2, 2]) == 0 and int(sim._band_tiers[2, 3]) == 0
+    lump = val * (100 + int(sim._band_tiers[2, 1])) // 100   # a fresh band's album is 0
+    nrow = sim.n_majors
+    assert nrow >= 3, "the reach test needs a third major"
+    reach = ((sim.pair_dist[sim.city_center[0, :nrow].clamp(min=0).reshape(-1), tile]
+              .reshape(nrow, sim.RC) <= sim._concert_share_range) & sim.city_alive[0, :nrow]).any(dim=1)
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "CONCERT_SHARE_NEAR"))
+    sim.civ_tourism_to.zero_()
+    concert(slot, tier=2)
+    assert int(sim.civ_tourism_to[0, 0, 1]) == lump
+    for other in range(2, nrow):
+        want = lump * 50 // 100 if bool(reach[other]) else 0
+        assert int(sim.civ_tourism_to[0, 0, other]) == want, f"Goes to 11 paid seat {other} {int(sim.civ_tourism_to[0, 0, other])}, not {want}"
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+    saved = sim.city_alive[0, 2].clone()
+    sim.city_alive[0, 2] = False
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "CONCERT_SHARE_NEAR"))
+    sim.civ_tourism_to.zero_()
+    concert(slot, tier=2)
+    assert int(sim.civ_tourism_to[0, 0, 2]) == 0, "a major with no city in reach was paid"
+    sim.city_alive[0, 2] = saved
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "CONCERT_GOLD_PCT"))
+    sim.civ_treasury[0, 0] = 100.0
+    concert(slot, tier=2)
+    assert float(sim.civ_treasury[0, 0]) == 100.0 + lump * 25 // 100, "Pop Star's gold"
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+
+    host = int(sim.city_slot_at(1)[0, tile])
+    assert host >= 0
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "CONCERT_LOYALTY"))
+    sim.city_loyalty[0, 1, host] = 100.0
+    concert(slot, tier=2)
+    assert float(sim.city_loyalty[0, 1, host]) == 60.0, "Indie's -40"
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+
+    slot = place_band(sim, 0, tile, promos=1 << band_col(sim, "CONCERT_CONVERT"))
+    sim.city_pressure[0, 1, host] = 0
+    sim.city_pressure[0, 1, host, 1] = 50
+    sim.civ_religion_done[0, 0] = False
+    concert(slot, tier=2)
+    assert int(sim.city_pressure[0, 1, host, 0]) == 0, "a band with no religion converted"
+    sim.civ_religion_done[0, 0] = True
+    concert(slot, tier=2)
+    assert int(sim.city_pressure[0, 1, host, 0]) == 51, "Religious Rock did not put the band's religion on top"
+    assert int(sim._followed_religion(sim.city_pressure[0, 1, host])) == 0
+    sim.unit_alive[0, slot] = False
+    sim.civilian_at[0, tile] = -1
+    print(f"  band promotions OK: {n} drawn per grant, four the ceiling, five effects pinned")
 
 
 def test_progressive_price(rules) -> None:
@@ -319,6 +499,7 @@ def main() -> None:
     test_venue(rules)
     test_perform_mask(rules)
     test_concert(rules)
+    test_band_promotions(rules)
     test_progressive_price(rules)
     print("ROCK BAND OK")
 

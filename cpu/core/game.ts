@@ -14,7 +14,7 @@ import { computeUnlocks, getModifiers, availableTechs, availableCivics, governme
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain } from './units';
-import { promoClassOf, promoFlag, unitPromoRows, XP_PER_LEVEL } from './promotions';
+import { drawPromoOffer, promoClassOf, promoFlag, unitPromoRows } from './promotions';
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -43,7 +43,7 @@ import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel } from './seats';
@@ -911,26 +911,15 @@ export function launchInquisition(state: GameState, unit: Unit, actor: Seat): Ru
  * automatically receive the Martyr promotion in addition to another one they
  * choose normally."
  *
- * The draw takes three DISTINCT columns without replacement, so the stream is
- * exactly three numbers however the offer lands.
+ * The draw is `drawPromoOffer`'s, taken before Yerevan widens it so the
+ * stream reads the same either way.
  */
 function offerApostlePromotions(state: GameState, unit: Unit, seat: number): void {
+  drawPromoOffer(state, unit);
   const rows = unitPromoRows(unit);
-  const all = (1 << rows.length) - 1;
-  const free = suzerainEffect(state, seat, 'apostlePromoChoice');
-  let offer = 0;
-  for (let j = 0; j < APOSTLE_PROMO_OFFER; j++) {
-    let pick = Math.floor(nextRandom(state) * (rows.length - j));
-    for (let k = 0; k < rows.length; k++) {
-      if (offer & (1 << k)) continue;
-      if (pick === 0) { offer |= 1 << k; break; }
-      pick -= 1;
-    }
+  if (suzerainEffect(state, seat, 'apostlePromoChoice')) {
+    unit.promoOffer = (1 << rows.length) - 1;
   }
-  unit.promoOffer = free ? all : offer;
-  // An Apostle never levels, so the one promotion it may take is its level-2
-  // rung and nothing more.
-  unit.xp = XP_PER_LEVEL;
   if (seatWonderFlag(state, seat, 'apostleMartyr')) {
     const k = rows.findIndex((p) => p.id === 'MARTYR');
     if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
@@ -1097,7 +1086,7 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   const def = UNITS.ROCK_BAND;
   if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) {
-    return { ok: false, reason: 'Needs the Professional Sports civic.' };
+    return { ok: false, reason: 'Needs the Cold War civic.' };
   }
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
@@ -1107,6 +1096,9 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   u.bandLevel = 1;
   u.bandAlbum = 0;
+  // CIV6 (Rock Band): InitialLevel 2, NumRandomChoices 3 — it is bought with
+  // one promotion to pick from three.
+  drawPromoOffer(state, u);
   buyer.faith = (buyer.faith ?? 0) - cost;
   buyer.rockBandsBought = (buyer.rockBandsBought ?? 0) + 1;
   return { ok: true };
