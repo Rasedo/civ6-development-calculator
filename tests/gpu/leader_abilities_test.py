@@ -31,6 +31,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
+
+def play(sim, row: int, name):
+    """Seat `row` (game 0) as civilization `name`'s first roster row, or as
+    nobody — both the civilization and the leader planes."""
+    if name is None:
+        sim.row_civ[0, row] = -1
+        sim.row_leader[0, row] = -1
+    else:
+        ci = sim._civ_ids.index(name)
+        sim.row_civ[0, row] = ci
+        sim.row_leader[0, row] = sim._pair_civ.index(ci)
+    # every memo keyed on the seat's state is stale now
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
                     / "seeder" / "worlds" / "rules.json").read_text())
@@ -41,8 +57,12 @@ ONE = torch.tensor([0], dtype=torch.long)
 
 
 def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+    """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
+    capitals settle, so the founding clauses land as the old fixtures had them."""
+    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+        play(sim, r, name)
+    return settle_all(sim)
 
 
 def civ(sim, name: str) -> int:
@@ -50,11 +70,10 @@ def civ(sim, name: str) -> int:
 
 
 def row_of(sim, name: str) -> int:
-    for r in range(sim.n_majors):
-        c = int(sim.row_civ[r])
-        if 0 <= c < len(sim._civ_ids) and sim._civ_ids[c] == name:
-            return r
-    raise AssertionError(f"no seat plays {name} in this fixture")
+    """SEAT `name` at its scene row — the fixture's trio is the seeder's draw."""
+    r = {"ROME": 0, "EGYPT": 1, "NORWAY": 2}[name]
+    play(sim, r, name)
+    return r
 
 
 def place(sim, tile: int, utype: int, seat: int, *, hp=100) -> int:
@@ -127,7 +146,7 @@ def test_leaders(rules, path) -> None:
     rome, egypt, norway = row_of(sim, "ROME"), row_of(sim, "EGYPT"), row_of(sim, "NORWAY")
     assert sim._row_leads(rome, "TRAJAN") and sim._row_leads(egypt, "CLEOPATRA") and sim._row_leads(norway, "HARDRADA")
     assert not sim._row_leads(rome, "CLEOPATRA") and not sim._row_leads(sim.BARB_ROW, "TRAJAN")
-    assert sim._leads_vec("HARDRADA").tolist() == [r == norway for r in range(sim.n_majors)]
+    assert sim._leads_vec("HARDRADA")[0].tolist() == [r == norway for r in range(sim.n_majors)]
     print("  1 leaders OK")
 
 
@@ -170,10 +189,10 @@ def test_cleopatra_routes(rules, path) -> None:
     # Egypt's route out: +4 Gold
     _route(sim, egypt, rome)
     g_egypt = float(sim._seat_route_income(egypt)[B0, 0, 2])
-    sim.row_civ[egypt] = civ(sim, "NORWAY")
+    play(sim, egypt, "NORWAY")
     sim._eff_version += 1
     g_other = float(sim._seat_route_income(egypt)[B0, 0, 2])
-    sim.row_civ[egypt] = civ(sim, "EGYPT")
+    play(sim, egypt, "EGYPT")
     sim._eff_version += 1
     assert abs((g_egypt - g_other) - sim._cleo_intl_gold) < 1e-9, (g_egypt, g_other)
     # Rome's route in: +2 Food for Rome, +2 Gold for Egypt's destination city
@@ -183,7 +202,7 @@ def test_cleopatra_routes(rules, path) -> None:
     assert abs(float(inc_r[B0, 0, 0]) - sim2._cleo_in_food) < 1e-9, float(inc_r[B0, 0, 0])
     inc_e = sim2._seat_route_income(egypt)
     assert inc_e is not None and abs(float(inc_e[B0, 0, 2]) - sim2._cleo_in_gold) < 1e-9, inc_e
-    sim2.row_civ[egypt] = civ(sim2, "NORWAY")
+    play(sim2, egypt, "NORWAY")
     sim2._eff_version += 1
     inc_r2 = sim2._seat_route_income(rome)
     assert float(inc_r2[B0, 0, 0]) == 0.0, "the sender's Food outlived Cleopatra"
@@ -212,7 +231,7 @@ def test_alliance_points(rules, path) -> None:
     assert tick(sim, rome, egypt) == sim._al_qp_turn + sim._al_qp_route * sim._cleo_trade_qp_mult
     # Gilgamesh: a common foe pays +2 points (8 quarter-points)
     sim = fresh(rules, path)
-    sim.row_civ[rome] = civ(sim, "SUMERIA")
+    play(sim, rome, "SUMERIA")
     ally(sim, rome, norway)
     war(sim, rome, egypt)
     war(sim, norway, egypt)
@@ -231,7 +250,7 @@ def test_hardrada_production(rules, path) -> None:
     def run(as_civ: str) -> float:
         sim = fresh(rules, path)
         norway = row_of(sim, "NORWAY")
-        sim.row_civ[norway] = civ(sim, as_civ)
+        play(sim, norway, as_civ)
         sim.city_current[B0, norway, 0, 0] = sim.UNIT_BASE + galley
         sim.city_qtile[B0, norway, 0, 0] = -1
         sim.city_progress[B0, norway, 0, 0] = 0
@@ -289,7 +308,7 @@ def test_hardrada_raid(rules, path) -> None:
 def test_enkidu_cs(rules, path) -> None:
     sim = fresh(rules, path)
     rome, egypt, norway = row_of(sim, "ROME"), row_of(sim, "EGYPT"), row_of(sim, "NORWAY")
-    sim.row_civ[rome] = civ(sim, "SUMERIA")
+    play(sim, rome, "SUMERIA")
     ally(sim, rome, egypt)
     war(sim, rome, norway)
     war(sim, egypt, norway)
@@ -297,7 +316,7 @@ def test_enkidu_cs(rules, path) -> None:
     assert float(cs[B0]) == float(sim._enkidu_cs), float(cs[B0])
     cs_ally = sim._ally_war_cs(torch.tensor([egypt]), torch.tensor([norway]))
     assert float(cs_ally[B0]) == float(sim._enkidu_cs), "the ally does not share it"
-    sim.row_civ[rome] = civ(sim, "ROME")
+    play(sim, rome, "ROME")
     assert float(sim._ally_war_cs(torch.tensor([rome]), torch.tensor([norway]))[B0]) == 0.0
     print("  7 Enkidu CS OK — +5 beside an ally's war, on both members")
 
@@ -305,7 +324,7 @@ def test_enkidu_cs(rules, path) -> None:
 def test_enkidu_xp_share(rules, path) -> None:
     sim = fresh(rules, path)
     rome, egypt, norway = row_of(sim, "ROME"), row_of(sim, "EGYPT"), row_of(sim, "NORWAY")
-    sim.row_civ[rome] = civ(sim, "SUMERIA")
+    play(sim, rome, "SUMERIA")
     ally(sim, rome, egypt)
     war(sim, rome, norway)
     war(sim, egypt, norway)
@@ -324,7 +343,7 @@ def test_enkidu_xp_share(rules, path) -> None:
     assert int(sim.major_unit_xp[B0, near]) == 6, int(sim.major_unit_xp[B0, near])
     assert int(sim.major_unit_xp[B0, far]) == 0, "a unit past 5 tiles banked the share"
     assert int(sim.major_unit_xp[B0, own]) == 0 and int(sim.major_unit_xp[B0, earner]) == 0, "the share reached the earner's own seat"
-    sim.row_civ[rome] = civ(sim, "ROME")
+    play(sim, rome, "ROME")
     sim._share_joint_xp(torch.tensor([True]), torch.tensor([t0]), torch.tensor([rome]), torch.tensor([norway]), gain)
     assert int(sim.major_unit_xp[B0, near]) == 6, "the share fired without Gilgamesh"
     print("  8 Enkidu XP share OK — within 5 tiles, the ally's units alone")
@@ -333,7 +352,7 @@ def test_enkidu_xp_share(rules, path) -> None:
 def test_enkidu_plunder_share(rules, path) -> None:
     sim = fresh(rules, path)
     rome, egypt, norway = row_of(sim, "ROME"), row_of(sim, "EGYPT"), row_of(sim, "NORWAY")
-    sim.row_civ[rome] = civ(sim, "SUMERIA")
+    play(sim, rome, "SUMERIA")
     ally(sim, rome, egypt)
     war(sim, rome, norway)
     war(sim, egypt, norway)

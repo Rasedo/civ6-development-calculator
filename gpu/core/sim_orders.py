@@ -977,8 +977,9 @@ class SimOrders:
                     # CIV6 (Thunderbolt of the North): Science from a Mine,
                     # Culture from a Quarry, Pasture, Plantation or Camp — on
                     # top of the row, scaled the same.
-                    if self._row_leads(row, "HARDRADA") and bool(_pi.any()):
-                        _hk = torch.where(_pi, self._hard_plun_kind[_iv], torch.zeros_like(_kind))
+                    _hard = self._row_leads(row, "HARDRADA")[_r]
+                    if bool((_pi & _hard).any()):
+                        _hk = torch.where(_pi & _hard, self._hard_plun_kind[_iv], torch.zeros_like(_kind))
                         _hm = _hk > 0
                         if bool(_hm.any()):
                             _hr = _r[_hm]

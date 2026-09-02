@@ -1360,6 +1360,8 @@ export function buildRules() {
         romeOwnPostGold: ROME_OWN_POST_GOLD,
       },
       leaders: CIV_LEADERS.map((l) => l.leader),
+      // the roster ROW's civilization — `Seat.civ` indexes the row
+      pairCiv: CIV_LEADERS.map((l) => CIV_IDS.indexOf(l.civ)),
       leaderAbilities: {
         cleopatraIntlGold: CLEOPATRA_INTL_ROUTE_GOLD,
         cleopatraIncomingFood: CLEOPATRA_INCOMING_ROUTE_FOOD,

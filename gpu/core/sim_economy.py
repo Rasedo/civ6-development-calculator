@@ -1369,7 +1369,7 @@ class SimEconomy:
         _ctr_clean = ~self._fallout().gather(1, self.city_center[:, row].clamp(min=0))
         _ctr_clean = _ctr_clean & (self.city_center[:, row] >= 0)
         ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
-        ok = ok & self._civ_unit_ok(row).reshape(1, -1)
+        ok = ok & self._civ_unit_ok(row)
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True) & _ctr_clean.unsqueeze(2)
         if bool(self.unit_naval.any()):
             out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
@@ -2006,8 +2006,8 @@ class SimEconomy:
         # CIV6 (Adventures of Enkidu): "+5 Combat Strength against units of
         # civilizations their allies are at war with" — any alliance where one
         # side plays Gilgamesh, on top (`allianceWarCS`).
-        lead = self._leads_vec("GILGAMESH")
-        e_pair = (self.seat_ally_turns[:, :NM, :NM] > 0) & (lead.view(1, NM, 1) | lead.view(1, 1, NM))
+        lead = self._leads_vec("GILGAMESH")  # [B, NM]
+        e_pair = (self.seat_ally_turns[:, :NM, :NM] > 0) & (lead.unsqueeze(2) | lead.unsqueeze(1))
         ep = e_pair.gather(1, o_f.unsqueeze(2).expand(self.B, o_f.shape[1], NM))     # [B, N, NM]
         hit_e = base & (ep & wx.transpose(1, 2)).any(dim=2)
         return out + torch.where(hit_e.reshape(sh), torch.full_like(z, float(self._enkidu_cs)), z)
@@ -2105,11 +2105,12 @@ class SimEconomy:
         owning city holds building `bi` (a unique building's city)."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for r in range(self.n_majors):
-            if int(self.row_civ[r]) != civ:
+            _pm = self._row_plays_idx(r, civ)
+            if not bool(_pm.any()):
                 continue
             slot = self.city_slot_at(r)
             has = self.city_bldg[:, r, :, bi].gather(1, slot.clamp(min=0)) & (slot >= 0)
-            out |= has
+            out |= has & _pm.unsqueeze(1)
         return out
 
     def _adj_woods_count(self) -> torch.Tensor:
@@ -3760,9 +3761,10 @@ class SimEconomy:
         # this city" — a Coast tile carrying a resource, worked or the centre,
         # the Lighthouse's way (`buildingVariantCoastYields`).
         for _bi, _civ, _y6 in self._bvar_coast:
-            if int(self.row_civ[row]) != _civ:
+            _pm = self._row_plays_idx(row, _civ)
+            if not bool(_pm.any()):
                 continue
-            sv = bldg[:, :, _bi]
+            sv = bldg[:, :, _bi] & _pm.reshape(-1, *([1] * (bldg.dim() - 2)))
             if not (sv.numel() and bool(sv.any())):
                 continue
             _tw = self.terrain.gather(1, stf).reshape(B, n, M)

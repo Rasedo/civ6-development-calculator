@@ -17,7 +17,13 @@ import { validImprovementsIn } from '../../../cpu/core/rules';
  */
 describe('the seat plays a civilization', () => {
   it('CIV_LEADERS and CIV_IDS agree, and civOf reads the seat', () => {
-    CIV_LEADERS.forEach((l, i) => expect(l.civ).toBe(CIV_IDS[i]));
+    // one row per civilization-LEADER pair: every row names a civilization
+    // the list holds, every civilization has a row, and the first four rows
+    // are the developed four in `CIV_IDS` order
+    for (const l of CIV_LEADERS) expect(CIV_IDS).toContain(l.civ);
+    for (const c of CIV_IDS) expect(CIV_LEADERS.some((l) => l.civ === c)).toBe(true);
+    CIV_LEADERS.slice(0, 4).forEach((l, i) => expect(l.civ).toBe(CIV_IDS[i]));
+    expect(new Set(CIV_LEADERS.map((l) => l.leader)).size).toBe(CIV_LEADERS.length);
     const state = makeState(makeMap(8, 8));
     expect(civOf(state, 0)).toBeNull(); // a bare seat plays none
     state.seats[0].civ = 0;

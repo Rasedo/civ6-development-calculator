@@ -289,12 +289,12 @@ class SimPhase:
                     # twice as many bonus Alliance Points"; (Adventures of
                     # Enkidu): "Their Alliances gain Alliance Points for being
                     # at war with a common foe."
-                    _cl = self._leads_vec("CLEOPATRA") | self._row_leads(row, "CLEOPATRA")
-                    _qpr = self._al_qp_route * torch.where(_cl, self._cleo_trade_qp_mult, 1).view(1, -1)
-                    _gl = self._leads_vec("GILGAMESH") | self._row_leads(row, "GILGAMESH")
+                    _cl = self._leads_vec("CLEOPATRA") | self._row_leads(row, "CLEOPATRA").unsqueeze(1)
+                    _qpr = self._al_qp_route * torch.where(_cl, self._cleo_trade_qp_mult, 1)
+                    _gl = self._leads_vec("GILGAMESH") | self._row_leads(row, "GILGAMESH").unsqueeze(1)
                     _common = (self.war[:, row, :].unsqueeze(1) & self.war[:, :NM, :]).any(dim=2)  # [B, NM]
                     add = run.long() * (self._al_qp_turn + _qpr * (to_o.long() + from_o.long())
-                                        + self._enkidu_qp * (_common & _gl.view(1, -1)).long())
+                                        + self._enkidu_qp * (_common & _gl).long())
                     self.seat_alliance_pts[:, row] += add
                     self.seat_alliance_pts[:, :, row] += add
                     # CIV6 (Military alliance 2): "Allies share visibility" -
@@ -578,11 +578,13 @@ class SimPhase:
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
         # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         # melee units."
-        if self._row_leads(row, "HARDRADA"):
-            _emall = torch.where(_is_unit & self._type_naval_melee[_ut], _emall * self._hard_naval_prod, _emall)
+        _hard = self._row_leads(row, "HARDRADA")
+        if bool(_hard.any()):
+            _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
-        if self._row_plays(row, "EGYPT"):
+        _egypt = self._row_plays(row, "EGYPT")
+        if bool(_egypt.any()):
             _nw = self._wonder_era.shape[0]
             _d_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _w_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
@@ -591,7 +593,7 @@ class SimPhase:
             _wplot = self.city_wonder[bidx, row, col, (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)]
             _plot = torch.where(_w_i, _wplot, qt0)
             _riv = (_plot >= 0) & self.tile_river[bidx, _plot.clamp(min=0)]
-            _emall = torch.where((_d_i | _w_i) & _riv, _emall * self._iteru_mult, _emall)
+            _emall = torch.where((_d_i | _w_i) & _riv & _egypt, _emall * self._iteru_mult, _emall)
         # The slotted production cards: CIV6 stacks production modifiers
         # ADDITIVELY, so two cards that both name the item pay their
         # percentages summed rather than compounded.

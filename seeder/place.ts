@@ -26,6 +26,7 @@ import type { GameMap, Tile } from '../world/types';
 import { hexDistance, tilesWithin } from '../world/hex';
 import { isWater, isImpassable, naturalWonderAt } from '../world/query';
 import { mulberry32, deriveSeed, randInt, type Rng } from '../world/rng';
+import { CIV_LEADERS } from '../cpu/data/seats';
 import type { WorldCiv, WorldCityState } from '../world/file';
 
 export const PLACEMENT_VERSION = 'spaced-balanced@1';
@@ -85,6 +86,15 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
   const res = new Map(legal.map((t) => [t.index, resourcesNear(map, t)]));
   const starts: Tile[] = [];
   const civs: WorldCiv[] = [];
+  // THE DRAW: which roster rows this world seats — a Fisher-Yates order off
+  // the seed's own stream, so every seed carries a different trio and the
+  // gate reaches the whole roster over a battery.
+  const draw: Rng = mulberry32(deriveSeed(seed, 'place/roster'));
+  const order = CIV_LEADERS.map((_, k) => k);
+  for (let k = order.length - 1; k > 0; k--) {
+    const m = randInt(draw, k + 1);
+    [order[k], order[m]] = [order[m], order[k]];
+  }
   for (let i = 0; i < nCivs; i++) {
     const rng: Rng = mulberry32(deriveSeed(seed, `place/civ/${i}`));
     let pick: Tile | null = null;
@@ -103,7 +113,7 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
     if (!pick) throw new Error(`seed ${seed}: no legal start for civ ${i} even after relaxation`);
     starts.push(pick);
     civs.push({
-      leader: i,
+      leader: order[i],
       aggression: 0.3 + rng() * 0.6,
       units: [
         { type: 'SETTLER', tile: pick.index },

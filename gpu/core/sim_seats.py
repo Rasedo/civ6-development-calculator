@@ -960,31 +960,44 @@ class SimSeats:
     def _civ_idx(self, civ: str) -> int:
         return self._civ_ids.index(civ) if civ in self._civ_ids else -1
 
-    def _row_plays(self, row: int, civ: str) -> bool:
-        """`civOf(state, seat) === civ` for one seat row."""
+    def _row_plays(self, row: int, civ: str) -> torch.Tensor:
+        """[B] bool — `civOf(state, seat) === civ` for one seat row, per game
+        (the seeder draws each world's roster)."""
         i = self._civ_idx(civ)
-        return i >= 0 and row < self.n_majors and int(self.row_civ[row]) == i
+        if i < 0 or row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.row_civ[:, row] == i
+
+    def _row_plays_idx(self, row: int, civ: int) -> torch.Tensor:
+        """[B] bool — `_row_plays` by civilization index."""
+        if civ < 0 or row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.row_civ[:, row] == civ
 
     def _seat_plays(self, seat: torch.Tensor, civ: str) -> torch.Tensor:
-        """bool, `seat`'s shape — `_row_plays` per absolute seat; anything
-        outside the major rows plays nothing."""
+        """bool, `seat`'s shape ([B] or [B, U]) — `_row_plays` per absolute
+        seat; anything outside the major rows plays nothing."""
         i = self._civ_idx(civ)
         if i < 0:
             return torch.zeros_like(seat, dtype=torch.bool)
-        r = seat.clamp(min=0, max=self.n_majors - 1)
-        return (seat >= 0) & (seat < self.n_majors) & (self.row_civ[r] == i)
+        r = seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
+        civ_at = self.row_civ.gather(1, r).reshape(seat.shape)
+        return (seat >= 0) & (seat < self.n_majors) & (civ_at == i)
 
-    def _row_leads(self, row: int, leader: str) -> bool:
-        """`leaderOf(state, seat) === leader` for one seat row."""
-        if row >= self.n_majors:
-            return False
-        c = int(self.row_civ[row])
-        return 0 <= c < len(self._civ_leader) and self._civ_leader[c] == leader
+    def _leader_idx(self, leader: str) -> int:
+        return self._pair_leader.index(leader) if leader in self._pair_leader else -1
+
+    def _row_leads(self, row: int, leader: str) -> torch.Tensor:
+        """[B] bool — `leaderOf(state, seat) === leader` for one seat row."""
+        li = self._leader_idx(leader)
+        if li < 0 or row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.row_leader[:, row] == li
 
     def _leads_vec(self, leader: str) -> torch.Tensor:
-        """[n_majors] bool — `_row_leads` per row."""
-        return torch.tensor([self._row_leads(r, leader) for r in range(self.n_majors)],
-                            dtype=torch.bool, device=self.device)
+        """[B, n_majors] bool — `_row_leads` per row."""
+        li = self._leader_idx(leader)
+        return self.row_leader[:, : self.n_majors] == li
 
     def _enkidu_allies(self, rows: torch.Tensor, seat: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """[n, n_majors] bool — `enkiduAllies`: the allies (any type) of the
@@ -992,7 +1005,7 @@ class SimSeats:
         with `foe` (an absolute seat). `seat` and `foe` are [n], one per row
         in `rows`; every gather runs over the whole batch and narrows after."""
         B, NM = self.B, self.n_majors
-        lead = self._leads_vec("GILGAMESH")
+        lead = self._leads_vec("GILGAMESH")  # [B, NM]
         seat_b = torch.zeros(B, dtype=torch.long, device=self.device)
         foe_b = torch.full((B,), -1, dtype=torch.long, device=self.device)
         seat_b[rows] = seat
@@ -1003,7 +1016,7 @@ class SimSeats:
         ally = self.seat_ally_turns[self._bidx, srow][:, :NM] > 0                 # [B, NM]
         war_f = self.war[:, :NM].gather(2, frow.view(-1, 1, 1).expand(B, NM, 1)).squeeze(2)  # [B, NM]
         other = torch.arange(NM, device=self.device).view(1, -1) != srow.view(-1, 1)
-        out = okm.view(-1, 1) & ally & (lead[srow].view(-1, 1) | lead.view(1, -1)) & war_f & other
+        out = okm.view(-1, 1) & ally & (lead.gather(1, srow.view(-1, 1)) | lead) & war_f & other
         return out[rows]
 
     def _units_within(self, rows: torch.Tensor, tile: torch.Tensor, seat_row: int, rng: int) -> torch.Tensor:
@@ -1039,26 +1052,42 @@ class SimSeats:
             return
         self.unit_xp[gr, gu] = self._bank_xp(self.unit_xp[gr, gu], self.unit_level[gr, gu], gain[gr])
 
-    def _levy_cost(self, row: int) -> float:
-        """`levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
+    def _levy_cost(self, row: int) -> torch.Tensor:
+        """[B] f64 `levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
         city-state costs 50% less Gold." """
         base = float(self.rules.citystate["levyGoldCost"])
-        return base * (self._epic_levy_mult if self._row_plays(row, "SUMERIA") else 1.0)
+        mult = torch.where(self._row_plays(row, "SUMERIA"),
+                           torch.full((self.B,), self._epic_levy_mult, dtype=torch.float64, device=self.device),
+                           torch.ones(self.B, dtype=torch.float64, device=self.device))
+        return base * mult
+
+    def _row_civ_or_none(self, row: int) -> torch.Tensor:
+        """[B] long — the row's civilization index, the catalog's LAST row
+        (plays none) where it plays nothing; read live, never cached."""
+        civ = self.row_civ[:, row]
+        return torch.where(civ >= 0, civ, torch.full_like(civ, len(self._civ_ids)))
 
     def _civ_unit_ok(self, row: int) -> torch.Tensor:
-        """[NU] bool `civUnitAllowed` — CIV6 (Civilizations.xml): a UNIQUE UNIT
-        trains for its civilization alone, and stands IN PLACE of the chassis
-        it replaces there; a seat playing no civilization trains no unique."""
-        c = int(self._row_civ_i[row])
-        return ((self._type_uniq < 0) | (self._type_uniq == int(self.row_civ[row]))) & (self._civ_repl[c] < 0)
+        """[B, NU] bool `civUnitAllowed` — CIV6 (Civilizations.xml): a UNIQUE
+        UNIT trains for its civilization alone, and stands IN PLACE of the
+        chassis it replaces there; a seat playing no civilization trains no
+        unique."""
+        civ = self.row_civ[:, row]  # [B]
+        own = (self._type_uniq < 0).unsqueeze(0) | (self._type_uniq.unsqueeze(0) == civ.unsqueeze(1))
+        return own & (self._civ_repl[self._row_civ_or_none(row)] < 0)
 
     def _up_to_row(self, row: int) -> torch.Tensor:
-        """[NU] long `civUpgradeTarget` — what each chassis upgrades INTO for
-        this seat: the catalog's successor, or the civilization's unique
-        standing in for it."""
+        """[B, NU] long `civUpgradeTarget` — what each chassis upgrades INTO
+        for this seat, per game: the catalog's successor, or the
+        civilization's unique standing in for it."""
         up = self._type_up_to
-        rep = self._civ_repl[int(self._row_civ_i[row])][up.clamp(min=0)]
-        return torch.where((up >= 0) & (rep >= 0), rep, up)
+        rep = self._civ_repl[self._row_civ_or_none(row)].gather(1, up.clamp(min=0).unsqueeze(0).expand(self.B, -1))
+        return torch.where((up >= 0).unsqueeze(0) & (rep >= 0), rep, up.unsqueeze(0).expand(self.B, -1))
+
+    def _up_to_of(self, row: int, utype: torch.Tensor) -> torch.Tensor:
+        """`_up_to_row` read at each unit's chassis — `utype` [B] or [B, N]."""
+        up = self._up_to_row(row)
+        return up.gather(1, utype.clamp(min=0).reshape(self.B, -1)).reshape(utype.shape)
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
         """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
@@ -1074,7 +1103,7 @@ class SimSeats:
             | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
         ) & self._res_avail_mask(self.tile_seat == row, row) \
             & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0) \
-            & self._civ_unit_ok(row).unsqueeze(0)
+            & self._civ_unit_ok(row)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor, faith: bool = False) -> torch.Tensor:
         # No hull and no plane on the GOLD rung: it spawns at the capital and
@@ -1987,8 +2016,8 @@ class SimSeats:
                         d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                         # CIV6 (Bath): the unique district is "cheaper to build"
                         for _v in self._d_variants.get(di, []):
-                            if int(self.row_civ[row]) == int(_v["civ"]):
-                                d_cost_si = torch.floor(d_cost_si * float(_v["costMult"]))
+                            _pm = self._row_plays_idx(row, int(_v["civ"]))
+                            d_cost_si = torch.where(_pm, torch.floor(d_cost_si * float(_v["costMult"])), d_cost_si)
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self._q_push(row, j, placed,
@@ -2562,7 +2591,7 @@ class SimSeats:
         chassis, pay the gold and the new chassis' resource, and spend the rest
         of the turn. CIV6: promotions and experience ride along, and "units do
         not Heal upon upgrading"."""
-        nxt = self._up_to_row(row)[utp.clamp(min=0)]
+        nxt = self._up_to_of(row, utp)
         ok = hit & (nxt >= 0) & (utp >= 0)
         if not bool(ok.any()):
             return
@@ -2774,9 +2803,9 @@ class SimSeats:
         own tech or civic, and the ground clause passes (`validImprovementsIn`'s
         unique arm)."""
         c = self._imp_uniq[k]
-        if c < 0 or int(self.row_civ[row]) != c:
+        if c < 0:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        ok = self._row_plays_idx(row, int(c))
         ut, uc = int(self._imp_unlock[k]), self._imp_unlock_civic[k]
         if ut >= 0:
             ok = ok & self.civ_techs[:, row, ut]
@@ -5385,7 +5414,7 @@ class SimSeats:
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
         # Cleopatra's destination gold pays a city with no route of its own
-        if not bool(act.any()) and not self._row_leads(row, "CLEOPATRA"):
+        if not bool(act.any()) and not bool(self._row_leads(row, "CLEOPATRA").any()):
             self._seat_route_cache = (key, None)
             return None
         B = self.B
@@ -5491,9 +5520,8 @@ class SimSeats:
             gold_i = (self._trade_intl_gold + spec_dest).double()
             # CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own
             # routes out; "+2 Food for them" on anyone's route in.
-            if self._row_leads(row, "CLEOPATRA"):
-                gold_i = gold_i + self._cleo_intl_gold
-            _cleo_d = self._leads_vec("CLEOPATRA")[dr]  # [B, K]
+            gold_i = gold_i + self._cleo_intl_gold * self._row_leads(row, "CLEOPATRA").double().unsqueeze(1)
+            _cleo_d = self._leads_vec("CLEOPATRA").gather(1, dr)  # [B, K]
             # CIV6 (Reform the Coinage, Golden face): "International Trade
             # Routes provide +3 Gold per specialty district in the foreign
             # city."
@@ -5560,9 +5588,10 @@ class SimSeats:
             # CIV6 (All Roads Lead to Rome): "+1 Gold for passing through
             # Trading Posts in your own cities" — a chain hop IS one of the
             # seat's posts.
-            if self._row_plays(row, "ROME"):
+            _rome = self._row_plays(row, "ROME")
+            if bool(_rome.any()):
                 own_c = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) == row)
-                cg = cg + own_c.double().sum(dim=2) * self._rome_post_gold
+                cg = cg + own_c.double().sum(dim=2) * self._rome_post_gold * _rome.double().unsqueeze(1)
             for r2 in range(self.n_majors):
                 if r2 == row:
                     continue
@@ -5571,7 +5600,8 @@ class SimSeats:
             inc.scatter_add_(1, from_j * 6 + 2, cg * (act & has_from).double())
         # CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
         # civilization's route INTO the city (`incomingIntlRoutes`).
-        if self._row_leads(row, "CLEOPATRA"):
+        _cleo = self._row_leads(row, "CLEOPATRA")
+        if bool(_cleo.any()):
             _cid = self.city_id[:, row, :cols]
             _cnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
             for r2 in range(self.n_majors):
@@ -5581,7 +5611,8 @@ class SimSeats:
                         & (self.seat_route_dcity[:, r2].unsqueeze(2) == _cid.unsqueeze(1)))  # [B, K, cols]
                 _cnt = _cnt + _hit.sum(dim=1).double()
             _addc = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
-            _addc[:, :, 2] = (self._cleo_in_gold * _cnt * self.city_alive[:, row, :cols].double()).to(inc.dtype)
+            _addc[:, :, 2] = (self._cleo_in_gold * _cnt * self.city_alive[:, row, :cols].double()
+                              * _cleo.double().unsqueeze(1)).to(inc.dtype)
             inc = inc + _addc.reshape(B, -1)
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
@@ -6130,8 +6161,9 @@ class SimSeats:
             )
             # CIV6 (Bath): its Districts row adds "Housing 2" on top of the water
             for _v in self._d_variants.get(self._aqueduct_idx, []):
-                if int(self.row_civ[row]) == int(_v["civ"]) and float(_v["housing"]):
-                    water = water + has_aq.to(water.dtype) * float(_v["housing"])
+                if float(_v["housing"]):
+                    _pm = self._row_plays_idx(row, int(_v["civ"])).to(water.dtype)
+                    water = water + has_aq.to(water.dtype) * float(_v["housing"]) * _pm.reshape(-1, *([1] * (water.dim() - 1)))
         else:
             water = wh
         selb_h = bldg & ~self._bldg_dark(dreg)
@@ -6247,8 +6279,9 @@ class SimSeats:
         # CIV6 (Bath): "Entertainment 1" — the unique district's own flat Amenity
         for _di, _vs in self._d_variants.items():
             for _v in _vs:
-                if int(self.row_civ[row]) == int(_v["civ"]) and float(_v["amenities"]):
-                    have = have + self._dist_counts(row)[:, :cols, _di].double() * float(_v["amenities"])
+                if float(_v["amenities"]):
+                    _pm = self._row_plays_idx(row, int(_v["civ"])).double().unsqueeze(1)
+                    have = have + self._dist_counts(row)[:, :cols, _di].double() * float(_v["amenities"]) * _pm
         # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
         # per adjacent tile, and dark while the district stands pillaged.
         if self._d_amen_adj_any:
@@ -6939,7 +6972,11 @@ class SimSeats:
         """CIV6 (Trajan's Column): "All cities start with an additional City
         Center building" — the cheapest completable one, ties by catalog
         order, built the way a purchase builds it (`trajansColumn`)."""
-        if rows.numel() == 0 or not self._row_leads(row, "TRAJAN"):
+        if rows.numel() == 0:
+            return
+        _lead = self._row_leads(row, "TRAJAN")[rows]
+        rows, slot = rows[_lead], slot[_lead]
+        if rows.numel() == 0:
             return
         self._eff_version += 1  # the city founded above must be in the walk
         B, dev = self.B, self.device
@@ -6964,7 +7001,11 @@ class SimSeats:
         road to it." `rows` are the games, `centre` the new city's tile per
         game. The road is the Trader's own course (`_trade_walk_step`), laid
         on every land tile of the descent (`allRoadsLeadToRome`)."""
-        if rows.numel() == 0 or not self._row_plays(row, "ROME"):
+        if rows.numel() == 0:
+            return
+        _rome = self._row_plays(row, "ROME")[rows]
+        rows, centre = rows[_rome], centre[_rome]
+        if rows.numel() == 0:
             return
         self.trading_post[rows, row, centre] = True
         capm = self.city_is_cap[rows, row] & self.city_alive[rows, row]
@@ -10052,9 +10093,8 @@ class SimSeats:
             ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec + self._route_post_gold(row, dctr)  # [B, D]
             # CIV6 (Mediterranean's Bride): the driver values Egypt's own +4 Gold
             # and the +2 Food a route INTO Egypt pays (`routeYieldsInternational`)
-            if self._row_leads(row, "CLEOPATRA"):
-                ysum_ip = ysum_ip + int(self._cleo_intl_gold)
-            ysum_ip = ysum_ip + int(self._cleo_in_food) * self._leads_vec("CLEOPATRA")[drow].long()
+            ysum_ip = ysum_ip + int(self._cleo_intl_gold) * self._row_leads(row, "CLEOPATRA").long().unsqueeze(1)
+            ysum_ip = ysum_ip + int(self._cleo_in_food) * self._leads_vec("CLEOPATRA").gather(1, drow).long()
             key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
                                  torch.full((B, RC, D), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_ip], dim=2)

@@ -29,7 +29,34 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import load_rules, fixture_paths  # noqa: E402
-from engineer_test import fresh, retype, mask_of, order, clear_tile, own_flat, neutral_flat  # noqa: E402
+from engineer_test import retype, mask_of, order, clear_tile, own_flat, neutral_flat  # noqa: E402
+
+
+def play(sim, row: int, name):
+    """Seat `row` (game 0) as civilization `name`'s first roster row, or as
+    nobody — both the civilization and the leader planes."""
+    if name is None:
+        sim.row_civ[0, row] = -1
+        sim.row_leader[0, row] = -1
+    else:
+        ci = sim._civ_ids.index(name)
+        sim.row_civ[0, row] = ci
+        sim.row_leader[0, row] = sim._pair_civ.index(ci)
+    # every memo keyed on the seat's state is stale now
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+
+
+def fresh(rules, path):
+    """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
+    capitals settle, so the founding clauses land as the old fixtures had them."""
+    from core import BatchSim, load_fixture
+    from warmup import settle_all
+    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+        play(sim, r, name)
+    return settle_all(sim)
 
 
 def stand(sim, row, ty, tile):
@@ -51,19 +78,19 @@ def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
     U = {u["id"]: i for i, u in enumerate(rules.units)}
-    C = {c: i for i, c in enumerate(rules.uniques["civs"])}
     sim = fresh(rules, path)
     R = sim.n_majors
-    rome = next(r for r in range(R) if int(sim.row_civ[r]) == C["ROME"])
-    egypt = next(r for r in range(R) if int(sim.row_civ[r]) == C["EGYPT"])
-    norway = next(r for r in range(R) if int(sim.row_civ[r]) == C["NORWAY"])
-    assert all(int(sim.row_civ[r]) >= 0 for r in range(R)), "every major plays a civilization"
+    rome, egypt, norway = 0, 1, 2
+    play(sim, rome, "ROME")
+    play(sim, egypt, "EGYPT")
+    play(sim, norway, "NORWAY")
+    assert all(int(sim.row_civ[0, r]) >= 0 for r in range(R)), "every major plays a civilization"
     cs_row = R
-    assert int(sim.row_civ[cs_row]) < 0, "a city-state row plays none"
+    assert int(sim.row_civ[0, cs_row]) < 0, "a city-state row plays none"
 
     # -- A: who may train what ---------------------------------------------
     def ok(row, uid):
-        return bool(sim._civ_unit_ok(row)[U[uid]])
+        return bool(sim._civ_unit_ok(row)[0, U[uid]])
 
     assert ok(rome, "LEGION") and not ok(rome, "SWORDSMAN")
     assert ok(egypt, "SWORDSMAN") and not ok(egypt, "LEGION")
@@ -78,12 +105,12 @@ def main() -> None:
     print("  A civ_unit_ok OK")
 
     # -- B: the upgrade target and the two trainable masks -----------------
-    assert int(sim._up_to_row(norway)[U["SWORDSMAN"]]) == U["BERSERKER"]
-    assert int(sim._up_to_row(rome)[U["SWORDSMAN"]]) == U["MAN_AT_ARMS"]
-    assert int(sim._up_to_row(rome)[U["WARRIOR"]]) == U["LEGION"]
-    assert int(sim._up_to_row(norway)[U["LEGION"]]) == U["BERSERKER"]
-    assert int(sim._up_to_row(cs_row)[U["SWORDSMAN"]]) == U["MAN_AT_ARMS"]
-    assert int(sim._up_to_row(norway)[U["QUADRIREME"]]) == int(sim._type_up_to[U["QUADRIREME"]])
+    assert int(sim._up_to_row(norway)[0, U["SWORDSMAN"]]) == U["BERSERKER"]
+    assert int(sim._up_to_row(rome)[0, U["SWORDSMAN"]]) == U["MAN_AT_ARMS"]
+    assert int(sim._up_to_row(rome)[0, U["WARRIOR"]]) == U["LEGION"]
+    assert int(sim._up_to_row(norway)[0, U["LEGION"]]) == U["BERSERKER"]
+    assert int(sim._up_to_row(cs_row)[0, U["SWORDSMAN"]]) == U["MAN_AT_ARMS"]
+    assert int(sim._up_to_row(norway)[0, U["QUADRIREME"]]) == int(sim._type_up_to[U["QUADRIREME"]])
     wheel = int(sim._type_tech[U["MARYANNU_CHARIOT_ARCHER"]])
     assert wheel >= 0
     for r in (egypt, rome):

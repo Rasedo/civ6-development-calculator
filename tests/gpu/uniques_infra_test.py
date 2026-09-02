@@ -26,7 +26,34 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import load_rules, fixture_paths  # noqa: E402
-from engineer_test import fresh, retype, mask_of, order, clear_tile, own_flat  # noqa: E402
+from engineer_test import retype, mask_of, order, clear_tile, own_flat  # noqa: E402
+
+
+def play(sim, row: int, name):
+    """Seat `row` (game 0) as civilization `name`'s first roster row, or as
+    nobody — both the civilization and the leader planes."""
+    if name is None:
+        sim.row_civ[0, row] = -1
+        sim.row_leader[0, row] = -1
+    else:
+        ci = sim._civ_ids.index(name)
+        sim.row_civ[0, row] = ci
+        sim.row_leader[0, row] = sim._pair_civ.index(ci)
+    # every memo keyed on the seat's state is stale now
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+
+
+def fresh(rules, path):
+    """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
+    capitals settle, so the founding clauses land as the old fixtures had them."""
+    from core import BatchSim, load_fixture
+    from warmup import settle_all
+    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+        play(sim, r, name)
+    return settle_all(sim)
 
 
 def stand_builder(sim, row, tile):
@@ -51,10 +78,10 @@ def main() -> None:
     path = fixture_paths()[0]
     C = {c: i for i, c in enumerate(rules.uniques["civs"])}
     sim = fresh(rules, path)
-    R = sim.n_majors
-    rome = next(r for r in range(R) if int(sim.row_civ[r]) == C["ROME"])
-    egypt = next(r for r in range(R) if int(sim.row_civ[r]) == C["EGYPT"])
-    norway = next(r for r in range(R) if int(sim.row_civ[r]) == C["NORWAY"])
+    rome, egypt, norway = 0, 1, 2
+    play(sim, rome, "ROME")
+    play(sim, egypt, "EGYPT")
+    play(sim, norway, "NORWAY")
     I = {n: i for i, n in enumerate(sim._imp_ids)}
     SX, ZG = I["SPHINX"], I["ZIGGURAT"]
     assert sim._imp_uniq[SX] == C["EGYPT"] and sim._imp_uniq[ZG] == C["SUMERIA"]
@@ -146,9 +173,9 @@ def main() -> None:
         return int(sim._seat_amenity(rome)[0][0, 0])
 
     with_bath = housing()
-    sim.row_civ[rome] = -1
+    play(sim, rome, None)
     plain = housing()
-    sim.row_civ[rome] = C["ROME"]
+    play(sim, rome, "ROME")
     assert with_bath - plain == 2.0, f"CIV6 (Bath): Housing 2 on top of the water ({plain} -> {with_bath})"
     sim.district_pillaged[0, site] = True
     sim._eff_version += 1
@@ -163,9 +190,9 @@ def main() -> None:
         sim.city_pop[0, rome, 0] = pop
         sim._eff_version += 1
         t_bath = tier()
-        sim.row_civ[rome] = -1
+        play(sim, rome, None)
         t_plain = tier()
-        sim.row_civ[rome] = C["ROME"]
+        play(sim, rome, "ROME")
         assert t_bath <= t_plain, f"pop {pop}: the Bath's Amenity worsened the tier"
         rose |= t_bath < t_plain
     assert rose, "the Bath's +1 Amenity never moved the tier over pop 1..15"
@@ -204,10 +231,10 @@ def main() -> None:
     manual = sum(1 for x in sim.neigh[site].tolist() if x >= 0 and int(sim.feat_id[0, x]) == wf and not bool(sim.feat_stripped[0, x]))
     assert n_woods == manual >= 1, (n_woods, manual)
     assert stave - base == float(n_woods), f"CIV6 (Stave Church): +1 per adjacent Woods ({base} -> {stave}, {n_woods} Woods)"
-    sim.row_civ[norway] = -1
+    play(sim, norway, None)
     sim._eff_version += 1  # a test-only toggle; in play the row's civilization never changes
     assert float(sim._district_adj_floor(hs)[0, site]) == base, "another civilization's Temple pays nothing"
-    sim.row_civ[norway] = C["NORWAY"]
+    play(sim, norway, "NORWAY")
     sim.city_bldg[0, norway, 0, tb] = False
     sim._eff_version += 1
     assert float(sim._district_adj_floor(hs)[0, site]) == base
@@ -244,10 +271,10 @@ def main() -> None:
         sim._eff_version += 1
         d = prod() - y0
         assert d == float(len(coast_nb)), f"one Production per worked coastal resource tile ({d} vs {len(coast_nb)})"
-        sim.row_civ[norway] = -1
+        play(sim, norway, None)
         sim._eff_version += 1
         assert prod() == y0, "the term is Norway's alone"
-        sim.row_civ[norway] = C["NORWAY"]
+        play(sim, norway, "NORWAY")
         sim._eff_version += 1
         print(f"  D Stave Church OK (adjacency {base} -> {stave}; coast production +{d})")
     else:

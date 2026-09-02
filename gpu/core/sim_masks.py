@@ -2615,7 +2615,8 @@ class SimMasks:
                          & (_nimp | _ndis)).reshape(B, N, 6).any(dim=2)
             # CIV6 (Thunderbolt of the North): "coastal raiding for all naval
             # melee units"
-            raid = (present & (self._type_raider[utype] | (self._type_naval_melee[utype] & self._row_leads(row, "HARDRADA")))
+            raid = (present & (self._type_raider[utype]
+                               | (self._type_naval_melee[utype] & self._row_leads(row, "HARDRADA").unsqueeze(1)))
                     & self.water.gather(1, tc)
                     & (self.unit_mp.gather(1, sc) >= 3 * self._mp_scale)
                     & _raidable)
@@ -3164,7 +3165,7 @@ class SimMasks:
         need any"."""
         B, N = utype.shape
         dev = self.device
-        nxt = self._up_to_row(row)[utype.clamp(min=0)]
+        nxt = self._up_to_of(row, utype)
         ok = (nxt >= 0) & (utype >= 0)
         if not bool(ok.any()):
             return torch.zeros(B, N, dtype=torch.bool, device=dev)

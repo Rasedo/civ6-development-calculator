@@ -2,7 +2,7 @@
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS } from '../data/civilizations';
-import { CIV_IDS, AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
+import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
@@ -135,7 +135,7 @@ export function civVariantOf<T extends { civ: string }>(state: GameState, seat: 
 export function civOf(state: GameState, seat: number): CivId | null {
   const s = seatOf(state, seat);
   const civ = s && 'civ' in s ? (s as Seat).civ : -1;
-  return civ >= 0 ? CIV_IDS[civ] ?? null : null;
+  return civ >= 0 ? CIV_LEADERS[civ]?.civ ?? null : null;
 }
 
 /** The leader this seat plays (`CIV_LEADERS[Seat.civ].leader`), null for a

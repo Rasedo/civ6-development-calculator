@@ -1237,15 +1237,14 @@ class SimInit:
         _nwv = (self.nwonder.gather(1, _nwn) & (self.neigh.reshape(1, -1) >= 0)).reshape(B, T, 6)
         self.wonder_near = self.nwonder | _nwv.any(dim=2)
         # CIV6: the civilization each seat plays (`Seat.civ`), fixed at seed time
-        _row_civ = [-1] * self.NS
+        # per GAME: the seeder draws which roster rows a world seats
+        _row_pair = [[-1] * self.NS for _ in fixtures]
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
                 row = int(cv["seat"])
                 self.civ_alive[b, row] = True
                 self.civ_aggression[b, row] = cv.get("aggression", 0.0)
-                _lead = int(cv["leader"])
-                assert _row_civ[row] in (-1, _lead), "a seat plays one civilization in every game"
-                _row_civ[row] = _lead
+                _row_pair[b][row] = int(cv["leader"])
                 # Nothing is pre-founded — `cities` is [] and every city arrives
                 # through a FOUND verb; the loop stays for the shape.
                 for j, rc in enumerate(cv.get("cities", [])):
@@ -2703,13 +2702,19 @@ class SimInit:
         for _i, _u in enumerate(ru):
             if int(_u["uniq"]) >= 0 and int(_u["repl"]) >= 0:
                 self._civ_repl[int(_u["uniq"]), int(_u["repl"])] = _i
-        self.row_civ = torch.tensor(_row_civ, dtype=torch.long, device=device)
+        # [B, NS] long — the roster ROW (`Seat.civ`) a seat plays per game, its
+        # civilization and its leader; -1 plays nothing
+        self._pair_leader: list[str] = list(_uq["leaders"])
+        self._pair_civ: list[int] = [int(x) for x in _uq["pairCiv"]]
+        self.row_leader = torch.tensor(_row_pair, dtype=torch.long, device=device)
+        self.row_civ = torch.where(self.row_leader >= 0,
+                                   torch.tensor(self._pair_civ + [-1], dtype=torch.long, device=device)[self.row_leader.clamp(min=0)],
+                                   torch.full_like(self.row_leader, -1))
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])
         self._epic_levy_mult = float(_ab["epicQuestLevyMult"])
         self._rome_post_gold = float(_ab["romeOwnPostGold"])
-        self._civ_leader: list[str] = list(_uq["leaders"])
         _la = _uq["leaderAbilities"]
         self._cleo_intl_gold = float(_la["cleopatraIntlGold"])
         self._cleo_in_food = float(_la["cleopatraIncomingFood"])
@@ -2729,7 +2734,6 @@ class SimInit:
         # that is neither a raider nor a carrier
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)
                                   & ~self._type_raider & (self._type_air_slots == 0))
-        self._row_civ_i = torch.where(self.row_civ >= 0, self.row_civ, torch.full_like(self.row_civ, _nc))
         self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
         # SCOUT is a military explorer (combat 10) but never in the civ roster
         # (BUY_UNITS and the ladder exclude it). The production ladder

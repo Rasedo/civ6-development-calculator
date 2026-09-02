@@ -31,6 +31,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
+
+def play(sim, row: int, name):
+    """Seat `row` (game 0) as civilization `name`'s first roster row, or as
+    nobody — both the civilization and the leader planes."""
+    if name is None:
+        sim.row_civ[0, row] = -1
+        sim.row_leader[0, row] = -1
+    else:
+        ci = sim._civ_ids.index(name)
+        sim.row_civ[0, row] = ci
+        sim.row_leader[0, row] = sim._pair_civ.index(ci)
+    # every memo keyed on the seat's state is stale now
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
                     / "seeder" / "worlds" / "rules.json").read_text())
@@ -41,8 +57,12 @@ ONE = torch.tensor([0], dtype=torch.long)
 
 
 def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+    """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
+    capitals settle, so the founding clauses land as the old fixtures had them."""
+    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+        play(sim, r, name)
+    return settle_all(sim)
 
 
 def civ(sim, name: str) -> int:
@@ -50,11 +70,10 @@ def civ(sim, name: str) -> int:
 
 
 def row_of(sim, name: str) -> int:
-    for r in range(sim.n_majors):
-        c = int(sim.row_civ[r])
-        if 0 <= c < len(sim._civ_ids) and sim._civ_ids[c] == name:
-            return r
-    raise AssertionError(f"no seat plays {name} in this fixture")
+    """SEAT `name` at its scene row — the fixture's trio is the seeder's draw."""
+    r = {"ROME": 0, "EGYPT": 1, "NORWAY": 2}[name]
+    play(sim, r, name)
+    return r
 
 
 def place(sim, tile: int, utype: int, seat: int, *, hp=100, promos=0) -> int:
@@ -208,10 +227,10 @@ def test_rome_chain_gold(rules, path) -> None:
     inc = sim._seat_route_income(rome)
     assert inc is not None
     g_rome = float(inc[B0, 0, 2])
-    sim.row_civ[rome] = civ(sim, "EGYPT")
+    play(sim, rome, "EGYPT")
     sim._eff_version += 1
     g_other = float(sim._seat_route_income(rome)[B0, 0, 2])
-    sim.row_civ[rome] = civ(sim, "ROME")
+    play(sim, rome, "ROME")
     assert abs((g_rome - g_other) - 1.0) < 1e-9, (g_rome, g_other)
     print("  4 Rome chain gold OK — +1 per own-city hop")
 
@@ -247,7 +266,7 @@ def test_iteru_production(rules, path) -> None:
     campus, t = _river_district(sim, egypt)
     p_egypt = _produce(sim, egypt, t, campus)
     sim2 = fresh(rules, path)
-    sim2.row_civ[egypt] = civ(sim2, "ROME")
+    play(sim2, egypt, "ROME")
     campus2, t2 = _river_district(sim2, egypt)
     assert (campus2, t2) == (campus, t)
     p_other = _produce(sim2, egypt, t, campus)
@@ -285,7 +304,7 @@ def test_iteru_flood(rules, path) -> None:
     def run(as_civ: str) -> tuple[int, int]:
         sim = fresh(rules, path)
         egypt = row_of(sim, "EGYPT")
-        sim.row_civ[egypt] = civ(sim, as_civ)
+        play(sim, egypt, as_civ)
         own = (~sim.water[B0] & sim.passable[B0] & (sim.tile_seat[B0] == egypt)
                & (sim.centre_slot_at[B0] < 0) & (sim.district[B0] < 0)
                & (sim.military_at[B0] < 0) & (sim.civilian_at[B0] < 0))
@@ -370,9 +389,9 @@ def test_epic_quest_levy(rules, path) -> None:
     rome = row_of(sim, "ROME")
     base = float(sim.rules.citystate["levyGoldCost"])
     assert sim._levy_cost(rome) == base
-    sim.row_civ[rome] = civ(sim, "SUMERIA")
+    play(sim, rome, "SUMERIA")
     assert sim._levy_cost(rome) == base * sim._epic_levy_mult
-    sim.row_civ[rome] = civ(sim, "ROME")
+    play(sim, rome, "ROME")
     print("  9 Epic Quest OK — half-price levies")
 
 
