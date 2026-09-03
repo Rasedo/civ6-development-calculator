@@ -28,6 +28,14 @@ export interface ImpAdjacency {
   builtWonder?: boolean;
   /** count a neighbour carrying one of these live features. */
   features?: FeatureId[];
+  /** count an adjacent MOUNTAIN (the Terrace Farm's own clause). */
+  mountain?: boolean;
+  /** count a neighbour carrying THIS improvement. */
+  sameImprovement?: boolean;
+  /** the civic the rule needs before it pays at all. */
+  requiresCivic?: string;
+  /** the TECH that improves the rule, beside `upgradeCivic`. */
+  upgradeTech?: string;
   per: number;
   yields: Partial<Yields>;
   /** the civic that improves the rule, and what it improves it to. */
@@ -438,6 +446,30 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     tourismFrom: 'culture',
     tourismTech: 'FLIGHT',
     description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +2 appeal around. Not beside another Sphinx.',
+  },
+  // CIV6 (Improvements.xml / Adjacency_YieldChanges): the Inca's Terrace
+  // Farm — hills of three terrains, +1 Food and (Housing 2 in the install's
+  // half-units) +1 Housing, +1 Food per adjacent Mountain, +2 Production per
+  // adjacent Aqueduct, and its own kind adjacent: one Food per TWO at
+  // Feudalism, per ONE at Replaceable Parts.
+  TERRACE_FARM: {
+    id: 'TERRACE_FARM',
+    name: 'Terrace Farm',
+    code: 'Tf',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { food: 1 },
+    housing: 1,
+    resourceOnly: false,
+    uniqueTo: 'INCA',
+    terrains: ['GRASSLAND', 'PLAINS', 'DESERT'],
+    elevations: ['HILLS'],
+    adjacency: [
+      { mountain: true, per: 1, yields: { food: 1 } },
+      { district: 'AQUEDUCT', per: 1, yields: { production: 2 } },
+      { sameImprovement: true, requiresCivic: 'FEUDALISM', per: 2, yields: { food: 1 },
+        upgradeTech: 'REPLACEABLE_PARTS', upgradePer: 1 },
+    ],
+    description: '+1 food, +1 housing on hills. +1 food per adjacent mountain, +2 production per adjacent Aqueduct, and its own kind beside it from Feudalism.',
   },
   ZIGGURAT: {
     id: 'ZIGGURAT',

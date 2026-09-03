@@ -535,6 +535,14 @@ export function inEnemyZoc(
 
 /** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
  * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
+/** The pool this unit was GRANTED this turn — `movesFull` where it stands,
+ *  and the live full where it does not. ONE fallback: the heal gate, the
+ *  fortify gate and the state compare must all read the same number, or a
+ *  unit born after the reset digs in on one engine alone. */
+export function grantedMoves(state: GameState, unit: Unit): number {
+  return unit.movesFull ?? unitFullMoves(state, unit);
+}
+
 export function fortifyBonus(unit: { fortifyTurns?: number }): number {
   return Math.min(FORTIFY_MAX_TURNS, unit.fortifyTurns ?? 0) * 3;
 }
@@ -1586,6 +1594,11 @@ export function spawnUnit(
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
     path: null,
   };
+  // The pool it was GRANTED, recorded at birth: every "spent no MP" gate
+  // reads `movesFull`, and a unit created after seatPhase's reset would
+  // otherwise carry none until the next turn — the GPU's `_spawn_unit` writes
+  // `unit_mp_full` beside `unit_mp` for the same reason.
+  unit.movesFull = unit.movesLeft;
   // FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
   if (capsOf(seat).xp) unit.xp = 0;
@@ -1709,7 +1722,7 @@ export function refreshUnits(state: GameState): void {
     // last refresh, not against its type's base moves — the aura's +1 MP makes
     // the granted pool vary per turn. `?? full` reproduces the pre-S3 gate for
     // units that have never been refreshed.
-    const grantedLast = unit.movesFull ?? full;
+    const grantedLast = grantedMoves(state, unit);
     // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
     // have no continuous access to Iron Mines, those Swordsmen won't be able to
     // Heal." A minor or the barbarians keep no bank and are not held to it.

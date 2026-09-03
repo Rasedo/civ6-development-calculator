@@ -2737,7 +2737,9 @@ class SimInit:
         # CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows, one tensor
         # per column (`PLOT_YIELD_ROWS`)
         _py = [[int(x) if i != 3 else float(x) for i, x in enumerate(r)] for r in _uq["plotYields"]]
-        self._plot_rows_any = len(_py) > 0
+        # the plot plane also pays the terrain-adjacency rows, so it must run
+        # whenever EITHER family is on the wire
+        self._plot_rows_any = len(_py) > 0 or bool(_uq["terrainAdjYields"])
         _col = lambda i, dt: torch.tensor([r[i] for r in _py] or [0], dtype=dt, device=device)  # noqa: E731
         self._py_civ, self._py_leader, self._py_yield = _col(0, torch.long), _col(1, torch.long), _col(2, torch.long)
         self._py_amt = _col(3, dtype)
@@ -2803,6 +2805,9 @@ class SimInit:
             (int(r[0]), int(r[1])) for r in _uq["workMountains"]]
         self._route_terrain_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeTerrain"]]  # type: ignore[misc]
+        # [civ, leaderRow, improvement, yield, amount] on a MOUNTAIN tile
+        self._terrain_adj_yield_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["terrainAdjYields"]]  # type: ignore[misc]
         # [civ, leaderRow, yield, pct, founded]
         self._governor_yield_rows: list[tuple[int, int, int, float, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4])) for r in _uq["governorYields"]]

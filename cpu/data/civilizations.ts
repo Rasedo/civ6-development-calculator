@@ -678,3 +678,18 @@ export const FORMATION_ROWS: readonly FormationRow[] = [
   { civ: 'SPAIN', tier: 1, naval: true, civic: 'MERCANTILISM' },
   { civ: 'SPAIN', tier: 2, naval: true, civic: 'MERCANTILISM' },
 ];
+
+/** CIV6 (Mit'a, EFFECT_ADJUST_TERRAIN_YIELD_FROM_ADJACENT_IMPROVEMENTS): "+1
+ *  Food to Mountain tiles for every adjacent Terrace Farm" — the MOUNTAIN's
+ *  own yield, which only a seat that may work one ever collects. */
+export interface TerrainAdjYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  mountain: true;
+  improvement: ImprovementId;
+  yield: YieldKey;
+  amount: number;
+}
+export const TERRAIN_ADJ_YIELD_ROWS: readonly TerrainAdjYieldRow[] = [
+  { civ: 'INCA', mountain: true, improvement: 'TERRACE_FARM', yield: 'food', amount: 1 },
+];

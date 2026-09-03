@@ -130,10 +130,12 @@ describe('general aura: +1 movement', () => {
     expect(land.fortifyTurns).toBe(2); // the land control: same idleness, digs in
   });
 
-  it('units that never refreshed fall back to their base moves (no NaN gate)', () => {
+  it('a NEW unit records the pool it was granted, so no gate falls back', () => {
     const state = newGame();
     const w = spawnUnit(state, 'WARRIOR', tileAt(state, seatOf(state, 0)!.cities[0].centerIndex, 3), 0)!;
-    expect(w.movesFull).toBeUndefined();
+    // the GPU's `_spawn_unit` writes `unit_mp_full` beside `unit_mp`; TS does
+    // the same, so a unit born after seatPhase's reset carries its own pool
+    expect(w.movesFull).toBe(w.movesLeft);
     w.hp = UNIT_HP - 20;
     refreshUnits(state); // `?? full` path
     expect(w.hp).toBeGreaterThan(UNIT_HP - 20);

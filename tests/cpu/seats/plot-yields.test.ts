@@ -117,10 +117,17 @@ describe('the plot rows', () => {
     ctx.mods.plotYields = rows;
     const t = tileAtCoords(map, 2, 2);
     t.elevation = 'MOUNTAIN';
-    // ORACLE: `tileYields` leaves on an impassable tile before its clauses,
-    // and the GPU's live mask does the same — the yield waits on
-    // EFFECT_ADJUST_PLAYER_TERRAIN_WORK_IMPASSABLE_MODIFIER
-    expect(tileYields(ctx, t).production).toBe(0);
+    // CIV6 (Mit'a): a MOUNTAIN pays the rows that NAME it — the seat still
+    // needs EFFECT_ADJUST_PLAYER_TERRAIN_WORK_IMPASSABLE_MODIFIER before a
+    // citizen may stand there and collect it (`workableTiles`)
+    // every row assigned here pays: the ERA gate lives in `plotYieldRowsFor`,
+    // which the caller runs before it hands the rows over
+    expect(tileYields(ctx, t).production).toBe(
+      rows.filter((r) => r.yield === 'production').reduce((n, r) => n + r.amount, 0),
+    );
+    // a seat with no mountain row takes nothing off the same tile
+    const bare = bareCtx(map);
+    expect(tileYields(bare, t).production).toBe(0);
   });
 
   it('getModifiers carries the rows of the seat it reads', () => {

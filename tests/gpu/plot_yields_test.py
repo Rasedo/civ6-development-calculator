@@ -177,13 +177,15 @@ def test_inca(rules, path) -> None:
     sim = fresh(rules, path)
     play(sim, 0, "INCA")
     t = int((sim.tile_mountain[B0] & ~sim.passable[B0]).nonzero(as_tuple=True)[0][0])
-    raw = sim._plot_yield_plane(0)[B0, t].tolist()
-    assert raw[1] >= 2, "the mountain row is not paid into the raw plane"
-    # ORACLE: `tileYields` leaves on an impassable tile before its clauses;
-    # `_seat_tile_add` masks the same way — Mit'a's yield waits on the
-    # impassable-work clause
-    assert add(sim, 0, t)[1] == 0.0, "an impassable mountain paid"
-    print("  6 Mit'a OK — the mountain rows stand, masked with the impassable ground")
+    # CIV6 (Mit'a): a MOUNTAIN row rides its own plane, since the tile-add
+    # mask refuses impassable ground — the TS twin is `tileYields`' mountain arm
+    assert sim._plot_yield_plane(0)[B0, t].tolist()[1] == 0.0, "a mountain row rode the general plane"
+    mtn = sim._mountain_yield_plane(0)[B0, t].tolist()
+    assert mtn[1] >= 2, "the mountain row is not paid into its own plane"
+    assert add(sim, 0, t)[1] == mtn[1], "the tile add lost the mountain's yield"
+    play(sim, 0, "ROME")
+    assert sim._mountain_yield_plane(0) is None or float(sim._mountain_yield_plane(0)[B0, t, 1]) == 0.0,         "a plain seat took the mountain's yield"
+    print("  6 Mit'a OK — the mountain rows pay on their own plane, the Inca alone")
 
 
 def main() -> int:

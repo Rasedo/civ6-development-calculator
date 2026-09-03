@@ -1,7 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow } from '../data/civilizations';
+import { HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -38,7 +38,8 @@ export interface Unlocks {
 }
 
 const BASELINE = {
-  improvements: ['FARM', 'ZIGGURAT'], // CIV6 (Ziggurat): no prerequisite
+  // CIV6 (Ziggurat, Terrace Farm): neither has a prerequisite in the install
+  improvements: ['FARM', 'ZIGGURAT', 'TERRACE_FARM'],
   buildings: ['MONUMENT'],
 };
 
@@ -158,6 +159,7 @@ export interface Modifiers {
   /** CIV6 (Mit'a): a citizen of this seat may work a MOUNTAIN */
   workMountains: boolean;
   routeTerrain: readonly RouteTerrainRow[];
+  terrainAdjYields: readonly TerrainAdjYieldRow[];
   governorYields: readonly GovernorYieldRow[];
   governorLoyaltyRows: readonly GovernorLoyaltyRow[];
   garrisonLoyalty: readonly GarrisonLoyaltyRow[];
@@ -331,6 +333,7 @@ export function defaultModifiers(): Modifiers {
     militaryPolicies: 0,
     workMountains: false,
     routeTerrain: [],
+    terrainAdjYields: [],
     governorYields: [],
     governorLoyaltyRows: [],
     garrisonLoyalty: [],
@@ -553,6 +556,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.postCombatYields = mine(POST_COMBAT_YIELD_ROWS);
   mods.workMountains = mine(WORK_IMPASSABLE_ROWS).length > 0;
   mods.routeTerrain = mine(ROUTE_TERRAIN_ROWS);
+  mods.terrainAdjYields = mine(TERRAIN_ADJ_YIELD_ROWS);
   mods.governorYields = mine(GOVERNOR_YIELD_ROWS);
   mods.governorLoyaltyRows = mine(GOVERNOR_LOYALTY_ROWS);
   mods.garrisonLoyalty = mine(GARRISON_LOYALTY_ROWS);

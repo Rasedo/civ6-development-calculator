@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { makeMap, makeState, tileAtCoords, settleAt, grantCivics } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { workableTiles, computeCityStats } from '../../../cpu/core/city';
+import { validImprovements } from '../../../cpu/core/rules';
+import { tileYields } from '../../../cpu/core/yields';
+import { makeYieldCtx } from '../../../cpu/core/effects';
+import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import { getModifiers } from '../../../cpu/core/effects';
 import { cityTradeYields, cityMountainCount } from '../../../cpu/core/trade';
 import { standingLoyalty } from '../../../cpu/core/phase';
@@ -12,7 +16,7 @@ import { formUp } from '../../../cpu/core/game';
 import { emptyGovernors } from '../../../cpu/core/governors';
 import { neighbors } from '../../../world/hex';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { WORK_IMPASSABLE_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS } from '../../../cpu/data/civilizations';
+import { TERRAIN_ADJ_YIELD_ROWS, WORK_IMPASSABLE_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS } from '../../../cpu/data/civilizations';
 import type { City, GameState } from '../../../cpu/core/types';
 
 /**
@@ -114,6 +118,21 @@ describe('the Toqui', () => {
       return standingLoyalty(state, other);
     };
     expect(loyaltyOf(seatRow('MAPUCHE'))).toBe(loyaltyOf(seatRow('AMERICA')) + 4);
+    // CIV6 (OncePerCity): a second governed city in reach pays NOTHING more
+    const twice = (row: number): number => {
+      const state = sceneAs(row);
+      const a = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
+      const b = settleAt(state, tileAtCoords(state.map, 3, 8).index, 0);
+      const other = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
+      state.seats[0].governors = emptyGovernors();
+      for (const [i, c] of [a, b].entries()) {
+        state.seats[0].governors[i].appointed = true;
+        state.seats[0].governors[i].cityId = c.id;
+        state.seats[0].governors[i].establishTurns = 0;
+      }
+      return standingLoyalty(state, other);
+    };
+    expect(twice(seatRow('MAPUCHE'))).toBe(twice(seatRow('AMERICA')) + 4);
   });
 });
 
@@ -134,6 +153,69 @@ describe('Isibongo', () => {
     expect(loyaltyOf(seatRow('ZULU'), 'unit')).toBe(base + 3);
     expect(loyaltyOf(seatRow('ZULU'), 'corps')).toBe(base + 5);
     expect(loyaltyOf(seatRow('AMERICA'), 'corps')).toBe(loyaltyOf(seatRow('AMERICA'), 'none'));
+  });
+});
+
+describe('the Terrace Farm', () => {
+  it("is the Inca's alone, on hills, and pays per mountain and per Aqueduct", () => {
+    const def = IMPROVEMENTS.TERRACE_FARM;
+    expect(def.uniqueTo).toBe('INCA');
+    expect(def.elevations).toEqual(['HILLS']);
+    expect(def.yields.food).toBe(1);
+    expect(def.housing).toBe(1);
+    const state = sceneAs(seatRow('INCA'));
+    const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
+    const site = neighbors(state.map, state.map.tiles[city.centerIndex])[0];
+    setTileOwner(site, 0, city.id);
+    site.elevation = 'HILLS';
+    site.feature = null;
+    // the Inca may build it; a plain seat may not
+    expect(validImprovements(state, site, 0)).toContain('TERRACE_FARM');
+    const plain = sceneAs(seatRow('AMERICA'));
+    const pc = settleAt(plain, tileAtCoords(plain.map, 7, 7).index, 0);
+    const ps = neighbors(plain.map, plain.map.tiles[pc.centerIndex])[0];
+    setTileOwner(ps, 0, pc.id);
+    ps.elevation = 'HILLS';
+    ps.feature = null;
+    expect(validImprovements(plain, ps, 0)).not.toContain('TERRACE_FARM');
+    // +1 Food per adjacent mountain
+    site.improvement = 'TERRACE_FARM';
+    const ctx = makeYieldCtx(state, 0);
+    const bare = tileYields(ctx, site).food;
+    let mtns = 0;
+    for (const nb of neighbors(state.map, site)) {
+      if (nb.index === city.centerIndex) continue;
+      nb.elevation = 'MOUNTAIN';
+      nb.feature = null;
+      mtns += 1;
+    }
+    expect(tileYields(makeYieldCtx(state, 0), site).food).toBe(bare + mtns);
+  });
+
+  it('pays a MOUNTAIN +1 Food per adjacent Terrace Farm, the Inca alone', () => {
+    expect(TERRAIN_ADJ_YIELD_ROWS.length).toBe(1);
+    const foodOf = (row: number): readonly [number, number] => {
+      const state = sceneAs(row);
+      const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
+      const mtn = neighbors(state.map, state.map.tiles[city.centerIndex])[0];
+      setTileOwner(mtn, 0, city.id);
+      mtn.elevation = 'MOUNTAIN';
+      mtn.feature = null;
+      let n = 0;
+      for (const nb of neighbors(state.map, mtn)) {
+        if (nb.index === city.centerIndex) continue;
+        nb.elevation = 'HILLS';
+        nb.feature = null;
+        nb.improvement = 'TERRACE_FARM';
+        n += 1;
+      }
+      expect(n).toBeGreaterThan(0);
+      return [tileYields(makeYieldCtx(state, 0), mtn).food, n] as const;
+    };
+    const [inca, farms] = foodOf(seatRow('INCA'));
+    const [plainFood] = foodOf(seatRow('AMERICA'));
+    expect(plainFood).toBe(0); // a mountain feeds nobody else
+    expect(inca).toBe(plainFood + farms);
   });
 });
 

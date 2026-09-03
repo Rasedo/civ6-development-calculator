@@ -34,7 +34,10 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
   const out = emptyYields();
   if (!rules) return out;
   for (const r of rules) {
-    const up = !!r.upgradeCivic && ctx.mods.impUpgrades.has(r.upgradeCivic);
+    // CIV6 (Terrace_MedievalAdjacency): a rule may WAIT on a civic of its own
+    if (r.requiresCivic && !ctx.mods.impUpgrades.has(r.requiresCivic)) continue;
+    const up = (!!r.upgradeCivic && ctx.mods.impUpgrades.has(r.upgradeCivic))
+      || (!!r.upgradeTech && ctx.mods.impUpgrades.has(r.upgradeTech));
     const per = (up && r.upgradePer) || r.per;
     const pay = (up && r.upgradeYields) || r.yields;
     let n = 0;
@@ -44,6 +47,8 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (r.anyDistrict && nb.district !== null && nb.districtComplete) ||
         (!!r.district && nb.district === r.district && nb.districtComplete) ||
         (!!r.builtWonder && nb.builtWonder !== null && nb.builtWonderComplete) ||
+        (!!r.mountain && isMountain(nb)) ||
+        (!!r.sameImprovement && nb.improvement === imp && !nb.pillaged) ||
         (!!r.features && nb.feature !== null && r.features.includes(nb.feature));
       if (hit) n += 1;
     }
@@ -70,7 +75,24 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (near) addYields(out, near);
     return out;
   }
-  if (isMountain(tile)) return out;
+  if (isMountain(tile)) {
+    // CIV6 (Mit'a): a MOUNTAIN yields nothing to anyone but the roster rows
+    // that name it — the plot rows keyed `mountain`, and the Food a Terrace
+    // Farm beside it pays (EFFECT_ADJUST_TERRAIN_YIELD_FROM_ADJACENT_IMPROVEMENTS).
+    for (const r of ctx.mods.plotYields) {
+      if (!r.mountain) continue;
+      if (r.improvement !== undefined && (tile.improvement !== r.improvement || tile.pillaged)) continue;
+      if (r.anyImprovement && (!tile.improvement || tile.pillaged)) continue;
+      out[r.yield] += r.amount;
+    }
+    for (const r of ctx.mods.terrainAdjYields) {
+      if (!r.mountain) continue;
+      let n = 0;
+      for (const nb of neighbors(ctx.map, tile)) if (nb.improvement === r.improvement && !nb.pillaged) n += 1;
+      out[r.yield] += r.amount * n;
+    }
+    return out;
+  }
   if (tile.district || tile.builtWonder) return out; // paved tiles don't produce tile yields
 
   addYields(out, terrainYields(tile));
@@ -93,6 +115,14 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (r.improvement !== undefined && (tile.improvement !== r.improvement || tile.pillaged)) continue;
     if (r.anyImprovement && (!tile.improvement || tile.pillaged)) continue;
     out[r.yield] += r.amount;
+  }
+  // CIV6 (Mit'a, EFFECT_ADJUST_TERRAIN_YIELD_FROM_ADJACENT_IMPROVEMENTS): a
+  // MOUNTAIN pays this seat per adjacent Terrace Farm (`TERRAIN_ADJ_YIELD_ROWS`)
+  for (const r of ctx.mods.terrainAdjYields) {
+    if (r.mountain && !isMountain(tile)) continue;
+    let n = 0;
+    for (const nb of neighbors(ctx.map, tile)) if (nb.improvement === r.improvement && !nb.pillaged) n += 1;
+    out[r.yield] += r.amount * n;
   }
   if (tile.improvement && !tile.pillaged) {
     const imp = tile.improvement as ImprovementId;

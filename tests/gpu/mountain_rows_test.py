@@ -113,6 +113,32 @@ def test_mita(rules, path) -> None:
     print(f"  2 Mit'a OK — {len(ring)} mountains worked by the Inca, none by Rome")
 
 
+def test_terrace_farm(rules, path) -> None:
+    """The Inca's unique improvement, and the Food a mountain takes from it."""
+    sim = fresh(rules, path)
+    imps = RULES["improvements"]["ids"]
+    tf = imps.index("TERRACE_FARM")
+    row = RULES["improvements"]["rows"][tf]
+    assert row["uniq"] == sim._civ_ids.index("INCA"), "the Terrace Farm is not the Inca's"
+    assert row["yields"][0] == 1 and row["housing"] == 1, "its own Food and Housing"
+    srcs = [(int(a.get("mtn", 0)), int(a.get("same", 0)), int(a["dist"]), int(a["per"])) for a in row["adj"]]
+    assert (1, 0, -1, 1) in srcs and (0, 1, -1, 2) in srcs, "the mountain and same-kind clauses"
+    # a MOUNTAIN pays the Inca per adjacent Terrace Farm
+    play(sim, 0, "INCA")
+    mtn = next(t for t in range(sim.T) if bool(sim.tile_mountain[B0, t]))
+    near = [int(x) for x in sim.neigh[mtn].tolist() if x >= 0]
+    for x in near:
+        sim.improvement[B0, x] = tf
+        sim.pillaged[B0, x] = False
+    sim._eff_version += 1
+    got = float(sim._mountain_yield_plane(0)[B0, mtn, 0])
+    assert got == len(near), f"the mountain took {got} Food from {len(near)} Terrace Farms"
+    play(sim, 0, "ROME")
+    plane = sim._mountain_yield_plane(0)
+    assert plane is None or float(plane[B0, mtn, 0]) == 0.0, "a plain seat took the Food"
+    print(f"  3 the Terrace Farm OK — +{len(near)} Food on the mountain beside {len(near)} of them")
+
+
 def test_qhapaq_nan(rules, path) -> None:
     """A DOMESTIC leg out of a city ringed in mountains."""
     def food_of(name, leader=None) -> tuple[float, int]:
@@ -224,6 +250,7 @@ def main() -> int:
     path = fixture_paths()[0]
     test_wire(rules, path)
     test_mita(rules, path)
+    test_terrace_farm(rules, path)
     test_qhapaq_nan(rules, path)
     test_toqui(rules, path)
     test_isibongo(rules, path)

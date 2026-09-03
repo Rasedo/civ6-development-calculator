@@ -86,7 +86,8 @@ export type ImprovementId =
   | 'WIND_FARM'
   | 'MISSILE_SILO'
   | 'GEOTHERMAL_PLANT'
-  | 'OFFSHORE_WIND_FARM';
+  | 'OFFSHORE_WIND_FARM'
+  | 'TERRACE_FARM';
 
 export type DistrictId =
   | 'CITY_CENTER'

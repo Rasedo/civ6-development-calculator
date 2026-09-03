@@ -49,7 +49,7 @@ import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } fro
 // drift from every other seat's. units.ts already imports from here, so this
 // closes a cycle — both directions are called at RUN time, never at module
 // init, which is what makes that safe.
-import { gdrHas, unitFullMoves, waterWalks } from './units';
+import { gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
 import { warWearinessBattle, warWearinessLaunch } from './weariness';
 import { unitKillEvent } from './eras';
 
@@ -746,7 +746,7 @@ export function siegeMayShoot(state: GameState, unit: Unit): boolean {
   if (def?.bombard === undefined) return true;
   // CIV6 (Expert Crew): "Can attack after moving."
   if (promoFlag(unit, 'SIEGE_MOVE_SHOOT')) return true;
-  if (unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit))) return true;
+  if (unit.movesLeft >= grantedMoves(state, unit)) return true;
   return unitFullMoves(state, unit) + generalAuraMP(state, unit) > (def.moves ?? 2) * MP_SCALE;
 }
 

@@ -4202,21 +4202,6 @@ class SimSeats:
         out.scatter_add_(1, sl.clamp(min=0), (plane & (sl >= 0)).long())
         return out
 
-    def _city_has_established_governor(self, row: int) -> torch.Tensor:
-        """[B, RC] — does an APPOINTED governor sit here with its establishment
-        clock run out? The abilities' own gate, by city column."""
-        out = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
-        if not self.n_governors:
-            return out
-        ids = self.city_id[:, row, : self.RC]
-        for g in range(self.civ_gov_city.shape[2]):
-            live = (self.civ_gov_appointed[:, row, g] & (self.civ_gov_establish[:, row, g] <= 0))
-            if not bool(live.any()):
-                continue
-            out = out | (live.unsqueeze(1) & (self.civ_gov_city[:, row, g].unsqueeze(1) == ids)
-                         & self.city_alive[:, row, : self.RC])
-        return out
-
     def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
         """[n] f64 — CIV6 (Monument): "+1 Loyalty", and (Government Plaza)
         "+8 Loyalty to this city": the flat per-turn term everything standing in
@@ -4270,7 +4255,7 @@ class SimSeats:
             rows = [r for r in self._governor_loyalty_rows if bool(self._row_is(src, r[0], r[1]).any())]
             if not rows:
                 continue
-            est = self._city_has_established_governor(src)          # [B, RC]
+            est = self._governor_established(src)          # [B, RC]
             if not bool(est.any()):
                 continue
             seat_ok = self._row_is(src, rows[0][0], rows[0][1])     # [B]
@@ -5300,9 +5285,15 @@ class SimSeats:
             if not bool(here.any()):
                 continue
             for r in rules:
-                uc = int(r.get("uc", -1))
+                # a rule may WAIT on a civic of its own (Terrace_MedievalAdjacency)
+                rc = int(r.get("rc", -1))
+                if rc >= 0 and not bool(cv[:, rc].any()):
+                    continue
+                uc, ut = int(r.get("uc", -1)), int(r.get("ut", -1))
                 up = (cv[:, uc] if uc >= 0 else
                       torch.zeros(self.B, dtype=torch.bool, device=self.device))
+                if ut >= 0:
+                    up = up | self.civ_techs[:, row, ut]
                 hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
                 if int(r.get("bres", 0)):
                     hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
@@ -5315,12 +5306,18 @@ class SimSeats:
                     hit |= (self.district[:, nbc] == di) & self.district_complete[:, nbc]
                 for f in r.get("feats", []):
                     hit |= (self.feat_id[:, nbc] == f) & ~self.feat_stripped[:, nbc]
+                if int(r.get("mtn", 0)):
+                    hit |= self.tile_mountain[:, nbc]
+                if int(r.get("same", 0)):
+                    hit |= (self.improvement[:, nbc] == k) & ~self.pillaged[:, nbc]
                 n = (hit & on).sum(dim=2)                    # [B, T]
                 uper = int(r.get("uper", 0))
                 per = torch.where(up.unsqueeze(1) & (uper > 0),
                                   torch.full_like(n, max(1, uper)),
                                   torch.full_like(n, max(1, int(r["per"]))))
                 groups = torch.div(n, per.clamp(min=1), rounding_mode="floor").to(self.dtype)
+                if rc >= 0:
+                    groups = groups * cv[:, rc].reshape(-1, 1).to(self.dtype)
                 base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
                 upy = torch.tensor(r.get("uy", [0] * 6), dtype=self.dtype, device=self.device)
                 pay = (torch.where(up.reshape(-1, 1, 1), upy.reshape(1, 1, 6),
@@ -5375,6 +5372,9 @@ class SimSeats:
             py = self._plot_yield_plane(row)
             if py is not None:
                 plane = plane + py * self._tile_add_live()
+            mty = self._mountain_yield_plane(row)
+            if mty is not None:
+                plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
@@ -5408,6 +5408,9 @@ class SimSeats:
         if py is not None:
             plane = plane + py
         plane = plane * self._tile_add_live()
+        mty = self._mountain_yield_plane(row)
+        if mty is not None:
+            plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
         pres = self._preserve_plane(row)
         if pres is not None:
             plane = plane + pres * self._preserve_live()
@@ -5447,7 +5450,7 @@ class SimSeats:
             if hl >= 0:
                 m = m & (hills == bool(hl))
             if int(self._py_mtn[k]):
-                m = m & self.tile_mountain
+                continue  # a mountain row rides `_mountain_yield_plane`
             if ft >= 0:
                 m = m & feat_live & (self.feat_id == ft)
             if im >= 0:
@@ -5455,6 +5458,51 @@ class SimSeats:
             if int(self._py_anyimp[k]):
                 m = m & imp_live
             out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
+        return out
+
+    def _mountain_yield_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — what a MOUNTAIN pays this row. CIV6 (Mit'a): a mountain
+        yields nothing to anyone but the roster rows that NAME it — the plot
+        rows keyed `mountain`, and the Food a Terrace Farm beside it pays
+        (EFFECT_ADJUST_TERRAIN_YIELD_FROM_ADJACENT_IMPROVEMENTS). It rides its
+        own plane because the tile-add mask refuses impassable ground, which is
+        exactly where TS's mountain arm sits."""
+        B, T, dev = self.B, self.T, self.device
+        civ, lead = self.row_civ[:, row], self.row_leader[:, row]
+        era = self._world_era()
+        imp_live = (self.improvement >= 0) & ~self.pillaged
+        out = None
+        for k in range(int(self._py_civ.numel())):
+            if not int(self._py_mtn[k]):
+                continue
+            c, ld = int(self._py_civ[k]), int(self._py_leader[k])
+            who = (civ == c) if c >= 0 else (lead == ld)
+            cv, er = int(self._py_civic[k]), int(self._py_era[k])
+            if cv >= 0:
+                who = who & self.civ_civics[:, row, cv]
+            if er >= 0:
+                who = who & (era >= er)
+            if not bool(who.any()):
+                continue
+            m = who.unsqueeze(1) & self.tile_mountain
+            im = int(self._py_imp[k])
+            if im >= 0:
+                m = m & imp_live & (self.improvement == im)
+            if int(self._py_anyimp[k]):
+                m = m & imp_live
+            if out is None:
+                out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+            out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
+        for _tc, _tl, _ti, _ty, _ta in self._terrain_adj_yield_rows:
+            _tw = self._row_is(row, _tc, _tl)
+            if not bool(_tw.any()):
+                continue
+            nbc = self.neigh.clamp(min=0)
+            _near = ((self.improvement[:, nbc] == _ti) & ~self.pillaged[:, nbc]
+                     & (self.neigh >= 0).unsqueeze(0)).sum(dim=2)
+            if out is None:
+                out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+            out[:, :, _ty] += (_tw.unsqueeze(1) & self.tile_mountain).to(self.dtype) * _near.to(self.dtype) * _ta
         return out
 
     def _dist_counts(self, row: int, pillage_gate: bool = True) -> torch.Tensor:

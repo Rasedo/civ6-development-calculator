@@ -50,7 +50,7 @@ import { FEATURES } from '../../world/features';
 import { ROUTE_CHAIN_MAX } from './trade';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
-import { emptyStockpile, MP_SCALE } from '../data/constants';
+import { emptyStockpile } from '../data/constants';
 
 // the exported feature index (FEAT_IDS order = the catalog's own)
 const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
@@ -71,6 +71,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { ARTIFACT_PROV_W, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
+import { grantedMoves } from './units';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -688,7 +689,7 @@ const UNIT_G: Record<string, Extractor> = {
   xpPct: overUnits((u) => u.xpPct ?? 0),
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
-  movesFull: overUnits((u) => u.movesFull ?? MP_SCALE * (UNITS[u.type]?.moves ?? 0)),
+  movesFull: ((state, rows) => (rows as Unit[]).map((u) => grantedMoves(state, u))) as Extractor,
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
   formation: overUnits((u) => u.formation ?? 0),

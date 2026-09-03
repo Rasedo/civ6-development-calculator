@@ -17,7 +17,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects } from './governors';
+import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -1030,7 +1030,7 @@ export function computeCityStats(
     for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) total[k] *= 1 + r.pct / 100;
     // CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for a
     // city with an ESTABLISHED governor, tripled in one this seat did not found
-    if (m.governorYields.length && (seatOf(state, city.seat)?.governors ?? []).some((g) => g.appointed && g.cityId === city.id && g.establishTurns <= 0)) {
+    if (m.governorYields.length && cityGovernorEffects(state, city).length > 0) {
       const founded = (city.founderSeat ?? city.seat) === city.seat;
       for (const r of m.governorYields) if (r.yield === k && r.founded === founded) total[k] *= 1 + r.pct / 100;
     }

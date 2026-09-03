@@ -343,17 +343,24 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
         if (hexDistance(here.col, here.row, t.col, t.row) > aura.range) continue;
         n += own ? aura.loyalty : -aura.loyalty;
       }
-      // CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE): "All cities
-      // within 9 tiles of a city with your Governor gain +4 Loyalty per turn
-      // towards your civilization" — the ROW's own reach, once per city,
-      // measured from any city of that seat holding an ESTABLISHED governor.
-      const rows = getModifiers(state, c.seat).governorLoyaltyRows;
-      if (!rows.length || !governorsOf(s).some((g) => g.appointed && g.cityId === c.id && g.establishTurns <= 0)) continue;
-      const t = state.map.tiles[c.centerIndex];
-      for (const r of rows) {
-        if (hexDistance(here.col, here.row, t.col, t.row) > r.range) continue;
-        n += c.seat === city.seat ? r.amount : -r.amount;
-      }
+    }
+  }
+  // CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE, OncePerCity):
+  // "All cities within 9 tiles of a city with your Governor gain +4 Loyalty
+  // per turn towards your civilization" — ONCE per city however many governed
+  // cities of that seat stand in reach, positive toward its own and negative
+  // against a foreign one.
+  for (const s of state.seats) {
+    const rows = getModifiers(state, s.seat).governorLoyaltyRows;
+    if (!rows.length) continue;
+    for (const r of rows) {
+      const near = s.cities.some((c) => {
+        if (c.id === city.id && c.seat === city.seat) return false;
+        if (!cityGovernorEffects(state, c).length) return false;
+        const t = state.map.tiles[c.centerIndex];
+        return hexDistance(here.col, here.row, t.col, t.row) <= r.range;
+      });
+      if (near) n += s.seat === city.seat ? r.amount : -r.amount;
     }
   }
   return n;

@@ -4105,8 +4105,8 @@ class SimEconomy:
         # found
         _grows = [r for r in self._governor_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
         if _grows:
-            _est = self._city_has_established_governor(row)[:, sl] if j is None else \
-                self._city_has_established_governor(row)[:, sl][:, j:j + 1]
+            _est = self._governor_established(row)[:, sl] if j is None else \
+                self._governor_established(row)[:, sl][:, j:j + 1]
             _own = (self.city_founder[:, row, sl] == row) if j is None else \
                 (self.city_founder[:, row, sl] == row)[:, j:j + 1]
             for _gc, _gl, _gy, _gp, _gf in _grows:
