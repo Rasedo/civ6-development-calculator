@@ -572,7 +572,9 @@ class SimPhase:
         # DISTRICT item (EFFECT_ADJUST_DISTRICT_PRODUCTION); the unit arms below
         # CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
         # the seat's home continent — its ORIGINAL capital's landmass
-        _off_home = ~self._on_home_continent(row, self.city_center[:, row])
+        # at THIS call's city column — `cur` is [B], one city per call, so a
+        # full-width read would broadcast against the wrong axis
+        _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
         for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._prod_mult_rows:
             if _rp >= 0 or _ru >= 0 or _rev == 2:
                 continue

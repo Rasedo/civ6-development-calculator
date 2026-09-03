@@ -112,7 +112,27 @@ def test_spain_production_is_off_home_only(rules, path) -> None:
                if bool(sim.city_alive[B0, ROW, j]) and int(sim.city_center[B0, ROW, j]) == site)
     assert bool(off2[B0, col]), "the city founded abroad did not read as off-home"
     assert not bool(off2[B0, 0]), "the capital's own city drifted off-home"
-    print("  2 Spain OK — the gate is true abroad and false at home")
+    # ...and RUN the production path at B > 1, which is where the row is
+    # actually read. The predicate alone missed a shape fault here, and so
+    # did a B=1 run: a full-width [B, RC] read BROADCASTS silently against a
+    # [B] one when B is 1, and only reds when the batch is wider (the
+    # battery's shard was B=3).
+    wide = settle_all(BatchSim([load_fixture(path), load_fixture(path)],
+                               load_rules(), device="cpu", dtype=torch.float64))
+    assert wide.B > 1, "this lane needs a batch wider than one to mean anything"
+    _seat(wide, ROW, civ="SPAIN")
+    # a DISTRICT must actually be at the queue head, or the row's own arm
+    # never runs and the lane passes without touching it
+    for j in (0, 1):
+        wide.city_current[:, ROW, j, 0] = wide.DISTRICT_BASE
+        wide.city_qtile[:, ROW, j, 0] = wide.city_center[:, ROW, j]
+    wide._eff_version += 1
+    for j in (0, 1):
+        jc = torch.full((wide.B,), j, dtype=torch.long)
+        wide._seat_city_produce(ROW, jc, torch.ones(wide.B, dtype=torch.bool),
+                                torch.full((wide.B,), 10.0, dtype=wide.dtype))
+    print("  2 Spain OK — the gate reads right, and the production path runs",
+          "at B =", wide.B)
 
 
 def test_victoria_capacity_counts_cities_abroad(rules, path) -> None:
