@@ -33,7 +33,7 @@ import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
 import type { FeatureId } from '../../world/types';
-import { isWater } from '../../world/query';
+import { isWater, deriveContinents } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -142,6 +142,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
   // map as it was made, so they are stamped once, here, and never re-derived
   // from a map the game has already changed.
   deriveLowlands(map);
+  deriveContinents(map);
   return {
     map,
     climateIdx: -1,

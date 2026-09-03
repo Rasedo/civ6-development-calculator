@@ -198,6 +198,12 @@ export interface Tile {
    *  inland, which the rising sea never reaches. Derived from the map at
    *  creation by `deriveLowlands`, never read off the world file. */
   lowland?: number;
+  /** CIV6 (Continents): the landmass this tile belongs to, counting from 0
+   *  in ascending tile index; -1 for water. Derived from the map at creation
+   *  by `deriveContinents`, never read off the world file — the same shape as
+   *  `lowland`. A seat's HOME continent is its ORIGINAL capital's.
+   */
+  continent?: number;
   /** the sea has been over this tile: it is pillaged and pays no improvement
    *  bonus, but is still workable and can be repaired behind a Flood
    *  Barrier. */

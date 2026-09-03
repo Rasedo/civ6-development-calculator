@@ -4509,6 +4509,38 @@ class SimSeats:
                 out = out + n * (_amt if src == row else -_amt)
         return out
 
+    def _home_continent(self, row: int) -> torch.Tensor:
+        """[B] — the landmass seat `row` calls HOME: its ORIGINAL capital's,
+        which is what every "home continent" requirement in the install reads.
+        `civ_cap_tile` is the twin of TS's `Seat.capitalTile`: both are
+        stamped at the first founding and neither MOVES, so a relocated Palace
+        — or a razed capital — leaves the home continent where it was. -1
+        where the seat never founded (`homeContinent`)."""
+        cap = self.civ_cap_tile[:, row]
+        return torch.where(cap >= 0,
+                           self.tile_continent.gather(1, cap.clamp(min=0).unsqueeze(1)).squeeze(1),
+                           torch.full_like(cap, -1))
+
+    def _on_home_continent(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
+        """bool, shaped like `tiles` — is each tile on `row`'s home continent?
+        False for water and for a seat with no capital, so a clause keyed on
+        it never pays by accident (`onHomeContinent`)."""
+        home = self._home_continent(row)
+        while home.dim() < tiles.dim():
+            home = home.unsqueeze(-1)
+        got = self.tile_continent.gather(
+            1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
+        return (home >= 0) & (got == home)
+
+    def _route_intercontinental(self, from_tile: torch.Tensor, to_tile: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Treasure Fleet): "Trade Routes between multiple continents" —
+        the two ENDPOINTS sit on different landmasses. A route touching
+        water-only ground (-1) is NOT intercontinental: the test is two known,
+        different ids (`routeIntercontinental`)."""
+        a = self.tile_continent.gather(1, from_tile.clamp(min=0).reshape(self.B, -1)).reshape(from_tile.shape)
+        b = self.tile_continent.gather(1, to_tile.clamp(min=0).reshape(self.B, -1)).reshape(to_tile.shape)
+        return (from_tile >= 0) & (to_tile >= 0) & (a >= 0) & (b >= 0) & (a != b)
+
     def _wonder_tourism_pct(self, row: int) -> torch.Tensor:
         """[B] long — the percentage this row adds to the WONDER half of its
         tourism, per GAME (`wonderTourismPct`). The roster mask is [B] and

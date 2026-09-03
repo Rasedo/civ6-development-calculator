@@ -2715,6 +2715,10 @@
       {
         "path": "Seat.congressVote",
         "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary."
+      },
+      {
+        "path": "Tile.continent",
+        "why": "a derived MAP fact, not state: `deriveContinents` flood-fills the landmasses once at map creation and the exporter ships the ids per tile, so the GPU reads exactly these rather than filling its own. Nothing mutates it — a tile the sea later takes keeps the id it was born with on BOTH engines, since neither recomputes — so there is nothing per-turn for a digest to compare."
       }
     ],
     "gpu": [

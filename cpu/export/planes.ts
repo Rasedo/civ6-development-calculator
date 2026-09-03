@@ -276,6 +276,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
           ? RESOURCES[t.resource]?.improvement === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS')
           ? 1 : 0,
+      // CIV6 (Continents): the landmass id, -1 for water. Derived at map
+      // creation by `deriveContinents`, shipped so both engines read the
+      // SAME ids rather than each flood-filling its own.
+      cont: t.continent ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
       dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,
       de: t.terrain === 'DESERT' ? 1 : 0,

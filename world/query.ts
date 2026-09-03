@@ -4,6 +4,38 @@ import { TERRAINS } from './terrains';
 import { FEATURES } from './features';
 import type { GameMap, Tile } from './types';
 
+/**
+ * CIV6 (Continents): every contiguous LANDMASS gets an id, counting from 0
+ * in ascending tile index; water is -1. A flood fill over land, which is what
+ * a continent IS — mountains and impassable ground belong to the landmass
+ * they sit in, and a lake never splits one because the ring of land around it
+ * stays connected.
+ *
+ * Derived at map creation like `deriveLowlands`, so the world FILE is
+ * unchanged and both engines read the same ids: the exporter ships this field
+ * per tile and the GPU reads it back.
+ */
+export function deriveContinents(map: GameMap): void {
+  const cont = new Int32Array(map.tiles.length).fill(-1);
+  let next = 0;
+  for (const seed of map.tiles) {
+    if (isWater(seed) || cont[seed.index] >= 0) continue;
+    const id = next++;
+    // ascending tile index out of the seed, so the walk is order-free
+    const stack: Tile[] = [seed];
+    cont[seed.index] = id;
+    while (stack.length) {
+      const t = stack.pop()!;
+      for (const n of neighbors(map, t)) {
+        if (isWater(n) || cont[n.index] >= 0) continue;
+        cont[n.index] = id;
+        stack.push(n);
+      }
+    }
+  }
+  for (const t of map.tiles) t.continent = cont[t.index];
+}
+
 export function isWater(tile: Tile): boolean {
   return TERRAINS[tile.terrain].water || !!tile.submerged;
 }

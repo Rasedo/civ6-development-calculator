@@ -3,6 +3,7 @@
 import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/types';
 import { BARB_SEAT, NO_SEAT, emptySeat, seatOf, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
+import { deriveContinents } from '../../world/query';
 import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
 import { canFoundCity } from '../../cpu/core/rules';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
@@ -50,6 +51,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
   // The same stamps `createGameFromMap` makes, so a test state answers the
   // climate the way a real one does.
   deriveLowlands(map);
+  deriveContinents(map);
   return {
     map,
     climateIdx: -1,

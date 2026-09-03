@@ -1748,6 +1748,12 @@ class SimInit:
         self.tile_wh = torch.tensor([[float(t.get("wh", 2)) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device)  # water housing at a hypothetical center
         # Chop planes: grant key (0 none/1 food/2 prod) + removal-unlock tech
         self.tile_ftr = torch.tensor([[int(t.get("ftr", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # CIV6 (Continents): the landmass id per tile, -1 for water. A seat's
+        # HOME continent is its ORIGINAL capital's (`civ_cap_tile`, which
+        # deliberately does not move).
+        self.tile_continent = torch.tensor(
+            [[int(t.get("cont", -1)) for t in f["tiles"]] for f in fixtures],
+            dtype=torch.long, device=device)
         self.tile_ftu = torch.tensor([[int(t.get("ftu", -1)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],

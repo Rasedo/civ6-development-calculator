@@ -554,3 +554,35 @@ export function denounceCasusBelli(state: GameState, a: number, b: number): bool
   const t = seatOf(state, a)?.denounced[b];
   return t !== undefined && state.turn - t >= FORMAL_WAR_MIN_TURNS && state.turn - t < AGREEMENT_TURNS;
 }
+
+/**
+ * CIV6 (Continents): the landmass a seat calls HOME — its ORIGINAL capital's,
+ * which is what every "home continent" requirement in the install reads
+ * (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT and its city/unit siblings).
+ * `Seat.capitalTile` is the twin of the GPU's `civ_cap_tile`: both are
+ * stamped at the first founding and neither MOVES, so a relocated Palace —
+ * or a razed capital — leaves the home continent where it was. -1 when the
+ * seat never founded.
+ */
+export function homeContinent(state: GameState, seat: number): number {
+  const ct = seatOf(state, seat)?.capitalTile;
+  if (ct === undefined || ct < 0) return -1;
+  return state.map.tiles[ct]?.continent ?? -1;
+}
+
+/** Is `tileIndex` on `seat`'s home continent? False for water and for a seat
+ *  with no capital, so a clause keyed on it never pays by accident. */
+export function onHomeContinent(state: GameState, seat: number, tileIndex: number): boolean {
+  const home = homeContinent(state, seat);
+  if (home < 0) return false;
+  return (state.map.tiles[tileIndex]?.continent ?? -1) === home;
+}
+
+/** CIV6 (Treasure Fleet): "Trade Routes between multiple continents" — the
+ *  two ENDPOINTS sit on different landmasses. A route touching water-only
+ *  ground (-1) is not intercontinental: the test is two KNOWN, different ids. */
+export function routeIntercontinental(state: GameState, fromTile: number, toTile: number): boolean {
+  const a = state.map.tiles[fromTile]?.continent ?? -1;
+  const b = state.map.tiles[toTile]?.continent ?? -1;
+  return a >= 0 && b >= 0 && a !== b;
+}
