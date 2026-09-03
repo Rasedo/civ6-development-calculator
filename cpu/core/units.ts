@@ -8,7 +8,7 @@ import type { GameState, City, Seat, Tile, Unit, QueueItem } from './types';
 import { seatWonderSum } from './wonders';
 import { takeItemBank } from './prodLayout';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { FORMATION_CS } from '../data/units';
+import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC } from '../data/units';
 
 /** what a unit's FORMATION adds to Combat, Ranged and Bombard Strength alike.
  *  ONE reader of the optional field, so no strength site spells its own
@@ -1571,6 +1571,23 @@ export function isGreatEngineer(unitType: string): boolean {
   return unitType === 'ENGINEER';
 }
 
+/** The highest formation TIER this seat may raise a chassis to right now —
+ *  the civic gate `formUp` asks, without a host to merge with. CIV6
+ *  (Isibongo): "if the proper Civics are unlocked". */
+export function formationTierFor(state: GameState, seat: number, unitType: string): number {
+  if (unitDomain(unitType) !== 'military' || formationBanned(unitType)) return 0;
+  const naval = !!UNITS[unitType]?.naval;
+  const rows = getModifiers(state, seat).formations;
+  let best = 0;
+  for (let tier = 1; tier <= FORMATION_MAX; tier++) {
+    const row = rows.find((r) => r.tier === tier && r.naval === naval && r.civic !== undefined);
+    const civic = row?.civic ?? FORMATION_CIVIC[tier];
+    if (civic && !isCivicComplete(state, civic, seat)) break;
+    best = tier;
+  }
+  return best;
+}
+
 export function spawnUnit(
   state: GameState,
   unitType: string,
@@ -1597,6 +1614,9 @@ export function spawnUnit(
       + startTileMoves(state, { type: unitType, seat, tileIndex: spot.index })),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
+    // CIV6 (Flying Squadron): "All spies start as Agents with a free
+    // promotion" — the level the unit is BORN at (`SPY_PROMO_ROWS`)
+    spyLevel: isSpy(unitType) ? getModifiers(state, seat).spyPromos : undefined,
     path: null,
   };
   // The pool it was GRANTED, recorded at birth: every "spent no MP" gate

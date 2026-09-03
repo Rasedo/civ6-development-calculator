@@ -2872,6 +2872,26 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["gpRefund"]]  # type: ignore[misc]
         self._evict_pct_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
+        # THE SLOT, THE GREAT WORK AND THE CONQUERED FORMATION
+        # [civ, leaderRow, fromSlot, toSlot] in SLOT_KINDS order
+        self._slot_convert_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["slotConvert"]]  # type: ignore[misc]
+        self._slot_favor_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["slotFavor"]]  # type: ignore[misc]
+        self._plaza_district_prod_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["plazaDistrictProd"]]  # type: ignore[misc]
+        # [civ, leaderRow, amount (NEGATIVE), range] per Great Work
+        self._great_work_loyalty_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["greatWorkLoyalty"]]  # type: ignore[misc]
+        self._park_appeal_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["parkAppeal"]]  # type: ignore[misc]
+        # [civ, leaderRow, pct, founded]
+        self._governor_xp_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["governorXp"]]  # type: ignore[misc]
+        self._conquest_formation_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["conquestFormation"]]  # type: ignore[misc]
+        self._spy_promo_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["spyPromos"]]  # type: ignore[misc]
         # THE WONDER, THE RIVER AND THE POST
         # [civ, leaderRow, startEra, endEra, pct] — an ERA BAND on a wonder
         self._wonder_era_prod_rows: list[tuple[int, int, int, int, int]] = [
@@ -2883,8 +2903,8 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["riverCrossProd"]]  # type: ignore[misc]
         self._immediate_post_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["immediatePosts"]]  # type: ignore[misc]
-        # [civ, leaderRow, postLevels, csPerLevel]
-        self._diplo_vis_rows: list[tuple[int, int, int, int]] = [
+        # [civ, leaderRow, postLevels, csPerLevel, flatLevels]
+        self._diplo_vis_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["diploVis"]]  # type: ignore[misc]
         # [civ, leaderRow, ban] — the ban's index is `WAR_BANS` order
         self._war_ban_rows: list[tuple[int, int, int]] = [

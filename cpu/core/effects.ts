@@ -1,7 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
+import { SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -11,6 +11,8 @@ import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFi
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf } from './seats';
+import { hexDistance } from '../../world/hex';
+import { gwCount, GW_WRITING, GW_ART, GW_MUSIC } from '../data/greatPeople';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
@@ -233,6 +235,18 @@ export interface Modifiers {
   goldenRouteCapacity: number;
   /** one yield per this many techs or civics another seat is AHEAD by */
   progressTradePer: number;
+  /** batch 13 — the slot, the great work and the conquered formation */
+  slotConvert: readonly SlotConvertRow[];
+  slotFavor: readonly SlotFavorRow[];
+  /** what a district gains in the city holding the Government Plaza */
+  plazaDistrictProd: number;
+  greatWorkLoyalty: readonly GreatWorkLoyaltyRow[];
+  /** what a city holding a National Park adds to every tile it owns */
+  parkAppeal: number;
+  governorXp: readonly GovernorXpRow[];
+  /** a unit that takes a city is promoted to a formation */
+  conquestFormation: boolean;
+  spyPromos: number;
   districtUnits: readonly DistrictUnitRow[];
   /** the roster's heal on eliminating a unit */
   postKillHeal: number;
@@ -450,6 +464,14 @@ export function defaultModifiers(): Modifiers {
     intlRouteTerrain: [],
     goldenRouteCapacity: 0,
     progressTradePer: 0,
+    slotConvert: [],
+    slotFavor: [],
+    plazaDistrictProd: 0,
+    greatWorkLoyalty: [],
+    parkAppeal: 0,
+    governorXp: [],
+    conquestFormation: false,
+    spyPromos: 0,
     districtUnits: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
@@ -666,6 +688,28 @@ export function progressAhead(state: GameState, mine: number, theirs: number, ci
   return Math.max(0, n);
 }
 
+/** CIV6 (Eleanor): "Great Works in Eleanor's cities each cause -1 Loyalty per
+ *  turn in FOREIGN cities within 9 tiles." The loss is the OTHER seat's, so
+ *  this reads every rival's rows against the city being scored
+ *  (`GREAT_WORK_LOYALTY_ROWS`). */
+export function greatWorkLoyalty(state: GameState, city: City): number {
+  let n = 0;
+  const here = state.map.tiles[city.centerIndex];
+  for (const s of state.seats) {
+    if (s.seat === city.seat) continue;
+    const rows = getModifiers(state, s.seat).greatWorkLoyalty;
+    if (!rows.length) continue;
+    for (const c of s.cities) {
+      const t = state.map.tiles[c.centerIndex];
+      const d = hexDistance(here.col, here.row, t.col, t.row);
+      const works = gwCount(c, GW_WRITING) + gwCount(c, GW_ART) + gwCount(c, GW_MUSIC);
+      if (!works) continue;
+      for (const r of rows) if (d <= r.range) n += r.amount * works;
+    }
+  }
+  return n;
+}
+
 export function religionsPresent(city: City): number[] {
   const out: number[] = [];
   const pres = city.religionPressure;
@@ -794,6 +838,14 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.intlRouteTerrain = mine(INTL_ROUTE_TERRAIN_ROWS);
   mods.goldenRouteCapacity = mine(GOLDEN_ROUTE_CAPACITY_ROWS).reduce((n, r) => n + r.amount, 0);
   mods.progressTradePer = mine(PROGRESS_TRADE_ROWS).reduce((n, r) => Math.max(n, r.per), 0);
+  mods.slotConvert = mine(SLOT_CONVERT_ROWS);
+  mods.slotFavor = mine(SLOT_FAVOR_ROWS);
+  mods.plazaDistrictProd = mine(PLAZA_DISTRICT_PROD_ROWS).reduce((n, r) => n + r.pct, 0);
+  mods.greatWorkLoyalty = mine(GREAT_WORK_LOYALTY_ROWS);
+  mods.parkAppeal = mine(PARK_APPEAL_ROWS).reduce((n, r) => n + r.amount, 0);
+  mods.governorXp = mine(GOVERNOR_XP_ROWS);
+  mods.conquestFormation = mine(CONQUEST_FORMATION_ROWS).length > 0;
+  mods.spyPromos = mine(SPY_PROMO_ROWS).reduce((n, r) => n + r.promotions, 0);
   mods.districtUnits = mine(DISTRICT_UNIT_ROWS);
   // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
   // adjacency adds the cards write, so `districtAdjacency` reads one list
@@ -1003,8 +1055,44 @@ export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKin
     const gov = computeAdoption(s.research).government;
     const i = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
     if (i >= 0) out.wildcard = Math.max(0, out.wildcard + congressWildcardDelta(state, i));
+    // CIV6 (Founding Fathers): "All Diplomatic policy slots in the current
+    // government are converted to Wildcard slots" — the install's
+    // `ReplacesAll`, so the whole kind moves, in whatever government is
+    // adopted (`SLOT_CONVERT_ROWS`). A conversion is a MOVE, which this
+    // delta record can say: the kind leaves and the other arrives.
+    const conv = SLOT_CONVERT_ROWS.filter((r) => rowIsFor(r, civOf(state, seat), leaderOf(state, seat)));
+    if (conv.length && i >= 0) {
+      const base = GOVERNMENT_LIST[i].slots;
+      for (const r of conv) {
+        const n = base.filter((k) => k === r.from).length + out[r.from];
+        if (n <= 0) continue;
+        out[r.from] -= n;
+        out[r.to] += n;
+      }
+    }
   }
   return out;
+}
+
+/** CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every Wildcard
+ *  slot in their government" — counted AFTER `wonderExtraSlots` has moved the
+ *  Diplomatic ones across, which is what makes the pair worth having
+ *  (`SLOT_FAVOR_ROWS`). */
+export function slotFavorOf(state: GameState, seat: number): number {
+  const rows = getModifiers(state, seat).slotFavor;
+  if (!rows.length) return 0;
+  const s = seatOf(state, seat);
+  const gov = s ? computeAdoption(s.research).government : null;
+  const i = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
+  if (i < 0) return 0;
+  const base = GOVERNMENT_LIST[i].slots;
+  const extra = wonderExtraSlots(state, seat);
+  let n = 0;
+  for (const r of rows) {
+    const held = base.filter((k) => k === r.kind).length + extra[r.kind];
+    n += r.favor * Math.max(0, held);
+  }
+  return n;
 }
 
 /** `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1

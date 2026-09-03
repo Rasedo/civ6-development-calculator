@@ -38,7 +38,8 @@ describe('the wire', () => {
     expect(WONDER_TOURISM_ROWS.length).toBe(1);
     expect(RIVER_CROSS_PROD_ROWS.length).toBe(2);
     expect(IMMEDIATE_POST_ROWS.length).toBe(1);
-    expect(DIPLO_VIS_ROWS.length).toBe(1);
+    // the family grew with Catherine's flat level; a census pin is a count
+    expect(DIPLO_VIS_ROWS.length).toBe(2);
     expect(WAR_BAN_ROWS.length).toBe(3);
     expect(TOURISM_FAVOR_ROWS.length).toBe(1);
     expect(EMERGENCY_FAVOR_ROWS.length).toBe(1);
@@ -50,7 +51,7 @@ describe('the wire', () => {
     expect(WONDER_ERA_PROD_ROWS[0].startEra).toBe('Medieval');
     expect(WONDER_ERA_PROD_ROWS[0].endEra).toBe('Industrial');
     // the visibility row ADDS a second step rather than replacing the first
-    expect(DIPLO_VIS_ROWS[0].csPerLevel).toBe(3);
+    expect(DIPLO_VIS_ROWS.find((r) => r.civ === 'MONGOLIA')!.csPerLevel).toBe(3);
     for (const r of WAR_BAN_ROWS) expect(WAR_BANS.indexOf(r.ban)).toBeGreaterThanOrEqual(0);
   });
 });

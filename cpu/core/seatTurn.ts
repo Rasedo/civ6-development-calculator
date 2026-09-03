@@ -15,7 +15,7 @@ import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
 import { pollutionFavorPenalty } from './climate';
 import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
-import { wonderExtraSlots, tourismFavorOf } from './effects';
+import { wonderExtraSlots, tourismFavorOf, slotFavorOf } from './effects';
 
 /** Suzerained city-states, each weighted by what TREATY ORGANIZATION does to
  *  the favor its TYPE pays — x2 on outcome A, x0 on B, 1 while nothing
@@ -113,6 +113,9 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   // Favor per turn" — this turn's OWN rate, the number stored just above
   // (`TOURISM_FAVOR_ROWS`)
   s.diplomaticFavor += tourismFavorOf(state, seat, s.tourRate ?? 0);
+  // CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every Wildcard
+  // slot in their government" (`SLOT_FAVOR_ROWS`)
+  s.diplomaticFavor += slotFavorOf(state, seat);
   // The GRIEVANCE ledger's own turn: what this seat is still owed decays
   // pairwise (once per pair, on its lower seat), and every original capital it
   // sits in keeps charging while that war is over.

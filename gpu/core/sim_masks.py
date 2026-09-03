@@ -855,13 +855,24 @@ class SimMasks:
         vet = foe_is_barb & (own_level >= 2)
         return torch.where(vet, torch.full_like(g, XP_BARB_VETERAN), g)
 
-    def _train_xp_pct(self, bldg: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+    def _train_xp_pct(self, bldg: torch.Tensor, utype: torch.Tensor,
+                      row: int, col: torch.Tensor) -> torch.Tensor:
         """CIV6: the training city's Encampment and Harbor experience lines,
-        SUMMED over the buildings it holds that reach this chassis's class."""
+        SUMMED over the buildings it holds that reach this chassis's class,
+        plus CIV6 (Toqui) "+10% experience in combat towards all units trained
+        in this city" — tripled in one the Mapuche did not found, on the same
+        established-governor channel its Culture and Production ride. `row` and
+        `col` are REQUIRED because that half is per CITY (`GOVERNOR_XP_ROWS`)."""
         rd = self.rules_dev
         cls = rd.u_promo_class[utype.clamp(min=0)]
         reach = rd.b_train_xp_cls[:, cls.clamp(min=0)].transpose(0, 1)  # [B, NB]
         pct = (rd.b_train_xp_pct.view(1, -1) * (bldg & reach).long()).sum(dim=1)
+        if self._governor_xp_rows and self.n_governors:
+            _est = self._governor_established(row).gather(1, col.unsqueeze(1)).squeeze(1)
+            _own = self.city_founder[:, row].gather(1, col.unsqueeze(1)).squeeze(1) == row
+            for _xc, _xl, _xp, _xf in self._governor_xp_rows:
+                _xw = self._row_is(row, _xc, _xl) & _est & (_own == bool(_xf))
+                pct = pct + _xw.long() * _xp
         return torch.where(cls >= 0, pct, torch.zeros_like(pct))
 
     def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
@@ -2029,7 +2040,16 @@ class SimMasks:
         getattr(self, f"{pre}_unit_spy_mission")[rows, slot] = self._spy_idle
         getattr(self, f"{pre}_unit_spy_turns")[rows, slot] = 0
         getattr(self, f"{pre}_unit_spy_target")[rows, slot] = -1
-        getattr(self, f"{pre}_unit_spy_level")[rows, slot] = 0
+        # CIV6 (Flying Squadron): "All spies start as Agents with a free
+        # promotion" — the level the unit is BORN at (`SPY_PROMO_ROWS`)
+        _spy_lvl = torch.zeros_like(slot)
+        if self._spy_promo_rows and self._spy_idx >= 0:
+            _ti = type_idx if isinstance(type_idx, torch.Tensor) else torch.full_like(slot, int(type_idx))
+            _is_spy = (_ti[rows] if _ti.shape[0] == self.B else _ti) == self._spy_idx
+            for _sc, _sl, _sn in self._spy_promo_rows:
+                _sw = self._row_is(row, _sc, _sl)[rows] & _is_spy
+                _spy_lvl = _spy_lvl + _sw.long() * _sn
+        getattr(self, f"{pre}_unit_spy_level")[rows, slot] = _spy_lvl
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
         off = self.POOL_LO[pre]

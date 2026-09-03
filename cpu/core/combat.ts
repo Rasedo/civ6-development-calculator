@@ -18,13 +18,13 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
 import { BUILDINGS } from '../data/buildings';
-import { governorSum, governorTileSum } from './governors';
+import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
-import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
+import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -126,12 +126,25 @@ export const SUPPORT_CS = 2;
 /** CIV6: "+25% combat experience for all <classes> units trained in this
  *  city", summed over the training city's Encampment and Harbor lines and
  *  carried by the unit for life. */
-export function trainXpPct(buildings: readonly string[], cls: string | undefined): number {
+export function trainXpPct(
+  state: GameState,
+  city: City,
+  cls: string | undefined,
+): number {
   if (!cls) return 0;
   let pct = 0;
-  for (const b of buildings) {
+  for (const b of city.buildings) {
     const def = BUILDINGS[b];
     if (def?.trainXpPct && def.trainXpClasses?.includes(cls as never)) pct += def.trainXpPct;
+  }
+  // CIV6 (Toqui): "+10% experience in combat towards all units trained in
+  // this city", tripled in one the Mapuche did not found — the same
+  // established-governor channel its Culture and Production ride
+  // (`GOVERNOR_XP_ROWS`)
+  const rows = getModifiers(state, city.seat).governorXp;
+  if (rows.length && cityGovernorEffects(state, city).length > 0) {
+    const founded = (city.founderSeat ?? city.seat) === city.seat;
+    for (const r of rows) if (r.founded === founded) pct += r.pct;
   }
   return pct;
 }
@@ -1976,6 +1989,14 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City):
   }
   const captor = seatOf(state, attacker.seat);
   if (captor && !isBarbSeat(attacker.seat)) {
+    // CIV6 (Isibongo): "Conquering a city with a unit will upgrade it into a
+    // Corps or Army, if the proper Civics are unlocked" — read BEFORE the
+    // transfer, which is what pays the plunder and moves the tiles
+    // (`CONQUEST_FORMATION_ROWS`)
+    if (getModifiers(state, attacker.seat).conquestFormation) {
+      const tier = formationTierFor(state, attacker.seat, attacker.type);
+      if (tier > (attacker.formation ?? 0)) attacker.formation = tier;
+    }
     transferCity(state, holder.seat, captor, city, 'conquered');  // pays the plunder itself
   } else {
     sackCity(state, city, holder.seat);

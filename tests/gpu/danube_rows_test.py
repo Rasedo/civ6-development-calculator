@@ -73,7 +73,8 @@ def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
     assert len(sim._wonder_era_prod_rows) == 1 and len(sim._wonder_tourism_rows) == 1
     assert len(sim._river_cross_prod_rows) == 2 and len(sim._immediate_post_rows) == 1
-    assert len(sim._diplo_vis_rows) == 1 and len(sim._war_ban_rows) == 3
+    # the visibility family grew with Catherine's flat level
+    assert len(sim._diplo_vis_rows) == 2 and len(sim._war_ban_rows) == 3
     assert len(sim._tourism_favor_rows) == 1 and len(sim._emergency_favor_rows) == 1
     assert len(sim._golden_dedication_rows) == 1
     assert len(sim._intl_route_terrain_rows) == 1
@@ -82,7 +83,7 @@ def test_wire(rules, path) -> None:
     _fc, _fl, _fs, _fe, _fp = sim._wonder_era_prod_rows[0]
     assert 0 <= _fs < _fe and _fp == 20
     # the visibility row ADDS a second step rather than replacing the first
-    assert sim._diplo_vis_rows[0][3] == sim._vis_cs_per_level
+    assert max(r[3] for r in sim._diplo_vis_rows) == sim._vis_cs_per_level
     print("  1 wire OK — 12 families, and the visibility step doubles")
 
 

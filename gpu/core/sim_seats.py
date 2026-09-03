@@ -1806,7 +1806,7 @@ class SimSeats:
                     key_u = torch.where(cand_u, key_u.expand(B, -1), torch.full((B, self.NU), -1e18, dtype=torch.float64, device=dev))
                     pick_ty = key_u.argmax(dim=1)
                     ctr_u = self.city_center[bidx, row, spawn_slot].clamp(min=0)
-                    xp_u = self._train_xp_pct(self.city_bldg[bidx, row, spawn_slot], pick_ty)
+                    xp_u = self._train_xp_pct(self.city_bldg[bidx, row, spawn_slot], pick_ty, row, spawn_slot)
                     landed_u = self._spawn_unit(
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
                         pick_ty, init_xp=xp_u)
@@ -1986,7 +1986,7 @@ class SimSeats:
                      & self._afford(self.civ_faith[:, row], price_u))
             if bool(buy_u.any()):
                 at_u = self.city_center[bidx, row, ju].clamp(min=0)
-                xp_u = self._train_xp_pct(self.city_bldg[bidx, row, ju], bu)
+                xp_u = self._train_xp_pct(self.city_bldg[bidx, row, ju], bu, row, ju)
                 landed_u = self._spawn_unit(row, buy_u, at_u, bu, init_xp=xp_u)
                 self.civ_faith[:, row] = torch.where(landed_u, self.civ_faith[:, row] - price_u, self.civ_faith[:, row])
                 for _ui, _sl, _c in self._res_slot_units:
@@ -6210,6 +6210,35 @@ class SimSeats:
         # slot (`POLICY_SLOT_ROWS`) — Plato's Republic, the Holy Roman Emperor
         for _pc, _pl, _pk, _pa in self._policy_slot_rows:
             out[:, _pk] = out[:, _pk] + self._row_is(row, _pc, _pl).long() * _pa
+        # CIV6 (Founding Fathers): "All Diplomatic policy slots in the current
+        # government are converted to Wildcard slots" — the install's
+        # `ReplacesAll`, so the whole kind moves, in whatever government is
+        # adopted (`SLOT_CONVERT_ROWS`). A conversion is a MOVE, which this
+        # delta record can say: the kind leaves and the other arrives.
+        for _cc, _cl, _cf, _ct in self._slot_convert_rows:
+            _cw = self._row_is(row, _cc, _cl) & _has
+            if not bool(_cw.any()):
+                continue
+            _base = self._gov_slots[gov][:, _cf]
+            _n = (_base + out[:, _cf]).clamp(min=0)
+            out[:, _cf] = torch.where(_cw, out[:, _cf] - _n, out[:, _cf])
+            out[:, _ct] = torch.where(_cw, out[:, _ct] + _n, out[:, _ct])
+        return out
+
+    def _slot_favor_of(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn
+        for every Wildcard slot in their government", counted AFTER
+        `_wonder_extra_slots` has moved the Diplomatic ones across
+        (`slotFavorOf`, `SLOT_FAVOR_ROWS`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if not self._slot_favor_rows:
+            return out
+        gov, has = self._adopted_gov(self._seat_civics(row))
+        extra = self._wonder_extra_slots(row)
+        for _fc, _fl, _fk, _fa in self._slot_favor_rows:
+            _fw = self._row_is(row, _fc, _fl) & has
+            _held = (self._gov_slots[gov][:, _fk] + (0 if extra is None else extra[:, _fk])).clamp(min=0)
+            out = out + torch.where(_fw, _held * _fa, torch.zeros_like(out))
         return out
 
     def _seat_wonder_sum(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
@@ -9257,6 +9286,22 @@ class SimSeats:
         a_seat = self._pool_of(atk_kind)[6]
         self._raze_garrison(fell, self.city_center[fell, hrow[fell], slot[fell]], a_seat[fell, u])
         if POOL_CLASS[atk_kind] == "major":
+            # CIV6 (Isibongo): "Conquering a city with a unit will upgrade it
+            # into a Corps or Army, if the proper Civics are unlocked" — read
+            # BEFORE the transfer, which pays the plunder and moves the tiles
+            # (`CONQUEST_FORMATION_ROWS`)
+            if self._conquest_formation_rows:
+                _atype = self._pool_of(atk_kind)[2]
+                _aform = getattr(self, f"{atk_kind}_unit_formation")
+                for _b in fell.tolist():
+                    _ar = int(a_seat[_b, u])
+                    if not (0 <= _ar < self.n_majors):
+                        continue
+                    if not any(bool(self._row_is(_ar, _c, _l)[_b]) for _c, _l in self._conquest_formation_rows):
+                        continue
+                    _tier = int(self._formation_tier_for(_ar, int(_atype[_b, u]))[_b])
+                    if _tier > int(_aform[_b, u]):
+                        _aform[_b, u] = _tier
             for _b in fell.tolist():
                 self._transfer_city(_b, int(hrow[_b]), int(slot[_b]), int(a_seat[_b, u]), conquest=True)
             return
@@ -10293,6 +10338,49 @@ class SimSeats:
         cap = cap + self._congress_route_capacity(row)
         cap = cap + self._roster_route_capacity(row)
         return cap + self._gp_perm(row, "tradeCapacity").long() + self._golden_route_capacity(row)
+
+    def _great_work_loyalty(self, row: int, here: torch.Tensor) -> torch.Tensor:
+        """[n] f64 — CIV6 (Eleanor): "Great Works in Eleanor's cities each cause
+        -1 Loyalty per turn in FOREIGN cities within 9 tiles." The loss is the
+        OTHER seat's, so this reads every rival's rows against the city being
+        scored (`greatWorkLoyalty`, `GREAT_WORK_LOYALTY_ROWS`)."""
+        out = torch.zeros(here.shape[0], dtype=torch.float64, device=self.device)
+        if not self._great_work_loyalty_rows:
+            return out
+        for r2 in range(self.n_majors):
+            if r2 == row:
+                continue
+            rows = [r for r in self._great_work_loyalty_rows
+                    if bool(self._row_is(r2, r[0], r[1]).any())]
+            if not rows:
+                continue
+            works = (self.city_gw_writing[:, r2] + self.city_gw_art[:, r2]
+                     + self.city_gw_music[:, r2]).long()          # [B, RC]
+            live = self.city_alive[:, r2] & (self.city_center[:, r2] >= 0)
+            ctr = self.city_center[:, r2].clamp(min=0)
+            d = self.pair_dist[here.unsqueeze(1), ctr]            # [n, RC]
+            for _ec, _el, _ea, _er in rows:
+                _ew = self._row_is(r2, _ec, _el)
+                hit = (d <= _er) & live & (works > 0)
+                out = out + (hit.long() * works).sum(dim=1).double() * _ea * _ew.double()
+        return out
+
+    def _formation_tier_for(self, row: int, unit_type: int) -> torch.Tensor:
+        """[B] long — the highest formation TIER this seat may raise a chassis
+        to right now: the civic gate `_form_civic_ok` asks, without a host to
+        merge with (`formationTierFor`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if unit_type < 0 or unit_type >= self.NU:
+            return out
+        # CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any means"
+        if int(self._type_combat[unit_type]) <= 0 or unit_type == self._gdr_idx:
+            return out
+        naval = bool(self.unit_naval[unit_type])
+        for tier in range(1, self._form_max + 1):
+            land_ok, naval_ok = self._form_civic_ok(row, tier)
+            ok = naval_ok if naval else land_ok
+            out = torch.where(ok & (out == tier - 1), torch.full_like(out, tier), out)
+        return out
 
     def _tourism_favor_of(self, row: int) -> torch.Tensor:
         """[B] long — CIV6 (Faces of Peace): "For every 100 Tourism per turn

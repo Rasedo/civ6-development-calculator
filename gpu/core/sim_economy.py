@@ -2009,7 +2009,7 @@ class SimEconomy:
         out = out + torch.maximum(ally, self._listening_levels())
         # CIV6 (Ortoo): "Receive an extra level of Diplomatic Visibility for
         # possessing a Trading Post in ANY city of a civilization"
-        for _vc, _vl, _vp, _vcs in self._diplo_vis_rows:
+        for _vc, _vl, _vp, _vcs, _vflat in self._diplo_vis_rows:
             if _vp == 0:
                 continue
             # `trading_post` is per SEAT: [B, NM, T]. The question is whether
@@ -2051,7 +2051,7 @@ class SimEconomy:
         # the install's Amount is 3, which is what this engine already pays per
         # level, so the row ADDS a second step (`DIPLO_VIS_ROWS`)
         per = torch.full_like(own, self._vis_cs_per_level)
-        for _vc, _vl, _vp, _vcs in self._diplo_vis_rows:
+        for _vc, _vl, _vp, _vcs, _vflat in self._diplo_vis_rows:
             per = per + self._seat_is(own, _vc, _vl).long() * _vcs
         return torch.where(ok, (d * per).to(self.dtype), z)
 

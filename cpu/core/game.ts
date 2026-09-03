@@ -694,7 +694,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
     return { ok: false, reason: 'No free tile near the city center.' };
   }
   if (!state.sandbox) chargeUnitResource(state, seat, unitType);
-  unit.xpPct = trainXpPct(city.buildings, promoClassOf(unitType));
+  unit.xpPct = trainXpPct(state, city, promoClassOf(unitType));
   if (unitType === 'BUILDER') buyer.buildersTrained += 1;
   return { ok: true };
 }
@@ -799,7 +799,7 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'Nowhere to place it.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
-  u.xpPct = trainXpPct(city.buildings, promoClassOf(unitType));
+  u.xpPct = trainXpPct(state, city, promoClassOf(unitType));
   chargeUnitResource(state, seat, unitType);
   return { ok: true };
 }

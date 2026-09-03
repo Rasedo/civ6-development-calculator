@@ -434,7 +434,10 @@ class SimPhase:
                  + self._congress_loyalty(row)
                  + self._standing_loyalty(row, bidx, col)
                  + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1)
-                 + self._gp_city_perm(row, "loyalty").gather(1, col.unsqueeze(1)).squeeze(1).double())
+                 + self._gp_city_perm(row, "loyalty").gather(1, col.unsqueeze(1)).squeeze(1).double()
+                 # CIV6 (Eleanor): "Great Works in Eleanor's cities each cause
+                 # -1 Loyalty per turn in FOREIGN cities within 9 tiles"
+                 + self._great_work_loyalty(row, here))
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
@@ -618,9 +621,19 @@ class SimPhase:
                 _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
                 _emall = torch.where(_dist_i, _emall * _dm, _emall)
             _pm = self._governor_mult(row, "projectProdMult")[bidx, col].to(_emall.dtype)
+
             if bool((_pm != 1).any()) and self._proj_rows:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
+        # CIV6 (Founder of Carthage): "+50% Production toward districts in the
+        # city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
+        if self._plaza_district_prod_rows and self._govplaza_didx >= 0:
+            _pd_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
+            _pz = self.city_dist_tile[bidx, row, col, self._govplaza_didx]
+            _pz_ok = (_pz >= 0) & self.district_complete[bidx, _pz.clamp(min=0)]
+            for _zc, _zl, _zp in self._plaza_district_prod_rows:
+                _zw = self._row_is(row, _zc, _zl)[bidx]
+                _emall = torch.where(_pd_i & _pz_ok & _zw, _emall * (1.0 + _zp / 100.0), _emall)
         # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         # melee units."
         _hard = self._row_leads(row, "HARDRADA")
@@ -802,7 +815,7 @@ class SimPhase:
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-            xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui)
+            xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui, row, col)
             fp = (self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)
                   if self.n_governors else torch.zeros_like(made_u))
             # CIV6 (Military alliance 3): "Units start with a free Promotion."
@@ -1404,7 +1417,10 @@ class SimPhase:
              # CIV6 (Faces of Peace): "For every 100 Tourism per turn earn 1
              # Diplomatic Favor per turn" — this turn's OWN rate, the number
              # stored just above (`TOURISM_FAVOR_ROWS`)
-             + self._tourism_favor_of(row).double())
+             + self._tourism_favor_of(row).double()
+             # CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every
+             # Wildcard slot in their government" (`SLOT_FAVOR_ROWS`)
+             + self._slot_favor_of(row).double())
         self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
         # The GRIEVANCE ledger's own turn: every original capital this row
         # sits in keeps charging while that war is over, and each pair decays

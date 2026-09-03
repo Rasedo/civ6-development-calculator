@@ -48,12 +48,13 @@ describe('Encampment', () => {
   });
 
   it('training XP: the Encampment lines are a PERCENTAGE, and they stack', () => {
-    expect(trainXpPct([], 'MELEE')).toBe(0);
-    expect(trainXpPct(['MONUMENT'], 'MELEE')).toBe(0);
-    expect(trainXpPct(['BARRACKS'], 'MELEE')).toBe(25);
-    expect(trainXpPct(['STABLE'], 'HEAVY_CAV')).toBe(25);
-    expect(trainXpPct(['BARRACKS', 'ARMORY'], 'MELEE')).toBe(50);
-    expect(trainXpPct(['ARMORY', 'MILITARY_ACADEMY'], 'MELEE')).toBe(50);
+    const { state, city } = battlefield();
+    expect(trainXpPct(state, { ...city, buildings: [] }, 'MELEE')).toBe(0);
+    expect(trainXpPct(state, { ...city, buildings: ['MONUMENT'] }, 'MELEE')).toBe(0);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS'] }, 'MELEE')).toBe(25);
+    expect(trainXpPct(state, { ...city, buildings: ['STABLE'] }, 'HEAVY_CAV')).toBe(25);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS', 'ARMORY'] }, 'MELEE')).toBe(50);
+    expect(trainXpPct(state, { ...city, buildings: ['ARMORY', 'MILITARY_ACADEMY'] }, 'MELEE')).toBe(50);
   });
 
   it('training XP end-to-end: a purchased military unit carries the percentage for life', () => {

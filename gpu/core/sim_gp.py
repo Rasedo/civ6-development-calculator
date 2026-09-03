@@ -82,10 +82,35 @@ class SimGp:
         """[B, T] — the appeal every owner city grants its own tiles, summed
         over the majors (a tile belongs to at most one of them)."""
         out = torch.zeros(self.B, self.T, dtype=self.city_gp_perm.dtype, device=self.device)
-        if not bool((self.city_gp_perm != 0).any()):
+        if bool((self.city_gp_perm != 0).any()):
+            for r in range(self.n_majors):
+                out = out + self._gp_tile_appeal(r)
+        # CIV6 (Roosevelt Corollary): "+1 Appeal to all tiles in a city with a
+        # National Park" — a per-CITY flat add, on the same plane the Great
+        # Person perk rides (`PARK_APPEAL_ROWS`)
+        for _pc, _pl, _pa in self._park_appeal_rows:
+            for r in range(self.n_majors):
+                _pw = self._row_is(r, _pc, _pl)
+                if not bool(_pw.any()):
+                    continue
+                _slot = self.city_slot_at(r)                       # [B, T]
+                _has = self._city_has_park(r)                      # [B, RC]
+                _hit = (_slot >= 0) & _has.gather(1, _slot.clamp(min=0)) & _pw.unsqueeze(1)
+                out = out + _hit.to(out.dtype) * _pa
+        return out
+
+    def _city_has_park(self, row: int) -> torch.Tensor:
+        """[B, RC] bool — does each of this row's cities hold a National Park?
+        The ANCHOR tile names the cluster, the same test `_park_amenities`
+        pays on (`cityHasPark`)."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        anchor = self.park == torch.arange(self.T, device=self.device).unsqueeze(0)
+        slot = self.city_slot_at(row)
+        live = anchor & (slot >= 0) & (self.tile_seat == row)
+        if not bool(live.any()):
             return out
-        for r in range(self.n_majors):
-            out = out + self._gp_tile_appeal(r)
+        for j in range(self.RC):
+            out[:, j] = (live & (slot == j)).any(dim=1)
         return out
 
     def _gp_prod_pct(self, row: int, cur: torch.Tensor) -> torch.Tensor:

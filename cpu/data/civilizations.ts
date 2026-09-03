@@ -7,6 +7,7 @@ import type { ImprovementId, TerrainId, FeatureId } from '../../world/types';
 import type { DistrictId } from '../core/types';
 import type { YieldKey } from '../core/types';
 import type { Era } from './techs';
+import type { SlotKind } from './policies';
 import type { CivId, LeaderId } from './seats';
 
 /** CIV6 (Iteru, TRAIT_RIVER_FASTER_BUILDTIME_DISTRICT / _WONDER): "+15%
@@ -1204,13 +1205,18 @@ export interface DiploVisRow {
   leader?: LeaderId;
   /** extra levels held for a trading post in any of that seat's cities */
   postLevels: number;
+  /** extra levels held against EVERY civilization this seat has met */
+  flatLevels: number;
   /** Combat Strength per level of advantage ADDED to the usual step — the
    *  engine's own `VISIBILITY_CS_PER_LEVEL` is 3, and the install's Amount is
    *  3 too, which is what "double the usual Combat Bonus" comes to */
   csPerLevel: number;
 }
 export const DIPLO_VIS_ROWS: readonly DiploVisRow[] = [
-  { civ: 'MONGOLIA', postLevels: 1, csPerLevel: 3 },
+  { civ: 'MONGOLIA', postLevels: 1, flatLevels: 0, csPerLevel: 3 },
+  // CIV6 (Flying Squadron): "Has 1 level of Diplomatic Visibility greater
+  // than normal with every civilization that she's met."
+  { leader: 'CATHERINE_DE_MEDICI', postLevels: 0, flatLevels: 1, csPerLevel: 0 },
 ];
 
 /** CIV6 (Faces of Peace, EFFECT_ADJUST_BANNED_DIPLOMATIC_ACTIONS): "Cannot
@@ -1354,4 +1360,129 @@ export interface ThemedBonusRow {
 }
 export const THEMED_BONUS_ROWS: readonly ThemedBonusRow[] = [
   { leader: 'KRISTINA', yieldPct: 100, tourismPct: 100 },
+];
+
+// ---------------------------------------------------------------------------
+// THE SLOT, THE GREAT WORK AND THE CONQUERED FORMATION
+
+/** CIV6 (Founding Fathers, EFFECT_REPLACE_PLAYER_GOVERNMENT_SLOT_TYPE): "All
+ *  Diplomatic policy slots in the current government are converted to Wildcard
+ *  slots." The install's `ReplacesAll` is true, so EVERY slot of the named
+ *  kind converts, in whatever government is adopted. */
+export interface SlotConvertRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  from: SlotKind;
+  to: SlotKind;
+}
+export const SLOT_CONVERT_ROWS: readonly SlotConvertRow[] = [
+  { civ: 'AMERICA', from: 'diplomatic', to: 'wildcard' },
+];
+
+/** CIV6 (Founding Fathers, EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE_GRANT_FAVOR):
+ *  "+1 Diplomatic Favor per turn for every Wildcard slot in their government."
+ *  Counted AFTER the conversion above, which is what makes the pair worth
+ *  having. */
+export interface SlotFavorRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  kind: SlotKind;
+  favor: number;
+}
+export const SLOT_FAVOR_ROWS: readonly SlotFavorRow[] = [
+  { civ: 'AMERICA', kind: 'wildcard', favor: 1 },
+];
+
+/** CIV6 (Founder of Carthage, EFFECT_ADJUST_ALL_DISTRICT_PRODUCTION_MODIFIER):
+ *  "+50% Production toward districts in the city with the Government Plaza." */
+export interface PlazaDistrictProdRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  pct: number;
+}
+export const PLAZA_DISTRICT_PROD_ROWS: readonly PlazaDistrictProdRow[] = [
+  { leader: 'DIDO', pct: 50 },
+];
+
+/** CIV6 (Eleanor, EFFECT_ADJUST_IDENTITY_PER_TURN_FROM_NEARBY_GREAT_WORKS):
+ *  "Great Works in Eleanor's cities each cause -1 Loyalty per turn in FOREIGN
+ *  cities within 9 tiles." Both her leaders carry the same row. */
+export interface GreatWorkLoyaltyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** per Great Work, and NEGATIVE — the foreign city loses it */
+  amount: number;
+  range: number;
+}
+export const GREAT_WORK_LOYALTY_ROWS: readonly GreatWorkLoyaltyRow[] = [
+  { leader: 'ELEANOR_ENGLAND', amount: -1, range: 9 },
+  { leader: 'ELEANOR_FRANCE', amount: -1, range: 9 },
+];
+
+/** CIV6 (Eleanor, EFFECT_ADJUST_PLAYER_SKIP_FREE_CITY_STEP): "A city that
+ *  leaves another civilization due to a loss of Loyalty and is currently
+ *  receiving the most Loyalty per turn from Eleanor's civilization skips the
+ *  Free City step to join this civilization." */
+export interface SkipFreeCityRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+/** OPEN against C-60: neither engine models a Free City at all — a city that
+ *  loses its loyalty goes straight to the highest-pressure seat — so every
+ *  seat already behaves as Eleanor alone should. Not on the wire
+ *  (docs/roster_ledger.json). */
+export const SKIP_FREE_CITY_ROWS: readonly SkipFreeCityRow[] = [
+  { leader: 'ELEANOR_ENGLAND' },
+  { leader: 'ELEANOR_FRANCE' },
+];
+
+/** CIV6 (Toqui): "+10% experience in combat towards all units trained in this
+ *  city", tripled in a city the Mapuche did not found — the same
+ *  established-governor channel its Culture and Production ride. */
+export interface GovernorXpRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  pct: number;
+  /** true = a city this seat FOUNDED, false = one it did not */
+  founded: boolean;
+}
+export const GOVERNOR_XP_ROWS: readonly GovernorXpRow[] = [
+  { civ: 'MAPUCHE', pct: 10, founded: true },
+  { civ: 'MAPUCHE', pct: 30, founded: false },
+];
+
+/** CIV6 (Isibongo, EFFECT_ADD_PLAYER_UPGRADE_MILITARY_FORMATION_ON_CITY_CONQUEST):
+ *  "Conquering a city with a unit will upgrade it into a Corps or Army, if the
+ *  proper Civics are unlocked." */
+export interface ConquestFormationRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const CONQUEST_FORMATION_ROWS: readonly ConquestFormationRow[] = [
+  { civ: 'ZULU' },
+];
+
+/** CIV6 (Flying Squadron): "All spies start as Agents with a free promotion."
+ *  The install's Amount is -1, which is its own marker for "one promotion",
+ *  not an experience figure. */
+export interface SpyPromoRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  promotions: number;
+}
+/** CIV6 (Roosevelt Corollary, EFFECT_ADJUST_CITY_APPEAL): "+1 Appeal to all
+ *  tiles in a city with a National Park." A per-CITY appeal add, which is what
+ *  `cityAppealResolver` / `_gp_appeal_plane` already carry for the Great
+ *  Person perk. */
+export interface ParkAppealRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const PARK_APPEAL_ROWS: readonly ParkAppealRow[] = [
+  { leader: 'T_ROOSEVELT', amount: 1 },
+];
+
+export const SPY_PROMO_ROWS: readonly SpyPromoRow[] = [
+  { leader: 'CATHERINE_DE_MEDICI', promotions: 1 },
 ];

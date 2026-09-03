@@ -566,15 +566,16 @@ describe('XP & levels', () => {
   });
 
   it('trainXpPct sums the buildings that reach the class, and misses the ones that do not', () => {
-    expect(trainXpPct([], 'MELEE')).toBe(0);
-    expect(trainXpPct(['MONUMENT'], 'MELEE')).toBe(0);
-    expect(trainXpPct(['BARRACKS'], 'MELEE')).toBe(25);
-    expect(trainXpPct(['BARRACKS'], 'HEAVY_CAV')).toBe(0); // Barracks misses cavalry
-    expect(trainXpPct(['STABLE'], 'HEAVY_CAV')).toBe(25);
-    expect(trainXpPct(['BARRACKS', 'ARMORY'], 'MELEE')).toBe(50); // the lines STACK
-    expect(trainXpPct(['ARMORY', 'MILITARY_ACADEMY'], 'SIEGE')).toBe(50);
-    expect(trainXpPct(['SHIPYARD', 'SEAPORT'], 'NAVAL_MELEE')).toBe(50);
-    expect(trainXpPct(['BARRACKS'], undefined)).toBe(0);
+    const { state, city } = battlefield();
+    expect(trainXpPct(state, { ...city, buildings: [] }, 'MELEE')).toBe(0);
+    expect(trainXpPct(state, { ...city, buildings: ['MONUMENT'] }, 'MELEE')).toBe(0);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS'] }, 'MELEE')).toBe(25);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS'] }, 'HEAVY_CAV')).toBe(0); // Barracks misses cavalry
+    expect(trainXpPct(state, { ...city, buildings: ['STABLE'] }, 'HEAVY_CAV')).toBe(25);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS', 'ARMORY'] }, 'MELEE')).toBe(50); // the lines STACK
+    expect(trainXpPct(state, { ...city, buildings: ['ARMORY', 'MILITARY_ACADEMY'] }, 'SIEGE')).toBe(50);
+    expect(trainXpPct(state, { ...city, buildings: ['SHIPYARD', 'SEAPORT'] }, 'NAVAL_MELEE')).toBe(50);
+    expect(trainXpPct(state, { ...city, buildings: ['BARRACKS'] }, undefined)).toBe(0);
   });
 
   it('a promotion heals 50, ends the turn, and takes the next rung', () => {

@@ -83,7 +83,8 @@ def test_training_xp_wiring(rules, path) -> None:
     bl = torch.zeros_like(sim.city_bldg[:, 0, 0])  # [B, NB]
     bl[:, bidx_of("BARRACKS")] = True
     bl[:, bidx_of("ARMORY")] = True
-    pct = sim._train_xp_pct(bl, torch.tensor([mil_ty]))
+    _col0 = torch.zeros(sim.B, dtype=torch.long)
+    pct = sim._train_xp_pct(bl, torch.tensor([mil_ty]), 0, _col0)
     assert int(pct[0]) == 50, f"a Barracks and an Armory on a melee chassis = {int(pct[0])}%, want 50"
 
     slot0 = int(sim.unit_next[0])
@@ -97,7 +98,7 @@ def test_training_xp_wiring(rules, path) -> None:
     # CIVILIAN: no class, so no percentage reaches it
     bld_ty = sim._builder_idx
     assert bld_ty >= 0 and bool(sim._type_civilian[bld_ty]), "builder type not civilian"
-    assert int(sim._train_xp_pct(bl, torch.tensor([bld_ty]))[0]) == 0, \
+    assert int(sim._train_xp_pct(bl, torch.tensor([bld_ty]), 0, _col0)[0]) == 0, \
         "a builder promotes from no class and reads no experience line"
 
     # CIV SEAT mirror: the same body on row 1

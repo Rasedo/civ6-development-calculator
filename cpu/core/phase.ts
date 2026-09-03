@@ -17,7 +17,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -397,7 +397,8 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   }
   const pressure =
     own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
-  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city);
+  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city)
+    + greatWorkLoyalty(state, city);
 }
 
 /** CIV6 (Monument): "+1 Loyalty", and (Government Plaza) "+8 Loyalty to this
@@ -1892,7 +1893,7 @@ export function seatPhase(state: GameState): void {
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;
             bought = true;
-            u.xpPct = trainXpPct(spawnCity.buildings, promoClassOf(pickId));
+            u.xpPct = trainXpPct(state, spawnCity, promoClassOf(pickId));
           }
         }
       }
@@ -2175,6 +2176,13 @@ export function seatPhase(state: GameState): void {
         // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit });
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
+        // CIV6 (Founder of Carthage): "+50% Production toward districts in the
+        // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
+        if (q.kind === 'district' && seatMods.plazaDistrictProd
+          && civCity.districts.some((d) => d.type === 'GOVERNMENT_PLAZA'
+            && state.map.tiles[d.tileIndex].districtComplete)) {
+          _em *= 1 + seatMods.plazaDistrictProd / 100;
+        }
         // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
         if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district });
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;

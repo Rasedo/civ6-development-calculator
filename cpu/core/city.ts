@@ -660,6 +660,16 @@ function wonderMult(state: GameState, cities: readonly City[], key: 'religiousTo
  * four. A park is four tiles; the CLUSTER pays once, so the payout is keyed
  * on the park tile with the LOWEST index in each owning-city group.
  */
+/** Does this city hold a National Park? The ANCHOR tile names the cluster,
+ *  which is the same test `parkAmenities` pays on. */
+export function cityHasPark(state: GameState, city: City): boolean {
+  for (const tile of state.map.tiles) {
+    if ((tile.park ?? -1) !== tile.index) continue;
+    if (tileSeat(tile) === city.seat && tile.ownerCity === city.id) return true;
+  }
+  return false;
+}
+
 export function parkAmenities(state: GameState, city: City): number {
   const cities = citiesOf(state, city.seat);
   if (cities.length === 0) return 0;

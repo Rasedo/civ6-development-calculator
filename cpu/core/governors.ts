@@ -3,7 +3,7 @@ import { cityAtTile, citiesOf, seatOf } from './seats';
 import { hexDistance, neighbors } from '../../world/hex';
 import { GP_CITY_PERM } from '../data/greatPeople';
 import type { GpAppeal } from './appeal';
-import { seatBuildingSum } from './city';
+import { seatBuildingSum, cityHasPark } from './city';
 import { cityDistrictSum } from './yields';
 import { congressGovernorFavorType } from './congress';
 import { getModifiers } from './effects';
@@ -322,6 +322,18 @@ export function cityAppealResolver(state: GameState): GpAppeal {
       if (n) flat.set(key, n);
       const f = governorSum(state, c, (e) => e.appealNearFeature);
       if (f) near.set(key, f);
+    }
+  }
+  // CIV6 (Roosevelt Corollary): "+1 Appeal to all tiles in a city with a
+  // National Park" — a per-CITY flat add, which is exactly what this resolver
+  // already carries for the Great Person perk (`PARK_APPEAL_ROWS`)
+  for (const s2 of state.seats) {
+    const add = getModifiers(state, s2.seat).parkAppeal;
+    if (!add) continue;
+    for (const c of s2.cities) {
+      if (!cityHasPark(state, c)) continue;
+      const key = c.seat * APPEAL_SEAT_STRIDE + c.id;
+      flat.set(key, (flat.get(key) ?? 0) + add);
     }
   }
   if (flat.size === 0 && near.size === 0) return undefined;
