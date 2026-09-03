@@ -73,7 +73,11 @@ def produce(sim, row: int, code: int) -> float:
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
     assert len(sim._prod_mult_rows) == 13 and len(sim._district_adj_rows) == 13
-    assert len(sim._intl_route_rows) == 1 and len(sim._route_cap_rows) == 5
+    # Radio Oranje's own row, not the list's length: Spain's Treasure Fleet
+    # shares this family and a bare count breaks whenever anyone joins
+    _wil = sim._leader_idx("WILHELMINA")
+    assert sum(1 for r in sim._intl_route_rows if r[1] == _wil) == 1
+    assert len(sim._route_cap_rows) == 5
     assert all(r[4] >= 0 or r[6] >= 0 or r[7] or r[8] >= 0 for r in sim._prod_mult_rows
                if r[2] < 0 and r[3] < 0), "a production row names nothing"
     print("  1 wire OK — 13 + 13 + 1 + 5 rows")

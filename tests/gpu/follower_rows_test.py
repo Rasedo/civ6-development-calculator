@@ -77,7 +77,10 @@ def test_wire(rules, path) -> None:
     assert len(sim._start_boost_rows) == 1 and len(sim._post_combat_loyalty_rows) == 1
     assert len(sim._levy_rows) == 1 and len(sim._domestic_route_loyalty_rows) == 1
     assert len(sim._incoming_route_yield_rows) == 1
-    assert len(sim._combat_cs_rows) == 8, "Swift Hawk joined the combat rows"
+    # by ROW, not by the list's length: this lane is about Swift Hawk, and
+    # every later civilization that joins the family moves a bare count
+    assert sum(1 for r in sim._combat_cs_rows if r[4] == 5) == 1, (
+        "Swift Hawk's foeGolden row is not the only one of its kind")
     # the install's own magnitudes
     assert sim._post_combat_loyalty_rows[0][2] == -20 and sim._post_combat_loyalty_rows[0][3] == -20
     assert sim._levy_rows[0][2] == 75
