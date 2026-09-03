@@ -13,7 +13,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
 import { drawPromoOffer, promoClassOf, promoFlag, unitPromoRows } from './promotions';
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
@@ -46,7 +46,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome } from './trade';
@@ -287,10 +287,19 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   const grant = newCityGrantUnit(state, seat);
   if (grant) spawnUnit(state, grant, tile.index, seat);
   // CIV6 (Kupe's Voyage): the FIRST city's Population and Builder
+  const cmods = getModifiers(state, seat);
   if (list.length === 1) {
-    const mods = getModifiers(state, seat);
-    for (const r of mods.capital) city.population += r.firstCityPop ?? 0;
-    for (const g of mods.grantUnits) if (g.firstCity) spawnUnit(state, g.unit, tile.index, seat);
+    for (const r of cmods.capital) city.population += r.firstCityPop ?? 0;
+  }
+  // CIV6 (Pax Britannica / Treasure Fleet): a city founded on a continent
+  // other than the HOME one. The first city can never qualify — `capitalTile`
+  // is stamped by then, so its own landmass IS the home one.
+  const foreign = !onHomeContinent(state, seat, tile.index);
+  for (const g of cmods.grantUnits) {
+    if (!(g.firstCity && list.length === 1) && !(g.foreignContinent && foreign)) continue;
+    // a row may name a chassis, or a promotion CLASS to take the best of
+    const id = g.unit ?? (g.promoClass ? bestTrainableOfClass(state, seat, g.promoClass) : null);
+    if (id) spawnUnit(state, id, tile.index, seat);
   }
   return city;
 }

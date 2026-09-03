@@ -1131,6 +1131,23 @@ export function cityNavalCapable(
   );
 }
 
+/**
+ * CIV6 (Pax Britannica): "a free melee unit" — a grant row that names a
+ * promotion CLASS rather than a chassis takes the STRONGEST one this seat
+ * could train, ties by catalog order. The city-free `trainableUnits` set,
+ * which is exactly what the GPU's `_seat_trainable_units` mirrors, so the two
+ * engines pick the same chassis by construction.
+ */
+export function bestTrainableOfClass(state: GameState, seat: number, promoClass: string): string | null {
+  let best: UnitDef | undefined;
+  for (const d of trainableUnits(state, seat)) {
+    if (UNIT_PROMO_CLASS[d.id] !== promoClass) continue;
+    // strictly greater keeps the FIRST of a tie, which is catalog order
+    if (!best || (d.combat ?? 0) > (best.combat ?? 0)) best = d;
+  }
+  return best?.id ?? null;
+}
+
 export function trainableUnits(
   state: GameState,
   seat: number,

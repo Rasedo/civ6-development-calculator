@@ -2847,7 +2847,10 @@ class SimInit:
         self._route_improvement_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeImprovement"]]  # type: ignore[misc]
         # [civ, leaderRow, unit, tech, firstCity]
-        self._grant_unit_rows: list[tuple[int, int, int, int, int]] = [
+        # [civ, leaderRow, unit, tech, firstCity, promoClass, foreignContinent]
+        # — unit -1 with a promoClass means "the best chassis of that class
+        # the seat could train" (`bestTrainableOfClass`, C-48)
+        self._grant_unit_rows: list[tuple[int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["grantUnits"]]  # type: ignore[misc]
         self._spy_capacity_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["spyCapacity"]]  # type: ignore[misc]

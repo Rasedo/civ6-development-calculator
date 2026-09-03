@@ -1525,8 +1525,10 @@ export function buildRules() {
       farmTerrain: FARM_TERRAIN_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), r.hills ? 1 : 0, r.civic !== undefined ? (civicIdx.get(r.civic) ?? -1) : -1]),
       // [civ, leaderRow, improvement, yield, amount, side (0 origin / 1 destination)]
       routeImprovement: ROUTE_IMPROVEMENT_ROWS.map((r) => [rowCiv(r), rowLeader(r), IMPROVEMENT_IDS.indexOf(r.improvement), YIELD_KEYS.indexOf(r.yield), r.amount, r.side === 'origin' ? 0 : 1]),
-      // [civ, leaderRow, unit, tech, firstCity]
-      grantUnits: GRANT_UNIT_ROWS.map((r) => [rowCiv(r), rowLeader(r), Object.keys(UNITS).indexOf(r.unit), r.tech !== undefined ? (techIdx.get(r.tech) ?? -1) : -1, r.firstCity ? 1 : 0]),
+      // [civ, leaderRow, unit, tech, firstCity, promoClass, foreignContinent] —
+      // `unit` -1 with a promoClass means "the best chassis of that class the
+      // seat could train" (`bestTrainableOfClass`)
+      grantUnits: GRANT_UNIT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.unit !== undefined ? Object.keys(UNITS).indexOf(r.unit) : -1, r.tech !== undefined ? (techIdx.get(r.tech) ?? -1) : -1, r.firstCity ? 1 : 0, r.promoClass !== undefined ? PROMO_CLASSES.indexOf(r.promoClass) : -1, r.foreignContinent ? 1 : 0]),
       spyCapacity: SPY_CAPACITY_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1, r.amount]),
       // [civ, leaderRow, firstCityPop, palaceHousing, palaceAmenities, ...presettle yields x6]
       capital: CAPITAL_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.firstCityPop ?? 0, r.palaceHousing ?? 0, r.palaceAmenities ?? 0, ...YIELD_KEYS.map((k) => r.presettleYields?.[k] ?? 0)]),

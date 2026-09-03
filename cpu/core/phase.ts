@@ -2515,7 +2515,10 @@ export function seatPhase(state: GameState): void {
       // technology. The SPAWN waits for the upkeep charge below — a unit
       // granted this turn starts paying next turn, and the GPU's tech loop
       // sits on the same side of `_seat_upkeep_and_bankruptcy`.
-      for (const g of seatMods.grantUnits) if (g.tech === rsr.tech) grantedNow.push(g.unit);
+      for (const g of seatMods.grantUnits) {
+        if (g.tech !== rsr.tech || !g.unit) continue;   // a CLASS row is a founding grant
+        grantedNow.push(g.unit);
+      }
       delete rsr.techRetained[rsr.tech];
       rsr.tech = null;
       pickNext();

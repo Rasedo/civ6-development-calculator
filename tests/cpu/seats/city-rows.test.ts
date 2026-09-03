@@ -211,7 +211,10 @@ describe('Favorable Terms', () => {
 
 describe('the granted units', () => {
   it('the Cree Trader at Pottery, and nobody else at that technology', () => {
-    expect(GRANT_UNIT_ROWS.length).toBe(3);
+    // the TECH-keyed rows, not the list's length: the family also carries
+    // founding grants now, and a bare count moves with every one of them
+    expect(GRANT_UNIT_ROWS.filter((r) => r.tech !== undefined).length).toBe(2);
+    expect(GRANT_UNIT_ROWS.filter((r) => r.tech === 'POTTERY').length).toBe(1);
     const born = (row: number): number => {
       const state = sceneAs(row);
       const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);

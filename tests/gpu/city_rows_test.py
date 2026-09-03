@@ -79,7 +79,10 @@ def test_wire(rules, path) -> None:
     # Dharma's Missionary — a census pin is a count, so it moves with them
     assert len(sim._unit_charge_rows) == 4 and len(sim._tile_cost_rows) == 2
     assert len(sim._farm_terrain_rows) == 2 and len(sim._route_improvement_rows) == 4
-    assert len(sim._grant_unit_rows) == 3 and len(sim._spy_capacity_rows) == 1
+    # the TECH-keyed grant rows, not the list's length: the family also
+    # carries founding grants now (`foreignContinent`)
+    assert sum(1 for r in sim._grant_unit_rows if r[3] >= 0) == 2
+    assert len(sim._spy_capacity_rows) == 1
     assert len(sim._capital_rows) == 1
     print("  1 wire OK — the city's thirteen row families")
 

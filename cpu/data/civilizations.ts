@@ -525,17 +525,31 @@ export const ROUTE_IMPROVEMENT_ROWS: readonly RouteImprovementRow[] = [
  *  technology (the Cree Trader at Pottery, Catherine's Spy at Castles), or in
  *  the FIRST city at its founding (Kupe's Builder). Spain's Builder on a
  *  foreign continent waits on C-48. */
+import type { PromoClass } from './promotions';
+
 export interface GrantUnitRow {
   civ?: CivId;
   leader?: LeaderId;
-  unit: string;
+  /** a named chassis. A row may name a promotion CLASS instead, and take the
+   *  strongest chassis of it the seat could train. */
+  unit?: string;
+  promoClass?: PromoClass;
   tech?: string;
   firstCity?: boolean;
+  /** CIV6 (Pax Britannica, Treasure Fleet): the city was founded on a
+   *  continent other than the seat's HOME one — its original capital's. */
+  foreignContinent?: boolean;
 }
 export const GRANT_UNIT_ROWS: readonly GrantUnitRow[] = [
   { civ: 'CREE', unit: 'TRADER', tech: 'POTTERY' },
   { leader: 'CATHERINE_DE_MEDICI', unit: 'SPY', tech: 'CASTLES' },
   { leader: 'KUPE', unit: 'BUILDER', firstCity: true },
+  // CIV6 (Treasure Fleet): "Cities not on your original Capital's continent
+  // receive ... a builder when founded."
+  { civ: 'SPAIN', unit: 'BUILDER', foreignContinent: true },
+  // CIV6 (Pax Britannica): "All cities founded on a continent other than your
+  // home continent receive a free melee unit."
+  { leader: 'VICTORIA', promoClass: 'MELEE', foreignContinent: true },
 ];
 
 /** CIV6 (Catherine's Flying Squadron, EFFECT_GRANT_SPY): "extra spy capacity"

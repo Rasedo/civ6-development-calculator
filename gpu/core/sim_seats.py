@@ -4532,6 +4532,18 @@ class SimSeats:
             1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
         return (home >= 0) & (got == home)
 
+    def _best_trainable_of_class(self, row: int, pcls: int) -> torch.Tensor:
+        """[B] long — the STRONGEST chassis of promotion class `pcls` this seat
+        could train, ties by catalog order; -1 where it could train none. The
+        city-free trainable set, which is what TS's `bestTrainableOfClass`
+        reads, so the two engines pick the same chassis by construction."""
+        ok = self._seat_trainable_units(row) & (self.rules_dev.u_promo_class == pcls).unsqueeze(0)
+        cs = torch.where(ok, self._type_combat.unsqueeze(0).long(),
+                         torch.full((1, self.NU), -1, dtype=torch.long, device=self.device))
+        # argmax takes the FIRST maximum, which is catalog order on a tie
+        pick = cs.argmax(dim=1)
+        return torch.where(ok.any(dim=1), pick, torch.full_like(pick, -1))
+
     def _seat_on_home_continent(self, seat: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """The per-SEAT twin of `_on_home_continent`, for the sites that hold a
         seat TENSOR rather than a row: is each tile on that seat's home
@@ -7723,14 +7735,36 @@ class SimSeats:
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
-            for _gc, _gl, _gu, _gt, _gf in self._grant_unit_rows:
-                if _gf and _gu >= 0:
-                    _gm = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                    _gm[rows] = _first & self._row_is(row, _gc, _gl)[rows]
-                    if bool(_gm.any()):
-                        _at = torch.zeros(self.B, dtype=torch.long, device=self.device)
-                        _at[rows] = s_idx
-                        self._spawn_unit(row, _gm, _at, torch.full((self.B,), _gu, dtype=torch.long, device=self.device))
+            # CIV6 (Pax Britannica / Treasure Fleet): a city founded on a
+            # continent other than the HOME one. The FIRST city can never
+            # qualify — `civ_cap_tile` is stamped by then, so its own
+            # landmass IS the home one.
+            _tile_at = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            _tile_at[rows] = s_idx
+            _foreign = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            _foreign[rows] = ~self._on_home_continent(row, _tile_at)[rows]
+            for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
+                _when = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                if _gf:
+                    _when[rows] = _first
+                if _gx:
+                    _when = _when | _foreign
+                if not bool(_when.any()):
+                    continue
+                _gm = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _gm[rows] = (_when & self._row_is(row, _gc, _gl))[rows]
+                if not bool(_gm.any()):
+                    continue
+                # a row may name a chassis, or a promotion CLASS to take the
+                # best of; a class the seat can train none of grants nothing
+                _uid = (torch.full((self.B,), _gu, dtype=torch.long, device=self.device)
+                        if _gu >= 0 else self._best_trainable_of_class(row, _gp))
+                _gm = _gm & (_uid >= 0)
+                if not bool(_gm.any()):
+                    continue
+                _at = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                _at[rows] = s_idx
+                self._spawn_unit(row, _gm, _at, _uid.clamp(min=0))
         self._eff_version += 1
         return found
 

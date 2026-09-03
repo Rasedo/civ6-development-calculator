@@ -1348,7 +1348,7 @@ class SimPhase:
             self._eff_version += 1
             # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
             # technology, in the capital (`GRANT_UNIT_ROWS`)
-            for _gc, _gl, _gu, _gt, _gf in self._grant_unit_rows:
+            for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
                 if _gt < 0 or _gu < 0:
                     continue
                 _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl) & (self.civ_cap_tile[:, row] >= 0)
