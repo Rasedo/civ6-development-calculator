@@ -207,10 +207,41 @@ export interface RouteYieldRow {
   leader?: LeaderId;
   yield: YieldKey;
   amount: number;
+  /** CIV6 (Treasure Fleet, the install's `Intercontinental` argument): the row
+   *  pays only where the route's two ENDPOINTS sit on different landmasses.
+   *  It ADDS to the plain row rather than replacing it — the install ships 3
+   *  and 6, and the text reads "triple these numbers". */
+  intercontinental?: boolean;
 }
+
+/**
+ * CIV6 (Treasure Fleet): "Trade Routes receive +3 Gold, +2 Faith, and +1
+ * Production. Trade Routes between multiple continents receive TRIPLE these
+ * numbers." Spain's six rows land in each list: the plain one on every route,
+ * the intercontinental one adding twice as much again on top, so an
+ * intercontinental leg pays 9 / 6 / 3. Both lists carry the same six because
+ * the install writes the clause once for DOMESTIC and once for INTERNATIONAL.
+ */
+const TREASURE_FLEET: readonly RouteYieldRow[] = [
+  { civ: 'SPAIN', yield: 'gold', amount: 3 },
+  { civ: 'SPAIN', yield: 'faith', amount: 2 },
+  { civ: 'SPAIN', yield: 'production', amount: 1 },
+  { civ: 'SPAIN', yield: 'gold', amount: 6, intercontinental: true },
+  { civ: 'SPAIN', yield: 'faith', amount: 4, intercontinental: true },
+  { civ: 'SPAIN', yield: 'production', amount: 2, intercontinental: true },
+];
+
 export const INTL_ROUTE_YIELD_ROWS: readonly RouteYieldRow[] = [
   // CIV6 (Radio Oranje): "+2 Culture from international Trade Routes."
   { leader: 'WILHELMINA', yield: 'culture', amount: 2 },
+  ...TREASURE_FLEET,
+];
+
+/** The DOMESTIC half of EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC — the
+ *  same shape as the international list, read on a route between two of the
+ *  seat's own cities. */
+export const DOMESTIC_ROUTE_YIELD_ROWS: readonly RouteYieldRow[] = [
+  ...TREASURE_FLEET,
 ];
 
 /** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): +1 Trade Route capacity under a

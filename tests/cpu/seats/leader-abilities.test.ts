@@ -45,9 +45,9 @@ describe("Mediterranean's Bride", () => {
     const state = threeSeats(['EGYPT', 'ROME', 'NORWAY']);
     const c0 = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
     const c1 = settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
-    const plain = routeYieldsInternational(state, c0, 1); // Rome's route into Egypt
+    const plain = routeYieldsInternational(state, c1, c0, 1); // Rome's route into Egypt
     expect(plain.food).toBe(CLEOPATRA_INCOMING_ROUTE_FOOD);
-    const out = routeYieldsInternational(state, c1, 0); // Egypt's route into Rome
+    const out = routeYieldsInternational(state, c0, c1, 0); // Egypt's route into Rome
     expect(out.gold - (plain.gold - 0)).toBe(CLEOPATRA_INTL_ROUTE_GOLD);
     expect(out.food).toBe(0);
     // the destination's own +2 per incoming route

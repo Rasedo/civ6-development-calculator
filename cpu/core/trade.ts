@@ -6,8 +6,8 @@
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf } from './seats';
-import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor } from '../data/civilizations';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental } from './seats';
+import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isWater, isMountain } from '../../world/query';
@@ -403,7 +403,13 @@ export const CITY_STATE_ROUTE_SPEC = 1;
  * domestic-only channel). Exported for the GPU rules dump. */
 export const INTL_ROUTE_GOLD = 3;
 
-export function routeYieldsInternational(state: GameState, dest: City, seat: number): Yields {
+/**
+ * CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): `origin` is
+ * REQUIRED because a row may be intercontinental, and that is a fact about
+ * the route's two ENDPOINTS — a defaulted origin would let a caller pay the
+ * plain amount on a leg that earns triple (C-48).
+ */
+export function routeYieldsInternational(state: GameState, origin: City, dest: City, seat: number): Yields {
   const out = emptyYields();
   out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
   // CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own routes out;
@@ -411,8 +417,22 @@ export function routeYieldsInternational(state: GameState, dest: City, seat: num
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INTL_ROUTE_GOLD;
   if (leaderOf(state, dest.seat) === 'CLEOPATRA') out.food += CLEOPATRA_INCOMING_ROUTE_FOOD;
   // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
-  for (const r of getModifiers(state, seat).intlRouteYields) out[r.yield] += r.amount;
+  addRouteRows(state, out, getModifiers(state, seat).intlRouteYields, origin, dest);
   return out;
+}
+
+/** The roster's route rows, plain and intercontinental, onto `out`. ONE reader
+ *  for both the domestic and the international list so the two cannot spell
+ *  the continent test differently (`routeIntercontinental`). */
+function addRouteRows(
+  state: GameState, out: Yields, rows: readonly RouteYieldRow[], origin: City, dest: City,
+): void {
+  if (!rows.length) return;
+  const across = routeIntercontinental(state, origin.centerIndex, dest.centerIndex);
+  for (const r of rows) {
+    if (r.intercontinental && !across) continue;
+    out[r.yield] += r.amount;
+  }
 }
 
 /** CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold for every
@@ -546,7 +566,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civSeat = seatOf(state, route.toSeat);
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
-        addYields(out, routeYieldsInternational(state, civCity, seat));
+        addYields(out, routeYieldsInternational(state, city, civCity, seat));
         // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
         addYields(out, intlRouteTerrainYields(state, city, seat));
         // CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
@@ -583,6 +603,9 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest) {
       addYields(out, routeYields(state, dest));
+      // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
+      // the same reader the international leg uses
+      addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);
       // CIV6 (Qhapaq Ñan,
       // EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
       // ORIGIN city's own mountains pay this seat on every domestic leg

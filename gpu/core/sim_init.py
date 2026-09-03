@@ -3023,8 +3023,15 @@ class SimInit:
         self._district_unit_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["districtUnits"]]  # type: ignore[misc]
         self._apply_roster_start()
-        self._intl_route_rows: list[tuple[int, int, int, float]] = [
-            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
+        # [civ, leaderRow, yield, amount, intercontinental] — the last gates
+        # the row on the route's two ENDPOINTS sitting on different
+        # landmasses (`_route_intercontinental`, C-48)
+        self._intl_route_rows: list[tuple[int, int, int, float, int]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
+            for r in _uq["intlRouteYields"]]
+        self._domestic_route_rows: list[tuple[int, int, int, float, int]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
+            for r in _uq["domesticRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
         # [civ, leaderRow, amount, classMask, when, per (1 = per slotted MILITARY policy)]

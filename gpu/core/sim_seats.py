@@ -5948,6 +5948,20 @@ class SimSeats:
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
+        # rows, the same shape the international leg pays (C-48)
+        if self._domestic_route_rows:
+            _octr_d = self.city_center[:, row].gather(1, from_j)
+            _dctr_d = self.city_center[:, row].gather(1, dest_j)
+            _across_d = self._route_intercontinental(_octr_d, _dctr_d)
+            for _rc, _rl, _ry, _ra, _rx_d in self._domestic_route_rows:
+                _who = self._row_is(row, _rc, _rl)
+                if not bool(_who.any()):
+                    continue
+                _pay = pays_d & _who.unsqueeze(1)
+                if _rx_d:
+                    _pay = _pay & _across_d
+                inc.scatter_add_(1, from_j * 6 + _ry, _ra * _pay.double())
         # CIV6 (Qhapaq Ñan,
         # EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
         # ORIGIN city's own mountains pay on every domestic leg
@@ -6075,11 +6089,20 @@ class SimSeats:
                 snd_s = _wcp.double() @ self._wond_sender_sci
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
-            # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
-            for _rc, _rl, _ry, _ra in self._intl_route_rows:
+            # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
+            # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
+            # on different landmasses, and it ADDS to the plain row rather
+            # than replacing it (`addRouteRows`, C-48).
+            _octr_i = self.city_center[:, row].gather(1, from_j)  # [B, K]
+            _across_i = self._route_intercontinental(_octr_i, _dctr)
+            for _rc, _rl, _ry, _ra, _rx_i in self._intl_route_rows:
                 _who = self._row_is(row, _rc, _rl)
-                if bool(_who.any()):
-                    inc.scatter_add_(1, from_j * 6 + _ry, _ra * (pays_i & _who.unsqueeze(1)).double())
+                if not bool(_who.any()):
+                    continue
+                _pay = pays_i & _who.unsqueeze(1)
+                if _rx_i:
+                    _pay = _pay & _across_i
+                inc.scatter_add_(1, from_j * 6 + _ry, _ra * _pay.double())
             # CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold
             # for every flat Desert tile in the ORIGIN city" — the international
             # twin of the domestic per-terrain rows (`INTL_ROUTE_TERRAIN_ROWS`)
@@ -10987,10 +11010,27 @@ class SimSeats:
             # CIV6 (Mediterranean's Bride): the driver values Egypt's own +4 Gold
             # and the +2 Food a route INTO Egypt pays (`routeYieldsInternational`)
             ysum_ip = ysum_ip + int(self._cleo_intl_gold) * self._row_leads(row, "CLEOPATRA").long().unsqueeze(1)
-            for _rc, _rl, _ry, _ra in self._intl_route_rows:
-                ysum_ip = ysum_ip + int(_ra) * self._row_is(row, _rc, _rl).long().unsqueeze(1)
             ysum_ip = ysum_ip + int(self._cleo_in_food) * self._leads_vec("CLEOPATRA").gather(1, drow).long()
-            key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
+            # The roster's route rows go on PER (origin, dest): an
+            # INTERCONTINENTAL row is a fact about both endpoints, so this
+            # twin cannot stay [B, D] once one exists — the engine pays it
+            # per leg and the driver must value it the same way, clause for
+            # clause (C-48).
+            _ys3 = ysum_ip.unsqueeze(1).expand(B, RC, D).clone()
+            if self._intl_route_rows:
+                _octr3 = self.city_center[:, row, :RC]
+                _across3 = self._route_intercontinental(
+                    _octr3.unsqueeze(2).expand(B, RC, D),
+                    dctr.unsqueeze(1).expand(B, RC, D))
+                for _rc, _rl, _ry, _ra, _rx3 in self._intl_route_rows:
+                    _who = self._row_is(row, _rc, _rl)
+                    if not bool(_who.any()):
+                        continue
+                    _add = int(_ra) * _who.reshape(B, 1, 1).long()
+                    if _rx3:
+                        _add = _add * _across3.long()
+                    _ys3 = _ys3 + _add
+            key_ip = torch.where(valid_ip, _ys3,
                                  torch.full((B, RC, D), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_ip], dim=2)
             W2 = W2 + D

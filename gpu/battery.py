@@ -361,6 +361,7 @@ def main() -> int:
                 ("wonder_charge", [py, "tests/gpu/wonder_charge_test.py"], 4),  # the Builder's charge into an Ancient or Classical wonder
                 ("disembark_river", [py, "tests/gpu/disembark_river_test.py"], 4),  # a step off the water crosses no river edge (A-1r)
                 ("continents", [py, "tests/gpu/continents_test.py"], 4),  # the landmass id and the home continent (C-48)
+                ("treasure_fleet", [py, "tests/gpu/treasure_fleet_test.py"], 4),  # Spain's route rows, plain and intercontinental
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

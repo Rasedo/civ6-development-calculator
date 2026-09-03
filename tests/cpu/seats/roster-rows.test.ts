@@ -75,16 +75,20 @@ describe('Meiji Restoration', () => {
 
 describe('Radio Oranje', () => {
   it('pays +2 Culture on an international route the Netherlands send', () => {
-    expect(INTL_ROUTE_YIELD_ROWS.length).toBe(1);
+    // the row under test, not the list's LENGTH: Spain's Treasure Fleet
+    // shares this list, and a bare count breaks whenever anyone joins
+    const dutch = INTL_ROUTE_YIELD_ROWS.filter((r) => r.leader === 'WILHELMINA');
+    expect(dutch.length).toBe(1);
+    expect(dutch[0].intercontinental).toBeUndefined();
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     state.seats.push(emptySeat(1));
     state.seats[0].civ = seatRow('NETHERLANDS');
     state.seats[1].civ = seatRow('ROME');
-    settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
+    const home = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
     const dest = settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
     expect(getModifiers(state, 0).leader).toBe('WILHELMINA');
-    expect(routeYieldsInternational(state, dest, 0).culture).toBe(2);
-    expect(routeYieldsInternational(state, dest, 1).culture).toBe(0);
+    expect(routeYieldsInternational(state, home, dest, 0).culture).toBe(2);
+    expect(routeYieldsInternational(state, dest, home, 1).culture).toBe(0);
   });
 });
 
