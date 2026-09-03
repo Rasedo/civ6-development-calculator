@@ -1232,6 +1232,28 @@ under their blocker so the dependency is readable, and both halves count.
   slot-count rule over any Great Work holder, wonders included, with the themed
   bonus as a factor both the yield and the tourism walk read. Kristina's four
   modifiers are marked open against this item in docs/roster_ledger.json.
+  SOURCED 2026-09-03, and the blocker is a DATA MODEL rather than a number.
+  The install's two auto-theme rows are exact: `AUTO_THEME_AT_LEAST_2_SLOTS`
+  is Amount 2 with `IsWonder: true`, `AUTO_THEME_AT_LEAST_3_SLOTS` is Amount 3
+  with `IsWonder: false`, matching her published "Buildings with at least
+  three Great Work slots and wonders with at least two ... when they have all
+  their slots filled".
+
+  THE TRAP: her other two modifiers, `THEMED_YIELD_MODIFIER` and
+  `THEMED_TOURISM_MODIFIER`, are Amount 100 each — and her description
+  promises NO extra yields, only the auto-theming. They are the STANDARD
+  theming bonus expressed as player modifiers so her auto-themed sets pay it,
+  not a bonus of her own. This engine already doubles a themed museum's yields
+  (`THEMING_MULT = 2`), so shipping them as a further +100% would pay twice.
+  What the engine genuinely lacks is the TOURISM half.
+
+  WHAT BLOCKS IT: great works are counted per CITY and per KIND —
+  `GW_SLOTS = [2, 3, 1]` is writing/art/music, and `gwArtType[]` /
+  `artifactSeats[]` are city-wide parallel arrays. No building or wonder
+  declares a slot count, and nothing records WHICH holder a work sits in. A
+  rule reading "a wonder with at least two slots, all filled" cannot be
+  written until great works are held PER HOLDER. That is a modelling change,
+  not a row, and it is the same gap Nkisi's Palace slots wait on.
 - **C-56. A TRADE ROUTE'S RELIGIOUS PRESSURE.** Weight 1. CIV6 (Dharma):
   "+100% Religious pressure from your Trade Routes." A live route in real Civ 6
   radiates its origin city's religion to the destination and the destination's
