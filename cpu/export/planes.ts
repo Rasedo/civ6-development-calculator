@@ -64,7 +64,13 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     throw new Error('GPU export requires a hut-free world (withVillages: false)');
   }
 
-  const tiles = map.tiles.map((t) => {
+  // Every flag below that reads `t.resource` is baked ONCE here, but TS
+  // recomputes it live — and a HARVEST is the only mutation that takes a
+  // resource off a tile that stays workable (a district pave hides the loss
+  // behind a zero-yield district). So each resource tile also ships `nr`:
+  // the keys whose value would DIFFER if the tile carried no resource, which
+  // is exactly what the twin copies in when the resource is harvested (C-52).
+  const tileRec = (t: (typeof map.tiles)[number]) => {
     // the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
     // GPU consumer, and civ-seat centers need their real (district-nulled)
@@ -275,6 +281,16 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       de: t.terrain === 'DESERT' ? 1 : 0,
       fz: !isWater(t) && t.elevation !== 'MOUNTAIN' ? 1 : 0,
     };
+  };
+  const tiles = map.tiles.map((t) => {
+    const rec: Record<string, unknown> = tileRec(t);
+    if (!t.resource) return rec;
+    const bare: Record<string, unknown> = tileRec({ ...t, resource: null });
+    const nr: Record<string, unknown> = {};
+    for (const k of Object.keys(rec)) {
+      if (JSON.stringify(rec[k]) !== JSON.stringify(bare[k])) nr[k] = bare[k];
+    }
+    return { ...rec, nr };
   });
   const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => t.index);
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;

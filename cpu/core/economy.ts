@@ -55,10 +55,18 @@ export function progressScale(r: ResearchState | undefined): number {
 /** CIV6: the base 20 of a feature chop, on the progression above, times the
  *  Groundbreaker's "+50% yields from plot harvests and feature removals in
  *  city" where the worked tile belongs to a city that holds it. */
-export function chopValue(state: GameState, seat: number, at?: Tile): number {
+/** CIV6: a chop or a harvest pays a lump that scales with game PROGRESS.
+ *  `base` is the table's own figure — a feature chop's 20, or the resource's
+ *  own `harvestAmount` (`Resource_Harvests.Amount`: 20 for Food and
+ *  Production, 40 for the two Gold ones). Required, not defaulted: a caller
+ *  that forgot it would quietly pay a chop's rate for a harvest. */
+export function chopValue(state: GameState, seat: number, at: Tile | undefined, base: number): number {
   const mult = at ? governorTileMult(state, at, (e) => e.harvestMult) : 1;
-  return Math.round(20 * progressScale(seatOf(state, seat)?.research) * mult);
+  return Math.round(base * progressScale(seatOf(state, seat)?.research) * mult);
 }
+
+/** The base a FEATURE chop pays before the progress scale. */
+export const CHOP_BASE = 20;
 
 /**
  * CIV6 (Pillaging): pay the pillager what the wrecked target's plunder row
@@ -138,7 +146,7 @@ export function chopGrant(state: GameState, tile: Tile, seat: number): LumpGrant
   const key = FEATURES[tile.feature]?.chopYield;
   if (!key) return null;
   if (tileSeat(tile) !== seat) return null;
-  return { key, amount: chopValue(state, seat, tile) };
+  return { key, amount: chopValue(state, seat, tile, CHOP_BASE) };
 }
 
 export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
@@ -151,7 +159,7 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   const rs = seatOf(state, seat)?.research;
   if (!rs) return null;
   if (!state.sandbox && !computeUnlocksIn(rs, getModifiers(state, seat).districtPrereq).improvements.has(res.improvement)) return null;
-  return { key: res.harvestYield, amount: chopValue(state, seat, tile) };
+  return { key: res.harvestYield, amount: chopValue(state, seat, tile, res.harvestAmount ?? CHOP_BASE) };
 }
 
 export function applyLumpYield(

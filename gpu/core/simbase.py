@@ -185,6 +185,7 @@ class Rules:
     b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
     b_appeal_y: torch.Tensor  # f64 [NB, 2, 6] — what it pays an adjacent unimproved tile at Breathtaking, then Charming
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
+    resources: dict  # {harvestYield, harvestAmount, improvement} per RESOURCE_IDS — the HARVEST's own table
     nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, cleanCharges, siloIid, wwLaunched, emergency*}
     gdr: dict  # {upgradeId[], upgradeTech[], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS, navalPenalty}
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
@@ -384,6 +385,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),
         b_appeal_y=torch.tensor([b.get("appealYields") or [[0.0] * 6, [0.0] * 6] for b in B], dtype=torch.float64),
         strategic=r["strategic"],
+        resources=r["resources"],
         nuclear=r["nuclear"],
         gdr=r["gdr"],
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
@@ -747,6 +749,11 @@ _MUTABLE = [
     "d_usable", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
     "lux_req", "res_imp", "tile_lowland",
+    # CIV6 (Builder): a HARVEST takes the resource off a tile that stays
+    # workable, so every baked flag that read `t.resource` is state now —
+    # the harvest copies each one's resource-free value in (`_nr_planes`).
+    "site_q3", "tile_ftr", "farm_flat", "farm_hill", "mine_ok", "lumber_ok",
+    "_fa_f_c", "_fa_h_c", "_mi_c",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)

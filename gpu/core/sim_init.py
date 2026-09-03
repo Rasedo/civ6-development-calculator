@@ -1491,6 +1491,8 @@ class SimInit:
             self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
             self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
             self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
+            # CIV6 (Builder): the resource goes for its own lump (C-52)
+            self._A_HARVEST = self._act.get("HARVEST", -1)
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
             assert _apc in (0, self._air_strike_cols), (
@@ -1517,6 +1519,7 @@ class SimInit:
                 + (1 if self._A_RAIL >= 0 else 0) \
                 + (1 if self._A_CLEAN >= 0 else 0) \
                 + (1 if self._A_REMOVE_IMP >= 0 else 0) \
+                + (1 if self._A_HARVEST >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -1540,6 +1543,7 @@ class SimInit:
             self._A_EXCAVATE = -1
             self._A_PARK = -1
             self._A_REMOVE_IMP = -1
+            self._A_HARVEST = -1
             self._A_PERFORM = -1
             self._A_BOOST = -1
             self._A_FORM_UP = -1
@@ -1793,6 +1797,36 @@ class SimInit:
         self.coastal_water = torch.tensor(
             [[t.get("cw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] Harbor surface: coastal/lake water adjacent to land, static
+        # CIV6 (Builder): a HARVESTED tile becomes the same tile with NO
+        # resource. Every flag below is baked from `t.resource` at export
+        # while TS recomputes it live, so the fixture ships each resource
+        # tile's resource-free value in `nr` and the harvest copies it in.
+        # A district pave never needed this: it hides the loss behind a
+        # zero-yield district. Keyed by the plane the flag feeds (C-52).
+        self._nr_planes: list[tuple[str, torch.Tensor]] = []
+        _nr_map = (
+            ("y", "tile_yields"), ("res", "res_priority"), ("res", "res_cat"),
+            ("rid", "res_id"), ("rq", "res_imp"), ("sq", "site_q3"),
+            ("lux", "lux_id"), ("luxreq", "lux_req"), ("du", "d_usable"),
+            ("cw", "coastal_water"), ("ftr", "tile_ftr"), ("wh", "tile_wh"),
+            ("fa_f", "farm_flat"), ("fa_h", "farm_hill"), ("mi", "mine_ok"),
+            ("lu", "lumber_ok"), ("sr_c", "_sr_c"),
+            ("fa_f_c", "_fa_f_c"), ("fa_h_c", "_fa_h_c"), ("mi_c", "_mi_c"),
+        )
+        # a key the table does not name would silently keep its resource-era
+        # value on the harvested tile, so refuse the fixture instead
+        _seen = {k for f in fixtures for t in f["tiles"] for k in t.get("nr", ())}
+        _unmapped = _seen - {k for k, _ in _nr_map}
+        assert not _unmapped, f"planes.ts `nr` carries unmapped keys {sorted(_unmapped)}"
+        for _k, _plane in _nr_map:
+            _live = getattr(self, _plane)
+            _bare = _live.clone()
+            for _b, _f in enumerate(fixtures):
+                for _ti, _t in enumerate(_f["tiles"]):
+                    _v = _t.get("nr", {}).get(_k)
+                    if _v is not None:
+                        _bare[_b, _ti] = torch.tensor(_v, dtype=_live.dtype, device=device)
+            self._nr_planes.append((_plane, _bare))
         # Per-district DYNAMIC adjacency source amounts, every one read from the
         # catalog (a district with no such row scores 0, which is not the same
         # as a hardwired default). The static sources live in d_static_adj.
@@ -2396,6 +2430,15 @@ class SimInit:
         self._gdr_plate_cs = float(_gdr["armorPlatingCS"])
         self._gdr_naval_penalty = float(_gdr["navalPenalty"])
         _st = rules.strategic
+        _rsc = rules.resources
+        # CIV6 (Resource_Harvests): the HARVEST's yield column, its own base
+        # before the progress scale, and the improvement whose unlock gates it
+        self._res_harvest_y = torch.tensor(
+            [int(x) for x in _rsc.get("harvestYield", [])] or [-1], dtype=torch.long, device=device)
+        self._res_harvest_amt = torch.tensor(
+            [int(x) for x in _rsc.get("harvestAmount", [])] or [0], dtype=torch.long, device=device)
+        self._res_harvest_imp = torch.tensor(
+            [int(x) for x in _rsc.get("improvement", [])] or [-1], dtype=torch.long, device=device)
         self._strat_rid = [int(x) for x in _st["rid"]]
         self._strat_rate = [int(x) for x in _st["rate"]]
         self._n_strategic = len(self._strat_rid)
@@ -2872,6 +2915,9 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["gpRefund"]]  # type: ignore[misc]
         self._evict_pct_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
+        # [civ, leaderRow, improvement, district] — exactly one of the last two
+        self._culture_bomb_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["cultureBombs"]]  # type: ignore[misc]
         # THE SLOT, THE GREAT WORK AND THE CONQUERED FORMATION
         # [civ, leaderRow, fromSlot, toSlot] in SLOT_KINDS order
         self._slot_convert_rows: list[tuple[int, int, int, int]] = [

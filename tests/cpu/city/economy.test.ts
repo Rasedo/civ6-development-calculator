@@ -3,7 +3,7 @@ import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { queueBuilding, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '../../../cpu/core/units';
-import { chopValue, chopGrant, harvestGrant } from '../../../cpu/core/economy';
+import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
@@ -96,7 +96,7 @@ describe('chops and harvests', () => {
   it('chopping woods inside borders grants era-scaled production', () => {
     const { state, city, woods, builder } = chopSetup();
     queueBuilding(state, city.id, 'MONUMENT', 0);
-    const expected = chopValue(state, 0);
+    const expected = chopValue(state, 0, undefined, CHOP_BASE);
     expect(chopGrant(state, woods, 0)).toEqual({ key: 'production', amount: expected });
     const r = builderRemoveFeature(state, builder.id, 0);
     expect(r.ok).toBe(true);
@@ -108,9 +108,9 @@ describe('chops and harvests', () => {
 
   it('chop value scales with research progress', () => {
     const state = makeState();
-    const before = chopValue(state, 0);
+    const before = chopValue(state, 0, undefined, CHOP_BASE);
     grantTechs(state, 'MINING', 'POTTERY', 'ANIMAL_HUSBANDRY', 'BRONZE_WORKING');
-    expect(chopValue(state, 0)).toBeGreaterThan(before);
+    expect(chopValue(state, 0, undefined, CHOP_BASE)).toBeGreaterThan(before);
   });
 
   it('chops outside your borders grant nothing', () => {
@@ -151,7 +151,7 @@ describe('chops and harvests', () => {
     const builder = spawnUnit(state, 'BUILDER', wheat.index, 0)!;
     builder.tileIndex = wheat.index;
     const grant = harvestGrant(state, wheat, 0);
-    expect(grant).toEqual({ key: 'food', amount: chopValue(state, 0) });
+    expect(grant).toEqual({ key: 'food', amount: chopValue(state, 0, undefined, CHOP_BASE) });
     const r = builderHarvest(state, builder.id);
     expect(r.ok).toBe(true);
     expect(wheat.resource).toBeNull();

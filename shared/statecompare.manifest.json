@@ -2736,7 +2736,7 @@
       },
       {
         "plane": "d_usable",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "camp_ok",
@@ -2748,19 +2748,19 @@
       },
       {
         "plane": "coastal_water",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "_sr_c",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "tile_wh",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "tile_yields",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "wok",
@@ -2768,27 +2768,27 @@
       },
       {
         "plane": "res_id",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "res_cat",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "res_priority",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "lux_id",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "lux_req",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "res_imp",
-        "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
         "plane": "civ_congress_vote",
@@ -2861,6 +2861,42 @@
       {
         "plane": "d_static_adj",
         "why": "static per-tile district adjacency, mutated only when a founding clears a feature — derived from the map plus feat_stripped, both covered."
+      },
+      {
+        "plane": "_fa_f_c",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "_fa_h_c",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "_mi_c",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "farm_flat",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "farm_hill",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "lumber_ok",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "mine_ok",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "site_q3",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "tile_ftr",
+        "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       }
     ]
   }

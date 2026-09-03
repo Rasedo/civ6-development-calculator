@@ -1486,3 +1486,20 @@ export const PARK_APPEAL_ROWS: readonly ParkAppealRow[] = [
 export const SPY_PROMO_ROWS: readonly SpyPromoRow[] = [
   { leader: 'CATHERINE_DE_MEDICI', promotions: 1 },
 ];
+
+/** CIV6 (EFFECT_ADD_CULTURE_BOMB_TRIGGER): completing the named IMPROVEMENT —
+ *  or the named DISTRICT — claims the tiles around it for the builder. The
+ *  Maori's Fishing Boats and the Netherlands' Harbour are the install's two.
+ *  This is the FULL bomb, not the Preserve's unowned-only one: a culture bomb
+ *  takes a neighbour's ground too. */
+export interface CultureBombRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** exactly one of these two names the carrier */
+  improvement?: ImprovementId;
+  district?: DistrictId;
+}
+export const CULTURE_BOMB_ROWS: readonly CultureBombRow[] = [
+  { civ: 'MAORI', improvement: 'FISHING_BOATS' },
+  { civ: 'NETHERLANDS', district: 'HARBOR' },
+];

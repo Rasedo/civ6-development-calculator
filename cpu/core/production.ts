@@ -240,6 +240,12 @@ export function completeQueueItem(
       // Preserve's own; only one of the two ever runs.
       if (congressCultureBombSeat(state) === city.seat) cultureBomb(state, city, item.tileIndex, false);
       else if (ddef?.cultureBombUnowned) cultureBomb(state, city, item.tileIndex, true);
+      // CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when completing a
+      // Harbor" — the roster's own carrier, a FULL bomb like the Congress's
+      else if (dt.district !== null
+        && getModifiers(state, city.seat).cultureBombs.some((r) => r.district === dt.district)) {
+        cultureBomb(state, city, item.tileIndex, false);
+      }
       break;
     }
     case 'wonder': {
@@ -376,7 +382,10 @@ export function completeQueueItem(
  * A tile whose district or wonder is still UNDER CONSTRUCTION is flipped too,
  * and `wipeConstruction` undoes the build it was carrying.
  */
-function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnly: boolean): void {
+/** CIV6 (Culture Bomb): the tiles around `tileIndex` become this city's.
+ *  Exported because a completed IMPROVEMENT bombs through the same body
+ *  (`CULTURE_BOMB_ROWS`), and a second hand-written claim would drift. */
+export function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnly: boolean): void {
   const owner = seatOf(state, city.seat);
   if (!owner) return;
   for (const t of neighbors(state.map, state.map.tiles[tileIndex]).slice().sort((a, b) => a.index - b.index)) {

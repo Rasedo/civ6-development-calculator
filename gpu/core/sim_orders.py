@@ -63,6 +63,7 @@ class SimOrders:
         _rrc = getattr(self, "_A_RAIL", -1)
         _cfc = getattr(self, "_A_CLEAN", -1)
         _nkc = getattr(self, "_A_NUKE", -1)
+        _hvc = getattr(self, "_A_HARVEST", -1)
         _nkw = self._nuke_cols * self._n_devices
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
@@ -115,6 +116,7 @@ class SimOrders:
             ((_ab == _rrc) if _rrc >= 0 else _no).any(dim=0),                     # lay a railroad
             ((_ab == _cfc) if _cfc >= 0 else _no).any(dim=0),                     # clean fallout
             (((_ab >= _nkc) & (_ab < _nkc + _nkw)) if _nkc >= 0 else _no).any(dim=0),  # a nuclear strike
+            ((_ab == _hvc) if _hvc >= 0 else _no).any(dim=0),                     # harvest a resource
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -122,7 +124,8 @@ class SimOrders:
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
-         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke) = _tab
+         _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
+         _rk_harvest) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -399,6 +402,69 @@ class SimOrders:
                     _r = _cfm.nonzero(as_tuple=True)[0]
                     self.tile_fallout[_r, hc[_r]] = 0
                     self._spend_build_charge(_r, sc, hc)
+
+            if _rk_harvest[n] and _hvc >= 0 and self._builder_idx >= 0:
+                # CIV6 (Builder): the resource is GONE and pays its own lump —
+                # `Resource_Harvests`' base times the progress scale, into the
+                # channel that yield uses (`builderHarvest`, C-52)
+                _rid_h = self.res_id.gather(1, hc.unsqueeze(1)).squeeze(1)
+                _nres = int(self._res_harvest_y.numel())
+                _ridc = _rid_h.clamp(min=0, max=max(_nres - 1, 0))
+                _hy = torch.where(_rid_h >= 0, self._res_harvest_y[_ridc], torch.full_like(_rid_h, -1))
+                _hamt = torch.where(_rid_h >= 0, self._res_harvest_amt[_ridc], torch.zeros_like(_rid_h))
+                _hvm = (act & (a == _hvc) & (utp == self._builder_idx) & (u_charges > 0)
+                        & (_hy >= 0)
+                        & ~self.res_stripped.gather(1, hc.unsqueeze(1)).squeeze(1)
+                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
+                        & ~self._row_banned(row, self.BAN_HARVEST))
+                if bool(_hvm.any()):
+                    _r = _hvm.nonzero(as_tuple=True)[0]
+                    _t = hc[_r]
+                    # the same progress scale the chop reads, and the same
+                    # Groundbreaker multiplier
+                    _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
+                                                     civics.sum(dim=1).double() / 50.0)
+                    _hm = torch.ones_like(_psc)
+                    if self.n_governors:
+                        _hm = self._governor_tile_mult(row, "harvestMult")[_r, _t]
+                        _psc = _psc[_r]
+                    else:
+                        _psc = _psc[_r]
+                    _amt = js_round(_hamt[_r].double() * _psc * _hm)
+                    # TS harvests with `tile.resource = null`, so the tile
+                    # becomes the same tile with NO resource: every baked
+                    # flag takes its resource-free value (`_nr_planes`), not
+                    # just the stripped bit. A paved tile never needed this —
+                    # a zero-yield district hides the loss (C-52).
+                    self.res_stripped[_r, _t] = True
+                    for _p, _bare in self._nr_planes:
+                        getattr(self, _p)[_r, _t] = _bare[_r, _t]
+                    # a sea resource also lends SEA_RESOURCE adjacency, and
+                    # that read is live on TS
+                    self._withdraw_sea_adj(_r, _t)
+                    _col_h = self._city_col_at(row, _r, _t)
+                    _drip_h = self.city_progress[:, row, :, 0].clone()
+                    for _i in range(len(_r)):
+                        _b, _j = int(_r[_i]), int(_col_h[_i])
+                        _v = float(_amt[_i])
+                        _k = int(_hy[_r[_i]])
+                        if _k == 2:        # GOLD lands in the bank, no city needed
+                            self.civ_treasury[_b, row] += _v
+                            continue
+                        if _k == 5:        # FAITH, likewise
+                            self.civ_faith[_b, row] += _v
+                            continue
+                        if _j < 0:
+                            continue
+                        if _k == 0:        # FOOD fills the city's own box
+                            self.city_growth[_b, row, _j] += _v
+                        elif int(self.city_current[_b, row, _j, 0]) >= 0:
+                            self.city_progress[_b, row, _j, 0] += _v
+                        else:
+                            self.city_prod_bank[_b, row, _j] += _v
+                    self._repair_drip(row, _drip_h)
+                    self._spend_build_charge(_r, sc, hc)
+                    self._eff_version += 1
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
                 _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)
@@ -821,6 +887,21 @@ class SimOrders:
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
                         did[_r] = True
+                # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
+                # improvement — the same claim a district's bomb makes
+                # (`CULTURE_BOMB_ROWS`)
+                for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
+                    if _bi < 0:
+                        continue
+                    _bw = did & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) == _bi) \
+                        & self._row_is(row, _bc, _bl)
+                    if not bool(_bw.any()):
+                        continue
+                    _br = _bw.nonzero(as_tuple=True)[0]
+                    _bcol = self._city_col_at(row, _br, hc[_br])
+                    _live = _bcol >= 0
+                    if bool(_live.any()):
+                        self._culture_bomb(row, _br[_live], hc[_br][_live], _bcol[_live])
                 if bool(did.any()):
                     _r = did.nonzero(as_tuple=True)[0]
                     self._eff_version += 1

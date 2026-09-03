@@ -1948,7 +1948,9 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   if (!tile.resource) return no('No resource here.');
   // CIV6 (Mana): "Resources cannot be harvested" (`SEAT_BAN_ROWS`)
   if (getModifiers(state, unit!.seat).seatBans.has('harvest')) return no('This civilization cannot harvest resources.');
-  const grant = harvestGrant(state, tile, 0);
+  // the ACTING unit's seat, both times: this body read and paid seat 0 for
+  // as long as nothing called it (C-52)
+  const grant = harvestGrant(state, tile, unit!.seat);
   if (!grant) {
     return no(
       tileSeat(tile) !== unit!.seat
@@ -1958,7 +1960,7 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   }
   const resName = RESOURCES[tile.resource]?.name ?? tile.resource;
   tile.resource = null;
-  applyLumpYield(state, tile.index, grant, 0);
+  applyLumpYield(state, tile.index, grant, unit!.seat);
   state.eventLog.push(`Harvested ${resName}: +${grant.amount} ${grant.key}.`);
   spendCharge(state, unit!);
   return ok;

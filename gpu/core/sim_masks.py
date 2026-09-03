@@ -3049,6 +3049,35 @@ class SimMasks:
                 _rm_u = _rm_u | (utype == self._eng_idx)
             _ri = [(present & _rm_u & own_tile.gather(1, tc)
                     & (self.improvement.gather(1, tc) >= 0)).unsqueeze(2)]
+        # CIV6 (Builder): HARVEST a resource for its own lump. The tile must
+        # be this seat's, carry a strippable resource the catalog says can be
+        # harvested, and the seat must hold the improvement that works it —
+        # `harvestGrant`'s three tests, plus Mana's ban (`SEAT_BAN_ROWS`).
+        _hv: list[torch.Tensor] = []
+        if getattr(self, "_A_HARVEST", -1) >= 0:
+            _rid = self.res_id.gather(1, tc)
+            _nres = int(self._res_harvest_y.numel())
+            _ridc = _rid.clamp(min=0, max=max(_nres - 1, 0))
+            _hy = torch.where(_rid >= 0, self._res_harvest_y[_ridc], torch.full_like(_rid, -1))
+            _himp = torch.where(_rid >= 0, self._res_harvest_imp[_ridc], torch.full_like(_rid, -1))
+            # the improvement's own unlock, the way the BUILD columns test it
+            _nimp = int(self._imp_unlock.numel())
+            _unl = torch.ones(B, _nimp, dtype=torch.bool, device=dev)
+            for _k in range(_nimp):
+                _ut, _uc = int(self._imp_unlock[_k]), int(self._imp_unlock_civic[_k])
+                if _ut >= 0:
+                    _unl[:, _k] = techs[:, _ut]
+                elif _uc >= 0:
+                    _unl[:, _k] = civics[:, _uc]
+            _has_imp = (_himp >= 0) & _unl.gather(1, _himp.clamp(min=0, max=max(_nimp - 1, 0)))
+            _hv = [(present
+                    & ((utype == self._builder_idx) if self._builder_idx >= 0 else torch.zeros_like(present))
+                    & (u_charges > 0)
+                    & own_tile.gather(1, tc)
+                    & (_hy >= 0)
+                    & ~self.res_stripped.gather(1, tc)
+                    & _has_imp
+                    & ~self._row_banned(row, self.BAN_HARVEST).reshape(-1, 1)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -3099,7 +3128,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk + _ri,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

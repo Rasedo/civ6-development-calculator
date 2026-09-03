@@ -36,6 +36,13 @@ export interface ResourceDef {
    * mode, removing the resource. Only some bonus resources, as in Civ 6.
    */
   harvestYield?: YieldKey;
+  /**
+   * CIV6 (Resource_Harvests.Amount): the harvest's BASE lump before the game
+   * progress scale — 20 for every Food and Production resource the install
+   * lists, and 40 for the two Gold ones. A feature CHOP is a different table
+   * and keeps its own base; only a resource reads this.
+   */
+  harvestAmount?: number;
 }
 
 const FLAT: Elevation[] = ['FLAT'];
@@ -43,16 +50,16 @@ const HILLS: Elevation[] = ['HILLS'];
 const ANY: Elevation[] = ['FLAT', 'HILLS'];
 
 export const RESOURCES: Record<string, ResourceDef> = {
-  WHEAT: { id: 'WHEAT', name: 'Wheat', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS'], harvestYield: 'food' },
-  RICE: { id: 'RICE', name: 'Rice', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['GRASSLAND'], elevations: FLAT, okFeatures: ['MARSH'], harvestYield: 'food' },
-  CATTLE: { id: 'CATTLE', name: 'Cattle', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND'], elevations: FLAT, noFeature: true },
-  SHEEP: { id: 'SHEEP', name: 'Sheep', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT'], elevations: HILLS, noFeature: true },
-  STONE: { id: 'STONE', name: 'Stone', category: 'bonus', yields: { production: 1 }, improvement: 'QUARRY', terrains: ['GRASSLAND'], elevations: ANY, noFeature: true, harvestYield: 'production' },
-  DEER: { id: 'DEER', name: 'Deer', category: 'bonus', yields: { production: 1 }, improvement: 'CAMP', terrains: ['TUNDRA', 'GRASSLAND', 'PLAINS'], elevations: ANY, requiresFeature: ['WOODS'], harvestYield: 'production' },
-  BANANAS: { id: 'BANANAS', name: 'Bananas', category: 'bonus', yields: { food: 1 }, improvement: 'PLANTATION', terrains: ['PLAINS'], elevations: FLAT, requiresFeature: ['RAINFOREST'], harvestYield: 'food' },
-  FISH: { id: 'FISH', name: 'Fish', category: 'bonus', yields: { food: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST', 'LAKE'], elevations: FLAT, harvestYield: 'food' },
-  CRABS: { id: 'CRABS', name: 'Crabs', category: 'bonus', yields: { gold: 2 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT, harvestYield: 'gold' },
-  COPPER: { id: 'COPPER', name: 'Copper', category: 'bonus', yields: { gold: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true, harvestYield: 'gold' },
+  WHEAT: { id: 'WHEAT', name: 'Wheat', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS'], harvestAmount: 20, harvestYield: 'food' },
+  RICE: { id: 'RICE', name: 'Rice', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['GRASSLAND'], elevations: FLAT, okFeatures: ['MARSH'], harvestAmount: 20, harvestYield: 'food' },
+  CATTLE: { id: 'CATTLE', name: 'Cattle', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND'], elevations: FLAT, noFeature: true, harvestAmount: 20, harvestYield: 'food' },
+  SHEEP: { id: 'SHEEP', name: 'Sheep', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT'], elevations: HILLS, noFeature: true, harvestAmount: 20, harvestYield: 'food' },
+  STONE: { id: 'STONE', name: 'Stone', category: 'bonus', yields: { production: 1 }, improvement: 'QUARRY', terrains: ['GRASSLAND'], elevations: ANY, noFeature: true, harvestAmount: 20, harvestYield: 'production' },
+  DEER: { id: 'DEER', name: 'Deer', category: 'bonus', yields: { production: 1 }, improvement: 'CAMP', terrains: ['TUNDRA', 'GRASSLAND', 'PLAINS'], elevations: ANY, requiresFeature: ['WOODS'], harvestAmount: 20, harvestYield: 'production' },
+  BANANAS: { id: 'BANANAS', name: 'Bananas', category: 'bonus', yields: { food: 1 }, improvement: 'PLANTATION', terrains: ['PLAINS'], elevations: FLAT, requiresFeature: ['RAINFOREST'], harvestAmount: 20, harvestYield: 'food' },
+  FISH: { id: 'FISH', name: 'Fish', category: 'bonus', yields: { food: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST', 'LAKE'], elevations: FLAT, harvestAmount: 20, harvestYield: 'food' },
+  CRABS: { id: 'CRABS', name: 'Crabs', category: 'bonus', yields: { gold: 2 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT, harvestAmount: 40, harvestYield: 'gold' },
+  COPPER: { id: 'COPPER', name: 'Copper', category: 'bonus', yields: { gold: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true, harvestAmount: 40, harvestYield: 'gold' },
 
   HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   IRON: { id: 'IRON', name: 'Iron', category: 'strategic', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },

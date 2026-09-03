@@ -890,6 +890,16 @@ class SimPhase:
             if bool(own_bomb.any()):
                 br3 = dr[own_bomb]
                 self._culture_bomb(row, br3, dt[own_bomb], col[br3], unowned_only=True)
+            # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
+            # completing a Harbor" — the roster's own carrier, a FULL bomb
+            # like the Congress's (`CULTURE_BOMB_ROWS`)
+            for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
+                if _bd < 0:
+                    continue
+                _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
+                if bool(_bw.any()):
+                    _br = dr[_bw]
+                    self._culture_bomb(row, _br, dt[_bw], col[_br])
             # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
             # Center."
             env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]

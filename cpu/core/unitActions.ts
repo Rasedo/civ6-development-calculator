@@ -117,6 +117,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // (costs no charge)" — both unit pages, verbatim. One column, the tile
   // underfoot; the turn is spent, never a charge.
   names.push('REMOVE_IMPROVEMENT');
+  // CIV6 (Builder): a resource is HARVESTED for a one-off lump — the
+  // resource's own `Resource_Harvests` amount, progress-scaled — and the
+  // resource is gone. One column, the tile underfoot, one charge.
+  names.push('HARVEST');
   return names;
 }
 
