@@ -1396,6 +1396,12 @@ class SimInit:
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
         self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
+        # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
+        # and never its queued price, which is what "the ORIGINAL wonder
+        # cost" means for the Builder's charge (C-55)
+        self._wond_cost = torch.tensor(
+            [float(w["cost"]) for w in self._wond_rows] or [0.0],
+            dtype=torch.float64, device=device)
         _wera = (rules.wonders or {}).get("eras", []) or [0]
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
@@ -1493,6 +1499,8 @@ class SimInit:
             self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
             # CIV6 (Builder): the resource goes for its own lump (C-52)
             self._A_HARVEST = self._act.get("HARVEST", -1)
+            # CIV6 (The First Emperor): a charge into the wonder underfoot (C-55)
+            self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
             assert _apc in (0, self._air_strike_cols), (
@@ -1520,6 +1528,7 @@ class SimInit:
                 + (1 if self._A_CLEAN >= 0 else 0) \
                 + (1 if self._A_REMOVE_IMP >= 0 else 0) \
                 + (1 if self._A_HARVEST >= 0 else 0) \
+                + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -1544,6 +1553,7 @@ class SimInit:
             self._A_PARK = -1
             self._A_REMOVE_IMP = -1
             self._A_HARVEST = -1
+            self._A_WONDER_CHARGE = -1
             self._A_PERFORM = -1
             self._A_BOOST = -1
             self._A_FORM_UP = -1
@@ -2942,6 +2952,10 @@ class SimInit:
         # [civ, leaderRow, startEra, endEra, pct] — an ERA BAND on a wonder
         self._wonder_era_prod_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderEraProd"]]  # type: ignore[misc]
+        # [civ, leaderRow, startEra, endEra, pct] — the same band, spent as a
+        # Builder's CHARGE rather than per-turn Production (C-55)
+        self._wonder_charge_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["wonderCharge"]]  # type: ignore[misc]
         self._wonder_tourism_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderTourism"]]  # type: ignore[misc]
         # [civ, leaderRow, district(1)/building(0), pct] ACROSS A RIVER

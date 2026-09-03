@@ -38,7 +38,7 @@ import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
-import { BUILT_WONDERS } from '../data/builtWonders';
+import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
@@ -1300,6 +1300,55 @@ export function boostProject(state: GameState, unit: Unit, actor: Seat): RuleRes
   unit.charges = 0;
   unit.movesLeft = 0;
   disbandUnit(state, unit.id);
+  return { ok: true };
+}
+
+/**
+ * CIV6 (The First Emperor): the city whose queued WONDER a Builder standing
+ * at `tileIndex` may pay a charge into. The charge goes into the wonder
+ * itself, so the plot must be the wonder's own site and the item must be
+ * that city's queue HEAD — the same reach `engineerFinishCity` has, since
+ * only the head accrues on either engine.
+ */
+export function wonderChargeCity(state: GameState, seat: number, tileIndex: number): City | undefined {
+  for (const city of citiesOf(state, seat)) {
+    const q = city.queue[0];
+    if (q?.kind === 'wonder' && q.tileIndex === tileIndex) return city;
+  }
+  return undefined;
+}
+
+/** The percentage a charge buys toward the wonder queued at `tileIndex`, or 0
+ *  where no row of this seat covers that wonder's era. ONE named reader, so
+ *  the mask and the applier cannot disagree about the era band. */
+export function wonderChargePct(state: GameState, seat: number, wonder: string): number {
+  const we = WONDER_ERA_INDEX[wonder] ?? 0;
+  let pct = 0;
+  for (const r of getModifiers(state, seat).wonderCharge) {
+    if (we >= ERAS.indexOf(r.startEra) && we <= ERAS.indexOf(r.endEra)) pct += r.pct;
+  }
+  return pct;
+}
+
+/**
+ * CIV6 (The First Emperor, EFFECT_ADJUST_PLAYER_UNIT_WONDER_PERCENT): "When
+ * building Ancient and Classical wonders you may spend Builder charges to
+ * complete 15% of the original wonder cost." ONE charge per helping, and
+ * ORIGINAL means the wonder's whole cost rather than what is left to pay.
+ */
+export function wonderChargeBoost(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (unit.type !== 'BUILDER') return { ok: false, reason: 'Not a Builder.' };
+  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
+  const city = wonderChargeCity(state, actor.seat, unit.tileIndex);
+  if (!city) return { ok: false, reason: 'No wonder under construction here.' };
+  const q = city.queue[0];
+  if (q.kind !== 'wonder') return { ok: false, reason: 'No wonder under construction here.' };
+  const pct = wonderChargePct(state, actor.seat, q.wonder);
+  if (pct <= 0) return { ok: false, reason: "This wonder's era is outside the ability." };
+  q.progress += Math.round(itemCost(q, state, city) * pct / 100);
+  unit.charges = (unit.charges ?? 1) - 1;
+  unit.movesLeft = 0;
+  if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);
   return { ok: true };
 }
 

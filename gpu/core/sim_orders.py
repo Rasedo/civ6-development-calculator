@@ -64,6 +64,7 @@ class SimOrders:
         _cfc = getattr(self, "_A_CLEAN", -1)
         _nkc = getattr(self, "_A_NUKE", -1)
         _hvc = getattr(self, "_A_HARVEST", -1)
+        _wcc = getattr(self, "_A_WONDER_CHARGE", -1)
         _nkw = self._nuke_cols * self._n_devices
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
@@ -117,6 +118,7 @@ class SimOrders:
             ((_ab == _cfc) if _cfc >= 0 else _no).any(dim=0),                     # clean fallout
             (((_ab >= _nkc) & (_ab < _nkc + _nkw)) if _nkc >= 0 else _no).any(dim=0),  # a nuclear strike
             ((_ab == _hvc) if _hvc >= 0 else _no).any(dim=0),                     # harvest a resource
+            ((_ab == _wcc) if _wcc >= 0 else _no).any(dim=0),                     # a charge into a wonder
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -125,7 +127,7 @@ class SimOrders:
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
          _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
-         _rk_harvest) = _tab
+         _rk_harvest, _rk_wcharge) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -465,6 +467,28 @@ class SimOrders:
                     self._repair_drip(row, _drip_h)
                     self._spend_build_charge(_r, sc, hc)
                     self._eff_version += 1
+
+            if _rk_wcharge[n] and _wcc >= 0 and self._builder_idx >= 0:
+                # CIV6 (The First Emperor): a charge into the queued WONDER
+                # underfoot, worth a percentage of that wonder's WHOLE cost.
+                # The site and the era band are the mask's own reader, so a
+                # legal column cannot land in no arm (C-55).
+                _wcm = act & (a == _wcc) & (utp == self._builder_idx) & (u_charges > 0)
+                if bool(_wcm.any()):
+                    _wcol = self._wonder_charge_slot(row, here.unsqueeze(1)).squeeze(1)
+                    _wcm = _wcm & (_wcol >= 0)
+                    if bool(_wcm.any()):
+                        _r = _wcm.nonzero(as_tuple=True)[0]
+                        _c = _wcol[_r]
+                        _pct = self._wonder_charge_pct(row, _c, _r)
+                        # `itemCost` reads a wonder off the CATALOG, never the
+                        # queued price — the ability says ORIGINAL cost
+                        _wq = self._q_head(row)[_r, _c] - self.WONDER_BASE
+                        _cst = self._wond_cost[
+                            _wq.clamp(min=0, max=max(self._wond_n - 1, 0))]
+                        self.city_progress[_r, row, _c, 0] += js_round(
+                            _cst * _pct / 100.0).to(self.city_progress.dtype)
+                        self._spend_build_charge(_r, sc, hc)
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
                 _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)

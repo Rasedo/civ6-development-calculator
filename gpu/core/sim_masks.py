@@ -3078,6 +3078,16 @@ class SimMasks:
                     & ~self.res_stripped.gather(1, tc)
                     & _has_imp
                     & ~self._row_banned(row, self.BAN_HARVEST).reshape(-1, 1)).unsqueeze(2)]
+        # CIV6 (The First Emperor): a charge into the WONDER underfoot. The
+        # site and the era band are `_wonder_charge_slot`'s, which the applier
+        # asks too — one reader, so a legal column cannot land in no arm.
+        _wc: list[torch.Tensor] = []
+        if getattr(self, "_A_WONDER_CHARGE", -1) >= 0:
+            _wc = [(present
+                    & ((utype == self._builder_idx) if self._builder_idx >= 0
+                       else torch.zeros_like(present))
+                    & (u_charges > 0)
+                    & self._wonder_charge_at(row).gather(1, tc)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -3128,7 +3138,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

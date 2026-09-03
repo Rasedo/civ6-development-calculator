@@ -36,14 +36,19 @@ def fresh(rules, path) -> BatchSim:
 
 
 def test_column(rules, path) -> None:
-    """The verb APPENDS: it must be the last column, or every hardcoded one
-    below it addresses a different verb."""
+    """The verb was APPENDED: it sits directly behind the verb that was last
+    when it landed, so no existing column moved. Pinned there rather than
+    at the END of the enum, which every later append moves.
+    """
     sim = fresh(rules, path)
     assert sim._A_HARVEST >= 0, "the action table carries no HARVEST"
-    assert sim._A_HARVEST == len(sim._act_names) - 1, (
-        "HARVEST must be the LAST column, found "
-        f"{sim._A_HARVEST} of {len(sim._act_names)}")
-    print("  1 the column OK — HARVEST appended last at", sim._A_HARVEST)
+    _prev = sim._act.get("REMOVE_IMPROVEMENT", -1)
+    assert _prev >= 0, "REMOVE_IMPROVEMENT is gone — re-pin this lane"
+    assert sim._A_HARVEST == _prev + 1, (
+        f"HARVEST is at {sim._A_HARVEST}, not directly behind "
+        f"REMOVE_IMPROVEMENT at {_prev}")
+    print("  1 the column OK — HARVEST appended at", sim._A_HARVEST,
+          "of", len(sim._act_names))
 
 
 def test_catalog(rules, path) -> None:

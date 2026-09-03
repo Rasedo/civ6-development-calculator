@@ -3004,6 +3004,70 @@ class SimSeats:
             out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
         return out
 
+    def _wonder_charge_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
+        """[B, N] — the CITY COLUMN whose queued WONDER a Builder standing at
+        each of `tiles` would pay a charge into, -1 where none
+        (`wonderChargeCity` + `wonderChargePct`). ONE reader for the mask and
+        the applier both, so the era band cannot be spelled twice.
+
+        The charge goes into the wonder itself, so the plot is the wonder's
+        own site from the city registry, and only the queue HEAD accrues on
+        either engine (C-55)."""
+        B, N = tiles.shape
+        out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
+        if self._builder_idx < 0 or not self._wonder_charge_rows:
+            return out
+        cur = self._q_head(row)                                      # [B, RC]
+        alive = self.city_alive[:, row]
+        nw = self._wonder_era.shape[0]
+        bidx = torch.arange(B, device=self.device)
+        for j in range(self.RC):
+            live = alive[:, j]
+            if not bool(live.any()):
+                continue
+            wid = (cur[:, j] - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
+            isw = (cur[:, j] >= self.WONDER_BASE) & (cur[:, j] < self.WONDER_BASE + nw)
+            band = torch.zeros(B, dtype=torch.bool, device=self.device)
+            for _c, _l, _s, _e, _p in self._wonder_charge_rows:
+                if _s < 0 or _e < 0 or _p <= 0:
+                    continue
+                band = band | (self._row_is(row, _c, _l)
+                               & (self._wonder_era[wid] >= _s)
+                               & (self._wonder_era[wid] <= _e))
+            want = live & isw & band
+            # `wid` is a [B] tensor, so the batch axis must be an arange: a
+            # bare `[:, row, j, wid]` is advanced indexing and answers [B, B]
+            at = torch.where(want, self.city_wonder[bidx, row, j, wid],
+                             torch.full_like(wid, -1))
+            hit = (at >= 0).unsqueeze(1) & (tiles == at.unsqueeze(1))
+            out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
+        return out
+
+    def _wonder_charge_pct(self, row: int, cols: torch.Tensor, rows: torch.Tensor) -> torch.Tensor:
+        """[n] float — the percentage a charge buys at each (rows[i], cols[i])
+        city column, summed over every row of this seat whose era band holds
+        that column's queued wonder (`wonderChargePct`)."""
+        out = torch.zeros(len(rows), dtype=torch.float64, device=self.device)
+        if not self._wonder_charge_rows:
+            return out
+        nw = self._wonder_era.shape[0]
+        cur = self._q_head(row)[rows, cols]
+        wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
+        isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw)
+        for _c, _l, _s, _e, _p in self._wonder_charge_rows:
+            if _s < 0 or _e < 0 or _p <= 0:
+                continue
+            hit = (self._row_is(row, _c, _l)[rows] & isw
+                   & (self._wonder_era[wid] >= _s) & (self._wonder_era[wid] <= _e))
+            out = out + hit.double() * float(_p)
+        return out
+
+    def _wonder_charge_at(self, row: int) -> torch.Tensor:
+        """[B, T] — every tile `_wonder_charge_slot` would answer for, as a
+        tile plane for the mask column."""
+        span = torch.arange(self.T, device=self.device).reshape(1, -1).expand(self.B, self.T)
+        return self._wonder_charge_slot(row, span) >= 0
+
     def _project_boost_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose DISTRICT PROJECT a Builder standing at
         each of `tiles` would pay into, -1 where none (`projectBoostCity`). The

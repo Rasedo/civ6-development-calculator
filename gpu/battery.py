@@ -358,6 +358,7 @@ def main() -> int:
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip
                 ("culture_bomb_rows", [py, "tests/gpu/culture_bomb_rows_test.py"], 4),  # the roster's two culture-bomb carriers, improvement and district
+                ("wonder_charge", [py, "tests/gpu/wonder_charge_test.py"], 4),  # the Builder's charge into an Ancient or Classical wonder
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

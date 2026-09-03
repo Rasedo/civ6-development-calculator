@@ -1503,3 +1503,25 @@ export const CULTURE_BOMB_ROWS: readonly CultureBombRow[] = [
   { civ: 'MAORI', improvement: 'FISHING_BOATS' },
   { civ: 'NETHERLANDS', district: 'HARBOR' },
 ];
+
+/**
+ * CIV6 (The First Emperor, EFFECT_ADJUST_PLAYER_UNIT_WONDER_PERCENT): "When
+ * building Ancient and Classical wonders you may spend Builder charges to
+ * complete 15% of the original wonder cost."
+ *
+ * The install's modifier carries the Amount (15) and NO requirement set, so
+ * the era band comes from the leader's own published description — the same
+ * install, its Text tables. ORIGINAL cost means the wonder's whole cost, not
+ * what is left to pay, and one charge buys one helping.
+ */
+export interface WonderChargeRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the engine's own era NAMES (`ERAS`), inclusive at both ends */
+  startEra: Era;
+  endEra: Era;
+  pct: number;
+}
+export const WONDER_CHARGE_ROWS: readonly WonderChargeRow[] = [
+  { leader: 'QIN', startEra: 'Ancient', endEra: 'Classical', pct: 15 },
+];

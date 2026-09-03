@@ -40,9 +40,12 @@ function researchAll(state: GameState, seat: number): void {
 }
 
 describe('the harvest', () => {
-  it('appends HARVEST last, so no existing column moves', () => {
+  it('was APPENDED, so no existing column moved', () => {
+    // pinned against the verb it landed behind rather than against the END of
+    // the enum, which every later append moves
     const names = unitActionNames(IMPROVEMENT_IDS);
-    expect(names[names.length - 1]).toBe('HARVEST');
+    expect(names.indexOf('HARVEST'))
+      .toBe(names.indexOf('REMOVE_IMPROVEMENT') + 1);
   });
 
   it('pays the ACTING seat, not seat 0', () => {

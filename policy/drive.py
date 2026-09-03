@@ -570,12 +570,13 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         rep_ok = um[:, :, sim._A_REPAIR]
         # A 20% charge into a district beats an improvement, and laying road is
         # the fallback when nothing else is placeable here.
-        # HARVEST sits AHEAD of the improvement run: a resource the builder is
-        # standing on is a one-off lump, and taking it first is what makes the
-        # verb reachable at all — the gate cannot compare an arm no driver
-        # orders (C-52).
+        # HARVEST and the wonder charge sit AHEAD of the improvement run:
+        # both are one-off lumps on the tile underfoot, and taking them
+        # first is what makes either verb reachable at all — the gate
+        # cannot compare an arm no driver orders (C-52, C-55).
         bcols = ([c for c in (getattr(sim, "_A_FINISH", -1),) if c >= 0]
                  + [c for c in (getattr(sim, "_A_HARVEST", -1),) if c >= 0]
+                 + [c for c in (getattr(sim, "_A_WONDER_CHARGE", -1),) if c >= 0]
                  + [c for c in sim._A_IMP if c >= 0]
                  + [c for c in (getattr(sim, "_A_ROAD", -1),) if c >= 0]
                  + [c for c in (getattr(sim, "_A_RAIL", -1),) if c >= 0])

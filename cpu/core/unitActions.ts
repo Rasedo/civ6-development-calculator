@@ -121,6 +121,11 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // resource's own `Resource_Harvests` amount, progress-scaled — and the
   // resource is gone. One column, the tile underfoot, one charge.
   names.push('HARVEST');
+  // CIV6 (The First Emperor): a Builder spends a charge into the WONDER it
+  // stands on, worth a percentage of that wonder's whole cost. One column,
+  // the tile underfoot, one charge — the era band is the row's
+  // (`WONDER_CHARGE_ROWS`).
+  names.push('WONDER_CHARGE');
   return names;
 }
 
