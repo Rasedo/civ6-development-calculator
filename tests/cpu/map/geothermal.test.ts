@@ -76,9 +76,9 @@ describe('the Geothermal Fissure', () => {
   it('is the only ground a Geothermal Plant may stand on', () => {
     const { state } = world();
     const t = tileAtCoords(state.map, 6, 8);
-    const un = computeUnlocksIn(seatOf(state, 0)!.research);
+    const un = computeUnlocksIn(seatOf(state, 0)!.research, []);
     const list = (tile: Tile) => validImprovementsIn(tile, {
-      unlocks: computeUnlocksIn(seatOf(state, 0)!.research),
+      unlocks: computeUnlocksIn(seatOf(state, 0)!.research, []),
       builder: 'BUILDER',
       map: state.map,
       ownsTile: () => true,

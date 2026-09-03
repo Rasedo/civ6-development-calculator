@@ -150,7 +150,7 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   // gating) — THIS seat's tech.
   const rs = seatOf(state, seat)?.research;
   if (!rs) return null;
-  if (!state.sandbox && !computeUnlocksIn(rs).improvements.has(res.improvement)) return null;
+  if (!state.sandbox && !computeUnlocksIn(rs, getModifiers(state, seat).districtPrereq).improvements.has(res.improvement)) return null;
   return { key: res.harvestYield, amount: chopValue(state, seat, tile) };
 }
 

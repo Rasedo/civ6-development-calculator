@@ -423,6 +423,10 @@ export interface UnitChargeRow {
 }
 export const UNIT_CHARGE_ROWS: readonly UnitChargeRow[] = [
   { civ: 'ENGLAND', unit: 'MILITARY_ENGINEER', amount: 2 },
+  // CIV6 (The First Emperor): "Builders receive an additional charge."
+  { leader: 'QIN', unit: 'BUILDER', amount: 1 },
+  // CIV6 (El Escorial): "Inquisitors can Remove Heresy one extra time."
+  { leader: 'PHILIP_II', unit: 'INQUISITOR', amount: 1 },
 ];
 
 /** CIV6 (The Last Best West, EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN):
@@ -811,4 +815,181 @@ export const OCEAN_ACCESS_ROWS: readonly OceanAccessRow[] = [
 
 export const DISTRICT_UNIT_ROWS: readonly DistrictUnitRow[] = [
   { leader: 'MVEMBA', district: 'THEATER_SQUARE', unit: 'APOSTLE' },
+];
+
+// ---------------------------------------------------------------------------
+// THE CONQUERED CITY, THE SECOND HORSE AND THE BOOST
+
+/** CIV6 (People of the Steppe, EFFECT_ADJUST_EXTRA_UNIT_COPY_TAG): "Receive a
+ *  second light cavalry unit ... each time you train a light cavalry unit."
+ *  A TRAINED unit only — the install's collection is the player's units and
+ *  the real game excludes a purchase, exactly as the Venetian Arsenal does. */
+export interface ExtraUnitCopyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the unit CLASS the copy follows */
+  cls: string;
+  amount: number;
+}
+/** the WIRE's index space for a copy row's class — both engines address one
+ *  by position, and the unit plane behind each is named on the unit row. */
+export const COPY_CLASSES = ['LIGHT_CAVALRY'] as const;
+export const EXTRA_UNIT_COPY_ROWS: readonly ExtraUnitCopyRow[] = [
+  { civ: 'SCYTHIA', cls: 'LIGHT_CAVALRY', amount: 1 },
+];
+
+/** CIV6 (Great Turkish Bombard, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST):
+ *  "Conquered cities do not lose Population" — the PERCENTAGE of the
+ *  captured city's population this row keeps, over the usual loss. */
+export interface ConquestPopRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** 100 = the whole population survives */
+  keepPct: number;
+}
+export const CONQUEST_POP_ROWS: readonly ConquestPopRow[] = [
+  { civ: 'OTTOMAN', keepPct: 100 },
+];
+
+/** CIV6 (Great Turkish Bombard, CITY_NOT_FOUNDED): "Cities not founded by the
+ *  Ottomans gain +1 Amenity and +4 Loyalty per turn." */
+export type NotFoundedChannel = 'amenity' | 'loyalty';
+export interface NotFoundedRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  channel: NotFoundedChannel;
+  amount: number;
+}
+/** the WIRE's index space for the channel — both engines address one by position. */
+export const NOT_FOUNDED_CHANNELS: readonly NotFoundedChannel[] = ['amenity', 'loyalty'];
+export const NOT_FOUNDED_ROWS: readonly NotFoundedRow[] = [
+  { civ: 'OTTOMAN', channel: 'amenity', amount: 1 },
+  { civ: 'OTTOMAN', channel: 'loyalty', amount: 4 },
+];
+
+/** CIV6 (Free Imperial Cities, EFFECT_ADJUST_CITY_EXTRA_DISTRICTS): "Each city
+ *  can build one more district than usual (exceeding the normal limit based on
+ *  Population)." */
+export interface ExtraDistrictRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const EXTRA_DISTRICT_ROWS: readonly ExtraDistrictRow[] = [
+  { civ: 'GERMANY', amount: 1 },
+];
+
+/** CIV6 (Mother Russia, EFFECT_ADJUST_PLAYER_CITY_TILES): "Extra territory
+ *  upon founding cities" — the install's Amount is 5, not the eight the
+ *  civilopedia's prose suggests. */
+export interface CityTilesRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const CITY_TILES_ROWS: readonly CityTilesRow[] = [
+  { civ: 'RUSSIA', amount: 5 },
+];
+
+/** CIV6 (Dynastic Cycle, EFFECT_ADJUST_TECHNOLOGY_BOOST /
+ *  EFFECT_ADJUST_CIVIC_BOOST): "Eurekas and Inspirations provide 50% ...
+ *  instead of 40%" — the install's Amount is 10 PERCENTAGE POINTS added to
+ *  the base fraction, not a factor. */
+export interface BoostPctRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** true for a TECH boost, false for a CIVIC one */
+  tech: boolean;
+  points: number;
+}
+export const BOOST_PCT_ROWS: readonly BoostPctRow[] = [
+  { civ: 'CHINA', tech: true, points: 10 },
+  { civ: 'CHINA', tech: false, points: 10 },
+];
+
+/** CIV6 (The First Emperor, EFFECT_ADJUST_DISTRICT_PREREQ): "Canals are
+ *  unlocked with the Masonry technology" — the row REPLACES the district's
+ *  own unlock. */
+export interface DistrictPrereqRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  district: DistrictId;
+  tech: string;
+}
+export const DISTRICT_PREREQ_ROWS: readonly DistrictPrereqRow[] = [
+  { leader: 'QIN', district: 'CANAL', tech: 'MASONRY' },
+];
+
+/** CIV6 (Satyagraha, EFFECT_ADJUST_WAR_WEARINESS): "Opposing civilizations
+ *  receive double the war weariness for fighting against Gandhi" — the
+ *  install's Amount is 100 with Enemy true, so it is a PERCENTAGE added to
+ *  the enemy's accrual. */
+export interface WarWearinessRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** added to what a seat AT WAR WITH this row accrues */
+  enemyPct: number;
+}
+export const WAR_WEARINESS_ROWS: readonly WarWearinessRow[] = [
+  { leader: 'GANDHI', enemyPct: 100 },
+];
+
+/** CIV6 (Satyagraha, EFFECT_ADJUST_PLAYER_FAITH_PEACEFUL_FOUNDERS): "+5 Faith
+ *  for each civilization (including India) they have met that has founded a
+ *  Religion and is not currently at war." */
+export interface PeacefulFounderRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const PEACEFUL_FOUNDER_ROWS: readonly PeacefulFounderRow[] = [
+  { leader: 'GANDHI', amount: 5 },
+];
+
+/** CIV6 (Surrounded by Glory, EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY):
+ *  "+5% Culture per city-state you are the Suzerain of." */
+export interface YieldPerSuzerainRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  pct: number;
+}
+export const YIELD_PER_SUZERAIN_ROWS: readonly YieldPerSuzerainRow[] = [
+  { leader: 'PERICLES', yield: 'culture', pct: 5 },
+];
+
+/** CIV6 (Grand Vizier, EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS): "Gain ... a
+ *  Governor Title when the Gunpowder technology is researched" — RunOnce. */
+export interface GovernorTitleGrantRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tech: string;
+  amount: number;
+}
+export const GOVERNOR_TITLE_GRANT_ROWS: readonly GovernorTitleGrantRow[] = [
+  { leader: 'SULEIMAN', tech: 'GUNPOWDER', amount: 1 },
+];
+
+/** CIV6 (Magnanimous, EFFECT_ADJUST_GREAT_PERSON_POINTS_REFUND_PERCENT):
+ *  "After recruiting or patronizing a Great Person, 20% of its Great Person
+ *  point cost is refunded." */
+export interface GpRefundRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  pct: number;
+}
+export const GP_REFUND_ROWS: readonly GpRefundRow[] = [
+  { leader: 'PEDRO', pct: 20 },
+];
+
+/** CIV6 (El Escorial, EFFECT_ADJUST_UNIT_EVICT_PERCENT): "Inquisitors
+ *  eliminate 100% of the presence of other Religions" — the install adds 25
+ *  PERCENTAGE POINTS to the base Remove Heresy share. */
+export interface EvictPctRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  points: number;
+}
+export const EVICT_PCT_ROWS: readonly EvictPctRow[] = [
+  { leader: 'PHILIP_II', points: 25 },
 ];

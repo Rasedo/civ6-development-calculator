@@ -43,6 +43,12 @@ export function governorTitlesEarned(state: GameState, seat: number): number {
   for (const c of GOVERNOR_TITLE_CIVICS) if (s.research.civics.includes(c)) n += 1;
   n += seatBuildingSum(state, seat, 'govTitle');
   for (const city of citiesOf(state, seat)) n += cityDistrictSum(state, city, 'governorTitle');
+  // CIV6 (Grand Vizier): "Gain ... a Governor Title when the Gunpowder
+  // technology is researched" — RunOnce, and a title is DERIVED here, so the
+  // held tech is what makes it permanent (`GOVERNOR_TITLE_GRANT_ROWS`)
+  for (const r of getModifiers(state, seat).governorTitleGrants) {
+    if (s.research.techs.includes(r.tech)) n += r.amount;
+  }
   return n;
 }
 

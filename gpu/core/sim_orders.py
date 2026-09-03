@@ -307,14 +307,21 @@ class SimOrders:
                     hr = hxm.nonzero(as_tuple=True)[0]
                     # CIV6 (GS): an Inquisitor's Remove Heresy leaves "only 75%
                     # presence of other Religions" removed, not all of it.
-                    keep = 100 - self._remove_heresy_pct
+                    # CIV6 (El Escorial): "Inquisitors eliminate 100% of the
+                    # presence of other Religions" — the roster's points on
+                    # top (`EVICT_PCT_ROWS`). Per GAME, so it rides `hr`.
+                    _ev = torch.full((self.B,), float(self._remove_heresy_pct),
+                                     dtype=torch.long, device=self.device)
+                    for _vc, _vl, _vp in self._evict_pct_rows:
+                        _ev = _ev + self._row_is(row, _vc, _vl).long() * _vp
+                    keep = (100 - _ev.clamp(max=100))[hr]
                     cs_h = _cslot[hr]
                     for g in range(self.n_majors):
                         if g == row:
                             continue
                         _cur = self.city_pressure[hr, row, cs_h, g]
                         self.city_pressure[hr, row, cs_h, g] = torch.div(
-                            _cur * keep, 100, rounding_mode="floor")
+                            _cur * keep.to(_cur.dtype), 100, rounding_mode="floor")
                     self.unit_charges[hr, sc[hr]] -= 1
                     self.unit_mp[hr, sc[hr]] = 0
 

@@ -17,8 +17,8 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocksIn, isCivicComplete, type Unlocks , prodMultFor } from './effects';
-import { detectBoosts, effectiveResearchCostIn } from './boosts';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith } from './effects';
+import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
@@ -405,6 +405,9 @@ export function standingLoyalty(state: GameState, city: City): number {
   // CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's rows
   // for a garrisoned unit, the second only for a Corps or an Army
   const mods = getModifiers(state, city.seat);
+  // CIV6 (Great Turkish Bombard): "Cities not founded by the Ottomans gain
+  // ... +4 Loyalty per turn"
+  n += notFoundedSum(state, city, 'loyalty');
   if (mods.garrisonLoyalty.length) {
     const garrison = unitsAt(state, city.centerIndex).find(
       (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
@@ -844,7 +847,9 @@ export function transferCity(
     name: civCity.name,
     seat: to.seat,
     centerIndex: civCity.centerIndex,
-    population: Math.max(1, Math.floor(civCity.population * 0.75)),
+    // CIV6 (Great Turkish Bombard): "Conquered cities do not lose
+    // Population" — `keepPct` of what stood, over the usual quarter lost
+    population: Math.max(1, Math.floor(civCity.population * Math.max(0.75, getModifiers(state, to.seat).conquestKeepPct / 100))),
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: civCity.tilesAcquired,
@@ -1139,7 +1144,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       // re-validated rather than re-derived by a scan each engine owns.
       const si = a - (NB + 2 + NU);
       const d = SCAFFOLD_DISTRICTS[si];
-      if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocksIn(actor.research), aTile ?? -1);
+      if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocks(state, actor.seat), aTile ?? -1);
     }
   }
 }
@@ -1442,7 +1447,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         } else {
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
-          const un = computeUnlocksIn(actor.research);
+          const un = computeUnlocks(state, actor.seat);
           if (!here.improvement
               && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics }).includes(imp)) {
             here.improvement = imp;
@@ -2412,8 +2417,9 @@ export function seatPhase(state: GameState): void {
     // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
     // lump grants (applyLumpGrant, goody maps) add to the same field.
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
-    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
-      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
+    const bTech = rosterBoostPoints(state, actor.seat, false);
+    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech)) {
+      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech);
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       for (const fx of TECHS[rsr.tech].effects) {
         // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
@@ -2441,6 +2447,7 @@ export function seatPhase(state: GameState): void {
     // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     actor.treasury = (actor.treasury ?? 0) + goldSum;
+    faithSum += peacefulFounderFaith(state, actor.seat);
     actor.faith = (actor.faith ?? 0) + faithSum;
     seatAccumulators(state, actor.seat, rGovIds);
     actor.treasury -= state.units.reduce(
@@ -2466,8 +2473,9 @@ export function seatPhase(state: GameState): void {
       const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
       if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
-    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
-      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);
+    const bCivic = rosterBoostPoints(state, actor.seat, true);
+    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
+      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
       for (const fx of CIVICS[rsr.civic].effects) {
         // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
         // Diplomatic Victory point" — once, at completion.

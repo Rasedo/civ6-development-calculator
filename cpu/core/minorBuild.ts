@@ -74,7 +74,7 @@ export function minorBuildPhase(state: GameState): void {
 
 function minorBuild(state: GameState, cityState: CityState): void {
   cityState.prodProgress = (cityState.prodProgress ?? 0) + cityState.population;
-  const unlocks = computeUnlocksIn(cityState.research);
+  const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   const held = cityState.buildings ?? [];
   for (const item of minorLadder(cityState)) {
     if (item.kind === 'walls') {

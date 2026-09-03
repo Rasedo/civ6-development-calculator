@@ -251,9 +251,7 @@ class SimSeats:
         # A district's unlock and a wonder's unlock/already-built pair are per
         # SEAT too, so both tables are built once for the whole column sweep.
         d_tech = [
-            (self.civ_techs[:, row, utech] if utech >= 0
-             else (self.civ_civics[:, row, uciv] if uciv >= 0 else ones_b))
-            for (_di, utech, uciv, _plc, _fc) in self._scaffold
+            self._district_unlocked(row, _si) for _si in range(len(self._scaffold))
         ] if (self.districts_on and self._scaffold) else []
         # FORMATION columns: the chassis gates are per SEAT (per unit row),
         # only the enabling building is per city. CIV6 (Military Academy,
@@ -303,8 +301,7 @@ class SimSeats:
             if self.districts_on and self._scaffold:
                 # CIV6 (Bi Sheng, Ada Lovelace): "one more district than the
                 # Population limit allows" — the per-city permanent raise
-                cap_max = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
-                           + self._gp_city_perm(row, "districtLimit")[:, j].long())
+                cap_max = self._district_cap(row, j)
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 site = self._district_elig_site(row, j)  # every type in this city shares it
                 for si, (di, _ut, _uc, plc, _fc) in enumerate(self._scaffold):
@@ -1009,6 +1006,49 @@ class SimSeats:
             for _row in range(self.n_majors):
                 _w = self._row_is(_row, _sc, _sl)
                 self.civ_techs[:, _row, _st] = self.civ_techs[:, _row, _st] | _w
+
+    def _not_founded_sum(self, row: int, channel: int) -> torch.Tensor:
+        """[B, RC] f64 — CIV6 (CITY_NOT_FOUNDED): what this row pays in a city
+        it did NOT found. The ONE reader, so the amenity and the loyalty
+        cannot drift apart on which cities count (`NOT_FOUNDED_ROWS`)."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        rows = [r for r in self._not_founded_rows if r[2] == channel]
+        if not rows:
+            return out
+        not_ours = self.city_founder[:, row] != row
+        for _nc, _nl, _ch, _na in rows:
+            out = out + (not_ours & self._row_is(row, _nc, _nl).unsqueeze(1)).double() * _na
+        return out
+
+    def _district_unlocked(self, row: int, si: int) -> torch.Tensor:
+        """[B] bool — is scaffold slot `si`'s district open to seat row `row`?
+        Its own tech or civic, unless a roster row REPLACES that unlock: CIV6
+        (The First Emperor) "Canals are unlocked with the Masonry technology"
+        (`DISTRICT_PREREQ_ROWS`). ONE body — the mask and the queue apply both
+        ask it, so an override cannot reach one and miss the other."""
+        di, utech, uciv, _plc, _fc = self._scaffold[si]
+        base = (self.civ_techs[:, row, utech] if utech >= 0
+                else (self.civ_civics[:, row, uciv] if uciv >= 0
+                      else torch.ones(self.B, dtype=torch.bool, device=self.device)))
+        for _pc, _pl, _pd, _pt in self._district_prereq_rows:
+            if _pd != di or _pt < 0:
+                continue
+            _w = self._row_is(row, _pc, _pl)
+            # REPLACES: where the row plays, only its own tech opens the door
+            base = torch.where(_w, self.civ_techs[:, row, _pt], base)
+        return base
+
+    def _district_cap(self, row: int, j: int) -> torch.Tensor:
+        """[B] long — how many SPECIALTY districts city slot `j` may hold:
+        `maxSpecialtyDistricts` plus the Great Person's permanent raise, plus
+        CIV6 (Free Imperial Cities) "one more district than usual"
+        (`EXTRA_DISTRICT_ROWS`). ONE body — the mask and the queue apply both
+        ask it, so a roster row cannot reach one and miss the other."""
+        cap = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+               + self._gp_city_perm(row, "districtLimit")[:, j].long())
+        for _dc, _dl, _da in self._extra_district_rows:
+            cap = cap + self._row_is(row, _dc, _dl).long() * _da
+        return cap
 
     def _worship_cost_of(self, row: int) -> torch.Tensor:
         """[B] — the Faith price of a worship building for this seat row.
@@ -2056,15 +2096,12 @@ class SimSeats:
                 d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
                 reg_j = self.city_dist_tile[:, row, j]  # [B, nD] THIS city's registry — the list TS counts
                 spec_cnt = ((reg_j >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
-                cap_j = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
-                         + self._gp_city_perm(row, "districtLimit")[:, j].long())
-                for si, (di, utech, uciv, plc, fc) in enumerate(self._scaffold):
+                cap_j = self._district_cap(row, j)
+                for si, (di, _utech, _uciv, plc, fc) in enumerate(self._scaffold):
                     want_d = is_d & (a == self.DISTRICT_BASE + si)
                     if not bool(want_d.any()):
                         continue
-                    has_tech = (self.civ_techs[:, row, utech] if utech >= 0
-                                else (self.civ_civics[:, row, uciv] if uciv >= 0
-                                      else torch.ones(self.B, dtype=torch.bool, device=self.device)))
+                    has_tech = self._district_unlocked(row, si)
                     spec_si = bool(self._is_specialty[di])
                     under_cap = (spec_cnt < cap_j) if spec_si else torch.ones_like(want_d)
                     want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
@@ -3635,6 +3672,13 @@ class SimSeats:
         return (self._suzerain_mask(row)[:, : self.S].double()
                 * self._congress_suz_favor_weight()).sum(dim=1)
 
+    def _suzerains_held(self, row: int) -> torch.Tensor:
+        """[B] f64 — a PLAIN count of the minors this row is suzerain of. The
+        Treaty Organization weighting in `_suzerain_count` is what a
+        suzerainty pays in FAVOR; a yield clause counts heads, which is what
+        TS's `isSuzerain` filter does (`culturePerSuzerain`, Pericles)."""
+        return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
+
     def _suz_live_mask(self, row: int) -> torch.Tensor:
         """[B, S] — the minors whose SUZERAIN bonus actually pays this row.
         Sovereignty outcome B silences a whole city-state TYPE."""
@@ -4258,6 +4302,9 @@ class SimSeats:
         if w.numel() and bool((w != 0).any()):
             stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg)
             out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        # CIV6 (Great Turkish Bombard): "+4 Loyalty per turn" in a city
+        # not founded here
+        out = out + self._not_founded_sum(row, 1)[bidx, col]
         # CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's
         # rows for a garrisoned unit, the second only for a Corps or an Army
         if self._garrison_loyalty_rows:
@@ -6656,6 +6703,8 @@ class SimSeats:
         # `computeCityStats`' own position: `luxuryAmenities` ranks on the
         # narrow baseHave (local + parks + regional) and nothing else.
         have = have + self._gp_city_perm(row, "amenities").double()
+        # CIV6 (Great Turkish Bombard): "+1 Amenity" in a city not founded here
+        have = have + self._not_founded_sum(row, 0)[:, :cols]
         if self._gov_has_effects:
             _gm = self._gov_mods(row)
             _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]
@@ -6876,7 +6925,13 @@ class SimSeats:
         if conquest:
             _one = torch.tensor([b], dtype=torch.long, device=self.device)
             self._all_roads_lead_to_rome(_one, dst_row, torch.tensor([c_t], dtype=torch.long, device=self.device))
-        self.city_pop[b, dst_row, col] = max(1, (old_pop * 3) // 4)
+        # CIV6 (Great Turkish Bombard): "Conquered cities do not lose
+        # Population" — `keepPct` of what stood, over the usual quarter lost
+        _keep = 75
+        for _cc, _cl, _cp in self._conquest_pop_rows:
+            if bool(self._row_is(dst_row, _cc, _cl)[b]):
+                _keep = max(_keep, _cp)
+        self.city_pop[b, dst_row, col] = max(1, (old_pop * _keep) // 100)
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
         self.city_acquired[b, dst_row, col] = old_acq
@@ -7303,6 +7358,24 @@ class SimSeats:
             )
             self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]
+            self._tile_owner_ver += 1
+        # CIV6 (Mother Russia): "Extra territory upon founding cities" — the
+        # SECOND ring, `amount` of it, in ascending TILE INDEX so both engines
+        # claim the same ground (`CITY_TILES_ROWS`)
+        for _tc, _tl, _tn in self._city_tiles_rows:
+            _tw = self._row_is(row, _tc, _tl)[rows]
+            if _tn <= 0 or not bool(_tw.any()):
+                continue
+            _ring2 = (self.pair_dist[s_idx] == 2)                      # [n, T]
+            _free = _ring2 & (self.tile_seat[rows] < 0) & _tw.unsqueeze(1)
+            # ascending tile index: the k-th True in each row, k < _tn
+            _rank = _free.long().cumsum(dim=1)
+            _take = _free & (_rank <= _tn)
+            if not bool(_take.any()):
+                continue
+            _r, _t = _take.nonzero(as_tuple=True)
+            self.tile_seat[rows[_r], _t] = seat
+            self.tile_city[rows[_r], _t] = _new_cid[_r]
             self._tile_owner_ver += 1
         self._all_roads_lead_to_rome(rows, row, s_idx)
         self._trajans_column(rows, row, slot)

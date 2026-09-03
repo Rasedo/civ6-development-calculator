@@ -309,6 +309,11 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const at = gpOffer(state, cls);
   const person = at >= 0 ? GREAT_PEOPLE[cls][at] : undefined;
   if (!owner || !person) return; // no standing offer
+  // CIV6 (Magnanimous): "After recruiting or patronizing a Great Person, 20%
+  // of its Great Person point cost is refunded" — read BEFORE the offer is
+  // retired, since `gpOfferCost` answers Infinity once it is (`GP_REFUND_ROWS`)
+  const refundPct = getModifiers(state, seat).gpRefundPct;
+  const refund = refundPct ? Math.floor((gpOfferCost(state, cls) * refundPct) / 100) : 0;
   (state.gpOffer ??= GP_CLASSES.map(() => -1))[GP_CLASSES.indexOf(cls)] = -1; // the loop draws the replacement
 
   // CIV6: the recruit is a UNIT. Nothing is paid out here — the person walks
@@ -325,6 +330,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   // CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great Person" —
   // every class, and the PATRONIZED person is earned too (`GP_FAVOR_ROWS`)
   owner.diplomaticFavor += getModifiers(state, seat).gpFavor;
+  if (refund) owner.gpp[cls] = (owner.gpp[cls] ?? 0) + refund;
 
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
   // the claim ends the pass: the NEXT person starts with nobody locked out

@@ -376,6 +376,13 @@ class SimPhase:
             out = out + torch.einsum("bjn,n->b", live, self._d_gov_title)
         if bool((self._b_gov_title > 0).any()):
             out = out + self._seat_building_sum(row, self._b_gov_title)
+        # CIV6 (Grand Vizier): "Gain ... a Governor Title when the Gunpowder
+        # technology is researched" — RunOnce, and a title is DERIVED on both
+        # engines, so the HELD tech is what makes it permanent
+        for _tc, _tl, _tt, _ta in self._governor_title_grant_rows:
+            if _tt < 0:
+                continue
+            out = out + (self.civ_techs[:, row, _tt] & self._row_is(row, _tc, _tl)).long() * _ta
         return out
 
     def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
@@ -768,6 +775,17 @@ class SimPhase:
             # CIV6 (Military alliance 3): "Units start with a free Promotion."
             fp = fp | self._allied_type(row, 3, 3).any(dim=1)
             self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp, free_promo=fp, formation=form_t)
+            # CIV6 (People of the Steppe): "Receive a second light cavalry
+            # unit ... each time you train a light cavalry unit" — a TRAINED
+            # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)
+            for _ec, _el, _ecls, _en in self._extra_unit_copy_rows:
+                if _ecls != 0:  # COPY_CLASSES[0] = LIGHT_CAVALRY
+                    continue
+                _ew = made_u & self._type_lightcav[ui] & self._row_is(row, _ec, _el)
+                if not bool(_ew.any()):
+                    continue
+                for _ in range(_en):
+                    self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
             if self._wond_n and bool(self._wond_dupnaval.any()):
@@ -1226,6 +1244,21 @@ class SimPhase:
         # a WON City-State Emergency pays +1 gold/turn per envoy, banked before
         # upkeep exactly as seatAccumulators is
         bank(self.civ_treasury, self._emergency_envoy_gold(row).to(self.civ_treasury.dtype))
+        # CIV6 (Satyagraha): "+5 Faith for each civilization (including India)
+        # they have met that has founded a Religion and is not currently at
+        # war". Acquaintance between MAJORS is not modelled on either engine —
+        # every one is known — so "met" is every live major.
+        for _pc, _pl, _pa in self._peaceful_founder_rows:
+            _pw = self._row_is(row, _pc, _pl)
+            if not bool(_pw.any()):
+                continue
+            _n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+            for _o in range(self.n_majors):
+                _ok = self.civ_religion_done[:, _o]
+                if _o != row:
+                    _ok = _ok & ~self.war[:, row, _o]
+                _n = _n + _ok.double()
+            faith_sum = faith_sum + _pw.double() * _n * _pa
         bank(self.civ_faith, faith_sum)
         self._seat_upkeep_and_bankruptcy(row, active)
         for _ in range(RESEARCH_LOOPS):
@@ -1233,7 +1266,7 @@ class SimPhase:
             cost_t = self._eff_cost(
                 rdv.t_cost.gather(0, curt.clamp(min=0)),
                 self.civ_tech_boosted[:, row].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=row,
+                row,
             )
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
             if not bool(fin.any()):
@@ -1330,7 +1363,7 @@ class SimPhase:
             cost_c = self._eff_cost(
                 rdv.c_cost.gather(0, curc.clamp(min=0)),
                 self.civ_civic_boosted[:, row].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=row, is_civic=True,
+                row, is_civic=True,
             )
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
             if not bool(fin.any()):
@@ -1572,6 +1605,16 @@ class SimPhase:
             return
         maxN = self._gp_effects.shape[1]
         at_c = self.gp_offer[:, cls].clamp(min=0)
+        # CIV6 (Magnanimous): "After recruiting or patronizing a Great Person,
+        # 20% of its Great Person point cost is refunded" — read the price
+        # BEFORE the offer is retired below (`GP_REFUND_ROWS`)
+        for _rc, _rl, _rp in self._gp_refund_rows:
+            _rw = hit & self._row_is(row, _rc, _rl)
+            if not bool(_rw.any()):
+                continue
+            _back = torch.floor(self.gp_price[:, cls].double() * _rp / 100.0)
+            self.civ_gpp[:, row, cls] = torch.where(
+                _rw, self.civ_gpp[:, row, cls] + _back, self.civ_gpp[:, row, cls])
         self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
         hr = hit.nonzero(as_tuple=True)[0]
         self.gp_claimed[hr, cls, at_c[hr]] = True

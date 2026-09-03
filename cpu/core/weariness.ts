@@ -85,7 +85,12 @@ function addWw(state: GameState, seat: number, other: number, amount: number): v
   // Weariness reduced by 15%" — the government's cut joins additively.
   const cut = Math.min(100, gpPermOf(s, 'warWearyPct')
     + (isCiv(seat) ? getModifiers(state, seat).wwCutPct : 0));
-  s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + Math.floor((amount * (100 - cut)) / 100));
+  // CIV6 (Satyagraha): "Opposing civilizations receive double the war
+  // weariness for fighting against Gandhi" — the OTHER seat's row raises what
+  // this one accrues against it (`WAR_WEARINESS_ROWS`)
+  const foePct = isCiv(other) ? getModifiers(state, other).enemyWarWearinessPct : 0;
+  const gained = Math.floor((amount * (100 + foePct)) / 100);
+  s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + Math.floor((gained * (100 - cut)) / 100));
   s.wwTurn[other] = state.turn;
 }
 

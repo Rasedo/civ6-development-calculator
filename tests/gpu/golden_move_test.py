@@ -141,9 +141,9 @@ def main() -> None:
         fi, pb = sim5._ded_free_inquiry, sim5._ded_pen_brush
         cost = torch.full((sim5.B,), 200.0, dtype=sim5.dtype)
         boosted = torch.ones(sim5.B, dtype=torch.bool)
-        plain = sim5._eff_cost(cost, boosted)
+        plain = sim5._eff_cost(cost, boosted, 1)  # row 1, before its golden age
         golden(sim5, 1, fi)  # civ 0 = unified civ 1
-        civ_g = sim5._eff_cost(cost, boosted, golden_civ=1)
+        civ_g = sim5._eff_cost(cost, boosted, 1)
         assert float(civ_g[0]) < float(plain[0]), (
             "a CIV in a golden FREE_INQUIRY got no extra discount — the call "
             "site is still asking about civ 0"
@@ -151,7 +151,7 @@ def main() -> None:
         # ...and seat 0's Golden age must not pay for the civ
         sim6 = build()
         golden(sim6, 0, fi)
-        assert float(sim6._eff_cost(cost, boosted, golden_civ=1)[0]) == float(plain[0]), (
+        assert float(sim6._eff_cost(cost, boosted, 1)[0]) == float(plain[0]), (
             "seat 0's dedication discounted a CIV's research"
         )
         print(f"  7 FREE_INQUIRY: civ cost {float(plain[0]):.0f} -> {float(civ_g[0]):.0f}; seat 0's own age does not pay for it")

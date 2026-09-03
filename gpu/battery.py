@@ -352,6 +352,7 @@ def main() -> int:
                 ("seat_rows", [py, "tests/gpu/seat_rows_test.py"], 4),  # the roster's seat rows: happiness yields and Great People, the government slot, what a kill pays, the per-policy strength, the Amazon
                 ("mountain_rows", [py, "tests/gpu/mountain_rows_test.py"], 4),  # Mit'a's worked mountains, Qhapaq Ñan's route Food, the Toqui, Isibongo's garrison, the formation rows
                 ("title_rows", [py, "tests/gpu/title_rows_test.py"], 4),  # Hwarang's promotions, the Nobel Prize, Mana's start and bans, Righteousness of the Faith, Religious Convert
+                ("conquest_rows", [py, "tests/gpu/conquest_rows_test.py"], 4),  # the second horse, the conquered city, the boost, the Canal, Satyagraha, the Vizier
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

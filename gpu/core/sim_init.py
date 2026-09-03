@@ -2625,6 +2625,8 @@ class SimInit:
         self._type_cls = torch.tensor([int(u.get("cls", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_era = torch.tensor([int(u.get("era", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_recon = torch.tensor([bool(u.get("recon", 0)) for u in ru], dtype=torch.bool, device=device)
+        # CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): `COPY_CLASSES[0]`'s plane
+        self._type_lightcav = torch.tensor([bool(u["lightcav"]) for u in ru], dtype=torch.bool, device=device)
         # THE NAVAL RAIDER AXIS. `_type_sight` is the chassis override; 0 means
         # the SIGHT_RANGE default, which `_unit_sight` supplies.
         self._type_stealth = torch.tensor([bool(u.get("stealth", 0)) for u in ru], dtype=torch.bool, device=device)
@@ -2836,6 +2838,37 @@ class SimInit:
         # [civ, leaderRow, costPct, yieldPct] on the worship building
         self._worship_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["worship"]]  # type: ignore[misc]
+        # THE CONQUERED CITY, THE SECOND HORSE AND THE BOOST
+        # [civ, leaderRow, COPY_CLASSES index, amount] on a TRAINED unit
+        self._extra_unit_copy_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["extraUnitCopies"]]  # type: ignore[misc]
+        self._conquest_pop_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["conquestPop"]]  # type: ignore[misc]
+        # [civ, leaderRow, channel (0 amenity / 1 loyalty), amount]
+        self._not_founded_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["notFounded"]]  # type: ignore[misc]
+        self._extra_district_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["extraDistricts"]]  # type: ignore[misc]
+        self._city_tiles_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["cityTiles"]]  # type: ignore[misc]
+        # [civ, leaderRow, tech(1)/civic(0), PERCENTAGE POINTS on the boost]
+        self._boost_pct_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["boostPct"]]  # type: ignore[misc]
+        # [civ, leaderRow, district, tech] — REPLACES the district's own unlock
+        self._district_prereq_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["districtPrereq"]]  # type: ignore[misc]
+        self._war_weariness_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["warWeariness"]]  # type: ignore[misc]
+        self._peaceful_founder_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["peacefulFounders"]]  # type: ignore[misc]
+        self._yield_per_suzerain_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["yieldPerSuzerain"]]  # type: ignore[misc]
+        self._governor_title_grant_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["governorTitleGrants"]]  # type: ignore[misc]
+        self._gp_refund_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["gpRefund"]]  # type: ignore[misc]
+        self._evict_pct_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
         # [civ, leaderRow, tech] — the tech an OCEAN crossing waits on, -1 none
         self._ocean_access_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["oceanAccess"]]  # type: ignore[misc]

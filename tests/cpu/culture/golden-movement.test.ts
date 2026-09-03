@@ -164,11 +164,11 @@ describe('golden dedications reach the civ that committed them', () => {
     expect(id).toBeTruthy();
     civ.research.boosted.push(id!);
     const base = TECHS[id!].cost;
-    const plain = effectiveResearchCostIn(civ.research, id!, base);
+    const plain = effectiveResearchCostIn(civ.research, id!, base, 0, 0);
     golden(state, 1, DED_FREE_INQUIRY);
     const g = goldenBoostBonus(state, 1, false);
     expect(g).toBeGreaterThan(0);
-    expect(effectiveResearchCostIn(civ.research, id!, base, g)).toBeLessThan(plain);
+    expect(effectiveResearchCostIn(civ.research, id!, base, g, 0)).toBeLessThan(plain);
     // ...and SEAT 0's Golden age does not pay for the civ
     const other = newGame();
     golden(other, 0, DED_FREE_INQUIRY);

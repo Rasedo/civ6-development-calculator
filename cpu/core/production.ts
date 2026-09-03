@@ -7,7 +7,7 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
-import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
 import { governorFlag, governorSum } from './governors';
@@ -317,6 +317,23 @@ export function completeQueueItem(
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
       // are excluded in the real game and take a different path here.
+      // CIV6 (People of the Steppe): "Receive a second light cavalry unit
+      // ... each time you train a light cavalry unit" — a TRAINED one, the
+      // same door the Arsenal's hull comes through (`EXTRA_UNIT_COPY_ROWS`)
+      let copies = 0;
+      if (UNITS[item.unit] && isLightCavalry(UNITS[item.unit])) {
+        for (const r of getModifiers(state, city.seat).extraUnitCopies) {
+          if (r.cls === 'LIGHT_CAVALRY') copies += r.amount;
+        }
+      }
+      for (let k = 0; k < copies; k++) {
+        const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);
+        if (extra) {
+          extra.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
+          grantFreePromotion(extra, freePromo);
+          if (item.formation) extra.formation = item.formation;
+        }
+      }
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
         const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
         if (twin) {

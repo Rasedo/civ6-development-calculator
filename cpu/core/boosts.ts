@@ -5,6 +5,7 @@ import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState } from './types';
 import { neighbors } from '../../world/hex';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
+import { getModifiers } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { computeAdoption, inDarkAge, wonderExtraSlots } from './effects';
 import { congressPolicyBlocked } from './congress';
@@ -19,11 +20,24 @@ export function effectiveResearchCostIn(
   rsr: ResearchState,
   id: string,
   baseCost: number,
-  goldenExtra = 0, // FREE_INQUIRY (techs) / PEN_BRUSH_AND_VOICE (civics)
+  goldenExtra: number, // FREE_INQUIRY (techs) / PEN_BRUSH_AND_VOICE (civics)
+  // CIV6 (Dynastic Cycle): "Eurekas and Inspirations provide 50% ... instead
+  // of 40%" — PERCENTAGE POINTS on top of the base share (`BOOST_PCT_ROWS`).
+  // Required, not defaulted: every caller knows the researching seat, and a
+  // forgotten one would quietly pay the plain fraction.
+  rosterPoints: number,
 ): number {
   return rsr.boosted.includes(id)
-    ? Math.round(baseCost * (1 - BOOST_FRACTION - goldenExtra))
+    ? Math.round(baseCost * (1 - BOOST_FRACTION - rosterPoints / 100 - goldenExtra))
     : baseCost;
+}
+
+/** CIV6 (Dynastic Cycle): the PERCENTAGE POINTS this seat's roster adds to a
+ *  boost — the ONE reader of `mods.boostPct`. */
+export function rosterBoostPoints(state: GameState, seat: number, isCivic: boolean): number {
+  let n = 0;
+  for (const r of getModifiers(state, seat).boostPct) if (r.tech !== isCivic) n += r.points;
+  return n;
 }
 
 function checkSatisfied(state: GameState, seat: number, check: BoostCheck): boolean {

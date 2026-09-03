@@ -98,6 +98,11 @@ export interface UnitDef {
    * The pair real suzerain/policy text addresses as "light and heavy
    * cavalry"; nothing else in this roster is mounted. */
   cavalry?: boolean;
+  /** CIV6 (Units.xml PromotionClass): which cavalry tag this chassis carries.
+   *  A ROSTER clause may name one and not the other — People of the Steppe
+   *  copies CLASS_LIGHT_CAVALRY and nothing else. A `cavalry` chassis whose
+   *  install class is RANGED (the two chariot archers) carries no tag. */
+  cavalryTag?: 'light' | 'heavy';
   /** CIV 6 unit class: MELEE (Warrior, Swordsman, Musketman) — the first of
    * the two classes a Battering Ram or a Siege Tower helps. */
   melee?: boolean;
@@ -291,6 +296,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 2,
       moves: 4,
       cavalry: true, // LIGHT cavalry
+      cavalryTag: 'light',
       combat: 36, // real Civ 6 Horseman
       requiresTech: 'HORSEBACK_RIDING',
       requiresResource: 'HORSES', // retroactive — its own description flagged this gap
@@ -341,6 +347,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 4,
       moves: 4,
       cavalry: true, // HEAVY cavalry
+      cavalryTag: 'heavy',
       combat: 50,
       requiresTech: 'STIRRUPS',
       requiresResource: 'IRON',
@@ -637,6 +644,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 2,
       combat: 28,
       cavalry: true,
+      cavalryTag: 'heavy',
       chariot: true,
       // CIV6 (Heavy Chariot): "+1 Movement if starting in Desert, Plains,
       // Grassland, or Tundra."
@@ -679,6 +687,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 5,
       combat: 46,
       cavalry: true,
+      cavalryTag: 'light',
       requiresTech: 'CASTLES',
       requiresResource: 'HORSES',
       upgradesTo: 'CAVALRY',
@@ -773,6 +782,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 5,
       combat: 62,
       cavalry: true,
+      cavalryTag: 'light',
       requiresTech: 'MILITARY_SCIENCE',
       requiresResource: 'HORSES',
       upgradesTo: 'HELICOPTER',
@@ -786,6 +796,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 64,
       cavalry: true,
+      cavalryTag: 'heavy',
       requiresTech: 'BALLISTICS',
       requiresResource: 'IRON',
       upgradesTo: 'TANK',
@@ -894,6 +905,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 85,
       cavalry: true,
+      cavalryTag: 'heavy',
       requiresTech: 'COMBUSTION',
       requiresResource: 'OIL',
       resourceCost: 1,
@@ -1018,6 +1030,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 86,
       cavalry: true,
+      cavalryTag: 'light',
       requiresTech: 'SYNTHETIC_MATERIALS',
       requiresResource: 'ALUMINUM',
       resourceCost: 1,
@@ -1060,6 +1073,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 95,
       cavalry: true,
+      cavalryTag: 'heavy',
       requiresTech: 'COMPOSITES',
       requiresResource: 'OIL',
       resourceCost: 1,
@@ -1403,6 +1417,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 3,
       combat: 30,
       cavalry: true, // PROMOTION_CLASS_HEAVY_CAVALRY
+      cavalryTag: 'heavy',
       chariot: true, // CLASS_HEAVY_CHARIOT — but CLASS_WAR_CART ignores ZOC
       ignoresZoc: true,
       // CIV6 (War-Cart): "+1 Movement if starting in Desert, Plains,
@@ -1450,6 +1465,12 @@ export function civUpgradeTarget(civ: string | null, id: string): string | undef
   const next = UNITS[id]?.upgradesTo;
   if (!next) return undefined;
   return civReplacement(civ, next) ?? next;
+}
+
+/** CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): the ONE reader of `cavalryTag` for
+ *  the light half — a chassis with no tag is never light. */
+export function isLightCavalry(def: UnitDef): boolean {
+  return def.cavalryTag === 'light';
 }
 
 export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {

@@ -385,7 +385,10 @@ export function canPlaceDistrictIn(
     const specialty = city.districts.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
     // CIV6 (Bi Sheng, Ada Lovelace): "Lets this city build one more district
     // than the Population limit allows" — a permanent per-city raise.
-    const cap = maxSpecialtyDistricts(city.population) + gpCityPermOf(city, 'districtLimit');
+    // CIV6 (Free Imperial Cities): "Each city can build one more district
+    // than usual (exceeding the normal limit based on Population)."
+    const cap = maxSpecialtyDistricts(city.population) + gpCityPermOf(city, 'districtLimit')
+      + getModifiers(state, city.seat).extraDistricts;
     if (specialty >= cap) {
       return no(`Needs more population (${specialty}/${cap} district slots used).`);
     }

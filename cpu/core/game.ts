@@ -12,7 +12,7 @@ import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
-import { effectiveResearchCostIn } from './boosts';
+import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain } from './units';
 import { drawPromoOffer, promoClassOf, promoFlag, unitPromoRows } from './promotions';
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -57,7 +57,8 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
   // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
   // RESEARCHING seat's dedication, which is the `seat` this function already
   // takes; the GPU passes the row.
-  return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost, goldenBoostBonus(state, seat, !TECHS[id]));
+  return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost,
+    goldenBoostBonus(state, seat, !TECHS[id]), rosterBoostPoints(state, seat, !TECHS[id]));
 }
 
 /**
@@ -255,6 +256,20 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   setTileOwner(tile, seat, id);
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     if (!tileClaimed(t)) setTileOwner(t, seat, id);
+  }
+  // CIV6 (Mother Russia): "Extra territory upon founding cities" — the
+  // SECOND ring, `amount` of it, in ascending TILE INDEX so both engines
+  // claim the same ground (`CITY_TILES_ROWS`)
+  let extra = getModifiers(state, seat).cityTiles;
+  if (extra > 0) {
+    const second = tilesWithin(state.map, tile.col, tile.row, 2)
+      .filter((t) => !tileClaimed(t) && hexDistance(tile.col, tile.row, t.col, t.row) === 2)
+      .sort((a, b) => a.index - b.index);
+    for (const t of second) {
+      if (extra <= 0) break;
+      setTileOwner(t, seat, id);
+      extra -= 1;
+    }
   }
   list.push(city);
   addEraScore(state, seat, ERA_SCORE_FOUND);
@@ -900,10 +915,13 @@ export function removeHeresy(state: GameState, unit: Unit): RuleResult {
   if (!city || here.district !== 'CITY_CENTER') return { ok: false, reason: 'Not in one of your City Centers.' };
   const mine = unitSeat(unit);
   const pres = city.religionPressure;
+  // CIV6 (El Escorial): "Inquisitors eliminate 100% of the presence of other
+  // Religions" — the roster's points on top (`EVICT_PCT_ROWS`)
+  const evict = Math.min(100, REMOVE_HERESY_PCT + getModifiers(state, mine).evictPoints);
   if (pres) {
     for (let g = 0; g < pres.length; g++) {
       if (g === mine) continue;
-      pres[g] = Math.floor(pres[g] * (100 - REMOVE_HERESY_PCT) / 100);
+      pres[g] = Math.floor(pres[g] * (100 - evict) / 100);
     }
   }
   unit.charges = (unit.charges ?? 0) - 1;

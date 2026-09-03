@@ -140,10 +140,10 @@ describe('the Sphinx and the Ziggurat', () => {
     nb.improvement = 'SPHINX';
     expect(validImprovementsIn(near, opts('EGYPT', { map }))).not.toContain('SPHINX');
     // the Sphinx waits on Craftsmanship; the Ziggurat on nothing
-    const none = computeUnlocksIn({ techs: [], civics: [] } as never);
+    const none = computeUnlocksIn({ techs: [], civics: [] } as never, []);
     expect(validImprovementsIn(flat, opts('EGYPT', { unlocks: none }))).not.toContain('SPHINX');
     expect(validImprovementsIn(flat, opts('SUMERIA', { unlocks: none }))).toContain('ZIGGURAT');
-    const craft = computeUnlocksIn({ techs: [], civics: ['CRAFTSMANSHIP'] } as never);
+    const craft = computeUnlocksIn({ techs: [], civics: ['CRAFTSMANSHIP'] } as never, []);
     expect(validImprovementsIn(flat, opts('EGYPT', { unlocks: craft }))).toContain('SPHINX');
   });
 

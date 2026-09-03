@@ -223,11 +223,22 @@ class SimEconomy:
             # government's cut joins additively, capped together.
             _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
                     + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
+            gain = torch.div(gain * self._ww_enemy_mult(foe_row), 100, rounding_mode="floor")
             gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
             idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
             flat_ww.scatter_add_(1, idx, torch.where(score, gain, zeros).unsqueeze(1))
             flat_turn.scatter_(1, idx, torch.where(
                 score, turn, flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
+
+    def _ww_enemy_mult(self, foe_row: torch.Tensor) -> torch.Tensor:
+        """long, `foe_row`'s shape — CIV6 (Satyagraha): "Opposing civilizations
+        receive double the war weariness for fighting against Gandhi". The
+        OPPONENT's row decides, so both accrual sites ask this one body
+        (`WAR_WEARINESS_ROWS`)."""
+        out = torch.full_like(foe_row, 100)
+        for _wc, _wl, _wp in self._war_weariness_rows:
+            out = out + self._seat_is(foe_row.clamp(min=0), _wc, _wl).long() * _wp
+        return out
 
     def _ww_launch(self, hit: torch.Tensor, row: int, foe_row) -> None:
         """`warWearinessLaunch`'s twin. CIV6 (War weariness): "every time you
@@ -249,6 +260,7 @@ class SimEconomy:
         gain = self._ww_era_base(self_row, foe) * mult
         _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
                 + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
+        gain = torch.div(gain * self._ww_enemy_mult(foe), 100, rounding_mode="floor")
         gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
         idx = (self_row * NS + foe.clamp(min=0)).unsqueeze(1)
         flat_ww.scatter_add_(1, idx, torch.where(live, gain, zeros).unsqueeze(1))
@@ -386,27 +398,20 @@ class SimEconomy:
         missing = (prereq.unsqueeze(0) & ~done.unsqueeze(1)).any(dim=2)
         return ~done & ~missing
 
-    def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor, golden_civ=None, is_civic: bool = False) -> torch.Tensor:
+    def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor, row: int, is_civic: bool = False) -> torch.Tensor:
+        """The BOOSTED cost of every item, for seat row `row`. The row is
+        required: a golden Free Inquiry / Pen-Brush-and-Voice and CIV6
+        (Dynastic Cycle)'s "Eurekas and Inspirations provide 50% ... instead
+        of 40%" are both the RESEARCHING seat's (`BOOST_PCT_ROWS`)."""
         frac = self.rules.boost_fraction
-        if golden_civ is not None:
-            g = self._golden_ded(golden_civ, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
-            extra = g.to(cost.dtype).reshape(-1, *((1,) * (cost.dim() - 1))) * 0.1
-            return torch.where(boosted, js_round(cost * (1 - frac - extra)), cost)
-        return torch.where(boosted, js_round(cost * (1 - frac)), cost)
-
-    def _auto_pick(self, cur, done, boosted, cost, prereq, golden_civ=None, is_civic: bool = False):
-        """Cheapest-available (effective cost, tie = table order), where cur == -1.
-        The key is the DISCOUNTED cost, so a golden Free Inquiry /
-        Pen-Brush-and-Voice changes which item is picked, and the cost it
-        sorts on is `effectiveResearchCostIn`'s, which carries the same
-        bonus."""
-        avail = self._available_mask(done, prereq)
-        eff = self._eff_cost(cost.unsqueeze(0).expand_as(avail), boosted, golden_civ, is_civic)
-        key = torch.where(avail, eff, torch.tensor(float("inf"), dtype=self.dtype, device=self.device)).double()
-        key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
-        best = key.argmin(dim=1)
-        has = avail.any(dim=1)
-        return torch.where((cur == -1) & has, best, cur)
+        for _bc, _bl, _bt, _bp in self._boost_pct_rows:
+            if bool(_bt) != (not is_civic):
+                continue
+            frac = frac + self._row_is(row, _bc, _bl).to(cost.dtype).reshape(
+                -1, *((1,) * (cost.dim() - 1))) * (_bp / 100.0)
+        g = self._golden_ded(row, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
+        extra = g.to(cost.dtype).reshape(-1, *((1,) * (cost.dim() - 1))) * 0.1
+        return torch.where(boosted, js_round(cost * (1 - frac - extra)), cost)
 
     def _feat_gone(self) -> torch.Tensor:
         """[B, T] bool — the BAKED (t0) feature's yields no longer apply: it
@@ -4136,11 +4141,23 @@ class SimEconomy:
                 for _wy in (3, 4, 5):  # science, culture, faith
                     total[:, :, _wy] = torch.where(_ww, total[:, :, _wy] * (1.0 + _wyp / 100.0), total[:, :, _wy])
         if gym is not None:
+            # a suzerainty pays CULTURE by the head, not by what Treaty
+            # Organization does to its favor — `suzerainCount`'s weighting is
+            # the favor's, and TS counts `isSuzerain` heads here
+            _suz_n = self._suzerains_held(row)
             if self._gov_has_effects:
                 _cz = self._gov_mods(row)[12]["culsuz"]
                 if bool((_cz != 0).any()):
                     gym = gym.clone()
-                    gym[:, 4] = gym[:, 4] * (1 + _cz * self._suzerain_count(row).to(gym.dtype))
+                    gym[:, 4] = gym[:, 4] * (1 + _cz * _suz_n.to(gym.dtype))
+            # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
+            # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
+            for _yc, _yl, _yy, _yp in self._yield_per_suzerain_rows:
+                _yw = self._row_is(row, _yc, _yl)
+                if not bool(_yw.any()):
+                    continue
+                gym = gym.clone()
+                gym[:, _yy] = gym[:, _yy] * (1 + _yw.to(gym.dtype) * _suz_n.to(gym.dtype) * (_yp / 100.0))
             gymc = gym.double().unsqueeze(1)
             # The governor's own multipliers are part of `m.yieldMult` on TS —
             # ONE number scales the total, so they fold in before it lands.

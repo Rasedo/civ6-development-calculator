@@ -209,7 +209,7 @@ describe('districts and buildings', () => {
     const { state, city } = settled();
     grantTechs(state, 'WRITING', 'MINING', 'BRONZE_WORKING');
     const seat = seatOf(state, 0)!;
-    const unlocks = computeUnlocksIn(seat.research);
+    const unlocks = computeUnlocksIn(seat.research, []);
     const off = tileAtCoords(state.map, 0, 0); // not this city's tile
     expect(placeSeatDistrict(state, seat, city, 'CAMPUS', unlocks, off.index)).toBe(false);
     expect(off.district).toBe(null);

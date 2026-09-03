@@ -31,7 +31,7 @@ import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
-import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
+import { computeUnlocks, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
@@ -285,7 +285,7 @@ for (let t = 0; t < N_TURNS; t++) {
       const sr: number[] = [];
       if (actor) {
         const owns = (t: Tile) => tileOwnedByCiv(t, seat);
-        const unl = computeUnlocksIn(actor.research);
+        const unl = computeUnlocks(state, seat);
         const camps = campTiles(state);
         // `_job_mask_core`'s twin: the REPAIR arms take ANY owned pillaged
         // tile or district (a pillaged Harbor repairs from its own water

@@ -1,7 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
+import { EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -10,7 +10,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { civOf, seatOf, citiesOf, campTiles, isCiv , leaderOf } from './seats';
+import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf } from './seats';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
@@ -54,7 +54,14 @@ function* completedEffectsIn(research: ResearchState): Generator<ResearchEffect>
   }
 }
 
-export function computeUnlocksIn(research: ResearchState): Unlocks {
+export function computeUnlocksIn(
+  research: ResearchState,
+  // CIV6 (The First Emperor): "Canals are unlocked with the Masonry
+  // technology" — the seat's own overrides, which REPLACE a district's usual
+  // unlock. Required, not defaulted: `computeUnlocksIn` takes no seat, so a
+  // forgotten one would quietly hand the row the base tree.
+  districtPrereq: readonly DistrictPrereqRow[],
+): Unlocks {
   const u: Unlocks = {
     improvements: new Set(BASELINE.improvements),
     districts: new Set(),
@@ -95,12 +102,20 @@ export function computeUnlocksIn(research: ResearchState): Unlocks {
     const ob = POLICIES[id]?.obsoleteCivic;
     if (ob && research.civics.includes(ob)) u.policies.delete(id);
   }
+  // the override REPLACES the district's own edge: where the row plays, only
+  // its named tech opens that door
+  for (const r of districtPrereq) {
+    if (research.techs.includes(r.tech)) u.districts.add(r.district);
+    else u.districts.delete(r.district);
+  }
   return u;
 }
 
 export function computeUnlocks(state: GameState, seat: number): Unlocks {
   const s = seatOf(state, seat);
-  return computeUnlocksIn(s ? s.research : { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} });
+  return computeUnlocksIn(
+    s ? s.research : { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
+    s ? getModifiers(state, seat).districtPrereq : []);
 }
 
 export function isTechComplete(state: GameState, id: string, seat: number): boolean {
@@ -171,6 +186,21 @@ export interface Modifiers {
   seatBans: ReadonlySet<SeatBan>;
   worship: readonly WorshipRow[];
   oceanAccess: readonly OceanAccessRow[];
+  /** batch 10 — the conquered city, the second horse and the boost */
+  extraUnitCopies: readonly ExtraUnitCopyRow[];
+  /** the PERCENTAGE of a captured city's population this row keeps, 0 for none */
+  conquestKeepPct: number;
+  notFounded: readonly NotFoundedRow[];
+  extraDistricts: number;
+  cityTiles: number;
+  boostPct: readonly BoostPctRow[];
+  districtPrereq: readonly DistrictPrereqRow[];
+  enemyWarWearinessPct: number;
+  peacefulFounderFaith: number;
+  yieldPerSuzerain: readonly YieldPerSuzerainRow[];
+  governorTitleGrants: readonly GovernorTitleGrantRow[];
+  gpRefundPct: number;
+  evictPoints: number;
   districtUnits: readonly DistrictUnitRow[];
   /** the roster's heal on eliminating a unit */
   postKillHeal: number;
@@ -352,6 +382,19 @@ export function defaultModifiers(): Modifiers {
     seatBans: new Set<SeatBan>(),
     worship: [],
     oceanAccess: [],
+    extraUnitCopies: [],
+    conquestKeepPct: 0,
+    notFounded: [],
+    extraDistricts: 0,
+    cityTiles: 0,
+    boostPct: [],
+    districtPrereq: [],
+    enemyWarWearinessPct: 0,
+    peacefulFounderFaith: 0,
+    yieldPerSuzerain: [],
+    governorTitleGrants: [],
+    gpRefundPct: 0,
+    evictPoints: 0,
     districtUnits: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
@@ -533,6 +576,33 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
 }
 
 
+/** CIV6 (CITY_NOT_FOUNDED): what this seat's roster pays in a city it did
+ *  NOT found — the ONE reader, so the amenity and the loyalty cannot drift
+ *  apart on which cities count (`NOT_FOUNDED_ROWS`). */
+/** CIV6 (Satyagraha): "+5 Faith for each civilization (including India) they
+ *  have met that has founded a Religion and is not currently at war."
+ *  Acquaintance is not modelled between majors on either engine — every one
+ *  is known — so "met" is every live major (`PEACEFUL_FOUNDER_ROWS`). */
+export function peacefulFounderFaith(state: GameState, seat: number): number {
+  const per = getModifiers(state, seat).peacefulFounderFaith;
+  if (!per) return 0;
+  let n = 0;
+  for (const o of state.seats) {
+    if (!o.religion.founded) continue;
+    if (o.seat !== seat && civsAtWar(state, seat, o.seat)) continue;
+    n += 1;
+  }
+  return per * n;
+}
+
+export function notFoundedSum(state: GameState, city: City, channel: NotFoundedChannel): number {
+  const rows = getModifiers(state, city.seat).notFounded;
+  if (!rows.length || (city.founderSeat ?? city.seat) === city.seat) return 0;
+  let n = 0;
+  for (const r of rows) if (r.channel === channel) n += r.amount;
+  return n;
+}
+
 export function getModifiers(state: GameState, seat: number): Modifiers {
   const s = seatOf(state, seat);
   if (!s) return defaultModifiers(); // no such seat — unreachable from real callers
@@ -582,6 +652,19 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.seatBans = new Set(mine(SEAT_BAN_ROWS).map((r) => r.ban));
   mods.worship = mine(WORSHIP_ROWS);
   mods.oceanAccess = mine(OCEAN_ACCESS_ROWS);
+  mods.extraUnitCopies = mine(EXTRA_UNIT_COPY_ROWS);
+  mods.conquestKeepPct = mine(CONQUEST_POP_ROWS).reduce((n, r) => Math.max(n, r.keepPct), 0);
+  mods.notFounded = mine(NOT_FOUNDED_ROWS);
+  mods.extraDistricts = mine(EXTRA_DISTRICT_ROWS).reduce((n, r) => n + r.amount, 0);
+  mods.cityTiles = mine(CITY_TILES_ROWS).reduce((n, r) => n + r.amount, 0);
+  mods.boostPct = mine(BOOST_PCT_ROWS);
+  mods.districtPrereq = mine(DISTRICT_PREREQ_ROWS);
+  mods.enemyWarWearinessPct = mine(WAR_WEARINESS_ROWS).reduce((n, r) => n + r.enemyPct, 0);
+  mods.peacefulFounderFaith = mine(PEACEFUL_FOUNDER_ROWS).reduce((n, r) => n + r.amount, 0);
+  mods.yieldPerSuzerain = mine(YIELD_PER_SUZERAIN_ROWS);
+  mods.governorTitleGrants = mine(GOVERNOR_TITLE_GRANT_ROWS);
+  mods.gpRefundPct = mine(GP_REFUND_ROWS).reduce((n, r) => n + r.pct, 0);
+  mods.evictPoints = mine(EVICT_PCT_ROWS).reduce((n, r) => n + r.points, 0);
   mods.districtUnits = mine(DISTRICT_UNIT_ROWS);
   // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
   // adjacency adds the cards write, so `districtAdjacency` reads one list
@@ -608,9 +691,18 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
       addPartial(cur, y);
     }
     addPartial(mods.capitalYields, cityStateSuzerainCapitalBonus(state, seat));
-    if (mods.culturePerSuzerain) {
-      const n = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;
-      if (n) mods.yieldMult.culture = (mods.yieldMult.culture ?? 1) * (1 + mods.culturePerSuzerain * n);
+    // a suzerainty pays a YIELD by the head — `suzerainCount`'s Treaty
+    // Organization weighting is what one pays in FAVOR, not here
+    const suz = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;
+    if (mods.culturePerSuzerain && suz) {
+      mods.yieldMult.culture = (mods.yieldMult.culture ?? 1) * (1 + mods.culturePerSuzerain * suz);
+    }
+    // CIV6 (Surrounded by Glory): "+5% Culture per city-state you are the
+    // Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
+    if (suz) {
+      for (const r of mods.yieldPerSuzerain) {
+        mods.yieldMult[r.yield] = (mods.yieldMult[r.yield] ?? 1) * (1 + (r.pct / 100) * suz);
+      }
     }
   }
   return mods;
@@ -806,7 +898,7 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   government: string | null;
   policies: (string | null)[];
 } {
-  const u = computeUnlocksIn(research);
+  const u = computeUnlocksIn(research, []); // no seat here — governments take no district override
   let chosen: GovernmentDef | null = null;
   for (const g of Object.values(GOVERNMENTS)) {
     if (!u.governments.has(g.id)) continue;

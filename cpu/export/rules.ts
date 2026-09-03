@@ -37,7 +37,7 @@ import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { NUKE_COLS, unitActionNames } from '../core/unitActions';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
-import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, ROCK_BAND_COST_STEP, NATURALIST_COST_STEP } from '../data/units';
+import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, isLightCavalry, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, ROCK_BAND_COST_STEP, NATURALIST_COST_STEP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, STORM_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
 import {
@@ -241,7 +241,7 @@ import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
-import { SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
+import { COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { AMENITY_TIERS, amenityTierIndex } from '../data/constants';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
@@ -1314,6 +1314,8 @@ export function buildRules() {
       cls: UNIT_CLASSES.reduce((m, c, i) => m | (unitHasClass(u, c) ? 1 << i : 0), 0),
       era: UNIT_ERA_INDEX[u.id] ?? 0,
       recon: u.recon ? 1 : 0, // Survey doubles what this class earns
+      // CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): `COPY_CLASSES[0]`'s plane
+      lightcav: isLightCavalry(u) ? 1 : 0,
       // the NAVAL RAIDER axis: STEALTH hides the chassis from anything more
       // than a hex away, REVEAL STEALTH sees one within `sight`, and the two
       // zone-of-control abilities are independent of both.
@@ -1414,6 +1416,22 @@ export function buildRules() {
       // [civ, leaderRow, ban] in SEAT_BANS order
       seatBans: SEAT_BAN_ROWS.map((r) => [rowCiv(r), rowLeader(r), SEAT_BANS.indexOf(r.ban)]),
       worship: WORSHIP_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.costPct, r.yieldPct]),
+      // [civ, leaderRow, COPY_CLASSES index, amount] on a TRAINED unit
+      extraUnitCopies: EXTRA_UNIT_COPY_ROWS.map((r) => [rowCiv(r), rowLeader(r), COPY_CLASSES.indexOf(r.cls as never), r.amount]),
+      conquestPop: CONQUEST_POP_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.keepPct]),
+      // [civ, leaderRow, channel in NOT_FOUNDED_CHANNELS, amount]
+      notFounded: NOT_FOUNDED_ROWS.map((r) => [rowCiv(r), rowLeader(r), NOT_FOUNDED_CHANNELS.indexOf(r.channel), r.amount]),
+      extraDistricts: EXTRA_DISTRICT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
+      cityTiles: CITY_TILES_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
+      // [civ, leaderRow, tech(1)/civic(0), PERCENTAGE POINTS on the boost]
+      boostPct: BOOST_PCT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.tech ? 1 : 0, r.points]),
+      districtPrereq: DISTRICT_PREREQ_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), techIdx.get(r.tech) ?? -1]),
+      warWeariness: WAR_WEARINESS_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.enemyPct]),
+      peacefulFounders: PEACEFUL_FOUNDER_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
+      yieldPerSuzerain: YIELD_PER_SUZERAIN_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.pct]),
+      governorTitleGrants: GOVERNOR_TITLE_GRANT_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1, r.amount]),
+      gpRefund: GP_REFUND_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.pct]),
+      evictPct: EVICT_PCT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.points]),
       // [civ, leaderRow, tech] — the tech an OCEAN crossing waits on, -1 for none
       oceanAccess: OCEAN_ACCESS_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.tech === null ? -1 : (techIdx.get(r.tech) ?? -1)]),
       districtUnits: DISTRICT_UNIT_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), Object.keys(UNITS).indexOf(r.unit)]),
