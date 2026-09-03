@@ -9,7 +9,7 @@
  */
 
 
-import { TURN_LIMIT, unitFaithCost } from '../core/game';
+import { TURN_LIMIT, unitFaithCost, DISTRICT_SPECIALTY_COST } from '../core/game';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
@@ -458,7 +458,14 @@ export function buildRules() {
     amenityTiers: AMENITY_TIERS.map((t) => ({ min: t.min, growth: t.growthFactor, yield: t.yieldFactor })),
     scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY },
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
-    districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
+    districtCost: {
+      // the SPECIALTY base, still what a district with no row of its own pays
+      base: Math.round(DISTRICT_SPECIALTY_COST * GAME_SPEED), scale: 9,
+      // ...and each PLACEABLE row's own base and under-represented discount,
+      // straight off `Districts.Cost` and `CostProgressionParam1` (B-67)
+      perDistrict: PLACEABLE_DISTRICTS.map((d) => Math.round((DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST) * GAME_SPEED)),
+      discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
+    },
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
     // THE MOVEMENT UNIT and the route ladder over it (`MP_SCALE`).
     mpScale: MP_SCALE,

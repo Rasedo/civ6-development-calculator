@@ -72,6 +72,12 @@ export interface DistrictDef {
   /** CIV6: this district's cost is FLAT (`cost` × game speed) — it never
    *  scales with research progress and takes no discount. The Spaceport. */
   fixedCost?: boolean;
+  /** CIV6 (`Districts.CostProgressionParam1`): the UNDER-REPRESENTED discount,
+   *  as a percentage off. Every specialty row ships 40; the Government Plaza
+   *  and the Diplomatic Quarter ship 25. Absent means the 40 the install gives
+   *  every other row.
+   */
+  discountPct?: number;
   countsTowardLimit: boolean;
   /** A city may hold SEVERAL of this type (CIV 6: the Neighborhood, which is
    *  why it does not count toward the population cap). Absent means one. */
@@ -489,6 +495,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // civilization".
   GOVERNMENT_PLAZA: D({
     id: 'GOVERNMENT_PLAZA',
+    // CIV6 (`CostProgressionParam1`): 25, not the usual 40
+    discountPct: 25,
     plunder: { kind: 'culture', amount: 25 },
     name: 'Government Plaza',
     code: 'GP',
@@ -510,6 +518,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // or adjacent districts", "Limit of one per civilization".
   DIPLOMATIC_QUARTER: D({
     id: 'DIPLOMATIC_QUARTER',
+    // CIV6 (`CostProgressionParam1`): 25, not the usual 40
+    discountPct: 25,
     plunder: { kind: 'culture', amount: 25 },
     name: 'Diplomatic Quarter',
     code: 'DQ',

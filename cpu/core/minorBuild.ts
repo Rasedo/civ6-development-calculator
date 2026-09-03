@@ -14,11 +14,12 @@
  * higher wall — is the same rule a major pays.
  */
 import type { City, CityState, DistrictId, GameState, Tile } from './types';
+import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1 } from '../data/cityStates';
 import { ENCAMPMENT_HP } from '../data/units';
 import { canPlaceDistrictIn, outerPool, wallsMax } from './rules';
-import { districtCostIn } from './game';
+import { districtCostIn, DISTRICT_SPECIALTY_COST } from './game';
 import { computeUnlocksIn, type Unlocks } from './effects';
 import { tileSeat } from './seats';
 import { tilesWithin } from '../../world/hex';
@@ -111,7 +112,10 @@ function minorBuild(state: GameState, cityState: CityState): void {
     }
     const site = minorDistrictSite(state, cityState, item.district, unlocks);
     if (site < 0) continue;
-    const cost = districtCostIn(cityState.research);
+    // the row's OWN base, not the specialty one: a minor builds real
+    // districts too and the install prices an Aqueduct at 36 (B-67)
+    const cost = districtCostIn(cityState.research,
+      DISTRICTS[item.district]?.cost ?? DISTRICT_SPECIALTY_COST);
     if (cityState.prodProgress < cost) return;
     cityState.prodProgress -= cost;
     const t = state.map.tiles[site];

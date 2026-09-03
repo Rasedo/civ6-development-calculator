@@ -118,7 +118,10 @@ class SimMinors:
             halt = ~alive
             t_pct = self.citystate_techs[:, s].sum(dim=1).double() / float(nT_c)
             c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(nC_c)
-            d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
+            # the research factor is the minor's; the BASE is the row's own,
+            # picked inside the ladder where the district is known (B-67)
+            d_fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
+            d_per = dcp.get("perDistrict") or []
             site_s = self._minor_district_site(s)
             ladder: list[tuple[str, object]] = [("b", walls_by_tier[0] if walls_by_tier else -1),
                                                 ("d", self._citystate_didx[:, s]),
@@ -202,6 +205,8 @@ class SimMinors:
                     if plc == 3:
                         splane = splane & (self._adj_center_count() == 0)
                     avail = gate & ~held & unlock & cap_ok & splane.any(dim=1)
+                    _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp.get("base", 32))
+                    d_cost = torch.floor(_b_dv * d_fac)
                     pay = avail & (self.citystate_prod[:, s] >= d_cost)
                     if bool(pay.any()):
                         rr = pay.nonzero(as_tuple=True)[0]

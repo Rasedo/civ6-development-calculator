@@ -18,7 +18,7 @@ import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { goldenBoostBonus, worldEraIndex } from './eras';
-import { itemCost, districtCostIn, settlerCost } from './game';
+import { itemCost, districtCostIn, settlerCost, DISTRICT_SPECIALTY_COST } from './game';
 import { builderCost, settlerCount } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
 import { TECHS } from '../data/techs';
@@ -135,7 +135,10 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   // Everything else a production pick needs is static rules data the ladder
   // already loads; static data is not state.
   const esc = [
-    districtCostIn(s?.research ?? { techs: [], civics: [] } as never) / 1000,
+    // no district is named here, so this is the SPECIALTY price — the same
+    // figure the head has always rendered
+    districtCostIn(s?.research ?? { techs: [], civics: [] } as never,
+      DISTRICT_SPECIALTY_COST) / 1000,
     settlerCost(state, seat) / 1000,
     builderCost(state, seat) / 1000,
   ];

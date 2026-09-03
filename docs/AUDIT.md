@@ -48,7 +48,6 @@ from the list below.
 | B-24r Ages/governors | 1 | Affluence copies the GROUND (a minor improves nothing here) and Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on a named absent system |
 | B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six (the ledger's); the summed-yield key and one-candidate head are P8-surface |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
-| B-67 the district price curve | 1 | `districtCostIn` prices EVERY district off the specialty base (54) and one GAME_PROGRESS-shaped curve, where the install gives each row its own base (Aqueduct 36, Canal and Dam 81, Government Plaza 30) and two progression models (AVG_PLUS_TECH 40 for the specialty rows, GAME_PROGRESS 1000 for the Neighborhood, Aqueduct, Canal and Dam); the unique districts scale off the replaced row's price, so they inherit the gap |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, and one magnitude the source never published |
@@ -58,6 +57,7 @@ from the list below.
 | B-63r the grievance ledger's magnitudes | 1 | the gang-up bar is a heuristic — no source publishes the AI threshold |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
 | B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; a direct-trained formation's strategic-resource charge is modelled at the single unit's; an escort formation is a PAIR here, and a dragged rider lifts no fog |
+| B-67 the district price MODEL | 1 | the per-row BASE and the per-row under-represented DISCOUNT now come from the install (`Districts.Cost` and `CostProgressionParam1`), so an Aqueduct no longer costs a Campus and the two plaza rows take 25% where every other row takes 40. What is still one curve for all is the PROGRESSION MODEL: the install splits COST_PROGRESSION_NUM_UNDER_AVG_PLUS_TECH (the specialty rows, the Government Plaza, the Diplomatic Quarter, the Aerodrome) from COST_PROGRESSION_GAME_PROGRESS (the Aqueduct, Canal, Dam, Neighborhood and the Mbanza), and the two formulas are DLL-side — this engine runs the tech-driven one for both |
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%, blocked on C-46's scale), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |

@@ -65,14 +65,32 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
  * Districts get pricier as the game advances (Civ 6 scales with overall
  * research progress). Cost is locked in when the district is queued.
  */
-export function districtCostIn(research: ResearchState): number {
-  // The real Civ 6 curve — floor(54·(1 + 9·max(tech%, civic%)))
-  // (the tree you are FURTHER through drives the price, not the average).
-  // The 54 base speed-scales like every other production cost.
-  // `districtDiscounted` carries the under-represented discount on top.
+/** The SPECIALTY base every row shared before the install's own were read —
+ *  still the price of a Campus and its kin, and the figure the observation
+ *  renders where no district is named. */
+export const DISTRICT_SPECIALTY_COST = 54;
+
+/**
+ * The real Civ 6 curve — floor(base·(1 + 9·max(tech%, civic%))), the tree you
+ * are FURTHER through driving the price rather than the average. `base` is
+ * REQUIRED: the install gives each row its own (`Districts.Cost` — Aqueduct
+ * 36, Canal and Dam 81, Government Plaza and Diplomatic Quarter 30,
+ * Neighborhood 54), and a defaulted one silently priced every district as a
+ * Campus (B-67). It speed-scales like every other production cost, and
+ * `districtDiscounted` carries the under-represented discount on top.
+ */
+export function districtCostIn(research: ResearchState, base: number): number {
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
+  return Math.floor(Math.round(base * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
+}
+
+/** CIV6 (`Districts.CostProgressionParam1`): what the under-represented
+ *  discount takes off this row — 40 for every specialty district, 25 for the
+ *  Government Plaza and the Diplomatic Quarter. ONE reader, so the price and
+ *  the placement preview cannot disagree. */
+export function districtDiscountMult(type: DistrictId): number {
+  return 1 - (DISTRICTS[type]?.discountPct ?? 40) / 100;
 }
 
 /** CIV6 ("District", District discount mechanics): a specialty district is
@@ -106,8 +124,10 @@ export function districtDiscounted(
 export function districtCost(state: GameState, seat: number, type?: DistrictId): number {
   // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
   if (type !== undefined && DISTRICTS[type]?.fixedCost) return Math.round(DISTRICTS[type].cost * GAME_SPEED);
-  const base = districtCostIn(seatOf(state, seat)!.research);
-  const cost = type !== undefined && districtDiscounted(state, seat, type) ? Math.floor(base * 0.6) : base;
+  const base = districtCostIn(seatOf(state, seat)!.research,
+    type !== undefined ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST);
+  const cost = type !== undefined && districtDiscounted(state, seat, type)
+    ? Math.floor(base * districtDiscountMult(type)) : base;
   return type !== undefined ? districtVariantCost(state, seat, type, cost) : cost;
 }
 
