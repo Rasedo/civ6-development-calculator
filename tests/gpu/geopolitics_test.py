@@ -910,6 +910,14 @@ def poke_visibility(rules, path):
     CIV6 (Diplomatic Visibility and Gossip)."""
     sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
     a, b = 1, 2
+    # The BASE rule, so the seeder's draw cannot decide what this lane
+    # measures: clear the roster rows. The uniques that ride visibility
+    # (Ortoo doubles the Combat Strength gap) get their own lane below,
+    # and row 1 of this fixture happens to BE Mongolia.
+    sim.row_civ[:, :] = -1
+    sim.row_leader[:, :] = -1
+    sim._eff_version += 1
+    sim._gen_ver += 1
     assert sim._vis_max == 4, f"{sim._vis_max} levels, expected the published five"
     sim.seat_route_dseat[:] = -1
     vis = sim._diplo_vis()
@@ -968,6 +976,24 @@ def poke_visibility(rules, path):
     _barb = torch.full((sim.B,), BARB_SEAT, dtype=torch.long, device=sim.device)
     assert float(sim._vis_cs(_a, _barb)[0]) == 0.0
     assert float(sim._vis_cs(_barb, _a)[0]) == 0.0
+
+    # CIV6 (Ortoo): "All Mongolian units double the usual Combat Bonus for
+    # having a higher level of Diplomatic Visibility than their opponent" —
+    # the install's Amount is 3, which is what this engine already pays per
+    # level, so the row ADDS a second step, and only for the row holding it
+    # (`DIPLO_VIS_ROWS`).
+    _vrow = next((r for r in sim._diplo_vis_rows if r[3] > 0), None)
+    assert _vrow is not None, "no roster row pays a visibility Combat Bonus"
+    _vc, _vl, _vp, _vcs, _vflat = _vrow
+    sim.row_civ[0, a] = _vc
+    sim.row_leader[0, a] = sim._pair_civ.index(_vc) if _vc >= 0 else _vl
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    assert (float(sim._vis_cs(_a, _b)[0])
+            == gap * (sim._vis_cs_per_level + _vcs)), (
+        "the roster row did not add its own step to the gap")
+    assert float(sim._vis_cs(_b, _a)[0]) == 0.0, (
+        "the row paid the side that is BEHIND")
     print("  j visibility OK (five levels, one per source, post-or-alliance, the intel bonus)")
 
 
