@@ -54,7 +54,7 @@ describe('the production rows', () => {
 
 describe('Meiji Restoration', () => {
   it('adds +1 to a district per adjacent district, Japan alone', () => {
-    expect(DISTRICT_ADJ_ROWS.length).toBe(9);
+    expect(DISTRICT_ADJ_ROWS.length).toBe(13);
     const faithOf = (civ: string): number => {
       const state = makeState(makeMap(12, 12, 'GRASSLAND'));
       state.seats[0].civ = seatRow(civ);

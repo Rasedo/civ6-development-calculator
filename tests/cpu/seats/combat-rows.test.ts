@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
 import { emptySeat, NO_SEAT } from '../../../cpu/core/seats';
 import { spawnUnit, unitFullMoves, stepUnit, ignoresShores } from '../../../cpu/core/units';
@@ -28,7 +29,7 @@ function coastalScene(civ: string): GameState {
 
 describe('the combat-strength rows', () => {
   it('are the census: six rows, each on a class mask the target classes spell', () => {
-    expect(COMBAT_CS_ROWS.length).toBe(6);
+    expect(COMBAT_CS_ROWS.length).toBe(7);
     expect(POST_KILL_HEAL_ROWS.length + EMBARK_MOVE_ROWS.length + IGNORE_SHORES_ROWS.length).toBe(5);
     const state = makeState(makeMap(8, 8, 'GRASSLAND'));
     state.seats[0].civ = seatRow('MONGOLIA');
@@ -93,6 +94,23 @@ describe('the combat-strength rows', () => {
     expect(rosterCS(state, cat, 1, 100, false)).toBe(0);
     const foot = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 6).index, 0)!;
     expect(rosterCS(state, foot, 1, null, true)).toBe(0);
+  });
+});
+
+describe('the site census', () => {
+  it('every strength composition that names one seat-keyed adder names them all', () => {
+    // a site with congressUnitCS and no rosterCS is a roster clause the other
+    // engine pays and this one does not — seed 9248's melee assault was that
+    const src = readFileSync(new URL('../../../cpu/core/combat.ts', import.meta.url), 'utf8');
+    const bodies = src.split('\nfunction ').flatMap((b) => b.split('\nexport function ')).slice(1);
+    const missing = bodies
+      .filter((b) => b.includes('congressUnitCS(') && !b.includes('rosterCS('))
+      .map((b) => b.slice(0, b.indexOf('(')));
+    // `cityStrikeStrength` is the CITY's own shot: its defender composition
+    // carries no roster row on either engine (recorded under C-26)
+    // `congressUnitCS` is the adder's OWN body; the city-strike composition
+    // (phase.ts) carries no roster row on either engine — recorded under C-26
+    expect(missing.filter((n) => n !== 'congressUnitCS')).toEqual([]);
   });
 });
 

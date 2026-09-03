@@ -156,12 +156,21 @@ export interface AmenityTier {
 /** Tier from amenity balance (have - needed). Real Civ 6 bands —
  * Content is exactly 0, Displeased −1..−2, Unhappy −3 and below (the Unrest/
  * Revolt tiers below that are unimplemented: no rebel mechanics here). */
+export const AMENITY_TIERS: readonly (AmenityTier & { min: number })[] = [
+  { min: 3, name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.1 },
+  { min: 1, name: 'Happy', growthFactor: 1.1, yieldFactor: 1.05 },
+  { min: 0, name: 'Content', growthFactor: 1, yieldFactor: 1 },
+  { min: -2, name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 },
+  { min: -999, name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 },
+];
+
 export function amenityTier(balance: number): AmenityTier {
-  if (balance >= 3) return { name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.1 };
-  if (balance >= 1) return { name: 'Happy', growthFactor: 1.1, yieldFactor: 1.05 };
-  if (balance >= 0) return { name: 'Content', growthFactor: 1, yieldFactor: 1 };
-  if (balance >= -2) return { name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 };
-  return { name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 };
+  return AMENITY_TIERS.find((t) => balance >= t.min) ?? AMENITY_TIERS[AMENITY_TIERS.length - 1];
+}
+
+/** The tier's WIRE index — the row order both engines address a tier by. */
+export function amenityTierIndex(name: string): number {
+  return AMENITY_TIERS.findIndex((t) => t.name === name);
 }
 
 /**
@@ -209,6 +218,11 @@ export function emptyStockpile(): number[] {
  *  but constructing Encampment buildings in your empire (Barracks, Armory,
  *  etc.) will increase your maximum stockpile by 10 per building for all
  *  resources." */
+/** How far a Trader's road-laying walk may reach in one leg. It lives here,
+ *  in a LEAF module: `TRADE_WALK_EXPIRY_RAIL` is computed from it at module
+ *  load, and a cycle between trade.ts and units.ts would leave that NaN. */
+export const TRADE_ROAD_MAX_STEPS = 32;
+
 export const STOCKPILE_CAP_BASE = 50;
 export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING = 10;
 

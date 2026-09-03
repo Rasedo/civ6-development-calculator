@@ -173,10 +173,18 @@ export interface DistrictAdjRow {
   leader?: LeaderId;
   district: DistrictId;
   amount: number;
-  /** per adjacent DISTRICT (the default) or for the district's own RIVER */
-  source?: 'RIVER';
+  /** per adjacent DISTRICT (the default), the district's own RIVER, or per
+   *  adjacent tile of a FEATURE */
+  source?: 'RIVER' | 'RAINFOREST';
 }
 export const DISTRICT_ADJ_ROWS: readonly DistrictAdjRow[] = [
+  // CIV6 (Amazon, EFFECT_FEATURE_ADJACENCY): "Rainforest tiles provide +1
+  // adjacency bonus for Campus, Commercial Hub, Holy Site, and Theater Square
+  // districts" — the install's FEATURE_JUNGLE is this engine's RAINFOREST.
+  { civ: 'BRAZIL', district: 'CAMPUS', amount: 1, source: 'RAINFOREST' },
+  { civ: 'BRAZIL', district: 'COMMERCIAL_HUB', amount: 1, source: 'RAINFOREST' },
+  { civ: 'BRAZIL', district: 'HOLY_SITE', amount: 1, source: 'RAINFOREST' },
+  { civ: 'BRAZIL', district: 'THEATER_SQUARE', amount: 1, source: 'RAINFOREST' },
   // CIV6 (Grote Rivieren, EFFECT_RIVER_ADJACENCY): "Major adjacency bonus for
   // Campuses, Theater Squares, and Industrial Zones if next to a river."
   { civ: 'NETHERLANDS', district: 'CAMPUS', amount: 2, source: 'RIVER' },
@@ -239,14 +247,22 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
  * empty list is every combat unit.
  */
 export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast';
+/** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
+ *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
+ *  PER slotted policy of the named kind instead of flat. */
+export type CombatCsPer = 'militaryPolicy';
 export interface CombatCsRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
   when: CombatCsWhen;
   classes?: readonly string[];
+  /** the amount is paid once per slotted policy of this kind */
+  per?: CombatCsPer;
 }
 export const COMBAT_CS_ROWS: readonly CombatCsRow[] = [
+  // CIV6 (Thermopylae): "+1 Combat Strength for every Military Policy slotted."
+  { leader: 'GORGO', amount: 1, when: 'always', per: 'militaryPolicy' },
   { leader: 'BARBAROSSA', amount: 7, when: 'foeMinor' },
   { leader: 'TOMYRIS', amount: 5, when: 'foeWounded' },
   { leader: 'GENGHIS_KHAN', amount: 3, when: 'always', classes: ['LIGHT_CAV', 'HEAVY_CAV'] },
@@ -499,4 +515,70 @@ export interface CapitalRow {
 }
 export const CAPITAL_ROWS: readonly CapitalRow[] = [
   { leader: 'KUPE', firstCityPop: 1, palaceHousing: 3, palaceAmenities: 1, presettleYields: { science: 2, culture: 2 } },
+];
+
+// ---------------------------------------------------------------------------
+// THE SEAT'S ROWS — happiness, policy slots and what a kill pays
+
+/** CIV6 (Scottish Enlightenment, EFFECT_ADJUST_CITY_HAPPINESS_YIELD): "Happy
+ *  cities receive an additional +5% Science and +5% Production ... Ecstatic
+ *  cities double all these amounts" — one row per tier and yield. */
+export interface HappyYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tier: 'Happy' | 'Ecstatic';
+  yield: YieldKey;
+  pct: number;
+}
+export const HAPPY_YIELD_ROWS: readonly HappyYieldRow[] = [
+  { civ: 'SCOTLAND', tier: 'Happy', yield: 'science', pct: 5 },
+  { civ: 'SCOTLAND', tier: 'Happy', yield: 'production', pct: 5 },
+  { civ: 'SCOTLAND', tier: 'Ecstatic', yield: 'science', pct: 10 },
+  { civ: 'SCOTLAND', tier: 'Ecstatic', yield: 'production', pct: 10 },
+];
+
+/** CIV6 (Scottish Enlightenment, EFFECT_ADJUST_CITY_HAPPINESS_GREAT_PERSON):
+ *  "+1 Great Scientist point per Campus and +1 Great Engineer point per
+ *  Industrial Zone", doubled while Ecstatic — the district must stand. */
+export interface HappyGppRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tier: 'Happy' | 'Ecstatic';
+  cls: string;
+  district: DistrictId;
+  amount: number;
+}
+export const HAPPY_GPP_ROWS: readonly HappyGppRow[] = [
+  { civ: 'SCOTLAND', tier: 'Happy', cls: 'SCIENTIST', district: 'CAMPUS', amount: 1 },
+  { civ: 'SCOTLAND', tier: 'Ecstatic', cls: 'SCIENTIST', district: 'CAMPUS', amount: 2 },
+  { civ: 'SCOTLAND', tier: 'Happy', cls: 'ENGINEER', district: 'INDUSTRIAL_ZONE', amount: 1 },
+  { civ: 'SCOTLAND', tier: 'Ecstatic', cls: 'ENGINEER', district: 'INDUSTRIAL_ZONE', amount: 2 },
+];
+
+/** CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): a policy slot of one kind
+ *  in every government — Plato's Republic's Wildcard, the Holy Roman
+ *  Emperor's Military. */
+export interface PolicySlotRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  kind: 'military' | 'economic' | 'diplomatic' | 'wildcard';
+  amount: number;
+}
+export const POLICY_SLOT_ROWS: readonly PolicySlotRow[] = [
+  { civ: 'GREECE', kind: 'wildcard', amount: 1 },
+  { leader: 'BARBAROSSA', kind: 'military', amount: 1 },
+];
+
+/** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories provide
+ *  Culture/Faith equal to 50% of the Combat Strength of the defeated unit" —
+ *  the DEFEATED type's own strength, banked in the killer's purse. */
+export interface PostCombatYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  pctOfDefeated: number;
+}
+export const POST_COMBAT_YIELD_ROWS: readonly PostCombatYieldRow[] = [
+  { leader: 'GORGO', yield: 'culture', pctOfDefeated: 50 },
+  { leader: 'TAMAR', yield: 'faith', pctOfDefeated: 50 },
 ];

@@ -928,6 +928,21 @@ class SimMasks:
                              & (self.hills == bool(_fh)) & (self.feat_id < 0))
         return out
 
+    def _military_policies(self, seat: torch.Tensor) -> torch.Tensor:
+        """`Modifiers.militaryPolicies`' twin, shaped like `seat`: how many
+        MILITARY policies the seat each element names has slotted. A minor or a
+        barbarian slots none."""
+        out = torch.zeros_like(seat)
+        if not self._gov_has_effects:
+            return out
+        for row in range(self.n_majors):
+            m = seat == row
+            if not bool(m.any()):
+                continue
+            n = self._gov_mods(row)[12]["milpol"]
+            out = torch.where(m, n.reshape(-1, *([1] * (out.dim() - 1))).expand_as(out), out)
+        return out
+
     def _powered_add(self, row: int) -> torch.Tensor | None:
         """[B, 6] double — CIV6 (EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING):
         what this row adds to each yield a POWERED building's powered half
@@ -981,7 +996,7 @@ class SimMasks:
                                self.coastal_land.gather(1, tc).reshape(seat.shape))
         cap = int(self.rules.combat.get("unitHp", 100))
         out = z
-        for civ, lead, amt, mask, when in self._combat_cs_rows:
+        for civ, lead, amt, mask, when, per in self._combat_cs_rows:
             who = self._seat_is(seat, civ, lead) & combat
             if mask:
                 who = who & ((bit & mask) != 0)
@@ -993,7 +1008,12 @@ class SimMasks:
                 who = who if foe_city else torch.zeros_like(who)
             elif when == 4:
                 who = who & on_coast
-            out = out + who.long() * amt
+            if per == 1:
+                # CIV6 (Thermopylae): the magnitude is per slotted Military policy
+                _mp = self._military_policies(seat)
+                out = out + who.long() * amt * _mp
+            else:
+                out = out + who.long() * amt
         return out
 
     def _roster_embark_mp(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:

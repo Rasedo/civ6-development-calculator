@@ -13,6 +13,7 @@ import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
 import { governorMult } from './governors';
 import { getModifiers } from './effects';
+import { computeCityStats } from './city';
 import { spawnUnit, extraCharges } from './units';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
@@ -168,6 +169,23 @@ export function greatPersonPointsPerTurn(
   // factor (`GPP_CLASS_ROWS`), over every source like the government's
   const gcm = getModifiers(state, seat).gppClassMult;
   for (const cls of GP_CLASSES) out[cls] *= gcm[cls] ?? 1;
+  // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_GREAT_PERSON): the roster's happiness
+  // rows (`HAPPY_GPP_ROWS`) — a FLAT add per city at the named tier holding
+  // the named district, so it rides after every factor
+  const happy = getModifiers(state, seat).happyGpp;
+  if (happy.length) {
+    for (const city of citiesOf(state, seat)) {
+      const name = computeCityStats(state, city).amenities.tier.name;
+      for (const r of happy) {
+        if (r.tier !== name) continue;
+        const d = city.districts.find((x) => x.type === r.district);
+        if (!d) continue;
+        const t = state.map.tiles[d.tileIndex];
+        if (!t.districtComplete || t.districtPillaged) continue;
+        out[r.cls as GreatPersonClass] += r.amount;
+      }
+    }
+  }
   return out;
 }
 

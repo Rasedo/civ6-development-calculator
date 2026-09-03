@@ -349,6 +349,7 @@ def main() -> int:
                 ("roster_rows", [py, "tests/gpu/roster_rows_test.py"], 4),  # the roster's production, adjacency, route-yield and capacity rows
                 ("combat_rows", [py, "tests/gpu/combat_rows_test.py"], 4),  # the roster's combat-strength, kill-heal, embark-movement and shore rows
                 ("city_rows", [py, "tests/gpu/city_rows_test.py"], 4),  # the roster's city rows: the centre's terrain, the works, the powered yield, the stockpile, the tile price, the Farm's ground, the granted units and the first city
+                ("seat_rows", [py, "tests/gpu/seat_rows_test.py"], 4),  # the roster's seat rows: happiness yields and Great People, the government slot, what a kill pays, the per-policy strength, the Amazon
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

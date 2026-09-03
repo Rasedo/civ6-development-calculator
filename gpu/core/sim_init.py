@@ -2787,11 +2787,23 @@ class SimInit:
         # [civ, leaderRow, firstCityPop, palaceHousing, palaceAmenities, presettle yields x6]
         self._capital_rows: list[tuple[int, int, int, int, int, list[float]]] = [
             (int(r[0]), int(r[1]), int(r[2]), int(r[3]), int(r[4]), [float(x) for x in r[5:11]]) for r in _uq["capital"]]
+        # THE SEAT'S ROWS: happiness, policy slots and what a kill pays
+        # [civ, leaderRow, tier (amenityTiers index), yield, pct]
+        self._happy_yield_rows: list[tuple[int, int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), int(r[3]), float(r[4])) for r in _uq["happyYields"]]
+        # [civ, leaderRow, tier, class, district, amount]
+        self._happy_gpp_rows: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["happyGpp"]]  # type: ignore[misc]
+        self._policy_slot_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["policySlots"]]  # type: ignore[misc]
+        self._post_combat_yield_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["postCombatYields"]]  # type: ignore[misc]
         self._intl_route_rows: list[tuple[int, int, int, float]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
-        self._combat_cs_rows: list[tuple[int, int, int, int, int]] = [
+        # [civ, leaderRow, amount, classMask, when, per (1 = per slotted MILITARY policy)]
+        self._combat_cs_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["combatCs"]]  # type: ignore[misc]
         self._post_kill_heal_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postKillHeal"]]  # type: ignore[misc]

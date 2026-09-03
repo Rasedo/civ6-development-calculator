@@ -1,6 +1,7 @@
 import type { GameState } from './types';
 import { civEraIndex } from './city';
 import { seatOf, citiesOf, isBarbSeat, isCiv } from './seats';
+import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
@@ -139,7 +140,26 @@ export function unitKillEvent(
   killer: { type: string } | undefined,
   victim: { type: string; seat: number; formation?: number },
 ): void {
-  if (!isCiv(killerSeat) || isBarbSeat(victim.seat)) return;
+  if (!isCiv(killerSeat)) return;
+  // CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories provide
+  // Culture/Faith equal to 50% of the Combat Strength of the defeated unit" —
+  // a BARBARIAN victim pays too, so this stands above the era-score gate
+  const rows = getModifiers(state, killerSeat).postCombatYields;
+  if (rows.length) {
+    const s = seatOf(state, killerSeat);
+    const cs = UNITS[victim.type]?.combat ?? 0;
+    if (s && cs > 0) {
+      for (const r of rows) {
+        const lump = Math.floor((cs * r.pctOfDefeated) / 100);
+        if (lump <= 0) continue;
+        if (r.yield === 'faith') s.faith += lump;
+        else if (r.yield === 'culture') s.research.civicProgress += lump;
+        else if (r.yield === 'science') s.research.techProgress += lump;
+        else if (r.yield === 'gold') s.treasury += lump;
+      }
+    }
+  }
+  if (isBarbSeat(victim.seat)) return;
   // CIV6 (To Arms!): "+1 Era Score each time you kill a non-Barbarian Corps in
   // combat and +2 Era Score each time you kill a non-Barbarian Army in
   // combat." A Fleet and an Armada are the same two tiers at sea.

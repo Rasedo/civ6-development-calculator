@@ -48,7 +48,7 @@ import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
   GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
-  MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP,
+  MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP, TRADE_ROAD_MAX_STEPS,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -320,7 +320,6 @@ export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex:
 /** the trade walk is bounded by the route range — a route
  *  longer than this cannot exist (canAddTradeRoute gates on TRADE_ROUTE_RANGE),
  *  so the bound is a safety rail, not a rule. */
-export const TRADE_ROAD_MAX_STEPS = 32;
 
 /** The MP a river crossing costs (real Civ 6 ends movement; this model charges
  *  a flat 3 points — the pre-existing convention, now named). */

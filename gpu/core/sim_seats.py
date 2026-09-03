@@ -3664,6 +3664,34 @@ class SimSeats:
         kill a non-Barbarian Army in combat". `killer` is a row int or a [B] seat
         tensor; a non-major killer (a city-state or a camp) holds no
         dedications and scores 0, and a CITY has no chassis to check."""
+        # CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories
+        # provide Culture/Faith equal to 50% of the Combat Strength of the
+        # defeated unit" — a BARBARIAN victim pays too, so this stands above
+        # the era-score gate
+        if self._post_combat_yield_rows:
+            _kcs = self._type_combat[vict_type.clamp(min=0)]
+            for _pc, _pl, _py, _ppct in self._post_combat_yield_rows:
+                _lump = torch.div(_kcs * _ppct, 100, rounding_mode="floor")
+                _pay = killed & (vict_type >= 0) & (_lump > 0)
+                if not bool(_pay.any()):
+                    continue
+                # the wire's yield order: 2 gold, 3 science, 4 culture, 5 faith
+                _purse = {2: self.civ_treasury, 3: self.civ_tech_prog,
+                          4: self.civ_civic_prog, 5: self.civ_faith}.get(_py)
+                if _purse is None:
+                    continue
+                for g in range(self.n_majors):
+                    _who = self._row_is(g, _pc, _pl)
+                    if not bool(_who.any()):
+                        continue
+                    if isinstance(killer, int):
+                        if killer != g:
+                            continue
+                        _m = _pay & _who
+                    else:
+                        _m = _pay & (killer == g) & _who
+                    if bool(_m.any()):
+                        _purse[:, g] += (_m.long() * _lump).to(_purse.dtype)
         alive = killed & ~vict_barb
         if killer_type is not None and self._gdr_idx >= 0:
             gdr = alive & (killer_type == self._gdr_idx)
@@ -5813,6 +5841,10 @@ class SimSeats:
         out[:, 3] = (out[:, 3] + self._congress_wildcard_delta(gov)).clamp(min=0)
         # CIV6 (Adam Smith): "Adds +1 Economic Policy slot to your government."
         out[:, 1] = out[:, 1] + self._gp_perm(row, "policySlotEconomic").long()
+        # CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): the roster's own
+        # slot (`POLICY_SLOT_ROWS`) — Plato's Republic, the Holy Roman Emperor
+        for _pc, _pl, _pk, _pa in self._policy_slot_rows:
+            out[:, _pk] = out[:, _pk] + self._row_is(row, _pc, _pl).long() * _pa
         return out
 
     def _seat_wonder_sum(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
@@ -8267,7 +8299,8 @@ class SimSeats:
                                      self.unit_naval[at0] | a_emb[:, u]).to(def_cs.dtype)
                  + (self._congress_unit_cs(at0, a_seat[:, u])
                     + self._gov_unit_cs(at0, a_seat[:, u])).to(def_cs.dtype)
-                 + self._roster_cs(a_seat[:, u], at0, a_tile[:, u], hrow, None, True).to(def_cs.dtype))
+                 + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
+                                   self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True).to(def_cs.dtype))
         roll = self._damage_roll(att, atk_e - def_cs, k=key, tile=tc)
         self._encamp_take_roll(att, tc, at0, a_seat[:, u], roll, True)
         self._ww_battle(att, self._row_of(a_seat[:, u]),
@@ -8313,6 +8346,10 @@ class SimSeats:
             atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
             atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
+        # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
+        atk_e = atk_e + self._roster_cs(
+            a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
+            self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
         d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
@@ -8728,6 +8765,9 @@ class SimSeats:
         atk_e = atk_e + (self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
                              + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
+        atk_e = atk_e + self._roster_cs(
+            a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
+            self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
         if getattr(self, "_battle_probe", False) and bool(att.any()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
                 print(f"GPU-BATTLE b={_b} t={self.turn} tgt={int(tgt[_b])} "

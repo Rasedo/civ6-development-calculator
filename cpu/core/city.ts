@@ -1021,6 +1021,9 @@ export function computeCityStats(
   addYields(total, trade);
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
     total[k] *= tier.yieldFactor;
+    // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
+    // (`HAPPY_YIELD_ROWS`) — a percentage over the same total
+    for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) total[k] *= 1 + r.pct / 100;
   }
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
     total[k] *= m.yieldMult[k] ?? 1;

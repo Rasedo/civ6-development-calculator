@@ -1425,6 +1425,21 @@ class SimPhase:
             # per-class factor, over every source like the government's
             if self._gpp_class_rows:
                 pts = pts * self._gpp_class_mult(row, cls)
+            # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_GREAT_PERSON): the roster's
+            # happiness rows (`HAPPY_GPP_ROWS`) — a FLAT add per city at the
+            # named tier holding the named district, after every factor
+            for _hc, _hl, _ht, _hcls, _hd, _ha in self._happy_gpp_rows:
+                if _hcls != cls:
+                    continue
+                _hw = self._row_is(row, _hc, _hl)
+                if not bool(_hw.any()) or not self.districts_on:
+                    continue
+                _reg = self.city_dist_tile[:, row, :, _hd]
+                _stand = ((_reg >= 0) & self.district_complete.gather(1, _reg.clamp(min=0))
+                          & ~self.district_pillaged.gather(1, _reg.clamp(min=0))
+                          & self.city_alive[:, row])
+                _tier = self._seat_amenity(row)[0]
+                pts = pts + (_stand & (_tier == _ht) & _hw.unsqueeze(1)).sum(dim=1).double() * _ha
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )

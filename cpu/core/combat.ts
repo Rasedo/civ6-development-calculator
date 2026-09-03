@@ -849,7 +849,8 @@ export function healOnEliminate(state: GameState, victor: Unit): void {
 export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean },
     foeSeat: number, foeHp: number | null, foeIsCity: boolean): number {
   if (!isCiv(own.seat)) return 0;
-  const rows = getModifiers(state, own.seat).combatCs;
+  const mods = getModifiers(state, own.seat);
+  const rows = mods.combatCs;
   if (rows.length === 0) return 0;
   const def = UNITS[own.type];
   if (!def || !(def.combat ?? 0)) return 0;
@@ -865,7 +866,8 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
       // a lake is shallow water to a hull.
       : def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile));
-    if (hit) cs += r.amount;
+    // CIV6 (Thermopylae): the magnitude is per slotted Military policy
+    if (hit) cs += r.per === 'militaryPolicy' ? r.amount * mods.militaryPolicies : r.amount;
   }
   return cs;
 }

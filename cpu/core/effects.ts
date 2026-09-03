@@ -1,6 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
+import { HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -147,7 +148,13 @@ export interface Modifiers {
   /** the roster's international route yields this seat holds */
   intlRouteYields: readonly RouteYieldRow[];
   /** the roster's combat-strength rows this seat holds, class masks resolved */
-  combatCs: readonly { amount: number; when: CombatCsWhen; classMask: number }[];
+  combatCs: readonly { amount: number; when: CombatCsWhen; classMask: number; per?: 'militaryPolicy' }[];
+  /** the roster's happiness rows and what a kill pays (`HAPPY_YIELD_ROWS`) */
+  happyYields: readonly HappyYieldRow[];
+  happyGpp: readonly HappyGppRow[];
+  postCombatYields: readonly PostCombatYieldRow[];
+  /** how many MILITARY policies this seat has slotted — Thermopylae's magnitude */
+  militaryPolicies: number;
   /** the roster's heal on eliminating a unit */
   postKillHeal: number;
   embarkMoves: readonly EmbarkMoveRow[];
@@ -311,6 +318,10 @@ export function defaultModifiers(): Modifiers {
     grantUnits: [],
     spyCapacityRows: [],
     capital: [],
+    happyYields: [],
+    happyGpp: [],
+    postCombatYields: [],
+    militaryPolicies: 0,
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -506,7 +517,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.prodMults = PROD_MULT_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   mods.intlRouteYields = INTL_ROUTE_YIELD_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   mods.combatCs = COMBAT_CS_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader))
-    .map((r) => ({ amount: r.amount, when: r.when, classMask: (r.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0) }));
+    .map((r) => ({ amount: r.amount, when: r.when, per: r.per, classMask: (r.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0) }));
   mods.postKillHeal = POST_KILL_HEAL_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader)).reduce((s, r) => s + r.amount, 0);
   mods.embarkMoves = EMBARK_MOVE_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   mods.ignoreShores = IGNORE_SHORES_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
@@ -524,6 +535,9 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.grantUnits = mine(GRANT_UNIT_ROWS);
   mods.spyCapacityRows = mine(SPY_CAPACITY_ROWS);
   mods.capital = mine(CAPITAL_ROWS);
+  mods.happyYields = mine(HAPPY_YIELD_ROWS);
+  mods.happyGpp = mine(HAPPY_GPP_ROWS);
+  mods.postCombatYields = mine(POST_COMBAT_YIELD_ROWS);
   // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
   // adjacency adds the cards write, so `districtAdjacency` reads one list
   for (const r of DISTRICT_ADJ_ROWS) {
@@ -702,6 +716,11 @@ export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKin
   const out: Record<SlotKind, number> = { military: 0, economic: 0, diplomatic: 0, wildcard: 0 };
   // CIV6 (Adam Smith): "Adds +1 Economic Policy slot to your government."
   out.economic += seatOf(state, seat)?.gpPerm?.[GP_PERM.indexOf('policySlotEconomic')] ?? 0;
+  // CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): the roster's own slot
+  // (`POLICY_SLOT_ROWS`) — Plato's Republic, the Holy Roman Emperor
+  for (const r of POLICY_SLOT_ROWS) {
+    if (rowIsFor(r, civOf(state, seat), leaderOf(state, seat))) out[r.kind] += r.amount;
+  }
   for (const c of citiesOf(state, seat)) {
     for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
@@ -782,7 +801,10 @@ function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Recor
   for (const cardId of policies) {
     if (!cardId) continue;
     const card = POLICIES[cardId];
-    if (card) applyPolicyEffects(mods, card.effects);
+    if (!card) continue;
+    applyPolicyEffects(mods, card.effects);
+    // CIV6 (Thermopylae): the magnitude is "every Military Policy slotted"
+    if (card.kind === 'military') mods.militaryPolicies += 1;
   }
 }
 

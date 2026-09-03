@@ -69,9 +69,9 @@ def a_tile(sim, pred) -> int:
 
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
-    assert len(sim._combat_cs_rows) == 6 and len(sim._post_kill_heal_rows) == 1
+    assert len(sim._combat_cs_rows) == 7 and len(sim._post_kill_heal_rows) == 1
     assert len(sim._embark_move_rows) == 2 and len(sim._ignore_shores_rows) == 2
-    print("  1 wire OK — 6 + 1 + 2 + 2 rows")
+    print("  1 wire OK — 7 + 1 + 2 + 2 rows")
 
 
 def test_barbarossa_tomyris(rules, path) -> None:
@@ -133,6 +133,32 @@ def test_embarked(rules, path) -> None:
     print("  4 embarked rows OK — Mana's +2, the Colonies' Settlers, the Knarr's shores")
 
 
+def test_site_census(rules, path) -> None:
+    """Every strength composition that names ONE seat-keyed adder names them
+    all: a site with `_congress_unit_cs` and no `_roster_cs` is a roster
+    clause the other engine pays and this one does not (seed 9248's melee
+    assault was exactly that)."""
+    import ast
+
+    root = Path(__file__).resolve().parent.parent.parent
+    missing = []
+    for name in ("gpu/core/sim_seats.py", "gpu/core/sim_phase.py"):
+        tree = ast.parse((root / name).read_text(encoding="utf-8"))
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef):
+                continue
+            calls = {n.func.attr for n in ast.walk(fn)
+                     if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+            if "_congress_unit_cs" in calls and "_roster_cs" not in calls:
+                missing.append(f"{name}::{fn.name}")
+    # a CITY's own strike composes its DEFENDER without the roster's rows on
+    # BOTH engines (`seatPhase`'s city-strike block does the same), so the two
+    # agree; the gap is recorded under C-26, not fixed on one side only
+    allow = {"gpu/core/sim_phase.py::_seat_city_strike"}
+    assert not (set(missing) - allow), f"a strength composition without the roster's own: {missing}"
+    print(f"  5 site census OK — every `_congress_unit_cs` site carries `_roster_cs`")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -140,6 +166,7 @@ def main() -> int:
     test_barbarossa_tomyris(rules, path)
     test_genghis_hojo_ottoman(rules, path)
     test_embarked(rules, path)
+    test_site_census(rules, path)
     print("BATTERY OK combat_rows")
     return 0
 

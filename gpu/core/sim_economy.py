@@ -1619,6 +1619,8 @@ class SimEconomy:
             "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
             "dch": _z.clone(), "dca": _z.clone(),
             "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
+            # CIV6 (Thermopylae): how many MILITARY policies stand slotted
+            "milpol": torch.zeros(B, dtype=torch.long, device=dev),
             "gpp": torch.zeros(B, self._gov_gpp.shape[1], dtype=torch.float64, device=dev),
             # ---- the DARK-AGE channels ----
             "routeymul": _o.clone(), "domroute": torch.zeros(B, 6, dtype=dt, device=dev),
@@ -1691,6 +1693,7 @@ class SimEconomy:
                                        int(_r[2]), float(_r[3])))
         if self._npol:
             slotted = self._slotted_policies(civics2, extra_slots, dark, era)
+            fx["milpol"] = (slotted & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
             sd = slotted.to(dt)
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
@@ -2113,15 +2116,22 @@ class SimEconomy:
             out |= has & _pm.unsqueeze(1)
         return out
 
-    def _adj_woods_count(self) -> torch.Tensor:
-        """[B, T] long — live Woods among each tile's neighbours: the Woods
-        FEATURE (`neighbor.feature === 'WOODS'`), not the movement rule's
-        woods list, which admits Rainforest."""
+    def _adj_feat_count(self, fid_want: int) -> torch.Tensor:
+        """[B, T] long — live tiles of ONE feature among each tile's
+        neighbours (`neighbor.feature === '<FEATURE>'`)."""
+        if fid_want < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
         nb = self.neigh
         nbc = nb.clamp(min=0)
         fid = self.feat_id[:, nbc]
         live = ~self.feat_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
-        return ((fid == self._woods_feat) & live).sum(dim=2)
+        return ((fid == fid_want) & live).sum(dim=2)
+
+    def _adj_woods_count(self) -> torch.Tensor:
+        """[B, T] long — live Woods among each tile's neighbours: the Woods
+        FEATURE (`neighbor.feature === 'WOODS'`), not the movement rule's
+        woods list, which admits Rainforest."""
+        return self._adj_feat_count(self._woods_feat)
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc
@@ -2134,10 +2144,17 @@ class SimEconomy:
         # CIV6 (Meiji Restoration): "+1 standard adjacency bonus to all
         # districts from adjacent districts" — the roster's district rows,
         # on the tiles a matching seat owns (`DISTRICT_ADJ_ROWS`)
-        # (Grote Rivieren, EFFECT_RIVER_ADJACENCY): the same rows on the district's own river
+        # (Grote Rivieren, EFFECT_RIVER_ADJACENCY): the same rows on the
+        # district's own river; (Amazon, EFFECT_FEATURE_ADJACENCY): per
+        # adjacent Rainforest
         for _rc, _rl, _rdi, _ramt, _rsrc in self._district_adj_rows:
             if _rdi == di:
-                _rsource = self.tile_river.to(self.dtype) if _rsrc == 1 else adjc
+                if _rsrc == 1:
+                    _rsource = self.tile_river.to(self.dtype)
+                elif _rsrc == 2:
+                    _rsource = self._adj_feat_count(self._rainforest_fid).to(self.dtype)
+                else:
+                    _rsource = adjc
                 raw = raw + _ramt * self._who_tile_plane(_rc, _rl).to(self.dtype) * _rsource
         if float(self._dyn_bwonder[di]) != 0:
             nbw = self.neigh
@@ -4069,6 +4086,20 @@ class SimEconomy:
 
         total = tiles_y + dist_y + bld_y + citz + bon + trade
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
+        # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
+        # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the
+        # yields the row names, in cities at the row's own tier. The tier comes
+        # from `_seat_amenity`, the one body that decides it.
+        _hrows = [r for r in self._happy_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        if _hrows:
+            _tier = self._seat_amenity(row)[0]
+            if j is not None:
+                _tier = _tier[:, j:j + 1]
+            for _hc, _hl, _ht, _hy, _hp in _hrows:
+                if _hy == 0:
+                    continue  # food takes no tier factor on either engine
+                _at = (_tier == _ht) & self._row_is(row, _hc, _hl).unsqueeze(1)
+                total[:, :, _hy] = torch.where(_at, total[:, :, _hy] * (1.0 + _hp / 100.0), total[:, :, _hy])
         if gym is not None:
             if self._gov_has_effects:
                 _cz = self._gov_mods(row)[12]["culsuz"]
