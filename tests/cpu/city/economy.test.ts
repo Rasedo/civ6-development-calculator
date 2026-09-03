@@ -49,7 +49,7 @@ describe('gold & faith purchases', () => {
     addDistrict(state, city, 'HOLY_SITE', 6, 5);
     city.buildings.push('SHRINE', 'TEMPLE');
     seatOf(state, 0)!.religion.worship = 'CATHEDRAL';
-    const cost = buildingFaithCost('CATHEDRAL');
+    const cost = buildingFaithCost(state, 0, 'CATHEDRAL');
     seatOf(state, 0)!.faith = cost + 3;
     seatOf(state, 0)!.treasury = 0;
     const r = purchaseBuilding(state, city.id, 'CATHEDRAL', 0);

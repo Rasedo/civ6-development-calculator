@@ -146,6 +146,11 @@ export function greatPersonPointsPerTurn(
           !state.map.tiles[d.tileIndex].districtPillaged,
       );
       if (!inst) continue;
+      // CIV6 (Nobel Prize, EFFECT_ADJUST_GREAT_PERSON_POINTS): the roster's
+      // own per-BUILDING points (`GPP_BUILDING_ROWS`)
+      for (const r of getModifiers(state, seat).gppBuildings) {
+        if (r.cls === cls && city.buildings.includes(r.building)) out[cls] += r.amount * cityMult;
+      }
       out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length) * cityMult;
     }
@@ -317,6 +322,10 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
     }
   }
 
+  // CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great Person" —
+  // every class, and the PATRONIZED person is earned too (`GP_FAVOR_ROWS`)
+  owner.diplomaticFavor += getModifiers(state, seat).gpFavor;
+
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
   // the claim ends the pass: the NEXT person starts with nobody locked out
   if (state.gpPassedBy) state.gpPassedBy[GP_CLASSES.indexOf(cls)] = -1;
@@ -375,9 +384,17 @@ export function passGreatPerson(state: GameState, seat: number, clsIdx: number):
 export function advanceGreatPeople(state: GameState, seat: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
+  const mods = getModifiers(state, seat);
   const perTurn = greatPersonPointsPerTurn(state, seat);
   for (const cls of GP_CLASSES) {
     ensureGpOffer(state, cls);
+    // CIV6 (Mana): "Great Writers cannot be earned"; (Religious Convert): no
+    // Great Prophets either — the class banks nothing and recruits nothing
+    if ((cls === 'WRITER' && mods.seatBans.has('greatWriter'))
+      || (cls === 'PROPHET' && mods.seatBans.has('greatProphet'))) {
+      owner.gpp[cls] = 0;
+      continue;
+    }
     let pts = (owner.gpp[cls] ?? 0) + perTurn[cls];
     if (pts !== 0) {
       for (;;) {

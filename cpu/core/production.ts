@@ -5,7 +5,7 @@ import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
-import { availableCivicsIn, availableTechsIn } from './effects';
+import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
 import { isGreatEngineer } from './units';
@@ -223,6 +223,11 @@ export function completeQueueItem(
         // its OWN perimeter arrives at whatever tier the city's walls
         // already supply — 0 where none stand yet (`fitEncampOuter`)
         dt.encampOuterHp = wallsMax(state, city);
+      }
+      // CIV6 (Religious Convert): "Receives an Apostle each time he finishes
+      // a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
+      for (const r of getModifiers(state, city.seat).districtUnits) {
+        if (dt.district === r.district) spawnUnit(state, r.unit, dt.index, city.seat);
       }
       const ddef = dt.district ? DISTRICTS[dt.district] : null;
       // CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City

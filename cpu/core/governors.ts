@@ -117,6 +117,18 @@ export function cityGovernorEstablished(state: GameState, city: City): boolean {
  * ability plus every promotion taken. An assigned-but-unestablished governor
  * pays nothing here; only the loyalty channel runs early.
  */
+/** How many PROMOTIONS the governor established here has earned, its first
+ *  included — Hwarang's magnitude. Zero where none is established. */
+export function cityGovernorTitles(state: GameState, city: City): number {
+  const i = governorAt(state, city);
+  if (i < 0) return 0;
+  const g = seatOf(state, city.seat)!.governors![i];
+  if ((g.establishTurns ?? 0) > 0) return 0;
+  let n = 1; // the DEFAULT promotion every governor arrives with
+  for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) if (hasPromotion(g, p)) n += 1;
+  return n;
+}
+
 export function cityGovernorEffects(state: GameState, city: City): GovernorEffects[] {
   const i = governorAt(state, city);
   if (i < 0) return [];

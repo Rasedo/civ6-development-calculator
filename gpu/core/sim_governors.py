@@ -339,6 +339,21 @@ class SimGovernors:
         est = self.civ_gov_establish[:, row].gather(1, at.clamp(min=0))
         return (at >= 0) & (est <= 0)
 
+    def _governor_titles(self, row: int) -> torch.Tensor:
+        """[B, RC] long — how many PROMOTIONS the governor established in each
+        city slot has earned, its first included (`cityGovernorTitles`).
+        A popcount, NOT the `_governor_mask` row count: the mask ORs the
+        default promotion in, which would swallow a duplicate if the bit were
+        ever bought, and TS counts it as a separate term."""
+        at = self._governor_at(row)
+        est = self._governor_established(row, at)
+        if self.n_governors == 0:
+            return torch.zeros_like(at)
+        held = self.civ_gov_promos[:, row].gather(1, at.clamp(min=0))  # [B, RC]
+        pidx = torch.arange(self.n_gov_promos, device=self.device).reshape(1, 1, -1)
+        n = 1 + (((held.unsqueeze(2) >> pidx) & 1) == 1).sum(dim=2)
+        return torch.where(est, n, torch.zeros_like(n))
+
     def _governor_mask(self, row: int) -> torch.Tensor:
         """[B, RC, NP] bool — the promotion rows an established governor pays
         in each city slot, its DEFAULT ability included."""

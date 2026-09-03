@@ -55,7 +55,7 @@ describe("Valletta's class purchase", () => {
     const seat = seatOf(state, 0)!;
     seat.faith = 5000;
     seat.treasury = 5000;
-    const cost = buildingFaithCost('MONUMENT');
+    const cost = buildingFaithCost(state, 0, 'MONUMENT');
     expect(cost).toBe(BUILDINGS.MONUMENT.cost * 2);
     expect(purchaseBuildingWithFaith(state, city.id, 'MONUMENT', 0).ok).toBe(true);
     expect(city.buildings).toContain('MONUMENT');

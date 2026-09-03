@@ -1761,9 +1761,15 @@ class SimMasks:
 
     def _ocean_open(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] bool — may the seat named per game put a hull on OCEAN: its
-        Cartography, or CIV6 (Knarr) Norway's Shipbuilding."""
-        return self._seat_tech(seat, self._cartography_tech) | (
-            self._seat_plays(seat, "NORWAY") & self._seat_tech(seat, self._shipbuilding_tech))
+        Cartography, or a roster row's own clause — CIV6 (Knarr) Norway's
+        Shipbuilding, (Mana) the Maori's first turn (`OCEAN_ACCESS_ROWS`)."""
+        out = self._seat_tech(seat, self._cartography_tech)
+        for _oc, _ol, _ot in self._ocean_access_rows:
+            _w = self._seat_is(seat, _oc, _ol)
+            if _ot >= 0:
+                _w = _w & self._seat_tech(seat, _ot)
+            out = out | _w
+        return out
 
     def _row_ocean_open(self, row: int) -> torch.Tensor:
         """[B] bool — `_ocean_open` for one seat row."""

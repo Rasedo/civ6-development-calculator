@@ -166,7 +166,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     let religC = -1;
     if (actor.religion.founded) {
       const wid = WORSHIP_BUILDINGS[actor.seat % WORSHIP_BUILDINGS.length];
-      if (goldAffordable(actor.faith ?? 0, buildingFaithCost(wid))) {
+      if (goldAffordable(actor.faith ?? 0, buildingFaithCost(state, actor.seat, wid))) {
         worshipC = actor.cities.find((city) => !city.buildings.includes(wid) && city.buildings.includes('TEMPLE') && hsOk(city))?.centerIndex ?? -1;
       }
       // A Shrine sells the Missionary; the Apostle and the Inquisitor need a

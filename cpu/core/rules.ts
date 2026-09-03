@@ -300,6 +300,11 @@ export function canPlaceDistrictIn(
   const tile = map.tiles[tileIndex];
   const center = map.tiles[city.centerIndex];
 
+  // CIV6 (Religious Convert): "May not build Holy Site districts" — a
+  // PERMANENT refusal, so it answers before the research gate
+  if (type === 'HOLY_SITE' && getModifiers(state, city.seat).seatBans.has('holySite')) {
+    return no('This leader may not build Holy Sites.');
+  }
   const unlocks = opts.unlocks;
   if (unlocks && type !== 'CITY_CENTER' && !unlocks.districts.has(type)) {
     return no(`${def.name} requires research.`);

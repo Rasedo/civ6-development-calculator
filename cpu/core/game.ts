@@ -541,8 +541,13 @@ export function buildingPurchaseCost(buildingId: string): number {
 /** Faith price of a worship building. CIV6 (GS Civilopedia, Cathedral):
  * a FLAT 380 faith at standard speed (speed-scaled like every other cost);
  * anything else keeps the production×mult schedule. */
-export function buildingFaithCost(buildingId: string): number {
-  if (BUILDINGS[buildingId]?.worship) return Math.round(380 * GAME_SPEED);
+export function buildingFaithCost(state: GameState, seat: number, buildingId: string): number {
+  if (BUILDINGS[buildingId]?.worship) {
+    // CIV6 (Righteousness of the Faith): the row pays `costPct` of the price
+    let pct = 100;
+    for (const r of getModifiers(state, seat).worship) pct = Math.min(pct, r.costPct);
+    return Math.round((380 * GAME_SPEED * pct) / 100);
+  }
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
@@ -630,7 +635,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   const worship = BUILDINGS[buildingId]?.worship === true;
   if (!state.sandbox) {
     if (worship) {
-      const cost = buildingFaithCost(buildingId);
+      const cost = buildingFaithCost(state, seat, buildingId);
       if (!goldAffordable(buyer.faith, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
       buyer.faith -= cost;
     } else {
@@ -717,7 +722,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = buildingFaithCost(wid);
+  const cost = buildingFaithCost(state, seat, wid);
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
@@ -742,7 +747,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!buildingCompletable(state, city, buildingId)) {
     return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
   }
-  const cost = buildingFaithCost(buildingId);
+  const cost = buildingFaithCost(state, city.seat, buildingId);
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
@@ -1972,6 +1977,10 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
 }
 
 export function canFoundReligion(state: GameState, seat: number): RuleResult {
+  // CIV6 (Religious Convert): "May not ... found Religions" (`SEAT_BAN_ROWS`)
+  if (getModifiers(state, seat).seatBans.has('foundReligion')) {
+    return { ok: false, reason: 'This leader may not found a religion.' };
+  }
   if (seatOf(state, seat)!.religion.founded) return { ok: false, reason: 'Religion already founded.' };
   if (!seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
   const hasHolySite = seatOf(state, seat)!.cities.some((c) =>

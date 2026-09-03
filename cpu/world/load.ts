@@ -3,9 +3,10 @@ import type { CityStateType, Elevation, FeatureId, GameMap, GameState, TerrainId
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { placeCityStateAt } from '../core/cityStates';
-import { emptySeat } from '../core/seats';
+import { civOf, emptySeat, leaderOf } from '../core/seats';
 import { spawnUnit } from '../core/units';
 import { CIV_LEADERS } from '../data/seats';
+import { START_TECH_ROWS, rowIsFor } from '../data/civilizations';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
@@ -81,6 +82,12 @@ export function loadWorld(world: WorldFile): GameState {
     seat.color = leader.color;
     seat.aggression = civ.aggression;
     seat.civ = civ.leader % CIV_LEADERS.length;
+    // CIV6 (Mana): "Begin the game with the Sailing and Shipbuilding
+    // technologies unlocked" (`START_TECH_ROWS`)
+    for (const r of START_TECH_ROWS) {
+      if (!rowIsFor(r, civOf(state, i), leaderOf(state, i))) continue;
+      if (!seat.research.techs.includes(r.tech)) seat.research.techs.push(r.tech);
+    }
     for (const u of civ.units) {
       if (!UNITS[u.type]) throw new Error(`world file names unit type '${u.type}' the engine does not know`);
       const spawned = spawnUnit(state, u.type, u.tile, i);

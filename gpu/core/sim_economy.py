@@ -2287,6 +2287,11 @@ class SimEconomy:
             elig = elig & self._dam_plot(di)
         elif placement == 6:
             elig = elig & self._canal_plot()
+        # CIV6 (Religious Convert): "May not build Holy Site districts"
+        if di == self._hs_idx:
+            _hban = self._row_banned(row, self.BAN_HOLY_SITE)
+            if bool(_hban.any()):
+                elig = elig & ~_hban.unsqueeze(1)
         if bool(self._d_one_civ[di]):
             # CIV6: "Limit of one per civilization" — one standing anywhere in
             # this seat's empire closes every plot in every city.
@@ -4112,6 +4117,24 @@ class SimEconomy:
             for _gc, _gl, _gy, _gp, _gf in _grows:
                 _hit = _est & (_own == bool(_gf)) & self._row_is(row, _gc, _gl).unsqueeze(1)
                 total[:, :, _gy] = torch.where(_hit, total[:, :, _gy] * (1.0 + _gp / 100.0), total[:, :, _gy])
+        # CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
+        # "+3% ... for each Promotion they have earned, including their first"
+        _trows = [r for r in self._governor_title_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        if _trows:
+            _tit = self._governor_titles(row)[:, sl] if j is None else                 self._governor_titles(row)[:, sl][:, j:j + 1]
+            for _tc, _tl, _ty, _tp in _trows:
+                _tw = self._row_is(row, _tc, _tl).unsqueeze(1) & (_tit > 0)
+                _f = 1.0 + (_tit.double() * _tp) / 100.0
+                total[:, :, _ty] = torch.where(_tw, total[:, :, _ty] * _f, total[:, :, _ty])
+        # CIV6 (Righteousness of the Faith): the worship building this row
+        # holds adds to the city's Science, Faith and Culture
+        _wrows = [r for r in self._worship_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        if _wrows:
+            _hasw = (bldg & self._b_worship.reshape(1, 1, -1)).any(dim=2)
+            for _wc, _wl, _wcp, _wyp in _wrows:
+                _ww = _hasw & self._row_is(row, _wc, _wl).unsqueeze(1)
+                for _wy in (3, 4, 5):  # science, culture, faith
+                    total[:, :, _wy] = torch.where(_ww, total[:, :, _wy] * (1.0 + _wyp / 100.0), total[:, :, _wy])
         if gym is not None:
             if self._gov_has_effects:
                 _cz = self._gov_mods(row)[12]["culsuz"]

@@ -996,6 +996,46 @@ class SimSeats:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self.row_leader[:, row] == leader
 
+    # the wire's ban index space, `SEAT_BANS` in cpu/data/civilizations.ts
+    BAN_HARVEST, BAN_GREAT_WRITER, BAN_HOLY_SITE, BAN_GREAT_PROPHET, BAN_FOUND_RELIGION = range(5)
+
+    def _apply_start_techs(self) -> None:
+        """CIV6 (Mana): "Begin the game with the Sailing and Shipbuilding
+        technologies unlocked" — the roster's own start, laid down once the
+        seeder's draw is known (`START_TECH_ROWS`, cpu/world/load.ts)."""
+        for _sc, _sl, _st in self._start_tech_rows:
+            if _st < 0:
+                continue
+            for _row in range(self.n_majors):
+                _w = self._row_is(_row, _sc, _sl)
+                self.civ_techs[:, _row, _st] = self.civ_techs[:, _row, _st] | _w
+
+    def _worship_cost_of(self, row: int) -> torch.Tensor:
+        """[B] — the Faith price of a worship building for this seat row.
+        CIV6 (Righteousness of the Faith): the row pays `costPct` of it
+        (`buildingFaithCost`)."""
+        out = torch.full((self.B,), float(self._worship_cost), dtype=torch.float64, device=self.device)
+        for _wc, _wl, _wcp, _wyp in self._worship_rows:
+            _w = self._row_is(row, _wc, _wl)
+            out = torch.where(_w, torch.full_like(out, float(round(self._worship_cost * _wcp / 100.0))), out)
+        return out
+
+    def _row_banned(self, row: int, ban: int) -> torch.Tensor:
+        """[B] bool — this seat row may not do `ban` (`SEAT_BAN_ROWS`)."""
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for civ, lead, which in self._seat_ban_rows:
+            if which == ban:
+                out = out | self._row_is(row, civ, lead)
+        return out
+
+    def _seat_banned(self, seat: torch.Tensor, ban: int) -> torch.Tensor:
+        """bool, `seat`'s shape — `_row_banned` per absolute seat."""
+        out = torch.zeros_like(seat, dtype=torch.bool)
+        for civ, lead, which in self._seat_ban_rows:
+            if which == ban:
+                out = out | self._seat_is(seat, civ, lead)
+        return out
+
     def _who_tile_plane(self, civ: int, leader: int) -> torch.Tensor:
         """[B, T] bool — tiles owned by a major that `_row_is` answers for."""
         NM = self.n_majors
@@ -1284,7 +1324,7 @@ class SimSeats:
         founded = active & self.civ_religion_done[:, row]
         elig_w = self._worship_city_ok(row)
         if bool(elig_w.any()):
-            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
+            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost_of(row)) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
             w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
         elig_s = self._seat_religious_city_ok(row)
         elig_t = self._seat_religious_city_ok(row, temple=True)
@@ -1680,14 +1720,14 @@ class SimSeats:
             if wb >= 0:
                 jw = wj.clamp(min=0, max=self.RC - 1)
                 buy_w = active & ext & (wj >= 0) & self.civ_religion_done[:, row] \
-                    & self._afford(self.civ_faith[:, row], self._worship_cost) \
+                    & self._afford(self.civ_faith[:, row], self._worship_cost_of(row)) \
                     & self._worship_city_ok(row)[bidx, jw]
                 if bool(buy_w.any()):
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
                     self.city_bldg[rows_w, row, jw[rows_w], wb] = True
                     self._bldg_version += 1
                     self._eff_version += 1
-                    self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._worship_cost, self.civ_faith[:, row])
+                    self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._worship_cost_of(row).to(self.civ_faith.dtype), self.civ_faith[:, row])
         rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
         if rel_kind is not None and rel_j is not None:
             rel_city = self._seat_religious_city_ok(row)

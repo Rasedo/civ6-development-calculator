@@ -792,6 +792,18 @@ class SimPhase:
             if bool(_rep.any()):
                 _rr = dr[_rep]
                 self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
+            # CIV6 (Religious Convert): "Receives an Apostle each time he
+            # finishes a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
+            for _dc, _dl, _dd, _du in self._district_unit_rows:
+                if _du < 0 or _dd < 0:
+                    continue
+                _dw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _dw[dr] = self.district[dr, dt] == _dd
+                _dw = _dw & self._row_is(row, _dc, _dl)
+                if bool(_dw.any()):
+                    _dat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                    _dat[dr] = dt
+                    self._spawn_unit(row, _dw, _dat, _du)
             # MONUMENTALITY pays era score per SPECIALTY district completed
             # (a city centre is never queued here).
             mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1404,7 +1416,15 @@ class SimPhase:
                     _pg = self._gov_mods(row)[12]["gpp"]
                     if cls < _pg.shape[1]:
                         gflat = gflat + _pg[:, cls].unsqueeze(1)
-                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + c2) * gm).sum(dim=1)
+                # CIV6 (Nobel Prize, EFFECT_ADJUST_GREAT_PERSON_POINTS): the
+                # roster's own per-BUILDING points, in the same per-city term
+                nb_r = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
+                for _gc, _gl, _gb, _gcls, _ga in self._gpp_building_rows:
+                    if _gcls != cls or _gb < 0:
+                        continue
+                    nb_r = nb_r + (self.city_bldg[:, row, :, _gb]
+                                   & self._row_is(row, _gc, _gl).unsqueeze(1)).double() * _ga
+                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + nb_r + c2) * gm).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:
@@ -1440,6 +1460,18 @@ class SimPhase:
                           & self.city_alive[:, row])
                 _tier = self._seat_amenity(row)[0]
                 pts = pts + (_stand & (_tier == _ht) & _hw.unsqueeze(1)).sum(dim=1).double() * _ha
+            # CIV6 (Mana): "Great Writers cannot be earned"; (Religious
+            # Convert): no Great Prophets — the class banks nothing and
+            # recruits nothing (`SEAT_BAN_ROWS`)
+            _ban = torch.zeros(B, dtype=torch.bool, device=dev)
+            if cls == self._writer_cls:
+                _ban = _ban | self._row_banned(row, self.BAN_GREAT_WRITER)
+            if cls == self._prophet_cls:
+                _ban = _ban | self._row_banned(row, self.BAN_GREAT_PROPHET)
+            if bool(_ban.any()):
+                pts = torch.where(_ban, torch.zeros_like(pts), pts)
+                self.civ_gpp[:, row, cls] = torch.where(
+                    _ban, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )
@@ -1452,7 +1484,7 @@ class SimPhase:
                 gcost = self.gp_price[:, cls]
                 # the PASSER is locked out of this individual — points wait
                 hit = active & has_person & (self.gp_passed_by[:, cls] != row) \
-                    & (self.civ_gpp[:, row, cls] >= gcost)
+                    & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban
                 if not bool(hit.any()):
                     break
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
@@ -1546,6 +1578,11 @@ class SimPhase:
         self.gp_offer[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_offer[:, cls])
         # the claim ends the pass: the NEXT person starts with nobody locked out
         self.gp_passed_by[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_passed_by[:, cls])
+        # CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great
+        # Person" — every class, patronage included (`GP_FAVOR_ROWS`)
+        for _fc, _fl, _fa in self._gp_favor_rows:
+            _fw = hit & self._row_is(row, _fc, _fl)
+            self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + _fw.to(self.civ_diplo_favor.dtype) * _fa
         self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."
@@ -1632,7 +1669,10 @@ class SimPhase:
         # instead of a Holy Site."
         if self._wond_n and bool(self._wond_religion_site.any()):
             has_hs = has_hs | self._seat_wonder_any(row, self._wond_religion_site)
-        rdue = active & ~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row] & (self.civ_prophets[:, row] > 0) & has_hs
+        # CIV6 (Religious Convert): "May not ... found Religions"
+        rdue = (active & ~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row]
+                & (self.civ_prophets[:, row] > 0) & has_hs
+                & ~self._row_banned(row, self.BAN_FOUND_RELIGION))
         ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
         rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
         ro_ = self._next_random(ropen)

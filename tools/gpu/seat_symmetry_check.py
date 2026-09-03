@@ -362,6 +362,12 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
                         for t2 in st.targets:
                             if isinstance(t2, ast.Name):
                                 names.add(t2.id)
+                            # a TUPLE unpack binds every name in it —
+                            # `A, B, C = range(3)` is one class constant each
+                            elif isinstance(t2, (ast.Tuple, ast.List)):
+                                for el in t2.elts:
+                                    if isinstance(el, ast.Name):
+                                        names.add(el.id)
                     elif isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name):
                         names.add(st.target.id)
     return names, shapes, aliases

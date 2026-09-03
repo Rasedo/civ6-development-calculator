@@ -693,3 +693,122 @@ export interface TerrainAdjYieldRow {
 export const TERRAIN_ADJ_YIELD_ROWS: readonly TerrainAdjYieldRow[] = [
   { civ: 'INCA', mountain: true, improvement: 'TERRACE_FARM', yield: 'food', amount: 1 },
 ];
+
+// ---------------------------------------------------------------------------
+// THE TITLE, THE PRIZE, THE START AND THE BAN
+
+/** CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
+ *  "Governors established in a city provide +3% Culture and Science for each
+ *  Promotion they have earned, including their first." */
+export interface GovernorTitleYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  pct: number;
+}
+export const GOVERNOR_TITLE_YIELD_ROWS: readonly GovernorTitleYieldRow[] = [
+  { leader: 'SEONDEOK', yield: 'culture', pct: 3 },
+  { leader: 'SEONDEOK', yield: 'science', pct: 3 },
+];
+
+/** CIV6 (Nobel Prize, EFFECT_ADJUST_GREAT_PERSON_POINTS): "+1 Great Engineer
+ *  point from Factories and +1 Great Scientist point from Universities." */
+export interface GppBuildingRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  building: string;
+  cls: string;
+  amount: number;
+}
+export const GPP_BUILDING_ROWS: readonly GppBuildingRow[] = [
+  { civ: 'SWEDEN', building: 'FACTORY', cls: 'ENGINEER', amount: 1 },
+  { civ: 'SWEDEN', building: 'UNIVERSITY', cls: 'SCIENTIST', amount: 1 },
+];
+
+/** CIV6 (Nobel Prize): "gains 50 Diplomatic Favor when earning a Great Person
+ *  (on Standard Speed)." */
+export interface GreatPersonFavorRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const GP_FAVOR_ROWS: readonly GreatPersonFavorRow[] = [
+  { civ: 'SWEDEN', amount: 50 },
+];
+
+/** CIV6 (Mana, EFFECT_GRANT_PLAYER_SPECIFIC_TECHNOLOGY): "Begin the game with
+ *  the Sailing and Shipbuilding technologies unlocked." */
+export interface StartTechRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tech: string;
+}
+export const START_TECH_ROWS: readonly StartTechRow[] = [
+  { civ: 'MAORI', tech: 'SAILING' },
+  { civ: 'MAORI', tech: 'SHIPBUILDING' },
+];
+
+/** What a roster row FORBIDS its own seat. CIV6 (Mana): "Resources cannot be
+ *  harvested. Great Writers cannot be earned"; (Religious Convert): "May not
+ *  build Holy Site districts, gain Great Prophets, or found Religions." */
+export type SeatBan = 'harvest' | 'greatWriter' | 'holySite' | 'greatProphet' | 'foundReligion';
+/** the WIRE's index space for a ban — both engines address one by position. */
+export const SEAT_BANS: readonly SeatBan[] = ['harvest', 'greatWriter', 'holySite', 'greatProphet', 'foundReligion'];
+export interface SeatBanRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  ban: SeatBan;
+}
+export const SEAT_BAN_ROWS: readonly SeatBanRow[] = [
+  { civ: 'MAORI', ban: 'harvest' },
+  { civ: 'MAORI', ban: 'greatWriter' },
+  { leader: 'MVEMBA', ban: 'holySite' },
+  { leader: 'MVEMBA', ban: 'greatProphet' },
+  { leader: 'MVEMBA', ban: 'foundReligion' },
+];
+
+/** CIV6 (Righteousness of the Faith, EFFECT_ADD_RELIGIOUS_BUILDING_MULTIPLIER):
+ *  the worship building of this row's religion costs a TENTH of the usual
+ *  Faith, and adds `yieldPct` to the Science, Faith and Culture of the row's
+ *  own cities that hold it. (The install lets ANY player buy it at that price;
+ *  a seat here founds only its own religion, so the discount reaches the row
+ *  itself — the cross-seat half is open in docs/roster_ledger.json.) */
+export interface WorshipRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the percentage of the usual faith cost this row pays */
+  costPct: number;
+  /** what the building adds to Science, Faith and Culture in this row's cities */
+  yieldPct: number;
+}
+export const WORSHIP_ROWS: readonly WorshipRow[] = [
+  { leader: 'SALADIN', costPct: 10, yieldPct: 10 },
+];
+
+/** CIV6 (Religious Convert, EFFECT_ADJUST_PLAYER_DISTRICT_CREATE_UNIT):
+ *  "Receives an Apostle each time he finishes a M'banza or Theater Square
+ *  district." The M'banza is Kongo's unique district and not in the roster,
+ *  so the Theater Square arm ships alone. */
+export interface DistrictUnitRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  district: DistrictId;
+  unit: string;
+}
+/** CIV6 (MODIFIER_PLAYER_UNITS_ADJUST_VALID_TERRAIN, TERRAIN_OCEAN): a row
+ *  whose units may cross OCEAN without Cartography — the Knarr from
+ *  Shipbuilding, Mana from the first turn (`tech: null`). */
+export interface OceanAccessRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the tech the clause waits on, or null for none */
+  tech: string | null;
+}
+export const OCEAN_ACCESS_ROWS: readonly OceanAccessRow[] = [
+  { civ: 'NORWAY', tech: 'SHIPBUILDING' },
+  { civ: 'MAORI', tech: null },
+];
+
+export const DISTRICT_UNIT_ROWS: readonly DistrictUnitRow[] = [
+  { leader: 'MVEMBA', district: 'THEATER_SQUARE', unit: 'APOSTLE' },
+];

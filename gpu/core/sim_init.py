@@ -1317,6 +1317,7 @@ class SimInit:
         self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
         self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
+        self._writer_cls = int(rr["writerCls"])  # WRITER's class index
         self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
         self._promo_max_level = int(rr.get("promoMaxLevel", 8))
         self._kill_spread_range = int(rr.get("killSpreadRange", 10))
@@ -2818,6 +2819,30 @@ class SimInit:
         # [civ, leaderRow, tier, naval, civic, cs]
         self._formation_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["formations"]]  # type: ignore[misc]
+        # THE TITLE, THE PRIZE, THE START AND THE BAN
+        # [civ, leaderRow, yield, pct] per governor PROMOTION in the city
+        self._governor_title_yield_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["governorTitleYields"]]
+        # [civ, leaderRow, building, greatPersonClass, amount]
+        self._gpp_building_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["gppBuildings"]]  # type: ignore[misc]
+        self._gp_favor_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["gpFavor"]]  # type: ignore[misc]
+        self._start_tech_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["startTechs"]]  # type: ignore[misc]
+        # [civ, leaderRow, ban] — the ban's index is `SEAT_BANS` order
+        self._seat_ban_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["seatBans"]]  # type: ignore[misc]
+        # [civ, leaderRow, costPct, yieldPct] on the worship building
+        self._worship_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["worship"]]  # type: ignore[misc]
+        # [civ, leaderRow, tech] — the tech an OCEAN crossing waits on, -1 none
+        self._ocean_access_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["oceanAccess"]]  # type: ignore[misc]
+        # [civ, leaderRow, district, unit] on that district's COMPLETION
+        self._district_unit_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["districtUnits"]]  # type: ignore[misc]
+        self._apply_start_techs()
         self._intl_route_rows: list[tuple[int, int, int, float]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [

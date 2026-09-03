@@ -17,7 +17,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects } from './governors';
+import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -1033,6 +1033,18 @@ export function computeCityStats(
     if (m.governorYields.length && cityGovernorEffects(state, city).length > 0) {
       const founded = (city.founderSeat ?? city.seat) === city.seat;
       for (const r of m.governorYields) if (r.yield === k && r.founded === founded) total[k] *= 1 + r.pct / 100;
+    }
+    // CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
+    // "+3% ... for each Promotion they have earned, including their first"
+    if (m.governorTitleYields.length) {
+      const titles = cityGovernorTitles(state, city);
+      if (titles > 0) for (const r of m.governorTitleYields) if (r.yield === k) total[k] *= 1 + (r.pct * titles) / 100;
+    }
+    // CIV6 (Righteousness of the Faith): the worship building this row holds
+    // adds to the city's Science, Faith and Culture
+    if (m.worship.length && (k === 'science' || k === 'faith' || k === 'culture')
+      && city.buildings.some((b) => BUILDINGS[b]?.worship === true)) {
+      for (const r of m.worship) total[k] *= 1 + r.yieldPct / 100;
     }
   }
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {

@@ -129,10 +129,15 @@ export function waterEnterable(
   tile: Tile,
   unit: { seat: number },
 ): boolean {
-  // CIV6 (Knarr): "Units gain the ability to enter Ocean tiles" at Shipbuilding.
+  // CIV6 (Knarr): "Units gain the ability to enter Ocean tiles" at
+  // Shipbuilding; (Mana) the Maori cross it from the first turn
+  // (`OCEAN_ACCESS_ROWS`).
   if (tile.terrain === 'OCEAN') {
-    return ownerHasTech(state, unit, 'CARTOGRAPHY')
-      || (civOf(state, unit.seat) === 'NORWAY' && ownerHasTech(state, unit, 'SHIPBUILDING'));
+    if (ownerHasTech(state, unit, 'CARTOGRAPHY')) return true;
+    for (const r of getModifiers(state, unit.seat).oceanAccess) {
+      if (r.tech === null || ownerHasTech(state, unit, r.tech)) return true;
+    }
+    return false;
   }
   return true;
 }
@@ -1921,6 +1926,8 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
   if (!tile.resource) return no('No resource here.');
+  // CIV6 (Mana): "Resources cannot be harvested" (`SEAT_BAN_ROWS`)
+  if (getModifiers(state, unit!.seat).seatBans.has('harvest')) return no('This civilization cannot harvest resources.');
   const grant = harvestGrant(state, tile, 0);
   if (!grant) {
     return no(
