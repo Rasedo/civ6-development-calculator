@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type DistrictId, type GameState, typ
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
-import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
+import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -794,7 +794,7 @@ export function computeCityStats(
 ): CityStats {
   const base = mods ?? getModifiers(state, city.seat);
   const m = withGovernor(state,
-    withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, city.seat)), city);
+    withFollowerBelief(state, base, followerReligionsForCity(base, city)), city);
   const ctx = makeYieldCtx(state, city.seat, m);
   const map = state.map;
   const center = map.tiles[city.centerIndex];

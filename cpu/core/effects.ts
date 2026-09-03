@@ -1256,10 +1256,12 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
 export function withFollowerBelief(
   state: GameState,
   base: Modifiers,
-  followed: number | null | undefined,
+  followed: readonly number[],
 ): Modifiers {
-  const belief = followed == null ? undefined : followerBeliefForReligion(state, followed);
-  if (!belief) return base;
+  const beliefs = followed
+    .map((g) => followerBeliefForReligion(state, g))
+    .filter((b): b is BeliefDef => b != null);
+  if (!beliefs.length) return base;
   const m: Modifiers = {
     ...base,
     // GEO-H: DEEP-clone buildingYieldAdd's nested per-building records.
@@ -1280,7 +1282,7 @@ export function withFollowerBelief(
     buildingHousingAdd: { ...base.buildingHousingAdd }, // scalar values, reassigned not mutated
     amenitiesIfSpecialty: [...base.amenitiesIfSpecialty], // array cloned; elements are pushed, not mutated
   };
-  applyBeliefEffects(m, belief);
+  for (const belief of beliefs) applyBeliefEffects(m, belief);
   return m;
 }
 
@@ -1290,6 +1292,25 @@ export function followerReligionForCity(
 ): number {
   if (B18_FOLLOWER_COUPLING_LIVE) return followedReligion ?? -1;
   return ownerReligionId;
+}
+
+/**
+ * The religions whose FOLLOWER belief a city pays.
+ *
+ * Normally exactly one — the religion the city follows. CIV6 (Dharma):
+ * "Receives Follower Belief bonuses in a city from each Religion that has at
+ * least 1 Follower", so India's cities pay EVERY religion present instead
+ * (`ALL_FOLLOWER_BELIEFS_ROWS`). Neither engine counts followers — a city
+ * holds pressure per religion and follows the argmax — so a religion with
+ * pressure here is one with a follower, the same proxy `religionsPresent`
+ * already uses for the amenity half of the same ability.
+ *
+ * The GPU twin is `_fol_tab_for`.
+ */
+export function followerReligionsForCity(base: Modifiers, city: City): readonly number[] {
+  if (base.allFollowerBeliefs) return religionsPresent(city);
+  const one = followerReligionForCity(city.followedReligion, city.seat);
+  return one < 0 ? [] : [one];
 }
 
 /**

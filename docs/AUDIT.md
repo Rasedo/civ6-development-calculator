@@ -1263,16 +1263,25 @@ under their blocker so the dependency is readable, and both halves count.
   it, and a disciple's kill spreads it. The carrier is a per-route pressure
   term in that per-turn body on both engines, with the roster's percentage on
   top; India's modifier is marked open against this item.
-- **C-57. ONE FOLLOWER BELIEF PER CITY.** Weight 1. CIV6 (Dharma):
+- **C-57. ONE FOLLOWER BELIEF PER CITY. CLOSED 2026-09-03.** CIV6 (Dharma):
   "Receives Follower Belief bonuses in a city from each Religion that has at
-  least 1 Follower." A city on both engines pays exactly one follower belief —
-  the one its FOLLOWED religion carries (`withFollowerBelief` keyed by
-  `followerReligionForCity`; `_follower_id_for` / `_fol_tab`). The amenity half
-  of Dharma ships, since that one counts religions rather than stacking their
-  beliefs, and `religionsPresent` / `_religions_present` is the shared count it
-  reads. Note both engines model PRESSURE and not followers, so "a religion with
-  at least 1 Follower" is read as "a religion with pressure here" — the same
-  proxy on both sides, and the honest one given the model.
+  least 1 Follower." A city used to pay exactly one follower belief on both
+  engines — its FOLLOWED religion's — and India now pays every religion
+  PRESENT in the city instead. The whole carrier had already shipped and
+  nobody read it: `ALL_FOLLOWER_BELIEFS_ROWS`, the `allFollowerBeliefs`
+  modifier, the wire field and the GPU's `_all_follower_belief_rows` were all
+  live with zero consumers, which is the "rows behind an early return" class
+  — the missing half was the QUANTIFIER, not a magnitude. It is one composer
+  per engine now: `followerReligionsForCity` feeds `withFollowerBelief` a
+  LIST, and `_fol_tab_for` sums the belief table over each present religion
+  (slot 0 of every table is the zero row, so an absent religion needs no mask
+  of its own). Both engines still model PRESSURE rather than followers, so "a
+  religion with at least 1 Follower" stays "a religion with pressure here" —
+  the same proxy `religionsPresent` / `_religions_present` already used for
+  the amenity half of the same ability. `all_follower_beliefs` is the bar on
+  both engines (6 lanes each, including the per-game batch guard that the
+  collapsed-roster-mask class demands), and a 250-turn single-seed serve is
+  green.
 - **C-58. A DEFEATED UNIT IS NEVER CAPTURED.** Weight 1. CIV6 (Mongol
   Horde): "All cavalry class units gain +3 Combat Strength and a chance to
   capture defeated enemy cavalry class units." The strength ships. The capture

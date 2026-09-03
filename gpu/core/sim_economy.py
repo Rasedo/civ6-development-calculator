@@ -3732,7 +3732,6 @@ class SimEconomy:
         # live coupling need not be one this seat founded (withFollowerBelief
         # has no owner test), so it gates on _follower_live, not the own claim.
         fol_live = self._follower_live(row)
-        fol_id = self._follower_id_for(self._city_rel(row)[:, sl]) if fol_live else None
         featP = None
         if tile_add:
             featP = self._seat_tile_add(row)
@@ -3927,7 +3926,7 @@ class SimEconomy:
             elif di == self._campus_idx:
                 st_adj = add
         if fol_live and hs_adj is not None:
-            dist_y[:, :, 1] = dist_y[:, :, 1] + hs_adj * self._fol_tab("we", fol_id)
+            dist_y[:, :, 1] = dist_y[:, :, 1] + hs_adj * self._fol_tab_for("we", row, sl)
         # CIV6 (GS Civilopedia, Free Inquiry, Golden face): "Commercial Hub and
         # Harbor district's Gold adjacency bonus provides Science as well."
         if fi_adj is not None:
@@ -3973,7 +3972,7 @@ class SimEconomy:
                 if has_bel:
                     bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, self._bel_add_pf("bldgY", row))
                 if fol_live:
-                    bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab("bldgY", fol_id))
+                    bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
             if self.S > 0:
                 env, acs, nB = self._seat_envoys(row), self.citystate_alive.double(), selb.shape[2]
                 csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
@@ -4058,7 +4057,7 @@ class SimEconomy:
             if _impy is not None:
                 bld_y = bld_y + _impy[:, sl]
             if fol_live:
-                bld_y[:, :, 5] = bld_y[:, :, 5] + self._fol_tab("fpw", fol_id) * compw.sum(dim=2).double()
+                bld_y[:, :, 5] = bld_y[:, :, 5] + self._fol_tab_for("fpw", row, sl) * compw.sum(dim=2).double()
         # Slotted GREAT WORKS (culture/turn per work BY KIND), ARTIFACT culture,
         # the Golden PEN, BRUSH AND VOICE culture per COMPLETED SPECIALTY
         # district, and RELIC faith — TS's own four consecutive lines at the

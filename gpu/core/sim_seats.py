@@ -5601,6 +5601,42 @@ class SimSeats:
     def _fol_tab(self, key: str, fol_id: torch.Tensor) -> torch.Tensor:
         return self._bel["fol"][key][fol_id + 1]
 
+    def _fol_tab_for(self, key: str, row: int, sl=slice(None)) -> torch.Tensor:
+        """The follower-belief table this row's cities pay, over `sl`.
+
+        Normally one religion — the one each city follows. CIV6 (Dharma):
+        "Receives Follower Belief bonuses in a city from each Religion that has
+        at least 1 Follower", so India's cities pay EVERY religion present
+        instead (`ALL_FOLLOWER_BELIEFS_ROWS`). Neither engine counts followers
+        — a city holds pressure per religion and follows the argmax — so a
+        religion with pressure here is one with a follower, the same proxy
+        `_religions_present` already uses for the amenity half of the ability.
+
+        Slot 0 of every table is the no-belief zero row, so a religion absent
+        from a city contributes nothing and the sum needs no mask of its own.
+        `followerReligionsForCity` + `withFollowerBelief` are the twin.
+        """
+        one = self._fol_tab(key, self._follower_id_for(self._city_rel(row)[:, sl]))
+        rows = self._all_follower_belief_rows
+        if not rows:
+            return one
+        on = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for _c, _l in rows:
+            on = on | self._row_is(row, _c, _l)
+        if not bool(on.any()):
+            return one
+        fbr = self._follower_by_rel()                          # [B, n_majors]
+        pres = self.city_pressure[:, row, sl]                  # [B, n, n_majors]
+        live = (pres >= 1) & self.city_alive[:, row, sl].unsqueeze(2)
+        n = live.shape[1]
+        tot = torch.zeros_like(one)
+        none = torch.full((self.B, n), -1, dtype=torch.long, device=self.device)
+        for g in range(min(self.n_majors, live.shape[2])):
+            fid = torch.where(live[:, :, g], fbr[:, g].unsqueeze(1).expand(self.B, n), none)
+            tot = tot + self._fol_tab(key, fid)
+        # [B] -> broadcast over whatever trailing axes this table carries
+        return torch.where(on.reshape((-1,) + (1,) * (one.dim() - 1)), tot, one)
+
     def _city_rel(self, row: int) -> torch.Tensor:
         if self._b18_couple:
             return self.city_followed[:, row]
@@ -6981,7 +7017,7 @@ class SimSeats:
                 hv = torch.where(ap >= self._appeal_bands[_b], torch.full_like(ap, _tab[_b]), hv)
             housing = housing + ((hv * ok_d).double().unsqueeze(2) * hit.double()).sum(dim=1)
         if self._follower_live(row):
-            housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", self._follower_id_for(self._city_rel(row))))
+            housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab_for("bldgH", row))
         if self._seat_has_beliefs(row):
             housing = housing + self._bel_add("river", row)[:, 1].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
         if self.improvements_on:
@@ -7136,7 +7172,7 @@ class SimSeats:
         if self._follower_live(row) and self.districts_on:
             # Zen Meditation — a FOLLOWER belief, so it keys per-city on the
             # religion the city FOLLOWS, which need not be this seat's.
-            zen = self._fol_tab("zen", self._follower_id_for(self._city_rel(row)))  # [B, cols, 2] = min, amenities
+            zen = self._fol_tab_for("zen", row)  # [B, cols, 2] = min, amenities
             zmin, zamt = zen[:, :, 0], zen[:, :, 1]
             if bool((zamt != 0).any()):
                 _spec = self._district_counts(row)[1].double()
