@@ -1291,6 +1291,35 @@ under their blocker so the dependency is readable, and both halves count.
   carrier is a per-event kind on the disaster roll plus a damage multiplier
   keyed on the tile's owner; the eight modifiers are marked open in
   docs/roster_ledger.json against this item.
+
+  SOURCED 2026-09-03, except one magnitude. The install decides the storm's
+  FAMILY by the terrain it starts on (`RandomEvent_Terrains`): HURRICANE on
+  TERRAIN_OCEAN, BLIZZARD on snow and tundra (flat and hills), DUST_STORM on
+  desert, TORNADO on grassland and plains. Each family has two severities —
+  CAT_4/CAT_5, SIGNIFICANT/CRIPPLING, GRADIENT/HABOOB, FAMILY/OUTBREAK — and
+  `RandomEvent_Damages` gives every column per severity as a percentage:
+
+  | family | impPill | impDest | distPill | bldgPill | pop | civKill | unitLand | unitNaval |
+  |---|---|---|---|---|---|---|---|---|
+  | HURRICANE  | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 60/100 |
+  | BLIZZARD   | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 0/60 |
+  | DUST_STORM | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/60 |
+  | TORNADO    | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/100 |
+
+  A column absent from a row is zero, not inherited. Note the engine's storm
+  picks from LAND only, so a hurricane cannot start where the install puts it
+  until the roll can reach open water.
+
+  BLOCKED ON THE UNIT HP BAND. `UNIT_DAMAGE_LAND` is a SHARE OF UNITS, not a
+  magnitude — the proof is the flood: the install writes 100 at BOTH
+  FLOOD_MAJOR and FLOOD_1000_YEAR, while this engine's own wiki-sourced band
+  differs between them (30-50 HP and 50-70 HP). So the percentage says how
+  many units are hit and something outside the XML says how hard. The flood's
+  band came from the wiki; the storms' has no equivalent here, and mapping the
+  flood's ladder onto storm severities 1 and 2 would be an invention. That
+  band belongs to the sourcing pass (#211) — the eight roster clauses PREVENT
+  and DOUBLE unit damage, so there is nothing for them to modify until it is
+  known.
 - **C-47. TRIBAL VILLAGES.** Weight 1. TS holds a six-outcome stub
   (`claimGoodyHut`, a `tile.goodyHut` flag the mapgen can set), the GPU
   holds nothing, and the exporter refuses a world carrying a hut — so no
