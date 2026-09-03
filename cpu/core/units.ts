@@ -27,7 +27,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
-import { effectiveAdjacency } from './yields';
+import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
@@ -1639,7 +1639,8 @@ export function holySiteFaith(state: GameState, tile: Tile, ctx: YieldCtx): numb
   if (tile.district !== 'HOLY_SITE' || !tile.districtComplete || tile.districtPillaged) return 0;
   const city = cityAtTile(state, tile);
   if (!city) return 0;
-  let faith = effectiveAdjacency(ctx, tile, 'HOLY_SITE');
+  // the adjacency `cityDistrictYields` pays — the unique building's rule included
+  let faith = effectiveAdjacency(ctx, tile, 'HOLY_SITE', buildingVariantAdjacency(ctx.mods.civ, city, 'HOLY_SITE'));
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (def?.district === 'HOLY_SITE') faith += def.yields?.faith ?? 0;

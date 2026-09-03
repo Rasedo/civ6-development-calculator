@@ -8,6 +8,8 @@ import { isWater } from '../../../world/query';
 import { endTurn } from '../../../cpu/core/game';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { UNITS } from '../../../cpu/data/units';
+import { BUILDINGS } from '../../../cpu/data/buildings';
+import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { THEO_PRESSURE_RANGE } from '../../../cpu/data/religion';
 import type { City, GameState, Seat, Unit } from '../../../cpu/core/types';
 
@@ -202,6 +204,19 @@ describe('religious healing', () => {
     expect(religiousHeal(state, miss, ctx)).toBe(RELIGIOUS_HEAL_PER_FAITH * withShrine); // "next to"
     miss.tileIndex = tileAtCoords(state.map, 2, 2).index;
     expect(religiousHeal(state, miss, ctx)).toBe(0);
+
+    // CIV6 (Stave Church): the unique building's Woods adjacency is the site's
+    // faith the heal reads, exactly as the city's yield walk counts it
+    miss.tileIndex = site.index;
+    state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'NORWAY');
+    const woods = neighbors(state.map, site).filter((t) => !isWater(t) && t.index !== centre.index && !t.district);
+    for (const t of woods) t.feature = 'WOODS';
+    const ctxN = makeYieldCtx(state, 0);
+    const withWoods = holySiteFaith(state, site, ctxN); // the standard Woods adjacency
+    city.buildings.push('TEMPLE'); // Norway's Temple is the Stave Church
+    const stave = withWoods + woods.length + BUILDINGS.TEMPLE.yields!.faith!;
+    expect(holySiteFaith(state, site, ctxN)).toBe(stave);
+    expect(religiousHeal(state, miss, ctxN)).toBe(RELIGIOUS_HEAL_PER_FAITH * stave);
 
     // a pillaged site heals nobody
     miss.tileIndex = site.index;
