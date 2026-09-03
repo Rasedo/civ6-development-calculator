@@ -381,7 +381,11 @@ def test_naval_heal(rules, path) -> None:
                 & (sim.military_at[B0] < 0)).nonzero(as_tuple=True)[0][0])
     s_w = place(sim, land, warrior, norway, hp=50)
     assert heal(s_w) == 10, "the land table moved"
-    print("  8 naval heal OK — 20 / 0 / 0, the promotion's +10 / +5, the Knarr's +10")
+    # CIV6 (Abu Al-Qasim Al-Zahrawi): DOMAIN_LAND alone — the hull reads none of it
+    hull_before = heal(s_n)
+    sim.civ_gp_perm[B0, norway, sim._gp_perm_names.index("healBonus")] = 5
+    assert heal(s_w) == 15 and heal(s_n) == hull_before, "Al-Zahrawi healed a hull"
+    print("  8 naval heal OK — 20 / 0 / 0, the promotion's +10 / +5, the Knarr's +10, Al-Zahrawi on land alone")
 
 
 def test_epic_quest_levy(rules, path) -> None:

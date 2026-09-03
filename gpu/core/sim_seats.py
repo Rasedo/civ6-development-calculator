@@ -8174,7 +8174,8 @@ class SimSeats:
                  + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
                                      self.unit_naval[at0] | a_emb[:, u]).to(def_cs.dtype)
                  + (self._congress_unit_cs(at0, a_seat[:, u])
-                    + self._gov_unit_cs(at0, a_seat[:, u])).to(def_cs.dtype))
+                    + self._gov_unit_cs(at0, a_seat[:, u])).to(def_cs.dtype)
+                 + self._roster_cs(a_seat[:, u], at0, a_tile[:, u], hrow, None, True).to(def_cs.dtype))
         roll = self._damage_roll(att, atk_e - def_cs, k=key, tile=tc)
         self._encamp_take_roll(att, tc, at0, a_seat[:, u], roll, True)
         self._ww_battle(att, self._row_of(a_seat[:, u]),
@@ -9004,6 +9005,7 @@ class SimSeats:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                              + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, hrow, None, True).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
@@ -9059,6 +9061,7 @@ class SimSeats:
                 atk_cs = atk_cs + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_cs.dtype)
             atk_cs = atk_cs + (self._congress_unit_cs(ut0, a_seat)
                                + self._gov_unit_cs(ut0, a_seat)).to(atk_cs.dtype)
+            atk_cs = atk_cs + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True).to(atk_cs.dtype)
             d_csv = self._damage_roll(cs_att, atk_cs - def_cs, k="vrngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(100 + csx), tgt, city=True)
@@ -9272,7 +9275,9 @@ class SimSeats:
             _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_city = self._damage_roll(city_att,
-                                       atk_base - atk_rs0 + _rs + _cpromo + rel_city - def_cs,
+                                       atk_base - atk_rs0 + _rs + _cpromo + rel_city
+                                       + self._roster_cs(aseat, at0, a_tile[:, u], hrow, None, True).to(atk_base.dtype)
+                                       - def_cs,
                                        k="rngrc", tile=tgt)
             self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
@@ -9305,7 +9310,9 @@ class SimSeats:
             _cs_rs = self._city_ranged_strength(at0, aseat, cs_outer)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_cs = self._damage_roll(cs_att,
-                                     atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city - def_cs,
+                                     atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city
+                                     + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True).to(atk_base.dtype)
+                                     - def_cs,
                                      k="rngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]

@@ -1091,7 +1091,8 @@ function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: num
     - woundPenalty(attacker)
     + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] })
     + relCity + generalAuraCS(state, attacker, attacker.tileIndex)
-    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, key, tileIndex);
+    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
+    + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS, key, tileIndex);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, roll, true));
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { city: true });
   spendAttack(attacker, true);
@@ -1601,7 +1602,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
     const defCS = cityDefenseStrength(state, civCity.city);
     const outer = outerPool(state, civCity.city);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rngrc', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, civCity.holder.seat, null, true)) - defCS, 'rngrc', targetIndex);
     const split = cityDamageSplit(outer, wallsMax(state, civCity.city), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
@@ -1629,7 +1630,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csOuter = outerPool(state, csShape);
     const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
       + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
-    const csRoll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rngcs', targetIndex);
+    const csRoll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, cityState.seat, null, true)) - defCS, 'rngcs', targetIndex);
     const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll, cityHitClass(attacker.type, true));
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
     cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre);
@@ -1702,7 +1703,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
     const outer = outerPool(state, enemyCity);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrngc', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, held!.holder.seat, null, true)) - defCS, 'vrngc', targetIndex);
     const split = cityDamageSplit(outer, wallsMax(state, enemyCity), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
@@ -1728,7 +1729,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const csOuter = outerPool(state, csShape);
     const defCS = 15 + csHere.population + (csHere.type === 'militaristic' ? 6 : 0)
       + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrngcs', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS, 'vrngcs', targetIndex);
     const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);

@@ -1730,18 +1730,23 @@ export function refreshUnits(state: GameState): void {
     if (rested && !starved && !healBlocked) {
       const home = ownGround;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
-      const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
-        ? religiousHeal(state, unit, yctx(unit.seat))
-        : UNITS[unit.type]?.naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
-        : (home && tile.district === 'CITY_CENTER' ? 20
-          : home ? 15
-          : onCamp ? 20
-          : tileSeat(tile) === NO_SEAT ? 10
-          : 5)
-          // a won Military Emergency heals its members in that seat's ground
+      const religious = (UNITS[unit.type]?.religiousStrength ?? 0) > 0;
+      const naval = !!UNITS[unit.type]?.naval;
+      const table = religious ? religiousHeal(state, unit, yctx(unit.seat))
+        : naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
+        : home && tile.district === 'CITY_CENTER' ? 20
+        : home ? 15
+        : onCamp ? 20
+        : tileSeat(tile) === NO_SEAT ? 10
+        : 5;
+      // CIV6 (MILITARY_EMERGENCY_MEMBER_HEALING_REWARD, MEDIC_INCREASE_HEAL_RATE,
+      // APOSTLE_CHAPLAIN): no domain clause — a hull heals by them too; (Abu
+      // Al-Qasim Al-Zahrawi): attached to DOMAIN_LAND units alone.
+      const heal = religious ? table
+        : table
           + emergencyHeal(state, unit.seat, tileSeat(tile))
           + chaplainHeal(state, unit)
-          + gpPermOf(seatOf(state, unit.seat), 'healBonus');
+          + (naval ? 0 : gpPermOf(seatOf(state, unit.seat), 'healBonus'));
       // CIV6 (Laying On Of Hands): "All Governor's units heal fully in one
       // turn in tiles of this city."
       unit.hp = governorTileFlag(state, tile, (e) => e.fullHeal) && home

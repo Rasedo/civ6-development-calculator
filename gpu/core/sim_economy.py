@@ -2869,6 +2869,9 @@ class SimEconomy:
         # territory. (Knarr): naval melee +10 in neutral territory.
         _ty = getattr(self, f"{pre}_unit_type").clamp(min=0)
         _hull = self.unit_naval[_ty]
+        # CIV6 (Abu Al-Qasim Al-Zahrawi): attached to DOMAIN_LAND units alone;
+        # the emergency and chaplain adders below carry no domain clause.
+        _gp_heal = torch.where(_hull, torch.zeros_like(t), self._gp_perm_at(seat, "healBonus").to(t.dtype))
         if bool(_hull.any()):
             _ha = self._promo_pool_flag(pre, "HEAL_ANYWHERE")
             _knarr = (self._seat_plays(seat, "NORWAY") & (self._type_ranged_strength[_ty] == 0)
@@ -2902,7 +2905,7 @@ class SimEconomy:
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
         heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre) \
-            + self._gp_perm_at(seat, "healBonus").to(heal.dtype)
+            + _gp_heal.to(heal.dtype)
         # a RELIGIOUS unit heals by its own rule and by nothing above it
         _rel = self._rel_strength[getattr(self, f"{pre}_unit_type").clamp(min=0)] > 0
         if bool(_rel.any()):

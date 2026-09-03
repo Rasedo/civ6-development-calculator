@@ -9,6 +9,7 @@ import { LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
 import { ITERU_RIVER_PROD_MULT } from '../../../cpu/data/civilizations';
 import { CIV_IDS } from '../../../cpu/data/seats';
 import { unitPromoRows } from '../../../cpu/core/promotions';
+import { GP_PERM } from '../../../cpu/data/greatPeople';
 import type { GameState, TradeRoute, Unit } from '../../../cpu/core/types';
 
 /**
@@ -181,6 +182,11 @@ describe('Knarr', () => {
     galley.promos = 0;
     galley.hp = 50;
     expect(sea.ownerSeat).toBe(NO_SEAT);
+    refreshUnits(state);
+    expect(galley.hp).toBe(60);
+    // CIV6 (Abu Al-Qasim Al-Zahrawi): DOMAIN_LAND alone — the hull reads none of it
+    state.seats[0].gpPerm = GP_PERM.map((k) => (k === 'healBonus' ? 5 : 0));
+    galley.hp = 50;
     refreshUnits(state);
     expect(galley.hp).toBe(60);
   });
