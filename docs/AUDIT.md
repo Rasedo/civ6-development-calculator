@@ -1203,14 +1203,26 @@ under their blocker so the dependency is readable, and both halves count.
   `_declare_war_major`, and a per-pair countdown the buff reads. Six modifiers
   wait on it.
 - **C-63. A LEGACY BONUS ACCRUES NO TIME.** Weight 1. CIV6 (Founding
-  Fathers): "All Government legacy bonuses are earned in half the usual time."
+  Fathers): "Earn all government legacy bonuses in half the usual time."
   Both engines model the legacy CARD itself — `PolicyDef.legacyOf` and the
   `LEGACY_${g.id}` synthesis, `_pol_legacy` and the `is_leg`/`been` block —
   but gate it on `Seat.government.held`, a bit meaning "this seat has held
   that government at some point". There is no accrual to halve. The carrier is
   turns-in-government per seat per government, with the card unlocking at a
-  threshold that the rate scales. America's nine BONUS_RATE modifiers wait
-  here.
+  threshold that the rate scales.
+  BLOCKED ON A NUMBER THE INSTALL DOES NOT CARRY (2026-09-03, measured). The
+  XML gives the SHAPE and nothing else: `Governments.BonusType` names each
+  government's accumulated bonus (Autocracy WONDER_CONSTRUCTION, Oligarchy
+  COMBAT_EXPERIENCE, Classical Republic GREAT_PEOPLE, Democracy
+  DISTRICT_PROJECTS, ...), `GovernmentBonusNames` lists the ten type names with
+  no fields at all, and America's nine `TRAIT_*_BONUS_RATE` modifiers carry
+  `BonusRate: 100` with NO ModifierType — they are DLL-read data, not effects.
+  What is missing is the THRESHOLD the rate scales (how much accrual earns the
+  card) and what each of the ten bonuses actually pays; neither appears in any
+  XML table or in GlobalParameters. Rate 100 against the published "half the
+  usual time" reads as +100% accrual, which is the one inference the two
+  sources agree on. The threshold belongs to the sourcing pass (#211) — do not
+  invent one. America's nine BONUS_RATE modifiers wait here.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1. CIV6 (Kristina):
   "Buildings with at least three Great Work slots and wonders with at least two
   Great Work slots are automatically themed when they have all their slots
