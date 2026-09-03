@@ -1385,8 +1385,7 @@ class SimPhase:
                                   torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
-            wonder_pct=sum(r[2] for r in self._wonder_tourism_rows
-                           if bool(self._row_is(row, r[0], r[1]).any())),
+            wonder_pct=self._wonder_tourism_pct(row),
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
             gw_mult=js_round(self._governor_mult(row, "gwTourismMult")).long() if self.n_governors else None,
         )

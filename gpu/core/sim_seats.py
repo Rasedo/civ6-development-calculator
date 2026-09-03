@@ -4495,16 +4495,28 @@ class SimSeats:
             est = self._governor_established(src)          # [B, RC]
             if not bool(est.any()):
                 continue
-            seat_ok = self._row_is(src, rows[0][0], rows[0][1])     # [B]
             src_ctr = self.city_center[:, src].clamp(min=0)         # [B, RC]
             d = self.pair_dist[here.unsqueeze(2), src_ctr.unsqueeze(1)]  # [B, RC, RC]
             same = (ids.unsqueeze(2) == self.city_id[:, src].unsqueeze(1)) if src == row else                 torch.zeros_like(d, dtype=torch.bool)
             live = (est.unsqueeze(1) & self.city_alive[:, src].unsqueeze(1)
                     & self.city_alive[:, row].unsqueeze(2) & ~same)
             for _lc, _ll, _amt, _rng in rows:
+                # each row by ITS OWN carrier: reading `rows[0]`'s for all of
+                # them aims every later row at the first one's civilization
+                seat_ok = self._row_is(src, _lc, _ll)         # [B]
                 near = live & (d <= _rng)
                 n = (near & seat_ok.reshape(B, 1, 1)).any(dim=2).double()
                 out = out + n * (_amt if src == row else -_amt)
+        return out
+
+    def _wonder_tourism_pct(self, row: int) -> torch.Tensor:
+        """[B] long — the percentage this row adds to the WONDER half of its
+        tourism, per GAME (`wonderTourismPct`). The roster mask is [B] and
+        the answer must stay [B]: collapsing it with `.any()` paid every
+        game in the batch for one game's France."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for _c, _l, _p in self._wonder_tourism_rows:
+            out = out + self._row_is(row, _c, _l).long() * int(_p)
         return out
 
     def _ungoverned_loyalty(self, row: int) -> torch.Tensor:

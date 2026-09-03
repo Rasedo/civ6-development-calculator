@@ -379,6 +379,12 @@ SIM_RECEIVERS = ("sim", "s", "self")
 _SIM_CTOR = re.compile(r"(?i)^(batchsim|build|make_sim|new_sim|_build)$")
 
 
+# builtins that turn a per-game mask into ONE number
+_AGGREGATORS = {"sum", "min", "max"}
+# `bool(...)` is NOT one: it is how a legitimate skip guard is spelled,
+# both as an `if` test and as the filter that narrows a row LIST.
+
+
 def _callee(call: ast.Call) -> str:
     f = call.func
     if isinstance(f, ast.Name):
@@ -865,6 +871,37 @@ def census_faults(engine: str, census, allow: dict) -> int:
     return fails
 
 
+def collapsed_roster_masks() -> list[tuple[str, int, str]]:
+    """A `_row_is` / `_seat_is` mask is [B] — one answer per GAME in the
+    batch. Collapsing it with `.any()` and using the result as a VALUE pays
+    every game for whatever one game seats: `wonder_pct=sum(... if
+    bool(_row_is(...).any()))` doubled a neighbouring game's tourism for a
+    France that was not in that game at all, and only a batched serve shard
+    could see it (single-seed runs were green).
+
+    `.any()` stays legal as a plain skip GUARD — an `if` test, or the filter
+    of a comprehension that narrows a row LIST. What this refuses is the
+    same call inside an aggregating builtin, where the answer becomes a
+    number the caller then applies to the whole batch.
+    """
+    out: list[tuple[str, int, str]] = []
+    for f in sorted(ROOT.glob("gpu/core/*.py")) + sorted(ROOT.glob("policy/*.py")):
+        try:
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or _callee(node) not in _AGGREGATORS:
+                continue
+            for inner in ast.walk(node):
+                if not isinstance(inner, ast.Call) or _callee(inner) != "any":
+                    continue
+                src = ast.unparse(inner)
+                if "_row_is(" in src or "_seat_is(" in src:
+                    out.append((str(f.relative_to(ROOT)).replace("\\", "/"),
+                                inner.lineno, src[:100]))
+    return out
+
 def main(census_only: bool = False) -> int:
     known, shapes, aliases = defined_attrs()
     known |= external_binds()
@@ -897,6 +934,13 @@ def main(census_only: bool = False) -> int:
         fails += 1
         print("DANGLING RULES FIELD — read but not declared on the Rules dataclass:")
         for f, ln, what in rbad:
+            print(f"  {f}:{ln}  {what}")
+
+    collapsed = collapsed_roster_masks()
+    if collapsed:
+        fails += 1
+        print("COLLAPSED ROSTER MASK — a [B] per-game mask became one number:")
+        for f, ln, what in collapsed:
             print(f"  {f}:{ln}  {what}")
 
     dupes = sorted(aliases & mutable_names())

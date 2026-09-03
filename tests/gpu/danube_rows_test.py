@@ -206,6 +206,29 @@ def test_strength_in_unity(rules, path) -> None:
     print("  6 Strength in Unity OK — the golden age still pays the normal era score")
 
 
+def test_wonder_tourism_is_per_game(rules, path) -> None:
+    """The roster mask is [B] — ONE answer per game in the batch. A batch
+    where a single game seats France must not pay every game: a collapsed
+    `.any()` here doubled a neighbouring game's tourism, and only a batched
+    serve shard could see it (single-seed runs stayed green)."""
+    sim = BatchSim([load_fixture(path), load_fixture(path)], rules,
+                   device="cpu", dtype=torch.float64)
+    _c, _l, _p = sim._wonder_tourism_rows[0]
+    row = 1
+    # game 0 seats nobody on this row; game 1 seats the carrier
+    sim.row_civ[0, row] = -1
+    sim.row_leader[0, row] = -1
+    sim.row_civ[1, row] = _c
+    sim.row_leader[1, row] = sim._pair_civ.index(_c) if _c >= 0 else _l
+    sim._eff_version += 1
+    got = sim._wonder_tourism_pct(row).tolist()
+    assert got == [0, _p], f"per-game percentage read {got}, expected [0, {_p}]"
+    # ...and the row is per ROW too: another row of the same games takes none
+    other = 0 if row else 1
+    assert sim._wonder_tourism_pct(other).tolist() == [0, 0], (
+        "a row that does not seat the carrier was paid")
+    print("  7 wonder tourism OK — per game and per row, never batch-wide")
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -215,6 +238,7 @@ def main() -> int:
     test_ortoo(rules, path)
     test_sahel_merchants(rules, path)
     test_strength_in_unity(rules, path)
+    test_wonder_tourism_is_per_game(rules, path)
     print("BATTERY OK danube_rows")
     return 0
 

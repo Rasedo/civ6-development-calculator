@@ -3390,7 +3390,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: int = 0) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -3435,8 +3435,12 @@ class SimEconomy:
             # CIV6 (France, EFFECT_ADJUST_CITY_TOURISM): "Tourism from wonders
             # of any era is +100%" — the WONDER half only, after the golden
             # Wish factor exactly as `wonderTourism` orders it
-            if wonder_pct:
-                wt = torch.div(wt * (100 + wonder_pct), 100, rounding_mode="floor")
+            # per GAME: the roster mask is [B], so a batch where ONE game
+            # seats the carrier must not pay every game (a collapsed
+            # `.any()` here doubled a neighbouring game's tourism)
+            if wonder_pct is not None and bool((wonder_pct != 0).any()):
+                wt = torch.div(wt * (100 + wonder_pct.reshape(-1, 1)), 100,
+                               rounding_mode="floor")
             t = t + (wt * w_live.long()).sum(dim=1)
         if self.SEASIDE >= 0:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
