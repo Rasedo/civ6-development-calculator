@@ -83,7 +83,7 @@ export function grantGuaranteedGreatPeople(state: GameState, seat: number): void
     // "when the NEXT-TO-LAST one is claimed": exactly one unclaimed remains
     if (greatPeopleEarned(state, cls) !== GREAT_PEOPLE[cls].length - 1) continue;
     ensureGpOffer(state, cls);
-    if (gpOffer(state, cls) >= 0) recruit(state, seat, cls);
+    if (gpOffer(state, cls) >= 0) owner.gpp[cls] = (owner.gpp[cls] ?? 0) + recruit(state, seat, cls);
   }
 }
 
@@ -102,7 +102,7 @@ export function grantFreeProphet(state: GameState, seat: number, centre: number)
   ensureGpOffer(state, 'PROPHET');
   if (!founded && standing) return; // the page's "you will not receive a unit"
   if (!founded && gpOffer(state, 'PROPHET') >= 0) {
-    recruit(state, seat, 'PROPHET');
+    owner.gpp.PROPHET = (owner.gpp.PROPHET ?? 0) + recruit(state, seat, 'PROPHET');
     return;
   }
   spawnUnit(state, 'APOSTLE', centre, seat);
@@ -139,8 +139,7 @@ export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: num
   if ((state.gpPassedBy?.[clsIdx] ?? -1) === seat) return { ok: false };
   if (gold) owner.treasury = (owner.treasury ?? 0) - cost;
   else owner.faith -= cost;
-  owner.gpp[cls] = 0;
-  recruit(state, seat, cls);
+  owner.gpp[cls] = recruit(state, seat, cls); // patronage keeps the refund too
   return { ok: true };
 }
 
@@ -331,11 +330,15 @@ export function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClas
   return citiesOf(state, seat).find((c) => c.isCapital)?.centerIndex ?? -1;
 }
 
-function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
+/** Returns the Great Person POINTS refunded by the claim, which the CALLER
+ *  banks: `advanceGreatPeople` holds the class's points in a local it
+ *  writes back at the end of the turn, so a store written here would be
+ *  overwritten and the refund lost (`GP_REFUND_ROWS`). */
+function recruit(state: GameState, seat: number, cls: GreatPersonClass): number {
   const owner = seatOf(state, seat);
   const at = gpOffer(state, cls);
   const person = at >= 0 ? GREAT_PEOPLE[cls][at] : undefined;
-  if (!owner || !person) return; // no standing offer
+  if (!owner || !person) return 0; // no standing offer
   // CIV6 (Magnanimous): "After recruiting or patronizing a Great Person, 20%
   // of its Great Person point cost is refunded" — read BEFORE the offer is
   // retired, since `gpOfferCost` answers Infinity once it is (`GP_REFUND_ROWS`)
@@ -357,7 +360,6 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   // CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great Person" —
   // every class, and the PATRONIZED person is earned too (`GP_FAVOR_ROWS`)
   owner.diplomaticFavor += getModifiers(state, seat).gpFavor;
-  if (refund) owner.gpp[cls] = (owner.gpp[cls] ?? 0) + refund;
 
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
   // the claim ends the pass: the NEXT person starts with nobody locked out
@@ -387,6 +389,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
       if (pick) o.research.boosted.push(pick);
     }
   }
+  return refund;
 }
 
 /** CIV6 (Great People): "you may pass on a Great Person, which will cost you
@@ -440,7 +443,7 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
         const cost = gpOfferCost(state, cls); // Infinity while no offer stands
         if (!Number.isFinite(cost) || pts < cost) break;
         pts -= cost;
-        recruit(state, seat, cls);
+        pts += recruit(state, seat, cls); // the refund joins the LIVE local
         ensureGpOffer(state, cls); // the replacement, drawn at once
       }
     }

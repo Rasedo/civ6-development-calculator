@@ -75,7 +75,9 @@ def test_wire(rules, path) -> None:
     assert len(sim._center_adj_rows) == 2 and len(sim._great_work_yield_rows) == 8
     assert len(sim._gpp_class_rows) == 3 and len(sim._powered_yield_rows) == 5
     assert len(sim._stockpile_rate_rows) == 4 and len(sim._stockpile_cap_rows) == 3
-    assert len(sim._unit_charge_rows) == 1 and len(sim._tile_cost_rows) == 2
+    # the charge family grew with Qin's Builder, Philip's Inquisitor and
+    # Dharma's Missionary — a census pin is a count, so it moves with them
+    assert len(sim._unit_charge_rows) == 4 and len(sim._tile_cost_rows) == 2
     assert len(sim._farm_terrain_rows) == 2 and len(sim._route_improvement_rows) == 4
     assert len(sim._grant_unit_rows) == 3 and len(sim._spy_capacity_rows) == 1
     assert len(sim._capital_rows) == 1

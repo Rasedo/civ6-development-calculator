@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setWar, tileCity } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
+import { advanceGreatPeople } from '../../../cpu/core/greatPeople';
 import { canPlaceDistrict } from '../../../cpu/core/rules';
 import { computeUnlocks, getModifiers } from '../../../cpu/core/effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from '../../../cpu/core/boosts';
@@ -151,6 +152,28 @@ describe('The First Emperor', () => {
     const at = tileAtCoords(state.map, 8, 8);
     expect(extraCharges(state, 0, 'BUILDER', at)).toBe(
       extraCharges(plain, 0, 'BUILDER', tileAtCoords(plain.map, 8, 8)) + 1);
+  });
+});
+
+describe('Magnanimous', () => {
+  it('keeps the refund through the RACE path, not just patronage', () => {
+    // the bug this pins: `recruit` wrote `owner.gpp[cls]` while
+    // `advanceGreatPeople` held the same class's points in a local it wrote
+    // back at the end of the turn, so the refund was silently discarded on
+    // the only path a game actually takes (seed 9274, turn 61)
+    const earned = (row: number): { gpp: number; n: number } => {
+      const state = sceneAs(row);
+      settleAt(state, tileAtCoords(state.map, 8, 8).index, 0);
+      state.seats[0].gpp = { SCIENTIST: 5000 };
+      advanceGreatPeople(state, 0);
+      return { gpp: state.seats[0].gpp.SCIENTIST ?? 0, n: state.seats[0].gpEarned.length };
+    };
+    const pedro = earned(leaderRow('PEDRO'));
+    const plain = earned(PLAIN);
+    expect(pedro.n).toBeGreaterThan(0);
+    expect(pedro.n).toBe(plain.n);
+    // every claim refunds a fifth of its price, so Pedro ends the turn ahead
+    expect(pedro.gpp).toBeGreaterThan(plain.gpp);
   });
 });
 
