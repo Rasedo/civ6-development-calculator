@@ -466,6 +466,14 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   // CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
   // civilization's route INTO this city.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD * incomingIntlRoutes(state, city);
+  // CIV6 (Radio Oranje, EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS): "+2
+  // Culture from each Trade Route another civilization sends to this one" —
+  // the same FOREIGN count Cleopatra's gold reads (`INCOMING_ROUTE_YIELD_ROWS`)
+  const inRows = getModifiers(state, seat).incomingRouteYields;
+  if (inRows.length) {
+    const foreignIn = incomingIntlRoutes(state, city);
+    if (foreignIn) for (const r of inRows) out[r.yield] += r.amount * foreignIn;
+  }
   // CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
   // the DESTINATION side): every route ending here pays this seat per
   // named improvement of this city (`ROUTE_IMPROVEMENT_ROWS`)

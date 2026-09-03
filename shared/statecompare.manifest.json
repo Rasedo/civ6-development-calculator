@@ -1273,6 +1273,17 @@
           "note": "how many recruited Great People this seat has actually SPENT."
         },
         {
+          "name": "gpEarnedByClass",
+          "compare": "exact",
+          "covers": [
+            "Seat.gpEarned"
+          ],
+          "planes": [
+            "civ_gp_earned"
+          ],
+          "note": "this seat's own tally of each Great Person CLASS awarded to it — the global `gp_earned` says how many of a class anyone has claimed, which is a different question. The roster's guarantee rows (The Last Prophet) read this one."
+        },
+        {
           "name": "gpPerm",
           "compare": "exact",
           "covers": [

@@ -193,6 +193,10 @@ class SimEconomy:
         # everyone" unreachable and no accumulator could ever drain.
         live = hit & (a_row >= 0) & (d_row >= 0) & (a_row != d_row) \
             & (a_row != self.BARB_ROW) & (d_row != self.BARB_ROW)
+        # Every combat path on both engines reaches this ONE hook, so a rule
+        # that fires "when a battle resolves" rides it rather than the
+        # thirteen call sites (`warWearinessBattle`'s twin).
+        self._post_combat_loyalty(live, a_row, d_row, tile, a_died, d_died)
         if not bool(live.any()):
             return
         NS = self.NS
@@ -239,6 +243,41 @@ class SimEconomy:
         for _wc, _wl, _wp in self._war_weariness_rows:
             out = out + self._seat_is(foe_row.clamp(min=0), _wc, _wl).long() * _wp
         return out
+
+    def _post_combat_loyalty(self, live: torch.Tensor, a_row: torch.Tensor,
+                             d_row: torch.Tensor, tile: torch.Tensor,
+                             a_died, d_died) -> None:
+        """CIV6 (Swift Hawk): "Defeating an enemy unit within the borders of an
+        enemy city causes that city to lose 20 Loyalty, and 40 if that
+        civilization is in a Golden or Heroic Age." The install's `AffectLocal`
+        is false — the city that loses is the DEFEATED side's, never the
+        victor's (`POST_COMBAT_LOYALTY_ROWS`). A heroic age IS a golden one."""
+        if not self._post_combat_loyalty_rows or not bool(live.any()):
+            return
+        tc = tile.clamp(min=0)
+        owner = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
+        cid = self.tile_city.gather(1, tc.unsqueeze(1)).squeeze(1)
+        for victor, loser, died in ((a_row, d_row, d_died), (d_row, a_row, a_died)):
+            if died is None:
+                continue
+            for _pc, _pl, _pa, _pg in self._post_combat_loyalty_rows:
+                who = (live & died & self._seat_is(victor, _pc, _pl)
+                       & (owner == loser) & (cid >= 0)
+                       & (loser >= 0) & (loser < self.n_majors))
+                if not bool(who.any()):
+                    continue
+                _lr = loser.clamp(min=0, max=self.n_majors - 1)
+                _golden = self.civ_age.gather(1, _lr.unsqueeze(1)).squeeze(1) == 2
+                drop = torch.where(_golden, torch.full_like(_lr, _pa + _pg),
+                                   torch.full_like(_lr, _pa))
+                for b in who.nonzero(as_tuple=True)[0].tolist():
+                    lr = int(loser[b])
+                    col = (self.city_id[b, lr] == int(cid[b])) & self.city_alive[b, lr]
+                    if not bool(col.any()):
+                        continue
+                    j = int(col.long().argmax())
+                    self.city_loyalty[b, lr, j] = torch.clamp(
+                        self.city_loyalty[b, lr, j] + float(drop[b]), min=0.0)
 
     def _ww_launch(self, hit: torch.Tensor, row: int, foe_row) -> None:
         """`warWearinessLaunch`'s twin. CIV6 (War weariness): "every time you

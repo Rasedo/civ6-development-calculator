@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type DistrictId, type GameState, typ
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
-import { computeAdoption, getModifiers, notFoundedSum, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
+import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -1001,7 +1001,13 @@ export function computeCityStats(
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0) +
     gpCityPermOf(city, 'amenities') +
-    notFoundedSum(state, city, 'amenity');
+    notFoundedSum(state, city, 'amenity') +
+    // CIV6 (Dharma): "Cities gain an Amenity for every Religion with at least
+    // 1 Follower" (`RELIGION_AMENITY_ROWS`)
+    (m.religionAmenities.length
+      ? m.religionAmenities.reduce((n, r) => n + r.amenities
+        * religionsPresent(city).filter((g) => (city.religionPressure?.[g] ?? 0) >= r.followers).length, 0)
+      : 0);
   have -= warWearinessPenalty(wwMax(seatOf(state, city.seat)));
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {

@@ -551,6 +551,7 @@ SEAT = {
     ],
     "prophets": _civ_scalar("civ_prophets"),
     "gpUsed": _civ_scalar("civ_gp_used"),
+    "gpEarnedByClass": lambda sim, b, rows: [[int(x) for x in sim.civ_gp_earned[b, c].tolist()] for c in rows],
     "gpPerm": lambda sim, b, rows: [[int(x) for x in sim.civ_gp_perm[b, c].tolist()] for c in rows],
     "gpLuxuries": lambda sim, b, rows: [
         [int(x) for x in sim.civ_gp_lux[b, c, : int(sim.civ_gp_lux_n[b, c])].tolist()] for c in rows

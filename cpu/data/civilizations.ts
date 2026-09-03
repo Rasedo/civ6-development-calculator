@@ -246,7 +246,10 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
  * district (the Great Turkish Bombard). `classes` names TARGET_CLASSES; an
  * empty list is every combat unit.
  */
-export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast';
+/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
+ *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
+ *  the age alone. Its "or Free Cities" half waits on a Free City existing. */
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden';
 /** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
  *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
  *  PER slotted policy of the named kind instead of flat. */
@@ -269,6 +272,9 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = [
   { leader: 'HOJO', amount: 5, when: 'onCoast', classes: ['RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
   { leader: 'HOJO', amount: 5, when: 'onCoast', classes: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'NAVAL_CARRIER'] },
   { civ: 'OTTOMAN', amount: 5, when: 'foeCity', classes: ['SIEGE'] },
+  // CIV6 (Swift Hawk): "+10 Combat Strength when fighting Free Cities or
+  // civilizations that are in a Golden or Heroic Age."
+  { leader: 'LAUTARO', amount: 10, when: 'foeGolden' },
 ];
 
 /** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_HEAL, Tomyris): "Heal after
@@ -427,6 +433,8 @@ export const UNIT_CHARGE_ROWS: readonly UnitChargeRow[] = [
   { leader: 'QIN', unit: 'BUILDER', amount: 1 },
   // CIV6 (El Escorial): "Inquisitors can Remove Heresy one extra time."
   { leader: 'PHILIP_II', unit: 'INQUISITOR', amount: 1 },
+  // CIV6 (Dharma): "Missionaries have +2 spreads."
+  { civ: 'INDIA', unit: 'MISSIONARY', amount: 2 },
 ];
 
 /** CIV6 (The Last Best West, EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN):
@@ -992,4 +1000,143 @@ export interface EvictPctRow {
 }
 export const EVICT_PCT_ROWS: readonly EvictPctRow[] = [
   { leader: 'PHILIP_II', points: 25 },
+];
+
+// ---------------------------------------------------------------------------
+// THE FOLLOWER, THE LEVY AND THE ROUTE
+
+/** CIV6 (Dharma, EFFECT_ADJUST_RELIGION_AMENITIES_FOR_MINIMUM_FOLLOWERS):
+ *  "Cities gain an Amenity for every Religion with at least 1 Follower." */
+export interface ReligionAmenityRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** how many followers a religion needs before it pays */
+  followers: number;
+  amenities: number;
+}
+export const RELIGION_AMENITY_ROWS: readonly ReligionAmenityRow[] = [
+  { civ: 'INDIA', followers: 1, amenities: 1 },
+];
+
+/** CIV6 (Dharma, EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS): "Receives Follower
+ *  Belief bonuses in a city from each Religion that has at least 1 Follower." */
+export interface AllFollowerBeliefsRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const ALL_FOLLOWER_BELIEFS_ROWS: readonly AllFollowerBeliefsRow[] = [
+  { civ: 'INDIA' },
+];
+
+/** CIV6 (Dharma, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE): "+100%
+ *  Religious pressure from your Trade Routes", on both ends of the leg. */
+export interface RoutePressureRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  origin: boolean;
+  destination: boolean;
+  pct: number;
+}
+export const ROUTE_PRESSURE_ROWS: readonly RoutePressureRow[] = [
+  { civ: 'INDIA', origin: true, destination: true, pct: 100 },
+];
+
+/** CIV6 (The Last Prophet, EFFECT_ADD_PLAYER_BELIEF_YIELD /
+ *  BELIEF_YIELD_PER_FOREIGN_CITY): "+1 Science for each foreign city following
+ *  Arabia's Religion." */
+export interface ForeignFollowerYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  amount: number;
+  /** how many foreign cities one payment needs */
+  per: number;
+}
+export const FOREIGN_FOLLOWER_YIELD_ROWS: readonly ForeignFollowerYieldRow[] = [
+  { civ: 'ARABIA', yield: 'science', amount: 1, per: 1 },
+];
+
+/** CIV6 (The Last Prophet, EFFECT_ADJUST_GREAT_PERSON_GUARANTEE):
+ *  "Automatically receive the final Great Prophet when the next-to-last one is
+ *  claimed (if you have not earned a Great Prophet already)." */
+export interface GreatPersonGuaranteeRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  cls: string;
+}
+export const GP_GUARANTEE_ROWS: readonly GreatPersonGuaranteeRow[] = [
+  { civ: 'ARABIA', cls: 'PROPHET' },
+];
+
+/** CIV6 (Songs of the Jeli, EFFECT_ENABLE_BUILDING_FAITH_PURCHASE): "May
+ *  purchase Commercial Hub district buildings with Faith." */
+export interface FaithPurchaseDistrictRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  district: DistrictId;
+}
+export const FAITH_PURCHASE_DISTRICT_ROWS: readonly FaithPurchaseDistrictRow[] = [
+  { civ: 'MALI', district: 'COMMERCIAL_HUB' },
+];
+
+/** CIV6 (Mediterranean Colonies, EFFECT_GRANT_PLAYER_SPECIFIC_TECH_BOOST):
+ *  "Begin the game with the Writing technology Eureka." */
+export interface StartBoostRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tech: string;
+}
+export const START_BOOST_ROWS: readonly StartBoostRow[] = [
+  { civ: 'PHOENICIA', tech: 'WRITING' },
+];
+
+/** CIV6 (Swift Hawk, EFFECT_ADJUST_PLAYER_POST_COMBAT_LOYALTY): "Defeating an
+ *  enemy unit within the borders of an enemy city causes that city to lose 20
+ *  Loyalty, and 40 if that civilization is in a Golden or Heroic Age." The
+ *  install's `AffectLocal` is false — the loss is the DEFEATED side's city. */
+export interface PostCombatLoyaltyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  /** what a GOLDEN or Heroic age adds to the loss */
+  goldenExtra: number;
+}
+export const POST_COMBAT_LOYALTY_ROWS: readonly PostCombatLoyaltyRow[] = [
+  { leader: 'LAUTARO', amount: -20, goldenExtra: -20 },
+];
+
+/** CIV6 (Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT
+ *  and EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): "levied units cost 75%
+ *  less to upgrade" and a levy hands back two Envoys. */
+export interface LevyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  upgradeDiscountPct: number;
+  envoys: number;
+}
+export const LEVY_ROWS: readonly LevyRow[] = [
+  { leader: 'MATTHIAS_CORVINUS', upgradeDiscountPct: 75, envoys: 2 },
+];
+
+/** CIV6 (Radio Oranje, EFFECT_ADJUST_PLAYER_IDENTITY_PER_TURN_FOR_DOMESTIC_TRADE_ROUTE_ORIGIN):
+ *  "+2 Loyalty per turn in the ORIGIN city of a domestic Trade Route." */
+export interface DomesticRouteLoyaltyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const DOMESTIC_ROUTE_LOYALTY_ROWS: readonly DomesticRouteLoyaltyRow[] = [
+  { leader: 'WILHELMINA', amount: 2 },
+];
+
+/** CIV6 (Radio Oranje, EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS): "+2
+ *  Culture from each Trade Route another civilization sends to this one." */
+export interface IncomingRouteYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  amount: number;
+}
+export const INCOMING_ROUTE_YIELD_ROWS: readonly IncomingRouteYieldRow[] = [
+  { leader: 'WILHELMINA', yield: 'culture', amount: 2 },
 ];

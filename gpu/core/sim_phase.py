@@ -1217,6 +1217,22 @@ class SimPhase:
                 _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
                 faith_sum = faith_sum + (_r3.double() * self._al_rel3_faith_pop
                                          * (_fol * self.city_pop[:, row].double()).sum(dim=1))
+        # CIV6 (The Last Prophet): "+1 Science for each foreign city following
+        # Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
+        for _fc, _fl, _fy, _fa, _fp in self._foreign_follower_yield_rows:
+            _fw = self._row_is(row, _fc, _fl)
+            if not bool(_fw.any()):
+                continue
+            _n = torch.div(self._foreign_follower_count(row), max(1, _fp), rounding_mode="floor")
+            _amt = _fw.double() * _n.double() * _fa
+            if _fy == 3:
+                sci_sum = sci_sum + _amt
+            elif _fy == 4:
+                cul_sum = cul_sum + _amt
+            elif _fy == 2:
+                gold_sum = gold_sum + _amt
+            elif _fy == 5:
+                faith_sum = faith_sum + _amt
         # the seat's OUTPUT this turn, stored for allies' percentage reads -
         # written before those reads, so the terms never compound
         self.civ_sci_rate[:, row] = torch.where(active, sci_sum, self.civ_sci_rate[:, row])
@@ -1407,6 +1423,9 @@ class SimPhase:
         if self._gp_nc == 0:
             return
         B, dev = self.B, self.device
+        # CIV6 (The Last Prophet): the guarantee is checked on this seat's own
+        # turn, ahead of the race, exactly as `advanceGreatPeople` does
+        self._grant_guaranteed_great_people(row, active)
         # CIV6 (Oracle): "Districts in this city provide +2 Great Person points
         # of their type" — the HOLDING city's own districts only.
         dgpp = (self._city_wonder_flat(row, self._wond_distgpp)
@@ -1567,6 +1586,29 @@ class SimPhase:
         xr = (need & ~has_pool).nonzero(as_tuple=True)[0]
         self.gp_offer[xr, cls] = -2
 
+    def _grant_guaranteed_great_people(self, row: int, active: torch.Tensor) -> None:
+        """CIV6 (The Last Prophet): "Automatically receive the final Great
+        Prophet when the next-to-last one is claimed (if you have not earned a
+        Great Prophet already)." Read on this seat's OWN turn, so a class
+        another seat claimed down to its last member is caught the turn after —
+        both engines read it at the same point in the seat loop
+        (`grantGuaranteedGreatPeople`, `GP_GUARANTEE_ROWS`)."""
+        for _gc, _gl, _cls in self._gp_guarantee_rows:
+            if _cls < 0 or _cls >= self._gp_nc:
+                continue
+            who = active & self._row_is(row, _gc, _gl)
+            if not bool(who.any()):
+                continue
+            nR = int(self._gp_roster[_cls]) if _cls < int(self._gp_roster.numel()) else 0
+            if nR <= 0:
+                continue
+            claimed = self.gp_claimed[:, _cls, :nR].sum(dim=1)
+            due = who & (self.civ_gp_earned[:, row, _cls] == 0) & (claimed == nR - 1)
+            if not bool(due.any()):
+                continue
+            self._gp_ensure_offer(due, _cls)
+            self._gp_claim(row, due & (self.gp_offer[:, _cls] >= 0), _cls)
+
     def _grant_free_prophet(self, row: int, sto: torch.Tensor, centre: torch.Tensor) -> None:
         """CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle
         if no Prophets are available)" — religion founded or the class spent
@@ -1616,6 +1658,8 @@ class SimPhase:
             self.civ_gpp[:, row, cls] = torch.where(
                 _rw, self.civ_gpp[:, row, cls] + _back, self.civ_gpp[:, row, cls])
         self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+        # this SEAT's own tally of the class, beside the global one
+        self.civ_gp_earned[:, row, cls] = self.civ_gp_earned[:, row, cls] + hit.long()
         hr = hit.nonzero(as_tuple=True)[0]
         self.gp_claimed[hr, cls, at_c[hr]] = True
         self.gp_offer[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_offer[:, cls])

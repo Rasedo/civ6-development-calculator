@@ -69,7 +69,7 @@ def a_tile(sim, pred) -> int:
 
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
-    assert len(sim._combat_cs_rows) == 7 and len(sim._post_kill_heal_rows) == 1
+    assert len(sim._combat_cs_rows) == 8 and len(sim._post_kill_heal_rows) == 1
     assert len(sim._embark_move_rows) == 2 and len(sim._ignore_shores_rows) == 2
     print("  1 wire OK — 7 + 1 + 2 + 2 rows")
 

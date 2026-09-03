@@ -1,6 +1,6 @@
 import type { GameState, Seat } from './types';
 import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED } from '../data/seats';
-import { atWarWithAny, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
+import { atWarWithAny, cityAtTile, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
 import { civEraIndex } from './city';
 
 import { gpPermOf } from '../data/greatPeople';
@@ -112,6 +112,38 @@ export function warWearinessBattle(
   };
   score(aSeat, dSeat, opts.aDied ?? false);
   score(dSeat, aSeat, opts.dDied ?? false);
+  // Every combat path on both engines reaches this ONE hook, so a rule that
+  // fires "when a battle resolves" rides it rather than the ten call sites.
+  postCombatLoyalty(state, aSeat, dSeat, tileIndex, opts);
+}
+
+/** CIV6 (Swift Hawk): "Defeating an enemy unit within the borders of an enemy
+ *  city causes that city to lose 20 Loyalty, and 40 if that civilization is in
+ *  a Golden or Heroic Age." The install's `AffectLocal` is false — the city
+ *  that loses is the DEFEATED side's, never the victor's
+ *  (`POST_COMBAT_LOYALTY_ROWS`). A heroic age IS a golden one here. */
+function postCombatLoyalty(
+  state: GameState,
+  aSeat: number,
+  dSeat: number,
+  tileIndex: number,
+  opts: { aDied?: boolean; dDied?: boolean },
+): void {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return;
+  const hit = (victor: number, loser: number, loserDied: boolean): void => {
+    if (!loserDied || !isCiv(victor)) return;
+    const rows = getModifiers(state, victor).postCombatLoyalty;
+    if (!rows.length) return;
+    const city = cityAtTile(state, tile);
+    if (!city || city.seat !== loser) return; // "within the borders of an ENEMY city"
+    const golden = (seatOf(state, loser)?.age ?? 0) === 2;
+    let drop = 0;
+    for (const r of rows) drop += r.amount + (golden ? r.goldenExtra : 0);
+    if (drop) city.loyalty = Math.max(0, (city.loyalty ?? 100) + drop);
+  };
+  hit(aSeat, dSeat, opts.dDied ?? false);
+  hit(dSeat, aSeat, opts.aDied ?? false);
 }
 
 /**

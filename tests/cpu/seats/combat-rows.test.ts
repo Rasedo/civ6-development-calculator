@@ -28,8 +28,8 @@ function coastalScene(civ: string): GameState {
 }
 
 describe('the combat-strength rows', () => {
-  it('are the census: six rows, each on a class mask the target classes spell', () => {
-    expect(COMBAT_CS_ROWS.length).toBe(7);
+  it('are the census: eight rows, each on a class mask the target classes spell', () => {
+    expect(COMBAT_CS_ROWS.length).toBe(8);
     expect(POST_KILL_HEAL_ROWS.length + EMBARK_MOVE_ROWS.length + IGNORE_SHORES_ROWS.length).toBe(5);
     const state = makeState(makeMap(8, 8, 'GRASSLAND'));
     state.seats[0].civ = seatRow('MONGOLIA');

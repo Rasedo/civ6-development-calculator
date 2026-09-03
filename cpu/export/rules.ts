@@ -241,7 +241,7 @@ import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
-import { COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
+import { RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { AMENITY_TIERS, amenityTierIndex } from '../data/constants';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
@@ -1432,6 +1432,20 @@ export function buildRules() {
       governorTitleGrants: GOVERNOR_TITLE_GRANT_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1, r.amount]),
       gpRefund: GP_REFUND_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.pct]),
       evictPct: EVICT_PCT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.points]),
+      // [civ, leaderRow, followers, amenities]
+      religionAmenities: RELIGION_AMENITY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.followers, r.amenities]),
+      allFollowerBeliefs: ALL_FOLLOWER_BELIEFS_ROWS.map((r) => [rowCiv(r), rowLeader(r)]),
+      // [civ, leaderRow, origin, destination, pct]
+      routePressure: ROUTE_PRESSURE_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.origin ? 1 : 0, r.destination ? 1 : 0, r.pct]),
+      foreignFollowerYields: FOREIGN_FOLLOWER_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount, r.per]),
+      gpGuarantee: GP_GUARANTEE_ROWS.map((r) => [rowCiv(r), rowLeader(r), GP_CLASSES.indexOf(r.cls as never)]),
+      faithPurchaseDistricts: FAITH_PURCHASE_DISTRICT_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district)]),
+      startBoosts: START_BOOST_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1]),
+      // [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
+      postCombatLoyalty: POST_COMBAT_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount, r.goldenExtra]),
+      levy: LEVY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.upgradeDiscountPct, r.envoys]),
+      domesticRouteLoyalty: DOMESTIC_ROUTE_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
+      incomingRouteYields: INCOMING_ROUTE_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount]),
       // [civ, leaderRow, tech] — the tech an OCEAN crossing waits on, -1 for none
       oceanAccess: OCEAN_ACCESS_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.tech === null ? -1 : (techIdx.get(r.tech) ?? -1)]),
       districtUnits: DISTRICT_UNIT_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), Object.keys(UNITS).indexOf(r.unit)]),
@@ -1471,7 +1485,7 @@ export function buildRules() {
       combatCs: COMBAT_CS_ROWS.map((r) => [
         rowCiv(r), rowLeader(r), r.amount,
         (r.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0),
-        ['always', 'foeMinor', 'foeWounded', 'foeCity', 'onCoast'].indexOf(r.when),
+        ['always', 'foeMinor', 'foeWounded', 'foeCity', 'onCoast', 'foeGolden'].indexOf(r.when),
         r.per === 'militaryPolicy' ? 1 : 0,
       ]),
       postKillHeal: POST_KILL_HEAL_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),

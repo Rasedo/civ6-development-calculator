@@ -863,6 +863,8 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeMinor' ? isCityStateSeat(foeSeat)
       : r.when === 'foeWounded' ? foeHp !== null && foeHp < UNIT_HP
       : r.when === 'foeCity' ? foeIsCity
+      // CIV6 (Swift Hawk): a HEROIC age is a golden one, so the age is the test
+      : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === 2
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
       // a lake is shallow water to a hull.
       : def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile));

@@ -996,16 +996,44 @@ class SimSeats:
     # the wire's ban index space, `SEAT_BANS` in cpu/data/civilizations.ts
     BAN_HARVEST, BAN_GREAT_WRITER, BAN_HOLY_SITE, BAN_GREAT_PROPHET, BAN_FOUND_RELIGION = range(5)
 
-    def _apply_start_techs(self) -> None:
+    def _apply_roster_start(self) -> None:
         """CIV6 (Mana): "Begin the game with the Sailing and Shipbuilding
-        technologies unlocked" — the roster's own start, laid down once the
-        seeder's draw is known (`START_TECH_ROWS`, cpu/world/load.ts)."""
+        technologies unlocked"; (Mediterranean Colonies) "Begin the game with
+        the Writing technology Eureka" — the roster's own start, laid down
+        once the seeder's draw is known (cpu/world/load.ts)."""
         for _sc, _sl, _st in self._start_tech_rows:
             if _st < 0:
                 continue
             for _row in range(self.n_majors):
                 _w = self._row_is(_row, _sc, _sl)
                 self.civ_techs[:, _row, _st] = self.civ_techs[:, _row, _st] | _w
+        # CIV6 (Mediterranean Colonies): "Begin the game with the Writing
+        # technology Eureka" — the BOOST, not the tech (`START_BOOST_ROWS`)
+        for _bc, _bl, _bt in self._start_boost_rows:
+            if _bt < 0:
+                continue
+            for _row in range(self.n_majors):
+                _w = self._row_is(_row, _bc, _bl)
+                self.civ_tech_boosted[:, _row, _bt] = self.civ_tech_boosted[:, _row, _bt] | _w
+
+    def _religions_present(self, row: int, min_pressure: int = 1) -> torch.Tensor:
+        """[B, RC] long — how many religions have at least `min_pressure` in
+        each of this row's cities. Neither engine counts FOLLOWERS — a city
+        holds pressure per religion and follows the argmax — so a religion
+        with pressure here is one with a follower (`religionsPresent`)."""
+        pres = self.city_pressure[:, row]                     # [B, RC, n_majors]
+        return ((pres >= min_pressure) & self.city_alive[:, row].unsqueeze(2)).sum(dim=2)
+
+    def _foreign_follower_count(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (The Last Prophet): the cities of ANOTHER seat that
+        follow this row's own religion. Religion ids are founder seat ids, so
+        the test is `city_followed == row` over every row but this one, minors
+        included (`foreignFollowerCount`)."""
+        fol = self.city_followed
+        alive = self.city_alive
+        hit = alive & (fol == row)
+        hit[:, row] = False                                   # a FOREIGN city only
+        return hit.sum(dim=(1, 2))
 
     def _not_founded_sum(self, row: int, channel: int) -> torch.Tensor:
         """[B, RC] f64 — CIV6 (CITY_NOT_FOUNDED): what this row pays in a city
@@ -1388,6 +1416,26 @@ class SimSeats:
             q_j = torch.where(q_ok, first_t, q_j)
         return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j
 
+    def _faith_buyable_class(self, row: int) -> torch.Tensor:
+        """[B, NB] bool — `faithBuyableClass`: the buildings this seat row may
+        buy with FAITH rather than gold. Valletta's suzerain opens the City
+        Center and Encampment lists; CIV6 (Songs of the Jeli) "May purchase
+        Commercial Hub district buildings with Faith" opens the row's own
+        district with no suzerain at all (`FAITH_PURCHASE_DISTRICT_ROWS`).
+        ONE body — the candidate and the driven apply both ask it, so a new
+        door cannot reach one and miss the other."""
+        out = torch.zeros(self.B, self.NB, dtype=torch.bool, device=self.device)
+        not_worship = ~self._b_worship
+        if self._suz_c_faith_bldg >= 0:
+            v_cls = ((self._b_req_district == -1) | (self._b_req_district == self._encamp_didx)) & not_worship
+            out = out | (self._suz_effect(row, self._suz_c_faith_bldg).unsqueeze(1) & v_cls.reshape(1, -1))
+        for _fc, _fl, _fd in self._faith_purchase_district_rows:
+            if _fd < 0:
+                continue
+            d_cls = (self._b_req_district == _fd) & not_worship
+            out = out | (self._row_is(row, _fc, _fl).unsqueeze(1) & d_cls.reshape(1, -1))
+        return out
+
     def _seat_class_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 12: Valletta's class purchase. CIV6 (its suzerain): "City
         Center buildings and Encampment district buildings can be bought with
@@ -1398,15 +1446,13 @@ class SimSeats:
         B, dev = self.B, self.device
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
         no = torch.zeros(B, dtype=torch.bool, device=dev)
-        if self._suz_c_faith_bldg < 0:
-            return no, neg, neg.clone()
-        held = active & self._suz_effect(row, self._suz_c_faith_bldg)
+        cls_b = self._faith_buyable_class(row)  # [B, NB]
+        held = active & cls_b.any(dim=1)
         if not bool(held.any()):
             return no, neg, neg.clone()
         rdv = self.rules_dev
         NB = rdv.b_cost.shape[0]
-        cls_b = ((self._b_req_district == -1) | (self._b_req_district == self._encamp_didx)) & ~self._b_worship
-        elig = self._seat_buildable(row, True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.reshape(1, 1, -1)
+        elig = self._seat_buildable(row, True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.unsqueeze(1)
         if self._walls_rows:
             elig = elig & (self._walls_build_ok(row).unsqueeze(2) | (self._b_walls.reshape(1, 1, -1) == 0))
         key = (rdv.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB, device=dev, dtype=rdv.b_cost.dtype).reshape(1, 1, -1)) * 32             + torch.arange(self.RC, device=dev, dtype=rdv.b_cost.dtype).reshape(1, -1, 1)
@@ -1894,17 +1940,16 @@ class SimSeats:
                         _bs = torch.zeros(self.B, dtype=torch.long, device=self.device)
                         _bs[lb[_ok]] = _sb[_ok]
                         self._promo_offer_draw(_bo, _bs)
-        if row in self._driven_buy_cls and self._suz_c_faith_bldg >= 0:
+        if row in self._driven_buy_cls:
             cj, cb = self._driven_buy_cls.pop(row)
             jc = cj.clamp(min=0, max=self.RC - 1)
             bc = cb.clamp(min=0, max=self.NB - 1)
-            cls_b = ((self._b_req_district == -1) | (self._b_req_district == self._encamp_didx)) & ~self._b_worship
-            legal_c = self._seat_buildable(row, True)[bidx, jc, bc] & cls_b[bc] & self.city_alive[bidx, row, jc]
+            cls_b = self._faith_buyable_class(row)[bidx, bc]
+            legal_c = self._seat_buildable(row, True)[bidx, jc, bc] & cls_b & self.city_alive[bidx, row, jc]
             if self._walls_rows:
                 legal_c = legal_c & (self._walls_build_ok(row)[bidx, jc] | (self._b_walls[bc] == 0))
             price_c = self._class_faith_cost(bc)
             buy_c = (active & ext & (cj >= 0) & (cb >= 0) & legal_c
-                     & self._suz_effect(row, self._suz_c_faith_bldg)
                      & self._afford(self.civ_faith[:, row], price_c))
             if bool(buy_c.any()):
                 self._seat_buy_building_faith(row, buy_c, jc, bc, price_c)
@@ -4305,6 +4350,18 @@ class SimSeats:
         # CIV6 (Great Turkish Bombard): "+4 Loyalty per turn" in a city
         # not founded here
         out = out + self._not_founded_sum(row, 1)[bidx, col]
+        # CIV6 (Radio Oranje): "+2 Loyalty per turn in the ORIGIN city of a
+        # domestic Trade Route" — once per such route out of this city
+        for _dc, _dl, _da in self._domestic_route_loyalty_rows:
+            _dw = self._row_is(row, _dc, _dl)
+            if not bool(_dw.any()):
+                continue
+            _rr = self.seat_routes[:, row]                       # [B, K, 2]
+            _cid = self.city_id[bidx, row, col]                  # [n]
+            _dom = ((_rr[bidx, :, 0] == _cid.unsqueeze(1))
+                    & (_rr[bidx, :, 1] >= 0)
+                    & (self.seat_route_dseat[bidx, row] < 0)).sum(dim=1)
+            out = out + _dom.double() * _dw[bidx].double() * _da
         # CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's
         # rows for a garrisoned unit, the second only for a Corps or an Army
         if self._garrison_loyalty_rows:
@@ -5945,6 +6002,26 @@ class SimSeats:
             _addc[:, :, 2] = (self._cleo_in_gold * _cnt * self.city_alive[:, row, :cols].double()
                               * _cleo.double().unsqueeze(1)).to(inc.dtype)
             inc = inc + _addc.reshape(B, -1)
+        # CIV6 (Radio Oranje): "+2 Culture from each Trade Route another
+        # civilization sends to this one" — the same FOREIGN count Cleopatra's
+        # Gold reads (`INCOMING_ROUTE_YIELD_ROWS`)
+        if self._incoming_route_yield_rows:
+            _ir = [r for r in self._incoming_route_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+            if _ir:
+                _icid = self.city_id[:, row, :cols]
+                _icnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
+                for r2 in range(self.n_majors):
+                    if r2 == row:
+                        continue
+                    _ihit = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                             & (self.seat_route_dcity[:, r2].unsqueeze(2) == _icid.unsqueeze(1)))
+                    _icnt = _icnt + _ihit.sum(dim=1).double()
+                _addi = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
+                for _wc, _wl, _wy, _wa in _ir:
+                    _ww = self._row_is(row, _wc, _wl).double().unsqueeze(1)
+                    _addi[:, :, _wy] = _addi[:, :, _wy] + (
+                        _wa * _icnt * self.city_alive[:, row, :cols].double() * _ww).to(inc.dtype)
+                inc = inc + _addi.reshape(B, -1)
         # the DESTINATION side of the improvement rows: every route ending in
         # one of this row's cities, own or foreign, pays this row per named
         # improvement of that city (`incomingRoutes` x `cityImprovementCount`)
@@ -6705,6 +6782,14 @@ class SimSeats:
         have = have + self._gp_city_perm(row, "amenities").double()
         # CIV6 (Great Turkish Bombard): "+1 Amenity" in a city not founded here
         have = have + self._not_founded_sum(row, 0)[:, :cols]
+        # CIV6 (Dharma): "Cities gain an Amenity for every Religion with at
+        # least 1 Follower" (`RELIGION_AMENITY_ROWS`)
+        for _rc, _rl, _rf, _ra in self._religion_amenity_rows:
+            _rw = self._row_is(row, _rc, _rl)
+            if not bool(_rw.any()):
+                continue
+            have = have + (self._religions_present(row, _rf)[:, :cols].double()
+                           * _rw.unsqueeze(1).double() * _ra)
         if self._gov_has_effects:
             _gm = self._gov_mods(row)
             _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]

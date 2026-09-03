@@ -1,5 +1,5 @@
 
-import type { City, GameState, GreatPersonClass } from './types';
+import type { City, GameState, GreatPersonClass, Seat } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_KINDS, GW_WONDER_SLOTS, ARTIFACT_BUILDING, ARTIFACT_SLOTS, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_WONDER_SLOTS, gpChargesOf, gpCost, gwCapacity, gwCount } from '../data/greatPeople';
 import { cityBuildingSum } from './city';
@@ -67,6 +67,33 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
  *  no Prophets are available)" — religion founded or the class spent pays
  *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
  *  the class's offer is claimed FREE (`_grant_free_prophet`). */
+/** CIV6 (The Last Prophet): "Automatically receive the final Great Prophet
+ *  when the next-to-last one is claimed (if you have not earned a Great
+ *  Prophet already)." Called after every claim, for every seat that names the
+ *  class (`GP_GUARANTEE_ROWS`). */
+export function grantGuaranteedGreatPeople(state: GameState, seat: number): void {
+  const rows = getModifiers(state, seat).gpGuarantee;
+  if (!rows.size) return;
+  const owner = seatOf(state, seat);
+  if (!owner) return;
+  for (const cls of GP_CLASSES) {
+    if (!rows.has(cls)) continue;
+    // "if you have not earned one already"
+    if (greatPeopleEarnedBy(owner, cls) > 0) continue;
+    // "when the NEXT-TO-LAST one is claimed": exactly one unclaimed remains
+    if (greatPeopleEarned(state, cls) !== GREAT_PEOPLE[cls].length - 1) continue;
+    ensureGpOffer(state, cls);
+    if (gpOffer(state, cls) >= 0) recruit(state, seat, cls);
+  }
+}
+
+/** How many of a CLASS this seat itself has been awarded — the GPU keeps it
+ *  as the `civ_gp_earned` plane, since the global `gp_earned` answers a
+ *  different question (how many ANYONE has claimed). */
+export function greatPeopleEarnedBy(owner: Seat, cls: GreatPersonClass): number {
+  return (owner.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
+}
+
 export function grantFreeProphet(state: GameState, seat: number, centre: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
@@ -391,6 +418,10 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
   const mods = getModifiers(state, seat);
+  // CIV6 (The Last Prophet): the guarantee is checked on this seat's own turn,
+  // so a class claimed down to its last member by ANOTHER seat is caught the
+  // turn after — both engines read it at the same point in the seat loop.
+  grantGuaranteedGreatPeople(state, seat);
   const perTurn = greatPersonPointsPerTurn(state, seat);
   for (const cls of GP_CLASSES) {
     ensureGpOffer(state, cls);

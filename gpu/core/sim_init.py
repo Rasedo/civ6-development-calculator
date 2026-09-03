@@ -1329,6 +1329,9 @@ class SimInit:
         # the INVENTED luxuries — each entry how many cities that copy reaches,
         # with `civ_gp_lux_n` saying how many of the row are live.
         self.civ_gp_used = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # how many of each CLASS this seat has been awarded — `Seat.gpEarned`
+        # counted per class, which the roster's guarantee rows ask for
+        self.civ_gp_earned = torch.zeros(B, self.n_majors, n_gp, dtype=torch.long, device=device)
         self.civ_gp_perm = torch.zeros(
             B, self.n_majors, max(1, len(self._gp_perm_names)), dtype=dtype, device=device)
         self.civ_gp_lux = torch.zeros(B, self.n_majors, simbase.GP_LUX_MAX, dtype=torch.long, device=device)
@@ -2869,13 +2872,41 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["gpRefund"]]  # type: ignore[misc]
         self._evict_pct_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
+        # THE FOLLOWER, THE LEVY AND THE ROUTE
+        # [civ, leaderRow, followers, amenities]
+        self._religion_amenity_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["religionAmenities"]]  # type: ignore[misc]
+        self._all_follower_belief_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["allFollowerBeliefs"]]  # type: ignore[misc]
+        # [civ, leaderRow, origin, destination, pct]
+        self._route_pressure_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["routePressure"]]  # type: ignore[misc]
+        # [civ, leaderRow, yield, amount, per] per FOREIGN city following it
+        self._foreign_follower_yield_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["foreignFollowerYields"]]  # type: ignore[misc]
+        self._gp_guarantee_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["gpGuarantee"]]  # type: ignore[misc]
+        self._faith_purchase_district_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["faithPurchaseDistricts"]]  # type: ignore[misc]
+        self._start_boost_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["startBoosts"]]  # type: ignore[misc]
+        # [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
+        self._post_combat_loyalty_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["postCombatLoyalty"]]  # type: ignore[misc]
+        # [civ, leaderRow, upgradeDiscountPct, envoys]
+        self._levy_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["levy"]]  # type: ignore[misc]
+        self._domestic_route_loyalty_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["domesticRouteLoyalty"]]  # type: ignore[misc]
+        self._incoming_route_yield_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["incomingRouteYields"]]  # type: ignore[misc]
         # [civ, leaderRow, tech] — the tech an OCEAN crossing waits on, -1 none
         self._ocean_access_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["oceanAccess"]]  # type: ignore[misc]
         # [civ, leaderRow, district, unit] on that district's COMPLETION
         self._district_unit_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["districtUnits"]]  # type: ignore[misc]
-        self._apply_start_techs()
+        self._apply_roster_start()
         self._intl_route_rows: list[tuple[int, int, int, float]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [

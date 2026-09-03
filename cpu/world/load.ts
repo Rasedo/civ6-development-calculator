@@ -6,7 +6,7 @@ import { placeCityStateAt } from '../core/cityStates';
 import { civOf, emptySeat, leaderOf } from '../core/seats';
 import { spawnUnit } from '../core/units';
 import { CIV_LEADERS } from '../data/seats';
-import { START_TECH_ROWS, rowIsFor } from '../data/civilizations';
+import { START_TECH_ROWS, START_BOOST_ROWS, rowIsFor } from '../data/civilizations';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
@@ -87,6 +87,12 @@ export function loadWorld(world: WorldFile): GameState {
     for (const r of START_TECH_ROWS) {
       if (!rowIsFor(r, civOf(state, i), leaderOf(state, i))) continue;
       if (!seat.research.techs.includes(r.tech)) seat.research.techs.push(r.tech);
+    }
+    // CIV6 (Mediterranean Colonies): "Begin the game with the Writing
+    // technology Eureka" — the BOOST, not the tech (`START_BOOST_ROWS`)
+    for (const r of START_BOOST_ROWS) {
+      if (!rowIsFor(r, civOf(state, i), leaderOf(state, i))) continue;
+      if (!seat.research.boosted.includes(r.tech)) seat.research.boosted.push(r.tech);
     }
     for (const u of civ.units) {
       if (!UNITS[u.type]) throw new Error(`world file names unit type '${u.type}' the engine does not know`);

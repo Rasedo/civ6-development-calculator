@@ -1,7 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
+import { RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -201,6 +201,21 @@ export interface Modifiers {
   governorTitleGrants: readonly GovernorTitleGrantRow[];
   gpRefundPct: number;
   evictPoints: number;
+  /** batch 11 — the follower, the levy and the route */
+  religionAmenities: readonly ReligionAmenityRow[];
+  /** CIV6 (Dharma): every religion with a follower pays its belief here */
+  allFollowerBeliefs: boolean;
+  routePressure: readonly RoutePressureRow[];
+  foreignFollowerYields: readonly ForeignFollowerYieldRow[];
+  /** the great-person classes this row is guaranteed the last of */
+  gpGuarantee: ReadonlySet<string>;
+  /** the districts whose buildings this row may buy with FAITH */
+  faithPurchaseDistricts: ReadonlySet<string>;
+  startBoosts: readonly string[];
+  postCombatLoyalty: readonly PostCombatLoyaltyRow[];
+  levy: readonly LevyRow[];
+  domesticRouteLoyalty: number;
+  incomingRouteYields: readonly IncomingRouteYieldRow[];
   districtUnits: readonly DistrictUnitRow[];
   /** the roster's heal on eliminating a unit */
   postKillHeal: number;
@@ -395,6 +410,17 @@ export function defaultModifiers(): Modifiers {
     governorTitleGrants: [],
     gpRefundPct: 0,
     evictPoints: 0,
+    religionAmenities: [],
+    allFollowerBeliefs: false,
+    routePressure: [],
+    foreignFollowerYields: [],
+    gpGuarantee: new Set<string>(),
+    faithPurchaseDistricts: new Set<string>(),
+    startBoosts: [],
+    postCombatLoyalty: [],
+    levy: [],
+    domesticRouteLoyalty: 0,
+    incomingRouteYields: [],
     districtUnits: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
@@ -583,6 +609,33 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
  *  have met that has founded a Religion and is not currently at war."
  *  Acquaintance is not modelled between majors on either engine — every one
  *  is known — so "met" is every live major (`PEACEFUL_FOUNDER_ROWS`). */
+/** CIV6 (Dharma): "each Religion that has at least 1 Follower" in a city.
+ *  Neither engine counts FOLLOWERS — a city holds pressure per religion and
+ *  follows the argmax — so a religion with any pressure here is one with a
+ *  follower. The religion's id is its founder's seat. */
+export function religionsPresent(city: City): number[] {
+  const out: number[] = [];
+  const pres = city.religionPressure;
+  if (!pres) return out;
+  for (let g = 0; g < pres.length; g++) if ((pres[g] ?? 0) > 0) out.push(g);
+  return out;
+}
+
+/** CIV6 (The Last Prophet): "+1 Science for each foreign city following
+ *  Arabia's Religion" — a FOREIGN city is one of another major seat, and the
+ *  religion is this seat's own founding. */
+export function foreignFollowerCount(state: GameState, seat: number): number {
+  let n = 0;
+  for (const o of state.seats) {
+    if (o.seat === seat) continue;
+    for (const c of o.cities) if (c.followedReligion === seat) n += 1;
+  }
+  for (const cs of state.cityStates ?? []) {
+    for (const c of cs.cities) if (c.followedReligion === seat) n += 1;
+  }
+  return n;
+}
+
 export function peacefulFounderFaith(state: GameState, seat: number): number {
   const per = getModifiers(state, seat).peacefulFounderFaith;
   if (!per) return 0;
@@ -665,6 +718,17 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.governorTitleGrants = mine(GOVERNOR_TITLE_GRANT_ROWS);
   mods.gpRefundPct = mine(GP_REFUND_ROWS).reduce((n, r) => n + r.pct, 0);
   mods.evictPoints = mine(EVICT_PCT_ROWS).reduce((n, r) => n + r.points, 0);
+  mods.religionAmenities = mine(RELIGION_AMENITY_ROWS);
+  mods.allFollowerBeliefs = mine(ALL_FOLLOWER_BELIEFS_ROWS).length > 0;
+  mods.routePressure = mine(ROUTE_PRESSURE_ROWS);
+  mods.foreignFollowerYields = mine(FOREIGN_FOLLOWER_YIELD_ROWS);
+  mods.gpGuarantee = new Set(mine(GP_GUARANTEE_ROWS).map((r) => r.cls));
+  mods.faithPurchaseDistricts = new Set(mine(FAITH_PURCHASE_DISTRICT_ROWS).map((r) => r.district));
+  mods.startBoosts = mine(START_BOOST_ROWS).map((r) => r.tech);
+  mods.postCombatLoyalty = mine(POST_COMBAT_LOYALTY_ROWS);
+  mods.levy = mine(LEVY_ROWS);
+  mods.domesticRouteLoyalty = mine(DOMESTIC_ROUTE_LOYALTY_ROWS).reduce((n, r) => n + r.amount, 0);
+  mods.incomingRouteYields = mine(INCOMING_ROUTE_YIELD_ROWS);
   mods.districtUnits = mine(DISTRICT_UNIT_ROWS);
   // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
   // adjacency adds the cards write, so `districtAdjacency` reads one list

@@ -1039,6 +1039,12 @@ class SimMasks:
                 who = who if foe_city else torch.zeros_like(who)
             elif when == 4:
                 who = who & on_coast
+            elif when == 5:
+                # CIV6 (Swift Hawk): a HEROIC age is a golden one on both
+                # engines, so the age plane alone answers
+                _fr = foe_seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
+                _fg = self.civ_age.gather(1, _fr).reshape(foe_seat.shape) == 2
+                who = who & (foe_seat >= 0) & (foe_seat < self.n_majors) & _fg
             if per == 1:
                 # CIV6 (Thermopylae): the magnitude is per slotted Military policy
                 _mp = self._military_policies(seat)

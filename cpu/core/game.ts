@@ -576,6 +576,10 @@ export function buildingFaithCost(state: GameState, seat: number, buildingId: st
 export function faithBuyableClass(state: GameState, seat: number, buildingId: string): boolean {
   const def = BUILDINGS[buildingId];
   if (!def || def.worship) return false;
+  // CIV6 (Songs of the Jeli): "May purchase Commercial Hub district
+  // buildings with Faith" — the roster's own door, open with no suzerain
+  // (`FAITH_PURCHASE_DISTRICT_ROWS`)
+  if (getModifiers(state, seat).faithPurchaseDistricts.has(def.district)) return true;
   if (!VALLETTA_FAITH_DISTRICTS.includes(def.district)) return false;
   return suzerainEffect(state, seat, 'faithBuildings');
 }

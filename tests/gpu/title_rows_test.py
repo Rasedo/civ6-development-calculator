@@ -166,12 +166,12 @@ def test_mana(rules, path) -> None:
     # the START techs ride the fixture's own draw, so seat the row and re-lay
     play(sim, 0, "MAORI")
     sim.civ_techs[B0, 0, :] = False
-    sim._apply_start_techs()
+    sim._apply_roster_start()
     for name in ("SAILING", "SHIPBUILDING"):
         assert bool(sim.civ_techs[B0, 0, TECHS.index(name)]), f"the Maori did not start with {name}"
     play(sim, 1, "ROME")
     sim.civ_techs[B0, 1, :] = False
-    sim._apply_start_techs()
+    sim._apply_roster_start()
     assert not bool(sim.civ_techs[B0, 1, TECHS.index("SAILING")]), "a plain seat took the start"
 
     def writer(name) -> float:

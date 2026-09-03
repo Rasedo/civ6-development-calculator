@@ -730,7 +730,7 @@ _MUTABLE = [
     "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair

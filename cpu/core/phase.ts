@@ -17,7 +17,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -360,6 +360,11 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     spawnUnit(state, type, cityState.centerIndex, seat);
   }
   cityState.lastLevyTurn = state.turn;
+  // CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): the levy
+  // hands two Envoys back (`LEVY_ROWS`)
+  for (const r of getModifiers(state, seat).levy) {
+    if (r.envoys) seatOf(state, seat)!.envoysAvailable = (seatOf(state, seat)!.envoysAvailable ?? 0) + r.envoys;
+  }
   state.eventLog.push(`${cityState.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
   return ok;
 }
@@ -408,6 +413,15 @@ export function standingLoyalty(state: GameState, city: City): number {
   // CIV6 (Great Turkish Bombard): "Cities not founded by the Ottomans gain
   // ... +4 Loyalty per turn"
   n += notFoundedSum(state, city, 'loyalty');
+  // CIV6 (Radio Oranje): "+2 Loyalty per turn in the ORIGIN city of a
+  // domestic Trade Route" — once per such route out of this city
+  if (mods.domesticRouteLoyalty) {
+    let domestic = 0;
+    for (const r of seatOf(state, city.seat)?.tradeRoutes ?? []) {
+      if (r.from === city.id && r.toSeat === undefined) domestic += 1;
+    }
+    n += mods.domesticRouteLoyalty * domestic;
+  }
   if (mods.garrisonLoyalty.length) {
     const garrison = unitsAt(state, city.centerIndex).find(
       (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
@@ -2385,6 +2399,19 @@ export function seatPhase(state: GameState): void {
         for (const c of actor.cities) {
           if (c.followedReligion === o.seat) faithSum += ALLIANCE_REL3_FAITH_PER_POP * c.population;
         }
+      }
+    }
+    // CIV6 (The Last Prophet): "+1 Science for each foreign city following
+    // Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
+    const foreignRows = getModifiers(state, actor.seat).foreignFollowerYields;
+    if (foreignRows.length) {
+      const foreign = foreignFollowerCount(state, actor.seat);
+      for (const r of foreignRows) {
+        const amt = r.amount * Math.floor(foreign / Math.max(1, r.per));
+        if (r.yield === 'science') sciSum += amt;
+        else if (r.yield === 'culture') culSum += amt;
+        else if (r.yield === 'gold') goldSum += amt;
+        else if (r.yield === 'faith') faithSum += amt;
       }
     }
     // the seat's OUTPUT this turn, stored for allies' percentage reads -
