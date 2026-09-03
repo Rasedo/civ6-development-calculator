@@ -268,11 +268,10 @@ class SimOrders:
                                          torch.zeros_like(hsl))
                     tier = h_form + self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1) + 1
                     civ_ok = torch.zeros_like(fum)
+                    _nav_o = self.unit_naval[utp.clamp(min=0)]
                     for _k in range(1, self._form_max + 1):
-                        _ci = self._formation_civic[_k] if _k < len(self._formation_civic) else -1
-                        if _ci < 0:
-                            continue
-                        civ_ok = civ_ok | ((tier == _k) & self.civ_civics[:, row, _ci])
+                        _land_o, _sea_o = self._form_civic_ok(row, _k)
+                        civ_ok = civ_ok | ((tier == _k) & torch.where(_nav_o, _sea_o, _land_o))
                     okf = (fum & (ftg >= 0) & _live & (h_seat == row) & (h_type == utp)
                            # CIV6: "Cannot form Corps or Armies by any means"
                            & (utp != self._gdr_idx) & (h_type != self._gdr_idx)

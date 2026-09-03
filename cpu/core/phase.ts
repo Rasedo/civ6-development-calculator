@@ -402,8 +402,21 @@ export function standingLoyalty(state: GameState, city: City): number {
     if (!def || dark.has(def.district)) continue;
     n += def.loyalty ?? 0;
   }
+  // CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's rows
+  // for a garrisoned unit, the second only for a Corps or an Army
+  const mods = getModifiers(state, city.seat);
+  if (mods.garrisonLoyalty.length) {
+    const garrison = unitsAt(state, city.centerIndex).find(
+      (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
+    );
+    if (garrison) {
+      for (const r of mods.garrisonLoyalty) {
+        if (!r.formation || (garrison.formation ?? 0) > 0) n += r.amount;
+      }
+    }
+  }
   // CIV6 (Automated Workforce): "-5 Loyalty per turn in your cities."
-  return n + governorLoyaltyAura(state, city) + getModifiers(state, city.seat).loyaltyAll;
+  return n + governorLoyaltyAura(state, city) + mods.loyaltyAll;
 }
 
 /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors." The
@@ -1106,7 +1119,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       const tier = a < formLo + NU ? 1 : 2;
       const id = units[(a - formLo) % NU];
       const def = id ? UNITS[id] : undefined;
-      const civic = FORMATION_CIVIC[tier];
+      // CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the roster's own civic for
+      // this TIER and domain, the catalog's otherwise
+      const fRow = def && getModifiers(state, actor.seat).formations.find(
+        (r) => r.tier === tier && r.naval === !!def.naval && r.civic !== undefined);
+      const civic = fRow?.civic ?? FORMATION_CIVIC[tier];
       if (def && def.combat > 0 && unitDomain(id) === 'military' && !formationBanned(id)
           && civCity.buildings.includes(def.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land)
           && (!civic || isCivicComplete(state, civic, actor.seat))

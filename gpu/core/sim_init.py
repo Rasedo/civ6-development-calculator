@@ -2798,6 +2798,21 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["policySlots"]]  # type: ignore[misc]
         self._post_combat_yield_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postCombatYields"]]  # type: ignore[misc]
+        # THE MOUNTAIN, THE GOVERNOR AND THE FORMATION
+        self._work_mountain_rows: list[tuple[int, int]] = [
+            (int(r[0]), int(r[1])) for r in _uq["workMountains"]]
+        self._route_terrain_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["routeTerrain"]]  # type: ignore[misc]
+        # [civ, leaderRow, yield, pct, founded]
+        self._governor_yield_rows: list[tuple[int, int, int, float, int]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4])) for r in _uq["governorYields"]]
+        self._governor_loyalty_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["governorLoyalty"]]  # type: ignore[misc]
+        self._garrison_loyalty_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["garrisonLoyalty"]]  # type: ignore[misc]
+        # [civ, leaderRow, tier, naval, civic, cs]
+        self._formation_rows: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["formations"]]  # type: ignore[misc]
         self._intl_route_rows: list[tuple[int, int, int, float]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [

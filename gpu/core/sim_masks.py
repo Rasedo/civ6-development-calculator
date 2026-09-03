@@ -910,6 +910,36 @@ class SimMasks:
         key = (self.row_civ if civ >= 0 else self.row_leader).gather(1, r).reshape(seat.shape)
         return (seat >= 0) & (seat < NM) & (key == (civ if civ >= 0 else leader))
 
+    def _work_ground(self, row: int) -> torch.Tensor:
+        """[B, T] — where a citizen of this row may stand: the exporter's
+        `work_ok` plane, widened by the roster's own row. CIV6 (Mit'a):
+        "Citizens may work Mountain tiles" — a MOUNTAIN and nothing else the
+        impassable plane refuses (an ice sheet stays unworkable)."""
+        out = self.work_ok
+        for _wc, _wl in self._work_mountain_rows:
+            _ww = self._row_is(row, _wc, _wl)
+            if bool(_ww.any()):
+                out = out | (_ww.unsqueeze(1) & self.tile_mountain & (self.feat_id < 0))
+        return out
+
+    def _form_civic_ok(self, row: int, tier: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(land, naval) [B] — is the civic this FORMATION tier needs in? The
+        roster's own row answers for the domain it names
+        (EFFECT_ADJUST_CORPS_ARMY_PREREQ); the catalog's civic answers for
+        every other seat and domain."""
+        B, dev = self.B, self.device
+        base_i = self._formation_civic[tier] if tier < len(self._formation_civic) else -1
+        base = (self.civ_civics[:, row, base_i] if base_i >= 0
+                else torch.zeros(B, dtype=torch.bool, device=dev))
+        out = [base, base]
+        for _fc, _fl, _ft, _fn, _fci, _fcs in self._formation_rows:
+            if _ft != tier or _fci < 0:
+                continue
+            _fw = self._row_is(row, _fc, _fl)
+            if bool(_fw.any()):
+                out[_fn] = torch.where(_fw, self.civ_civics[:, row, _fci], out[_fn])
+        return out[0], out[1]
+
     def _farm_ground(self, row: int, civics: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — where this row may build a FARM: the exporter's two static
         planes under the hill-farms civic, widened by the roster's terrain rows
@@ -977,14 +1007,15 @@ class SimMasks:
         return out
 
     def _roster_cs(self, seat: torch.Tensor, utype: torch.Tensor, tile: torch.Tensor,
-                   foe_seat: torch.Tensor, foe_hp: torch.Tensor | None, foe_city: bool) -> torch.Tensor:
+                   foe_seat: torch.Tensor, foe_hp: torch.Tensor | None, foe_city: bool,
+                   formation: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `rosterCS`: the flat Combat Strength a unit's
         civilization or leader adds under its row's clause (`COMBAT_CS_ROWS`):
         against a city-state's unit, a wounded one, a city or district, for a
         class, on a coastal tile (a hull on Coast, a land unit on coastal
         land, never embarked)."""
         z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
-        if not self._combat_cs_rows:
+        if not self._combat_cs_rows and not self._formation_rows:
             return z
         t = utype.clamp(min=0, max=self.NU - 1)
         combat = (utype >= 0) & (self._type_combat[t] > 0)
@@ -1014,6 +1045,15 @@ class SimMasks:
                 out = out + who.long() * amt * _mp
             else:
                 out = out + who.long() * amt
+        # CIV6 (EFFECT_ADJUST_CORPS_ARMY_MODIFIED_STRENGTH): what this row's own
+        # FORMATION adds, for the domain the row names
+        if self._formation_rows and formation is not None:
+            naval = self.unit_naval[t]
+            for _fc, _fl, _ft, _fn, _fci, _fcs in self._formation_rows:
+                if not _fcs:
+                    continue
+                _fw = self._seat_is(seat, _fc, _fl) & combat & (formation == _ft) & (naval == bool(_fn))
+                out = out + _fw.long() * _fcs
         return out
 
     def _roster_embark_mp(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
@@ -2837,11 +2877,12 @@ class SimMasks:
                                   torch.zeros_like(_hm))
             _tier = _h_form.reshape(B, N, 6) + self.unit_formation.gather(1, sc).unsqueeze(2) + 1
             _civ_ok = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
+            _nav_u = self.unit_naval[utype.clamp(min=0)].unsqueeze(2)
             for _k in range(1, self._form_max + 1):
-                _ci = self._formation_civic[_k] if _k < len(self._formation_civic) else -1
-                if _ci < 0:
-                    continue
-                _civ_ok = _civ_ok | ((_tier == _k) & civics[:, _ci].view(B, 1, 1))
+                _land, _sea = self._form_civic_ok(row, _k)
+                _have = torch.where(_nav_u, _sea.view(B, 1, 1).expand_as(_nav_u),
+                                    _land.view(B, 1, 1).expand_as(_nav_u))
+                _civ_ok = _civ_ok | ((_tier == _k) & _have)
             # CIV6 (Giant Death Robot): "Cannot form Corps or Armies by any
             # means" — neither as the actor nor as the host.
             _no_form = ((utype == self._gdr_idx).unsqueeze(2)

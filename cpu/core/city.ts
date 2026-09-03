@@ -1,7 +1,7 @@
 
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
+import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
@@ -148,6 +148,10 @@ export function cityMaintenance(state: GameState, city: City): number {
 
 export function workableTiles(state: GameState, city: City): Tile[] {
   const center = state.map.tiles[city.centerIndex];
+  // CIV6 (Mit'a, EFFECT_ADJUST_PLAYER_TERRAIN_WORK_IMPASSABLE_MODIFIER):
+  // "Citizens may work Mountain tiles" — the roster's own row, and the ONLY
+  // impassable ground it opens (an ice sheet stays unworkable).
+  const mtnOk = getModifiers(state, city.seat).workMountains;
   return tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS).filter(
     (t) =>
       tileBelongsTo(t, city) &&
@@ -158,7 +162,7 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       // CIV6: contaminated tiles "cannot be worked by the city until the
       // contamination timer expires or until the tile is cleaned".
       !irradiated(t) &&
-      !isImpassable(t),
+      (!isImpassable(t) || (mtnOk && isMountain(t) && !t.feature)),
   );
 }
 
@@ -1024,6 +1028,12 @@ export function computeCityStats(
     // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
     // (`HAPPY_YIELD_ROWS`) — a percentage over the same total
     for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) total[k] *= 1 + r.pct / 100;
+    // CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for a
+    // city with an ESTABLISHED governor, tripled in one this seat did not found
+    if (m.governorYields.length && (seatOf(state, city.seat)?.governors ?? []).some((g) => g.appointed && g.cityId === city.id && g.establishTurns <= 0)) {
+      const founded = (city.founderSeat ?? city.seat) === city.seat;
+      for (const r of m.governorYields) if (r.yield === k && r.founded === founded) total[k] *= 1 + r.pct / 100;
+    }
   }
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
     total[k] *= m.yieldMult[k] ?? 1;

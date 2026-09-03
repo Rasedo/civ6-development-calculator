@@ -3537,7 +3537,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == row)
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self.work_ok & ~self._fallout())
+            & gat(self._work_ground(row) & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)
             & (gat(self.built_wonder) < 0)
@@ -3668,7 +3668,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == row)
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self.work_ok & ~self._fallout())
+            & gat(self._work_ground(row) & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)  # !t.district
             & (gat(self.built_wonder) < 0)  # !t.builtWonder
@@ -4100,6 +4100,18 @@ class SimEconomy:
                     continue  # food takes no tier factor on either engine
                 _at = (_tier == _ht) & self._row_is(row, _hc, _hl).unsqueeze(1)
                 total[:, :, _hy] = torch.where(_at, total[:, :, _hy] * (1.0 + _hp / 100.0), total[:, :, _hy])
+        # CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for
+        # a city with an ESTABLISHED governor, tripled in one this seat did not
+        # found
+        _grows = [r for r in self._governor_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        if _grows:
+            _est = self._city_has_established_governor(row)[:, sl] if j is None else \
+                self._city_has_established_governor(row)[:, sl][:, j:j + 1]
+            _own = (self.city_founder[:, row, sl] == row) if j is None else \
+                (self.city_founder[:, row, sl] == row)[:, j:j + 1]
+            for _gc, _gl, _gy, _gp, _gf in _grows:
+                _hit = _est & (_own == bool(_gf)) & self._row_is(row, _gc, _gl).unsqueeze(1)
+                total[:, :, _gy] = torch.where(_hit, total[:, :, _gy] * (1.0 + _gp / 100.0), total[:, :, _gy])
         if gym is not None:
             if self._gov_has_effects:
                 _cz = self._gov_mods(row)[12]["culsuz"]

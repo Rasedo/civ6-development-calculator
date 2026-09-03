@@ -830,7 +830,11 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   if (!host) return { ok: false, reason: 'No unit of this type to join.' };
   const tier = (host.formation ?? 0) + (unit.formation ?? 0) + 1;
   if (tier > FORMATION_MAX) return { ok: false, reason: 'Nothing larger than an Army.' };
-  const civic = FORMATION_CIVIC[tier];
+  // CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the roster's own civic for this
+  // TIER and domain — Shaka's land Corps, Spain's Fleets
+  const naval = !!UNITS[unit.type]?.naval;
+  const row = getModifiers(state, seat).formations.find((r) => r.tier === tier && r.naval === naval && r.civic !== undefined);
+  const civic = row?.civic ?? FORMATION_CIVIC[tier];
   if (civic && !isCivicComplete(state, civic, seat)) return { ok: false, reason: `${civic} is not in.` };
   const vet = veteranOf(host, unit);
   host.formation = tier;

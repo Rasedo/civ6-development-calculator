@@ -6,6 +6,7 @@ import type { GpAppeal } from './appeal';
 import { seatBuildingSum } from './city';
 import { cityDistrictSum } from './yields';
 import { congressGovernorFavorType } from './congress';
+import { getModifiers } from './effects';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
   GOVERNANCE_DOCTRINE_FAVOR, promotionBit, promotionBitValue, type GovernorEffects,
@@ -341,6 +342,17 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
         const t = state.map.tiles[c.centerIndex];
         if (hexDistance(here.col, here.row, t.col, t.row) > aura.range) continue;
         n += own ? aura.loyalty : -aura.loyalty;
+      }
+      // CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE): "All cities
+      // within 9 tiles of a city with your Governor gain +4 Loyalty per turn
+      // towards your civilization" — the ROW's own reach, once per city,
+      // measured from any city of that seat holding an ESTABLISHED governor.
+      const rows = getModifiers(state, c.seat).governorLoyaltyRows;
+      if (!rows.length || !governorsOf(s).some((g) => g.appointed && g.cityId === c.id && g.establishTurns <= 0)) continue;
+      const t = state.map.tiles[c.centerIndex];
+      for (const r of rows) {
+        if (hexDistance(here.col, here.row, t.col, t.row) > r.range) continue;
+        n += c.seat === city.seat ? r.amount : -r.amount;
       }
     }
   }

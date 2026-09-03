@@ -582,3 +582,99 @@ export const POST_COMBAT_YIELD_ROWS: readonly PostCombatYieldRow[] = [
   { leader: 'GORGO', yield: 'culture', pctOfDefeated: 50 },
   { leader: 'TAMAR', yield: 'faith', pctOfDefeated: 50 },
 ];
+
+// ---------------------------------------------------------------------------
+// THE MOUNTAIN, THE GOVERNOR AND THE FORMATION
+
+/** CIV6 (Mit'a, EFFECT_ADJUST_PLAYER_TERRAIN_WORK_IMPASSABLE_MODIFIER):
+ *  "Citizens may work Mountain tiles." The install names its five mountain
+ *  terrains one by one; this engine's MOUNTAIN elevation is all five. */
+export interface WorkImpassableRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  mountain: true;
+}
+export const WORK_IMPASSABLE_ROWS: readonly WorkImpassableRow[] = [
+  { civ: 'INCA', mountain: true },
+];
+
+/** CIV6 (Qhapaq Ñan,
+ *  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): "Domestic
+ *  Trade Routes gain +1 Food for every Mountain tile in the origin city." */
+export interface RouteTerrainRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  mountain: true;
+  yield: YieldKey;
+  amount: number;
+}
+export const ROUTE_TERRAIN_ROWS: readonly RouteTerrainRow[] = [
+  { leader: 'PACHACUTI', mountain: true, yield: 'food', amount: 1 },
+];
+
+/** CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): "Cities with an
+ *  Established Governor provide +5% Culture, +5% Production ... These numbers
+ *  are tripled in cities not founded by the Mapuche." */
+export interface GovernorYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  pct: number;
+  /** the city this row pays: one this seat FOUNDED, or one it did not */
+  founded: boolean;
+}
+export const GOVERNOR_YIELD_ROWS: readonly GovernorYieldRow[] = [
+  { civ: 'MAPUCHE', yield: 'culture', pct: 5, founded: true },
+  { civ: 'MAPUCHE', yield: 'production', pct: 5, founded: true },
+  { civ: 'MAPUCHE', yield: 'culture', pct: 15, founded: false },
+  { civ: 'MAPUCHE', yield: 'production', pct: 15, founded: false },
+];
+
+/** CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE): "All cities within
+ *  9 tiles of a city with your Governor gain +4 Loyalty per turn towards your
+ *  civilization" — the seat's own cities gain it, a foreign one loses it, the
+ *  shape `governorLoyaltyAura` already pays for the Garrison Commander. */
+export interface GovernorLoyaltyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  range: number;
+}
+export const GOVERNOR_LOYALTY_ROWS: readonly GovernorLoyaltyRow[] = [
+  { civ: 'MAPUCHE', amount: 4, range: 9 },
+];
+
+/** CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): "Cities with a
+ *  garrisoned unit get +3 Loyalty per turn, or +5 if it is a Corps or Army" —
+ *  the second row is the +2 the install adds on top. */
+export interface GarrisonLoyaltyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+  /** paid only when the garrison is a Corps or an Army */
+  formation: boolean;
+}
+export const GARRISON_LOYALTY_ROWS: readonly GarrisonLoyaltyRow[] = [
+  { civ: 'ZULU', amount: 3, formation: false },
+  { civ: 'ZULU', amount: 2, formation: true },
+];
+
+/** CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the civic a formation TIER needs,
+ *  for one domain — Shaka's land Corps at Mercenaries and Armies at
+ *  Nationalism, Spain's Fleets and Armadas both at Mercantilism.
+ *  (EFFECT_ADJUST_CORPS_ARMY_MODIFIED_STRENGTH): what that formation adds. */
+export interface FormationRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** 1 = Corps/Fleet, 2 = Army/Armada */
+  tier: 1 | 2;
+  naval: boolean;
+  civic?: string;
+  cs?: number;
+}
+export const FORMATION_ROWS: readonly FormationRow[] = [
+  { leader: 'SHAKA', tier: 1, naval: false, civic: 'MERCENARIES', cs: 5 },
+  { leader: 'SHAKA', tier: 2, naval: false, civic: 'NATIONALISM', cs: 5 },
+  { civ: 'SPAIN', tier: 1, naval: true, civic: 'MERCANTILISM' },
+  { civ: 'SPAIN', tier: 2, naval: true, civic: 'MERCANTILISM' },
+];

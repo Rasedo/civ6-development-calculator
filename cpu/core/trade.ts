@@ -10,7 +10,7 @@ import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, til
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { isCoastalLand, isWater } from '../../world/query';
+import { isCoastalLand, isWater, isMountain } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
@@ -412,6 +412,15 @@ export function routeYieldsInternational(state: GameState, dest: City, seat: num
   return out;
 }
 
+/** How many MOUNTAIN tiles this city owns — Qhapaq Ñan's per-terrain count. */
+export function cityMountainCount(state: GameState, city: City): number {
+  let n = 0;
+  for (const t of state.map.tiles) {
+    if (t.ownerSeat === city.seat && t.ownerCity === city.id && isMountain(t)) n += 1;
+  }
+  return n;
+}
+
 /** Every route, any seat's, that ends in this city. */
 export function incomingRoutes(state: GameState, city: City): number {
   let n = 0;
@@ -532,6 +541,12 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest) {
       addYields(out, routeYields(state, dest));
+      // CIV6 (Qhapaq Ñan,
+      // EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
+      // ORIGIN city's own mountains pay this seat on every domestic leg
+      for (const r of getModifiers(state, seat).routeTerrain) {
+        out[r.yield] += r.amount * cityMountainCount(state, city);
+      }
       // CIV6 (Surplus Logistics): "Your Trade Routes ending here provide +2
       // Food to their starting city" — the DESTINATION's governor pays the
       // ORIGIN, which is the city this walk is computing.

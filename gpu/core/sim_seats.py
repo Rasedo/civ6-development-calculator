@@ -265,11 +265,14 @@ class SimSeats:
             # means."
             form_u = form_u.clone()
             form_u[self._gdr_idx] = False
+        # the civic each formation TIER needs, PER UNIT TYPE: the roster's row
+        # answers for the domain it names (`_form_civic_ok`), the catalog for
+        # every other seat and domain
         form_civ = []
         for _fk in (1, 2):
-            _fci = self._formation_civic[_fk] if _fk < len(self._formation_civic) else -1
-            form_civ.append(self.civ_civics[:, row, _fci] if _fci >= 0
-                            else torch.zeros(B, dtype=torch.bool, device=dev))
+            _land_f, _sea_f = self._form_civic_ok(row, _fk)
+            form_civ.append(torch.where(self.unit_naval.unsqueeze(0),
+                                        _sea_f.unsqueeze(1), _land_f.unsqueeze(1)))
         w_okc: list[torch.Tensor | None] = []
         for wi in range(nW_m):
             unl_w = self._wonder_unlock_ok(row, wi)
@@ -361,8 +364,8 @@ class SimSeats:
                 bld_f = torch.where(self.unit_naval.unsqueeze(0),
                                     has_sp.unsqueeze(1), has_ma.unsqueeze(1))
                 base_f = tr_j & form_u.unsqueeze(0) & bld_f
-                ok_f[:, :self.NU] = base_f & form_civ[0].unsqueeze(1)
-                ok_f[:, self.NU:] = base_f & form_civ[1].unsqueeze(1)
+                ok_f[:, :self.NU] = base_f & form_civ[0]
+                ok_f[:, self.NU:] = base_f & form_civ[1]
             room_j = room[:, j].unsqueeze(1)
             prod_cols.append(torch.cat(
                 [base_j & room_j, ok_w & room_j, ok_p & room_j, ok_f & room_j, prom_j], dim=1))
@@ -2126,9 +2129,8 @@ class SimSeats:
                             else torch.zeros_like(is_f))
                 is_f = is_f & torch.where(f_naval, has_sp_a, has_ma_a)
                 for _fk in (1, 2):
-                    _fci = self._formation_civic[_fk] if _fk < len(self._formation_civic) else -1
-                    civ_ok_f = (self.civ_civics[:, row, _fci] if _fci >= 0
-                                else torch.zeros_like(is_f))
+                    _land_a, _sea_a = self._form_civic_ok(row, _fk)
+                    civ_ok_f = torch.where(f_naval, _sea_a, _land_a)
                     is_f = is_f & ((ftier != _fk) | civ_ok_f)
                 # Math.round is half-UP; torch.round is half-even, so spell it
                 cost_f = torch.floor(self._type_cost.gather(0, fui).double()
@@ -4192,6 +4194,29 @@ class SimSeats:
         stand = self.city_bldg[:, row] & ~self._bldg_dark(reg) & self.city_alive[:, row].unsqueeze(2)
         return torch.einsum("bjn,n->b", stand.to(w.dtype), w)
 
+    def _city_terrain_count(self, row: int, plane: torch.Tensor) -> torch.Tensor:
+        """[B, RC] long — how many tiles of each city carry this ground, the
+        `cityMountainCount` twin."""
+        sl = self.city_slot_at(row)
+        out = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        out.scatter_add_(1, sl.clamp(min=0), (plane & (sl >= 0)).long())
+        return out
+
+    def _city_has_established_governor(self, row: int) -> torch.Tensor:
+        """[B, RC] — does an APPOINTED governor sit here with its establishment
+        clock run out? The abilities' own gate, by city column."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        if not self.n_governors:
+            return out
+        ids = self.city_id[:, row, : self.RC]
+        for g in range(self.civ_gov_city.shape[2]):
+            live = (self.civ_gov_appointed[:, row, g] & (self.civ_gov_establish[:, row, g] <= 0))
+            if not bool(live.any()):
+                continue
+            out = out | (live.unsqueeze(1) & (self.civ_gov_city[:, row, g].unsqueeze(1) == ids)
+                         & self.city_alive[:, row, : self.RC])
+        return out
+
     def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
         """[n] f64 — CIV6 (Monument): "+1 Loyalty", and (Government Plaza)
         "+8 Loyalty to this city": the flat per-turn term everything standing in
@@ -4208,12 +4233,56 @@ class SimSeats:
         if w.numel() and bool((w != 0).any()):
             stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg)
             out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        # CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's
+        # rows for a garrisoned unit, the second only for a Corps or an Army
+        if self._garrison_loyalty_rows:
+            ctr = self.city_center[bidx, row, col].clamp(min=0)
+            gslot = self.military_at.gather(1, ctr.unsqueeze(1)).squeeze(1)
+            gar = (gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)
+            form = self.unit_formation[bidx, gslot.clamp(min=0)] > 0
+            for _lc, _ll, _la, _lf in self._garrison_loyalty_rows:
+                _lw = self._row_is(row, _lc, _ll)[bidx]
+                hit = _lw & gar & (form if _lf else torch.ones_like(gar))
+                out = out + hit.double() * _la
         # CIV6 (Garrison Commander / Emissary): the two governor auras, and
         # (Automated Workforce): "-5 Loyalty per turn in your cities."
         if self.n_governors and row < self.n_majors:
             out = out + self._governor_loyalty_aura(row)[bidx, col]
+        if self._governor_loyalty_rows:
+            out = out + self._roster_loyalty_aura(row)[bidx, col]
         if self._gov_has_effects:
             out = out + self._gov_mods(row)[12]["loyall"].double()[bidx]
+        return out
+
+    def _roster_loyalty_aura(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE):
+        "All cities within 9 tiles of a city with your Governor gain +4 Loyalty
+        per turn towards your civilization" — the seat's OWN cities gain it and
+        a foreign one loses it, the shape `governorLoyaltyAura` already pays
+        for the Garrison Commander. Never paid to the governed city itself."""
+        B, RC, dev = self.B, self.RC, self.device
+        out = torch.zeros(B, RC, dtype=torch.float64, device=dev)
+        if not self._governor_loyalty_rows or not self.n_governors:
+            return out
+        here = self.city_center[:, row].clamp(min=0)  # [B, RC]
+        ids = self.city_id[:, row]
+        for src in range(self.n_majors):
+            rows = [r for r in self._governor_loyalty_rows if bool(self._row_is(src, r[0], r[1]).any())]
+            if not rows:
+                continue
+            est = self._city_has_established_governor(src)          # [B, RC]
+            if not bool(est.any()):
+                continue
+            seat_ok = self._row_is(src, rows[0][0], rows[0][1])     # [B]
+            src_ctr = self.city_center[:, src].clamp(min=0)         # [B, RC]
+            d = self.pair_dist[here.unsqueeze(2), src_ctr.unsqueeze(1)]  # [B, RC, RC]
+            same = (ids.unsqueeze(2) == self.city_id[:, src].unsqueeze(1)) if src == row else                 torch.zeros_like(d, dtype=torch.bool)
+            live = (est.unsqueeze(1) & self.city_alive[:, src].unsqueeze(1)
+                    & self.city_alive[:, row].unsqueeze(2) & ~same)
+            for _lc, _ll, _amt, _rng in rows:
+                near = live & (d <= _rng)
+                n = (near & seat_ok.reshape(B, 1, 1)).any(dim=2).double()
+                out = out + n * (_amt if src == row else -_amt)
         return out
 
     def _ungoverned_loyalty(self, row: int) -> torch.Tensor:
@@ -5536,6 +5605,14 @@ class SimSeats:
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        # CIV6 (Qhapaq Ñan,
+        # EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
+        # ORIGIN city's own mountains pay on every domestic leg
+        for _tc, _tl, _ty, _ta in self._route_terrain_rows:
+            _tw = self._row_is(row, _tc, _tl)
+            if bool(_tw.any()):
+                _mtn = self._city_terrain_count(row, self.tile_mountain).gather(1, from_j).double()
+                inc.scatter_add_(1, from_j * 6 + _ty, _ta * _mtn * pd * _tw.double().unsqueeze(1))
         # CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
         # the ORIGIN side): this row's route out, per named improvement at its
         # destination city (`ROUTE_IMPROVEMENT_ROWS`) — the domestic leg
@@ -7356,7 +7433,8 @@ class SimSeats:
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._ally_war_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
-                atk_e = atk_e + self._roster_cs(a_seat[:, u], a_type[:, u], here, d_seat_m, def_hp, False).to(atk_e.dtype)
+                atk_e = atk_e + self._roster_cs(a_seat[:, u], a_type[:, u], here, d_seat_m, def_hp, False,
+                                                getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
@@ -7365,7 +7443,8 @@ class SimSeats:
             def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + self._vis_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             def_e = def_e + self._ally_war_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
-            def_e = def_e + self._roster_cs(def_civ_u, d_type, ttc, a_seat[:, u], a_hp[:, u], False).to(def_e.dtype)
+            def_e = def_e + self._roster_cs(def_civ_u, d_type, ttc, a_seat[:, u], a_hp[:, u], False,
+                                            self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, a_type[:, u])
@@ -8300,7 +8379,8 @@ class SimSeats:
                  + (self._congress_unit_cs(at0, a_seat[:, u])
                     + self._gov_unit_cs(at0, a_seat[:, u])).to(def_cs.dtype)
                  + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
-                                   self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True).to(def_cs.dtype))
+                                   self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True,
+                                   getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(def_cs.dtype))
         roll = self._damage_roll(att, atk_e - def_cs, k=key, tile=tc)
         self._encamp_take_roll(att, tc, at0, a_seat[:, u], roll, True)
         self._ww_battle(att, self._row_of(a_seat[:, u]),
@@ -8349,7 +8429,8 @@ class SimSeats:
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
             a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
-            self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
+            self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True,
+            getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_e.dtype)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
         d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
@@ -8767,7 +8848,8 @@ class SimSeats:
                              + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
         atk_e = atk_e + self._roster_cs(
             a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
-            self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
+            self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True,
+            getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_e.dtype)
         if getattr(self, "_battle_probe", False) and bool(att.any()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
                 print(f"GPU-BATTLE b={_b} t={self.turn} tgt={int(tgt[_b])} "
@@ -8924,7 +9006,8 @@ class SimSeats:
                          + self._congress_unit_cs(at0, a_seat[:, u])
                          + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
         atk_e = atk_e + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
-                                        self.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), None, True).to(atk_e.dtype)
+                                        self.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), None, True,
+                                        getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_e.dtype)
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         self._spend_one_attack(atk_kind, u, att)
@@ -9096,6 +9179,7 @@ class SimSeats:
         atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
                   + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
+        a_form = getattr(self, f"{atk_kind}_unit_formation")[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[ut0] | _emb_p[:, u]
         # `cityAtIndex` finds ANY major's centre, so this arm was never seat
@@ -9137,7 +9221,7 @@ class SimSeats:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                              + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
-            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, hrow, None, True).to(atk_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, hrow, None, True, a_form).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
@@ -9193,7 +9277,7 @@ class SimSeats:
                 atk_cs = atk_cs + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_cs.dtype)
             atk_cs = atk_cs + (self._congress_unit_cs(ut0, a_seat)
                                + self._gov_unit_cs(ut0, a_seat)).to(atk_cs.dtype)
-            atk_cs = atk_cs + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True).to(atk_cs.dtype)
+            atk_cs = atk_cs + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form).to(atk_cs.dtype)
             d_csv = self._damage_roll(cs_att, atk_cs - def_cs, k="vrngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(100 + csx), tgt, city=True)
@@ -9281,8 +9365,9 @@ class SimSeats:
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
             def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
             atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
-            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False).to(def_e.dtype)
-            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False).to(atk_e.dtype)
+            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False,
+                                            self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False, a_form).to(atk_e.dtype)
             def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
                              + self._gov_unit_cs(d_type, def_civ_u)
                              + self._era_matchup_cs(def_civ_u, ut0)
@@ -9408,7 +9493,8 @@ class SimSeats:
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_city = self._damage_roll(city_att,
                                        atk_base - atk_rs0 + _rs + _cpromo + rel_city
-                                       + self._roster_cs(aseat, at0, a_tile[:, u], hrow, None, True).to(atk_base.dtype)
+                                       + self._roster_cs(aseat, at0, a_tile[:, u], hrow, None, True,
+                                                         getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_base.dtype)
                                        - def_cs,
                                        k="rngrc", tile=tgt)
             self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
@@ -9443,7 +9529,8 @@ class SimSeats:
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_cs = self._damage_roll(cs_att,
                                      atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city
-                                     + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True).to(atk_base.dtype)
+                                     + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True,
+                                                       getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_base.dtype)
                                      - def_cs,
                                      k="rngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
@@ -9508,8 +9595,10 @@ class SimSeats:
             atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
             def_e = def_e + (self._vis_cs(d_seat, aseat) + self._ally_war_cs(d_seat, aseat)).to(def_e.dtype)
             atk_e = atk_e + (self._vis_cs(aseat, d_seat) + self._ally_war_cs(aseat, d_seat)).to(atk_e.dtype)
-            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, aseat, a_hp[:, u], False).to(def_e.dtype)
-            atk_e = atk_e + self._roster_cs(aseat, at0, a_tile[:, u], d_seat, def_hp, False).to(atk_e.dtype)
+            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, aseat, a_hp[:, u], False,
+                                            self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
+            atk_e = atk_e + self._roster_cs(aseat, at0, a_tile[:, u], d_seat, def_hp, False,
+                                            getattr(self, f"{atk_kind}_unit_formation")[:, u]).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
                              + self._gov_unit_cs(d_type, _ucs_seat)

@@ -1,7 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow } from '../data/civilizations';
+import { HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -155,6 +155,13 @@ export interface Modifiers {
   postCombatYields: readonly PostCombatYieldRow[];
   /** how many MILITARY policies this seat has slotted — Thermopylae's magnitude */
   militaryPolicies: number;
+  /** CIV6 (Mit'a): a citizen of this seat may work a MOUNTAIN */
+  workMountains: boolean;
+  routeTerrain: readonly RouteTerrainRow[];
+  governorYields: readonly GovernorYieldRow[];
+  governorLoyaltyRows: readonly GovernorLoyaltyRow[];
+  garrisonLoyalty: readonly GarrisonLoyaltyRow[];
+  formations: readonly FormationRow[];
   /** the roster's heal on eliminating a unit */
   postKillHeal: number;
   embarkMoves: readonly EmbarkMoveRow[];
@@ -322,6 +329,12 @@ export function defaultModifiers(): Modifiers {
     happyGpp: [],
     postCombatYields: [],
     militaryPolicies: 0,
+    workMountains: false,
+    routeTerrain: [],
+    governorYields: [],
+    governorLoyaltyRows: [],
+    garrisonLoyalty: [],
+    formations: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -538,6 +551,12 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.happyYields = mine(HAPPY_YIELD_ROWS);
   mods.happyGpp = mine(HAPPY_GPP_ROWS);
   mods.postCombatYields = mine(POST_COMBAT_YIELD_ROWS);
+  mods.workMountains = mine(WORK_IMPASSABLE_ROWS).length > 0;
+  mods.routeTerrain = mine(ROUTE_TERRAIN_ROWS);
+  mods.governorYields = mine(GOVERNOR_YIELD_ROWS);
+  mods.governorLoyaltyRows = mine(GOVERNOR_LOYALTY_ROWS);
+  mods.garrisonLoyalty = mine(GARRISON_LOYALTY_ROWS);
+  mods.formations = mine(FORMATION_ROWS);
   // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
   // adjacency adds the cards write, so `districtAdjacency` reads one list
   for (const r of DISTRICT_ADJ_ROWS) {

@@ -846,12 +846,12 @@ export function healOnEliminate(state: GameState, victor: Unit): void {
  * civilization or leader adds under the row's clause — see `COMBAT_CS_ROWS`.
  * `foeHp` is null against a city, `foeIsCity` marks a district target.
  */
-export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean },
+export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number },
     foeSeat: number, foeHp: number | null, foeIsCity: boolean): number {
   if (!isCiv(own.seat)) return 0;
   const mods = getModifiers(state, own.seat);
   const rows = mods.combatCs;
-  if (rows.length === 0) return 0;
+  if (rows.length === 0 && mods.formations.length === 0) return 0;
   const def = UNITS[own.type];
   if (!def || !(def.combat ?? 0)) return 0;
   const bit = classBitOf(own.type);
@@ -868,6 +868,15 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile));
     // CIV6 (Thermopylae): the magnitude is per slotted Military policy
     if (hit) cs += r.per === 'militaryPolicy' ? r.amount * mods.militaryPolicies : r.amount;
+  }
+  // CIV6 (EFFECT_ADJUST_CORPS_ARMY_MODIFIED_STRENGTH): what this roster row's
+  // own FORMATION adds, for the domain the row names
+  const tier = own.formation ?? 0;
+  if (tier > 0) {
+    const naval = !!def.naval;
+    for (const r of mods.formations) {
+      if (r.tier === tier && r.naval === naval && r.cs) cs += r.cs;
+    }
   }
   return cs;
 }
