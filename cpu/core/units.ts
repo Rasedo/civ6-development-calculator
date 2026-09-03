@@ -2056,6 +2056,22 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
   const owner = seatOf(state, unit.seat);
   if (!tile.goodyHut || !owner || !isCiv(unit.seat)) return;
   tile.goodyHut = false;
+  drawAndPayGoody(state, unit, tile);
+}
+
+/**
+ * Draw one village reward and pay it — the ONE payout body, so the tile a
+ * unit walked onto and the barbarian outpost it cleared cannot drift apart on
+ * what a village is worth.
+ *
+ * CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture a
+ * barbarian outpost" is the second caller (`CAMP_GOODY_ROWS`), and the
+ * install spells it as exactly that — EFFECT_ADJUST_IMPROVEMENT_GOODY_HUT
+ * mapping IMPROVEMENT_BARBARIAN_CAMP to IMPROVEMENT_GOODY_HUT.
+ */
+export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void {
+  const owner = seatOf(state, unit.seat);
+  if (!owner) return;
   const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0);
   if (!sub) return;
   const p = sub.payload;

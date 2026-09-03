@@ -4,6 +4,9 @@ import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { claimGoodyHut, mostAdvancedStrategic } from '../../../cpu/core/units';
 import { drawGoodyReward, goodyEligible, eligibleGoodyKinds } from '../../../cpu/core/goodyHuts';
 import { GOODY_SUBTYPES, GOODY_KINDS, GOODY_KIND_WEIGHT } from '../../../cpu/data/goodyHuts';
+import { CAMP_GOODY_ROWS } from '../../../cpu/data/civilizations';
+import { getModifiers } from '../../../cpu/core/effects';
+import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { STRATEGIC_IDS, GAME_SPEED } from '../../../cpu/data/constants';
 import { governorTitlesEarned } from '../../../cpu/core/governors';
 import type { GameState, Unit } from '../../../cpu/core/types';
@@ -137,5 +140,22 @@ describe('claiming a village', () => {
     // with no source at all the fallback is slot 0, the ancient one
     expect(mostAdvancedStrategic(state, 0)).toBe(0);
     expect(STRATEGIC_IDS[0]).toBe('HORSES');
+  });
+});
+
+describe('Epic Quest`s outpost reward', () => {
+  it('reads the install: one row, and it is Sumeria', () => {
+    expect(CAMP_GOODY_ROWS.length).toBe(1);
+    expect(CAMP_GOODY_ROWS[0].civ).toBe('SUMERIA');
+  });
+
+  it('pays the SAME table a village pays, and only for that seat', () => {
+    const plain = makeState(makeMap(16, 16, 'GRASSLAND'));
+    plain.seats.push(emptySeat(1));
+    expect(getModifiers(plain, 0).campGoody).toBe(false);
+    const sumer = makeState(makeMap(16, 16, 'GRASSLAND'));
+    sumer.seats.push(emptySeat(1));
+    sumer.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'SUMERIA');
+    expect(getModifiers(sumer, 0).campGoody).toBe(true);
   });
 });

@@ -1090,6 +1090,19 @@ export const ALL_FOLLOWER_BELIEFS_ROWS: readonly AllFollowerBeliefsRow[] = [
   { civ: 'INDIA' },
 ];
 
+/** CIV6 (Epic Quest, TRAIT_BARBARIAN_CAMP_GOODY): "Receive a Tribal Village
+ *  reward each time you capture a barbarian outpost." The install spells it
+ *  as EFFECT_ADJUST_IMPROVEMENT_GOODY_HUT, mapping IMPROVEMENT_BARBARIAN_CAMP
+ *  to IMPROVEMENT_GOODY_HUT — so it is the SAME draw, not a reward of its own
+ *  (C-47). */
+export interface CampGoodyRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const CAMP_GOODY_ROWS: readonly CampGoodyRow[] = [
+  { civ: 'SUMERIA' },
+];
+
 /** CIV6 (Dharma, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE): "+100%
  *  Religious pressure from your Trade Routes", on both ends of the leg. */
 export interface RoutePressureRow {

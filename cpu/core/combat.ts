@@ -24,6 +24,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
+import { drawAndPayGoody } from './units';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -72,6 +73,12 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   markAntiquitySite(state, tileIndex, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
+  // CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture
+  // a barbarian outpost" — the install maps the camp to a goody hut outright,
+  // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`, C-47).
+  if (clearer && getModifiers(state, unit.seat).campGoody) {
+    drawAndPayGoody(state, unit, state.map.tiles[tileIndex]);
+  }
 }
 
 

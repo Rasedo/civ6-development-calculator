@@ -4627,82 +4627,94 @@ class SimSeats:
         hit = hit & (seat >= 0) & (seat < self.n_majors)
         if not bool(hit.any()):
             return
-        ch = self._goody_ch
-        cap = int(self.rules.combat.get("unitHp", 100))
         for b in hit.nonzero(as_tuple=True)[0].tolist():
             t = int(tile[b])
             srow = int(seat[b])
             self.tile_goody[b, t] = False
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
-            alive = self.city_alive[b, srow]
-            sub = self._draw_goody_reward(one, b, bool(alive.any()))
-            if sub is None:
-                continue
-            _id, _hut, _w, _turn, _moc, pay, amt, unit_i, pcls = self._goody_sub[sub]
-            # the claimer's nearest city — where settlers, builders and traders
-            # arrive, and whose population a village of survivors joins
-            near = -1
-            if bool(alive.any()):
-                cols = alive.nonzero().flatten()
-                d = self.pair_dist[self.city_center[b, srow, cols].clamp(min=0), t]
-                near = int(cols[int(d.argmin())])
-            if pay == ch["relic"]:
-                self.civ_relic_reserve[b, srow] += amt
-            elif pay == ch["gold"]:
-                self.civ_treasury[b, srow] += amt
-            elif pay == ch["faith"]:
-                self.civ_faith[b, srow] += amt
-            elif pay in (ch["civicBoost"], ch["techBoost"]):
-                civic = pay == ch["civicBoost"]
-                held = self.civ_civics[b, srow] if civic else self.civ_techs[b, srow]
-                bst = self.civ_civic_boosted[b, srow] if civic else self.civ_tech_boosted[b, srow]
-                k = min(held.shape[0], bst.shape[0])
-                for col in self._goody_pool_draw(one, b, (~held[:k] & ~bst[:k]), amt):
-                    if civic:
-                        self.civ_civic_boosted[b, srow, col] = True
-                    else:
-                        self.civ_tech_boosted[b, srow, col] = True
-            elif pay == ch["tech"]:
-                held = self.civ_techs[b, srow]
-                for col in self._goody_pool_draw(one, b, ~held, amt):
-                    self.civ_techs[b, srow, col] = True
-                    self._eff_version += 1
-            elif pay == ch["unitByClass"]:
-                pcl = list(self.rules.promo_classes)
-                pi = pcl.index(pcls) if pcls in pcl else -1
-                if pi >= 0:
-                    ut = self._best_trainable_of_class(srow, pi)
-                    if int(ut[b]) >= 0:
-                        self._spawn_unit(srow, one, tile, ut)
-            elif pay == ch["unitInCity"]:
-                if near >= 0 and unit_i >= 0:
-                    at = torch.full_like(tile, int(self.city_center[b, srow, near]))
-                    self._spawn_unit(srow, one, at,
-                                     torch.full_like(tile, unit_i))
-            elif pay == ch["experience"]:
-                gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
-                    if bool((self.unit_tile[b] == t).any()) else -1
-                if gs >= 0:
-                    self.unit_xp[b, gs] += amt
-            elif pay == ch["heal"]:
-                gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
-                    if bool((self.unit_tile[b] == t).any()) else -1
-                if gs >= 0:
-                    self.unit_hp[b, gs] = min(cap, int(self.unit_hp[b, gs]) + amt)
-            elif pay == ch["population"]:
-                if near >= 0:
-                    self.city_pop[b, srow, near] += amt
-            elif pay == ch["governorTitle"]:
-                self.civ_granted_titles[b, srow] += amt
-            elif pay == ch["envoy"]:
-                self.civ_envoys_avail[b, srow] += amt
-            elif pay == ch["favor"]:
-                self.civ_diplo_favor[b, srow] += amt
-            elif pay == ch["strategic"]:
-                self.civ_stockpile[b, srow, self._most_advanced_strategic(b, srow)] += amt
-            else:
-                raise AssertionError(f"goody payload {self._goody_payload_kinds[pay]} has no arm")
+            self._draw_and_pay_goody(one, b, srow, t)
+
+    def _draw_and_pay_goody(self, one: torch.Tensor, b: int, srow: int, t: int) -> None:
+        """Draw one village reward for game `b` and pay it — the ONE payout
+        body, so the tile a unit walked onto and the barbarian outpost it
+        cleared cannot drift apart on what a village is worth.
+
+        CIV6 (Epic Quest): "Receive a Tribal Village reward each time you
+        capture a barbarian outpost" is the second caller (`CAMP_GOODY_ROWS`),
+        and the install spells it as exactly that — the camp IS a goody hut for
+        that seat. `drawAndPayGoody`'s twin."""
+        ch = self._goody_ch
+        cap = int(self.rules.combat.get("unitHp", 100))
+        tile = torch.full((self.B,), t, dtype=torch.long, device=self.device)
+        alive = self.city_alive[b, srow]
+        sub = self._draw_goody_reward(one, b, bool(alive.any()))
+        if sub is None:
+            return
+        _id, _hut, _w, _turn, _moc, pay, amt, unit_i, pcls = self._goody_sub[sub]
+        # the claimer's nearest city — where settlers, builders and traders
+        # arrive, and whose population a village of survivors joins
+        near = -1
+        if bool(alive.any()):
+            cols = alive.nonzero().flatten()
+            d = self.pair_dist[self.city_center[b, srow, cols].clamp(min=0), t]
+            near = int(cols[int(d.argmin())])
+        if pay == ch["relic"]:
+            self.civ_relic_reserve[b, srow] += amt
+        elif pay == ch["gold"]:
+            self.civ_treasury[b, srow] += amt
+        elif pay == ch["faith"]:
+            self.civ_faith[b, srow] += amt
+        elif pay in (ch["civicBoost"], ch["techBoost"]):
+            civic = pay == ch["civicBoost"]
+            held = self.civ_civics[b, srow] if civic else self.civ_techs[b, srow]
+            bst = self.civ_civic_boosted[b, srow] if civic else self.civ_tech_boosted[b, srow]
+            k = min(held.shape[0], bst.shape[0])
+            for col in self._goody_pool_draw(one, b, (~held[:k] & ~bst[:k]), amt):
+                if civic:
+                    self.civ_civic_boosted[b, srow, col] = True
+                else:
+                    self.civ_tech_boosted[b, srow, col] = True
+        elif pay == ch["tech"]:
+            held = self.civ_techs[b, srow]
+            for col in self._goody_pool_draw(one, b, ~held, amt):
+                self.civ_techs[b, srow, col] = True
+                self._eff_version += 1
+        elif pay == ch["unitByClass"]:
+            pcl = list(self.rules.promo_classes)
+            pi = pcl.index(pcls) if pcls in pcl else -1
+            if pi >= 0:
+                ut = self._best_trainable_of_class(srow, pi)
+                if int(ut[b]) >= 0:
+                    self._spawn_unit(srow, one, tile, ut)
+        elif pay == ch["unitInCity"]:
+            if near >= 0 and unit_i >= 0:
+                at = torch.full_like(tile, int(self.city_center[b, srow, near]))
+                self._spawn_unit(srow, one, at,
+                                 torch.full_like(tile, unit_i))
+        elif pay == ch["experience"]:
+            gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
+                if bool((self.unit_tile[b] == t).any()) else -1
+            if gs >= 0:
+                self.unit_xp[b, gs] += amt
+        elif pay == ch["heal"]:
+            gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
+                if bool((self.unit_tile[b] == t).any()) else -1
+            if gs >= 0:
+                self.unit_hp[b, gs] = min(cap, int(self.unit_hp[b, gs]) + amt)
+        elif pay == ch["population"]:
+            if near >= 0:
+                self.city_pop[b, srow, near] += amt
+        elif pay == ch["governorTitle"]:
+            self.civ_granted_titles[b, srow] += amt
+        elif pay == ch["envoy"]:
+            self.civ_envoys_avail[b, srow] += amt
+        elif pay == ch["favor"]:
+            self.civ_diplo_favor[b, srow] += amt
+        elif pay == ch["strategic"]:
+            self.civ_stockpile[b, srow, self._most_advanced_strategic(b, srow)] += amt
+        else:
+            raise AssertionError(f"goody payload {self._goody_payload_kinds[pay]} has no arm")
 
     def _most_advanced_strategic(self, b: int, row: int) -> int:
         """The most advanced strategic this seat can actually use.

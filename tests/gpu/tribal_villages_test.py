@@ -164,6 +164,41 @@ def test_the_hut_is_its_own_live_plane(rules, path) -> None:
     print("  6 the plane OK — the hut is live, and camp_ok answers terrain alone")
 
 
+def test_epic_quests_outpost_pays_the_same_table(rules, path) -> None:
+    """CIV6 (Epic Quest): a cleared barbarian outpost pays a village reward.
+    The install maps the camp to a goody hut, so it must be the SAME draw off
+    the SAME table — one payout body, or the two drift."""
+    sim = build(path)
+    rows = sim._camp_goody_rows
+    assert len(rows) == 1, f"one carrier expected, wire has {len(rows)}"
+    assert rows[0][0] >= 0, "the carrier names no civilization"
+    # the payout body both callers share really is one body
+    assert hasattr(sim, "_draw_and_pay_goody"), "the outpost has no shared payout to call"
+    ci = rows[0][0]
+    sim.row_civ[B0, ROW] = ci
+    sim.row_leader[B0, ROW] = sim._pair_civ.index(ci)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    assert bool(sim._row_is(ROW, rows[0][0], rows[0][1])[B0]), "the seated carrier does not read"
+    sim.turn = 250
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[B0] = True
+    # the reward is RANDOM, so watch every channel and require one to move
+    def snap():
+        return (int(sim.civ_treasury[B0, ROW]), int(sim.civ_faith[B0, ROW]),
+                int(sim.civ_relic_reserve[B0, ROW]), int(sim.civ_granted_titles[B0, ROW]),
+                int(sim.civ_envoys_avail[B0, ROW]), int(sim.civ_diplo_favor[B0, ROW]),
+                int(sim.civ_stockpile[B0, ROW].sum()), int(sim.civ_techs[B0, ROW].sum()),
+                int(sim.civ_tech_boosted[B0, ROW].sum()),
+                int(sim.civ_civic_boosted[B0, ROW].sum()),
+                int(sim.city_pop[B0, ROW].sum()), int(sim.unit_xp[B0].sum()),
+                int(sim.unit_hp[B0].sum()), int((sim.unit_seat[B0] == ROW).sum()))
+    before = snap()
+    sim._draw_and_pay_goody(one, B0, ROW, int(sim.unit_tile[B0, 0]))
+    assert snap() != before, "a cleared outpost paid the Epic Quest seat nothing"
+    print("  7 Epic Quest OK — one carrier, and the outpost pays the village table")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -173,6 +208,7 @@ def main() -> int:
     test_a_barbarian_claims_nothing(rules, path)
     test_the_draw_moves_one_games_stream(rules, path)
     test_the_hut_is_its_own_live_plane(rules, path)
+    test_epic_quests_outpost_pays_the_same_table(rules, path)
     print("BATTERY OK tribal_villages")
     return 0
 

@@ -3016,6 +3016,11 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["religionAmenities"]]  # type: ignore[misc]
         self._all_follower_belief_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["allFollowerBeliefs"]]  # type: ignore[misc]
+        # CIV6 (Epic Quest): a cleared barbarian outpost pays a village reward —
+        # the install maps the camp to a goody hut outright, so it is the SAME
+        # draw off the SAME table (C-47)
+        self._camp_goody_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["campGoody"]]  # type: ignore[misc]
 
         # TRIBAL VILLAGES (C-47) — the install's own table, straight off the
         # wire so the GPU draws what TS draws. Kind weights are all equal, so

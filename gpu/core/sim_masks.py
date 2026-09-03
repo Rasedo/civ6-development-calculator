@@ -2489,6 +2489,13 @@ class SimMasks:
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)
+                # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
+                # you capture a barbarian outpost" — the install maps the camp
+                # to a goody hut, so it is the SAME draw (`_camp_goody_rows`)
+                if any(bool(self._row_is(_s, _cc, _cl)[b]) for _cc, _cl in self._camp_goody_rows):
+                    _one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    _one[b] = True
+                    self._draw_and_pay_goody(_one, b, _s, int(tile[b]))
 
 
     def _type_civic_slot_ok(self, row: int, per_city: bool) -> torch.Tensor:

@@ -1390,10 +1390,14 @@ under their blocker so the dependency is readable, and both halves count.
   each subtype to be the only drawable one and checks all 23 live rows move
   their own plane, which is the disjoint-arms guard this many channels needs.
 
-  STILL OPEN, and it belongs to the mechanic rather than the table: CIV6 (Epic
-  Quest) "Receive a Tribal Village reward each time you capture a barbarian
-  outpost" — the same draw from the outpost-capture path, which waits on
-  nothing but the wiring.
+  Epic Quest's clause ships with it: CIV6 "Receive a Tribal Village reward
+  each time you capture a barbarian outpost" is `TRAIT_BARBARIAN_CAMP_GOODY`
+  (EFFECT_ADJUST_IMPROVEMENT_GOODY_HUT, IMPROVEMENT_BARBARIAN_CAMP ->
+  IMPROVEMENT_GOODY_HUT), so the install says outright that the camp IS a
+  village for Sumeria — the same draw off the same table, not a reward of its
+  own. Both engines call ONE payout body from both call sites
+  (`drawAndPayGoody` / `_draw_and_pay_goody`), so the tile a unit walked onto
+  and the outpost it cleared cannot drift apart on what a village is worth.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1. The minor
   BUILDS now (`minorBuildPhase` / `_minor_build`): a production pot takes
   POPULATION points a turn — the `minorResearch` pacing stylization, since
