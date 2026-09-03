@@ -281,7 +281,7 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
 /** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
  *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
  *  the age alone. Its "or Free Cities" half waits on a Free City existing. */
-export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden';
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent';
 /** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
  *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
  *  PER slotted policy of the named kind instead of flat. */
@@ -307,6 +307,10 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = [
   // CIV6 (Swift Hawk): "+10 Combat Strength when fighting Free Cities or
   // civilizations that are in a Golden or Heroic Age."
   { leader: 'LAUTARO', amount: 10, when: 'foeGolden' },
+  // CIV6 (Roosevelt Corollary): "Units receive a +5 Combat Strength on their
+  // home continent" — REQUIREMENTS_UNIT_ON_HOME_CONTINENT, the ORIGINAL
+  // capital's landmass (C-48).
+  { leader: 'T_ROOSEVELT', amount: 5, when: 'onHomeContinent' },
 ];
 
 /** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_HEAL, Tomyris): "Heal after

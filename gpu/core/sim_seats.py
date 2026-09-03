@@ -4532,6 +4532,22 @@ class SimSeats:
             1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
         return (home >= 0) & (got == home)
 
+    def _seat_on_home_continent(self, seat: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """The per-SEAT twin of `_on_home_continent`, for the sites that hold a
+        seat TENSOR rather than a row: is each tile on that seat's home
+        landmass? False for a non-major, for a seat with no capital and for
+        water, so a clause keyed on it never pays by accident
+        (`onHomeContinent`)."""
+        ok = (seat >= 0) & (seat < self.n_majors)
+        _s = seat.clamp(min=0, max=max(self.n_majors - 1, 0)).reshape(self.B, -1)
+        cap = self.civ_cap_tile.gather(1, _s).reshape(seat.shape)
+        home = torch.where(
+            cap >= 0,
+            self.tile_continent.gather(1, cap.clamp(min=0).reshape(self.B, -1)).reshape(seat.shape),
+            torch.full_like(cap, -1))
+        got = self.tile_continent.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(seat.shape)
+        return ok & (home >= 0) & (got == home)
+
     def _route_intercontinental(self, from_tile: torch.Tensor, to_tile: torch.Tensor) -> torch.Tensor:
         """CIV6 (Treasure Fleet): "Trade Routes between multiple continents" —
         the two ENDPOINTS sit on different landmasses. A route touching

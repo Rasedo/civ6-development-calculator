@@ -1056,6 +1056,15 @@ class SimMasks:
                 _fr = foe_seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
                 _fg = self.civ_age.gather(1, _fr).reshape(foe_seat.shape) == 2
                 who = who & (foe_seat >= 0) & (foe_seat < self.n_majors) & _fg
+            elif when == 6:
+                # CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
+                who = who & self._seat_on_home_continent(seat, tc.reshape(seat.shape))
+            elif when != 0:
+                # `always` is the only arm that filters nothing. A `when`
+                # this chain does not know must pay NOTHING rather than
+                # inherit the unfiltered arm (the TS twin spells its own
+                # fallback out for the same reason).
+                who = torch.zeros_like(who)
             if per == 1:
                 # CIV6 (Thermopylae): the magnitude is per slotted Military policy
                 _mp = self._military_policies(seat)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
+import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { emptySeat, NO_SEAT } from '../../../cpu/core/seats';
 import { spawnUnit, unitFullMoves, stepUnit, ignoresShores } from '../../../cpu/core/units';
 import { rosterCS, healOnEliminate } from '../../../cpu/core/combat';
@@ -27,9 +27,33 @@ function coastalScene(civ: string): GameState {
   return state;
 }
 
+describe('the Roosevelt Corollary', () => {
+  it('pays +5 on the ORIGINAL capital continent and nothing off it', () => {
+    // two landmasses, the capital on the western one
+    const map = makeMap(20, 20, 'GRASSLAND');
+    for (const t of map.tiles) if (t.col === 10) t.terrain = 'OCEAN';
+    const state = makeState(map);
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    state.seats[0].civ = seatRow('AMERICA');
+    settleAt(state, tileAtCoords(state.map, 4, 5).index, 0);
+    expect(getModifiers(state, 0).leader).toBe('T_ROOSEVELT');
+
+    const home = tileAtCoords(state.map, 5, 6);
+    const abroad = tileAtCoords(state.map, 15, 6);
+    expect(home.continent).not.toBe(abroad.continent);
+    const at = (t: number) => rosterCS(state, { type: 'WARRIOR', seat: 0, tileIndex: t }, 1, 100, false);
+    expect(at(home.index)).toBe(5);
+    expect(at(abroad.index)).toBe(0);
+    // ...and a seat the roster does not name takes nothing anywhere
+    state.seats[0].civ = -1;
+    expect(at(home.index)).toBe(0);
+  });
+});
+
 describe('the combat-strength rows', () => {
   it('are the census: eight rows, each on a class mask the target classes spell', () => {
-    expect(COMBAT_CS_ROWS.length).toBe(8);
+    expect(COMBAT_CS_ROWS.length).toBe(9);
     expect(POST_KILL_HEAL_ROWS.length + EMBARK_MOVE_ROWS.length + IGNORE_SHORES_ROWS.length).toBe(5);
     const state = makeState(makeMap(8, 8, 'GRASSLAND'));
     state.seats[0].civ = seatRow('MONGOLIA');

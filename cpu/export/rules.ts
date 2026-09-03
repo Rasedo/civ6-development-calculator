@@ -1539,7 +1539,7 @@ export function buildRules() {
       combatCs: COMBAT_CS_ROWS.map((r) => [
         rowCiv(r), rowLeader(r), r.amount,
         (r.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0),
-        ['always', 'foeMinor', 'foeWounded', 'foeCity', 'onCoast', 'foeGolden'].indexOf(r.when),
+        ['always', 'foeMinor', 'foeWounded', 'foeCity', 'onCoast', 'foeGolden', 'onHomeContinent'].indexOf(r.when),
         r.per === 'militaryPolicy' ? 1 : 0,
       ]),
       postKillHeal: POST_KILL_HEAL_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),

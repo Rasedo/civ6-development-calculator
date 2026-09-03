@@ -69,9 +69,9 @@ def a_tile(sim, pred) -> int:
 
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
-    assert len(sim._combat_cs_rows) == 8 and len(sim._post_kill_heal_rows) == 1
+    assert len(sim._combat_cs_rows) == 9 and len(sim._post_kill_heal_rows) == 1
     assert len(sim._embark_move_rows) == 2 and len(sim._ignore_shores_rows) == 2
-    print("  1 wire OK — 7 + 1 + 2 + 2 rows")
+    print("  1 wire OK — 9 + 1 + 2 + 2 rows")
 
 
 def test_barbarossa_tomyris(rules, path) -> None:
@@ -159,6 +159,30 @@ def test_site_census(rules, path) -> None:
     print(f"  5 site census OK — every `_congress_unit_cs` site carries `_roster_cs`")
 
 
+def test_roosevelt(rules, path) -> None:
+    """CIV6 (Roosevelt Corollary): "+5 Combat Strength on their home
+    continent" — the ORIGINAL capital's landmass, and nothing off it."""
+    sim = fresh(rules, path)
+    row = 0
+    play(sim, row, "AMERICA")
+    assert bool(sim._row_leads(row, "T_ROOSEVELT")[B0])
+    cap = int(sim.civ_cap_tile[B0, row])
+    assert cap >= 0, "the row never founded, so this lane would prove nothing"
+    home = int(sim.tile_continent[B0, cap])
+    assert home >= 0
+    on = a_tile(sim, lambda t: int(sim.tile_continent[B0, t]) == home
+                and bool(sim.passable[B0, t]) and not bool(sim.water[B0, t]))
+    off = next((t for t in range(sim.T)
+                if int(sim.tile_continent[B0, t]) >= 0
+                and int(sim.tile_continent[B0, t]) != home), None)
+    assert off is not None, "this fixture has ONE landmass — the lane would prove nothing"
+    assert cs(sim, row, "WARRIOR", on, 1, 100, False) == 5, "no bonus at home"
+    assert cs(sim, row, "WARRIOR", off, 1, 100, False) == 0, "the bonus followed it abroad"
+    # ...and a seat the roster does not name takes nothing anywhere
+    play(sim, row, None)
+    assert cs(sim, row, "WARRIOR", on, 1, 100, False) == 0, "a plain seat was paid"
+    print("  6 Roosevelt OK — +5 on the original capital's landmass, 0 off it")
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -167,6 +191,7 @@ def main() -> int:
     test_genghis_hojo_ottoman(rules, path)
     test_embarked(rules, path)
     test_site_census(rules, path)
+    test_roosevelt(rules, path)
     print("BATTERY OK combat_rows")
     return 0
 

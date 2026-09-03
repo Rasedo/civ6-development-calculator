@@ -43,7 +43,7 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -878,9 +878,15 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeCity' ? foeIsCity
       // CIV6 (Swift Hawk): a HEROIC age is a golden one, so the age is the test
       : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === 2
+      // CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
+      : r.when === 'onHomeContinent' ? onHomeContinent(state, own.seat, own.tileIndex)
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
-      // a lake is shallow water to a hull.
-      : def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile));
+      // a lake is shallow water to a hull. Spelled out rather than left as the
+      // chain's fallback: a `when` that reached no arm used to inherit THIS
+      // rule silently, which is a whole clause paid to the wrong row.
+      : r.when === 'onCoast'
+        ? (def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile)))
+        : false;
     // CIV6 (Thermopylae): the magnitude is per slotted Military policy
     if (hit) cs += r.per === 'militaryPolicy' ? r.amount * mods.militaryPolicies : r.amount;
   }
