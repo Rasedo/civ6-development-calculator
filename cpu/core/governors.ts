@@ -49,6 +49,7 @@ export function governorTitlesEarned(state: GameState, seat: number): number {
   for (const r of getModifiers(state, seat).governorTitleGrants) {
     if (s.research.techs.includes(r.tech)) n += r.amount;
   }
+  n += s.grantedTitles;
   return n;
 }
 

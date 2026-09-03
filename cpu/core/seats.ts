@@ -106,6 +106,7 @@ export function emptySeat(seat: number): Seat {
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     government: { current: null, policies: [], held: 0 },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
+    grantedTitles: 0,
     gpp: {}, gpEarned: [],
     buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0, tilesPurchased: 0,
     projectsDone: [], spaceLy: -1, orbitalLasers: 0, stockpile: emptyStockpile(), camps: [], explored: [],

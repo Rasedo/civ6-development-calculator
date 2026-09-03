@@ -49,11 +49,13 @@ import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
   GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
   MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP, TRADE_ROAD_MAX_STEPS,
+  STRATEGIC_IDS, emptyStockpile,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
-import { revealAround, claimGoodyHut, nearestUnexplored, unitSight } from './fog';
+import { revealAround, nearestUnexplored, unitSight } from './fog';
+import { drawGoodyReward } from './goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
@@ -2005,4 +2007,123 @@ export function walkToward(state: GameState, unit: Unit, target: Tile, stopWithi
     if (dest < 0) break;
     if (stepUnit(state, unit, state.map.tiles[dest]) !== 'moved') break;
   }
+}
+
+/** The most advanced strategic resource this seat can actually use.
+ *
+ * CIV6 (GOODY_MILITARY_ADJUST_STRATEGIC_RESOURCES): "20 of the most advanced
+ * strategic resource." The real game means the most advanced one REVEALED,
+ * and neither engine models resource reveal — so this reads "the most
+ * advanced one the seat has a live source of", falling back to the first
+ * slot. `STRATEGIC_IDS` is already in ascending era order, so the most
+ * advanced is the last match. THE ONE MODEL CHOICE in C-47, recorded there.
+ */
+export function mostAdvancedStrategic(state: GameState, seat: number): number {
+  let slot = 0;
+  for (let i = 0; i < STRATEGIC_IDS.length; i++) {
+    if (civHasStrategic(state, seat, STRATEGIC_IDS[i])) slot = i;
+  }
+  return slot;
+}
+
+/** the seat's city nearest a tile — where a village's settlers, builders and
+ *  traders arrive (`hexDistance`, ties by the seat's own city order) */
+function nearestCityTo(state: GameState, owner: Seat, tile: Tile): City | undefined {
+  let best: City | undefined;
+  let bestD = Infinity;
+  for (const c of owner.cities) {
+    const ctr = state.map.tiles[c.centerIndex];
+    const d = hexDistance(ctr.col, ctr.row, tile.col, tile.row);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/**
+ * CLAIM a tribal village with a unit standing on it (C-47).
+ *
+ * Real Civ 6 gives the village to whoever reaches it first, so any civ seat
+ * claims it; barbarians and city-states neither settle nor research and take
+ * none. The reward is the install's own table — `drawGoodyReward` picks it
+ * and this pays it. The engine's older six-arm reward was unsourced and is
+ * gone rather than preserved.
+ */
+export function claimGoodyHut(state: GameState, unit: Unit): void {
+  const tile = state.map.tiles[unit.tileIndex];
+  const owner = seatOf(state, unit.seat);
+  if (!tile.goodyHut || !owner || !isCiv(unit.seat)) return;
+  tile.goodyHut = false;
+  const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0);
+  if (!sub) return;
+  const p = sub.payload;
+  const scaled = (n: number) => (sub.scale ? Math.round(n * GAME_SPEED) : n);
+  switch (p.kind) {
+    case 'relic':
+      owner.relicReserve += p.amount;
+      break;
+    case 'gold':
+      owner.treasury += scaled(p.amount);
+      break;
+    case 'faith':
+      owner.faith += scaled(p.amount);
+      break;
+    case 'civicBoost':
+    case 'techBoost': {
+      const pool = Object.keys(p.kind === 'techBoost' ? TECHS : CIVICS).filter((id) =>
+        !owner.research.boosted.includes(id)
+        && !(p.kind === 'techBoost' ? owner.research.techs : owner.research.civics).includes(id));
+      for (let i = 0; i < p.amount && pool.length; i++) {
+        owner.research.boosted.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
+      }
+      break;
+    }
+    case 'tech': {
+      const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
+      for (let i = 0; i < p.amount && pool.length; i++) {
+        owner.research.techs.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
+      }
+      break;
+    }
+    case 'unitByClass': {
+      const id = bestTrainableOfClass(state, unit.seat, p.promoClass);
+      if (id) spawnUnit(state, id, tile.index, unit.seat);
+      break;
+    }
+    case 'unitInCity': {
+      const city = nearestCityTo(state, owner, tile);
+      if (city) spawnUnit(state, p.unit, city.centerIndex, unit.seat);
+      break;
+    }
+    case 'experience':
+      unit.xp = (unit.xp ?? 0) + p.amount;
+      break;
+    case 'heal':
+      unit.hp = Math.min(UNIT_HP, unit.hp + p.amount);
+      break;
+    case 'population': {
+      const city = nearestCityTo(state, owner, tile);
+      if (city) city.population += p.amount;
+      break;
+    }
+    case 'governorTitle':
+      owner.grantedTitles += p.amount;
+      break;
+    case 'envoy':
+      owner.envoysAvailable += p.amount;
+      break;
+    case 'favor':
+      owner.diplomaticFavor += p.amount;
+      break;
+    case 'strategic': {
+      const slot = mostAdvancedStrategic(state, unit.seat);
+      const bank = (owner.stockpile ??= emptyStockpile());
+      bank[slot] = (bank[slot] ?? 0) + p.amount;
+      break;
+    }
+  }
+  state.eventLog.push(`Tribal village: ${sub.id}.`);
+  if (state.eventLog.length > 20) state.eventLog.shift();
 }

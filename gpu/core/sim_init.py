@@ -123,6 +123,11 @@ class SimInit:
         self._n_lux = int(rules.improvements["nLuxuries"])
         self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # TRIBAL VILLAGES (C-47) — MUTABLE: a village is claimed and gone, and
+        # `camp_ok` deliberately does NOT bake it, so every camp-placement read
+        # ANDs the two live (the baked-derivation trap C-52 exists for).
+        self.tile_goody = torch.tensor([[t.get("goody", 0) for t in f["tiles"]] for f in fixtures],
+                                       dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
         # The distance-2 ring, [T, 12], each row SORTED ASCENDING and padded -1
         # at map edges. Column order IS tile-index order, the engine's own
@@ -997,6 +1002,9 @@ class SimInit:
         self.civ_gov_city = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
         # the CITY-STATE this governor is posted to, by roster index (-1 =
         # none). Only the catalog's `_gov_minor_ok` rows ever hold one.
+        # governor titles a TRIBAL VILLAGE granted outright — nothing derives
+        # them, so they need a store, and it is MUTABLE (C-47)
+        self.civ_granted_titles = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_gov_minor = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
         self.civ_gov_establish = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
         self.civ_gov_out = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
@@ -3008,6 +3016,22 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["religionAmenities"]]  # type: ignore[misc]
         self._all_follower_belief_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["allFollowerBeliefs"]]  # type: ignore[misc]
+
+        # TRIBAL VILLAGES (C-47) — the install's own table, straight off the
+        # wire so the GPU draws what TS draws. Kind weights are all equal, so
+        # the kind draw is uniform over the kinds with an eligible subtype.
+        _gh = rules.goody_huts
+        self._goody_kinds: list[str] = list(_gh["kinds"])
+        self._goody_payload_kinds: list[str] = list(_gh["payloadKinds"])
+        self._goody_sub = [
+            (str(r["id"]), int(r["hut"]), int(r["weight"]), int(r["turn"]),
+             int(r["minOneCity"]), int(r["payload"]), int(r["amount"]),
+             int(r["unit"]), str(r["promoClass"]))
+            for r in _gh["subTypes"]
+        ]
+        # every channel the wire names must have an arm, or a reward silently
+        # pays nothing (the disjoint-arms class)
+        self._goody_ch = {k: i for i, k in enumerate(self._goody_payload_kinds)}
         # [civ, leaderRow, origin, destination, pct]
         self._route_pressure_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routePressure"]]  # type: ignore[misc]

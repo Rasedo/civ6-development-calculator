@@ -57,7 +57,7 @@ const ELEVATIONS = ['FLAT', 'HILLS', 'MOUNTAIN'];
 
 function buildWorld(seed: number): WorldFile {
   const map = generateMap({
-    width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: false,
+    width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: true,
     layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
     // the default triple keeps the picker's LITERAL 0.45/0.8 boundaries — the
     // normalised quotient of the same weights is a different float.

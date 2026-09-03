@@ -4,7 +4,8 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { spawnUnit, orderMove, setExploreMission } from '../../../cpu/core/units';
-import { fogActive, isExplored, initFog, claimGoodyHut } from '../../../cpu/core/fog';
+import { fogActive, isExplored, initFog } from '../../../cpu/core/fog';
+import { claimGoodyHut } from '../../../cpu/core/units';
 import { generateMap } from '../../../world/mapgen';
 
 function foggyState() {

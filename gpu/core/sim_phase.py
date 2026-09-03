@@ -383,7 +383,9 @@ class SimPhase:
             if _tt < 0:
                 continue
             out = out + (self.civ_techs[:, row, _tt] & self._row_is(row, _tc, _tl)).long() * _ta
-        return out
+        # ...and the titles a TRIBAL VILLAGE handed over, which no held state
+        # derives, so they need a store of their own (C-47)
+        return out + self.civ_granted_titles[:, row]
 
     def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
         """[B, T] bool — the row's tiles whose OWNING city is governor-seated,

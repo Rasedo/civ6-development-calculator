@@ -545,6 +545,9 @@ export interface Seat {
   gpPerm?: number[];
   influencePoints: number;
   envoysAvailable: number;
+  /** governor titles GRANTED outright rather than derived from held state —
+   *  CIV6 (GOODY_DIPLOMACY_GRANT_GOVERNOR_TITLE): "+1 governor point" */
+  grantedTitles: number;
 
   treasury: number;
   scienceTotal: number;

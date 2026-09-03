@@ -1527,7 +1527,9 @@ class SimOrders:
             cc_w = self.city_center[wr, :self.n_majors].reshape(len(wr), -1)
             alive_w = self.city_alive[wr, :self.n_majors].reshape(len(wr), -1)
             near_city_w = ((self.pair_dist[cc_w.clamp(min=0)] < 5) & alive_w.unsqueeze(2)).any(dim=1)  # [n, T]
-            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)
+            # the HUT clause is LIVE, not baked into camp_ok: a village is
+            # claimed mid-game (`tileClaimed(t) || t.goodyHut`, C-47)
+            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0) & ~self.tile_goody[wr]
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
                 # seat (unexploredByAll; combat.ts's preferFog term).

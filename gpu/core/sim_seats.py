@@ -4546,6 +4546,182 @@ class SimSeats:
             1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
         return (home >= 0) & (got == home)
 
+    # ---------------------------------------------------------------- C-47
+    def _goody_eligible(self, has_city: bool) -> list[int]:
+        """Indices into `_goody_sub` a claimer may draw right now.
+
+        A weight of 0 is a subtype this ruleset turns OFF, not a free one.
+        `goodyEligible`'s twin — the two must filter in the SAME order,
+        because the weighted pick below walks the surviving rows in it."""
+        out = []
+        for i, (_id, _hut, w, turn, moc, _p, _a, _u, _pc) in enumerate(self._goody_sub):
+            if w <= 0:
+                continue
+            if turn and self.turn < turn:
+                continue
+            if moc and not has_city:
+                continue
+            out.append(i)
+        return out
+
+    def _draw_goody_reward(self, one: torch.Tensor, b: int, has_city: bool) -> int | None:
+        """The subtype game `b` draws, or None if it can draw nothing.
+
+        `one` is a [B] mask true only at `b`, so the stream moves for that game
+        alone. TWO draws when anything is eligible and NONE when nothing is —
+        `drawGoodyReward`'s twin, step for step: a kind uniformly among those
+        with an eligible subtype (every kind carries the same weight), then a
+        subtype within it by its own weight."""
+        elig = self._goody_eligible(has_city)
+        if not elig:
+            return None
+        kinds = [k for k in range(len(self._goody_kinds))
+                 if any(self._goody_sub[i][1] == k for i in elig)]
+        r = float(self._next_random(one)[b])
+        kind = kinds[min(len(kinds) - 1, int(r * len(kinds)))]
+        subs = [i for i in elig if self._goody_sub[i][1] == kind]
+        total = sum(self._goody_sub[i][2] for i in subs)
+        acc = float(self._next_random(one)[b]) * total
+        for i in subs:
+            acc -= self._goody_sub[i][2]
+            if acc < 0:
+                return i
+        return subs[-1]
+
+    def _goody_pool_draw(self, one: torch.Tensor, b: int, open_: torch.Tensor,
+                         n: int) -> list[int]:
+        """`n` picks WITHOUT replacement from the open columns of `open_`
+        ([nCols] bool for game `b`), each one draw, ascending index.
+
+        TS holds a JS array and splices the pick out; taking the k-th still-open
+        column in ascending order is the same walk over the same order."""
+        got: list[int] = []
+        live = open_.clone()
+        for _ in range(n):
+            cnt = int(live.sum())
+            if cnt <= 0:
+                break
+            k = int(float(self._next_random(one)[b]) * cnt)
+            k = min(k, cnt - 1)
+            col = int(live.nonzero().flatten()[k])
+            live[col] = False
+            got.append(col)
+        return got
+
+    def _claim_goody_hut(self, mask: torch.Tensor, tile: torch.Tensor,
+                         seat: torch.Tensor) -> None:
+        """A unit entering a TRIBAL VILLAGE claims it (C-47).
+
+        Real Civ 6 gives the village to whoever reaches it first, so any civ
+        seat claims it; barbarians and city-states neither settle nor research
+        and take none — `claimGoodyHut` gates on `isCiv` the same way. The
+        reward is the install's own table, drawn by `_draw_goody_reward`.
+
+        Per game rather than batched on purpose: the draw is a sequence of rng
+        calls whose COUNT depends on the reward, so the games cannot share a
+        step without their streams walking apart.
+        """
+        if not self._goody_sub or not bool(mask.any()):
+            return
+        hit = mask & self.tile_goody.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        hit = hit & (seat >= 0) & (seat < self.n_majors)
+        if not bool(hit.any()):
+            return
+        ch = self._goody_ch
+        cap = int(self.rules.combat.get("unitHp", 100))
+        for b in hit.nonzero(as_tuple=True)[0].tolist():
+            t = int(tile[b])
+            srow = int(seat[b])
+            self.tile_goody[b, t] = False
+            one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            one[b] = True
+            alive = self.city_alive[b, srow]
+            sub = self._draw_goody_reward(one, b, bool(alive.any()))
+            if sub is None:
+                continue
+            _id, _hut, _w, _turn, _moc, pay, amt, unit_i, pcls = self._goody_sub[sub]
+            # the claimer's nearest city — where settlers, builders and traders
+            # arrive, and whose population a village of survivors joins
+            near = -1
+            if bool(alive.any()):
+                cols = alive.nonzero().flatten()
+                d = self.pair_dist[self.city_center[b, srow, cols].clamp(min=0), t]
+                near = int(cols[int(d.argmin())])
+            if pay == ch["relic"]:
+                self.civ_relic_reserve[b, srow] += amt
+            elif pay == ch["gold"]:
+                self.civ_treasury[b, srow] += amt
+            elif pay == ch["faith"]:
+                self.civ_faith[b, srow] += amt
+            elif pay in (ch["civicBoost"], ch["techBoost"]):
+                civic = pay == ch["civicBoost"]
+                held = self.civ_civics[b, srow] if civic else self.civ_techs[b, srow]
+                bst = self.civ_civic_boosted[b, srow] if civic else self.civ_tech_boosted[b, srow]
+                k = min(held.shape[0], bst.shape[0])
+                for col in self._goody_pool_draw(one, b, (~held[:k] & ~bst[:k]), amt):
+                    if civic:
+                        self.civ_civic_boosted[b, srow, col] = True
+                    else:
+                        self.civ_tech_boosted[b, srow, col] = True
+            elif pay == ch["tech"]:
+                held = self.civ_techs[b, srow]
+                for col in self._goody_pool_draw(one, b, ~held, amt):
+                    self.civ_techs[b, srow, col] = True
+                    self._eff_version += 1
+            elif pay == ch["unitByClass"]:
+                pcl = list(self.rules.promo_classes)
+                pi = pcl.index(pcls) if pcls in pcl else -1
+                if pi >= 0:
+                    ut = self._best_trainable_of_class(srow, pi)
+                    if int(ut[b]) >= 0:
+                        self._spawn_unit(srow, one, tile, ut)
+            elif pay == ch["unitInCity"]:
+                if near >= 0 and unit_i >= 0:
+                    at = torch.full_like(tile, int(self.city_center[b, srow, near]))
+                    self._spawn_unit(srow, one, at,
+                                     torch.full_like(tile, unit_i))
+            elif pay == ch["experience"]:
+                gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
+                    if bool((self.unit_tile[b] == t).any()) else -1
+                if gs >= 0:
+                    self.unit_xp[b, gs] += amt
+            elif pay == ch["heal"]:
+                gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
+                    if bool((self.unit_tile[b] == t).any()) else -1
+                if gs >= 0:
+                    self.unit_hp[b, gs] = min(cap, int(self.unit_hp[b, gs]) + amt)
+            elif pay == ch["population"]:
+                if near >= 0:
+                    self.city_pop[b, srow, near] += amt
+            elif pay == ch["governorTitle"]:
+                self.civ_granted_titles[b, srow] += amt
+            elif pay == ch["envoy"]:
+                self.civ_envoys_avail[b, srow] += amt
+            elif pay == ch["favor"]:
+                self.civ_diplo_favor[b, srow] += amt
+            elif pay == ch["strategic"]:
+                self.civ_stockpile[b, srow, self._most_advanced_strategic(b, srow)] += amt
+            else:
+                raise AssertionError(f"goody payload {self._goody_payload_kinds[pay]} has no arm")
+
+    def _most_advanced_strategic(self, b: int, row: int) -> int:
+        """The most advanced strategic this seat can actually use.
+
+        CIV6 says the most advanced REVEALED, and neither engine models
+        resource reveal, so this reads "the most advanced one with a live
+        source", falling back to slot 0. The stockpile's slot order IS era
+        order. `mostAdvancedStrategic`'s twin, and the ONE model choice in
+        C-47."""
+        owned = ((self.tile_seat[b] == row) & ~self.pillaged[b]
+                 & (self.improvement[b] == self.res_imp[b]))
+        slot = 0
+        for k, rid in enumerate(self._strat_rid):
+            if k >= self.civ_stockpile.shape[2]:
+                break
+            if bool((owned & (self.res_id[b] == rid)).any()):
+                slot = k
+        return slot
+
     def _best_trainable_of_class(self, row: int, pcls: int) -> torch.Tensor:
         """[B] long — the STRONGEST chassis of promotion class `pcls` this seat
         could train, ties by catalog order; -1 where it could train none. The
@@ -8751,6 +8927,9 @@ class SimSeats:
                 self.unit_promo_used[rows, gs] = torch.where(
                     _near & (_pv > 0), _pu, self.unit_promo_used[rows, gs])
                 self.unit_charges[rows, gs] += _pv
+        # TS claims the village between the Pilgrim's charge and the camp
+        # clear, and the rng order is the whole point of matching it (C-47)
+        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1))
         if clear_camp:
             self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         if self._embark_live:

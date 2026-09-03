@@ -60,10 +60,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
 
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
 
-  if (map.tiles.some((t) => t.goodyHut)) {
-    throw new Error('GPU export requires a hut-free world (withVillages: false)');
-  }
-
   // Every flag below that reads `t.resource` is baked ONCE here, but TS
   // recomputes it live — and a HARVEST is the only mutation that takes a
   // resource off a tile that stays workable (a district pave hides the loss
@@ -117,7 +113,11 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       tmove: terrainMp(t) - MP_SCALE,
       rd: t.road ? 1 : 0, // the ROAD plane (false at t0)
       rr: t.railroad ? 1 : 0, // the RAILROAD plane (false at t0)
-      camp: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
+      // the HUT clause is deliberately NOT baked in: a village is claimed
+      // mid-game, so it ships as its own mutable plane and both engines AND
+      // it in live (the baked-derivation trap C-52 exists for).
+      camp: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.district && !t.builtWonder ? 1 : 0,
+      goody: t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
       // Chop planes: ftr = the chop grant key when this tile's feature

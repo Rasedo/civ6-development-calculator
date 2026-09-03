@@ -416,6 +416,7 @@ const SEAT: Record<string, Extractor> = {
   diplomaticPoints: overSeats((s) => s.diplomaticPoints),
   influencePoints: overSeats((s) => s.influencePoints),
   envoysAvailable: overSeats((s) => s.envoysAvailable),
+  grantedTitles: overSeats((s) => s.grantedTitles),
   buildersTrained: overSeats((s) => s.buildersTrained),
   relicReserve: overSeats((s) => s.relicReserve ?? 0),
   conquestProdTurns: overSeats((s) => s.conquestProdTurns ?? 0),
@@ -710,6 +711,7 @@ const TILE: Record<string, Extractor> = {
   ownerCity: overTiles((t) => t.ownerCity),
   improvement: overTiles((t) => (t.improvement === null ? -1 : IMPROVEMENT_IDS.indexOf(t.improvement))),
   pillaged: overTiles((t) => (t.pillaged ? 1 : 0)),
+  goodyHut: overTiles((t) => (t.goodyHut ? 1 : 0)),
   district: overTiles((t) => (t.district === null ? -1 : PLACEABLE_DISTRICTS.indexOf(t.district))),
   // PLACEABLE districts only, matching `district`'s own encoding: a founded
   // centre carries districtComplete on TS while the GPU has no CITY_CENTER

@@ -223,6 +223,7 @@ const effectRow = (fx: PolicyEffects) => ({
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS } from '../data/constants';
+import { GOODY_KINDS, GOODY_KIND_WEIGHT, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
@@ -465,6 +466,34 @@ export function buildRules() {
       // straight off `Districts.Cost` and `CostProgressionParam1` (B-67)
       perDistrict: PLACEABLE_DISTRICTS.map((d) => Math.round((DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST) * GAME_SPEED)),
       discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
+    },
+    // TRIBAL VILLAGES (C-47) — the install's `GoodyHuts` + `GoodyHutSubTypes`
+    // straight through, so the GPU draws from the same table TS does. Kinds
+    // are indices into `kinds`; `payload` is the channel index into
+    // `payloadKinds` with its own amount, and a weight of 0 is a subtype this
+    // ruleset turns OFF. The two SCALED yields are pre-scaled here, as every
+    // other game-speed figure on the wire is.
+    goodyHuts: {
+      kinds: GOODY_KINDS,
+      kindWeight: GOODY_KIND_WEIGHT,
+      payloadKinds: GOODY_PAYLOAD_KINDS,
+      subTypes: GOODY_SUBTYPES.map((g) => {
+        const pl = g.payload;
+        return {
+          id: g.id,
+          hut: GOODY_KINDS.indexOf(g.hut),
+          weight: g.weight,
+          turn: g.turn ?? 0,
+          minOneCity: g.minOneCity ? 1 : 0,
+          payload: GOODY_PAYLOAD_KINDS.indexOf(pl.kind),
+          amount: 'amount' in pl
+            ? (g.scale ? Math.round(pl.amount * GAME_SPEED) : pl.amount) : 0,
+          // a unit row names its chassis by roster index, -1 for a CLASS row
+          unit: pl.kind === 'unitInCity'
+            ? Object.values(UNITS).findIndex((u) => u.id === pl.unit) : -1,
+          promoClass: pl.kind === 'unitByClass' ? pl.promoClass : '',
+        };
+      }),
     },
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
     // THE MOVEMENT UNIT and the route ladder over it (`MP_SCALE`).

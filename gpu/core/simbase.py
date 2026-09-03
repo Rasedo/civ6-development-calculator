@@ -93,6 +93,7 @@ class Rules:
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
+    goody_huts: dict  # TRIBAL VILLAGES (C-47): the install's kind + subtype tables
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
@@ -293,6 +294,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         turn_limit=r["scenario"].get("turnLimit", 250),
         space_ly_target=r["scenario"].get("spaceLyTarget", 30),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
+        goody_huts=r["goodyHuts"],
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
@@ -756,6 +758,7 @@ _MUTABLE = [
     "_fa_f_c", "_fa_h_c", "_mi_c",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
+    "tile_goody",  # TRIBAL VILLAGES: claimed and gone (C-47)
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
@@ -763,7 +766,7 @@ _MUTABLE = [
     # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation",
     "unit_escorted", "military_at", "civilian_at", "embarked_at", "war", "ww", "ww_turn",
-    "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
+    "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",

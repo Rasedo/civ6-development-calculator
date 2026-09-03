@@ -1347,51 +1347,53 @@ under their blocker so the dependency is readable, and both halves count.
   band belongs to the sourcing pass (#211) — the eight roster clauses PREVENT
   and DOUBLE unit damage, so there is nothing for them to modify until it is
   known.
-- **C-47. TRIBAL VILLAGES.** Weight 1. TS holds a six-outcome stub
-  (`claimGoodyHut`, a `tile.goodyHut` flag the mapgen can set), the GPU
-  holds nothing, and the exporter refuses a world carrying a hut — so no
-  gate lane reaches the stub and an outpost capture is a plain kill on
-  both engines. CIV6 (Epic Quest): "Receive a Tribal Village reward each
-  time you capture a barbarian outpost" — the clause waits on the
-  mechanic, and the reward TABLE (Expansion2_GoodyHuts.xml) is the source
-  to seed both engines from; the stub's six arms are unsourced.
-  FULLY SOURCED 2026-09-03 — every number below is the install's, and none of
-  it needs the sourcing pass. `GoodyHuts` gives seven KINDS at weight 100
-  each (CULTURE, GOLD, FAITH, MILITARY, SCIENCE, SURVIVORS, and the DIPLOMACY
-  row Expansion 2 adds); `GoodyHutSubTypes` gives 24 subtypes, each with its
-  own WEIGHT within its kind, an optional `MinOneCity`, an optional earliest
-  `Turn`, and a modifier carrying the payload:
+- **C-47. TRIBAL VILLAGES. CLOSED 2026-09-04.** The install's own reward
+  table now runs on both engines, sourced entire from `GoodyHuts` +
+  `GoodyHutSubTypes` and each row's own modifier: seven kinds at Weight 100
+  apiece, 24 subtypes each with its weight within its kind, its `MinOneCity`,
+  its earliest `Turn` and its payload — 120/75/40 Gold and 100/60/20 Faith
+  (both `Scale: true`, so game-speed scaled on the wire), 20 XP, 100 HP, 20
+  Favor, an envoy, a governor title, +1 Population, 20 of the most advanced
+  strategic, plus the relic, tech, civic and unit grants. A weight of 0 is a
+  subtype this ruleset turns OFF, not a free one, and GRANT_UPGRADE and
+  GRANT_SETTLER are the two. The old six-arm `claimGoodyHut` was unsourced and
+  was REPLACED, not preserved.
 
-  | subtype | w | payload |
-  |---|---|---|
-  | ONE_RELIC (MinOneCity) | 15 | a relic, RELIC_SOURCE_TRIBAL_VILLAGE |
-  | TWO_CIVIC_BOOSTS (turn 30) | 30 | 2 random Inspirations |
-  | ONE_CIVIC_BOOST | 55 | 1 random Inspiration |
-  | LARGE/MEDIUM/SMALL_GOLD (MinOneCity; 40/20/-) | 15/30/55 | 120 / 75 / 40 Gold, Scale true |
-  | LARGE/MEDIUM/SMALL_FAITH | 15/30/55 | 100 / 60 / 20 Faith, Scale true |
-  | GRANT_SCOUT | 35 | a unit of PROMOTION_CLASS_RECON |
-  | GRANT_UPGRADE | 0 | one free upgrade |
-  | GRANT_EXPERIENCE | 20 | 20 XP |
-  | HEAL | 25 | 100 HP |
-  | ONE_TECH | 15 | 1 random technology |
-  | TWO_TECH_BOOSTS / ONE_TECH_BOOST | 30/55 | 2 / 1 random Eurekas |
-  | ADD_POP | 40 | +1 Population |
-  | GRANT_BUILDER / GRANT_TRADER / GRANT_SETTLER | 35/25/0 | that unit in a city |
-  | GOVERNOR_TITLE | 15 | +1 governor point |
-  | ENVOY | 40 | 1 influence token |
-  | FAVOR | 45 | 20 Diplomatic Favor |
-  | RESOURCES | 20 | 20 of the most advanced strategic |
+  The draw is `drawGoodyReward` / `_draw_goody_reward`: a kind uniformly among
+  those with an eligible subtype (equal weights say uniform), then a subtype by
+  its own weight — exactly two rng draws when anything is eligible and none
+  when nothing is. That shape is the one MODEL choice about the draw, since the
+  install publishes the two tables and no rule joining them; the other is
+  "the most advanced strategic", which real Civ 6 reads as the most advanced
+  REVEALED and neither engine models reveal, so both read "the most advanced
+  with a live source" (`mostAdvancedStrategic` / `_most_advanced_strategic`).
 
-  A weight of 0 means the subtype is off in this ruleset, not that it is
-  free. `Scale: true` is the game-speed scale every other production and yield
-  figure here already takes.
+  THREE things this closed that were not the reward at all:
+  * the exporter REFUSED a hut-carrying world, and the seeder therefore made
+    none (`withVillages: false`). Both are lifted — villages are on, 240 over
+    the 24 fixtures — because shipping the table into a world that cannot hold
+    a village is the "rows behind an early return" class.
+  * `camp` baked `!t.goodyHut` at export. A village is claimed MID-GAME, so
+    that flag would have gone stale the moment one was: the hut is its own
+    mutable plane now and both engines AND it in live.
+  * `Tile.goodyHut` was EXCLUDED from statecompare, reasoned "tribal villages
+    are TS-only — the GPU carries no goody-hut plane and never claims one".
+    That reason had to stop being true before the gate could see any of this,
+    and the plane is compared now.
 
-  So the stub's six unsourced arms are replaceable outright rather than
-  preserved, and Epic Quest's "a Tribal Village reward each time you capture a
-  barbarian outpost" is the same draw called from the outpost-capture path.
-  What still has to be decided rather than read: the exporter currently
-  REFUSES a world carrying a hut (`buildFixture` throws), so either the
-  seeder stops placing them or the fixture learns to carry them.
+  REACHABILITY, measured not assumed: with villages merely present the gate
+  claimed ZERO in 250 turns, so the driver now steps onto an adjacent village
+  ahead of its walk — a DECISION the applier validates and TS replays, which
+  is free coverage. Measured again after: 1 claim per 250-turn single seed,
+  and the gate green with the hut plane in the digest. `tribal_villages` (6
+  lanes) and `tribal-villages.test.ts` (10) are the bar; the GPU lane forces
+  each subtype to be the only drawable one and checks all 23 live rows move
+  their own plane, which is the disjoint-arms guard this many channels needs.
+
+  STILL OPEN, and it belongs to the mechanic rather than the table: CIV6 (Epic
+  Quest) "Receive a Tribal Village reward each time you capture a barbarian
+  outpost" — the same draw from the outpost-capture path, which waits on
+  nothing but the wiring.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1. The minor
   BUILDS now (`minorBuildPhase` / `_minor_build`): a production pot takes
   POPULATION points a turn — the `minorResearch` pacing stylization, since
