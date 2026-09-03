@@ -1768,6 +1768,9 @@ class SimInit:
         # the same five bands, as the CUTS alone — what `appealBand` returns and
         # the Preserve's housing table and the Grove's yield bands are keyed by.
         self._appeal_bands = [c for c, _v in sorted(self._appeal_cuts, reverse=True)]
+        # the DISTRICT each production slot builds — a queue code is a SCAFFOLD
+        # slot, so a row naming a district must come through here
+        self._scaffold_di = torch.tensor([p[0] for p in self._scaffold] or [-1], dtype=torch.long, device=device)
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
@@ -2303,6 +2306,7 @@ class SimInit:
         # Zone's adjacency as production.
         self._b_power = rules.b_power.to(device)  # [NB] f64
         self._b_pow_y = rules.b_pow_yields.to(device)  # [NB, 6] f64
+        self._b_pow_y_mask = (self._b_pow_y != 0).double()  # which yields a powered half pays at all
         self._b_pow_am = rules.b_pow_amenities.to(device)  # [NB] f64
         self._b_powerplant = rules.b_powerplant.to(device)  # [NB] bool
         self._b_iz_adj = rules.b_iz_adj_prod.to(device)  # [NB] bool
@@ -2743,11 +2747,46 @@ class SimInit:
         # `INTL_ROUTE_YIELD_ROWS`, `ROUTE_CAPACITY_ROWS`): python lists of
         # tuples, each site reads the columns it needs
         _pcl = list(rules.promo_classes)
-        self._prod_mult_rows: list[tuple[int, int, int, int, int, float]] = [
-            (int(r[0]), int(r[1]), int(r[2]), int(r[3]), (_pcl.index(r[4]) if r[4] in _pcl else -1), float(r[5]))
+        # [civ, leaderRow, building, buildings-of-district, promoClass, pct, districtItem, every (1 building / 2 unit), unit]
+        self._prod_mult_rows: list[tuple[int, int, int, int, int, float, int, int, int]] = [
+            (int(r[0]), int(r[1]), int(r[2]), int(r[3]), (_pcl.index(r[4]) if r[4] in _pcl else -1), float(r[5]),
+             int(r[6]), int(r[7]), int(r[8]))
             for r in _uq["prodMults"]]
-        self._district_adj_rows: list[tuple[int, int, int, float]] = [
-            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["districtAdj"]]
+        # [civ, leaderRow, district, amount, source (0 adjacent districts / 1 the river)]
+        self._district_adj_rows: list[tuple[int, int, int, float, int]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4])) for r in _uq["districtAdj"]]
+        # THE CITY'S ROWS (`CENTER_ADJ_ROWS` and its siblings): [civ, leaderRow, ...clauses]
+        self._center_adj_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["centerAdj"]]  # type: ignore[misc]
+        self._great_work_yield_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["greatWorkYields"]]  # type: ignore[misc]
+        self._gpp_class_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["gppClass"]]
+        self._powered_yield_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["poweredYields"]]
+        # [civ, leaderRow, resource (RESOURCE_IDS), terrain, amount, pct]
+        self._stockpile_rate_rows: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["stockpileRate"]]  # type: ignore[misc]
+        self._stockpile_cap_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["stockpileCap"]]  # type: ignore[misc]
+        self._unit_charge_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["unitCharges"]]  # type: ignore[misc]
+        self._tile_cost_rows: list[tuple[int, int, int, float]] = [
+            (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["tileCost"]]
+        # [civ, leaderRow, terrain, hills, civic]
+        self._farm_terrain_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["farmTerrain"]]  # type: ignore[misc]
+        # [civ, leaderRow, improvement, yield, amount, side (0 origin / 1 destination)]
+        self._route_improvement_rows: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["routeImprovement"]]  # type: ignore[misc]
+        # [civ, leaderRow, unit, tech, firstCity]
+        self._grant_unit_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["grantUnits"]]  # type: ignore[misc]
+        self._spy_capacity_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["spyCapacity"]]  # type: ignore[misc]
+        # [civ, leaderRow, firstCityPop, palaceHousing, palaceAmenities, presettle yields x6]
+        self._capital_rows: list[tuple[int, int, int, int, int, list[float]]] = [
+            (int(r[0]), int(r[1]), int(r[2]), int(r[3]), int(r[4]), [float(x) for x in r[5:11]]) for r in _uq["capital"]]
         self._intl_route_rows: list[tuple[int, int, int, float]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3])) for r in _uq["intlRouteYields"]]
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [

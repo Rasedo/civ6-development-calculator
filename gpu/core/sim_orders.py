@@ -732,8 +732,6 @@ class SimOrders:
                         self._occ_clear(dr, hc[dr], sc[dr])
 
             if _rk_imp[n] and self.improvements_on and self._builder_idx >= 0:
-                hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
-                      else torch.zeros(B, dtype=torch.bool, device=dev))
                 mining = (techs[:, self._mine_unlock_tech] if self._mine_unlock_tech >= 0
                           else torch.zeros(B, dtype=torch.bool, device=dev))
                 constr = (techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0
@@ -773,8 +771,7 @@ class SimOrders:
                     if _col < 0:
                         continue
                     if _k == self.FARM:
-                        _valid = self.farm_flat.gather(1, hc.unsqueeze(1)).squeeze(1) | (
-                            self.farm_hill.gather(1, hc.unsqueeze(1)).squeeze(1) & hf)
+                        _valid = self._farm_ground(row).gather(1, hc.unsqueeze(1)).squeeze(1)
                     elif _k == self.MINE:
                         _valid = self.mine_ok.gather(1, hc.unsqueeze(1)).squeeze(1) & mining
                     elif _k == self.LUMBER:

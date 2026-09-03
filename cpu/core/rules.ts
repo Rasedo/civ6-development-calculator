@@ -20,7 +20,7 @@ import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/build
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { CITY_MIN_DIST } from '../../world/types';
+import { CITY_MIN_DIST, type TerrainId } from '../../world/types';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
@@ -122,6 +122,9 @@ export function validImprovementsIn(
     suzerain?: ReadonlySet<string>;
     /** the civilization the seat plays (`civOf`), for the UNIQUE rows */
     civ?: string | null;
+    /** the roster's extra Farm ground (`FARM_TERRAIN_ROWS`) and the civics that gate it */
+    farmTerrain?: readonly { terrain: TerrainId; hills: boolean; civic?: string }[];
+    civics?: readonly string[];
   },
 ): ImprovementId[] {
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -196,12 +199,15 @@ export function validImprovementsIn(
   const hills = tile.elevation === 'HILLS';
   const hillFarmsOk = !unlocks || unlocks.hillFarms;
 
+  // CIV6 (EFFECT_ADJUST_IMPROVEMENT_VALID_TERRAIN): the roster's extra ground
+  const rowFarm = tile.feature === null && (opts.farmTerrain ?? []).some(
+    (r) => r.terrain === tile.terrain && r.hills === hills && (r.civic === undefined || (opts.civics ?? []).includes(r.civic)));
   if (
     unlocked('FARM') &&
     ((tile.feature === null &&
       (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS') &&
       (flat || (hills && hillFarmsOk))) ||
-      tile.feature === 'FLOODPLAINS')
+      tile.feature === 'FLOODPLAINS' || rowFarm)
   ) {
     out.push('FARM');
   }
@@ -258,6 +264,8 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     gpAppeal: cityAppealResolver(state),
     suzerain: suzerainNames(state, seat),
     civ: civOf(state, seat),
+    farmTerrain: getModifiers(state, seat).farmTerrain,
+    civics: seatOf(state, seat)?.research.civics,
   });
 }
 

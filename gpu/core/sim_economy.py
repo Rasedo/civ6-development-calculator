@@ -2134,9 +2134,11 @@ class SimEconomy:
         # CIV6 (Meiji Restoration): "+1 standard adjacency bonus to all
         # districts from adjacent districts" — the roster's district rows,
         # on the tiles a matching seat owns (`DISTRICT_ADJ_ROWS`)
-        for _rc, _rl, _rdi, _ramt in self._district_adj_rows:
+        # (Grote Rivieren, EFFECT_RIVER_ADJACENCY): the same rows on the district's own river
+        for _rc, _rl, _rdi, _ramt, _rsrc in self._district_adj_rows:
             if _rdi == di:
-                raw = raw + _ramt * self._who_tile_plane(_rc, _rl).to(self.dtype) * adjc
+                _rsource = self.tile_river.to(self.dtype) if _rsrc == 1 else adjc
+                raw = raw + _ramt * self._who_tile_plane(_rc, _rl).to(self.dtype) * _rsource
         if float(self._dyn_bwonder[di]) != 0:
             nbw = self.neigh
             nbwc = nbw.clamp(min=0)
@@ -3703,6 +3705,15 @@ class SimEconomy:
             ctr6 = ctr6 + featP.gather(1, _c6).double()
         ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev))
         ctr6[:, :, 1] = torch.maximum(p_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_production), dtype=F64, device=dev))
+        # CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
+        # tile of the named terrain (`CENTER_ADJ_ROWS`) — after the floors, as
+        # TS adds them beside `tileYieldsForCenter`
+        for _cc, _cl, _ct, _cy, _ca in self._center_adj_rows:
+            _cw = self._row_is(row, _cc, _cl)
+            if bool(_cw.any()):
+                _nb = self.neigh[ctr]  # [B, n, 6]
+                _cnt = ((self.terrain.gather(1, _nb.clamp(min=0).reshape(self.B, -1)).reshape_as(_nb) == _ct) & (_nb >= 0)).sum(dim=2)
+                ctr6[:, :, _cy] = ctr6[:, :, _cy] + _ca * _cw.double().unsqueeze(1) * _cnt.double()
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to the
             # TS reduce over the worked loop
@@ -3875,6 +3886,11 @@ class SimEconomy:
                 # while its city meets its whole load.
                 _lit = self.city_powered[:, row, sl].double().unsqueeze(2)
                 bld_y = bld_y + (selbf * _lit) @ self._b_pow_y
+                # CIV6 (EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING): the
+                # roster's add on each yield a powered half pays
+                _pa = self._powered_add(row)
+                if _pa is not None:
+                    bld_y = bld_y + ((selbf * _lit) @ self._b_pow_y_mask) * _pa.unsqueeze(1)
             if self._iz_idx >= 0 and self._iz_adj_bidx:
                 # CIV6 (Coal Power Plant): "Grants bonus Production equal to the
                 # district's current adjacency bonus", and unlike its two
@@ -3969,6 +3985,13 @@ class SimEconomy:
                 self._suz_writing_sci * self.city_gw_writing[:, row, sl].double()
                 + self._suz_relic_sci * (self.city_relics[:, row, sl] + self.city_artifacts[:, row, sl]).double()
             ) * alivef
+        # CIV6 (EFFECT_ADJUST_CITY_GREATWORK_YIELD): the roster's per-work rows
+        # (`GREAT_WORK_YIELD_ROWS`) — a Relic or an Artifact held here
+        for _gc, _gl, _gk, _gy, _ga in self._great_work_yield_rows:
+            _gw = self._row_is(row, _gc, _gl)
+            if bool(_gw.any()):
+                _gn = (self.city_relics if _gk == 0 else self.city_artifacts)[:, row, sl].double()
+                bld_y[:, :, _gy] = bld_y[:, :, _gy] + _ga * _gw.double().unsqueeze(1) * _gn * alivef
 
         # ================= bucket 4: CITIZENS ===============================
         # THE non-dyadic term (CITIZEN_CULTURE = 0.3), so its POSITION is the

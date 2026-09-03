@@ -1,6 +1,7 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
-import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
+import type { CivId, LeaderId } from '../data/seats';
+import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
@@ -151,6 +152,22 @@ export interface Modifiers {
   postKillHeal: number;
   embarkMoves: readonly EmbarkMoveRow[];
   ignoreShores: readonly IgnoreShoresRow[];
+  // the roster's city rows (`CENTER_ADJ_ROWS` and its siblings)
+  centerAdj: readonly CenterAdjRow[];
+  greatWorkYields: readonly GreatWorkYieldRow[];
+  /** per Great Person class, a factor over its per-turn points */
+  gppClassMult: Partial<Record<string, number>>;
+  /** what a POWERED building's powered yields gain, per yield it pays */
+  poweredYieldAdd: Partial<Yields>;
+  stockpileRate: readonly StockpileRateRow[];
+  stockpileCap: readonly StockpileCapRow[];
+  unitCharges: readonly UnitChargeRow[];
+  tileCost: readonly TileCostRow[];
+  farmTerrain: readonly FarmTerrainRow[];
+  routeImprovement: readonly RouteImprovementRow[];
+  grantUnits: readonly GrantUnitRow[];
+  spyCapacityRows: readonly SpyCapacityRow[];
+  capital: readonly CapitalRow[];
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -255,12 +272,15 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
 }
 
 /** The product of a seat's production percentages that name this item. */
-export function prodMultFor(rows: readonly ProdMultRow[], item: { building?: string; district?: string; promoClass?: string }): number {
+export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }): number {
   let m = 1;
   for (const r of rows) {
     const hit = r.building !== undefined ? r.building === item.building
       : r.district !== undefined ? r.district === item.district
-      : r.promoClass !== undefined ? r.promoClass === item.promoClass : false;
+      : r.promoClass !== undefined ? r.promoClass === item.promoClass
+      : r.unit !== undefined ? r.unit === item.unit
+      : r.districtItem !== undefined ? r.districtItem === item.districtItem
+      : r.every !== undefined ? r.every === item.kind : false;
     if (hit) m *= 1 + r.pct / 100;
   }
   return m;
@@ -278,6 +298,19 @@ export function defaultModifiers(): Modifiers {
     postKillHeal: 0,
     embarkMoves: [],
     ignoreShores: [],
+    centerAdj: [],
+    greatWorkYields: [],
+    gppClassMult: {},
+    poweredYieldAdd: {},
+    stockpileRate: [],
+    stockpileCap: [],
+    unitCharges: [],
+    tileCost: [],
+    farmTerrain: [],
+    routeImprovement: [],
+    grantUnits: [],
+    spyCapacityRows: [],
+    capital: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
     hillFarms: false,
@@ -477,10 +510,24 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.postKillHeal = POST_KILL_HEAL_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader)).reduce((s, r) => s + r.amount, 0);
   mods.embarkMoves = EMBARK_MOVE_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
   mods.ignoreShores = IGNORE_SHORES_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
-  // CIV6 (Meiji Restoration): the district rows join the adjacency adds the
-  // cards write, so `districtAdjacency` reads one list
+  const mine = <T extends { civ?: CivId; leader?: LeaderId }>(rows: readonly T[]): T[] => rows.filter((r) => rowIsFor(r, mods.civ, mods.leader));
+  mods.centerAdj = mine(CENTER_ADJ_ROWS);
+  mods.greatWorkYields = mine(GREAT_WORK_YIELD_ROWS);
+  for (const r of mine(GPP_CLASS_ROWS)) mods.gppClassMult[r.cls] = (mods.gppClassMult[r.cls] ?? 1) * (1 + r.pct / 100);
+  for (const r of mine(POWERED_YIELD_ROWS)) mods.poweredYieldAdd[r.yield] = (mods.poweredYieldAdd[r.yield] ?? 0) + r.amount;
+  mods.stockpileRate = mine(STOCKPILE_RATE_ROWS);
+  mods.stockpileCap = mine(STOCKPILE_CAP_ROWS);
+  mods.unitCharges = mine(UNIT_CHARGE_ROWS);
+  mods.tileCost = mine(TILE_COST_ROWS);
+  mods.farmTerrain = mine(FARM_TERRAIN_ROWS);
+  mods.routeImprovement = mine(ROUTE_IMPROVEMENT_ROWS);
+  mods.grantUnits = mine(GRANT_UNIT_ROWS);
+  mods.spyCapacityRows = mine(SPY_CAPACITY_ROWS);
+  mods.capital = mine(CAPITAL_ROWS);
+  // CIV6 (Meiji Restoration, Grote Rivieren): the district rows join the
+  // adjacency adds the cards write, so `districtAdjacency` reads one list
   for (const r of DISTRICT_ADJ_ROWS) {
-    if (rowIsFor(r, mods.civ, mods.leader)) (mods.districtAdjacencyAdd[r.district] ??= []).push({ source: 'DISTRICT', amount: r.amount });
+    if (rowIsFor(r, mods.civ, mods.leader)) (mods.districtAdjacencyAdd[r.district] ??= []).push({ source: r.source ?? 'DISTRICT', amount: r.amount });
   }
 
   if (GOVERNMENTS_ADOPTION_LIVE) {

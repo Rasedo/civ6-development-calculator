@@ -125,12 +125,34 @@ export const PLOT_YIELD_ROWS: readonly PlotYieldRow[] = [
 export interface ProdMultRow {
   civ?: CivId;
   leader?: LeaderId;
+  /** one building; or every building of a district */
   building?: string;
   district?: DistrictId;
+  /** every unit of a promotion class; or one unit type */
   promoClass?: string;
+  unit?: string;
+  /** a DISTRICT item */
+  districtItem?: DistrictId;
+  /** every item of a queue kind */
+  every?: 'building' | 'unit';
   pct: number;
 }
 export const PROD_MULT_ROWS: readonly ProdMultRow[] = [
+  // CIV6 (Divine Wind, EFFECT_ADJUST_DISTRICT_PRODUCTION): "Builds Encampment,
+  // Holy Site and Theater Square districts in half the time."
+  { leader: 'HOJO', districtItem: 'ENCAMPMENT', pct: 100 },
+  { leader: 'HOJO', districtItem: 'HOLY_SITE', pct: 100 },
+  { leader: 'HOJO', districtItem: 'THEATER_SQUARE', pct: 100 },
+  // CIV6 (Grote Rivieren): "+50% Production toward the Dam district" (the
+  // Flood Barrier building waits on its row)
+  { civ: 'NETHERLANDS', districtItem: 'DAM', pct: 50 },
+  // CIV6 (Songs of the Jeli, EFFECT_ADJUST_ALL_BUILDING/UNIT_PRODUCTION_MODIFIER):
+  // "-30% Production toward constructing buildings or training units."
+  { civ: 'MALI', every: 'building', pct: -30 },
+  { civ: 'MALI', every: 'unit', pct: -30 },
+  // CIV6 (Workshop of the World, EFFECT_ADJUST_UNIT_PRODUCTION): "+100%
+  // Production towards Military Engineers."
+  { civ: 'ENGLAND', unit: 'MILITARY_ENGINEER', pct: 100 },
   // CIV6 (Workshop of the World): "+20% Production towards Industrial Zone buildings."
   { civ: 'ENGLAND', district: 'INDUSTRIAL_ZONE', pct: 20 },
   // CIV6 (Strength in Unity): "+50% Production towards walls" — the three tiers
@@ -151,8 +173,15 @@ export interface DistrictAdjRow {
   leader?: LeaderId;
   district: DistrictId;
   amount: number;
+  /** per adjacent DISTRICT (the default) or for the district's own RIVER */
+  source?: 'RIVER';
 }
 export const DISTRICT_ADJ_ROWS: readonly DistrictAdjRow[] = [
+  // CIV6 (Grote Rivieren, EFFECT_RIVER_ADJACENCY): "Major adjacency bonus for
+  // Campuses, Theater Squares, and Industrial Zones if next to a river."
+  { civ: 'NETHERLANDS', district: 'CAMPUS', amount: 2, source: 'RIVER' },
+  { civ: 'NETHERLANDS', district: 'THEATER_SQUARE', amount: 2, source: 'RIVER' },
+  { civ: 'NETHERLANDS', district: 'INDUSTRIAL_ZONE', amount: 2, source: 'RIVER' },
   { civ: 'JAPAN', district: 'HOLY_SITE', amount: 1 },
   { civ: 'JAPAN', district: 'CAMPUS', amount: 1 },
   { civ: 'JAPAN', district: 'HARBOR', amount: 1 },
@@ -261,4 +290,213 @@ export interface IgnoreShoresRow {
 export const IGNORE_SHORES_ROWS: readonly IgnoreShoresRow[] = [
   { civ: 'NORWAY' },
   { civ: 'PHOENICIA', settlerOnly: true },
+];
+
+// ---------------------------------------------------------------------------
+// THE CITY'S ROWS — clauses a civilization or leader pays in every city
+
+/** CIV6 (Songs of the Jeli, EFFECT_TERRAIN_ADJACENCY): "City Centers gain +1
+ *  Faith and +1 Food for every adjacent Desert and Desert Hills tiles" — the
+ *  install's two terrains are the engine's one DESERT, hills or flat. */
+export interface CenterAdjRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  terrain: TerrainId;
+  yield: YieldKey;
+  amount: number;
+}
+export const CENTER_ADJ_ROWS: readonly CenterAdjRow[] = [
+  { civ: 'MALI', terrain: 'DESERT', yield: 'faith', amount: 1 },
+  { civ: 'MALI', terrain: 'DESERT', yield: 'food', amount: 1 },
+];
+
+/** CIV6 (Nkisi, EFFECT_ADJUST_CITY_GREATWORK_YIELD): "+2 Food, +2 Production,
+ *  +1 Faith, and +4 Gold from each Relic, Artifact, and Sculpture" — the
+ *  Relic and the Artifact are counted; a Work of Art carries no
+ *  sculpture/painting kind on either engine, so that third row waits. */
+export interface GreatWorkYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  kind: 'relic' | 'artifact';
+  yield: YieldKey;
+  amount: number;
+}
+export const GREAT_WORK_YIELD_ROWS: readonly GreatWorkYieldRow[] = [
+  { civ: 'KONGO', kind: 'relic', yield: 'food', amount: 2 },
+  { civ: 'KONGO', kind: 'relic', yield: 'production', amount: 2 },
+  { civ: 'KONGO', kind: 'relic', yield: 'faith', amount: 1 },
+  { civ: 'KONGO', kind: 'relic', yield: 'gold', amount: 4 },
+  { civ: 'KONGO', kind: 'artifact', yield: 'food', amount: 2 },
+  { civ: 'KONGO', kind: 'artifact', yield: 'production', amount: 2 },
+  { civ: 'KONGO', kind: 'artifact', yield: 'faith', amount: 1 },
+  { civ: 'KONGO', kind: 'artifact', yield: 'gold', amount: 4 },
+];
+
+/** CIV6 (Nkisi, EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): "Receive 50% more
+ *  Great Artist, Great Musician, and Great Merchant points." */
+export interface GppClassRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  cls: string;
+  pct: number;
+}
+export const GPP_CLASS_ROWS: readonly GppClassRow[] = [
+  { civ: 'KONGO', cls: 'ARTIST', pct: 50 },
+  { civ: 'KONGO', cls: 'MUSICIAN', pct: 50 },
+  { civ: 'KONGO', cls: 'MERCHANT', pct: 50 },
+];
+
+/** CIV6 (Workshop of the World, EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING):
+ *  "Buildings that provide additional yields when Powered receive +4 of that
+ *  yield" — one row per yield the install names. */
+export interface PoweredYieldRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yield: YieldKey;
+  amount: number;
+}
+export const POWERED_YIELD_ROWS: readonly PoweredYieldRow[] = [
+  { civ: 'ENGLAND', yield: 'culture', amount: 4 },
+  { civ: 'ENGLAND', yield: 'gold', amount: 4 },
+  { civ: 'ENGLAND', yield: 'production', amount: 4 },
+  { civ: 'ENGLAND', yield: 'science', amount: 4 },
+  { civ: 'ENGLAND', yield: 'food', amount: 4 },
+];
+
+/** Strategic accumulation: CIV6 (Workshop of the World,
+ *  EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE): "Iron and Coal
+ *  Mines accumulate 2 more resources per turn"; (The Last Best West,
+ *  EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): on Tundra and Snow "strategic
+ *  resource accumulation rate is +100%". */
+export interface StockpileRateRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  resource?: string;
+  terrain?: TerrainId;
+  amount?: number;
+  pct?: number;
+}
+export const STOCKPILE_RATE_ROWS: readonly StockpileRateRow[] = [
+  { civ: 'ENGLAND', resource: 'COAL', amount: 2 },
+  { civ: 'ENGLAND', resource: 'IRON', amount: 2 },
+  { leader: 'LAURIER', terrain: 'TUNDRA', pct: 100 },
+  { leader: 'LAURIER', terrain: 'SNOW', pct: 100 },
+];
+
+/** CIV6 (Workshop of the World, EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP):
+ *  +10 stockpile capacity per Lighthouse, Shipyard and Seaport. */
+export interface StockpileCapRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  building: string;
+  amount: number;
+}
+export const STOCKPILE_CAP_ROWS: readonly StockpileCapRow[] = [
+  { civ: 'ENGLAND', building: 'LIGHTHOUSE', amount: 10 },
+  { civ: 'ENGLAND', building: 'SHIPYARD', amount: 10 },
+  { civ: 'ENGLAND', building: 'SEAPORT', amount: 10 },
+];
+
+/** CIV6 (Workshop of the World, EFFECT_ADJUST_UNIT_BUILD_CHARGES): "Military
+ *  Engineers receive +2 charges." */
+export interface UnitChargeRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  unit: string;
+  amount: number;
+}
+export const UNIT_CHARGE_ROWS: readonly UnitChargeRow[] = [
+  { civ: 'ENGLAND', unit: 'MILITARY_ENGINEER', amount: 2 },
+];
+
+/** CIV6 (The Last Best West, EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN):
+ *  "Reduces the purchase cost of tiles in these terrain types by 50%." */
+export interface TileCostRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  terrain: TerrainId;
+  pct: number;
+}
+export const TILE_COST_ROWS: readonly TileCostRow[] = [
+  { leader: 'LAURIER', terrain: 'TUNDRA', pct: -50 },
+  { leader: 'LAURIER', terrain: 'SNOW', pct: -50 },
+];
+
+/** CIV6 (The Last Best West, EFFECT_ADJUST_IMPROVEMENT_VALID_TERRAIN): "Allows
+ *  Farms to be built on Tundra terrain. After Civil Engineering is unlocked
+ *  Farms can be built on Tundra Hills." */
+export interface FarmTerrainRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  terrain: TerrainId;
+  hills: boolean;
+  civic?: string;
+}
+export const FARM_TERRAIN_ROWS: readonly FarmTerrainRow[] = [
+  { leader: 'LAURIER', terrain: 'TUNDRA', hills: false },
+  { leader: 'LAURIER', terrain: 'TUNDRA', hills: true, civic: 'CIVIL_ENGINEERING' },
+];
+
+/** CIV6 (Favorable Terms,
+ *  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY): the
+ *  ORIGIN side pays the sender +1 Food per Camp or Pasture at the destination;
+ *  the DESTINATION side pays the destination's owner +1 Gold per Camp or
+ *  Pasture there on every route sent to his cities. */
+export interface RouteImprovementRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  improvement: ImprovementId;
+  yield: YieldKey;
+  amount: number;
+  side: 'origin' | 'destination';
+}
+export const ROUTE_IMPROVEMENT_ROWS: readonly RouteImprovementRow[] = [
+  { leader: 'POUNDMAKER', improvement: 'CAMP', yield: 'food', amount: 1, side: 'origin' },
+  { leader: 'POUNDMAKER', improvement: 'CAMP', yield: 'gold', amount: 1, side: 'destination' },
+  { leader: 'POUNDMAKER', improvement: 'PASTURE', yield: 'food', amount: 1, side: 'origin' },
+  { leader: 'POUNDMAKER', improvement: 'PASTURE', yield: 'gold', amount: 1, side: 'destination' },
+];
+
+/** CIV6 (EFFECT_GRANT_UNIT_IN_CITY): a free unit in the capital at a
+ *  technology (the Cree Trader at Pottery, Catherine's Spy at Castles), or in
+ *  the FIRST city at its founding (Kupe's Builder). Spain's Builder on a
+ *  foreign continent waits on C-48. */
+export interface GrantUnitRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  unit: string;
+  tech?: string;
+  firstCity?: boolean;
+}
+export const GRANT_UNIT_ROWS: readonly GrantUnitRow[] = [
+  { civ: 'CREE', unit: 'TRADER', tech: 'POTTERY' },
+  { leader: 'CATHERINE_DE_MEDICI', unit: 'SPY', tech: 'CASTLES' },
+  { leader: 'KUPE', unit: 'BUILDER', firstCity: true },
+];
+
+/** CIV6 (Catherine's Flying Squadron, EFFECT_GRANT_SPY): "extra spy capacity"
+ *  with the Castles technology. */
+export interface SpyCapacityRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  tech: string;
+  amount: number;
+}
+export const SPY_CAPACITY_ROWS: readonly SpyCapacityRow[] = [
+  { leader: 'CATHERINE_DE_MEDICI', tech: 'CASTLES', amount: 1 },
+];
+
+/** CIV6 (Kupe's Voyage): "+1 Population when settling your first city. The
+ *  Palace receives +3 Housing and +1 Amenity. +2 Science and +2 Culture per
+ *  turn before you settle your first city." */
+export interface CapitalRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  firstCityPop?: number;
+  palaceHousing?: number;
+  palaceAmenities?: number;
+  presettleYields?: Partial<Record<YieldKey, number>>;
+}
+export const CAPITAL_ROWS: readonly CapitalRow[] = [
+  { leader: 'KUPE', firstCityPop: 1, palaceHousing: 3, palaceAmenities: 1, presettleYields: { science: 2, culture: 2 } },
 ];

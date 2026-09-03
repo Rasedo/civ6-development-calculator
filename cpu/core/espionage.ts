@@ -30,6 +30,7 @@ import {
 import { envoysOf, resolveSuzerain, suzerainOf } from './cityStates';
 import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
+import { getModifiers } from './effects';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
 import { cityHasGovernor, governorAt, governorsOf, neutralizeGovernor } from './governors';
 import { seatBuildingSum } from './city';
@@ -56,6 +57,8 @@ export function spyCapacity(state: GameState, seat: number): number {
   for (const id of SPY_CAPACITY_TECHS) if (s.research.techs.includes(id)) n++;
   // CIV6 (Intelligence Agency): "+1 Spy and Spy capacity."
   n += seatBuildingSum(state, seat, 'spyCapacity');
+  // CIV6 (EFFECT_GRANT_SPY): the roster's capacity at a technology (`SPY_CAPACITY_ROWS`)
+  for (const r of getModifiers(state, seat).spyCapacityRows) if (s.research.techs.includes(r.tech)) n += r.amount;
   return Math.min(n, SPY_CAPACITY_MAX);
 }
 

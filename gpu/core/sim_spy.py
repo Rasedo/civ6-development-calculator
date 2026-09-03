@@ -24,6 +24,9 @@ class SimSpy:
             n = n + self.civ_civics[:, row, c].long()
         for t in self._spy_cap_techs:
             n = n + self.civ_techs[:, row, t].long()
+        # CIV6 (EFFECT_GRANT_SPY): the roster's capacity at a technology (`SPY_CAPACITY_ROWS`)
+        for _sc, _sl, _st, _sa in self._spy_capacity_rows:
+            n = n + (self._row_is(row, _sc, _sl) & self.civ_techs[:, row, _st]).long() * _sa
         # CIV6 (Intelligence Agency): "+1 Spy and Spy capacity."
         if bool((self._b_spy_capacity > 0).any()):
             n = n + self._seat_building_sum(row, self._b_spy_capacity)

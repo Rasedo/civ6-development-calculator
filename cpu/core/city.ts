@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
-import { tilesWithin, hexDistance } from '../../world/hex';
+import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
@@ -337,6 +337,8 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     const def = BUILDINGS[id];
     if (def && pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
     if (def?.housing) total += def.housing;
+    // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
+    if (def?.autoCapital) for (const r of m.capital) total += r.palaceHousing ?? 0;
     const beliefHousing = m.buildingHousingAdd[id];
     if (beliefHousing) total += beliefHousing;
   }
@@ -796,6 +798,11 @@ export function computeCityStats(
   const worked = assignWorkedTiles(state, city, ctx, city.population - specialistTotal);
   const tiles = emptyYields();
   addYields(tiles, tileYieldsForCenter(ctx, center));
+  // CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
+  // tile of the named terrain (`CENTER_ADJ_ROWS`)
+  for (const r of ctx.mods.centerAdj) {
+    tiles[r.yield] += r.amount * neighbors(state.map, center).filter((n) => n.terrain === r.terrain).length;
+  }
   const wonderTileBonus = (t: Tile, isCenter: boolean) => {
     if (!tileRules.length || (t.district && !isCenter)) return;
     for (const r of tileRules) {
@@ -902,6 +909,11 @@ export function computeCityStats(
   if (suzerainEffect(state, city.seat, 'worksScience')) {
     buildings.science += ANSHAN_WRITING_SCIENCE * (city.greatWorksWriting ?? 0)
       + ANSHAN_RELIC_SCIENCE * ((city.relics ?? 0) + (city.artifacts ?? 0));
+  }
+  // CIV6 (EFFECT_ADJUST_CITY_GREATWORK_YIELD): the roster's per-work rows
+  // (`GREAT_WORK_YIELD_ROWS`) — a Relic or an Artifact held here
+  for (const r of ctx.mods.greatWorkYields) {
+    buildings[r.yield] += r.amount * (r.kind === 'relic' ? (city.relics ?? 0) : (city.artifacts ?? 0));
   }
 
   const trade = cityTradeYields(state, city, m.routeGold);

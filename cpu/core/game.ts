@@ -270,6 +270,12 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   // sees it.
   const grant = newCityGrantUnit(state, seat);
   if (grant) spawnUnit(state, grant, tile.index, seat);
+  // CIV6 (Kupe's Voyage): the FIRST city's Population and Builder
+  if (list.length === 1) {
+    const mods = getModifiers(state, seat);
+    for (const r of mods.capital) city.population += r.firstCityPop ?? 0;
+    for (const g of mods.grantUnits) if (g.firstCity) spawnUnit(state, g.unit, tile.index, seat);
+  }
   return city;
 }
 
@@ -1304,16 +1310,19 @@ export function tilePurchaseCost(
   };
   const center = state.map.tiles[city.centerIndex];
   let ring = 2;
+  // CIV6 (EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN): the roster's terrain rows
+  let terrainPct = 0;
   if (tileIndex !== undefined) {
     const t = state.map.tiles[tileIndex];
     ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
+    for (const r of src.mods.tileCost) if (r.terrain === t.terrain) terrainPct += r.pct;
   }
   const tPct = src.research.techs.length / Object.keys(TECHS).length;
   const cPct = src.research.civics.length / Object.keys(CIVICS).length;
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
   return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (src.tilesPurchased ?? 0)) * src.mods.tilePurchaseMult,
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (src.tilesPurchased ?? 0)) * src.mods.tilePurchaseMult * (1 + terrainPct / 100),
   );
 }
 

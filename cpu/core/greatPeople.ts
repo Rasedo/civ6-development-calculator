@@ -164,6 +164,10 @@ export function greatPersonPointsPerTurn(
   // factor covers every per-turn source the same way.
   const gppMult = getModifiers(state, seat).gppMult;
   for (const cls of GP_CLASSES) out[cls] *= gppMult;
+  // CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the roster's per-class
+  // factor (`GPP_CLASS_ROWS`), over every source like the government's
+  const gcm = getModifiers(state, seat).gppClassMult;
+  for (const cls of GP_CLASSES) out[cls] *= gcm[cls] ?? 1;
   return out;
 }
 

@@ -910,6 +910,57 @@ class SimMasks:
         key = (self.row_civ if civ >= 0 else self.row_leader).gather(1, r).reshape(seat.shape)
         return (seat >= 0) & (seat < NM) & (key == (civ if civ >= 0 else leader))
 
+    def _farm_ground(self, row: int, civics: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T] — where this row may build a FARM: the exporter's two static
+        planes under the hill-farms civic, widened by the roster's terrain rows
+        (`FARM_TERRAIN_ROWS`, a civic of their own gating the hills). ONE
+        predicate for the mask, the applier and the job walk."""
+        cv = self.civ_civics[:, row] if civics is None else civics
+        hf = (cv[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
+              else torch.zeros(self.B, dtype=torch.bool, device=self.device))
+        out = self.farm_flat | (self.farm_hill & hf.unsqueeze(1))
+        for _fc, _fl, _ft, _fh, _fv in self._farm_terrain_rows:
+            _fok = self._row_is(row, _fc, _fl)
+            if _fv >= 0:
+                _fok = _fok & cv[:, _fv]
+            if bool(_fok.any()):
+                out = out | (_fok.unsqueeze(1) & (self.terrain == _ft)
+                             & (self.hills == bool(_fh)) & (self.feat_id < 0))
+        return out
+
+    def _powered_add(self, row: int) -> torch.Tensor | None:
+        """[B, 6] double — CIV6 (EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING):
+        what this row adds to each yield a POWERED building's powered half
+        pays (`POWERED_YIELD_ROWS`); None when no row is seated."""
+        out = None
+        for _pc, _pl, _py, _pa in self._powered_yield_rows:
+            _pw = self._row_is(row, _pc, _pl)
+            if not bool(_pw.any()):
+                continue
+            if out is None:
+                out = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
+            out[:, _py] = out[:, _py] + _pa * _pw.double()
+        return out
+
+    def _gpp_class_mult(self, row: int, cls: int) -> torch.Tensor:
+        """[B] double — CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the
+        roster's factor over one class's per-turn points (`GPP_CLASS_ROWS`)."""
+        m = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        for _gc, _gl, _gk, _gp in self._gpp_class_rows:
+            if _gk == cls:
+                m = m * torch.where(self._row_is(row, _gc, _gl), torch.full_like(m, 1.0 + _gp / 100.0), torch.ones_like(m))
+        return m
+
+    def _city_improvement_count(self, imp: int) -> torch.Tensor:
+        """[B, NM, RC] long — `cityImprovementCount`: how many of each city's
+        tiles carry the named improvement, every major's cities."""
+        out = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
+        hit = self.improvement == imp
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r)
+            out[:, r].scatter_add_(1, sl.clamp(min=0), (hit & (sl >= 0)).long())
+        return out
+
     def _roster_cs(self, seat: torch.Tensor, utype: torch.Tensor, tile: torch.Tensor,
                    foe_seat: torch.Tensor, foe_hp: torch.Tensor | None, foe_city: bool) -> torch.Tensor:
         """[B] long — `rosterCS`: the flat Combat Strength a unit's
@@ -2533,8 +2584,6 @@ class SimMasks:
         hold = alive
 
         if self.improvements_on and self._builder_idx >= 0:
-            hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
-                  else torch.zeros(B, dtype=torch.bool, device=dev)).unsqueeze(1)
             mining = (techs[:, self._mine_unlock_tech] if self._mine_unlock_tech >= 0
                       else torch.zeros(B, dtype=torch.bool, device=dev)).unsqueeze(1)
             constr = (techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0
@@ -2549,7 +2598,7 @@ class SimMasks:
                 & (self.district.gather(1, tc) < 0)          # can't improve a district tile
                 & (self.built_wonder.gather(1, tc) < 0)      # an in-flight wonder pave refuses improvements
             )
-            farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & hf)
+            farmable = self._farm_ground(row, civics).gather(1, tc)
             build_f = (here_ok & farmable).unsqueeze(2)
             build_m = (here_ok & self.mine_ok.gather(1, tc) & mining).unsqueeze(2)
             build_l = (here_ok & self.lumber_ok.gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)

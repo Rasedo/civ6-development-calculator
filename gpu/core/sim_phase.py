@@ -146,6 +146,20 @@ class SimPhase:
     def _seat_turn(self, row: int) -> torch.Tensor:
         B, dev = self.B, self.device
         active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
+        # CIV6 (Kupe's Voyage): "+2 Science and +2 Culture per turn before you
+        # settle your first city" — the only yield a CITY-LESS seat makes, so
+        # it banks here, above the economy block both engines skip; it
+        # completes with the turn the first city gives the seat.
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+            if not (_cy[3] or _cy[4]):
+                continue
+            _nc = self.civ_alive[:, row] & ~active & self._row_is(row, _cc, _cl)
+            if bool(_nc.any()):
+                _ncf = _nc.to(self.civ_tech_prog.dtype)
+                self.civ_tech_prog[:, row] += _ncf * _cy[3]
+                self.civ_civic_prog[:, row] += _ncf * _cy[4]
+                self.seat_science_total[:, row] += _ncf * _cy[3]
+                self.civ_culture[:, row] += _ncf * _cy[4]
         if not bool(active.any()):
             # TS's eliminated-actor `continue` — but the stashed intents are for
             # THIS turn and must not survive into the next one. Both drains pop
@@ -535,14 +549,27 @@ class SimPhase:
         _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
         # CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows —
         # a named building or every building of a district
-        for _rc, _rl, _rb, _rd, _rp, _pct in self._prod_mult_rows:
-            if _rp >= 0:
+        # a named building, every building of a district, EVERY building, or a
+        # DISTRICT item (EFFECT_ADJUST_DISTRICT_PRODUCTION); the unit arms below
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru in self._prod_mult_rows:
+            if _rp >= 0 or _ru >= 0 or _rev == 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
             if not bool(_who.any()):
                 continue
             _is_b = (cur >= 0) & (cur < self.NB)
-            _hit = (cur == _rb) if _rb >= 0 else (_is_b & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _rd))
+            if _rb >= 0:
+                _hit = cur == _rb
+            elif _rd >= 0:
+                _hit = _is_b & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _rd)
+            elif _rdi >= 0:
+                # a district queue code is a SCAFFOLD slot; the row names the
+                # district, so the slot's own district answers
+                _ds = cur - self.DISTRICT_BASE
+                _in_d = (_ds >= 0) & (_ds < len(self._scaffold))
+                _hit = _in_d & (self._scaffold_di[_ds.clamp(min=0, max=max(len(self._scaffold) - 1, 0))] == _rdi)
+            else:
+                _hit = _is_b
             _emall = torch.where(_hit & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
         # Project."
@@ -593,13 +620,19 @@ class SimPhase:
         if bool(_hard.any()):
             _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
         # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
-        for _rc, _rl, _rb, _rd, _rp, _pct in self._prod_mult_rows:
-            if _rp < 0:
+        # a promotion class, ONE unit type (EFFECT_ADJUST_UNIT_PRODUCTION), or every unit
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru in self._prod_mult_rows:
+            if _rp < 0 and _ru < 0 and _rev != 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
             if not bool(_who.any()):
                 continue
-            _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _rp)
+            if _rp >= 0:
+                _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _rp)
+            elif _ru >= 0:
+                _cls_i = _is_unit & (_ut == _ru)
+            else:
+                _cls_i = _is_unit
             _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
@@ -1196,6 +1229,15 @@ class SimPhase:
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
             self._eff_version += 1
+            # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
+            # technology, in the capital (`GRANT_UNIT_ROWS`)
+            for _gc, _gl, _gu, _gt, _gf in self._grant_unit_rows:
+                if _gt < 0 or _gu < 0:
+                    continue
+                _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl) & (self.civ_cap_tile[:, row] >= 0)
+                if bool(_gm.any()):
+                    self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
+                                     torch.full((self.B,), _gu, dtype=torch.long, device=self.device))
             self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
             # Diplomatic Victory point" — once, at completion.
@@ -1379,6 +1421,10 @@ class SimPhase:
             # government's factor covers every per-turn source the same way.
             if self._gov_has_effects:
                 pts = pts * self._gov_mods(row)[12]["gppmult"]
+            # CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the roster's
+            # per-class factor, over every source like the government's
+            if self._gpp_class_rows:
+                pts = pts * self._gpp_class_mult(row, cls)
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )

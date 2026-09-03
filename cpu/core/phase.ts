@@ -1423,7 +1423,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocksIn(actor.research);
           if (!here.improvement
-              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat) }).includes(imp)) {
+              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics }).includes(imp)) {
             here.improvement = imp;
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
@@ -1646,6 +1646,18 @@ export function seatPhase(state: GameState): void {
       // owns nothing but units, so skipping the whole block here locks the
       // seat out of the FOUND verb, the one verb that would give it a city.
       // CIV6: a civ is eliminated when it holds neither a city nor a settler.
+      // CIV6 (Kupe's Voyage): "+2 Science and +2 Culture per turn before you
+      // settle your first city" — the only yield a city-less seat makes, so it
+      // banks here, above the economy block; it completes with the turn the
+      // first city gives the seat.
+      for (const r of getModifiers(state, actor.seat).capital) {
+        const s0 = r.presettleYields?.science ?? 0;
+        const c0 = r.presettleYields?.culture ?? 0;
+        actor.research.techProgress += s0;
+        actor.research.civicProgress += c0;
+        actor.scienceTotal = (actor.scienceTotal ?? 0) + s0;
+        actor.cultureTotal = (actor.cultureTotal ?? 0) + c0;
+      }
       if (recU) applySeatUnitOrders(state, actor, recU.units);
       continue;
     }
@@ -2095,7 +2107,7 @@ export function seatPhase(state: GameState): void {
         const _udtD = congressUdtProdDistrict(state);
         if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
         // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
-        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { building: q.building, district: BUILDINGS[q.building]?.district });
+        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district });
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
@@ -2111,8 +2123,10 @@ export function seatPhase(state: GameState): void {
         // melee units."
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
         // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
-        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { promoClass: promoClassOf(q.unit) });
+        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit });
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
+        // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
+        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district });
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
         // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         // next to a River."
@@ -2388,6 +2402,13 @@ export function seatPhase(state: GameState): void {
         }
       }
       rsr.techs.push(rsr.tech);
+      // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
+      // technology, in the capital
+      for (const g of seatMods.grantUnits) {
+        if (g.tech !== rsr.tech) continue;
+        const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
+        if (cap) spawnUnit(state, g.unit, cap.centerIndex, actor.seat);
+      }
       delete rsr.techRetained[rsr.tech];
       rsr.tech = null;
       pickNext();

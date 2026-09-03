@@ -3,7 +3,7 @@ import { addYields, emptyYields, type GameState, type City, type Tile, type Yiel
 import { citiesOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
-import type { YieldCtx } from './effects';
+import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -258,6 +258,17 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   return out;
 }
 
+/** CIV6 (EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING): "Buildings that
+ *  provide additional yields when Powered receive +4 of that yield" — the
+ *  roster's rows, on each yield the building's powered half pays. */
+export function poweredExtra(mods: Modifiers, poweredYields: Partial<Yields>): Partial<Yields> {
+  const out: Partial<Yields> = {};
+  for (const k of Object.keys(poweredYields) as (keyof Yields)[]) {
+    if ((poweredYields[k] ?? 0) !== 0 && mods.poweredYieldAdd[k]) out[k] = mods.poweredYieldAdd[k];
+  }
+  return out;
+}
+
 export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): Yields {
   const out = emptyYields();
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
@@ -267,7 +278,10 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     if (def.regional) continue; // handled by regional scan (affects own city too)
     if (pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
     if (def.yields) addYields(out, def.yields);
-    if (powered && def.poweredYields) addYields(out, def.poweredYields);
+    if (powered && def.poweredYields) {
+      addYields(out, def.poweredYields);
+      addYields(out, poweredExtra(ctx.mods, def.poweredYields));
+    }
     if (def.special === 'COAL_PLANT') {
       const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
       if (iz && ctx.map.tiles[iz.tileIndex].districtComplete) {
@@ -440,7 +454,10 @@ export function regionalEffects(
         if ((!def.poweredYields && !def.poweredAmenities) || (!every && seenPowered.has(id))) continue;
         if (!other.powered) continue;
         seenPowered.add(id);
-        if (def.poweredYields) addYields(out.yields, def.poweredYields);
+        if (def.poweredYields) {
+          addYields(out.yields, def.poweredYields);
+          addYields(out.yields, poweredExtra(getModifiers(state, city.seat), def.poweredYields));
+        }
         out.amenities += def.poweredAmenities ?? 0;
       }
     }
@@ -487,6 +504,8 @@ export function localAmenities(state: GameState, city: City): number {
     if (!def || def.regional) continue;
     if (pillaged.has(def.district)) continue; // pillaged district's amenities go dark
     n += def.amenities ?? 0;
+    // CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
+    if (def.autoCapital) for (const r of getModifiers(state, city.seat).capital) n += r.palaceAmenities ?? 0;
     if (def.poweredAmenities && city.powered) n += def.poweredAmenities;
   }
   return n;

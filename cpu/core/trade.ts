@@ -411,6 +411,24 @@ export function routeYieldsInternational(state: GameState, dest: City, seat: num
   return out;
 }
 
+/** Every route, any seat's, that ends in this city. */
+export function incomingRoutes(state: GameState, city: City): number {
+  let n = 0;
+  for (const s of state.seats) {
+    for (const r of s.tradeRoutes ?? []) {
+      if (s.seat === city.seat ? r.to === city.id && r.toSeat === undefined : r.toSeat === city.seat && r.toSeatCity === city.id) n += 1;
+    }
+  }
+  return n;
+}
+
+/** How many tiles of this city carry the named improvement. */
+export function cityImprovementCount(state: GameState, city: City, improvement: string): number {
+  let n = 0;
+  for (const t of state.map.tiles) if (t.ownerSeat === city.seat && t.ownerCity === city.id && t.improvement === improvement) n += 1;
+  return n;
+}
+
 /** The international routes OTHER seats run into this city. */
 export function incomingIntlRoutes(state: GameState, city: City): number {
   let n = 0;
@@ -438,10 +456,26 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   // CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
   // civilization's route INTO this city.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD * incomingIntlRoutes(state, city);
+  // CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
+  // the DESTINATION side): every route ending here pays this seat per
+  // named improvement of this city (`ROUTE_IMPROVEMENT_ROWS`)
+  const rowsHere = getModifiers(state, seat).routeImprovement;
+  if (rowsHere.length) {
+    const incoming = incomingRoutes(state, city);
+    for (const r of rowsHere) if (r.side === 'destination') out[r.yield] += r.amount * incoming * cityImprovementCount(state, city, r.improvement);
+  }
   const originWonderGold = wonderRouteOriginGold(state, city);
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
     out.gold += routeGold;
+    // the ORIGIN side of the same rows: this seat's route out, per named
+    // improvement at its destination city
+    if (rowsHere.length) {
+      const destCity = route.toSeat !== undefined
+        ? seatOf(state, route.toSeat)?.cities.find((c) => c.id === route.toSeatCity)
+        : route.to !== undefined ? seatOf(state, seat)?.cities.find((c) => c.id === route.to) : undefined;
+      if (destCity) for (const r of rowsHere) if (r.side === 'origin') out[r.yield] += r.amount * cityImprovementCount(state, destCity, r.improvement);
+    }
     out.gold += routeChainGold(state, seat, route);
     out.gold += originWonderGold;
     if (route.toCs !== undefined) {

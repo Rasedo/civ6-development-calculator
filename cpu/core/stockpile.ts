@@ -14,6 +14,7 @@ import { BUILDINGS } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
 import { citiesOf, civOf, seatOf, tileOwnedByCiv } from './seats';
+import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
@@ -49,7 +50,12 @@ export function stockpileCap(state: GameState, seat: number): number {
       if (BUILDINGS[id]?.district === 'ENCAMPMENT') n += 1;
     }
   }
-  return STOCKPILE_CAP_BASE + STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING * n;
+  // CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's per-building rows
+  let extra = 0;
+  for (const r of getModifiers(state, seat).stockpileCap) {
+    for (const city of citiesOf(state, seat)) if (city.buildings.includes(r.building)) extra += r.amount;
+  }
+  return STOCKPILE_CAP_BASE + STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING * n + extra;
 }
 
 /**
@@ -74,6 +80,7 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
   const bk = bank(s);
+  const rate = getModifiers(state, seat).stockpileRate;
   for (const t of state.map.tiles) {
     if (!t.resource || t.pillaged) continue;
     const k = strategicSlot(t.resource);
@@ -81,8 +88,18 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     if (!tileOwnedByCiv(t, seat)) continue;
     // CIV6 (Defense Logistics): "Accumulating Strategic resources gain an
     // additional +1 per turn" — per accruing tile of the governed city.
-    bk[k] += STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource)
-      + governorTileSum(state, t, (e) => e.stockpilePerTurn);
+    // CIV6 (EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE /
+    // EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): the roster's rate rows — a
+    // flat add for the named resource, a percentage on the named terrain
+    let add = 0;
+    let pct = 0;
+    for (const r of rate) {
+      if (r.resource !== undefined && r.resource === t.resource) add += r.amount ?? 0;
+      if (r.terrain !== undefined && r.terrain === t.terrain) pct += r.pct ?? 0;
+    }
+    const per = STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource)
+      + governorTileSum(state, t, (e) => e.stockpilePerTurn) + add;
+    bk[k] += Math.floor((per * (100 + pct)) / 100);
   }
   // CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" — a
   // standing grant, owed whether or not the seat mines any.

@@ -1179,7 +1179,11 @@ class SimSeats:
         base = js_round(torch.full_like(tpct, 1.0) * (50.0 + 25.0 * (ring - 2).double()) * self.rules.game_speed)
         step = js_round(torch.full_like(tpct, 5.0 * self.rules.game_speed))
         tpm = self._gov_mods(row)[6].double()
-        return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_tiles_purchased[:, row].double()) * tpm)
+        # CIV6 (EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN): the roster's terrain rows (`TILE_COST_ROWS`)
+        _tpct = torch.zeros_like(tpm)
+        for _tc, _tl, _tt, _tp in self._tile_cost_rows:
+            _tpct = _tpct + (self._row_is(row, _tc, _tl) & (self.terrain.gather(1, tgt.unsqueeze(1)).squeeze(1) == _tt)).double() * _tp
+        return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_tiles_purchased[:, row].double()) * tpm * (1.0 + _tpct / 100.0))
 
     def _seat_tile_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 3: the TILE-BUY candidate — ONE legality body for the wire
@@ -2722,11 +2726,10 @@ class SimSeats:
         return ok
 
     def _seat_job_mask(self, row: int) -> torch.Tensor:
-        return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row)
+        return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row, row)
 
-    def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor) -> torch.Tensor:
-        farm = self.farm_flat | (self.farm_hill & cv[:, self._hillfarms_civic].unsqueeze(1)) if self._hillfarms_civic >= 0 else self.farm_flat
-        ok = farm
+    def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor, row: int) -> torch.Tensor:
+        ok = self._farm_ground(row, cv)
         if self.MINE >= 0 and self._mine_unlock_tech >= 0:
             ok = ok | (self.mine_ok & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
@@ -5505,6 +5508,16 @@ class SimSeats:
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        # CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
+        # the ORIGIN side): this row's route out, per named improvement at its
+        # destination city (`ROUTE_IMPROVEMENT_ROWS`) — the domestic leg
+        for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+            if _is != 0:
+                continue
+            _iw = self._row_is(row, _ic, _il)
+            if bool(_iw.any()):
+                _cnt_d = self._city_improvement_count(_ii)[:, row].gather(1, dest_j).double()
+                inc.scatter_add_(1, from_j * 6 + _iy, _ia * _cnt_d * pd * _iw.double().unsqueeze(1))
         if self.n_governors and row < self.n_majors:
             # CIV6 (Surplus Logistics): "Your Trade Routes ending here provide
             # +2 Food to their starting city" — the DESTINATION's governor
@@ -5619,6 +5632,14 @@ class SimSeats:
                 _who = self._row_is(row, _rc, _rl)
                 if bool(_who.any()):
                     inc.scatter_add_(1, from_j * 6 + _ry, _ra * (pays_i & _who.unsqueeze(1)).double())
+            # the ORIGIN side of the improvement rows on the international leg
+            for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+                if _is != 0:
+                    continue
+                _iw = self._row_is(row, _ic, _il)
+                if bool(_iw.any()):
+                    _cnt_i = self._city_improvement_count(_ii).gather(1, _rx).gather(2, _col).squeeze(2).double()
+                    inc.scatter_add_(1, from_j * 6 + _iy, _ia * _cnt_i * (pays_i & _iw.unsqueeze(1)).double())
             if bool(_cleo_d.any()):
                 inc.scatter_add_(1, from_j * 6 + 0, self._cleo_in_food * (pays_i & _cleo_d).double())
             if snd_s is not None and bool((snd_s != 0).any()):
@@ -5684,6 +5705,28 @@ class SimSeats:
             _addc[:, :, 2] = (self._cleo_in_gold * _cnt * self.city_alive[:, row, :cols].double()
                               * _cleo.double().unsqueeze(1)).to(inc.dtype)
             inc = inc + _addc.reshape(B, -1)
+        # the DESTINATION side of the improvement rows: every route ending in
+        # one of this row's cities, own or foreign, pays this row per named
+        # improvement of that city (`incomingRoutes` x `cityImprovementCount`)
+        if self._route_improvement_rows and any(r[5] == 1 for r in self._route_improvement_rows):
+            _in_dom = ((rr[:, :, 1] >= 0).unsqueeze(2) & dm).sum(dim=1).double()  # [B, cols]
+            _in_for = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
+            for r2 in range(self.n_majors):
+                if r2 == row:
+                    continue
+                _hit2 = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                         & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
+                _in_for = _in_for + _hit2.sum(dim=1).double()
+            _in_all = (_in_dom + _in_for) * alive.double()
+            _addr = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
+            for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+                if _is != 1:
+                    continue
+                _iw = self._row_is(row, _ic, _il)
+                if bool(_iw.any()):
+                    _cnt_h = self._city_improvement_count(_ii)[:, row].double()
+                    _addr[:, :, _iy] = _addr[:, :, _iy] + (_ia * _in_all * _cnt_h * _iw.double().unsqueeze(1)).to(inc.dtype)
+            inc = inc + _addr.reshape(B, -1)
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
             # CIV6 (Letters of Marque): "Trade Route yields -50%."
@@ -6030,7 +6073,8 @@ class SimSeats:
         owned = (self.tile_seat == row) & ~self.pillaged & (self.improvement == self.res_imp)
         bank = self.civ_stockpile[:, row]
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
-            n = (owned & (self.res_id == rid)).sum(dim=1)
+            here = owned & (self.res_id == rid)
+            n = here.sum(dim=1)
             if bool((n > 0).any()):
                 # CIV6 (Sky and Stars / Automaton Warfare, Golden faces):
                 # Aluminum mines accumulate +2 and Uranium mines +1 more per
@@ -6040,13 +6084,24 @@ class SimSeats:
                     per = per + self._golden_ded(row, self._ded_sky).long() * self._sky_alu_rate
                 if k == self._auto_ura_slot:
                     per = per + self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_mine
-                bank[:, k] += n * per
+                # CIV6 (EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE):
+                # the roster's flat add for this resource (`STOCKPILE_RATE_ROWS`)
+                for _sc, _sl, _sr, _st, _sa, _sp in self._stockpile_rate_rows:
+                    if _sr == rid and _sa:
+                        per = per + self._row_is(row, _sc, _sl).long() * _sa
+                pt = here.long() * per.unsqueeze(1)  # [B, T] — each accruing tile's own rate
                 if self.n_governors:
                     # CIV6 (Defense Logistics): "Accumulating Strategic
                     # resources gain an additional +1 per turn" — per accruing
                     # tile of the governed city.
-                    _gl = self._governor_tile_sum(row, "stockpilePerTurn")
-                    bank[:, k] += (owned & (self.res_id == rid)).double().mul(_gl).sum(dim=1).long()
+                    pt = pt + here.long() * self._governor_tile_sum(row, "stockpilePerTurn").long()
+                # CIV6 (EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): the roster's
+                # percentage on the named terrain, floored per tile as TS does
+                pct = torch.zeros_like(pt)
+                for _sc, _sl, _sr, _st, _sa, _sp in self._stockpile_rate_rows:
+                    if _st >= 0 and _sp:
+                        pct = pct + (self._row_is(row, _sc, _sl).unsqueeze(1) & (self.terrain == _st)).long() * _sp
+                bank[:, k] += ((pt * (100 + pct)) // 100).sum(dim=1)
         # CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" —
         # a standing grant, owed whether or not the seat mines any.
         if self._auto_ura_slot >= 0:
@@ -6064,7 +6119,15 @@ class SimSeats:
         enc = (self._b_req_district == self._encampment_didx).reshape(1, 1, -1)
         stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols])
         n = (stand & enc & self.city_alive[:, row, :cols].unsqueeze(2)).sum(dim=(1, 2))
-        return self._stock_cap_base + self._stock_cap_per_enc * n
+        cap = self._stock_cap_base + self._stock_cap_per_enc * n
+        # CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's
+        # per-building rows (`STOCKPILE_CAP_ROWS`), every standing copy
+        for _kc, _kl, _kb, _ka in self._stockpile_cap_rows:
+            _kw = self._row_is(row, _kc, _kl)
+            if bool(_kw.any()):
+                _kn = (self.city_bldg[:, row, :cols, _kb] & self.city_alive[:, row, :cols]).sum(dim=1)
+                cap = cap + _kw.long() * _kn * _ka
+        return cap
 
     def _laser_speed(self, row: int) -> torch.Tensor:
         """[B] long — the craft's speed above its base 1 LY/turn: every orbital
@@ -6143,6 +6206,9 @@ class SimSeats:
             if every is not None and int(self._b_req_district[n]) == self._iz_idx:
                 hpf = torch.where(every, (_lin.sum(dim=1) * alive).double(), hpf)
             y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
+            _pa = self._powered_add(row)
+            if _pa is not None:
+                y6 = y6 + hpf.unsqueeze(2) * (self._b_pow_y_mask[n].reshape(1, 1, 6) * _pa.unsqueeze(1))
             am = am + hpf * float(self._b_pow_am[n])
         return None if y6 is None else (y6, am)
 
@@ -6239,6 +6305,10 @@ class SimSeats:
         selb_h = bldg & ~self._bldg_dark(dreg)
         housing = water + torch.einsum("bjn,n->bj", selb_h.double(), rd.b_housing.double())
         housing = housing + self._palace_housing * is_cap_a
+        # CIV6 (Kupe's Voyage): "The Palace receives +3 Housing" (`CAPITAL_ROWS`)
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+            if _ch:
+                housing = housing + _ch * self._row_is(row, _cc, _cl).to(housing.dtype).reshape(-1, *([1] * (housing.dim() - 1))) * is_cap_a
         # THE DISTRICT'S OWN HOUSING (the Dam's +3). A type a city may hold
         # SEVERAL of is counted off the tile plane below, because the registry
         # keeps one tile per type; the Aqueduct's is the water rule above, and
@@ -6340,6 +6410,10 @@ class SimSeats:
         dreg = self.city_dist_tile[:, row, :cols]
         selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
         have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
+        # CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+            if _ca:
+                have = have + _ca * self._row_is(row, _cc, _cl).double().unsqueeze(1) * is_cap.double()
         # CIV6 (Entertainment Complex, Water Park): "+1 Amenity from
         # entertainment to parent city" — the DISTRICT's own, before any
         # building, and dark while it is pillaged.
@@ -7035,6 +7109,21 @@ class SimSeats:
             self._tile_owner_ver += 1
         self._all_roads_lead_to_rome(rows, row, s_idx)
         self._trajans_column(rows, row, slot)
+        # CIV6 (Kupe's Voyage): the FIRST city's Population and Builder
+        if self._capital_rows or self._grant_unit_rows:
+            _first = self.city_alive[rows, row].sum(dim=1) == 1
+            for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+                if _cpop:
+                    _fw = _first & self._row_is(row, _cc, _cl)[rows]
+                    self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
+            for _gc, _gl, _gu, _gt, _gf in self._grant_unit_rows:
+                if _gf and _gu >= 0:
+                    _gm = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    _gm[rows] = _first & self._row_is(row, _gc, _gl)[rows]
+                    if bool(_gm.any()):
+                        _at = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                        _at[rows] = s_idx
+                        self._spawn_unit(row, _gm, _at, torch.full((self.B,), _gu, dtype=torch.long, device=self.device))
         self._eff_version += 1
         return found
 
@@ -7415,6 +7504,9 @@ class SimSeats:
         SPAWN tile, which the Guildmaster's "All Builders trained in city get
         +1 build charge" needs."""
         z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        # CIV6 (EFFECT_ADJUST_UNIT_BUILD_CHARGES): the roster's per-type rows (`UNIT_CHARGE_ROWS`)
+        for _uc, _ul, _uu, _ua in self._unit_charge_rows:
+            z = z + (self._row_is(row, _uc, _ul) & (type_idx == _uu)).long() * _ua
         if self._gov_has_effects and self._builder_idx >= 0:
             z = z + (type_idx == self._builder_idx).long() * self._gov_mods(row)[12]["bcharge"].long()
         if self.n_governors and at is not None and self._builder_idx >= 0:

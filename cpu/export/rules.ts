@@ -32,6 +32,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { ROUTE_CHAIN_MAX, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { CIV_IDS, MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, ALLIANCE_QP_TURN, ALLIANCE_QP_ROUTE, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, ALLIANCE_M1_CS, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C2_GPP, ALLIANCE_C3_CUL_PCT, ALLIANCE_C3_TOUR_PCT, ALLIANCE_E2_INFLUENCE, ALLIANCE_REL2_THEO_CS, ALLIANCE_REL3_FAITH_PER_POP, WAR_GRIEVANCE_PCT, GRIEVANCE_WAR_BASE, GRIEVANCE_WAR_ON_FRIEND, GRIEVANCE_WAR_ON_SUZERAIN, GRIEVANCE_WAR_ON_CS_FRIEND, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_CS_CONQUERED, GRIEVANCE_CS_RAZED, GRIEVANCE_DENOUNCE, GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_ALLY_SHARE, GRIEVANCE_FRIEND_SHARE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DECAY_FLOOR, GRIEVANCE_OCCUPIED_DECAY, GRIEVANCE_OCCUPIED_CAPITAL_DECAY, GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX, GRIEVANCE_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CONGRESS_ENERGY_DISCOUNT, CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS, CONGRESS_PACT_LEVELS, DEAL_ITEMS, DEAL_TURNS, DEAL_OFFER_TURNS, DEAL_ITEM_KINDS, DEAL_PERMANENT, COMPETITIONS, COMPETITION_TURNS, COMPETITION_SILVER_PCT, COMPETITION_BRONZE_PCT, VISIBILITY_MAX, VISIBILITY_TECH, VISIBILITY_CS_PER_LEVEL, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, EMERGENCY_NUCLEAR, EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT, WW_WMD_LAUNCHED, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, TOURISM_GOV_MULT, TOURISM_RELIGIOUS_PENALTY_PCT, GOV_INTOLERANCE, CULTURE_PER_DOMESTIC_TOURIST, HOLY_CITY_TOURISM, ENLIGHTENMENT_CIVIC, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_SKY, DED_BODYGUARD, DED_AUTOMATON, SKY_EUREKAS, SKY_ALUMINUM_PER_TURN, SKY_AIR_XP_PCT, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE, PRODUCTION_QUEUE_MAX , CIV_LEADERS } from '../data/seats';
+import { CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { ITERU_RIVER_PROD_MULT, KNARR_NAVAL_MELEE_NEUTRAL_HEAL, EPIC_QUEST_LEVY_MULT, ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, HARDRADA_PILLAGE, ENKIDU_WAR_CS, ENKIDU_COMMON_FOE_QP, ENKIDU_SHARE_RANGE , PLOT_YIELD_ROWS , PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, ROUTE_CAPACITY_ROWS , COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS } from '../data/civilizations';
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
@@ -1382,13 +1383,42 @@ export function buildRules() {
       // the roster ROW's civilization — `Seat.civ` indexes the row
       pairCiv: CIV_LEADERS.map((l) => CIV_IDS.indexOf(l.civ)),
       // the roster's other data families: [civ, leaderRow, ...clauses], -1 absent
+      // [civ, leaderRow, building, buildings-of-district, promoClass, pct, districtItem, every (1 building / 2 unit), unit]
       prodMults: PROD_MULT_ROWS.map((r) => [
         rowCiv(r), rowLeader(r),
         r.building !== undefined ? (buildingIdx.get(r.building) ?? -1) : -1,
         r.district !== undefined ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,
         r.promoClass ?? '', r.pct,
+        r.districtItem !== undefined ? PLACEABLE_DISTRICTS.indexOf(r.districtItem) : -1,
+        r.every === 'building' ? 1 : r.every === 'unit' ? 2 : 0,
+        r.unit !== undefined ? Object.keys(UNITS).indexOf(r.unit) : -1,
       ]),
-      districtAdj: DISTRICT_ADJ_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), r.amount]),
+      // [civ, leaderRow, district, amount, source (0 adjacent districts / 1 the river)]
+      districtAdj: DISTRICT_ADJ_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), r.amount, r.source === 'RIVER' ? 1 : 0]),
+      centerAdj: CENTER_ADJ_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), YIELD_KEYS.indexOf(r.yield), r.amount]),
+      // [civ, leaderRow, kind (0 relic / 1 artifact), yield, amount]
+      greatWorkYields: GREAT_WORK_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.kind === 'relic' ? 0 : 1, YIELD_KEYS.indexOf(r.yield), r.amount]),
+      gppClass: GPP_CLASS_ROWS.map((r) => [rowCiv(r), rowLeader(r), GP_CLASSES.indexOf(r.cls as never), r.pct]),
+      poweredYields: POWERED_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount]),
+      // [civ, leaderRow, resource (RESOURCE_IDS), terrain, amount, pct]
+      stockpileRate: STOCKPILE_RATE_ROWS.map((r) => [
+        rowCiv(r), rowLeader(r),
+        r.resource !== undefined ? RESOURCE_IDS.indexOf(r.resource as never) : -1,
+        r.terrain !== undefined ? TERRAIN_IDS.indexOf(r.terrain) : -1,
+        r.amount ?? 0, r.pct ?? 0,
+      ]),
+      stockpileCap: STOCKPILE_CAP_ROWS.map((r) => [rowCiv(r), rowLeader(r), buildingIdx.get(r.building) ?? -1, r.amount]),
+      unitCharges: UNIT_CHARGE_ROWS.map((r) => [rowCiv(r), rowLeader(r), Object.keys(UNITS).indexOf(r.unit), r.amount]),
+      tileCost: TILE_COST_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), r.pct]),
+      // [civ, leaderRow, terrain, hills, civic]
+      farmTerrain: FARM_TERRAIN_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), r.hills ? 1 : 0, r.civic !== undefined ? (civicIdx.get(r.civic) ?? -1) : -1]),
+      // [civ, leaderRow, improvement, yield, amount, side (0 origin / 1 destination)]
+      routeImprovement: ROUTE_IMPROVEMENT_ROWS.map((r) => [rowCiv(r), rowLeader(r), IMPROVEMENT_IDS.indexOf(r.improvement), YIELD_KEYS.indexOf(r.yield), r.amount, r.side === 'origin' ? 0 : 1]),
+      // [civ, leaderRow, unit, tech, firstCity]
+      grantUnits: GRANT_UNIT_ROWS.map((r) => [rowCiv(r), rowLeader(r), Object.keys(UNITS).indexOf(r.unit), r.tech !== undefined ? (techIdx.get(r.tech) ?? -1) : -1, r.firstCity ? 1 : 0]),
+      spyCapacity: SPY_CAPACITY_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1, r.amount]),
+      // [civ, leaderRow, firstCityPop, palaceHousing, palaceAmenities, ...presettle yields x6]
+      capital: CAPITAL_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.firstCityPop ?? 0, r.palaceHousing ?? 0, r.palaceAmenities ?? 0, ...YIELD_KEYS.map((k) => r.presettleYields?.[k] ?? 0)]),
       intlRouteYields: INTL_ROUTE_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount]),
       // [civ, leaderRow, amount, classMask (CLASS_BIT), when]
       combatCs: COMBAT_CS_ROWS.map((r) => [

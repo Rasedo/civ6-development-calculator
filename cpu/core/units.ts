@@ -1541,13 +1541,16 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
  *  Engineer gets nothing). All are paid at CREATION, so a unit that predates
  *  the wonder or the card keeps its own count. */
 export function extraCharges(state: GameState, seat: number, unitType: string, at: Tile): number {
+  // CIV6 (EFFECT_ADJUST_UNIT_BUILD_CHARGES): the roster's per-type rows (`UNIT_CHARGE_ROWS`)
+  let rows = 0;
+  for (const r of getModifiers(state, seat).unitCharges) if (r.unit === unitType) rows += r.amount;
   if (unitType === 'BUILDER') {
-    return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges
+    return rows + seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges
       + governorTileSum(state, at, (e) => e.builderCharges);
   }
-  if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
-  if (isGreatEngineer(unitType)) return seatWonderSum(state, seat, 'engineerCharges');
-  return 0;
+  if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return rows + seatWonderSum(state, seat, 'spreadCharges');
+  if (isGreatEngineer(unitType)) return rows + seatWonderSum(state, seat, 'engineerCharges');
+  return rows;
 }
 
 /** CIV6 (Mausoleum): "Great Engineers have an additional charge" — the one
