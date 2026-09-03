@@ -4609,7 +4609,7 @@ class SimSeats:
         return got
 
     def _claim_goody_hut(self, mask: torch.Tensor, tile: torch.Tensor,
-                         seat: torch.Tensor) -> None:
+                         seat: torch.Tensor, slot: torch.Tensor | None = None) -> None:
         """A unit entering a TRIBAL VILLAGE claims it (C-47).
 
         Real Civ 6 gives the village to whoever reaches it first, so any civ
@@ -4633,9 +4633,11 @@ class SimSeats:
             self.tile_goody[b, t] = False
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
-            self._draw_and_pay_goody(one, b, srow, t)
+            self._draw_and_pay_goody(one, b, srow, t,
+                                     None if slot is None else int(slot[b]))
 
-    def _draw_and_pay_goody(self, one: torch.Tensor, b: int, srow: int, t: int) -> None:
+    def _draw_and_pay_goody(self, one: torch.Tensor, b: int, srow: int, t: int,
+                            slot: int | None = None) -> None:
         """Draw one village reward for game `b` and pay it — the ONE payout
         body, so the tile a unit walked onto and the barbarian outpost it
         cleared cannot drift apart on what a village is worth.
@@ -4693,13 +4695,11 @@ class SimSeats:
                 self._spawn_unit(srow, one, at,
                                  torch.full_like(tile, unit_i))
         elif pay == ch["experience"]:
-            gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
-                if bool((self.unit_tile[b] == t).any()) else -1
+            gs = self._goody_unit_slot(b, t, slot)
             if gs >= 0:
                 self.unit_xp[b, gs] += amt
         elif pay == ch["heal"]:
-            gs = int((self.unit_tile[b] == t).nonzero().flatten()[0]) \
-                if bool((self.unit_tile[b] == t).any()) else -1
+            gs = self._goody_unit_slot(b, t, slot)
             if gs >= 0:
                 self.unit_hp[b, gs] = min(cap, int(self.unit_hp[b, gs]) + amt)
         elif pay == ch["population"]:
@@ -4715,6 +4715,18 @@ class SimSeats:
             self.civ_stockpile[b, srow, self._most_advanced_strategic(b, srow)] += amt
         else:
             raise AssertionError(f"goody payload {self._goody_payload_kinds[pay]} has no arm")
+
+    def _goody_unit_slot(self, b: int, t: int, slot: int | None) -> int:
+        """The unit a village's MILITARY reward lands on.
+
+        TS hands `claimGoodyHut` the moving unit itself, so the XP and the heal
+        are its own; falling back to whoever stands on the tile first would
+        pick a different unit the moment two share it. `slot` is that unit,
+        threaded from the mover; the fallback serves the outpost caller."""
+        if slot is not None and 0 <= slot < self.unit_tile.shape[1]:
+            return slot
+        at = (self.unit_tile[b] == t).nonzero().flatten()
+        return int(at[0]) if at.numel() else -1
 
     def _most_advanced_strategic(self, b: int, row: int) -> int:
         """The most advanced strategic this seat can actually use.
@@ -8939,16 +8951,21 @@ class SimSeats:
                 self.unit_promo_used[rows, gs] = torch.where(
                     _near & (_pv > 0), _pu, self.unit_promo_used[rows, gs])
                 self.unit_charges[rows, gs] += _pv
-        # TS claims the village between the Pilgrim's charge and the camp
-        # clear, and the rng order is the whole point of matching it (C-47)
-        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1))
-        if clear_camp:
-            self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         if self._embark_live:
             self.unit_emb[rows, gs] = (
                 to_water & ~naval
                 & ~self.unit_water_walk[u_type.clamp(min=0, max=self.NU - 1)])[rows]
+        # OCCUPANCY FIRST, and it has to be: a village may GRANT a unit, and
+        # `_first_free_spot` would otherwise hand it the tile the mover has
+        # just taken. TS reads `unit.tileIndex`, already updated by here, so
+        # its grant goes to a NEIGHBOUR instead. Cost one battery (seed 9261
+        # turn 1: the granted Scout on the hut tile against TS's on the next).
         self._occ_set(rows, dest[rows], gs)
+        # TS claims the village between the Pilgrim's charge and the camp
+        # clear, and the rng order is the whole point of matching it (C-47)
+        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), gs)
+        if clear_camp:
+            self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         spent = (mp - cost).clamp(min=0)
         if self._embark_live and bool((moved & transition).any()):
             # the transfer cap, and the stored full pool refreshed for the

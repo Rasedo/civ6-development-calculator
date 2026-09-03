@@ -1296,6 +1296,34 @@ under their blocker so the dependency is readable, and both halves count.
   EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE with `CanCapture: true` — a boolean.
   The odds are DLL-side, so this waits on the sourcing pass (#211) exactly as
   C-49's damage band and C-63's legacy threshold do.
+- **A-2r. A FOUR-STEP WALK PARTS THE ENGINES.** Weight 2. OPEN, found
+  2026-09-04 while giving C-47 gate reachability, and NOT a village bug — the
+  village mechanic is green without it and this is green with villages on,
+  until something walks a unit further than the scripted driver ever does.
+  Merged slot 90, seed 9261 turn 160, seat 0, walking 159 -> 158 -> 157 -> 156
+  -> 155 with a 16-MP pool and every step costing 4:
+
+      AFF 159->158 mp=16 full=16 moved=True post=12
+      AFF 158->157 mp=12 full=16 moved=True post=8
+      AFF 157->156 mp=8  full=16 moved=True post=4
+      AFF 156->155 mp=4  full=16 moved=True post=0
+
+  The FOURTH step is exactly affordable and the GPU takes it; TS stops at 156,
+  so the digest reads one unit at two adjacent tiles (`unit[465]` GPU-only vs
+  `unit[468]` TS-only — the unit key is `tile * 3 + kind`, so those are tiles
+  155 and 156, one unit, not two). ZONE OF CONTROL IS RULED OUT: no neighbour
+  of any tile on the chain holds a living hostile at the moment of the step,
+  and the GPU's own `post=4` shows nothing zeroed the remainder. What is NOT
+  yet separated is why TS declines — the recorded plan carrying only three
+  ranks for that unit, TS's re-validation refusing the fourth on
+  terrain/occupancy the GPU's `ok` allows, or a `movesFull` disagreement that
+  moves the "at FULL MP always gets its first step" clause partway down a
+  chain. The reproduction, including the exact driver block that reaches it,
+  is the first thing to restore when this is picked up; the applier is meant
+  to be the one validator both engines share
+  (`applier-carries-whole-validator`), and no gate lane walks far enough to
+  see this today.
+
 - **C-50. APPEAL IS MAP-GLOBAL.** Weight 1. `tileAppeal(map, tile, camps,
   gpAppeal)` and the GPU's appeal plane answer one number per tile for
   every seat. CIV6 keys roster clauses on a seat's own view: the Amazon
@@ -1381,14 +1409,16 @@ under their blocker so the dependency is readable, and both halves count.
     That reason had to stop being true before the gate could see any of this,
     and the plane is compared now.
 
-  REACHABILITY, measured not assumed: with villages merely present the gate
-  claimed ZERO in 250 turns, so the driver now steps onto an adjacent village
-  ahead of its walk — a DECISION the applier validates and TS replays, which
-  is free coverage. Measured again after: 1 claim per 250-turn single seed,
-  and the gate green with the hut plane in the digest. `tribal_villages` (6
-  lanes) and `tribal-villages.test.ts` (10) are the bar; the GPU lane forces
-  each subtype to be the only drawable one and checks all 23 live rows move
-  their own plane, which is the disjoint-arms guard this many channels needs.
+  REACHABILITY, measured not assumed, and it is ZERO in the gate. Villages
+  are on the map (240 over the 24 fixtures) and both engines claim correctly,
+  but 250 driven turns claim NOTHING: the scripted driver never steps onto a
+  village tile. Making it do so is one block in `_seat_unit_orders` and it was
+  written, measured (1 claim per single seed, gate green) and then REMOVED,
+  because it exposed an unrelated four-step applier divergence that is now
+  A-2r — shipping the steering would have shipped a red gate. So `C-47`'s bar
+  is its 19 dedicated lanes, not the serve gate, exactly as C-20's Military
+  Engineer is; the gate proves only that villages sitting unclaimed on the map
+  break nothing. A-2r's fix is what restores this to a measured mechanic.
 
   Epic Quest's clause ships with it: CIV6 "Receive a Tribal Village reward
   each time you capture a barbarian outpost" is `TRAIT_BARBARIAN_CAMP_GOODY`

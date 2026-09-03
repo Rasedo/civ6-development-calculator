@@ -436,19 +436,6 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         w_key = torch.where(closer, d_nb * 8 + torch.arange(6, device=um.device), torch.full_like(d_nb, 2 ** 30))
         has_w = walkers & closer.any(dim=2)
         orders0 = torch.where(has_w, w_key.argmin(dim=2), orders0)
-    # A TRIBAL VILLAGE within one step is worth taking, and it OUTRANKS the
-    # walk: the driver may freely choose (the applier validates and TS replays
-    # the same orders), and without this the gate never reaches the reward
-    # table at all — 250 turns over a hut-carrying world claimed nothing (C-47).
-    if bool(sim.tile_goody.any()):
-        gnb = sim.neigh[tiles.clamp(min=0)]                       # [B, N, 6]
-        B_, N_ = tiles.shape
-        ghut = sim.tile_goody.gather(1, gnb.reshape(B_, -1).clamp(min=0)).reshape(B_, N_, 6)
-        ghut = ghut & (gnb >= 0) & um[:, :, 0:6]
-        gtake = present & ghut.any(dim=2)
-        if bool(gtake.any()):
-            # the lowest legal direction, the engine's own tie-break
-            orders0 = torch.where(gtake, ghut.long().argmax(dim=2), orders0)
     A_SP = sim._A_SPREAD
     if A_SP >= 0 and bool((spread_t >= 0).any()):
         d_sp = sim.pair_dist[tiles.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
