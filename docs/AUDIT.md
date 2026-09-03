@@ -88,8 +88,8 @@ from the list below.
 | C-54 a wonder's free era boost | 1 | EFFECT_ADJUST_FREE_TECH_BOOST_WONDER_ERA / _CIVIC_ — completing a wonder hands a RANDOM unearned boost from that wonder's own era. Both engines draw a random tech boost already (the Great Library's, inside the recruit body) but neither draws one keyed on an ERA, and no path fires on a wonder completing; Dynastic Cycle's pair waits on it |
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **25** | |
-| **OPEN, TOTAL** | **45** | |
+| **C. Absent systems** | **38** | |
+| **OPEN, TOTAL** | **58** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
