@@ -61,7 +61,7 @@ import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purc
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
-import { beginMission, beginTravel, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
+import { beginMission, beginTravel, isSpy, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
@@ -1171,7 +1171,11 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
     units.forEach((unit, j) => {
       const a = row[j] ?? -1;
       if (a < 0 || a === 12) return;            // no instruction, or HOLD
-      if (!state.units.includes(unit) || unit.movesLeft <= 0) return;  // died or spent
+      // died, or spent its turn. A SPY has no movement AT ALL (moves 0), and
+      // its verbs cost none — the GPU's applier gates on `present` alone, so
+      // the spent gate must not silence the one chassis that never moves.
+      if (!state.units.includes(unit)) return;
+      if (unit.movesLeft <= 0 && !isSpy(unit.type)) return;
       const here = state.map.tiles[unit.tileIndex];
       if (a === A_FOUND_CITY) {
         if (unit.type !== 'SETTLER') return;
@@ -2065,6 +2069,7 @@ export function seatPhase(state: GameState): void {
     // Iterate a SNAPSHOT — a settler completing mid-loop founds a city,
     // and the newborn must not act this turn (the GPU gates on the
     // pre-turn alive mask the same way).
+    const grantedNow: string[] = []; // the roster's technology grants, spawned after the upkeep
     let sciSum = 0;
     let culSum = 0;
     let goldSum = 0;
@@ -2420,12 +2425,10 @@ export function seatPhase(state: GameState): void {
       }
       rsr.techs.push(rsr.tech);
       // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
-      // technology, in the capital
-      for (const g of seatMods.grantUnits) {
-        if (g.tech !== rsr.tech) continue;
-        const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
-        if (cap) spawnUnit(state, g.unit, cap.centerIndex, actor.seat);
-      }
+      // technology. The SPAWN waits for the upkeep charge below — a unit
+      // granted this turn starts paying next turn, and the GPU's tech loop
+      // sits on the same side of `_seat_upkeep_and_bankruptcy`.
+      for (const g of seatMods.grantUnits) if (g.tech === rsr.tech) grantedNow.push(g.unit);
       delete rsr.techRetained[rsr.tech];
       rsr.tech = null;
       pickNext();
@@ -2455,6 +2458,13 @@ export function seatPhase(state: GameState): void {
         if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
       }
       if (victim) disbandUnit(state, victim.id);
+    }
+    // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
+    // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
+    // force — the GPU's tech loop sits on the same side of both.
+    for (const id of grantedNow) {
+      const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
+      if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);

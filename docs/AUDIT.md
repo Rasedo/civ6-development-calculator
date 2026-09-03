@@ -864,8 +864,7 @@ under their blocker so the dependency is readable, and both halves count.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the twelve-mission catalog, the counterspy post, the capture roll,
   the ESPIONAGE promotion class, the Espionage Pact's two outcomes (B-22r)
-  and the Listening Post's payload (C-2's visibility) ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured —
-  treat as poke-proven). The chassis is a CIVILIAN — its own page types it
+  and the Listening Post's payload (C-2's visibility) ship (`spy_test.py`, `spy.test.ts`). The gate REACHES the spy now — Catherine's free Spy at Castles puts one on the map — and the first serve that produced one found the head silenced on TS: `applySeatUnitOrders` refused every order for a unit with no movement left, which is a spy always (moves 0), while the GPU's applier gates on presence. Fixed; the reachability note is retired. The chassis is a CIVILIAN — its own page types it
   "Civilian/Espionage" — so `unitIsMilitary` / `_type_military` is what To
   Arms! pays now, and the Spy is outside it. The class is a flat pool
   of seventeen rows with no prerequisites, three drawn without replacement
