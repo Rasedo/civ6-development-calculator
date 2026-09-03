@@ -972,6 +972,13 @@ class SimPhase:
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
                 self._add_era_score(row, self._era_pts["wonder"], made_w.long())
+                # CIV6 (Dynastic Cycle): a random Eureka and Inspiration from
+                # the ERA OF THE WONDER, at TS's position — right after the
+                # era score and before any other completion payout draws
+                if self._wonder_era_boost_rows:
+                    _wera = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _wera[wr] = self._wonder_era[wi[wr].clamp(min=0, max=self._wond_n - 1)]
+                    self._grant_era_boosts(row, made_w, _wera)
                 # CIV6: Statue of Liberty +4 Diplomatic Victory points on
                 # completion, Potala Palace +1.
                 self.civ_diplo_points[wr, row] += self._wond_dvp[wi[wr]]

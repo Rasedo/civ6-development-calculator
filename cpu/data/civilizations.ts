@@ -1586,3 +1586,22 @@ export interface WonderChargeRow {
 export const WONDER_CHARGE_ROWS: readonly WonderChargeRow[] = [
   { leader: 'QIN', startEra: 'Ancient', endEra: 'Classical', pct: 15 },
 ];
+
+/**
+ * CIV6 (Dynastic Cycle, EFFECT_ADJUST_FREE_TECH_BOOST_WONDER_ERA and its
+ * CIVIC twin): "When completing a wonder receive a random Eureka and
+ * Inspiration from the era of the wonder, if available." The install writes
+ * the two as separate modifiers, each Amount 1, so the row carries both
+ * counts and a seat may hold one without the other (C-54).
+ */
+export interface WonderEraBoostRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** how many unearned EUREKAS of the wonder's era to grant */
+  techs: number;
+  /** ...and how many INSPIRATIONS */
+  civics: number;
+}
+export const WONDER_ERA_BOOST_ROWS: readonly WonderEraBoostRow[] = [
+  { civ: 'CHINA', techs: 1, civics: 1 },
+];

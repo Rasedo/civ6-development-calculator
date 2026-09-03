@@ -4583,6 +4583,50 @@ class SimSeats:
         b = self.tile_continent.gather(1, to_tile.clamp(min=0).reshape(self.B, -1)).reshape(to_tile.shape)
         return (from_tile >= 0) & (to_tile >= 0) & (a >= 0) & (b >= 0) & (a != b)
 
+    def _draw_era_boost(self, row: int, m: torch.Tensor, era: torch.Tensor,
+                        n: torch.Tensor, era_of: torch.Tensor,
+                        held: torch.Tensor, boosted: torch.Tensor) -> None:
+        """One kind's half of `grantEraBoosts`: `n` draws per game from the
+        UNEARNED rows of `era`. A game whose pool is empty takes NO draw at
+        all — TS returns out of its loop there, so the rng must not move for
+        it either, which is what masking `_next_random` gives."""
+        if not bool(m.any()) or int(n.max()) <= 0:
+            return
+        k = min(era_of.numel(), held.shape[2], boosted.shape[2])
+        for i in range(int(n.max())):
+            want = m & (n > i)
+            if not bool(want.any()):
+                break
+            open_ = ((era_of[:k].reshape(1, -1) == era.reshape(-1, 1))
+                     & ~held[:, row, :k] & ~boosted[:, row, :k])
+            cnt = open_.sum(dim=1)
+            want = want & (cnt > 0)          # "if available" — no pool, no draw
+            if not bool(want.any()):
+                break
+            r = self._next_random(want)
+            pick = torch.floor(r * cnt.clamp(min=1).double()).long()
+            # the pick-th OPEN column, in ascending index — TS indexes its
+            # filtered array the same way
+            rank = open_.long().cumsum(dim=1) - 1
+            hit = open_ & (rank == pick.reshape(-1, 1)) & want.reshape(-1, 1)
+            boosted[:, row, :k] |= hit
+
+    def _grant_era_boosts(self, row: int, m: torch.Tensor, era: torch.Tensor) -> None:
+        """CIV6 (Dynastic Cycle): "When completing a wonder receive a random
+        Eureka and Inspiration from the era of the wonder, if available."
+        `grantEraBoosts`'s twin — TECHS first, then CIVICS, because both
+        engines replay one rng stream (C-54)."""
+        if not self._wonder_era_boost_rows:
+            return
+        t_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        c_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for _c, _l, _t, _v in self._wonder_era_boost_rows:
+            w = self._row_is(row, _c, _l).long()
+            t_n = t_n + w * int(_t)
+            c_n = c_n + w * int(_v)
+        self._draw_era_boost(row, m, era, t_n, self._tech_era, self.civ_techs, self.civ_tech_boosted)
+        self._draw_era_boost(row, m, era, c_n, self._civic_era, self.civ_civics, self.civ_civic_boosted)
+
     def _wonder_tourism_pct(self, row: int) -> torch.Tensor:
         """[B] long — the percentage this row adds to the WONDER half of its
         tourism, per GAME (`wonderTourismPct`). The roster mask is [B] and

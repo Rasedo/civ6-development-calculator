@@ -365,6 +365,7 @@ def main() -> int:
                 ("foreign_founding", [py, "tests/gpu/foreign_founding_test.py"], 4),  # a city founded off the home continent (C-48)
                 ("home_continent_rows", [py, "tests/gpu/home_continent_rows_test.py"], 4),  # Spain's districts, Victoria's capacity, Phoenicia's loyalty
                 ("district_price", [py, "tests/gpu/district_price_test.py"], 4),  # each row's own base and discount (B-67)
+                ("wonder_era_boost", [py, "tests/gpu/wonder_era_boost_test.py"], 4),  # Dynastic Cycle's Eureka and Inspiration (C-54)
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

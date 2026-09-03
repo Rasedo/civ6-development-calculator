@@ -2972,6 +2972,10 @@ class SimInit:
         # Builder's CHARGE rather than per-turn Production (C-55)
         self._wonder_charge_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderCharge"]]  # type: ignore[misc]
+        # [civ, leaderRow, techs, civics] — a random Eureka and Inspiration
+        # from the ERA of the wonder just completed (C-54)
+        self._wonder_era_boost_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["wonderEraBoost"]]  # type: ignore[misc]
         self._wonder_tourism_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderTourism"]]  # type: ignore[misc]
         # [civ, leaderRow, district(1)/building(0), pct] ACROSS A RIVER

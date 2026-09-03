@@ -1727,6 +1727,37 @@ function religiousVictor(state: GameState): number {
  * granted Inspiration is an Inspiration like any other, so it pays the Pen,
  * Brush and Voice dedication the same way a detected one does.
  */
+/**
+ * CIV6 (Dynastic Cycle): "a random Eureka and Inspiration from the era of the
+ * wonder, IF AVAILABLE" — one draw per count from the unearned rows of that
+ * era, and nothing at all where the era holds none. ONE body for both kinds,
+ * so the tech and the civic pool cannot drift apart, and the draws are taken
+ * in a fixed order (techs, then civics) because both engines replay the same
+ * stream (C-54).
+ */
+export function grantEraBoosts(state: GameState, seat: number, era: string): void {
+  const rows = getModifiers(state, seat).wonderEraBoost;
+  if (!rows.length) return;                     // no row, no draw, no rng moved
+  const rsr = seatOf(state, seat)?.research;
+  if (!rsr) return;
+  let techs = 0;
+  let civics = 0;
+  for (const r of rows) { techs += r.techs; civics += r.civics; }
+  const draw = (n: number, pool: () => string[], onto: string[]): void => {
+    for (let i = 0; i < n; i++) {
+      const open = pool();
+      if (open.length === 0) return;            // "if available" — no draw at all
+      onto.push(open[Math.floor(nextRandom(state) * open.length)]);
+    }
+  };
+  draw(techs, () => Object.values(TECHS)
+    .filter((t) => t.era === era && !rsr.techs.includes(t.id) && !rsr.boosted.includes(t.id))
+    .map((t) => t.id), rsr.boosted);
+  draw(civics, () => Object.values(CIVICS)
+    .filter((c) => c.era === era && !rsr.civics.includes(c.id) && !rsr.boosted.includes(c.id))
+    .map((c) => c.id), rsr.boosted);
+}
+
 function eraInspirations(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
   const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];

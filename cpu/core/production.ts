@@ -7,6 +7,7 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
+import { grantEraBoosts } from './game';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
@@ -27,7 +28,7 @@ import { trainXpPct } from './combat';
 import { promoClassOf, unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
-import { BUILT_WONDERS } from '../data/builtWonders';
+import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { nextRandom } from './rand';
 
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
@@ -251,6 +252,9 @@ export function completeQueueItem(
     case 'wonder': {
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
       addEraScore(state, city.seat, ERA_SCORE_WONDER);
+      // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
+      // THE WONDER, before any other completion payout draws (C-54)
+      grantEraBoosts(state, city.seat, ERAS[WONDER_ERA_INDEX[item.wonder] ?? 0]);
       const fx = BUILT_WONDERS[item.wonder]?.effects;
       // CIV6: Statue of Liberty pays +4 Diplomatic Victory points on
       // completion, Potala Palace +1.
