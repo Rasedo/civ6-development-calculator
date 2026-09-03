@@ -8489,6 +8489,15 @@ class SimSeats:
             transition = (emb != to_water) & ~naval & ~self.unit_water_walk[_ut]
             base_step = torch.where(
                 to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
+            # A TRANSITION pays no river charge: a river is an edge between two
+            # LAND tiles, so stepping off the water crosses none. `land_cost`
+            # folds `riv` in for the ordinary land step, and reusing it on the
+            # disembark charged a crossing TS never charges — `moveCostInto` is
+            # terrain and road ALONE, and `riverCharge` rides only the
+            # non-transition arm (`stepUnit`).
+            trans_step = torch.where(
+                to_water, torch.full_like(land_cost, self._mp_scale),
+                self._mp_scale + terr)
             w_end = torch.where(to_water, dest.clamp(min=0), hc)
             l_end = torch.where(to_water, hc, dest.clamp(min=0))
             easy_dock = (
@@ -8500,8 +8509,8 @@ class SimSeats:
                 transition,
                 # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
                 # Mediterranean Colonies' Settlers. `seat` is the mover's row here.
-                base_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
-                                        torch.full_like(land_cost, self._embark_transition_mp)),
+                trans_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
+                                         torch.full_like(land_cost, self._embark_transition_mp)),
                 base_step,
             )
         else:
