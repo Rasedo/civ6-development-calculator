@@ -6,7 +6,7 @@ import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, naturalWonderAt, hasRiver } from '../../world/query';
+import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
@@ -101,7 +101,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -471,7 +471,12 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false): boolean {
   const govBonus = hasGovernor ? GOVERNOR_LOYALTY : ungovernedLoyalty(state, city.seat);
   if (!state.seats.some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
-  if (city.isCapital || wonderLoyaltyAura(state, city)) {
+  // CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia and
+  // located on the same continent as the Phoenician Capital are 100% Loyal."
+  const phoen = getModifiers(state, city.seat).coastalHomeLoyal
+    && isCoastalLand(state.map, state.map.tiles[city.centerIndex])
+    && onHomeContinent(state, city.seat, city.centerIndex);
+  if (city.isCapital || wonderLoyaltyAura(state, city) || phoen) {
     city.loyalty = LOYALTY_MAX;
     return false;
   }
@@ -2174,7 +2179,10 @@ export function seatPhase(state: GameState): void {
         const _udtD = congressUdtProdDistrict(state);
         if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
         // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
-        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district });
+        // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
+        // the seat's home continent — its original capital's landmass
+        const _offHome = !onHomeContinent(state, civCity.seat, civCity.centerIndex);
+        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district }, _offHome);
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
@@ -2190,7 +2198,7 @@ export function seatPhase(state: GameState): void {
         // melee units."
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
         // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
-        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit });
+        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         // CIV6 (Founder of Carthage): "+50% Production toward districts in the
         // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
@@ -2200,7 +2208,7 @@ export function seatPhase(state: GameState): void {
           _em *= 1 + seatMods.plazaDistrictProd / 100;
         }
         // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
-        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district });
+        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
         // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         // toward Medieval, Renaissance, and Industrial era wonders" — an ERA

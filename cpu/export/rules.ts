@@ -1404,8 +1404,10 @@ export function buildRules() {
         r.district !== undefined ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,
         r.promoClass ?? '', r.pct,
         r.districtItem !== undefined ? PLACEABLE_DISTRICTS.indexOf(r.districtItem) : -1,
-        r.every === 'building' ? 1 : r.every === 'unit' ? 2 : 0,
+        r.every === 'building' ? 1 : r.every === 'unit' ? 2 : r.every === 'district' ? 3 : 0,
         r.unit !== undefined ? Object.keys(UNITS).indexOf(r.unit) : -1,
+        // the row pays only in a city OFF the seat's home continent (C-48)
+        r.offHomeContinent ? 1 : 0,
       ]),
       // [civ, leaderRow, district, amount, source (0 adjacent districts / 1 the river)]
       districtAdj: DISTRICT_ADJ_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), r.amount,
@@ -1467,6 +1469,9 @@ export function buildRules() {
       // [civ, leaderRow, startEra, endEra, pct] — the same shape, but the
       // percentage is a Builder's CHARGE rather than per-turn Production
       wonderCharge: WONDER_CHARGE_ROWS.map((r) => [rowCiv(r), rowLeader(r), ERAS.indexOf(r.startEra), ERAS.indexOf(r.endEra), r.pct]),
+      // CIV6 (Mediterranean Colonies): the civilizations whose COASTAL cities
+      // on their home continent are 100% Loyal
+      coastalHomeLoyal: CIV_IDS.map((c) => (c === 'PHOENICIA' ? 1 : 0)),
       wonderTourism: WONDER_TOURISM_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.pct]),
       // [civ, leaderRow, district(1)/building(0), pct] ACROSS A RIVER from the centre
       riverCrossProd: RIVER_CROSS_PROD_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.kind === 'district' ? 1 : 0, r.pct]),
@@ -1551,6 +1556,8 @@ export function buildRules() {
         rowCiv(r), rowLeader(r), r.amount,
         r.tech !== undefined ? (techIdx.get(r.tech) ?? -1) : -1,
         r.needsCapital ? 1 : 0, r.govPlaza ? 1 : 0, r.govTier ?? -1,
+        // the amount is paid once PER city off the home continent (C-48)
+        r.perForeignCity ? 1 : 0,
       ]),
       leaderAbilities: {
         cleopatraIntlGold: CLEOPATRA_INTL_ROUTE_GOLD,

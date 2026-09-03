@@ -6,7 +6,7 @@
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
@@ -372,6 +372,12 @@ export function rosterRouteCapacity(state: GameState, seat: number): number {
     if (r.needsCapital && !cities.some((c) => c.isCapital)) continue;
     if (r.govPlaza && !cities.some((c) => c.districts.some((d) => d.type === 'GOVERNMENT_PLAZA' && state.map.tiles[d.tileIndex].districtComplete))) continue;
     if (r.govTier !== undefined && !cities.some((c) => c.buildings.some((b) => BUILDINGS[b]?.govTier === r.govTier))) continue;
+    if (r.perForeignCity) {
+      // CIV6 (Pax Britannica): once per city this seat holds off its home
+      // continent — the ORIGINAL capital's landmass
+      cap += r.amount * cities.filter((c) => !onHomeContinent(state, seat, c.centerIndex)).length;
+      continue;
+    }
     cap += r.amount;
   }
   return cap;

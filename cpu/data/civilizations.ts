@@ -134,11 +134,17 @@ export interface ProdMultRow {
   unit?: string;
   /** a DISTRICT item */
   districtItem?: DistrictId;
+  /** CIV6 (Treasure Fleet): the row pays only in a city that is NOT on the
+   *  seat's home continent — its ORIGINAL capital's landmass. */
+  offHomeContinent?: boolean;
   /** every item of a queue kind */
-  every?: 'building' | 'unit';
+  every?: 'building' | 'unit' | 'district';
   pct: number;
 }
 export const PROD_MULT_ROWS: readonly ProdMultRow[] = [
+  // CIV6 (Treasure Fleet): "Cities not on your original Capital's continent
+  // receive +25% Production towards districts".
+  { civ: 'SPAIN', every: 'district', pct: 25, offHomeContinent: true },
   // CIV6 (Divine Wind, EFFECT_ADJUST_DISTRICT_PRODUCTION): "Builds Encampment,
   // Holy Site and Theater Square districts in half the time."
   { leader: 'HOJO', districtItem: 'ENCAMPMENT', pct: 100 },
@@ -255,6 +261,8 @@ export interface RouteCapacityRow {
   needsCapital?: boolean;
   govPlaza?: boolean;
   govTier?: number;
+  /** the amount is paid ONCE PER city this seat holds off its home continent */
+  perForeignCity?: boolean;
 }
 export const ROUTE_CAPACITY_ROWS: readonly RouteCapacityRow[] = [
   { civ: 'CREE', amount: 1, tech: 'POTTERY', needsCapital: true },
@@ -262,6 +270,10 @@ export const ROUTE_CAPACITY_ROWS: readonly RouteCapacityRow[] = [
   { leader: 'DIDO', amount: 1, govTier: 1 },
   { leader: 'DIDO', amount: 1, govTier: 2 },
   { leader: 'DIDO', amount: 1, govTier: 3 },
+  // CIV6 (Pax Britannica, EFFECT_GRANT_FOUND_FOREIGN_CITY_TRADE_ROUTE_CAPACITY):
+  // Amount 1 per city off the home continent. The leader's published blurb does
+  // not mention it — the install's TABLE does, and the table outranks the text.
+  { leader: 'VICTORIA', amount: 1, perForeignCity: true },
 ];
 
 /** Does a roster row name this seat? */

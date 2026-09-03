@@ -2815,9 +2815,11 @@ class SimInit:
         # tuples, each site reads the columns it needs
         _pcl = list(rules.promo_classes)
         # [civ, leaderRow, building, buildings-of-district, promoClass, pct, districtItem, every (1 building / 2 unit), unit]
-        self._prod_mult_rows: list[tuple[int, int, int, int, int, float, int, int, int]] = [
+        # ...the last field gates the row on the city sitting OFF the seat's
+        # home continent (`offHomeContinent`, C-48)
+        self._prod_mult_rows: list[tuple[int, int, int, int, int, float, int, int, int, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), int(r[3]), (_pcl.index(r[4]) if r[4] in _pcl else -1), float(r[5]),
-             int(r[6]), int(r[7]), int(r[8]))
+             int(r[6]), int(r[7]), int(r[8]), int(r[9]))
             for r in _uq["prodMults"]]
         # [civ, leaderRow, district, amount, source (0 adjacent districts / 1 the river)]
         self._district_adj_rows: list[tuple[int, int, int, float, int]] = [
@@ -2935,6 +2937,11 @@ class SimInit:
         self._evict_pct_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
         # [civ, leaderRow, improvement, district] — exactly one of the last two
+        # CIV6 (Mediterranean Colonies): whose COASTAL cities on their home
+        # continent are 100% Loyal, by civilization index
+        self._coastal_home_loyal = torch.tensor(
+            [int(x) for x in _uq.get("coastalHomeLoyal", [])] or [0],
+            dtype=torch.bool, device=device)
         self._culture_bomb_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["cultureBombs"]]  # type: ignore[misc]
         # THE SLOT, THE GREAT WORK AND THE CONQUERED FORMATION
@@ -3035,7 +3042,9 @@ class SimInit:
         self._domestic_route_rows: list[tuple[int, int, int, float, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
             for r in _uq["domesticRouteYields"]]
-        self._route_cap_rows: list[tuple[int, int, int, int, int, int, int]] = [
+        # ...the last field pays the amount once PER city off the home
+        # continent (`perForeignCity`, C-48)
+        self._route_cap_rows: list[tuple[int, int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
         # [civ, leaderRow, amount, classMask, when, per (1 = per slotted MILITARY policy)]
         self._combat_cs_rows: list[tuple[int, int, int, int, int, int]] = [

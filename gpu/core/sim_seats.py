@@ -10601,7 +10601,7 @@ class SimSeats:
         if not self._route_cap_rows:
             return cap
         alive = self.city_alive[:, row]
-        for _c, _l, _amt, _tech, _capn, _plaza, _tier in self._route_cap_rows:
+        for _c, _l, _amt, _tech, _capn, _plaza, _tier, _pfc in self._route_cap_rows:
             who = self._row_is(row, _c, _l)
             if _tech >= 0:
                 who = who & self.civ_techs[:, row, _tech]
@@ -10615,6 +10615,12 @@ class SimSeats:
             if _tier >= 0:
                 who = who & (self.city_bldg[:, row] & alive.unsqueeze(2)
                              & (self._b_gov_tier == _tier).reshape(1, 1, -1)).any(dim=2).any(dim=1)
+            if _pfc:
+                # CIV6 (Pax Britannica): once PER city this seat holds off its
+                # home continent — the ORIGINAL capital's landmass
+                _far = (alive & ~self._on_home_continent(row, self.city_center[:, row])).sum(dim=1)
+                cap = cap + who.long() * _amt * _far
+                continue
             cap = cap + who.long() * _amt
         return cap
 

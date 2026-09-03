@@ -441,7 +441,16 @@ class SimPhase:
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
-        cap = self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
+        # CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia
+        # and located on the same continent as the Phoenician Capital are 100%
+        # Loyal."
+        _civ_i = self.row_civ[:, row].clamp(min=0)
+        _phoen = ((self.row_civ[:, row] >= 0)
+                  & self._coastal_home_loyal[_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))]
+                  & self.coastal_land.gather(1, here.unsqueeze(1)).squeeze(1)
+                  & self._on_home_continent(row, here))
+        cap = (self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
+               | _phoen)
         # f64 intermediates, stored at the PLANE's dtype (an f32 sim keeps an
         # f32 loyalty plane).
         self.city_loyalty[bidx, row, col] = torch.where(
@@ -561,7 +570,10 @@ class SimPhase:
         # a named building or every building of a district
         # a named building, every building of a district, EVERY building, or a
         # DISTRICT item (EFFECT_ADJUST_DISTRICT_PRODUCTION); the unit arms below
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru in self._prod_mult_rows:
+        # CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
+        # the seat's home continent — its ORIGINAL capital's landmass
+        _off_home = ~self._on_home_continent(row, self.city_center[:, row])
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._prod_mult_rows:
             if _rp >= 0 or _ru >= 0 or _rev == 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
@@ -578,8 +590,14 @@ class SimPhase:
                 _ds = cur - self.DISTRICT_BASE
                 _in_d = (_ds >= 0) & (_ds < len(self._scaffold))
                 _hit = _in_d & (self._scaffold_di[_ds.clamp(min=0, max=max(len(self._scaffold) - 1, 0))] == _rdi)
+            elif _rev == 3:
+                # EVERY district item, whichever scaffold slot it is
+                _ds3 = cur - self.DISTRICT_BASE
+                _hit = (_ds3 >= 0) & (_ds3 < len(self._scaffold))
             else:
                 _hit = _is_b
+            if _rho:
+                _hit = _hit & _off_home
             _emall = torch.where(_hit & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
         # Project."
@@ -641,7 +659,7 @@ class SimPhase:
             _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
         # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         # a promotion class, ONE unit type (EFFECT_ADJUST_UNIT_PRODUCTION), or every unit
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru in self._prod_mult_rows:
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._prod_mult_rows:
             if _rp < 0 and _ru < 0 and _rev != 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
@@ -653,6 +671,8 @@ class SimPhase:
                 _cls_i = _is_unit & (_ut == _ru)
             else:
                 _cls_i = _is_unit
+            if _rho:
+                _cls_i = _cls_i & _off_home
             _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."

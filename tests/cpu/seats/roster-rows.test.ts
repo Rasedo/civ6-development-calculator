@@ -26,11 +26,11 @@ function placeDistrict(city: City, type: 'HOLY_SITE' | 'CAMPUS' | 'GOVERNMENT_PL
 
 describe('the production rows', () => {
   it('prodMultFor multiplies the rows that name the item', () => {
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'WORKSHOP', district: 'INDUSTRIAL_ZONE' })).toBe(1.2);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'MONUMENT', district: 'CITY_CENTER' })).toBe(1);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'GEORGIA'), { building: 'ANCIENT_WALLS', district: 'CITY_CENTER' })).toBe(1.5);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'SIEGE' })).toBe(1.5);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'MELEE' })).toBe(1);
+    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'WORKSHOP', district: 'INDUSTRIAL_ZONE' }, false)).toBe(1.2);
+    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'MONUMENT', district: 'CITY_CENTER' }, false)).toBe(1);
+    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'GEORGIA'), { building: 'ANCIENT_WALLS', district: 'CITY_CENTER' }, false)).toBe(1.5);
+    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'SIEGE' }, false)).toBe(1.5);
+    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'MELEE' }, false)).toBe(1);
   });
 
   it('pay on the queue: England +20% on a Workshop, Georgia +50% on walls, the Ottomans +50% on a Catapult', () => {
@@ -94,7 +94,9 @@ describe('Radio Oranje', () => {
 
 describe('the capacity rows', () => {
   it("Nîhithaw: +1 at Pottery once a capital stands; Founder of Carthage: +1 per plaza and tier", () => {
-    expect(ROUTE_CAPACITY_ROWS.length).toBe(5);
+    // the two carriers this lane is about, not the list's length
+    expect(ROUTE_CAPACITY_ROWS.filter((r) => r.civ === 'CREE').length).toBe(1);
+    expect(ROUTE_CAPACITY_ROWS.filter((r) => r.leader === 'DIDO').length).toBe(4);
     const cree = makeState(makeMap(12, 12, 'GRASSLAND'));
     cree.seats[0].civ = seatRow('CREE');
     expect(rosterRouteCapacity(cree, 0)).toBe(0); // no capital yet

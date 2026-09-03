@@ -39,19 +39,22 @@ function sceneAs(row: number, terrain: 'GRASSLAND' | 'DESERT' | 'TUNDRA' = 'GRAS
 
 describe('the production rows widen', () => {
   it('name a district item, one unit type, or every item of a kind', () => {
-    expect(PROD_MULT_ROWS.length).toBe(13);
+    // the SHAPES this lane is about, not the list's length: a row keyed on
+    // the city's continent joined the family and moves a bare count
+    expect(PROD_MULT_ROWS.filter((r) => r.districtItem !== undefined).length).toBeGreaterThan(0);
+    expect(PROD_MULT_ROWS.filter((r) => r.every !== undefined).length).toBeGreaterThan(0);
     const hojo = PROD_MULT_ROWS.filter((r) => r.leader === 'HOJO');
-    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'ENCAMPMENT' })).toBe(2);
-    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'CAMPUS' })).toBe(1);
+    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'ENCAMPMENT' }, false)).toBe(2);
+    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'CAMPUS' }, false)).toBe(1);
     const dutch = PROD_MULT_ROWS.filter((r) => r.civ === 'NETHERLANDS');
-    expect(prodMultFor(dutch, { kind: 'district', districtItem: 'DAM' })).toBe(1.5);
+    expect(prodMultFor(dutch, { kind: 'district', districtItem: 'DAM' }, false)).toBe(1.5);
     const mali = PROD_MULT_ROWS.filter((r) => r.civ === 'MALI');
-    expect(prodMultFor(mali, { kind: 'building', building: 'MONUMENT' })).toBe(0.7);
-    expect(prodMultFor(mali, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' })).toBe(0.7);
-    expect(prodMultFor(mali, { kind: 'district', districtItem: 'CAMPUS' })).toBe(1);
+    expect(prodMultFor(mali, { kind: 'building', building: 'MONUMENT' }, false)).toBe(0.7);
+    expect(prodMultFor(mali, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false)).toBe(0.7);
+    expect(prodMultFor(mali, { kind: 'district', districtItem: 'CAMPUS' }, false)).toBe(1);
     const eng = PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND');
-    expect(prodMultFor(eng, { kind: 'unit', unit: 'MILITARY_ENGINEER', promoClass: 'SUPPORT' })).toBe(2 * 1);
-    expect(prodMultFor(eng, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' })).toBe(1);
+    expect(prodMultFor(eng, { kind: 'unit', unit: 'MILITARY_ENGINEER', promoClass: 'SUPPORT' }, false)).toBe(2 * 1);
+    expect(prodMultFor(eng, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false)).toBe(1);
   });
 
   it("Grote Rivieren: the Netherlands' three districts read the river as a major adjacency", () => {

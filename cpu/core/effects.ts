@@ -222,6 +222,9 @@ export interface Modifiers {
   /** batch 12 — the wonder, the river and the post */
   wonderEraProd: readonly WonderEraProdRow[];
   wonderCharge: readonly WonderChargeRow[];
+  /** CIV6 (Mediterranean Colonies): a COASTAL city of this seat on its home
+   *  continent is 100% Loyal. */
+  coastalHomeLoyal: boolean;
   /** what this row ADDS to the Tourism its wonders pay, as a percentage */
   wonderTourismPct: number;
   riverCrossProd: readonly RiverCrossProdRow[];
@@ -376,7 +379,13 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
 }
 
 /** The product of a seat's production percentages that name this item. */
-export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }): number {
+/**
+ * The roster's production multipliers for one queue item. `offHome` is
+ * REQUIRED — a row may be keyed on the city sitting off the seat's home
+ * continent (Treasure Fleet), and a defaulted flag would pay it in every
+ * city or none (C-48).
+ */
+export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }, offHome: boolean): number {
   let m = 1;
   for (const r of rows) {
     const hit = r.building !== undefined ? r.building === item.building
@@ -385,7 +394,7 @@ export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'buildi
       : r.unit !== undefined ? r.unit === item.unit
       : r.districtItem !== undefined ? r.districtItem === item.districtItem
       : r.every !== undefined ? r.every === item.kind : false;
-    if (hit) m *= 1 + r.pct / 100;
+    if (hit && (!r.offHomeContinent || offHome)) m *= 1 + r.pct / 100;
   }
   return m;
 }
@@ -459,6 +468,7 @@ export function defaultModifiers(): Modifiers {
     incomingRouteYields: [],
     wonderEraProd: [],
     wonderCharge: [],
+    coastalHomeLoyal: false,
     wonderTourismPct: 0,
     riverCrossProd: [],
     immediatePost: false,
@@ -836,6 +846,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.incomingRouteYields = mine(INCOMING_ROUTE_YIELD_ROWS);
   mods.wonderEraProd = mine(WONDER_ERA_PROD_ROWS);
   mods.wonderCharge = mine(WONDER_CHARGE_ROWS);
+  mods.coastalHomeLoyal = mods.civ === 'PHOENICIA';
   mods.wonderTourismPct = mine(WONDER_TOURISM_ROWS).reduce((n, r) => n + r.pct, 0);
   mods.riverCrossProd = mine(RIVER_CROSS_PROD_ROWS);
   mods.immediatePost = mine(IMMEDIATE_POST_ROWS).length > 0;
