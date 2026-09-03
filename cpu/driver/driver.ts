@@ -355,17 +355,20 @@ for (let t = 0; t < N_TURNS; t++) {
       (state.seatActions as unknown as Record<number, unknown>)[state.turn - 1] = bySeat;
     }
   }
-  // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's turn events for diagnosis.
+  // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's turn events for
+  // diagnosis, on STDERR — under the serve gate stdout IS the protocol
+  // channel, so a narration line there is a message the orchestrator
+  // has to parse and cannot.
   const evBefore = state.eventLog.length;
   endTurn(state);
   if (process.env.CIV6_EXPORT_DEBUG === String(seed)) {
-    for (const line of state.eventLog.slice(evBefore)) console.log(`t${state.turn - 1} ${line}`);
+    for (const line of state.eventLog.slice(evBefore)) console.error(`t${state.turn - 1} ${line}`);
     // EVERY major, not just seat 0 — a divergence rarely announces which seat
     // it belongs to, and a probe that only watches one seat cannot say.
     for (let s = 0; s < N_MAJORS; s++) {
       const sx = state.seats[s];
       if (!sx) continue;
-      console.log(`t${state.turn - 1} seat ${s} cities=${sx.cities.length} pop=${sx.cities.map((c) => c.population).join(',')}`);
+      console.error(`t${state.turn - 1} seat ${s} cities=${sx.cities.length} pop=${sx.cities.map((c) => c.population).join(',')}`);
     }
   }
   o.send({ digest: stateDigest(state) });

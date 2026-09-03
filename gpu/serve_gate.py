@@ -72,7 +72,8 @@ def digest_diff(man: dict, gdig: dict, tdig: dict | None) -> tuple[list[str], li
     return bad, reps
 
 
-def dump_diff(man: dict, group: str, gdump: dict, tdump: dict, cap: int = 12) -> list[str]:
+def dump_diff(man: dict, group: str, gdump: dict, tdump: dict,
+              cap: int = int(os.environ.get("CIV6_DIFF_CAP", "12"))) -> list[str]:
     """The by-name diff of one group's keyed dumps — the report names the
     field, never a row offset."""
     g = next(x for x in man["groups"] if x["name"] == group)
@@ -253,7 +254,16 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         if resume:
             assert ckpt_dir is not None
             child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"b_seed{sd}_t{resume}.json")
-        ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
+        # CIV6_SERVE_ERRDIR keeps each child's stderr where a hunt can read
+        # it: the temp file is dumped only when a child CRASHES, and a
+        # narration (CIV6_EXPORT_DEBUG) is wanted exactly when it does not.
+        _errdir = os.environ.get("CIV6_SERVE_ERRDIR")
+        if _errdir:
+            os.makedirs(_errdir, exist_ok=True)
+            ef = open(os.path.join(_errdir, f"seed{sd}.err"), "w+",
+                      encoding="utf-8", errors="replace")
+        else:
+            ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
         ch = subprocess.Popen(
             ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(turns), str(FIXTURES)],
             cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

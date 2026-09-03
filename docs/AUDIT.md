@@ -41,7 +41,8 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| **A. Engine vs engine** | **0** | |
+| **A. Engine vs engine** | **2** | |
+| A-1r the theological combat at seed 9235 t191 | 2 | a LIVE divergence, reproducible single-seed: TS runs a theological combat at t191 that the GPU declines — TS holds one fewer unit (a seat-1 Inquisitor the GPU keeps alive), its attacker took the 15-point damage draw, and it applied the 15-point pressure swing the GPU did not. The seat group matches, so no purchase diverged; the visibility row, the wonder-tourism collapse, a Great Person grant, slot-order drift and the religious-strength table are each eliminated by measurement (see below) |
 | B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the scored-competition catalog holds one row |
@@ -88,7 +89,7 @@ from the list below.
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
 | **C. Absent systems** | **25** | |
-| **OPEN, TOTAL** | **43** | |
+| **OPEN, TOTAL** | **45** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1266,6 +1267,48 @@ under their blocker so the dependency is readable, and both halves count.
   pool for both the tech and the civic draw, called from the wonder-complete
   path on both engines; China's two modifiers are marked open against this
   item in docs/roster_ledger.json.
+- **A-1r. THE THEOLOGICAL COMBAT AT SEED 9235 t191.** Weight 2. A LIVE
+  engine-vs-engine divergence, reproducible single-seed:
+
+      python gpu/serve_gate.py --batched --seeds 9235 --turns 192
+
+  TS runs a theological combat at t191 that the GPU does not run at all.
+  The evidence is one coherent set: TS's event log narrates the turn
+  (`CIV6_EXPORT_DEBUG=9235 CIV6_SERVE_ERRDIR=<dir>`), TS's `unit[1675]` is
+  at 85 hp where the GPU's is at 100 (one damage draw of 15), TS holds one
+  FEWER unit — a seat-1 INQUISITOR the GPU still has alive at tile 1273 —
+  and TS has applied `THEO_PRESSURE_SWING` (15) to religion 0 and away from
+  religion 1 in every city within `THEO_PRESSURE_RANGE`, which the GPU has
+  not. `game[0].rng` differs because TS drew damage the GPU never drew.
+  Everything else agrees: the SEAT group is identical, so faith and gold
+  match and no purchase diverged.
+
+  ELIMINATED, each by measurement rather than by reading:
+  - not the roster's visibility row (seed 9235 draws England, Norway, Zulu —
+    no Mongolia) and not the wonder-tourism collapse fixed in the same
+    battery;
+  - not a religious-unit PURCHASE: the seat group matches to the faith, and
+    the GPU's buy clauses were read against `purchaseReligiousUnit`'s eight
+    early returns and against `_seat_religious_city_ok`;
+  - not a Great Person grant: no GP row in `_gp_effects` carries an
+    `unitIdx` of INQUISITOR, and the turn's narrated activation (Marcus
+    Licinius Crassus) grants gold and a site, no chassis;
+  - not slot-order drift between `state.units` and the GPU pool: the pool's
+    `POOL_NEXT` counter is append-only, so slot order IS spawn order, which
+    is what TS's array order is after a splice;
+  - not the target table: `_rel_strength` and `UNITS[].religiousStrength`
+    agree exactly (Missionary 100, Apostle 110, Inquisitor 70), so the
+    Inquisitor is a legal defender on both.
+
+  So the fight is legal on TS and the GPU's `_theological_combat` declines
+  it. The next step is to instrument both engines' theology phase at t191
+  for seed 9235 and compare the attacker walk and the defender pick
+  candidate by candidate — the eligibility clause that differs is the item.
+  Trajectory note: the game only reaches this position because C-52 and
+  C-55 gave the driver two new Builder verbs, so this is a LATENT
+  divergence a changed rollout exposed, not a regression from them (the
+  driver may freely change decisions; the applier validates).
+
 - **C-50. APPEAL IS MAP-GLOBAL.** Weight 1. `tileAppeal(map, tile, camps,
   gpAppeal)` and the GPU's appeal plane answer one number per tile for
   every seat. CIV6 keys roster clauses on a seat's own view: the Amazon
