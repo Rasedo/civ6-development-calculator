@@ -28,7 +28,7 @@ import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpPermOf } from '../data/greatPeople';
-import { getModifiers } from './effects';
+import { getModifiers, progressAhead } from './effects';
 import { governorSum } from './governors';
 /**
  * CIV6: "The base range for land trade routes is 15 tiles ... The base range
@@ -351,8 +351,11 @@ export function tradeCapacity(state: GameState, seat: number): number {
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
     }
   }
+  // CIV6 (Sahel Merchants): "+1 Trade Capacity every time you enter a Golden
+  // Age" — cumulative, so it reads the seat's own count of them
+  const golden = getModifiers(state, seat).goldenRouteCapacity * (s?.goldenAges ?? 0);
   return cap + cityStateTradeCapacityBonus(state, seat) + congressRouteCapacity(state, seat)
-    + gpPermOf(s, 'tradeCapacity') + rosterRouteCapacity(state, seat);
+    + gpPermOf(s, 'tradeCapacity') + rosterRouteCapacity(state, seat) + golden;
 }
 
 /** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): the roster's capacity rows. */
@@ -409,6 +412,27 @@ export function routeYieldsInternational(state: GameState, dest: City, seat: num
   if (leaderOf(state, dest.seat) === 'CLEOPATRA') out.food += CLEOPATRA_INCOMING_ROUTE_FOOD;
   // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
   for (const r of getModifiers(state, seat).intlRouteYields) out[r.yield] += r.amount;
+  return out;
+}
+
+/** CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold for every
+ *  flat Desert tile in the ORIGIN city" — the international twin of the
+ *  domestic per-terrain rows, counted on the origin the way
+ *  `cityMountainCount` counts for those (`INTL_ROUTE_TERRAIN_ROWS`). */
+export function intlRouteTerrainYields(state: GameState, origin: City, seat: number): Yields {
+  const out = emptyYields();
+  const rows = getModifiers(state, seat).intlRouteTerrain;
+  if (!rows.length) return out;
+  for (const r of rows) {
+    let n = 0;
+    for (const t of state.map.tiles) {
+      if (t.ownerSeat !== origin.seat || t.ownerCity !== origin.id) continue;
+      if (t.terrain !== r.terrain) continue;
+      if (r.flatOnly && t.elevation !== 'FLAT') continue;
+      n += 1;
+    }
+    out[r.yield] += r.amount * n;
+  }
   return out;
 }
 
@@ -523,6 +547,16 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, civCity, seat));
+        // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
+        addYields(out, intlRouteTerrainYields(state, city, seat));
+        // CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
+        // Routes to civilizations that are MORE ADVANCED than Russia. +1 per
+        // 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
+        const per = getModifiers(state, seat).progressTradePer;
+        if (per > 0) {
+          out.science += Math.floor(progressAhead(state, seat, route.toSeat, false) / per);
+          out.culture += Math.floor(progressAhead(state, seat, route.toSeat, true) / per);
+        }
         // CIV6 (Alliance, level 1): the typed alliance pays its route bonus
         // on every paying leg - the sender half.
         const aty = allianceTypeWith(state, seat, route.toSeat);
@@ -626,6 +660,10 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
   if (walks && !isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
   (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
+  // CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading Post
+  // in the destination city" — the post the ordinary route only plants when
+  // it COMPLETES (`IMMEDIATE_POST_ROWS`)
+  if (getModifiers(state, seat).immediatePost) stampTradingPost(seatOf(state, seat)!, destCenter);
 }
 
 export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: number, seat: number): RuleResult {

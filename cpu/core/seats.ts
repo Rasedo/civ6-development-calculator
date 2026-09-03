@@ -1,7 +1,7 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
-import { ENKIDU_WAR_CS } from '../data/civilizations';
+import { ENKIDU_WAR_CS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
 import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
@@ -415,7 +415,43 @@ export function diploVisibility(state: GameState, viewer: number, target: number
   // separate Diplomatic Visibility levels - it does no good to spy on your
   // allies!"
   n += Math.max(listeningPostLevels(state, viewer, target), seatsAllied(state, viewer, target) ? 1 : 0);
+  // CIV6 (Ortoo): "Receive an extra level of Diplomatic Visibility for
+  // possessing a Trading Post in ANY city of a civilization"
+  const vr = rosterDiploVis(state, viewer);
+  if (vr.length) {
+    const post = (seatOf(state, target)?.cities ?? []).some((c) => (sx.tradingPosts ?? []).includes(c.centerIndex));
+    if (post) for (const r of vr) n += r.postLevels;
+  }
   return Math.min(VISIBILITY_MAX, n);
+}
+
+/** CIV6 (Faces of Peace, EFFECT_ADJUST_BANNED_DIPLOMATIC_ACTIONS): "Cannot
+ *  declare war on City-States or surprise wars. Surprise wars cannot be
+ *  declared on Canada." ONE reader, so the aggressor's row and the target's
+ *  are asked in the same place (`WAR_BAN_ROWS`). `formal` is the war kind the
+ *  declaration would take — a surprise war is the informal one, and a minor
+ *  takes no kind at all, so its path passes `true`. Read from the DATA module
+ *  rather than through `getModifiers`: `effects` imports both this file and
+ *  `cityStates`, and either import back would close a cycle. */
+export function warBanned(state: GameState, from: number, to: number, formal: boolean): boolean {
+  if (!isCiv(from) || WAR_BAN_ROWS.length === 0) return false;
+  const mine = (s: number) => WAR_BAN_ROWS.filter((r) => rowIsFor(r, civOf(state, s), leaderOf(state, s)));
+  for (const r of mine(from)) {
+    if (r.ban === 'onCityState' && isCityStateSeat(to)) return true;
+    if (r.ban === 'surpriseByMe' && !formal) return true;
+  }
+  if (!formal && isCiv(to)) {
+    for (const r of mine(to)) if (r.ban === 'surpriseOnMe') return true;
+  }
+  return false;
+}
+
+/** The roster's visibility rows for one seat. Read from the DATA module
+ *  rather than through `getModifiers`, which lives in `effects` and imports
+ *  this file — the cycle would leave a derived constant undefined at load. */
+function rosterDiploVis(state: GameState, seat: number): readonly DiploVisRow[] {
+  if (!isCiv(seat)) return [];
+  return DIPLO_VIS_ROWS.filter((r) => rowIsFor(r, civOf(state, seat), leaderOf(state, seat)));
 }
 
 /** CIV6 ("Intel on enemy movements"): when two civs' visibility levels differ,
@@ -424,7 +460,14 @@ export function diploVisibility(state: GameState, viewer: number, target: number
  *  nothing at all for the side that is behind. */
 export function visibilityCS(state: GameState, own: number, foe: number): number {
   const d = diploVisibility(state, own, foe) - diploVisibility(state, foe, own);
-  return d > 0 ? d * VISIBILITY_CS_PER_LEVEL : 0;
+  if (d <= 0) return 0;
+  // CIV6 (Ortoo): "All Mongolian units double the usual Combat Bonus for
+  // having a higher level of Diplomatic Visibility than their opponent" — the
+  // install's own Amount is 3, which is what this engine already pays per
+  // level, so the row ADDS a second step (`DIPLO_VIS_ROWS`)
+  let per = VISIBILITY_CS_PER_LEVEL;
+  for (const r of rosterDiploVis(state, own)) per += r.csPerLevel;
+  return d * per;
 }
 
 /** CIV6 (Military alliance 1): "+5 Combat Strength against units of players

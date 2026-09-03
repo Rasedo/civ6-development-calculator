@@ -2007,6 +2007,26 @@ class SimEconomy:
         # add separate Diplomatic Visibility levels".
         ally = (self.seat_ally_turns[:, :NM, :NM] > 0).long()
         out = out + torch.maximum(ally, self._listening_levels())
+        # CIV6 (Ortoo): "Receive an extra level of Diplomatic Visibility for
+        # possessing a Trading Post in ANY city of a civilization"
+        for _vc, _vl, _vp, _vcs in self._diplo_vis_rows:
+            if _vp == 0:
+                continue
+            # `trading_post` is per SEAT: [B, NM, T]. The question is whether
+            # VIEWER v holds one in any living city of TARGET t, so the plane
+            # is the viewer's and the centres are the target's.
+            _vw = torch.stack([self._row_is(_r, _vc, _vl) for _r in range(NM)], dim=1)  # [B, NM]
+            _held = torch.zeros(B, NM, NM, dtype=torch.bool, device=dev)
+            for _v in range(NM):
+                if not bool(_vw[:, _v].any()):
+                    continue
+                for _t in range(NM):
+                    if _t == _v:
+                        continue
+                    _ctr = self.city_center[:, _t]                   # [B, RC]
+                    _ok = (_ctr >= 0) & self.city_alive[:, _t]
+                    _held[:, _v, _t] = (self.trading_post[:, _v].gather(1, _ctr.clamp(min=0)) & _ok).any(dim=1)
+            out = out + (_vw.unsqueeze(2) & _held).long() * _vp
         off = (tgt.view(NM, 1) != tgt.view(1, NM)).unsqueeze(0)
         return torch.where(off, out.clamp(max=self._vis_max), torch.zeros_like(out))
 
@@ -2026,7 +2046,14 @@ class SimEconomy:
         bi = bi.reshape((-1,) + (1,) * (own.dim() - 1)).expand_as(own)
         d = vis[bi, a, f] - vis[bi, f, a]
         ok = (own >= 0) & (own < NM) & (foe >= 0) & (foe < NM) & (d > 0)
-        return torch.where(ok, (d * self._vis_cs_per_level).to(self.dtype), z)
+        # CIV6 (Ortoo): "All Mongolian units double the usual Combat Bonus for
+        # having a higher level of Diplomatic Visibility than their opponent" —
+        # the install's Amount is 3, which is what this engine already pays per
+        # level, so the row ADDS a second step (`DIPLO_VIS_ROWS`)
+        per = torch.full_like(own, self._vis_cs_per_level)
+        for _vc, _vl, _vp, _vcs in self._diplo_vis_rows:
+            per = per + self._seat_is(own, _vc, _vl).long() * _vcs
+        return torch.where(ok, (d * per).to(self.dtype), z)
 
     def _ally_war_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """CIV6 (Military alliance 1): "+5 Combat Strength against units of
@@ -3363,7 +3390,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: int = 0) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -3405,6 +3432,11 @@ class SimEconomy:
                 wt = torch.where(gov_tile,
                                  torch.div(wt * self._wish_wond_num, self._wish_wond_den, rounding_mode="floor"),
                                  wt)
+            # CIV6 (France, EFFECT_ADJUST_CITY_TOURISM): "Tourism from wonders
+            # of any era is +100%" — the WONDER half only, after the golden
+            # Wish factor exactly as `wonderTourism` orders it
+            if wonder_pct:
+                wt = torch.div(wt * (100 + wonder_pct), 100, rounding_mode="floor")
             t = t + (wt * w_live.long()).sum(dim=1)
         if self.SEASIDE >= 0:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own

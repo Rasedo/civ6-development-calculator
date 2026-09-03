@@ -354,6 +354,7 @@ def main() -> int:
                 ("title_rows", [py, "tests/gpu/title_rows_test.py"], 4),  # Hwarang's promotions, the Nobel Prize, Mana's start and bans, Righteousness of the Faith, Religious Convert
                 ("conquest_rows", [py, "tests/gpu/conquest_rows_test.py"], 4),  # the second horse, the conquered city, the boost, the Canal, Satyagraha, the Vizier
                 ("follower_rows", [py, "tests/gpu/follower_rows_test.py"], 4),  # Dharma, the Last Prophet, the Jeli's faith door, Swift Hawk, Radio Oranje
+                ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

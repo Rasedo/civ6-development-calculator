@@ -654,6 +654,39 @@ class SimPhase:
             _plot = torch.where(_w_i, _wplot, qt0)
             _riv = (_plot >= 0) & self.tile_river[bidx, _plot.clamp(min=0)]
             _emall = torch.where((_d_i | _w_i) & _riv & _egypt, _emall * self._iteru_mult, _emall)
+        # CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
+        # toward Medieval, Renaissance, and Industrial era wonders" — an ERA
+        # BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
+        for _fc, _fl, _fs, _fe, _fp in self._wonder_era_prod_rows:
+            _fw = self._row_is(row, _fc, _fl)
+            if not bool(_fw.any()) or _fs < 0 or _fe < 0:
+                continue
+            _nw = self._wonder_era.shape[0]
+            _wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(_nw - 1, 0))
+            _isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
+            _band = _isw & (self._wonder_era[_wid] >= _fs) & (self._wonder_era[_wid] <= _fe)
+            _emall = torch.where(_band & _fw[bidx], _emall * (1.0 + _fp / 100.0), _emall)
+        # CIV6 (Pearl of the Danube): "+50% Production to Districts and
+        # Buildings constructed ACROSS A RIVER from a City Center." A building
+        # is built in its district, so its tile is that district's; a City
+        # Center building never crosses a river from the centre it stands on.
+        if self._river_cross_prod_rows:
+            _hd = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
+            _hb = (cur >= 0) & (cur < self.NB)
+            _hbd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
+            # a district's plot rides the queue entry; a building's is the
+            # tile its own district stands on
+            _hbt = self.city_dist_tile[bidx, row, col].gather(
+                1, _hbd.clamp(min=0).unsqueeze(1)).squeeze(1)
+            _hat = torch.where(_hd, qt0, torch.where(_hb & (_hbd >= 0), _hbt, torch.full_like(qt0, -1)))
+            _hctr = self.city_center[bidx, row, col]
+            #  answers 0 or 1 as a LONG, not a bool
+            _hcross = ((_hat >= 0) & (_hctr >= 0)
+                       & (self._river_cross(_hctr.clamp(min=0), _hat.clamp(min=0)) != 0))
+            for _rc, _rl, _rk, _rp in self._river_cross_prod_rows:
+                _rw = self._row_is(row, _rc, _rl)[bidx]
+                _kind = _hd if _rk == 1 else (_hb & (_hbd >= 0))
+                _emall = torch.where(_hcross & _kind & _rw, _emall * (1.0 + _rp / 100.0), _emall)
         # The slotted production cards: CIV6 stacks production modifiers
         # ADDITIVELY, so two cards that both name the item pay their
         # percentages summed rather than compounded.
@@ -1329,6 +1362,8 @@ class SimPhase:
                                   torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
+            wonder_pct=sum(r[2] for r in self._wonder_tourism_rows
+                           if bool(self._row_is(row, r[0], r[1]).any())),
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
             gw_mult=js_round(self._governor_mult(row, "gwTourismMult")).long() if self.n_governors else None,
         )
@@ -1365,7 +1400,11 @@ class SimPhase:
              # CIV6 (Losing Favor): "200 Grievance = -1 Diplomatic Favor.
              # Every 50 Grievance = -1", to a floor of -10.
              - self._grievance_favor_penalty(row).double()
-             - self._favor_occ_capital * self._occupied_capitals(row))
+             - self._favor_occ_capital * self._occupied_capitals(row)
+             # CIV6 (Faces of Peace): "For every 100 Tourism per turn earn 1
+             # Diplomatic Favor per turn" — this turn's OWN rate, the number
+             # stored just above (`TOURISM_FAVOR_ROWS`)
+             + self._tourism_favor_of(row).double())
         self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
         # The GRIEVANCE ledger's own turn: every original capital this row
         # sits in keeps charging while that war is over, and each pair decays

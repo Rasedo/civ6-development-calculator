@@ -10,7 +10,7 @@ import { isWater, isImpassable, naturalWonderAt, hasRiver } from '../../world/qu
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver } from './units';
 import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -99,13 +99,13 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
 import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
-import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
+import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
 
 import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 
@@ -247,16 +247,21 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
   const bound = treatyTurnsWith(state, actor.seat, seat);
   if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
-  setWar(state, actor.seat, seat, true);
-  setWarTurnsWith(state, actor.seat, seat, 0);
-  // CIV6: war cancels every route between the two civs; the Traders return.
-  cancelRoutesBetween(state, actor.seat, seat);
   const denounced = denounceCasusBelli(state, seat, actor.seat);
   // CIV6 (Golden Age War row, DiplomaticActions.xml): the To Arms!
   // dedicant's casus belli requires NO denouncement and sits in the
   // FORMALWAR group, so a golden declaration is a formal war either way.
   const golden = goldenDedication(state, seat, DED_TO_ARMS);
   const formal = denounced || golden;
+  // CIV6 (Faces of Peace): the war kind is what the ban reads, so the three
+  // pure reads above move AHEAD of the first mutation (`WAR_BAN_ROWS`)
+  if (warBanned(state, actor.seat, seat, formal)) {
+    return no('This civilization may not declare that war.');
+  }
+  setWar(state, actor.seat, seat, true);
+  setWarTurnsWith(state, actor.seat, seat, 0);
+  // CIV6: war cancels every route between the two civs; the Traders return.
+  cancelRoutesBetween(state, actor.seat, seat);
   setWarFormal(state, actor.seat, seat, formal);
   setWarGolden(state, actor.seat, seat, golden);
   grievanceWarDeclared(state, seat, actor.seat, formal, golden);
@@ -759,7 +764,11 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
     for (const m of e.members) {
       const sx = state.seats[m];
       if (!sx) continue;
-      sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + EMERGENCY_MEMBER_FAVOR;
+      // CIV6 (Faces of Peace): "+100% Diplomatic Favor from successfully
+      // completing an Emergency" — as a MEMBER of it (`EMERGENCY_FAVOR_ROWS`)
+      const pct = getModifiers(state, m).emergencyFavorPct;
+      sx.diplomaticFavor = (sx.diplomaticFavor ?? 0)
+        + Math.floor((EMERGENCY_MEMBER_FAVOR * (100 + pct)) / 100);
       if (e.kind === EMERGENCY_CITY_STATE) sx.emgEnvoyGold = (sx.emgEnvoyGold ?? 0) + 1;
       else sx.emgHeal = bump(sx.emgHeal, e.target);
     }
@@ -2169,6 +2178,27 @@ export function seatPhase(state: GameState): void {
         // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
         if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district });
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
+        // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
+        // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
+        // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
+        if (q.kind === 'wonder' && seatMods.wonderEraProd.length) {
+          const we = WONDER_ERA_INDEX[q.wonder] ?? 0;
+          for (const r of seatMods.wonderEraProd) {
+            if (we >= ERAS.indexOf(r.startEra) && we <= ERAS.indexOf(r.endEra)) _em *= 1 + r.pct / 100;
+          }
+        }
+        // CIV6 (Pearl of the Danube): "+50% Production to Districts and
+        // Buildings constructed ACROSS A RIVER from a City Center." A building
+        // is built in its district, so its tile is that district's; a City
+        // Center building never crosses a river from the centre it stands on.
+        if (seatMods.riverCrossProd.length && (q.kind === 'district' || q.kind === 'building')) {
+          const at = q.kind === 'district'
+            ? q.tileIndex
+            : civCity.districts.find((d) => d.type === BUILDINGS[q.building]?.district)?.tileIndex;
+          if (at !== undefined && crossesRiver(state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
+            for (const r of seatMods.riverCrossProd) if (r.kind === q.kind) _em *= 1 + r.pct / 100;
+          }
+        }
         // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         // next to a River."
         if ((q.kind === 'district' || q.kind === 'wonder') && seatMods.civ === 'EGYPT' && hasRiver(state.map.tiles[q.tileIndex])) {

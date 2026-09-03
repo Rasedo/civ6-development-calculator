@@ -2872,6 +2872,36 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["gpRefund"]]  # type: ignore[misc]
         self._evict_pct_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["evictPct"]]  # type: ignore[misc]
+        # THE WONDER, THE RIVER AND THE POST
+        # [civ, leaderRow, startEra, endEra, pct] — an ERA BAND on a wonder
+        self._wonder_era_prod_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["wonderEraProd"]]  # type: ignore[misc]
+        self._wonder_tourism_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["wonderTourism"]]  # type: ignore[misc]
+        # [civ, leaderRow, district(1)/building(0), pct] ACROSS A RIVER
+        self._river_cross_prod_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["riverCrossProd"]]  # type: ignore[misc]
+        self._immediate_post_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["immediatePosts"]]  # type: ignore[misc]
+        # [civ, leaderRow, postLevels, csPerLevel]
+        self._diplo_vis_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["diploVis"]]  # type: ignore[misc]
+        # [civ, leaderRow, ban] — the ban's index is `WAR_BANS` order
+        self._war_ban_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["warBans"]]  # type: ignore[misc]
+        self._tourism_favor_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["tourismFavor"]]  # type: ignore[misc]
+        self._emergency_favor_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["emergencyFavor"]]  # type: ignore[misc]
+        self._golden_dedication_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["goldenDedication"]]  # type: ignore[misc]
+        # [civ, leaderRow, terrain, flatOnly, yield, amount] on an INTERNATIONAL leg
+        self._intl_route_terrain_rows: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["intlRouteTerrain"]]  # type: ignore[misc]
+        self._golden_route_capacity_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["goldenRouteCapacity"]]  # type: ignore[misc]
+        self._progress_trade_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["progressTrade"]]  # type: ignore[misc]
         # THE FOLLOWER, THE LEVY AND THE ROUTE
         # [civ, leaderRow, followers, amenities]
         self._religion_amenity_rows: list[tuple[int, int, int, int]] = [

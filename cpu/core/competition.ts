@@ -22,6 +22,7 @@ import {
   COMPETITION_TURNS,
 } from '../data/seats';
 import { isCiv, seatOf } from './seats';
+import { getModifiers } from './effects';
 
 /** The competition running right now, if any. */
 export function competitionOf(state: GameState): Competition | undefined {
@@ -78,8 +79,12 @@ function payPodium(state: GameState, c: Competition): void {
     const sx = seatOf(state, field[r]);
     if (!sx) continue;
     if (r === 0) sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + def.goldPoints;
-    if (r < silver) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + def.silverFavor;
-    else if (r < bronze) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + def.bronzeFavor;
+    // CIV6 (Faces of Peace): "+100% Diplomatic Favor from successfully
+    // completing an ... Scored Competition" (`EMERGENCY_FAVOR_ROWS`)
+    const pct = getModifiers(state, field[r]).emergencyFavorPct;
+    const paid = (n: number) => Math.floor((n * (100 + pct)) / 100);
+    if (r < silver) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + paid(def.silverFavor);
+    else if (r < bronze) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + paid(def.bronzeFavor);
   }
   state.eventLog.push(`${def.name}: ${seatOf(state, field[0])?.name ?? 'nobody'} takes the gold.`);
 }

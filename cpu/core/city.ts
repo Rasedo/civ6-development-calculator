@@ -595,14 +595,20 @@ function wonderTourism(
   era: number,
   owns: (t: Tile) => boolean,
   govCities: ReadonlySet<number> | null,
+  // CIV6 (France, EFFECT_ADJUST_CITY_TOURISM): "Tourism from wonders of any
+  // era is +100%" — the WONDER half only, which is what this body is
+  // (`WONDER_TOURISM_ROWS`). Required, not defaulted: the one caller knows
+  // the seat and a silent 0 would read as "France has no bonus".
+  rosterPct: number,
 ): number {
   let t = 0;
   for (const tile of state.map.tiles) {
     if (!tile.builtWonder || !tile.builtWonderComplete || !owns(tile)) continue;
     const base = WONDER_TOURISM_BASE + Math.max(0, era - wonderEraIndex(tile.builtWonder));
-    t += govCities?.has(tile.ownerCity ?? -1)
+    const wished = govCities?.has(tile.ownerCity ?? -1)
       ? Math.floor((base * WISH_WONDER_TOURISM_NUM) / WISH_WONDER_TOURISM_DEN)
       : base;
+    t += rosterPct ? Math.floor((wished * (100 + rosterPct)) / 100) : wished;
   }
   return t;
 }
@@ -722,7 +728,8 @@ export function seatTourism(
   return t + suzerainTourism(state, seat, owns)
     + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
-    + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null);
+    + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null,
+                    getModifiers(state, seat).wonderTourismPct);
 }
 
 /** CIV6 (Tourism): the RELIGIOUS half of a seat's per-turn tourism — "Relics

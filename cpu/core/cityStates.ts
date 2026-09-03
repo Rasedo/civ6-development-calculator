@@ -1,6 +1,6 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel } from './seats';
+import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
@@ -457,6 +457,11 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   if (civsAtWar(state, cityState.seat, seat)) return { ok: false, reason: 'Already at war.' };
   const bound = treatyTurnsWith(state, cityState.seat, seat);
   if (bound > 0) return { ok: false, reason: `The peace treaty binds for another ${bound} turns.` };
+  // CIV6 (Faces of Peace): "Cannot declare war on City-States" — a minor takes
+  // no war KIND, so the ban reads as a formal one (`WAR_BAN_ROWS`)
+  if (warBanned(state, seat, cityState.seat, true)) {
+    return { ok: false, reason: 'This civilization may not declare war on a city-state.' };
+  }
   setWar(state, cityState.seat, seat, true);
   // CIV6: war cancels the routes with the new enemy; the Traders return.
   cancelRoutes(state, seat, (r) => r.toCs === cityStateId);

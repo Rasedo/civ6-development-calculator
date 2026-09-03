@@ -107,7 +107,13 @@ export function eraBoundary(state: GameState): void {
  */
 export function dedicationEvent(state: GameState, civ: number, kind: number, events = 1): void {
   if (!DEDICATION_PAYOUTS_LIVE || events <= 0) return;
-  if (((seatOf(state, civ)?.age ?? 1)) === 2) return; // a GOLDEN age takes bonuses, not era score
+  // CIV6 (Strength in Unity): "When making Dedications at the beginning of a
+  // Golden Age or Heroic Age, receive the Normal Age bonus towards improving
+  // Era Score IN ADDITION to the other bonus" — the one row that reaches past
+  // this guard (`GOLDEN_DEDICATION_ROWS`)
+  if ((seatOf(state, civ)?.age ?? 1) === 2 && !getModifiers(state, civ).goldenDedication) {
+    return; // a GOLDEN age takes bonuses, not era score
+  }
   const picks = seatOf(state, civ)?.dedicationPicks;
   if (!picks) return;
   let n = 0;

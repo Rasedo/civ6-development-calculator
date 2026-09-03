@@ -1140,3 +1140,218 @@ export interface IncomingRouteYieldRow {
 export const INCOMING_ROUTE_YIELD_ROWS: readonly IncomingRouteYieldRow[] = [
   { leader: 'WILHELMINA', yield: 'culture', amount: 2 },
 ];
+
+// ---------------------------------------------------------------------------
+// THE WONDER, THE RIVER AND THE POST
+
+/** CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
+ *  toward Medieval, Renaissance, and Industrial era wonders" — an ERA BAND,
+ *  which is what `PROD_MULT_ROWS` cannot say. */
+export interface WonderEraProdRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the engine's own era NAMES (`ERAS`), inclusive at both ends */
+  startEra: Era;
+  endEra: Era;
+  pct: number;
+}
+export const WONDER_ERA_PROD_ROWS: readonly WonderEraProdRow[] = [
+  { civ: 'FRANCE', startEra: 'Medieval', endEra: 'Industrial', pct: 20 },
+];
+
+/** CIV6 (France, EFFECT_ADJUST_CITY_TOURISM): "Tourism from wonders of any era
+ *  is +100%" — the install's ScalingFactor is 200, so the row carries the
+ *  ADDED percentage. */
+export interface WonderTourismRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  pct: number;
+}
+export const WONDER_TOURISM_ROWS: readonly WonderTourismRow[] = [
+  { civ: 'FRANCE', pct: 100 },
+];
+
+/** CIV6 (Pearl of the Danube): "+50% Production to Districts and Buildings
+ *  constructed ACROSS A RIVER from a City Center." */
+export interface RiverCrossProdRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  kind: 'district' | 'building';
+  pct: number;
+}
+export const RIVER_CROSS_PROD_ROWS: readonly RiverCrossProdRow[] = [
+  { civ: 'HUNGARY', kind: 'district', pct: 50 },
+  { civ: 'HUNGARY', kind: 'building', pct: 50 },
+];
+
+/** CIV6 (Ortoo, EFFECT_ADJUST_PLAYER_IMMEDIATE_TRADING_POST): "Starting a
+ *  Trade Route immediately creates a Trading Post in the destination city." */
+export interface ImmediatePostRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const IMMEDIATE_POST_ROWS: readonly ImmediatePostRow[] = [
+  { civ: 'MONGOLIA' },
+];
+
+/** CIV6 (Ortoo): "Receive an extra level of Diplomatic Visibility for
+ *  possessing a Trading Post in any city of a civilization", and "All
+ *  Mongolian units double the usual Combat Bonus for having a higher level of
+ *  Diplomatic Visibility than their opponent" — the install's Amount 3 IS the
+ *  doubled step, taken over the DELTA with the opponent. */
+export interface DiploVisRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** extra levels held for a trading post in any of that seat's cities */
+  postLevels: number;
+  /** Combat Strength per level of advantage ADDED to the usual step — the
+   *  engine's own `VISIBILITY_CS_PER_LEVEL` is 3, and the install's Amount is
+   *  3 too, which is what "double the usual Combat Bonus" comes to */
+  csPerLevel: number;
+}
+export const DIPLO_VIS_ROWS: readonly DiploVisRow[] = [
+  { civ: 'MONGOLIA', postLevels: 1, csPerLevel: 3 },
+];
+
+/** CIV6 (Faces of Peace, EFFECT_ADJUST_BANNED_DIPLOMATIC_ACTIONS): "Cannot
+ *  declare war on City-States or surprise wars. Surprise wars cannot be
+ *  declared on Canada." */
+export type WarBan = 'surpriseByMe' | 'surpriseOnMe' | 'onCityState';
+/** the WIRE's index space for a war ban — both engines address one by position. */
+export const WAR_BANS: readonly WarBan[] = ['surpriseByMe', 'surpriseOnMe', 'onCityState'];
+export interface WarBanRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  ban: WarBan;
+}
+export const WAR_BAN_ROWS: readonly WarBanRow[] = [
+  { civ: 'CANADA', ban: 'surpriseByMe' },
+  { civ: 'CANADA', ban: 'surpriseOnMe' },
+  { civ: 'CANADA', ban: 'onCityState' },
+];
+
+/** CIV6 (Faces of Peace, EFFECT_ADJUST_PLAYER_TOURISM_FAVOR): "For every 100
+ *  Tourism per turn earn 1 Diplomatic Favor per turn." */
+export interface TourismFavorRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  perTourism: number;
+  favor: number;
+}
+export const TOURISM_FAVOR_ROWS: readonly TourismFavorRow[] = [
+  { civ: 'CANADA', perTourism: 100, favor: 1 },
+];
+
+/** CIV6 (Faces of Peace, EFFECT_ADJUST_PLAYER_EMERGENCY_FAVOR_MODIFIER):
+ *  "+100% Diplomatic Favor from successfully completing an Emergency or Scored
+ *  Competition" — as a MEMBER of it. */
+export interface EmergencyFavorRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  pct: number;
+}
+export const EMERGENCY_FAVOR_ROWS: readonly EmergencyFavorRow[] = [
+  { civ: 'CANADA', pct: 100 },
+];
+
+/** CIV6 (Strength in Unity,
+ *  EFFECT_ADJUST_PLAYER_ALWAYS_ALLOW_COMMEMORATION_QUEST_COUNT): "When making
+ *  Dedications at the beginning of a Golden Age or Heroic Age, receive the
+ *  Normal Age bonus towards improving Era Score in addition to the other
+ *  bonus." */
+export interface GoldenDedicationRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  count: number;
+}
+export const GOLDEN_DEDICATION_ROWS: readonly GoldenDedicationRow[] = [
+  { civ: 'GEORGIA', count: 1 },
+];
+
+/** CIV6 (Sahel Merchants,
+ *  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_INTERNATIONAL):
+ *  "International Trade Routes gain +1 Gold for every flat Desert tile in the
+ *  origin city" — the INTERNATIONAL twin of the domestic per-terrain rows. */
+export interface IntlRouteTerrainRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  terrain: string;
+  /** the install names FLAT ground; its hills are a terrain of their own */
+  flatOnly: boolean;
+  yield: YieldKey;
+  amount: number;
+}
+export const INTL_ROUTE_TERRAIN_ROWS: readonly IntlRouteTerrainRow[] = [
+  { leader: 'MANSA_MUSA', terrain: 'DESERT', flatOnly: true, yield: 'gold', amount: 1 },
+];
+
+/** CIV6 (Sahel Merchants, EFFECT_GRANT_GOLDEN_AGE_TRADE_ROUTE_CAPACITY):
+ *  "Receive +1 Trade Capacity every time you enter a Golden Age." */
+export interface GoldenRouteCapacityRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const GOLDEN_ROUTE_CAPACITY_ROWS: readonly GoldenRouteCapacityRow[] = [
+  { leader: 'MANSA_MUSA', amount: 1 },
+];
+
+/** CIV6 (The Grand Embassy, EFFECT_ADJUST_PLAYER_PROGRESS_DIFF_TRADE_BONUS):
+ *  "Receives Science or Culture from Trade Routes to civilizations that are
+ *  more advanced than Russia. +1 per 3 technologies or civics ahead." */
+export interface ProgressTradeRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** how many techs (or civics) ahead one point of yield costs */
+  per: number;
+}
+export const PROGRESS_TRADE_ROWS: readonly ProgressTradeRow[] = [
+  { leader: 'PETER_GREAT', per: 3 },
+];
+
+/** CIV6 (Janissary, EFFECT_ADJUST_CITY_POPULATION_UNIT_CREATED): the unit
+ *  costs the city a Population when it is trained — and only in a city this
+ *  seat FOUNDED (the install's own requirement set). */
+export interface UnitPopCostRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  unit: string;
+  amount: number;
+  foundedOnly: boolean;
+}
+/** OPEN: the Janissary is not in the engine's unit roster, so this row has
+ *  no chassis to charge — it is not on the wire (docs/roster_ledger.json). */
+export const UNIT_POP_COST_ROWS: readonly UnitPopCostRow[] = [
+  { leader: 'SULEIMAN', unit: 'JANISSARY', amount: -1, foundedOnly: true },
+];
+
+/** CIV6 (Kristina, EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS):
+ *  "Buildings with at least three Great Work slots and wonders with at least
+ *  two Great Work slots are automatically themed when they have all their
+ *  slots filled." */
+export interface AutoThemeRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** the slot count at or above which the carrier themes itself */
+  slots: number;
+  wonder: boolean;
+}
+/** OPEN against C-59: only a MUSEUM themes on either engine, and a wonder
+ *  never does, so a generic themed carrier has nowhere to land. Not on the
+ *  wire (docs/roster_ledger.json). */
+export const AUTO_THEME_ROWS: readonly AutoThemeRow[] = [
+  { leader: 'KRISTINA', slots: 3, wonder: false },
+  { leader: 'KRISTINA', slots: 2, wonder: true },
+];
+
+/** CIV6 (Kristina, EFFECT_ADJUST_ALL_GREAT_WORKS_YIELDS_MODIFIER /
+ *  _TOURISM_MODIFIER): what a THEMED carrier pays over its works' face. */
+export interface ThemedBonusRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  yieldPct: number;
+  tourismPct: number;
+}
+export const THEMED_BONUS_ROWS: readonly ThemedBonusRow[] = [
+  { leader: 'KRISTINA', yieldPct: 100, tourismPct: 100 },
+];

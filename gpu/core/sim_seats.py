@@ -532,6 +532,21 @@ class SimSeats:
         binding, a friendship the head refuses to break)."""
         if not bool(declare.any()):
             return
+        # CIV6 (Faces of Peace): "Cannot declare war on ... surprise wars.
+        # Surprise wars cannot be declared on Canada." The war KIND is what the
+        # ban reads, so it is decided here BEFORE the first mutation, exactly
+        # as `declareWar` orders it (`WAR_BAN_ROWS`).
+        _wf = (declare & self._denounce_casus_belli(row, tgt)) | (declare & self._golden_ded(row, self._ded_to_arms))
+        if self._war_ban_rows:
+            _ban = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            for _bc, _bl, _bw in self._war_ban_rows:
+                if _bw == 0:  # this row may declare no SURPRISE war
+                    _ban = _ban | (self._row_is(row, _bc, _bl) & ~_wf)
+                elif _bw == 1:  # no surprise war may be declared ON this row
+                    _ban = _ban | (self._row_is(tgt, _bc, _bl) & ~_wf)
+            declare = declare & ~_ban
+            if not bool(declare.any()):
+                return
         self.war[:, row, tgt] |= declare
         self.war[:, tgt, row] |= declare
         self._reset_war_clock(row, tgt, declare)
@@ -566,6 +581,13 @@ class SimSeats:
     def _declare_war_minor(self, row: int, s: int, declare: torch.Tensor) -> None:
         """`declareWarOnCityState`'s body — the war axis, the routes to that
         minor, and the grievance its patrons take."""
+        if not bool(declare.any()):
+            return
+        # CIV6 (Faces of Peace): "Cannot declare war on City-States" — a minor
+        # takes no war KIND, so the ban reads as a formal one (`WAR_BAN_ROWS`)
+        for _bc, _bl, _bw in self._war_ban_rows:
+            if _bw == 2:
+                declare = declare & ~self._row_is(row, _bc, _bl)
         if not bool(declare.any()):
             return
         crow = self.n_majors + s
@@ -4166,8 +4188,15 @@ class SimSeats:
                 hit = m & self.emg_member[:, k, row]
                 if not bool(hit.any()):
                     continue
+                # CIV6 (Faces of Peace): "+100% Diplomatic Favor from
+                # successfully completing an Emergency" — as a MEMBER of it
+                # (`EMERGENCY_FAVOR_ROWS`)
+                _pay = torch.full_like(zero_f, float(self._emg_member_favor))
+                for _ec, _el, _ep in self._emergency_favor_rows:
+                    _ew = self._row_is(row, _ec, _el)
+                    _pay = torch.where(_ew, torch.floor(_pay * (100 + _ep) / 100.0), _pay)
                 self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(
-                    hit, zero_f + self._emg_member_favor, zero_f)
+                    hit, _pay, zero_f)
                 self.civ_emg_envoy_gold[:, row] += (hit & is_cs).long()
                 for tgt in range(self.n_majors):
                     self.civ_emg_heal[:, row, tgt] += (hit & ~is_cs & (self.emg_target[:, k] == tgt)).long()
@@ -4798,10 +4827,16 @@ class SimSeats:
             for rank, r in enumerate(field):
                 if rank == 0:
                     self.civ_diplo_points[b, r] += int(row["gold"])
+                # CIV6 (Faces of Peace): "+100% Diplomatic Favor from
+                # successfully completing a ... Scored Competition"
+                _pct = 0
+                for _ec, _el, _ep in self._emergency_favor_rows:
+                    if bool(self._row_is(r, _ec, _el)[b]):
+                        _pct += _ep
                 if rank < silver:
-                    self.civ_diplo_favor[b, r] += int(row["silver"])
+                    self.civ_diplo_favor[b, r] += (int(row["silver"]) * (100 + _pct)) // 100
                 elif rank < bronze:
-                    self.civ_diplo_favor[b, r] += int(row["bronze"])
+                    self.civ_diplo_favor[b, r] += (int(row["bronze"]) * (100 + _pct)) // 100
 
     def _resolve_competition(self) -> None:
         """The turn's competition: score the field, run the clock down, pay the
@@ -5132,7 +5167,15 @@ class SimSeats:
         if not bool((cnt > 0).any()):
             return
         n = (self.ded_picks[:, civ] == kind).sum(dim=1)
-        pay = (self.civ_age[:, civ] != 2) & (n > 0)
+        # CIV6 (Strength in Unity): "When making Dedications at the beginning
+        # of a Golden Age or Heroic Age, receive the Normal Age bonus towards
+        # improving Era Score IN ADDITION to the other bonus" — the one row
+        # that reaches past this guard (`GOLDEN_DEDICATION_ROWS`)
+        _gpast = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for _dc, _dl, _dn in self._golden_dedication_rows:
+            if _dn:
+                _gpast = _gpast | self._row_is(civ, _dc, _dl)
+        pay = ((self.civ_age[:, civ] != 2) | _gpast) & (n > 0)
         if bool(pay.any()):
             self._add_era_score(civ, int(self._ded_event_score[kind]), pay.long() * cnt * n)
 
@@ -5929,6 +5972,39 @@ class SimSeats:
                 _who = self._row_is(row, _rc, _rl)
                 if bool(_who.any()):
                     inc.scatter_add_(1, from_j * 6 + _ry, _ra * (pays_i & _who.unsqueeze(1)).double())
+            # CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold
+            # for every flat Desert tile in the ORIGIN city" — the international
+            # twin of the domestic per-terrain rows (`INTL_ROUTE_TERRAIN_ROWS`)
+            for _tc, _tl, _tt, _tflat, _ty, _ta in self._intl_route_terrain_rows:
+                _tw = self._row_is(row, _tc, _tl)
+                if not bool(_tw.any()) or _tt < 0:
+                    continue
+                _plane = self.terrain == _tt
+                if _tflat:
+                    _plane = _plane & ~self.hills
+                # the ORIGIN city's own tiles, so the count is gathered by
+                # `from_j` — `_rx`/`_col` address the DESTINATION
+                _cnt_t = self._city_terrain_count(row, _plane).gather(1, from_j).double()
+                inc.scatter_add_(1, from_j * 6 + _ty, _ta * _cnt_t * (pays_i & _tw.unsqueeze(1)).double())
+            # CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
+            # Routes to civilizations that are MORE ADVANCED than Russia. +1 per
+            # 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
+            for _pc, _pl, _pper in self._progress_trade_rows:
+                _pw = self._row_is(row, _pc, _pl)
+                if not bool(_pw.any()) or _pper <= 0:
+                    continue
+                _mine_t = self.civ_techs[:, row].sum(dim=1)
+                _mine_c = self.civ_civics[:, row].sum(dim=1)
+                _all_t = self.civ_techs[:, : self.n_majors].sum(dim=2)   # [B, NM]
+                _all_c = self.civ_civics[:, : self.n_majors].sum(dim=2)
+                _drow = dr.clamp(min=0, max=self.n_majors - 1)
+                _ah_t = (_all_t.gather(1, _drow) - _mine_t.unsqueeze(1)).clamp(min=0)
+                _ah_c = (_all_c.gather(1, _drow) - _mine_c.unsqueeze(1)).clamp(min=0)
+                _ok = pays_i & _pw.unsqueeze(1)  # `pays_i` already carries valid_dest
+                inc.scatter_add_(1, from_j * 6 + 3,
+                                 torch.div(_ah_t, _pper, rounding_mode="floor").double() * _ok.double())
+                inc.scatter_add_(1, from_j * 6 + 4,
+                                 torch.div(_ah_c, _pper, rounding_mode="floor").double() * _ok.double())
             # the ORIGIN side of the improvement rows on the international leg
             for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
                 if _is != 0:
@@ -10216,7 +10292,27 @@ class SimSeats:
             cap = cap + (self._suzerain_mask(row)[:, :S] & (self.citystate_type[:, :S] == trade_ti)).sum(dim=1)
         cap = cap + self._congress_route_capacity(row)
         cap = cap + self._roster_route_capacity(row)
-        return cap + self._gp_perm(row, "tradeCapacity").long()
+        return cap + self._gp_perm(row, "tradeCapacity").long() + self._golden_route_capacity(row)
+
+    def _tourism_favor_of(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (Faces of Peace): "For every 100 Tourism per turn
+        earn 1 Diplomatic Favor per turn", off the rate stored this turn
+        (`tourismFavorOf`, `TOURISM_FAVOR_ROWS`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for _tc, _tl, _tper, _tfav in self._tourism_favor_rows:
+            _tw = self._row_is(row, _tc, _tl)
+            _n = torch.div(self.civ_tour_rate[:, row], max(1, _tper), rounding_mode="floor")
+            out = out + torch.where(_tw, _n * _tfav, torch.zeros_like(out))
+        return out
+
+    def _golden_route_capacity(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (Sahel Merchants): "+1 Trade Capacity every time you
+        enter a Golden Age", cumulative, so it reads the seat's own count of
+        them (`GOLDEN_ROUTE_CAPACITY_ROWS`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for _gc, _gl, _ga in self._golden_route_capacity_rows:
+            out = out + self._row_is(row, _gc, _gl).long() * _ga * self.golden_ages[:, row]
+        return out
 
     def _roster_route_capacity(self, row: int) -> torch.Tensor:
         """[B] long — CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): the roster's
@@ -10502,6 +10598,14 @@ class SimSeats:
         if len(lr) > 0:
             # the walker lays road on every LAND tile it stands on; the origin is turn 0
             self.road[lr, o_ct[lr]] = True
+        # CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading
+        # Post in the destination city" — the post an ordinary route only
+        # plants when it COMPLETES (`IMMEDIATE_POST_ROWS`)
+        for _mc, _ml in self._immediate_post_rows:
+            _mw = self._row_is(row, _mc, _ml)[rows]
+            if bool(_mw.any()):
+                _mr = rows[_mw]
+                self.trading_post[_mr, row, dest_ct[_mr]] = True
         # SPEND the Trader
         self.major_unit_alive[rows, t_slot[rows]] = False
         self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
