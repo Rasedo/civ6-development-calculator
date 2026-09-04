@@ -977,7 +977,35 @@ under their blocker so the dependency is readable, and both halves count.
     Cannot be pillaged or removed."
 
     `EFFECT_MOUNTAIN_PORTAL` carries NO ModifierArguments, so every number
-    except the published 2 Movement is DLL-side. Its description: "Acts as a movement portal
+    except the published 2 Movement is DLL-side.
+
+    THE BUILD, SCOPED 2026-09-04 — it is one unit of work, not two, because a
+    tunnel that is buildable but not enterable states the mechanic wrongly
+    rather than merely doing nothing:
+
+    * TS costs ONE edit. `isImpassable` is the single function every movement
+      path inherits, so `isMountain(tile) -> tile.improvement !== 'MOUNTAIN_TUNNEL'`
+      covers all of them at once. `gdrJump` is the precedent for a mountain
+      that one thing may enter.
+    * THE GPU IS THE WORK, and the shape is already known. `passable` is BAKED
+      at export, and MEASURED: FOURTEEN exported flags derive from
+      `isImpassable` — wpass, work, camp, st, and ten improvement-site flags.
+      A tunnel built mid-game makes a mountain passable, so every one of them
+      goes stale exactly as the harvest's eighteen did. This is the
+      baked-derivation-of-a-new-mutable class and C-52's `nr` machinery is the
+      answer: ship a per-tile diff of what changes when the tile gains a
+      tunnel, rather than hand-listing fourteen flags and missing one.
+      A tunnel is never removed ("Cannot be pillaged or removed"), so the
+      plane only ever gains bits — monotone, which makes the diff cheap.
+    * THE PORTAL ITSELF is a new verb: enter a tunnel, leave from another at
+      2 Movement. "Another portal" is read as one on the SAME mountain range,
+      and a range is a connected component of mountain tiles — the same flood
+      fill `deriveContinents` already does for C-48. That reading is a MODEL
+      choice: the description says "on a mountain range" but no table names a
+      range, and the alternative (any tunnel anywhere) is a far larger
+      gameplay change. Record it when it ships.
+    * appending the verb SHIFTS the unit-action layout, which is the class
+      that silently killed PILLAGE in #78 — re-check the layout after. Its description: "Acts as a movement portal
     on a mountain range, allowing units to move into it and exit from
     another portal at the cost of 2 Movement. Trade Routes traveling
     through it can multiply the Gold they get from districts at their
