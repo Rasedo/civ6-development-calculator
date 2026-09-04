@@ -78,15 +78,16 @@ from the list below.
 | C-60 no Free City step | 1 | a city that loses its loyalty goes straight to the highest-pressure seat on both engines (`flipCity` -> `transferCity`, `_seat_loyalty_flips` -> `_transfer_city`) — there is no ownerless intermediate at all. Eleanor's "skips the Free City step" is therefore what EVERY seat already gets, which is a fidelity gap on both engines at once rather than a divergence |
 | C-61 the capital never moves | 1 | `relocatePalace` / `_relocate_palace` move `isCapital` only when the seat holds NO capital, and `origCapitalSeat` / `civ_cap_tile` are written once at founding and never again. Dido's Cothon capital move also needs a civ-UNIQUE project, which `ProjectDef` has no field for |
 | C-62 a war TYPE | 2 | the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and _LIBERATION_WAR are war kinds with their own civic prerequisite and a 10-turn buff on the declarer. Both engines carry exactly two kinds — formal and surprise (`seat_warkind`) — with no prerequisite beyond a casus belli and no post-declaration clock. Chandragupta's and Robert the Bruce's six modifiers wait here |
-| C-63 a legacy bonus accrues no time | 1 | the install's GOVERNMENTBONUS rates are the SPEED at which a government earns its legacy bonus. Both engines model the legacy CARD (`legacyOf`, `_pol_legacy`) as "have you ever held this government", with no accrual to halve, so America's nine BONUS_RATE modifiers have no clock to double |
+| C-63 a legacy bonus accrues no time (SOURCED 2026-09-04, +1%/interval) | 1 | the install's GOVERNMENTBONUS rates are the SPEED at which a government earns its legacy bonus. Both engines model the legacy CARD (`legacyOf`, `_pol_legacy`) as "have you ever held this government", with no accrual to halve, so America's nine BONUS_RATE modifiers have no clock to double |
+| C-73 a legacy card pays the whole government | 1 | this engine synthesises `LEGACY_${g.id}` with `effects: g.effects`, so slotting a legacy card re-grants that government's ENTIRE inherent bonus. The install gives each government exactly one `BonusType` and an accumulating +1%/Interval against it, which is what the card is worth. Blocked on C-63's clock, which is the accrual it must read |
 | C-59 a generic themed carrier | 1 | EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS and the themed yield/tourism modifiers — only a MUSEUM themes on either engine (`museumThemed` / `artMuseumThemed`, `_museum_themed` / `_art_museum_themed`) and a wonder never does, so Kristina's "buildings with at least three Great Work slots and wonders with at least two are automatically themed when full" has no carrier to theme. The shape is a slot-count rule over any building or wonder, plus the +100% yields and +100% Tourism a themed set then pays |
 | C-56 a trade route's religious pressure | 1 | EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE — a live Trade Route spreads its origin's religion to the destination and back. Pressure on both engines comes only from holy-city radiation, a unit's spread, theological combat and a disciple's kill; no route touches it, so Dharma's +100% has nothing to multiply |
 | C-57 one follower belief per city | 1 | EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS — a city pays the follower belief of its ONE followed religion (`withFollowerBelief` / `_follower_id_for`), so Dharma's "Follower Belief bonuses from EACH Religion that has at least 1 Follower" cannot stack. The carrier is a per-religion belief walk over the city's live pressure, on both engines |
 | C-58 a defeated unit is never captured | 1 | EFFECT_ATTACH_MODIFIER / TRAIT_CAVALRY_CAPTURE_CAVALRY — Genghis Khan's cavalry has "a chance to capture defeated enemy cavalry class units". Both engines only CONVERT: `convertHeathens` turns an adjacent barbarian, and a captured Settler/Builder changes hands on capture-on-move; a unit that loses a combat is removed, never re-seated. Its +3 Combat Strength ships |
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **36** | |
-| **OPEN, TOTAL** | **54** | |
+| **C. Absent systems** | **37** | |
+| **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1170,19 +1171,58 @@ under their blocker so the dependency is readable, and both halves count.
   that government at some point". There is no accrual to halve. The carrier is
   turns-in-government per seat per government, with the card unlocking at a
   threshold that the rate scales.
-  BLOCKED ON A NUMBER THE INSTALL DOES NOT CARRY (2026-09-03, measured). The
-  XML gives the SHAPE and nothing else: `Governments.BonusType` names each
-  government's accumulated bonus (Autocracy WONDER_CONSTRUCTION, Oligarchy
-  COMBAT_EXPERIENCE, Classical Republic GREAT_PEOPLE, Democracy
-  DISTRICT_PROJECTS, ...), `GovernmentBonusNames` lists the ten type names with
-  no fields at all, and America's nine `TRAIT_*_BONUS_RATE` modifiers carry
-  `BonusRate: 100` with NO ModifierType — they are DLL-read data, not effects.
-  What is missing is the THRESHOLD the rate scales (how much accrual earns the
-  card) and what each of the ten bonuses actually pays; neither appears in any
-  XML table or in GlobalParameters. Rate 100 against the published "half the
-  usual time" reads as +100% accrual, which is the one inference the two
-  sources agree on. The threshold belongs to the sourcing pass (#211) — do not
-  invent one. America's nine BONUS_RATE modifiers wait here.
+  UNBLOCKED 2026-09-04 — THE INSTALL CARRIES IT UNDER ITS OWN VOCABULARY.
+  The 2026-09-03 read searched `Governments`, `GovernmentBonusNames` and
+  `BonusRate`, and concluded no XML table holds the threshold. It does. The
+  install does not spell this "legacy" anywhere; it spells it ACCUMULATING.
+  Nine `MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS` modifiers in
+  `Governments.xml` each take three arguments — `BonusType`, `Increment` and
+  `Interval` — and `Interval` is the missing threshold, `ScaleByGameSpeed`:
+
+  | government | bonus | increment | interval |
+  |---|---|---|---|
+  | OLIGARCHY          | COMBAT_EXPERIENCE   | 1 |  5 |
+  | MONARCHY           | ENVOYS              | 1 | 10 |
+  | DEMOCRACY          | DISTRICT_PROJECTS   | 1 | 10 |
+  | FASCISM            | UNIT_PRODUCTION     | 1 | 10 |
+  | CLASSICAL_REPUBLIC | GREAT_PEOPLE        | 1 | 15 |
+  | MERCHANT_REPUBLIC  | GOLD_PURCHASES      | 1 | 15 |
+  | THEOCRACY          | FAITH_PURCHASES     | 1 | 15 |
+  | AUTOCRACY          | WONDER_CONSTRUCTION | 1 | 20 |
+  | COMMUNISM          | OVERALL_PRODUCTION  | 1 | 20 |
+
+  So the accrual is +1% per Interval turns held, permanent once earned, and
+  the community's independently-reported "+1% every 20 turns on Standard" for
+  Autocracy matches the install row exactly. There is no cap in the XML —
+  those three argument names are the whole modifier. America's nine
+  `TRAIT_*_BONUS_RATE` rows at `BonusRate: 100` now have a clock to double,
+  and "in half the usual time" is the interval halved.
+
+  A SECOND FINDING, not part of the original item. This engine's
+  `LEGACY_${g.id}` card carries `effects: g.effects` — the government's whole
+  inherent bonus. That is not what a legacy card is: it pays the ACCUMULATED
+  PERCENTAGE of the one named `BonusType`, which is why each government names
+  exactly one. Opened as C-73 rather than folded in here, because it changes
+  what a slotted card pays and C-63's clock is what it needs first.
+- **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
+  sourcing C-63 on 2026-09-04, and kept separate from it because the two fail
+  differently. `cpu/data/policies.ts` synthesises one wildcard card per
+  government with `effects: g.effects` — the government's whole inherent
+  bonus — under a comment calling it "that government's own inherent bonus".
+  The install disagrees: each government names exactly ONE `BonusType` in its
+  `MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS`, and the legacy a seat keeps
+  after switching is the accumulated percentage against that one thing, not
+  the government's inherent package. Fascism's card, for instance, pays this
+  engine +5 Combat Strength to every unit and -15% war weariness where the
+  install pays +N% unit production for N = turns held / 10.
+  BLOCKED ON C-63, which builds the clock this card has to read. The nine
+  bonus types also need channels of their own — WONDER_CONSTRUCTION,
+  OVERALL_PRODUCTION, UNIT_PRODUCTION and DISTRICT_PROJECTS have production
+  multipliers to land on, GREAT_PEOPLE and COMBAT_EXPERIENCE have accrual
+  rates, and ENVOYS, FAITH_PURCHASES and GOLD_PURCHASES need a reader each.
+  Do NOT close C-63 by wiring the clock and leaving the card wrong: that
+  would be the "rows behind an early return" class again, a shipped accrual
+  nothing reads.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1. CIV6 (Kristina):
   "Buildings with at least three Great Work slots and wonders with at least two
   Great Work slots are automatically themed when they have all their slots
@@ -1255,8 +1295,11 @@ under their blocker so the dependency is readable, and both halves count.
   `TRAIT_CAVALRY_CAPTURE_CAVALRY` attaches
   `TRAIT_CAVALRY_CAPTURE_CAVALRY_MODIFIER`, whose whole payload is
   EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE with `CanCapture: true` — a boolean.
-  The odds are DLL-side, so this waits on the sourcing pass (#211) exactly as
-  C-49's damage band and C-63's legacy threshold do.
+  The odds are DLL-side, so this waits on the sourcing pass (#211). It used to
+  be grouped here with C-49's damage band and C-63's legacy threshold; both of
+  those turned out to be IN the install on 2026-09-04, read off tables the
+  first pass had already opened, so this item is now alone in that group and
+  its "DLL-side" verdict deserves one more look before it is taken as final.
 - **A-2r. A NAVAL UNIT IS BORN A MOVEMENT SHORT. CLOSED 2026-09-04.** Filed
   as "a four-step walk parts the engines", which was the symptom; the cause is
   `spawnUnit`.
@@ -1369,16 +1412,33 @@ under their blocker so the dependency is readable, and both halves count.
   picks from LAND only, so a hurricane cannot start where the install puts it
   until the roll can reach open water.
 
-  BLOCKED ON THE UNIT HP BAND. `UNIT_DAMAGE_LAND` is a SHARE OF UNITS, not a
-  magnitude — the proof is the flood: the install writes 100 at BOTH
-  FLOOD_MAJOR and FLOOD_1000_YEAR, while this engine's own wiki-sourced band
-  differs between them (30-50 HP and 50-70 HP). So the percentage says how
-  many units are hit and something outside the XML says how hard. The flood's
-  band came from the wiki; the storms' has no equivalent here, and mapping the
-  flood's ladder onto storm severities 1 and 2 would be an invention. That
-  band belongs to the sourcing pass (#211) — the eight roster clauses PREVENT
-  and DOUBLE unit damage, so there is nothing for them to modify until it is
-  known.
+  UNBLOCKED 2026-09-04 — THE BAND WAS IN THE SAME TABLE, ONE COLUMN OVER.
+  `RandomEvent_Damages` carries `MinHP` and `MaxHP` beside `Percentage`, and
+  the 2026-09-03 read of this table took the percentage for the whole row.
+  Half of that read was right: `Percentage` IS the share of units hit, which
+  is why it is 100 at both flood severities. The other half was wrong — the
+  magnitude is not outside the XML at all. `MinHP`/`MaxHP` are 30/50 at
+  FLOOD_MAJOR and 50/70 at FLOOD_1000_YEAR, which is this engine's
+  wiki-sourced flood band EXACTLY, so the two sources agree and the wiki band
+  was never an outside number.
+
+  The storms' bands, from the same columns:
+
+  | event | land | naval |
+  |---|---|---|
+  | HURRICANE_CAT_4        | (none)      | 40-60 @ 60%  |
+  | HURRICANE_CAT_5        | 40-60 @100% | 60-80 @100%  |
+  | BLIZZARD_SIGNIFICANT   | (none)      | (none)       |
+  | BLIZZARD_CRIPPLING     | 40-60 @100% | 40-60 @ 60%  |
+  | DUST_STORM_GRADIENT    | (none)      | (none)       |
+  | DUST_STORM_HABOOB      | 40-60 @100% | 40-60 @ 60%  |
+  | TORNADO_FAMILY         | (none)      | (none)       |
+  | TORNADO_OUTBREAK       | 40-60 @100% | 40-60 @100%  |
+
+  The band is 40-60 for every storm row but CAT_5's naval, which is 60-80.
+  The milder severity of each family damages no unit at all — that is the
+  absence of a row, not a zero band. Nothing here waits on #211 any longer,
+  and the eight roster clauses have their magnitude to PREVENT and DOUBLE.
 - **C-47. TRIBAL VILLAGES. CLOSED 2026-09-04.** The install's own reward
   table now runs on both engines, sourced entire from `GoodyHuts` +
   `GoodyHutSubTypes` and each row's own modifier: seven kinds at Weight 100
