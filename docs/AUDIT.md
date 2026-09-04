@@ -1452,18 +1452,20 @@ under their blocker so the dependency is readable, and both halves count.
     That reason had to stop being true before the gate could see any of this,
     and the plane is compared now.
 
-  REACHABILITY, measured not assumed, and it is ZERO in the gate. Villages
-  are on the map (240 over the 24 fixtures) and both engines claim correctly,
-  but 250 driven turns claim NOTHING: the scripted driver never steps onto a
-  village tile. Making it do so is one block in `_seat_unit_orders` and it was
-  written, measured (1 claim per single seed, gate green) and then REMOVED,
-  because it exposed an unrelated four-step applier divergence that is now
-  A-2r. Villages on the map at all exposes a SECOND one, A-3r.
-  The seeder therefore keeps `withVillages: false` and villages-on is a
-  HUNTING configuration (the preset-gate pattern), not the round bar. So `C-47`'s bar
-  is its 19 dedicated lanes, not the serve gate, exactly as C-20's Military
-  Engineer is; the gate proves only that villages sitting unclaimed on the map
-  break nothing. A-2r's fix is what restores this to a measured mechanic.
+  REACHABILITY, measured not assumed, and it is REAL now. Villages are on in
+  the seeder (240 over the 24 fixtures) and the driver steps onto an adjacent
+  one ahead of its walk — a DECISION the applier validates and TS replays, so
+  it costs no fidelity and buys coverage the scripted walk never had. Measured
+  over four seeds x 250 turns: 18 claims spanning 11 of the 24 subtypes
+  (ONE_CIVIC_BOOST 4, ONE_TECH_BOOST 2, GRANT_SCOUT 2, FAVOR 2, GRANT_BUILDER
+  2, and one each of ENVOY, LARGE_GOLD, ONE_TECH, GRANT_TRADER, RESOURCES,
+  TWO_CIVIC_BOOSTS).
+
+  This was ZERO twice, and the two things standing in the way were not village
+  bugs at all: A-2r (a naval unit born a Movement short) and A-3r (an engineer
+  walking to rail sites). Both are closed, and villages-on — the FAITHFUL
+  configuration, since real Civ 6 has tribal villages — is the round bar
+  rather than a hunting tool.
 
   Epic Quest's clause ships with it: CIV6 "Receive a Tribal Village reward
   each time you capture a barbarian outpost" is `TRAIT_BARBARIAN_CAMP_GOODY`
