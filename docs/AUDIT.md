@@ -1548,6 +1548,90 @@ under their blocker so the dependency is readable, and both halves count.
   missionary lump, the two swings, and every test that pins a raw value)
   — after it the alliance clause is a one-line multiplier.
 
+- **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1. Both engines hold
+  religious PRESSURE per city and a followed religion per city, and neither
+  ever asks which religion a SEAT is majority-held by. Three roster rows wait
+  on that one fact and are marked open against this item in
+  docs/roster_ledger.json: `TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
+  `TRAIT_COMBAT_BONUS_OTHER_RELIGION` and
+  `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`. The carrier is a per-seat
+  majority read over its own cities' followed religions, on both engines; the
+  tie rule is the thing to source before it ships, since a seat can hold two
+  religions in equal numbers of cities.
+
+- **C-65. A GREAT WORK OF ART CARRIES NO OBJECT KIND.** Weight 1. CIV6 splits
+  Art into SCULPTURE, PAINTING and RELIGIOUS, and four roster rows pay only
+  the sculpture half: `TRAIT_GREAT_WORK_FAITH_SCULPTURE`,
+  `..._FOOD_SCULPTURE`, `..._GOLD_SCULPTURE` and `..._PRODUCTION_SCULPTURE`
+  (all marked open against this item). Both engines model a work's SLOT kind
+  (writing / art / music) and nothing finer, so no site can tell one Art work
+  from another. The carrier is an object-kind field on the work itself,
+  written where a work is created and read by the four rows. It is the same
+  shape as C-59's theming and should be decided with it.
+
+- **C-66. NO UNIT CARRIES A LEVIED MARK.** Weight 1. A city-state's levied
+  units are, on both engines, ordinary units re-seated under the suzerain —
+  nothing records that they were LEVIED, so nothing can pay a clause that
+  names them. `LEVY_UNITS_GRANT_ABILITY` and `LEVY_UNITUPGRADEDISCOUNT` are
+  marked open against this item. The carrier is one flag per unit, set at the
+  levy and cleared when the suzerainty lapses; the question to settle first is
+  what happens to the mark when the unit is upgraded, since one of the two
+  rows is an upgrade discount.
+
+- **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1. CIV6's
+  agenda-style clauses that make an AI PREFER or REFUSE an action are DLL-side
+  weightings, and neither engine has an AI that weighs diplomatic actions at
+  all — the driver decides them. `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
+  `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are marked open against this item.
+  This one is a genuine MODEL question rather than a missing field: a
+  preference is only meaningful against a decider that has alternatives to
+  weigh, so it waits on the self-play direction rather than on a carrier.
+
+- **C-68. TWO UNIQUE CHASSIS ARE NOT IN THE UNIT ROSTER.** Weight 1. The
+  Janissary (Ottoman) and the Saka Horse Archer (Scythia) have no row in the
+  engine's unit table, so the clauses that name them have nothing to charge:
+  `JANISSARY_LOSE_POPULATION_IN_FOUNDED_CITIES` and
+  `TRAIT_EXTRASAKAHORSEARCHER`. Both are marked open against this item. Note
+  the second carries a sourcing correction worth keeping: the Saka Horse
+  Archer is PROMOTION_CLASS_RANGED, NOT light cavalry, so a roster row keyed
+  on the engine's coarser cavalry class would pay the wrong chassis
+  (`engine-class-coarser-than-install`).
+
+- **C-69. THREE UNIQUE DISTRICTS, BUILDINGS AND IMPROVEMENTS ARE ABSENT.**
+  Weight 1. Kongo's M'banza (district), England's Royal Navy Dockyard
+  (district), Georgia's Tsikhe (building) and Spain's Mission (improvement)
+  have no row on either engine, so four clauses have nothing to attach to:
+  `TRAIT_FREE_APOSTLE_FINISH_MBANZA`, `TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT`,
+  `TRAIT_TSIKHE_PRODUCTION` and `TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER`,
+  all marked open against this item. The Dockyard row carries a second gap of
+  its own: a district's granted unit is NAMED by its row on both engines, and
+  nothing picks the strongest naval unit of a class the way
+  `bestTrainableOfClass` picks a land one.
+
+- **C-70. AN ALLIANCE CARRIES NO SHARED VISIBILITY.** Weight 1. Alliances
+  exist on both engines with their levels and their per-level yields, but
+  visibility is not among the things an alliance grants, so
+  `TRAIT_ALLIANCE_SHARED_VIS` (marked open against this item) has nothing to
+  set. The carrier is an OR of the ally's explored/visible planes into the
+  seat's own, which is the same machinery the Listening Post's visibility
+  already uses.
+
+- **C-71. A BUILDING'S GREAT-WORK SLOTS ARE ONE TABLE FOR EVERY SEAT.**
+  Weight 1. `GW_SLOTS` gives each building its slot count globally, and no
+  site asks the SEAT how many slots its own copy has, so
+  `TRAIT_EXTRA_PALACE_SLOTS` (marked open against this item) cannot add one to
+  a Palace. The carrier is a per-seat override read wherever the slot count is
+  read; the trap is that the count is baked into the wire and into the GPU's
+  slot geometry, so widening it is a layout change, not a lookup change
+  (`append-shifts-derived-layouts`).
+
+- **C-72. A TRADER CLAIMS NO TILE IT WALKS OVER.** Weight 1. Trade routes on
+  both engines move gold and yields between two cities and never touch tile
+  ownership, so `TRAIT_TRADE_GAIN_TILES_EN_ROUTE` (marked open against this
+  item) has no hook. The carrier is a border-growth write on the route's own
+  walk, which both engines already compute for the road-laying leg — so the
+  path exists and only the claim does not.
+
 ## Reachability — what the green gate does NOT prove
 
 A green serve run proves the two engines agree over the regime the scripted
