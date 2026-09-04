@@ -1932,10 +1932,10 @@ class SimMasks:
         r3 at all five capture bodies (seat-0/civ city captures + transfers,
         both CS conquests). NOT reveals on either engine: the melee
         advance-into-freed-tile and unit capture/transfers (TS writes
-        tileIndex directly — no stepUnit, no reveal). FOG-DEBT remaining:
-        the goody-hut maps reward r5 has no twin because the GPU has no
-        goody-hut mechanic at all (a pre-existing feature gap, not a fog
-        one)."""
+        tileIndex directly — no stepUnit, no reveal). The old FOG-DEBT note
+        here named a goody-hut MAPS reward with no twin; both halves of it are
+        gone — the mechanic ships (C-47) and the install's own reward table
+        carries no maps arm, that was the unsourced stub's invention."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         disk = self.pair_dist[tiles.clamp(min=0)] <= (
@@ -1945,6 +1945,13 @@ class SimMasks:
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
         # discover a new Continent or natural wonder" — one continent here,
         # so wonders are the whole event.
+        # CIV6 (Poundmaker): "...all alliances provide shared visibility" — an
+        # ally sees what this seat uncovers, and the clause is MUTUAL, so
+        # either side carrying it opens both. The discovery event below is the
+        # discoverer's ALONE: a seat merely SHOWN a natural wonder scores no
+        # era points for it, which is why this write sits above it (C-70).
+        if self._alliance_shared_vis_rows:
+            self._share_fog_with_allies(rows, seat_row, disk)
         cnt = (new & self.nwonder[rows]).sum(dim=1) * self._dracones_disc
         if bool((cnt > 0).any()):
             full = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -1958,6 +1965,38 @@ class SimMasks:
                         full.zero_()
                         full.index_add_(0, rows[m], cnt[m])
                         self._dedication_event(g, self._ded_dracones, full)
+
+    def _share_fog_with_allies(self, rows: torch.Tensor, seat_row, disk: torch.Tensor) -> None:
+        """CIV6 (Poundmaker): open `disk` to every ALLY of the revealing seat
+        that shares visibility with it. `sharesVisWithAllies`' twin — the row
+        is read on EITHER side, because "shared" is mutual, and the fog write
+        alone travels: the discovery event stays with the discoverer."""
+        for g in range(self.n_majors):
+            if isinstance(seat_row, int):
+                if seat_row != g:
+                    continue
+                sel, dsk = rows, disk
+            else:
+                pick = seat_row == g
+                sel, dsk = rows[pick], disk[pick]
+            if sel.numel() == 0:
+                continue
+            for o in range(self.n_majors):
+                if o == g:
+                    continue
+                # the row is per GAME, so the pair test is too — a `.any()`
+                # here as the gate would pay every game for what one seats
+                carry = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                for _c, _l in self._alliance_shared_vis_rows:
+                    carry |= self._row_is(g, _c, _l) | self._row_is(o, _c, _l)
+                if not bool(carry.any()):
+                    continue
+                ally = self._allied_with(g, torch.full((self.B,), o, dtype=torch.long,
+                                                       device=self.device))
+                ok = (carry & ally)[sel]
+                if not bool(ok.any()):
+                    continue
+                self.seat_explored[sel, o] |= dsk & ok.unsqueeze(1)
 
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
         if not self.fog_of_war:

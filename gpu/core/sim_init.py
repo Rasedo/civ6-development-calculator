@@ -3025,6 +3025,9 @@ class SimInit:
         # FEATURE is worth to this seat's appeal, over the map-global walk (C-50)
         self._feature_appeal_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["featureAppeal"]]  # type: ignore[misc]
+        # CIV6 (Poundmaker): this seat's alliances share MAP visibility (C-70)
+        self._alliance_shared_vis_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["allianceSharedVis"]]  # type: ignore[misc]
 
         # TRIBAL VILLAGES (C-47) — the install's own table, straight off the
         # wire so the GPU draws what TS draws. Kind weights are all equal, so

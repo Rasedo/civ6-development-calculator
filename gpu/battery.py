@@ -357,6 +357,7 @@ def main() -> int:
                 ("all_follower_beliefs", [py, "tests/gpu/all_follower_beliefs_test.py"], 2),  # C-57 Dharma stacks every present religion
                 ("tribal_villages", [py, "tests/gpu/tribal_villages_test.py"], 7),  # C-47 the install's 24-subtype reward table
                 ("feature_appeal", [py, "tests/gpu/feature_appeal_test.py"], 5),  # C-50 the Amazon reads a rainforest her own way
+                ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # C-70 an alliance shares what it sees
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip

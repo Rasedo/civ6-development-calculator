@@ -1608,14 +1608,33 @@ under their blocker so the dependency is readable, and both halves count.
   nothing picks the strongest naval unit of a class the way
   `bestTrainableOfClass` picks a land one.
 
-- **C-70. AN ALLIANCE CARRIES NO SHARED VISIBILITY.** Weight 1. Alliances
-  exist on both engines with their levels and their per-level yields, but
-  visibility is not among the things an alliance grants, so
-  `TRAIT_ALLIANCE_SHARED_VIS` (marked open against this item) has nothing to
-  set. The carrier is an OR of the ally's explored/visible planes into the
-  seat's own, which is the same machinery the Listening Post's visibility
-  already uses.
+- **C-70. AN ALLIANCE CARRIES NO SHARED VISIBILITY. CLOSED 2026-09-04.**
+  CIV6 (Poundmaker): the install writes
+  EFFECT_ADJUST_PLAYER_ALL_ALLIANCES_PROVIDE_SHARED_VIS with `ShareVis: true`
+  — a boolean, no direction and no level. Read as MUTUAL, because that is what
+  "shared" means in the alliance system it names: the holder and its ally each
+  see what the other uncovers. Recorded as the reading it is.
 
+  CORRECTION to this entry as first written: it said the carrier was "the same
+  machinery the Listening Post's visibility already uses". It is not. The
+  Listening Post feeds DIPLOMATIC visibility LEVELS (`diploVisibility`), which
+  is a different quantity from map fog entirely; shared visibility is the
+  `Seat.explored` / `seat_explored` plane. Verified before building, not
+  after.
+
+  It lands inside the reveal itself — `revealAround` / `_reveal_around` — and
+  not in a new per-turn phase step, which makes it turn-exact by construction
+  and independent of seat order: whoever uncovers a tile opens it for the
+  sharing ally in the same call. The discovery EVENT is deliberately left
+  behind: an ally merely SHOWN a natural wonder earns no era score for it, so
+  the fog write and the Hic Sunt Dracones event are separated (`liftFog` on
+  TS, the write above the event on the GPU).
+
+  `shared_vision` (6 lanes) and `shared-vision.test.ts` (6) are the bar, and
+  `explored` is in the statecompare digest, so the serve gate polices the
+  merge turn by turn. TS reads the roster row directly rather than through
+  `getModifiers`, because the fog walk runs on every unit step and should pull
+  in none of the effect stack.
 - **C-71. A BUILDING'S GREAT-WORK SLOTS ARE ONE TABLE FOR EVERY SEAT.**
   Weight 1. `GW_SLOTS` gives each building its slot count globally, and no
   site asks the SEAT how many slots its own copy has, so

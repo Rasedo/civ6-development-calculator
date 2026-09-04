@@ -1118,6 +1118,21 @@ export const FEATURE_APPEAL_ROWS: readonly FeatureAppealRow[] = [
   { civ: 'BRAZIL', feature: 'RAINFOREST', amount: 2 },
 ];
 
+/** CIV6 (Poundmaker, TRAIT_ALLIANCE_SHARED_VIS): the install writes
+ *  EFFECT_ADJUST_PLAYER_ALL_ALLIANCES_PROVIDE_SHARED_VIS with `ShareVis:
+ *  true` — a boolean, no direction and no level. Read as MUTUAL, because that
+ *  is what "shared" means in the alliance system it names: the holder and its
+ *  ally each see what the other uncovers. The DISCOVERY event stays the
+ *  discoverer's own — an ally shown a natural wonder earns no era score for
+ *  it (C-70). */
+export interface AllianceSharedVisRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const ALLIANCE_SHARED_VIS_ROWS: readonly AllianceSharedVisRow[] = [
+  { leader: 'POUNDMAKER' },
+];
+
 /** CIV6 (Dharma, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE): "+100%
  *  Religious pressure from your Trade Routes", on both ends of the leg. */
 export interface RoutePressureRow {
