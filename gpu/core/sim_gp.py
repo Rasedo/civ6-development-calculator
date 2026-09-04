@@ -97,6 +97,23 @@ class SimGp:
                 _has = self._city_has_park(r)                      # [B, RC]
                 _hit = (_slot >= 0) & _has.gather(1, _slot.clamp(min=0)) & _pw.unsqueeze(1)
                 out = out + _hit.to(out.dtype) * _pa
+        # CIV6 (Amazon): "Rainforest tiles provide +1 Appeal to adjacent tiles,
+        # instead of the usual -1" — a per-SEAT term over the map-global walk.
+        # It rides THIS plane rather than a per-row appeal cache because the
+        # plane is already keyed by the tile's owner and already threaded
+        # through every consumer (`cityAppealResolver`'s twin, C-50).
+        for _fc, _fl, _fi, _fa in self._feature_appeal_rows:
+            if _fi < 0:
+                continue
+            src = self.feat_id == _fi                              # [B, T]
+            nb = self.neigh
+            cnt = (src[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)  # [B, T]
+            for r in range(self.n_majors):
+                _fw = self._row_is(r, _fc, _fl)
+                if not bool(_fw.any()):
+                    continue
+                owned = (self.tile_seat == r) & (self.city_slot_at(r) >= 0)
+                out = out + (owned & _fw.unsqueeze(1)).to(out.dtype) * cnt.to(out.dtype) * _fa
         return out
 
     def _city_has_park(self, row: int) -> torch.Tensor:

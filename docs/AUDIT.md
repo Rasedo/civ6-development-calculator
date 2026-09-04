@@ -1343,17 +1343,31 @@ under their blocker so the dependency is readable, and both halves count.
   Reproduce: `withVillages: true` in seeder/world.ts plus the driver steering
   block in docs/A2R_REPRO.md, reseed and export, then
   `python gpu/serve_gate.py --batched --turns 250 --seeds 9300`.
-- **C-50. APPEAL IS MAP-GLOBAL.** Weight 1. `tileAppeal(map, tile, camps,
-  gpAppeal)` and the GPU's appeal plane answer one number per tile for
-  every seat. CIV6 keys roster clauses on a seat's own view: the Amazon
-  ("Rainforest ... grant +1 Appeal to adjacent tiles, instead of the usual
-  -1", EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER +2) CORRECTED: Roosevelt's National Park
-  appeal shipped in batch 13 — a per-CITY add is what `cityAppealResolver` /
-  `_gp_appeal_plane` already carry, and only the FEATURE half is blocked here. The carrier is a per-seat
-  appeal read threaded through the four consumers — housing, amenities, the
-  Seaside Resort's gold and the National Park's site — and the GPU's cached
-  plane becomes one per row. The Amazon's four ADJACENCY rows ship; its
-  appeal row is marked open against this item in docs/roster_ledger.json.
+- **C-50. APPEAL IS MAP-GLOBAL. CLOSED 2026-09-04.** CIV6 (Amazon,
+  TRAIT_AMAZON_RAINFOREST_EXTRA_APPEAL): "Rainforest tiles provide +1 Appeal to
+  adjacent tiles, instead of the usual -1" — EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER
+  on FEATURE_JUNGLE with Amount 2, which is exactly the swing from -1 to +1.
+  The engine spells the install's JUNGLE as RAINFOREST.
+
+  This entry expected a per-seat appeal read threaded through four consumers
+  and the GPU's cached plane split one per row. It needed NEITHER. The
+  per-owner channel already existed and was already threaded everywhere:
+  `cityAppealResolver` / `_gp_appeal_plane`, which the same entry's own
+  correction had noted carries Roosevelt's per-CITY add. It is keyed by the
+  tile's OWNER, which names the seat, and it already reads neighbours for the
+  governor's near-feature clause — so the Amazon is one more term in a
+  composer that exists, not a new plane. The map-global walk is untouched and
+  still has ONE body per engine.
+
+  An UNOWNED tile takes none of it, which is right for all four consumers:
+  housing, amenities, the Seaside Resort's gold and the National Park's site
+  all concern owned ground.
+
+  `feature_appeal` (5 lanes) and `feature-appeal.test.ts` (4) are the bar,
+  including the per-game guard the collapsed-roster-mask class demands. Found
+  while writing them: the GPU term first read `self.feature`, which does not
+  exist — the plane is `feat_id`. pyright cannot see it, because mixin
+  attributes are untypeable here; only running the lane did.
 - **C-49. NAMED RANDOM EVENTS.** Weight 1. `disasterPhase` floods a
   river, storms a tile, droughts a region and erupts a volcano, but none of
   it carries the install's RandomEvent NAME or category, and units take

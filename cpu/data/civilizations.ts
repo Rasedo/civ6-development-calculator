@@ -1103,6 +1103,21 @@ export const CAMP_GOODY_ROWS: readonly CampGoodyRow[] = [
   { civ: 'SUMERIA' },
 ];
 
+/** CIV6 (Amazon, TRAIT_AMAZON_RAINFOREST_EXTRA_APPEAL): "Rainforest tiles
+ *  provide +1 Appeal to adjacent tiles, instead of the usual -1" — the
+ *  install writes it as EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER on
+ *  FEATURE_JUNGLE with Amount 2, which is exactly the swing from -1 to +1.
+ *  The engine spells the install's JUNGLE as RAINFOREST (C-50). */
+export interface FeatureAppealRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  feature: string;
+  amount: number;
+}
+export const FEATURE_APPEAL_ROWS: readonly FeatureAppealRow[] = [
+  { civ: 'BRAZIL', feature: 'RAINFOREST', amount: 2 },
+];
+
 /** CIV6 (Dharma, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE): "+100%
  *  Religious pressure from your Trade Routes", on both ends of the leg. */
 export interface RoutePressureRow {

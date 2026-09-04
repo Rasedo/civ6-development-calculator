@@ -3021,6 +3021,10 @@ class SimInit:
         # draw off the SAME table (C-47)
         self._camp_goody_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["campGoody"]]  # type: ignore[misc]
+        # [civ, leaderRow, featureIdx, amount] — CIV6 (Amazon): what an adjacent
+        # FEATURE is worth to this seat's appeal, over the map-global walk (C-50)
+        self._feature_appeal_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["featureAppeal"]]  # type: ignore[misc]
 
         # TRIBAL VILLAGES (C-47) — the install's own table, straight off the
         # wire so the GPU draws what TS draws. Kind weights are all equal, so

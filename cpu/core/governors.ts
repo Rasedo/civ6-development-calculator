@@ -1,6 +1,7 @@
 import type { City, GameState, Governor, Seat, Tile } from './types';
 import { cityAtTile, citiesOf, seatOf } from './seats';
 import { hexDistance, neighbors } from '../../world/hex';
+import { type FeatureAppealRow } from '../data/civilizations';
 import { GP_CITY_PERM } from '../data/greatPeople';
 import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark } from './city';
@@ -337,14 +338,32 @@ export function cityAppealResolver(state: GameState): GpAppeal {
       flat.set(key, (flat.get(key) ?? 0) + add);
     }
   }
-  if (flat.size === 0 && near.size === 0) return undefined;
+  // CIV6 (Amazon): "Rainforest tiles provide +1 Appeal to adjacent tiles,
+  // instead of the usual -1" — a per-SEAT term over the map-global walk, and
+  // this resolver is where it belongs: it is already keyed by the tile's
+  // OWNER, already reads neighbours for the governor's own near-feature
+  // clause, and is already threaded through every appeal consumer, so C-50
+  // needs no per-seat plane of its own. An unowned tile takes none of it,
+  // which is right for all four consumers (housing, amenities, the Seaside
+  // Resort's gold and the National Park's site all concern owned ground).
+  const feat = new Map<number, readonly FeatureAppealRow[]>();
+  for (const s3 of state.seats) {
+    const rows = getModifiers(state, s3.seat).featureAppeal;
+    if (rows.length) feat.set(s3.seat, rows);
+  }
+  if (flat.size === 0 && near.size === 0 && feat.size === 0) return undefined;
   const map = state.map;
   return (t: Tile) => {
     if (t.ownerCity < 0) return 0;
     const key = t.ownerSeat * APPEAL_SEAT_STRIDE + t.ownerCity;
     const f = near.get(key) ?? 0;
-    const beside = f > 0 && neighbors(map, t).some((n) => !!n.feature && !n.improvement);
-    return (flat.get(key) ?? 0) + (beside ? f : 0);
+    const nb = neighbors(map, t);
+    const beside = f > 0 && nb.some((n) => !!n.feature && !n.improvement);
+    let fa = 0;
+    for (const r of feat.get(t.ownerSeat) ?? []) {
+      fa += r.amount * nb.filter((n) => n.feature === r.feature).length;
+    }
+    return (flat.get(key) ?? 0) + (beside ? f : 0) + fa;
   };
 }
 
