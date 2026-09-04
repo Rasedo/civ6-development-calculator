@@ -85,9 +85,10 @@ from the list below.
 | C-57 one follower belief per city | 1 | EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS — a city pays the follower belief of its ONE followed religion (`withFollowerBelief` / `_follower_id_for`), so Dharma's "Follower Belief bonuses from EACH Religion that has at least 1 Follower" cannot stack. The carrier is a per-religion belief walk over the city's live pressure, on both engines |
 | C-58 a defeated unit is never captured | 1 | EFFECT_ATTACH_MODIFIER / TRAIT_CAVALRY_CAPTURE_CAVALRY — Genghis Khan's cavalry has "a chance to capture defeated enemy cavalry class units". Both engines only CONVERT: `convertHeathens` turns an adjacent barbarian, and a captured Settler/Builder changes hands on capture-on-move; a unit that loses a combat is removed, never re-seated. Its +3 Combat Strength ships |
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
+| C-74 three disaster rates are stylized, and RandomEvent_Frequencies publishes them | 1 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **37** | |
-| **OPEN, TOTAL** | **55** | |
+| **C. Absent systems** | **38** | |
+| **OPEN, TOTAL** | **56** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1220,6 +1221,25 @@ under their blocker so the dependency is readable, and both halves count.
   PERCENTAGE of the one named `BonusType`, which is why each government names
   exactly one. Opened as C-73 rather than folded in here, because it changes
   what a slotted card pays and C-63's clock is what it needs first.
+- **C-74. THREE DISASTER RATES ARE STYLIZED AND THE INSTALL PUBLISHES THEM.**
+  Weight 1. Found while sourcing C-49 on 2026-09-04. `cpu/data/disasters.ts`
+  says outright that `FLOOD_CHANCE` 0.05, `DROUGHT_CHANCE` 0.02,
+  `STORM_CHANCE` 0.04 and `FLOOD_SEVERITY_P` [0.6, 0.3, 0.1] are NOT sourced —
+  "the page publishes only that the base rate is set for each game at its
+  start ... and no numbers". The page does not. `RandomEvent_Frequencies`
+  does: an `OccurrencesPerGame` for every event at each of five
+  `RealismSettingType` levels (MINIMAL, LIGHT, MODERATE, HEAVY, HYPERREAL).
+  At MODERATE, for instance, floods run 2 / 1.5 / 1 per game by severity —
+  a 0.44 / 0.33 / 0.22 split where this engine writes 0.6 / 0.3 / 0.1 — and
+  the storms run BLIZZARD 8 and 2, DUST_STORM 8 and 2, TORNADO 15 and 3,
+  HURRICANE 15 and 3.
+  Two decisions belong to the owner before this ships, and neither is a
+  magnitude: WHICH Realism setting this engine models (it has no such
+  setting today), and how OccurrencesPerGame becomes a per-turn probability
+  (game length is the obvious divisor and the install does not say so).
+  Changing any of these moves every trajectory, so it lands on its own with a
+  battery behind it — never folded into C-49's own commit.
+
 - **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
   sourcing C-63 on 2026-09-04, and kept separate from it because the two fail
   differently. `cpu/data/policies.ts` synthesises one wildcard card per
@@ -1455,6 +1475,33 @@ under their blocker so the dependency is readable, and both halves count.
   The milder severity of each family damages no unit at all — that is the
   absence of a row, not a zero band. Nothing here waits on #211 any longer,
   and the eight roster clauses have their magnitude to PREVENT and DOUBLE.
+
+  AND THE REST OF THE EVENT, which the 2026-09-03 pass did not reach.
+  `RandomEvents` carries seven more columns per row, all exact:
+
+  | event | sev | hexes | duration | movement | spacing | +/degree | fertilizes |
+  |---|---|---|---|---|---|---|---|
+  | TORNADO_FAMILY       | 1 |  1 | 3 | 8 | 15 |  0 | no  |
+  | TORNADO_OUTBREAK     | 2 |  3 | 3 | 8 | 15 | 50 | no  |
+  | DUST_STORM_GRADIENT  | 1 |  3 | 3 | 8 | 15 |  0 | yes |
+  | DUST_STORM_HABOOB    | 2 |  7 | 3 | 8 | 15 | 50 | yes |
+  | BLIZZARD_SIGNIFICANT | 1 |  7 | 3 | 8 | 15 |  0 | no  |
+  | BLIZZARD_CRIPPLING   | 2 | 19 | 3 | 8 | 15 | 50 | no  |
+  | HURRICANE_CAT_4      | 1 |  7 | 3 | 8 | 15 |  0 | yes |
+  | HURRICANE_CAT_5      | 2 | 19 | 3 | 8 | 15 | 50 | yes |
+
+  `Hexes` is the footprint (1 tile, 3, a radius-1 ring of 7, a radius-2 ring
+  of 19), `Duration` 3 means a storm PERSISTS for three turns and `Movement`
+  8 that it walks while it lasts — this engine's storm is a one-turn stamp on
+  a radius-1 disc, which is neither. `ChanceIncreasePerDegree` 50 on every
+  severity-2 row is the climate scaling, and the FERTILITY column is already
+  half-modelled: `disasters.ts` says "sandstorms deposit silt", and the
+  install agrees for dust storms and hurricanes and disagrees for blizzards
+  and tornadoes, which fertilize nothing.
+
+  Opens C-74 (below): `RandomEvent_Frequencies` publishes an
+  OccurrencesPerGame for every event at five Realism settings, which is the
+  base rate three of this engine's constants stand in for.
 - **C-47. TRIBAL VILLAGES. CLOSED 2026-09-04.** The install's own reward
   table now runs on both engines, sourced entire from `GoodyHuts` +
   `GoodyHutSubTypes` and each row's own modifier: seven kinds at Weight 100
