@@ -523,6 +523,7 @@ def main() -> int:
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # C-66 the levy mark and its 75% discount
                 ("legacy_accrual", [py, "tests/gpu/legacy_accrual_test.py"], 6),  # C-63 the government clock an accumulating bonus rides
                 ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
+                ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # A-5r a narrowed XP award must read its own game
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip

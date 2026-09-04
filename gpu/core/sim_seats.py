@@ -3883,20 +3883,34 @@ class SimSeats:
             return torch.zeros_like(tiles)
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = torch.where(ok, seat, torch.zeros_like(seat))
+        assert seat.shape[0] == self.B, (
+            f"_cav_hill_cs: a NARROWED seat ({tuple(seat.shape)}) with no `rows` — the gather "
+            f"below is over GAMES and would read batch rows 0..n-1 instead (B={self.B})")
         suz = self._suz_effect_rows(self._suz_c_hill).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
         cav = self._type_cavalry[types.clamp(min=0, max=self.NU - 1)]
         hill = self.hills.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
         return self._suz_hill_cs * (suz & cav & hill).long()
 
-    def _suz_xp_mult(self, seat: torch.Tensor) -> torch.Tensor:
-        """`xpMult`'s Kabul half, [B] long. CIV6 (Kabul's suzerain): "Your units
+    def _suz_xp_mult(self, seat: torch.Tensor,
+                     rows: torch.Tensor | None = None) -> torch.Tensor:
+        """`xpMult`'s Kabul half, long. CIV6 (Kabul's suzerain): "Your units
         receive double experience from battles they initiate." Only the
-        initiator asks for it, and a barbarian holds no suzerain."""
+        initiator asks for it, and a barbarian holds no suzerain.
+
+        `rows` names the BATCH rows when the caller has already narrowed — the
+        gather below is over games, so without it a narrowed `seat` reads
+        rows 0..n-1 instead."""
         if self._suz_c_xp < 0 or self.S == 0:
             return torch.ones_like(seat)
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = torch.where(ok, seat, torch.zeros_like(seat))
-        suz = self._suz_effect_rows(self._suz_c_xp).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
+        _tab = self._suz_effect_rows(self._suz_c_xp)
+        if rows is None:
+            assert seat.shape[0] == self.B, (
+            f"_suz_xp_mult: a NARROWED seat ({tuple(seat.shape)}) with no `rows` — the gather "
+            f"below is over GAMES and would read batch rows 0..n-1 instead (B={self.B})")
+        suz = (_tab[rows, s0] if rows is not None
+               else _tab.gather(1, s0.unsqueeze(1)).squeeze(1)) & ok
         return 1 + (self._suz_xp_mult_k - 1) * suz.long()
 
     def _unit_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor,
@@ -9544,6 +9558,10 @@ class SimSeats:
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = seat.clamp(min=0, max=self.n_majors - 1)
         tab = self._golden_ded_table(self._ded_sky)
+        if rows is None:
+            assert seat.shape[0] == self.B, (
+            f"_seat_xp_pct: a NARROWED seat ({tuple(seat.shape)}) with no `rows` — the gather "
+            f"below is over GAMES and would read batch rows 0..n-1 instead (B={self.B})")
         holds = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
         return pct + torch.where(air & ok & holds, torch.full_like(pct, self._sky_air_xp),
                                  torch.zeros_like(pct))
@@ -9580,7 +9598,10 @@ class SimSeats:
             self.unit_level[rows, ds],
             self.unit_xp_pct[rows, ds]
             + self._seat_xp_pct(d_type[rows], self.unit_seat[rows, ds], rows),
-            ranged=ranged, initiated=False, foe_died=a_died[rows], foe_is_barb=a_barb[rows])
+            ranged=ranged, initiated=False, foe_died=a_died[rows], foe_is_barb=a_barb[rows],
+            # every argument above is narrowed to `rows`; the multipliers inside
+            # have to be told, or they read game 0's roster for every defender.
+            rows=rows)
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gd)
         _gd = torch.zeros(self.B, dtype=gd.dtype, device=self.device)

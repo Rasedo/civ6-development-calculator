@@ -1964,6 +1964,10 @@ class SimEconomy:
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = seat.clamp(min=0, max=self.n_majors - 1)
         tab = self._fx_by_row(key)
+        if rows is None:
+            assert seat.shape[0] == self.B, (
+            f"_fx_at_seat: a NARROWED seat ({tuple(seat.shape)}) with no `rows` — the gather "
+            f"below is over GAMES and would read batch rows 0..n-1 instead (B={self.B})")
         v = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
         return torch.where(ok, v, z)
 

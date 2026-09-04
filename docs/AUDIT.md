@@ -41,7 +41,9 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| **A. Engine vs engine** | **0** | |
+| A-4r seed 9001 parts on culture | 1 | narrowed to the citizen assignment after a pop drop; the next probe is named in the entry |
+| A-6r the slotted policy cards are not compared | 1 | the digest carries `governmentsHeld` and the civics under it, but not the CARDS a seat slots nor the extra SLOTS it holds — A-5r lived in that gap for as long as it took one unit's XP to come out wrong |
+| **A. Engine vs engine** | **2** | |
 | B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the scored-competition catalog holds one row |
@@ -88,7 +90,7 @@ from the list below.
 | C-74 three disaster rates are stylized, and RandomEvent_Frequencies publishes them | 1 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
 | **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **56** | |
+| **OPEN, TOTAL** | **58** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1336,6 +1338,55 @@ under their blocker so the dependency is readable, and both halves count.
   those turned out to be IN the install on 2026-09-04, read off tables the
   first pass had already opened, so this item is now alone in that group and
   its "DLL-side" verdict deserves one more look before it is taken as final.
+- **A-5r. A NARROWED XP AWARD READ ANOTHER GAME'S ROSTER. CLOSED 2026-09-04.**
+  Found by the battery's first memory-sized shard (#230), not by a hunt.
+
+  `_award_pair_xp`'s DEFENDER arm narrows every tensor to `rows` — the games
+  where a defender survived — and hands them to `_battle_gain`. That body
+  multiplied by `_recon_xp_mult(seat)` and `_suz_xp_mult(seat)`, both of which
+  end in `tab.gather(1, seat.unsqueeze(1))` over a [B, seats] table. A gather
+  along dim 1 with a NARROWED index reads batch rows 0..n-1, so every defender
+  in the batch was paid GAME 0's Survey and Kabul multipliers. The
+  `_seat_xp_pct` call on the very next line was already given `rows`; the two
+  multipliers beside it were not.
+
+  It could not show at B=1, where the wrong game is the right game, and the
+  battery's fixed 8-shard/3-seed layout never put the two seeds that expose it
+  into one batch. Sizing the pool from free memory made the shards 4 seeds
+  wide and it fired at once: seed 9222 t28, `unit.xp` GPU 8 vs TS 6 — a
+  doubled award hitting the cap of 8, from a Barbarossa two games away.
+
+  The hunt cost one wrong turn worth recording: `run_batched` orders fixtures
+  by `fixture_paths()`, NOT by the order `--seeds` names them, so a probe
+  printing `b=0` read 9209 in one run and 9222 in the other. Two "same game,
+  different batch" comparisons were nothing of the kind, and the first
+  diagnosis drawn from them was wrong. Print the game id, never a fixed index
+  — the probe-hygiene rule, ignored by its own author.
+
+  FIXED by threading `rows` through `_battle_gain` into both multipliers, and
+  GUARDED: the four per-seat gathers (`_fx_at_seat`, `_seat_xp_pct`,
+  `_suz_xp_mult`, `_cav_hill_cs`) now assert their index is batch-wide when no
+  `rows` is given, so the next one of these is loud instead of silent. The
+  remaining ungated site, `_cav_hill_cs`, has only whole-batch callers today.
+  Bar: `narrow_batch_xp` (5 lanes, verified to red against the old body), plus
+  the four-seed shard green to 60 turns.
+
+  WHAT IT SAYS ABOUT THE GATE: the slotted POLICY CARD set is not in the
+  statecompare manifest. This divergence lived in the cards and only surfaced
+  as banked XP many turns later. That gap is open as A-6r.
+- **A-6r. THE SLOTTED POLICY CARDS ARE NOT COMPARED.** Weight 1. Opened
+  2026-09-04 by A-5r. `governmentsHeld` and the civics that derive the adopted
+  government are both in the digest, but the CARDS a seat actually has slotted
+  are not, and neither are the extra policy SLOTS a seat holds beyond its
+  government's own (`wonderExtraSlots` / `_wonder_extra_slots`). A-5r's
+  divergence lived in exactly that gap: the two engines disagreed about a
+  military slot and the Survey card in it, and nothing said so until the
+  banked XP of one unit came out wrong at turn 28.
+  The carrier is a per-seat slotted-card vector on both engines plus its
+  manifest row. Note the shape question first: TS's `computeAdoption` returns
+  `policies` as a slot-indexed array with nulls, the GPU keeps a [B, nPol]
+  mask, and slot POSITION is not a fact either engine owns — compare the SET,
+  the way `techs` and `civics` already do.
 - **A-2r. A NAVAL UNIT IS BORN A MOVEMENT SHORT. CLOSED 2026-09-04.** Filed
   as "a four-step walk parts the engines", which was the symptom; the cause is
   `spawnUnit`.

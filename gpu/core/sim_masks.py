@@ -842,14 +842,22 @@ class SimMasks:
         self, own_type: torch.Tensor, foe_type: torch.Tensor, own_seat: torch.Tensor,
         own_level: torch.Tensor, own_pct: torch.Tensor, *,
         ranged: bool, initiated: bool, foe_died: torch.Tensor, foe_is_barb: torch.Tensor,
+        rows: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """[B] the XP ONE side earns from ONE battle — `awardBattleXp`'s per-side
-        half, the veteran-vs-barbarian flat rate included."""
+        """the XP ONE side earns from ONE battle — `awardBattleXp`'s per-side
+        half, the veteran-vs-barbarian flat rate included.
+
+        [B] when the caller passes whole-batch tensors; [n] when it has already
+        NARROWED to `rows`, which it must then hand over: both multipliers read
+        a per-seat table by game, and `tab.gather(1, seat.unsqueeze(1))` on a
+        narrowed seat silently reads batch rows 0..n-1 — the WRONG GAMES. That
+        is exactly what it did (unit XP, seed 9222 t28), and only a shard wide
+        enough to put two games in one batch could show it."""
         own_cs = self._xp_strength(own_type, ranged and initiated)
         foe_cs = self._xp_strength(foe_type, ranged and not initiated)
-        mult = self._recon_xp_mult(own_seat, own_type)
+        mult = self._recon_xp_mult(own_seat, own_type, rows)
         if initiated:
-            mult = mult * self._suz_xp_mult(own_seat)
+            mult = mult * self._suz_xp_mult(own_seat, rows)
         g = self._battle_xp(own_cs, foe_cs, foe_died=foe_died, ranged=ranged,
                             initiated=initiated, pct=own_pct, mult=mult)
         vet = foe_is_barb & (own_level >= 2)

@@ -463,8 +463,8 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
   ].map((p) => [p.id, p]),
 );
 
-/** CIV6: the nine `GOVERNMENTBONUS_*` names in `GovernmentBonusNames`, less
- *  `NO_GOVERNMENTBONUS`. Each government names exactly one — which is why a
+/** CIV6: the nine accumulating bonus kinds the install's `GovernmentBonusNames`
+ *  lists, less its own "none" row. Each government names exactly one — which is why a
  *  legacy card is worth a percentage of ONE thing and not the government's
  *  whole inherent package (C-73). */
 export type GovBonusType =
