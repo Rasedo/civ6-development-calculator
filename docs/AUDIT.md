@@ -1324,6 +1324,32 @@ under their blocker so the dependency is readable, and both halves count.
   (`applier-carries-whole-validator`), and no gate lane walks far enough to
   see this today.
 
+- **A-3r. COMBAT XP PARTS THE ENGINES AFTER AN EXTRA UNIT.** Weight 2. OPEN,
+  found 2026-09-04 by the same widened trajectory that found A-2r, and like it
+  NOT a village bug: no C-47 code runs anywhere near the divergence.
+
+      seed 9300 turn 159: KEYED DIFF group unit:
+        unit[2148].xp: GPU 9 vs TS 7
+
+  The one village claimed in that whole game is at TURN 121 (tile 713,
+  GRANT_SCOUT), and the digests agree on every group through turn 158 — so the
+  grant itself is faithful on both engines and the extra Scout is identical.
+  Thirty-eight turns later a unit's XP differs by 2, with nothing else in the
+  state differing. At that turn the GPU awards combat XP through
+  `_award_pair_xp` with gains 3, 3 and 4; TS reaches a different total.
+
+  So the chain is: a village grants a unit, the unit changes which battles
+  happen, and a pre-existing combat-XP disagreement surfaces. The BASELINE
+  gate never grants that unit and never reaches it.
+
+  Worth noting while hunting this, because it can hide a second cause: the
+  unit digest group is keyed `tile * 3 + kind`, so TWO units of the same kind
+  on one tile collide into a single key and a positional difference between
+  the engines can go unseen until it changes something else.
+
+  To reproduce, turn the seeder's villages on (`seeder/world.ts`
+  `withVillages: true`), reseed and export, then run seed 9300 to 160 turns.
+
 - **C-50. APPEAL IS MAP-GLOBAL.** Weight 1. `tileAppeal(map, tile, camps,
   gpAppeal)` and the GPU's appeal plane answer one number per tile for
   every seat. CIV6 keys roster clauses on a seat's own view: the Amazon
@@ -1415,7 +1441,9 @@ under their blocker so the dependency is readable, and both halves count.
   village tile. Making it do so is one block in `_seat_unit_orders` and it was
   written, measured (1 claim per single seed, gate green) and then REMOVED,
   because it exposed an unrelated four-step applier divergence that is now
-  A-2r — shipping the steering would have shipped a red gate. So `C-47`'s bar
+  A-2r. Villages on the map at all exposes a SECOND one, A-3r.
+  The seeder therefore keeps `withVillages: false` and villages-on is a
+  HUNTING configuration (the preset-gate pattern), not the round bar. So `C-47`'s bar
   is its 19 dedicated lanes, not the serve gate, exactly as C-20's Military
   Engineer is; the gate proves only that villages sitting unclaimed on the map
   break nothing. A-2r's fix is what restores this to a measured mechanic.
