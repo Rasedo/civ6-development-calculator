@@ -81,7 +81,8 @@ from the list below.
 | C-61 the capital never moves | 1 | `relocatePalace` / `_relocate_palace` move `isCapital` only when the seat holds NO capital, and `origCapitalSeat` / `civ_cap_tile` are written once at founding and never again. Dido's Cothon capital move also needs a civ-UNIQUE project, which `ProjectDef` has no field for |
 | C-62 a war TYPE | 2 | the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and _LIBERATION_WAR are war kinds with their own civic prerequisite and a 10-turn buff on the declarer. Both engines carry exactly two kinds — formal and surprise (`seat_warkind`) — with no prerequisite beyond a casus belli and no post-declaration clock. Chandragupta's and Robert the Bruce's six modifiers wait here |
 | C-63 a legacy bonus accrues no time (SOURCED 2026-09-04, +1%/interval) | 1 | the install's GOVERNMENTBONUS rates are the SPEED at which a government earns its legacy bonus. Both engines model the legacy CARD (`legacyOf`, `_pol_legacy`) as "have you ever held this government", with no accrual to halve, so America's nine BONUS_RATE modifiers have no clock to double |
-| C-73 a legacy card pays the whole government | 1 | this engine synthesises `LEGACY_${g.id}` with `effects: g.effects`, so slotting a legacy card re-grants that government's ENTIRE inherent bonus. The install gives each government exactly one `BonusType` and an accumulating +1%/Interval against it, which is what the card is worth. Blocked on C-63's clock, which is the accrual it must read |
+| C-75 no legacy card is ever slotted | 1 | the greedy fill walks the catalog in order and legacy cards are appended LAST, so an earlier card takes every slot — zero legacy cards slotted with every civic and every government held, on both engines. Real Civ 6 lets the PLAYER choose; what replaces the greedy fill is an owner question |
+| C-73 a legacy card pays the whole government (7 of 9 channels ship) | 1 | this engine synthesises `LEGACY_${g.id}` with `effects: g.effects`, so slotting a legacy card re-grants that government's ENTIRE inherent bonus. The install gives each government exactly one `BonusType` and an accumulating +1%/Interval against it, which is what the card is worth. Blocked on C-63's clock, which is the accrual it must read |
 | C-59 a generic themed carrier | 1 | EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS and the themed yield/tourism modifiers — only a MUSEUM themes on either engine (`museumThemed` / `artMuseumThemed`, `_museum_themed` / `_art_museum_themed`) and a wonder never does, so Kristina's "buildings with at least three Great Work slots and wonders with at least two are automatically themed when full" has no carrier to theme. The shape is a slot-count rule over any building or wonder, plus the +100% yields and +100% Tourism a themed set then pays |
 | C-56 a trade route's religious pressure | 1 | EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE — a live Trade Route spreads its origin's religion to the destination and back. Pressure on both engines comes only from holy-city radiation, a unit's spread, theological combat and a disciple's kill; no route touches it, so Dharma's +100% has nothing to multiply |
 | C-57 one follower belief per city | 1 | EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS — a city pays the follower belief of its ONE followed religion (`withFollowerBelief` / `_follower_id_for`), so Dharma's "Follower Belief bonuses from EACH Religion that has at least 1 Follower" cannot stack. The carrier is a per-religion belief walk over the city's live pressure, on both engines |
@@ -89,8 +90,8 @@ from the list below.
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-74 three disaster rates are stylized, and RandomEvent_Frequencies publishes them | 1 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **58** | |
+| **C. Absent systems** | **39** | |
+| **OPEN, TOTAL** | **59** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1242,6 +1243,29 @@ under their blocker so the dependency is readable, and both halves count.
   Changing any of these moves every trajectory, so it lands on its own with a
   battery behind it — never folded into C-49's own commit.
 
+- **C-75. NO LEGACY CARD IS EVER SLOTTED.** Weight 1. Measured 2026-09-04
+  while building C-73's bar, on both engines independently.
+  `computeAdoption` / `_slotted_policies` fill a government's slots GREEDILY,
+  walking the policy catalog in order, and the legacy cards are appended LAST
+  (deliberately — the wire's card indices, which the World Congress' Policy
+  Treaty names, must keep their positions). So an earlier card takes every
+  slot a legacy card could fit. This is not a near miss: with EVERY civic
+  researched and EVERY government held, Democracy's eight slots go to
+  Veterancy, Scripture, Simultaneum, Grand Opera, Diplomatic League,
+  Containment, Rationalism and Free Markets, and adding spare wildcard slots
+  simply admits more catalog-earlier cards. Zero, at every scene tried.
+  Real Civ 6 does not fill slots greedily — the PLAYER chooses which cards to
+  slot, and a legacy card is a card you pick deliberately for the bonus you
+  spent a hundred turns accruing. So the carrier is a slotting DECISION, and
+  what should replace the greedy fill is an owner question rather than a
+  magnitude: this engine has nowhere for that decision to arrive from, and
+  inventing a preference order (legacy-first? highest-yield-first?) would be a
+  stylization with no source. Both engines agree today, so this is a shared
+  fidelity gap and not a divergence.
+  Pinned by `legacy-accrual`'s reachability lane on TS and
+  `legacy_accrual`'s on the GPU: both assert ZERO legacy cards slotted, so
+  the day that changes, C-73's payout goes live and both entries get re-read.
+
 - **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
   sourcing C-63 on 2026-09-04, and kept separate from it because the two fail
   differently. `cpu/data/policies.ts` synthesises one wildcard card per
@@ -1253,14 +1277,37 @@ under their blocker so the dependency is readable, and both halves count.
   the government's inherent package. Fascism's card, for instance, pays this
   engine +5 Combat Strength to every unit and -15% war weariness where the
   install pays +N% unit production for N = turns held / 10.
-  BLOCKED ON C-63, which builds the clock this card has to read. The nine
-  bonus types also need channels of their own — WONDER_CONSTRUCTION,
-  OVERALL_PRODUCTION, UNIT_PRODUCTION and DISTRICT_PROJECTS have production
-  multipliers to land on, GREAT_PEOPLE and COMBAT_EXPERIENCE have accrual
-  rates, and ENVOYS, FAITH_PURCHASES and GOLD_PURCHASES need a reader each.
-  Do NOT close C-63 by wiring the clock and leaving the card wrong: that
-  would be the "rows behind an early return" class again, a shipped accrual
-  nothing reads.
+  SEVEN OF NINE CHANNELS SHIP, 2026-09-04. `legacyEffects` / the GPU's
+  payout switch map each BonusType to its channel: wonderConstruction and
+  unitProduction to a synthesized `prodBoost`, overallProduction to the
+  production `yieldMult`, districtProjects to `projectProdMult`, greatPeople
+  to `gppMult`, combatExperience to `xpPct`, and envoys to a new
+  `influenceMult` that multiplies the ONE envoy accrual sum. Every mapping is
+  corroborated twice: the install's own Increment/Interval, and the
+  community's independently-reported percentages — "+1% experience every five
+  turns" for Oligarchy and "+1% wonder production every 20 turns" for
+  Autocracy match those rows exactly.
+
+  The GPU memo needed the CLOCK added to its key. `_gov_mods` compared five
+  inputs; a legacy payout is an accrual, so the answer moves on a turn when
+  none of the five do, and the bonus would have frozen at whatever it was when
+  the answer was first computed. That is the memo-key class, caught before it
+  shipped rather than after.
+
+  STILL OPEN, two channels: goldPurchases and faithPurchases are DISCOUNTS,
+  and this engine composes a purchase price at about a dozen sites
+  (`GOLD_PURCHASE_MULT` / `FAITH_PURCHASE_MULT` in `game.ts` x9, `phase.ts`,
+  and the driver's four affordability twins). A discount added at eleven of
+  them and missed at the twelfth is the two-composers class, and the driver's
+  copies are the driver-twin class on top. The channels exist on both engines
+  and are read by NEITHER, which is at least the same nowhere — no divergence,
+  a shared gap. The fix is one `purchasePrice` composer first, as a refactor
+  with no discount in it, then the discount inside it.
+
+  AND NOTE C-75: no legacy card is slotted in play on either engine, so this
+  payout is correct and currently unreachable. The correction still matters —
+  the card used to hand back the government's WHOLE inherent bonus, which is
+  what would go live the moment the slotting changes.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1. CIV6 (Kristina):
   "Buildings with at least three Great Work slots and wonders with at least two
   Great Work slots are automatically themed when they have all their slots

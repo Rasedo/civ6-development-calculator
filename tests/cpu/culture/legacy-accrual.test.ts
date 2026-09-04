@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
-import { governmentIndex, legacyBonusPct, legacyRatePct } from '../../../cpu/core/effects';
+import { computeAdoption, governmentBit, governmentIndex, legacyBonusPct, legacyEffects, legacyRatePct } from '../../../cpu/core/effects';
 import { GOVERNMENTS, GOVERNMENT_LIST } from '../../../cpu/data/policies';
 import { LEGACY_RATE_ROWS } from '../../../cpu/data/civilizations';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
+import { CIVICS } from '../../../cpu/data/civics';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
@@ -106,5 +107,69 @@ describe('the government legacy accrual', () => {
     expect(turns).toBeDefined();
     expect(turns!.length).toBe(GOVERNMENT_LIST.length);
     expect(turns!.every((t) => t === 0)).toBe(true);
+  });
+});
+
+/**
+ * C-73: a legacy card is worth the percentage its government has ACCUMULATED
+ * against the ONE BonusType it names — not that government's whole inherent
+ * bonus, which is what `POLICIES[LEGACY_*].effects` still holds.
+ */
+describe('what a legacy card pays', () => {
+  it('maps every BonusType to a channel, and zero to nothing', () => {
+    // Sourced twice over: the install's Increment/Interval, and the
+    // community's reported percentages, which match those rows exactly.
+    expect(legacyEffects(GOVERNMENTS.AUTOCRACY, 2)).toEqual({
+      prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.02 },
+    });
+    expect(legacyEffects(GOVERNMENTS.FASCISM, 3)).toEqual({
+      prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: 0.03 },
+    });
+    expect(legacyEffects(GOVERNMENTS.COMMUNISM, 5)).toEqual({ yieldMult: { production: 1.05 } });
+    expect(legacyEffects(GOVERNMENTS.DEMOCRACY, 4)).toEqual({ projectProdMult: 1.04 });
+    expect(legacyEffects(GOVERNMENTS.CLASSICAL_REPUBLIC, 6)).toEqual({ gppMult: 1.06 });
+    expect(legacyEffects(GOVERNMENTS.OLIGARCHY, 7)).toEqual({ xpPct: 7 });
+    expect(legacyEffects(GOVERNMENTS.MONARCHY, 8)).toEqual({ influenceMult: 1.08 });
+    expect(legacyEffects(GOVERNMENTS.MERCHANT_REPUBLIC, 9)).toEqual({ goldBuyDiscountPct: 9 });
+    expect(legacyEffects(GOVERNMENTS.THEOCRACY, 10)).toEqual({ faithBuyDiscountPct: 10 });
+    // an accrual of nothing must pay NOTHING — a multiplicative channel has
+    // to stay exactly 1, not arrive at 1.0 by another route
+    for (const g of GOVERNMENT_LIST) expect(legacyEffects(g, 0)).toEqual({});
+    expect(legacyEffects(GOVERNMENTS.CHIEFDOM, 50)).toEqual({});
+  });
+
+  it('is worth its BonusType and never the government package', () => {
+    // The end-to-end scene cannot be built: no civic set, and no number of
+    // spare wildcard slots, ever slots a legacy card (see the reachability
+    // lane below). So the payload is pinned at the composer instead.
+    const state = scene();
+    const seat = seatOf(state, 0)!;
+    seat.government.govTurns![governmentIndex('AUTOCRACY')] = 40;
+    expect(legacyBonusPct(state, 0, 'AUTOCRACY'), '40 turns at 1%/20').toBe(2);
+    expect(legacyEffects(GOVERNMENTS.AUTOCRACY, legacyBonusPct(state, 0, 'AUTOCRACY')))
+      .toEqual({ prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.02 } });
+    // ...and NOT Autocracy's own inherent bonus, which is what the card's
+    // `effects` field still holds and what this engine used to hand back.
+    expect(GOVERNMENTS.AUTOCRACY.effects.yieldsPerGovBuilding).toBeGreaterThan(0);
+    expect(legacyEffects(GOVERNMENTS.AUTOCRACY, 2).yieldsPerGovBuilding).toBeUndefined();
+  });
+
+  it('REACHABILITY: no legacy card is ever slotted in play today', () => {
+    // Not a feature — a gap, pinned so it cannot be forgotten (C-75). The
+    // greedy fill walks the card catalog in order and legacy cards are
+    // appended LAST, so an earlier card takes every wildcard slot. With
+    // EVERY civic researched and EVERY government held, the best government
+    // in the game still slots none of them.
+    const held = GOVERNMENT_LIST.reduce((m, g) => m | governmentBit(g.id), 0);
+    const research = {
+      tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [],
+      civics: Object.keys(CIVICS), boosted: [], techRetained: {}, civicRetained: {},
+    };
+    const a = computeAdoption(research as never, undefined, -1, false, held);
+    const slotted = a.policies.filter((p) => p !== null) as string[];
+    expect(slotted.length, 'the scene must fill some slots').toBeGreaterThan(0);
+    expect(slotted.filter((p) => p.startsWith('LEGACY_')),
+      'a legacy card became reachable — re-read C-75 and C-73 before changing this')
+      .toEqual([]);
   });
 });

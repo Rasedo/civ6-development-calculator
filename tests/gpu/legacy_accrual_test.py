@@ -179,6 +179,56 @@ def test_the_rate_is_per_game(rules, path) -> None:
     print("  6 the batch OK — only the game that seats the carrier earns faster")
 
 
+def test_the_card_pays_its_bonus_type(rules, path) -> None:
+    """C-73: a legacy card is worth its government's ACCUMULATED percentage
+    against the one BonusType it names. The nine channels are corroborated
+    twice — the install's Increment/Interval, and the community's reported
+    percentages, which match those rows exactly."""
+    sim = build(path)
+    # the wire's index space, shared with cpu/data/policies.ts GOV_BONUS_TYPES
+    assert (sim.GB_WONDER, sim.GB_COMBAT_XP, sim.GB_GREAT_PEOPLE, sim.GB_ENVOYS,
+            sim.GB_FAITH_BUY, sim.GB_GOLD_BUY, sim.GB_UNIT_PROD,
+            sim.GB_OVERALL_PROD, sim.GB_DISTRICT_PROJ) == tuple(range(9)),         "the bonus-type constants do not match the wire's order"
+    for gid, want in (("AUTOCRACY", sim.GB_WONDER), ("OLIGARCHY", sim.GB_COMBAT_XP),
+                      ("MONARCHY", sim.GB_ENVOYS), ("THEOCRACY", sim.GB_FAITH_BUY),
+                      ("MERCHANT_REPUBLIC", sim.GB_GOLD_BUY), ("FASCISM", sim.GB_UNIT_PROD),
+                      ("COMMUNISM", sim.GB_OVERALL_PROD), ("DEMOCRACY", sim.GB_DISTRICT_PROJ),
+                      ("CLASSICAL_REPUBLIC", sim.GB_GREAT_PEOPLE)):
+        g = gov_index(rules, gid)
+        assert int(sim._gov_bonus_type[g]) == want, f"{gid} maps to the wrong channel"
+    print("  7 the payout OK — nine BonusTypes, each on its own channel")
+
+
+def test_the_memo_sees_the_clock(rules, path) -> None:
+    """The payout is an ACCRUAL, so `_gov_mods` answers differently on a turn
+    when none of its other inputs move. A memo that cannot see the clock would
+    freeze the bonus at whatever it was when the answer was first computed."""
+    sim = build(path)
+    _ = sim._gov_mods(ROW)                       # populate
+    ent = sim._gov_pol_cache[ROW]
+    assert len(ent) == 8, f"the memo entry carries {len(ent)} fields, expected 8 with the clock"
+    import torch as _t
+    assert _t.equal(ent[6], sim.civ_gov_turns[:, ROW]), "the memo's 7th input is not the clock"
+    print("  8 the memo OK — the clock is part of the key")
+
+
+def test_no_legacy_card_is_reachable(rules, path) -> None:
+    """The gap C-75 records, pinned on this engine too: the greedy fill walks
+    the card catalog in order and legacy cards are appended LAST, so an
+    earlier card takes every slot. If this ever fails, a legacy card became
+    reachable and C-73's payout went live — read both entries first."""
+    sim = build(path)
+    if not sim._npol or not sim._ngov:
+        raise AssertionError("no policy or government catalog to test")
+    civics = torch.ones(sim.B, sim.civ_civics.shape[2], dtype=torch.bool)
+    held = torch.full((sim.B,), (1 << sim._ngov) - 1, dtype=torch.long)
+    slotted = sim._slotted_policies(civics, None, None, None, held)
+    leg = (slotted & (sim._pol_legacy.unsqueeze(0) >= 0)).any().item()
+    assert not leg, "a legacy card became reachable — re-read C-75 and C-73"
+    assert bool(slotted.any()), "nothing was slotted at all; the scene proves nothing"
+    print("  9 the reachability OK — zero legacy cards slotted, as C-75 records")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -188,6 +238,9 @@ def main() -> int:
     test_the_accrual_floors(rules, path)
     test_america_halves_the_interval(rules, path)
     test_the_rate_is_per_game(rules, path)
+    test_the_card_pays_its_bonus_type(rules, path)
+    test_the_memo_sees_the_clock(rules, path)
+    test_no_legacy_card_is_reachable(rules, path)
     print("BATTERY OK legacy_accrual")
     return 0
 

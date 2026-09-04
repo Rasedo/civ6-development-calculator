@@ -1639,7 +1639,7 @@ class SimEconomy:
 
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None,
                          dark: torch.Tensor | None = None, era: torch.Tensor | None = None,
-                         held: torch.Tensor | None = None):
+                         held: torch.Tensor | None = None, row: int | None = None):
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
         [B,6], slotted-mask [B,nPol], encampHarborProdMult [B],
         tilePurchaseMult [B], amenitiesAll [B], housingIfDistricts triples,
@@ -1682,6 +1682,14 @@ class SimEconomy:
             "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _o.clone(),
             "pillm": _o.clone(),
             "rgold": _z.clone(), "infl": _z.clone(),
+            # C-73: Monarchy's envoy influence, and the two purchase
+            # discounts. The discounts have no READER on either engine
+            # yet — the price is composed at a dozen sites and a
+            # discount added at eleven of them is the two-composers
+            # class — so both engines carry the channel and pay it
+            # nowhere, which is at least the SAME nowhere.
+            "inflmult": _o.clone(), "goldbuydisc": _z.clone(),
+            "faithbuydisc": _z.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
             "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
@@ -1810,6 +1818,45 @@ class SimEconomy:
                 fx["gppmult"] = fx["gppmult"] * torch.where(
                     slotted, self._pol_gppmult.unsqueeze(0).expand(B, -1),
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
+                # CIV6: a LEGACY card is worth the percentage its own
+                # government has ACCUMULATED against the ONE BonusType it
+                # names — not that government's whole inherent bonus, which
+                # is what `_pol_*` still holds for it (C-73). Nine cards at
+                # most, so a loop over the legacy ones beats a table.
+                if row is not None and self._ngov:
+                    for _p in range(self._npol):
+                        _g = int(self._pol_legacy[_p])
+                        if _g < 0:
+                            continue
+                        _bt = int(self._gov_bonus_type[_g])
+                        if _bt < 0:
+                            continue
+                        _on = slotted[:, _p]
+                        if not bool(_on.any()):
+                            continue
+                        _pc = (self._legacy_pct(row, _g) * _on.long()).to(dt)
+                        _f = _pc / 100.0
+                        if _bt in (self.GB_WONDER, self.GB_UNIT_PROD):
+                            # (mask, target, classMask, eraMax, pct) — the pct
+                            # is per GAME here, where every other row carries a
+                            # catalog scalar, so the consumer broadcasts.
+                            fx["prod"].append((
+                                _on & (_pc > 0),
+                                1 if _bt == self.GB_WONDER else 2, 0, -1, _f))
+                        elif _bt == self.GB_OVERALL_PROD:
+                            ymult[:, 1] = ymult[:, 1] * (1.0 + _f)
+                        elif _bt == self.GB_DISTRICT_PROJ:
+                            fx["projprod"] = fx["projprod"] * (1.0 + _f)
+                        elif _bt == self.GB_GREAT_PEOPLE:
+                            fx["gppmult"] = fx["gppmult"] * (1.0 + _f).to(fx["gppmult"].dtype)
+                        elif _bt == self.GB_COMBAT_XP:
+                            fx["xppct"] = fx["xppct"] + _pc
+                        elif _bt == self.GB_ENVOYS:
+                            fx["inflmult"] = fx["inflmult"] * (1.0 + _f)
+                        elif _bt == self.GB_GOLD_BUY:
+                            fx["goldbuydisc"] = fx["goldbuydisc"] + _pc
+                        elif _bt == self.GB_FAITH_BUY:
+                            fx["faithbuydisc"] = fx["faithbuydisc"] + _pc
                 fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
                 fx["envoy2"] = fx["envoy2"] | (slotted & self._pol_envoy2.unsqueeze(0)).any(dim=1)
                 fx["tourroute"] = fx["tourroute"] + (slotted.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
@@ -1890,7 +1937,7 @@ class SimEconomy:
         ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
         if ent is not None and ent[0] == ver:
-            return ent[6]
+            return ent[7]
         # `_seat_civics` hands back a VIEW of the live plane; a key that is not
         # a copy compares equal to itself forever and freezes the answer.
         civ = self._seat_civics(row).clone()
@@ -1898,14 +1945,19 @@ class SimEconomy:
         dark = self.civ_age[:, row] == 0
         era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
         held = self.civ_gov_held[:, row].clone()
+        # ...and the CLOCK. A legacy card's payout is what this seat has
+        # ACCUMULATED, so the answer moves on a turn when none of the five
+        # inputs above do. Left out, the memo would freeze the accrual at
+        # whatever it was when the answer was first computed (C-73).
+        turns = self.civ_gov_turns[:, row].clone()
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
-                and torch.equal(ent[5], held):
-            val = ent[6]
+                and torch.equal(ent[5], held) and torch.equal(ent[6], turns):
+            val = ent[7]
         else:
-            val = self._gov_policy_mods(civ, slots, dark, era, held)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, val)
+            val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, val)
         return val
 
     def _seat_slotted(self, row: int) -> torch.Tensor:

@@ -362,6 +362,11 @@ export interface Modifiers {
   navalRaiderMoves: number;
   grievanceNoDecay: boolean;
   projectProdMult: number;
+  /** C-73: the legacy channels. `influenceMult` multiplies the ONE envoy
+   *  accrual sum; the two discounts are percentages OFF a purchase price. */
+  influenceMult: number;
+  goldBuyDiscountPct: number;
+  faithBuyDiscountPct: number;
   loyaltyAll: number;
   favorPerBuilding: { building: string; favor: number }[];
   noEnvoyInfluence: boolean;
@@ -573,6 +578,9 @@ export function defaultModifiers(): Modifiers {
     navalRaiderMoves: 0,
     grievanceNoDecay: false,
     projectProdMult: 1,
+    influenceMult: 1,
+    goldBuyDiscountPct: 0,
+    faithBuyDiscountPct: 0,
     loyaltyAll: 0,
     favorPerBuilding: [],
     noEnvoyInfluence: false,
@@ -653,6 +661,11 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.navalRaiderMoves) mods.navalRaiderMoves += fx.navalRaiderMoves;
   if (fx.grievanceNoDecay) mods.grievanceNoDecay = true;
   if (fx.projectProdMult) mods.projectProdMult *= fx.projectProdMult;
+  if (fx.influenceMult) mods.influenceMult *= fx.influenceMult;
+  // the discounts ADD: two legacy cards cannot both be slotted for the same
+  // government, but a future row could stack with one.
+  if (fx.goldBuyDiscountPct) mods.goldBuyDiscountPct += fx.goldBuyDiscountPct;
+  if (fx.faithBuyDiscountPct) mods.faithBuyDiscountPct += fx.faithBuyDiscountPct;
   if (fx.loyaltyAll) mods.loyaltyAll += fx.loyaltyAll;
   if (fx.favorPerBuilding) mods.favorPerBuilding.push(fx.favorPerBuilding);
   if (fx.noEnvoyInfluence) mods.noEnvoyInfluence = true;
@@ -895,7 +908,9 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   }
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
+    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state),
+                    inDarkAge(state, seat), s.government.held,
+                    (g) => legacyBonusPct(state, seat, g));
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -1181,13 +1196,57 @@ export function legacyBonusPct(state: GameState, seat: number, govId: string): n
 
 /** The seat's `BonusRate` for one government, as a percentage ADDED to the
  *  base 100. The install writes nine separate rows for America, one per
- *  government, so this is keyed by government rather than blanket. */
+ *  government, so this is keyed by government rather than blanket.
+ *
+ *  Reads the ROWS directly rather than `getModifiers`: the accrual is spent
+ *  by a legacy card, which `applyGovernment` slots while the modifier object
+ *  is still being BUILT — asking for it there would recurse. The fog walk
+ *  reads `ALLIANCE_SHARED_VIS_ROWS` the same way and for the same reason. */
 export function legacyRatePct(state: GameState, seat: number, govId: string): number {
+  const civ = civOf(state, seat);
+  const leader = leaderOf(state, seat);
   let out = 0;
-  for (const r of getModifiers(state, seat).legacyRates) {
-    if (r.government === govId) out = Math.max(out, r.ratePct);
+  for (const r of LEGACY_RATE_ROWS) {
+    if (r.government === govId && rowIsFor(r, civ, leader)) out = Math.max(out, r.ratePct);
   }
   return out;
+}
+
+/** CIV6: what ONE government's accumulated percentage actually pays. Each
+ *  government names exactly ONE `BonusType`, so a legacy card is worth a
+ *  percentage of one thing — not the government's whole inherent package,
+ *  which is what this engine used to hand back (C-73).
+ *
+ *  The channel each name maps to is corroborated twice over: the install's
+ *  own Increment/Interval, and the community's independently-reported
+ *  percentages ("+1% experience every five turns" for Oligarchy, "+1% wonder
+ *  production every 20 turns" for Autocracy) which match those rows exactly.
+ *  A pct of 0 must return an EMPTY object — a seat three turns into a
+ *  government has earned nothing, and a multiplicative channel must stay
+ *  exactly 1 rather than becoming 1.0 by a different route. */
+export function legacyEffects(gov: GovernmentDef, pct: number): PolicyEffects {
+  if (pct <= 0 || !gov.bonus) return {};
+  const f = pct / 100;
+  switch (gov.bonus.type) {
+    case 'wonderConstruction':
+      return { prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: f } };
+    case 'unitProduction':
+      return { prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: f } };
+    case 'overallProduction':
+      return { yieldMult: { production: 1 + f } };
+    case 'districtProjects':
+      return { projectProdMult: 1 + f };
+    case 'greatPeople':
+      return { gppMult: 1 + f };
+    case 'combatExperience':
+      return { xpPct: pct };
+    case 'envoys':
+      return { influenceMult: 1 + f };
+    case 'goldPurchases':
+      return { goldBuyDiscountPct: pct };
+    case 'faithPurchases':
+      return { faithBuyDiscountPct: pct };
+  }
 }
 
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
@@ -1227,7 +1286,8 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
 }
 
 function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
-                         blocked = -1, dark = false, held = 0): void {
+                         blocked = -1, dark = false, held = 0,
+                         legacyPct: (govId: string) => number = () => 0): void {
   const { government, policies } = computeAdoption(research, extra, blocked, dark, held);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
@@ -1236,7 +1296,13 @@ function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Recor
     if (!cardId) continue;
     const card = POLICIES[cardId];
     if (!card) continue;
-    applyPolicyEffects(mods, card.effects);
+    // CIV6: a LEGACY card is worth the percentage its government has
+    // ACCUMULATED against its own BonusType — not that government's whole
+    // inherent bonus, which is what `card.effects` still holds (C-73).
+    // `legacyPct` is a closure because this body has no seat to ask.
+    applyPolicyEffects(mods, card.legacyOf !== undefined
+      ? legacyEffects(GOVERNMENTS[card.legacyOf], legacyPct(card.legacyOf))
+      : card.effects);
     // CIV6 (Thermopylae): the magnitude is "every Military Policy slotted"
     if (card.kind === 'military') mods.militaryPolicies += 1;
   }

@@ -1901,6 +1901,11 @@ class SimInit:
         self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
+        # C-73: the wire's GOV_BONUS_TYPES order (cpu/data/policies.ts),
+        # named so the payout switch reads as the mapping it is.
+        (self.GB_WONDER, self.GB_COMBAT_XP, self.GB_GREAT_PEOPLE, self.GB_ENVOYS,
+         self.GB_FAITH_BUY, self.GB_GOLD_BUY, self.GB_UNIT_PROD,
+         self.GB_OVERALL_PROD, self.GB_DISTRICT_PROJ) = range(9)
         _govs = rules.governments or []
         _pols = rules.policies or []
         self._ngov = len(_govs)

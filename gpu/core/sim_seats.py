@@ -10592,6 +10592,11 @@ class SimSeats:
                 if _o != row and bool(_e2[:, _o].any()):
                     pt = pt + (self._al_e2_influence
                                * _e2[:, _o].double() * self._suzerain_mask(_o)[:, : self.S].sum(dim=1).double())
+        # CIV6 (Monarchy legacy): "bonus influence points toward earning more
+        # Envoys" — a percentage of the WHOLE per-turn sum, so it multiplies
+        # here rather than inside any one term (C-73).
+        if self._gov_has_effects:
+            pt = pt * self._gov_mods(row)[12]["inflmult"].double()
         # CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if self._gov_has_effects:
             any_met = any_met & ~self._gov_mods(row)[12]["noenvoy"]

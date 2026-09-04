@@ -1823,12 +1823,17 @@ export function seatPhase(state: GameState): void {
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         // CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
-          actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
+          // CIV6 (Monarchy legacy): "bonus influence points toward earning
+          // more Envoys" — a percentage of the WHOLE per-turn sum, which is
+          // why it multiplies here and not inside any one term (C-73).
+          const _infl = INFLUENCE_PER_TURN + tier
             + getModifiers(state, actor.seat).influencePerTurn
             + seatBuildingSum(state, actor.seat, 'influencePerTurn')
             // CIV6 (Economic alliance 2): an Envoy point per turn "for every
             // City-State with your Ally as Suzerain".
             + ALLIANCE_E2_INFLUENCE * allianceSuzInfluence(state, actor.seat);
+          actor.influencePoints = (actor.influencePoints ?? 0)
+            + _infl * getModifiers(state, actor.seat).influenceMult;
         }
         // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
         // envoy the moment the meter fills, assigned or not. WHERE it is spent

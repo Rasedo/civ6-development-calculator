@@ -168,6 +168,11 @@ export interface PolicyEffects {
   grievanceNoDecay?: boolean;
   /** Automated Workforce: production toward city PROJECTS. */
   projectProdMult?: number;
+  /** C-73: the government legacy channels this model had no shape for —
+   *  Monarchy's envoy influence and the two purchase discounts. */
+  influenceMult?: number;
+  goldBuyDiscountPct?: number;
+  faithBuyDiscountPct?: number;
   /** Automated Workforce: loyalty per turn in every city. */
   loyaltyAll?: number;
   /** Disinformation Campaign: diplomatic favor per copy of a building. */
@@ -589,10 +594,17 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
   ].map((g) => [g.id, { ...g, bonus: GOV_BONUS[g.id] }]),
 );
 
-// CIV6: every government but the Chiefdom has a LEGACY policy card carrying
-// that government's own inherent bonus — "unlocked by" the government and
-// "cannot be slotted while in" it. Appended LAST, so the wire's card indices
-// (which the World Congress' Policy Treaty names) keep their positions.
+// CIV6: every government but the Chiefdom has a LEGACY policy card — one
+// "unlocked by" that government and "cannot be slotted while in" it.
+// Appended LAST, so the wire's card indices (which the World Congress' Policy
+// Treaty names) keep their positions.
+//
+// `effects` here is NOT what the card pays. A legacy card is worth the
+// percentage its government has ACCUMULATED against its own BonusType, which
+// only a seat can answer, so `applyGovernment` builds the real payload from
+// `legacyEffects` and never reads this field for a legacy card (C-73). It
+// stays because the wire and the UI both name a card's effects, and an empty
+// object there would read as "this card does nothing".
 for (const g of Object.values(GOVERNMENTS)) {
   if (g.tier === 0) continue; // the Chiefdom alone has no legacy bonus
   POLICIES[`LEGACY_${g.id}`] = {
