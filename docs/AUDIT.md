@@ -1296,60 +1296,53 @@ under their blocker so the dependency is readable, and both halves count.
   EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE with `CanCapture: true` — a boolean.
   The odds are DLL-side, so this waits on the sourcing pass (#211) exactly as
   C-49's damage band and C-63's legacy threshold do.
-- **A-2r. A FOUR-STEP WALK PARTS THE ENGINES.** Weight 2. OPEN, found
-  2026-09-04 while giving C-47 gate reachability, and NOT a village bug — the
-  village mechanic is green without it and this is green with villages on,
-  until something walks a unit further than the scripted driver ever does.
-  Merged slot 90, seed 9261 turn 160, seat 0, walking 159 -> 158 -> 157 -> 156
-  -> 155 with a 16-MP pool and every step costing 4:
+- **A-2r. A NAVAL UNIT IS BORN A MOVEMENT SHORT. CLOSED 2026-09-04.** Filed
+  as "a four-step walk parts the engines", which was the symptom; the cause is
+  `spawnUnit`.
 
-      AFF 159->158 mp=16 full=16 moved=True post=12
-      AFF 158->157 mp=12 full=16 moved=True post=8
-      AFF 157->156 mp=8  full=16 moved=True post=4
-      AFF 156->155 mp=4  full=16 moved=True post=0
+  TS built a fresh unit's pool by re-adding the chassis moves, the raider
+  bonus, the golden bonus and the start tile BY HAND. `unitFullMoves` — the
+  composer `refreshUnits` calls every turn — carries three more terms: the
+  Mathematics rung every HULL reads (`seaMoveBonus`), Enhanced Mobility, and
+  the emergency march. So a naval unit was born one whole Movement short and
+  only came right at the next refresh. Its FIRST turn was the divergence, and
+  the GPU (whose spawn uses its full builder) was the faithful one.
 
-  The FOURTH step is exactly affordable and the GPU takes it; TS stops at 156,
-  so the digest reads one unit at two adjacent tiles (`unit[465]` GPU-only vs
-  `unit[468]` TS-only — the unit key is `tile * 3 + kind`, so those are tiles
-  155 and 156, one unit, not two). ZONE OF CONTROL IS RULED OUT: no neighbour
-  of any tile on the chain holds a living hostile at the moment of the step,
-  and the GPU's own `post=4` shows nothing zeroed the remainder. What is NOT
-  yet separated is why TS declines — the recorded plan carrying only three
-  ranks for that unit, TS's re-validation refusing the fourth on
-  terrain/occupancy the GPU's `ok` allows, or a `movesFull` disagreement that
-  moves the "at FULL MP always gets its first step" clause partway down a
-  chain. The reproduction, including the exact driver block that reaches it,
-  is the first thing to restore when this is picked up; the applier is meant
-  to be the one validator both engines share
-  (`applier-carries-whole-validator`), and no gate lane walks far enough to
-  see this today.
+  Measured at seed 9261 turn 160: a Galley, base 3 Movement, seat holding
+  MATHEMATICS since turn 105. TS `mp=12 full=12 atSea=1 naval=true` — the
+  bonus was computed and then not spent, because `movesFull` had been stamped
+  at birth without it. The GPU had 16. Four steps of 4 versus three.
 
-- **A-3r. COMBAT XP PARTS THE ENGINES AFTER AN EXTRA UNIT.** Weight 2. OPEN,
-  found 2026-09-04 by the same widened trajectory that found A-2r, and like it
-  NOT a village bug: no C-47 code runs anywhere near the divergence.
+  The fix is one composer: `spawnUnit` calls `unitFullMoves`. This is the
+  "two composers of one fact" class, and the give-away was that the second
+  copy was a SUBSET of the first rather than a contradiction of it — every
+  term it did carry agreed, so nothing looked wrong at any single site.
 
-      seed 9300 turn 159: KEYED DIFF group unit:
-        unit[2148].xp: GPU 9 vs TS 7
+  `spawn-pool.test.ts` is the bar (3 lanes, verified to fail on the old code):
+  a hull gets the rung AT BIRTH, every chassis is born with exactly what
+  `unitFullMoves` answers, and a land unit is untouched by the naval rung.
+- **A-3r. THE VILLAGE TRAJECTORY'S NEXT LAYER.** Weight 2. OPEN, and its
+  RECORDED SYMPTOM IS SUPERSEDED — read this before hunting the old one.
 
-  The one village claimed in that whole game is at TURN 121 (tile 713,
-  GRANT_SCOUT), and the digests agree on every group through turn 158 — so the
-  grant itself is faithful on both engines and the extra Scout is identical.
-  Thirty-eight turns later a unit's XP differs by 2, with nothing else in the
-  state differing. At that turn the GPU awards combat XP through
-  `_award_pair_xp` with gains 3, 3 and 4; TS reaches a different total.
+  Filed 2026-09-04 as a combat-XP divergence (seed 9300 turn 159,
+  `unit[2148].xp: GPU 9 vs TS 7`). A-2r's fix — a naval unit born with its
+  full pool — moved that trajectory, and the XP divergence is GONE. With
+  villages on and the driver steering restored, seed 9300 now runs to turn
+  210 and parts on a different decision entirely:
 
-  So the chain is: a village grants a unit, the unit changes which battles
-  happen, and a pre-existing combat-XP disagreement surfaces. The BASELINE
-  gate never grants that unit and never reaches it.
+      seed 9300 turn 210 seat 1: JOB row 16: GPU 344 vs TS 343
 
-  Worth noting while hunting this, because it can hide a second cause: the
-  unit digest group is keyed `tile * 3 + kind`, so TWO units of the same kind
-  on one tile collide into a single key and a positional difference between
-  the engines can go unseen until it changes something else.
+  a builder job target one tile apart. Whether that is the same cause wearing
+  a new face or a fresh one is NOT established.
 
-  To reproduce, turn the seeder's villages on (`seeder/world.ts`
-  `withVillages: true`), reseed and export, then run seed 9300 to 160 turns.
+  This is the first-fire-layers shape: the widened trajectory is a stack of
+  divergences, and each fix reveals the next. Two layers are now peeled
+  (A-2r, and the XP one it dissolved). The honest reading is that villages-on
+  is a HUNTING configuration with more layers left, not a regression.
 
+  Reproduce: `withVillages: true` in seeder/world.ts plus the driver steering
+  block in docs/A2R_REPRO.md, reseed and export, then
+  `python gpu/serve_gate.py --batched --turns 250 --seeds 9300`.
 - **C-50. APPEAL IS MAP-GLOBAL.** Weight 1. `tileAppeal(map, tile, camps,
   gpAppeal)` and the GPU's appeal plane answer one number per tile for
   every seat. CIV6 keys roster clauses on a seat's own view: the Amazon

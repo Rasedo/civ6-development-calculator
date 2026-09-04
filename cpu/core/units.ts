@@ -1628,9 +1628,14 @@ export function spawnUnit(
     type: unitType,
     seat,
     tileIndex: spot.index,
-    movesLeft: MP_SCALE * (def.moves + (def.raider ? getModifiers(state, seat).navalRaiderMoves : 0)
-      + goldenMoveBonus(state, { type: unitType, seat })
-      + startTileMoves(state, { type: unitType, seat, tileIndex: spot.index })),
+    // ONE composer for the pool. This used to re-add def.moves, the raider
+    // bonus, the golden bonus and the start tile by hand, and so quietly
+    // dropped the three terms `unitFullMoves` also carries — the Mathematics
+    // rung every HULL reads, Enhanced Mobility, and the emergency march. A
+    // naval unit was therefore born a whole Movement short and only came
+    // right at the next `refreshUnits`, which does call this. Its first turn
+    // was the divergence (A-2r).
+    movesLeft: unitFullMoves(state, { type: unitType, seat, tileIndex: spot.index }),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
     // CIV6 (Flying Squadron): "All spies start as Agents with a free
