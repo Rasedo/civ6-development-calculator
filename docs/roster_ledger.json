@@ -279,6 +279,7 @@
   "TRAIT_RENAISSANCE_NAVAL_MELEE_PRODUCTION": "shipped",
   "TRAIT_RIVER_FASTER_BUILDTIME_DISTRICT": "shipped",
   "TRAIT_RIVER_FASTER_BUILDTIME_WONDER": "shipped",
+  "TRAIT_RADIO_ORANJE": "shipped",
   "TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT": "open: C-69 — the Royal Navy Dockyard is England's unique district, and a district's granted unit is NAMED by its row — no engine picks the strongest naval unit of a class",
   "TRAIT_SCIENCE_ECSTATIC": "shipped",
   "TRAIT_SCIENCE_HAPPY": "shipped",
