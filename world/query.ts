@@ -36,6 +36,34 @@ export function deriveContinents(map: GameMap): void {
   for (const t of map.tiles) t.continent = cont[t.index];
 }
 
+/**
+ * CIV6 (Mountain Tunnel): "Acts as a movement portal on a mountain range."
+ * No table names a range, so one is the connected component of MOUNTAIN tiles
+ * — the same flood fill `deriveContinents` runs over land, and static for the
+ * same reason: mountains never move, so this bakes at export and never has to
+ * be a mutable plane (C-20).
+ */
+export function deriveMountainRanges(map: GameMap): void {
+  const rng = new Int32Array(map.tiles.length).fill(-1);
+  let next = 0;
+  for (const seed of map.tiles) {
+    if (!isMountain(seed) || rng[seed.index] >= 0) continue;
+    const id = next++;
+    // ascending tile index out of the seed, so the walk is order-free
+    const stack: Tile[] = [seed];
+    rng[seed.index] = id;
+    while (stack.length) {
+      const t = stack.pop()!;
+      for (const n of neighbors(map, t)) {
+        if (!isMountain(n) || rng[n.index] >= 0) continue;
+        rng[n.index] = id;
+        stack.push(n);
+      }
+    }
+  }
+  for (const t of map.tiles) t.mountainRange = rng[t.index];
+}
+
 export function isWater(tile: Tile): boolean {
   return TERRAINS[tile.terrain].water || !!tile.submerged;
 }

@@ -280,6 +280,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // creation by `deriveContinents`, shipped so both engines read the
       // SAME ids rather than each flood-filling its own.
       cont: t.continent ?? -1,
+      // CIV6 (Mountain Tunnel): the connected MOUNTAIN component this tile
+      // belongs to, -1 off a mountain. Static, so it bakes (C-20).
+      mrange: t.mountainRange ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
       dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,
       de: t.terrain === 'DESERT' ? 1 : 0,

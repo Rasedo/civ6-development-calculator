@@ -1509,6 +1509,8 @@ class SimInit:
             self._A_HARVEST = self._act.get("HARVEST", -1)
             # CIV6 (The First Emperor): a charge into the wonder underfoot (C-55)
             self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
+            # CIV6 (Mountain Tunnel): the portal step, 2 Movement (C-20)
+            self._A_PORTAL = self._act.get("PORTAL", -1)
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
             assert _apc in (0, self._air_strike_cols), (
@@ -1537,6 +1539,7 @@ class SimInit:
                 + (1 if self._A_REMOVE_IMP >= 0 else 0) \
                 + (1 if self._A_HARVEST >= 0 else 0) \
                 + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
+                + (1 if self._A_PORTAL >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
@@ -1562,6 +1565,7 @@ class SimInit:
             self._A_REMOVE_IMP = -1
             self._A_HARVEST = -1
             self._A_WONDER_CHARGE = -1
+            self._A_PORTAL = -1
             self._A_PERFORM = -1
             self._A_BOOST = -1
             self._A_FORM_UP = -1
@@ -1594,6 +1598,7 @@ class SimInit:
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         self.SEASIDE = ids.index("SEASIDE_RESORT") if "SEASIDE_RESORT" in ids else -1
         self.FORT = ids.index("FORT") if "FORT" in ids else -1
+        self.TUNNEL = ids.index("MOUNTAIN_TUNNEL") if "MOUNTAIN_TUNNEL" in ids else -1
         # CIV6 (Pillaging): each improvement's plunder row — kind (0 none,
         # 1 heal, 2 gold, 3 faith, 4 science, 5 culture) and base amount.
         self._imp_plun_kind = torch.tensor(
@@ -1761,6 +1766,11 @@ class SimInit:
         # deliberately does not move).
         self.tile_continent = torch.tensor(
             [[int(t.get("cont", -1)) for t in f["tiles"]] for f in fixtures],
+            dtype=torch.long, device=device)
+        # CIV6 (Mountain Tunnel): the connected MOUNTAIN component per tile, -1
+        # off a mountain — "a movement portal on a mountain range" (C-20).
+        self.tile_range = torch.tensor(
+            [[int(t.get("mrange", -1)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=device)
         self.tile_ftu = torch.tensor([[int(t.get("ftu", -1)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self._feat_adj = torch.tensor(
@@ -2130,6 +2140,8 @@ class SimInit:
         self._city_centre_air_slots = 1
         self._aerodrome_air_slots = 2
         self._mp_scale = int(rules.mp_scale)
+        # CIV6 (Mountain Tunnel): the published exit price, "2 Movement" (C-20)
+        self._portal_mp = 2
         self._road_tier_mp = list(rules.road_tier_mp)
         self._road_tier_bridges = list(rules.road_tier_bridges)
         self._road_tier_era = list(rules.road_tier_era)

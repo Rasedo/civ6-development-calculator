@@ -953,111 +953,45 @@ under their blocker so the dependency is readable, and both halves count.
   **"Can clean Nuclear Fallout"** — `CLEAN_FALLOUT` / `_rk_clean`, offered
   to any chassis holding a build charge, because the charge is the whole
   gate the page states. What the silo is FOR is C-31's item. OPEN:
-  - **THE MOUNTAIN TUNNEL** — SOURCED (Expansion2_Improvements.xml):
-    `IMPROVEMENT_MOUNTAIN_TUNNEL`, PrereqTech CHEMISTRY, built by the
-    Military Engineer alone (`Improvement_ValidBuildUnits`) on any of the
-    five mountain terrains (`Improvement_ValidTerrains`:
-    GRASS/PLAINS/DESERT/TUNDRA/SNOW_MOUNTAIN), `CanBuildOutsideTerritory`,
-    `PlunderType` PLUNDER_NONE.
+  - **THE MOUNTAIN TUNNEL — SHIPPED 2026-09-04.**
+    `IMPROVEMENT_MOUNTAIN_TUNNEL`, PrereqTech TECH_CHEMISTRY, built by
+    UNIT_MILITARY_ENGINEER alone, on the five mountain terrains,
+    `CanBuildOutsideTerritory`, PlunderType PLUNDER_NONE. Every behaviour
+    below the columns comes from the description, which is its source: "Acts
+    as a movement portal on a mountain range, allowing units to move into it
+    and exit from another portal at the cost of 2 Movement. ... Can only be
+    built on an adjacent Mountain tile. Cannot be pillaged or removed."
 
-    CORRECTION 2026-09-04: this entry previously cited `BuildOnAdjacentPlot`,
-    `DisasterResistant` and `AllowImpassableMovement` as columns on the row.
-    NONE of the three is a column in `Improvements` at all — the first two
-    were invented field names for behaviour that is real but stated in the
-    DESCRIPTION text, and the third likewise. The row's full column set is
-    exactly: Buildable, CanBuildOutsideTerritory, Description, Icon,
-    ImprovementType, Name, PlunderAmount 50, PlunderType PLUNDER_NONE,
-    PrereqTech TECH_CHEMISTRY.
+    ENTERABLE, and only that. It rides `gdrJump`'s two sites per engine
+    (`tileFreeForUnit` + the pathing arm on TS, the two `_jmp` terms on the
+    GPU) rather than `isImpassable`, because FOURTEEN exported flags derive
+    from that predicate and a tunnelled mountain must not become workable,
+    campable or farmable. A lane pins that none of them moves.
 
-    The behaviour comes from the description string, which is the source for
-    it: "Acts as a movement portal on a mountain range, allowing units to move
-    into it and exit from another portal at the cost of 2 Movement. Trade
-    Routes traveling through it can multiply the Gold they get from districts
-    at their destination. Can only be built on an adjacent Mountain tile.
-    Cannot be pillaged or removed."
+    THREE MODEL CHOICES, all forced by the action space carrying six
+    DIRECTIONS and no target, and all recorded here rather than smuggled in:
+      * the BUILD target is the LOWEST-index bare adjacent mountain
+        (`tunnelTarget` / its GPU block) — the only improvement in the game
+        whose target is not the builder's own tile;
+      * the PORTAL exit is the NEXT tunnel on the same range by ascending tile
+        index, WRAPPING (`portalExit` / `_portal_exit`). Wrapping-next reaches
+        every portal on a range under repeated use where a fixed "lowest"
+        would make one tunnel a hub;
+      * a RANGE is a connected component of MOUNTAIN tiles
+        (`deriveMountainRanges`, the flood fill `deriveContinents` already
+        runs), baked at export like `continent` because mountains never move.
+    `EFFECT_MOUNTAIN_PORTAL` carries no ModifierArguments at all, so the
+    install settles none of the three.
 
-    `EFFECT_MOUNTAIN_PORTAL` carries NO ModifierArguments, so every number
-    except the published 2 Movement is DLL-side.
+    Both new verbs APPEND LAST — and a new improvement moves PILLAGE and
+    everything after it regardless, which is the #78 class; the GPU's own
+    action-width assertion caught the change, and a lane pins the ordering.
 
-    THE BUILD, SCOPED 2026-09-04 — and the first scoping of it was WRONG, so
-    read this one. It said TS should make a tunnelled mountain pass
-    `isImpassable`, and that the GPU would then have to chase the FOURTEEN
-    exported flags derived from that predicate (wpass, work, camp, st and ten
-    improvement-site flags) through C-52's `nr` machinery. That is real work
-    and it is also unnecessary, because it is the wrong model: a tunnelled
-    mountain does not become WORKABLE, campable or farmable. Only ENTERABLE.
+    STILL BLOCKED: the trade-route gold multiplier ("Trade Routes traveling
+    through it can multiply the Gold they get from districts at their
+    destination") has no published magnitude — DLL-side, #211.
 
-    The right model is already in both engines. `gdrJump` — CIV6 (Enhanced
-    Mobility): the robot "can perform a Jump action to cross over mountain
-    terrain" — is exactly "a mountain this may enter", and it is consulted at
-    TWO sites on each engine and nowhere else:
-
-      TS   units.ts `tileFreeForUnit`, and the pathing arm beside it
-      GPU  sim_masks.py's `_jmp` term, and sim_orders.py's
-
-    So the ENTERABLE half is four small terms and touches none of the fourteen
-    baked flags. Mirror `gdrJump`'s sites with a tunnel plane
-    (`improvement == MOUNTAIN_TUNNEL`), which is monotone because a tunnel is
-    never removed.
-
-    THE PORTAL HALF is where the real difficulty is, and it is a DESIGN fork
-    rather than a sourcing one. "Exit from another portal at the cost of 2
-    Movement" needs a TARGET, and both engines' move space is six DIRECTIONS —
-    there is nowhere to say WHICH portal. The options are a per-portal action
-    column (widening the action space, and appending shifts the layout that
-    silently killed PILLAGE in #78), or a deterministic pick (nearest, or
-    lowest tile index) that needs no encoding but decides play. Neither is
-    published; the install's `EFFECT_MOUNTAIN_PORTAL` carries no arguments at
-    all. Settle that fork before building, and record it.
-
-    A range, if the "same mountain range" reading is kept, is a connected
-    component of mountain tiles — the flood fill `deriveContinents` already
-    does for C-48.
-
-  THE FOUR FUTURE-ERA UPGRADES need no per-unit state after all: the page
-  says the chassis "gains additional abilities and upgrades via Future Era
-  technology research", so an upgrade is the SEAT's tech, empire-wide, and
-  `GDR_UPGRADES` / `_gdr_upgrade_tech` reads it off the research plane.
-  Drone Air Defense raises Anti-Air Defense Strength to 130 (`antiAirAt` /
-  `_anti_air_at`); the Particle Beam Siege Cannon waives the city penalty
-  and pays +30 against Cities and Encampments attacking and defending
-  (`gdrBeamCS` / `_gdr_beam_cs`); Enhanced Mobility pays +3 Moves; and
-  Reinforced Armor Plating pays +10 defending against land and naval units
-  (`gdrArmorCS` / `_gdr_armor_cs`). Advanced AI and Cybernetics joined the
-  Future tree to carry two of them.
-
-  Reach is ZERO — the chassis needs Robotics and the upgrades a Future-era
-  tech, which no seed reaches in 250 turns — so the proof is
-  `tests/gpu/robot_test.py` and `tests/cpu/units/robot.test.ts`.
-
-  OPEN: **what the Jump COSTS.** Enhanced Mobility "can perform a Jump
-  action to cross over mountain terrain"; a mountain hex is enterable to
-  the upgraded chassis here (`gdrJump`, and the same term on the GPU move
-  mask), at the tile's ordinary movement cost and with no head of its own.
-  Whether the real action spends the whole turn, costs a fixed pool, or
-  reaches further than one hex is not published anywhere this repo has.
-  ASK THE OWNER before any of it is written; no branch ships on a guess.
-- **C-34. AIR COMBAT'S SECOND HALF.** Weight 2. Bases, both heads, the
-  sortie, the carrier and the scatter ship — and the sortie now rolls
-  the promotion term on both sides (`promoCS` / `_promo_cs` with `vsAir`
-  and `vsAntiAir`), pays both sides' XP, and reads the operational range
-  through `RANGE`. The PARKED ANTI-AIR WEAPON answers too — CIV6 (Anti-Air
-  Gun, Mobile SAM): "Provides cover from air attacks up to 1 hex away from
-  the weapon", Range 1 — which `airCoverAgainst` / `_air_cover_scan` fold
-  into the same one answer the anti-air hull already fired, strongest first
-  and ties by tile then by the tile's own occupancy order. AIR PILLAGE is
-  its own head (`AIR_PILLAGE_k`, the strike head's width and column order):
-  CIV6 (Bomber) — a bomber "may attack tile improvements and districts,
-  though they need more than 50% health to do so (or the Superfortress
-  Promotion, which removes the minimum health requirement)", and the wreck
-  "is equivalent to Pillaging but does not yield any spoils", so
-  `airPillage` / `_air_pillage` wreck what the ground verb wrecks, pay
-  nothing, spend the sortie, and take the covering weapon's answer.
-  GATE REACHABILITY IS ZERO for the whole chapter — no seed trains an
-  aircraft inside 250 turns — so every clause above is proved by
-  `tests/gpu/air_test.py`, `tests/gpu/air_promo_test.py` and
-  `tests/cpu/units/air.test.ts` + `tests/cpu/units/air-promotions.test.ts`,
-  and by nothing the battery's serve lane runs. OPEN:
+    `mountain_tunnel` (7 lanes) and `mountain-tunnel.test.ts` (8) are the bar.
   - **INTERCEPTION BY A FIGHTER** has no published roll. The wiki says
     only that "every Interception does damage to the unit being
     intercepted", that a shot-down plane never lands its attack and a

@@ -2,7 +2,7 @@
 import { PROMO_COLS } from '../data/promotions';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 
-export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO', 'GEOTHERMAL_PLANT', 'FISHING_BOATS', 'SPHINX', 'ZIGGURAT', 'TERRACE_FARM'];
+export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO', 'GEOTHERMAL_PLANT', 'FISHING_BOATS', 'SPHINX', 'ZIGGURAT', 'TERRACE_FARM', 'MOUNTAIN_TUNNEL'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -126,6 +126,14 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // the tile underfoot, one charge — the era band is the row's
   // (`WONDER_CHARGE_ROWS`).
   names.push('WONDER_CHARGE');
+  // THE MOUNTAIN TUNNEL'S PORTAL: CIV6 "allowing units to move into it and
+  // exit from another portal at the cost of 2 Movement". One column, no
+  // target — the exit is the NEXT tunnel on the same mountain range by
+  // ascending tile index, wrapping, which reaches every portal under repeated
+  // use and needs no encoding the six-direction move space cannot carry. A
+  // MODEL choice, recorded in C-20. Appended last, like every verb since
+  // FOUND_CITY.
+  names.push('PORTAL');
   return names;
 }
 

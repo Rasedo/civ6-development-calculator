@@ -1998,6 +1998,31 @@ class SimMasks:
                     continue
                 self.seat_explored[sel, o] |= dsk & ok.unsqueeze(1)
 
+    def _portal_exit(self, tiles: torch.Tensor) -> torch.Tensor:
+        """[B] — where a portal step from `tiles` comes out, -1 if nowhere.
+
+        The NEXT tunnel on the same mountain range by ascending tile index,
+        wrapping to the lowest. `portalExit`'s twin: the action space carries
+        six directions and no target, so the exit has to be deterministic, and
+        wrapping-next reaches every portal on the range where a fixed "lowest"
+        would make one tunnel a hub (a MODEL choice, C-20)."""
+        out = torch.full_like(tiles, -1)
+        if self.TUNNEL < 0:
+            return out
+        tun = self.improvement == self.TUNNEL                    # [B, T]
+        if not bool(tun.any()):
+            return out
+        idx = torch.arange(self.T, device=self.device).unsqueeze(0)
+        here = tiles.clamp(min=0).unsqueeze(1)
+        rng_here = self.tile_range.gather(1, tiles.clamp(min=0).unsqueeze(1))
+        same = tun & (self.tile_range == rng_here) & (rng_here >= 0) & (idx != here)
+        BIG = self.T + 1
+        up = torch.where(same & (idx > here), idx, torch.full_like(idx, BIG)).min(dim=1).values
+        lo = torch.where(same, idx, torch.full_like(idx, BIG)).min(dim=1).values
+        pick = torch.where(up < BIG, up, lo)
+        on_tunnel = tun.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where(on_tunnel & (pick < BIG) & (tiles >= 0), pick, out)
+
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
         if not self.fog_of_war:
             return torch.ones_like(tiles, dtype=torch.bool)
@@ -2659,6 +2684,12 @@ class SimMasks:
         _jmp = ((ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves).unsqueeze(1)).unsqueeze(2)
         if bool(_jmp.any()):
             terr = terr | (_jmp & self.tile_mountain.gather(1, nbc).reshape(B, N, 6))
+        # CIV6 (Mountain Tunnel): "allowing units to move into it" — a tunnelled
+        # mountain is ENTERABLE by anything, and only that. It rides the jump's
+        # site rather than `passable` because fourteen exported flags derive
+        # from impassability and none of them should move (C-20).
+        if self.TUNNEL >= 0:
+            terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
         _blk = torch.where(
             is_civ,
@@ -2811,6 +2842,20 @@ class SimMasks:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_uniq[_k] >= 0:
                     _ok = here_ok & self._uniq_improvement_ok(row, _k).gather(1, tc)
+                elif _k == self.TUNNEL:
+                    # CIV6 (Mountain Tunnel): "Can only be built on an adjacent
+                    # Mountain tile" — the engineer stands OFF the mountain, so
+                    # the ground rule is about a NEIGHBOUR, not this tile. The
+                    # applier writes the lowest-index bare adjacent mountain
+                    # (`tunnelTarget`'s twin, C-20).
+                    _tnb = self.neigh[tc.reshape(-1)].reshape(tc.shape + (6,))
+                    _tnc = _tnb.clamp(min=0)
+                    _tflat = _tnc.reshape(B, -1)
+                    _tmt = (self.tile_mountain.gather(1, _tflat).reshape(_tnb.shape)
+                            & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
+                            & (_tnb >= 0))
+                    _ok = (present & (utype == self._eng_idx) & (u_charges > 0)
+                           & _unl & _tmt.any(dim=-1))
                 elif self._imp_eng[_k]:
                     _who = (utype == self._eng_idx) & _unl
                     if _k == self.FORT:
@@ -3143,6 +3188,16 @@ class SimMasks:
                        else torch.zeros_like(present))
                     & (u_charges > 0)
                     & self._wonder_charge_at(row).gather(1, tc)).unsqueeze(2)]
+        # CIV6 (Mountain Tunnel): "move into it and exit from another portal at
+        # the cost of 2 Movement" — offered where the unit STANDS on a tunnel,
+        # another portal shares its range, and the 2 Movement is affordable.
+        # The applier asks `_portal_exit` too, so a legal column cannot land in
+        # no arm (C-20).
+        _pt: list[torch.Tensor] = []
+        if getattr(self, "_A_PORTAL", -1) >= 0:
+            _pex = self._portal_exit(tc.reshape(-1)).reshape(tc.shape)
+            _pt = [(present & (_pex >= 0)
+                    & (self.unit_mp.gather(1, sc) >= self._portal_mp * self._mp_scale)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if getattr(self, "_A_FINISH", -1) >= 0:
             _fi = [(present
@@ -3193,7 +3248,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

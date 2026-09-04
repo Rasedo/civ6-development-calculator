@@ -65,6 +65,7 @@ class SimOrders:
         _nkc = getattr(self, "_A_NUKE", -1)
         _hvc = getattr(self, "_A_HARVEST", -1)
         _wcc = getattr(self, "_A_WONDER_CHARGE", -1)
+        _ptc = getattr(self, "_A_PORTAL", -1)
         _nkw = self._nuke_cols * self._n_devices
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
@@ -468,6 +469,25 @@ class SimOrders:
                     self._spend_build_charge(_r, sc, hc)
                     self._eff_version += 1
 
+            if _ptc >= 0 and self.TUNNEL >= 0:
+                # CIV6 (Mountain Tunnel): "move into it and exit from another
+                # portal at the cost of 2 Movement". The exit is the mask's own
+                # reader, so a legal column cannot land in no arm (C-20).
+                _ptm = act & (a == _ptc)
+                if bool(_ptm.any()):
+                    _pex = self._portal_exit(here)
+                    _pmp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
+                    _ptm = _ptm & (_pex >= 0) & (_pmp >= self._portal_mp * self._mp_scale)
+                    if bool(_ptm.any()):
+                        _r = _ptm.nonzero(as_tuple=True)[0]
+                        _dst = _pex[_r]
+                        self._occ_clear(_r, here[_r], sc[_r])
+                        self.unit_tile[_r, sc[_r]] = _dst
+                        self.unit_mp[_r, sc[_r]] -= self._portal_mp * self._mp_scale
+                        self._occ_set(_r, _dst, sc[_r])
+                        self._reveal_around(_r, row, _dst,
+                                            self._unit_sight(utp[_r], self.unit_promos[_r, sc[_r]]))
+
             if _rk_wcharge[n] and _wcc >= 0 and self._builder_idx >= 0:
                 # CIV6 (The First Emperor): a charge into the queued WONDER
                 # underfoot, worth a percentage of that wonder's WHOLE cost.
@@ -632,6 +652,10 @@ class SimOrders:
                 _jmp = (ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves)
                 if bool(_jmp.any()):
                     terr = terr | (_jmp & self.tile_mountain.gather(1, tc.unsqueeze(1)).squeeze(1))
+                # CIV6 (Mountain Tunnel): a tunnelled mountain is ENTERABLE
+                # by anything — `tunnelAt`'s twin, on the jump's own site (C-20)
+                if self.TUNNEL >= 0:
+                    terr = terr | (self.improvement.gather(1, tc.unsqueeze(1)).squeeze(1) == self.TUNNEL)
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
                 clf = self._cliff_block_dirs(
                     hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
@@ -866,6 +890,8 @@ class SimOrders:
                     _col = self._A_IMP[_k] if _k < len(self._A_IMP) else -1
                     if _col < 0:
                         continue
+                    if _k == self.TUNNEL:
+                        continue   # its target is not `hc` — its own block below
                     if _k == self.FARM:
                         _valid = self._farm_ground(row).gather(1, hc.unsqueeze(1)).squeeze(1)
                     elif _k == self.MINE:
@@ -910,6 +936,30 @@ class SimOrders:
                         _r = _ok.nonzero(as_tuple=True)[0]
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
+                        did[_r] = True
+                # CIV6 (Mountain Tunnel): "Can only be built on an adjacent
+                # Mountain tile" — the ONE improvement whose target is not the
+                # builder's own tile, so it gets its own write. The pick is the
+                # LOWEST-index adjacent bare mountain, `tunnelTarget`'s twin
+                # and a MODEL choice recorded in C-20 (the action space carries
+                # no target).
+                if self.TUNNEL >= 0 and self.TUNNEL < len(self._A_IMP) and self._A_IMP[self.TUNNEL] >= 0:
+                    _tcol = self._A_IMP[self.TUNNEL]
+                    _tnb = self.neigh[hc]                                   # [B, 6]
+                    _tnc = _tnb.clamp(min=0)
+                    _tok = ((_tnb >= 0) & self.tile_mountain.gather(1, _tnc)
+                            & (self.improvement.gather(1, _tnc) < 0))
+                    _tkey = torch.where(_tok, _tnb, torch.full_like(_tnb, 2 ** 30))
+                    _tt = _tkey.min(dim=1).values
+                    _tt = torch.where(_tt < 2 ** 30, _tt, torch.full_like(_tt, -1))
+                    _tu = int(self._imp_unlock[self.TUNNEL])
+                    _tunl = (techs[:, _tu] if _tu >= 0
+                             else torch.ones(B, dtype=torch.bool, device=dev))
+                    _twin = eng_ok & (a == _tcol) & _tunl & (_tt >= 0)
+                    if bool(_twin.any()):
+                        _r = _twin.nonzero(as_tuple=True)[0]
+                        self.improvement[_r, _tt[_r]] = self.TUNNEL
+                        self.pillaged[_r, _tt[_r]] = False
                         did[_r] = True
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
                 # improvement — the same claim a district's bomb makes
@@ -977,7 +1027,13 @@ class SimOrders:
                     & self.war[:, row].gather(
                         1, self._seat_row[_ts.clamp(min=0)].unsqueeze(1)).squeeze(1)
                 )
-                _hi = (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0) & ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+                # CIV6 (Mountain Tunnel): "Cannot be pillaged or removed" —
+                # the verb refuses it outright rather than wrecking it for
+                # nothing, `impWreckable`'s twin (C-20)
+                _himp = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1)
+                _hi = (_himp >= 0) & ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+                if self.TUNNEL >= 0:
+                    _hi = _hi & (_himp != self.TUNNEL)
                 _hd = (
                     (self.district.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0)
                     & self.district_complete.gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -1014,6 +1070,8 @@ class SimOrders:
                         _cwar = _cown & self.war[:, row][_ri, _csr]
                         _ok0 = (_cand >= 0) & ~self.water[_ri, _cc] & _cwar
                         _cimp = _ok0 & (self.improvement[_ri, _cc] >= 0) & ~self.pillaged[_ri, _cc]
+                        if self.TUNNEL >= 0:
+                            _cimp = _cimp & (self.improvement[_ri, _cc] != self.TUNNEL)
                         _cdis = (_ok0 & (self.district[_ri, _cc] >= 0)
                                  & (self.district[_ri, _cc] != self._encamp_didx)
                                  & self.district_complete[_ri, _cc]

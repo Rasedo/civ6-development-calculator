@@ -87,7 +87,8 @@ export type ImprovementId =
   | 'MISSILE_SILO'
   | 'GEOTHERMAL_PLANT'
   | 'OFFSHORE_WIND_FARM'
-  | 'TERRACE_FARM';
+  | 'TERRACE_FARM'
+  | 'MOUNTAIN_TUNNEL';
 
 export type DistrictId =
   | 'CITY_CENTER'
@@ -204,6 +205,10 @@ export interface Tile {
    *  `lowland`. A seat's HOME continent is its ORIGINAL capital's.
    */
   continent?: number;
+  /** CIV6 (Mountain Tunnel): "a movement portal on a mountain range" — the
+   *  connected component of MOUNTAIN tiles this one belongs to, -1 off a
+   *  mountain. Static, like `continent`: mountains never move (C-20). */
+  mountainRange?: number;
   /** the sea has been over this tile: it is pillaged and pays no improvement
    *  bonus, but is still workable and can be repaired behind a Flood
    *  Barrier. */

@@ -186,6 +186,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockImprovement', improvement: 'SEASIDE_RESORT' },
     ]),
     T('CHEMISTRY', 'Chemistry', 'Modern', 1370, ['SANITATION', 'REPLACEABLE_PARTS'], [
+      { kind: 'unlockImprovement', improvement: 'MOUNTAIN_TUNNEL' },
       { kind: 'unlockBuilding', building: 'RESEARCH_LAB' },
     ]),
     T('STEEL', 'Steel', 'Modern', 1250, ['RIFLING'], [

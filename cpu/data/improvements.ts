@@ -106,6 +106,10 @@ export interface ImprovementDef {
   /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager;
    *  absent = NO_PLUNDER. */
   plunder?: PlunderRow;
+  /** CIV6 (Mountain Tunnel): "Cannot be pillaged or removed" — PlunderType
+   *  PLUNDER_NONE, and the pillage verb refuses it outright rather than
+   *  wrecking it for nothing. */
+  noPillage?: boolean;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -470,6 +474,27 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
         upgradeTech: 'REPLACEABLE_PARTS', upgradePer: 1 },
     ],
     description: '+1 food, +1 housing on hills. +1 food per adjacent mountain, +2 production per adjacent Aqueduct, and its own kind beside it from Feudalism.',
+  },
+  // CIV6 (Mountain Tunnel): "Acts as a movement portal on a mountain range,
+  // allowing units to move into it and exit from another portal at the cost
+  // of 2 Movement. ... Can only be built on an adjacent Mountain tile. Cannot
+  // be pillaged or removed." Expansion2_Improvements.xml: PrereqTech
+  // TECH_CHEMISTRY, `Improvement_ValidBuildUnits` names UNIT_MILITARY_ENGINEER
+  // alone, `Improvement_ValidTerrains` the five mountain rows,
+  // `CanBuildOutsideTerritory`, PlunderType PLUNDER_NONE (C-20).
+  MOUNTAIN_TUNNEL: {
+    id: 'MOUNTAIN_TUNNEL',
+    name: 'Mountain Tunnel',
+    code: 'Tn',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    engineer: true,
+    elevations: ['MOUNTAIN'],
+    // it is the ONE improvement that stands on impassable ground, and the one
+    // a unit may enter without being able to work
+    noPillage: true,
+    description: 'Military Engineer only, on a mountain, built from an adjacent tile. A movement portal to the next tunnel on its range, at 2 Movement. Cannot be pillaged or removed.',
   },
   ZIGGURAT: {
     id: 'ZIGGURAT',

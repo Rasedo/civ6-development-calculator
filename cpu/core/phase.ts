@@ -4,7 +4,7 @@ import { advanceGreatPeople, gwExtraSlots, passGreatPerson, patronizeGreatPerson
 import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from '../data/greatPeople';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
-import { isExplored, revealAround } from './fog';
+import { isExplored, revealAround, unitSight } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
@@ -51,7 +51,7 @@ import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
-import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, validImprovementsIn, wonderExists } from './rules';
+import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, tunnelTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
@@ -94,6 +94,7 @@ const A_CLEAN_FALLOUT = unitActionIndex(IMPROVEMENT_IDS).CLEAN_FALLOUT;
 const A_REMOVE_IMP = unitActionIndex(IMPROVEMENT_IDS).REMOVE_IMPROVEMENT;
 const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
+const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
@@ -1426,7 +1427,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           t.district !== null && t.district !== 'CITY_CENTER' &&
           t.district !== 'ENCAMPMENT' &&
           !!t.districtComplete && !t.districtPillaged;
-        if (here.improvement && !here.pillaged && hereOwned) {
+        // CIV6 (Mountain Tunnel): "Cannot be pillaged or removed" — the one
+        // improvement the verb refuses outright rather than wrecking for
+        // nothing, the same shape as the Encampment's district clause (C-20).
+        const impWreckable = (t: Tile): boolean => !!t.improvement && !t.pillaged
+          && !IMPROVEMENTS[t.improvement as keyof typeof IMPROVEMENTS]?.noPillage;
+        if (impWreckable(here) && hereOwned) {
           here.pillaged = true;
           pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
           spendPillage();
@@ -1445,7 +1451,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const cand = neighbors(state.map, here)
             .filter((t) => !isWater(t) && raidable(t))
             .sort((x, y) => x.index - y.index);
-          const impT = cand.find((t) => t.improvement && !t.pillaged);
+          const impT = cand.find(impWreckable);
           if (impT) {
             impT.pillaged = true;
             pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, impT.improvement ?? undefined, tileSeat(impT));
@@ -1479,6 +1485,22 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocks(state, actor.seat);
+          // CIV6 (Mountain Tunnel): the ONE improvement whose target is not
+          // the builder's own tile — "Can only be built on an adjacent
+          // Mountain tile". The engineer stands off the mountain, so the
+          // legality and the write both move to `tunnelTarget` (C-20).
+          if (imp === 'MOUNTAIN_TUNNEL') {
+            const tt = tunnelTarget(state.map, here);
+            const unl = computeUnlocks(state, actor.seat);
+            if (tt >= 0 && unl.improvements.has('MOUNTAIN_TUNNEL')
+                && unit.type === 'MILITARY_ENGINEER' && (unit.charges ?? 0) > 0) {
+              state.map.tiles[tt].improvement = 'MOUNTAIN_TUNNEL';
+              unit.charges = (unit.charges ?? 0) - 1;
+              unit.movesLeft = 0;
+              if (unit.charges <= 0 && unitDomain(unit.type) === 'civilian') disbandUnit(state, unit.id);
+            }
+            return;
+          }
           if (!here.improvement
               && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics }).includes(imp)) {
             here.improvement = imp;
@@ -1524,6 +1546,17 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       } else if (a === A_WONDER_CHARGE) {
         // CIV6 (The First Emperor): a charge into the wonder underfoot
         wonderChargeBoost(state, unit, actor);
+      } else if (a === A_PORTAL) {
+        // CIV6 (Mountain Tunnel): "move into it and exit from another portal
+        // at the cost of 2 Movement". The exit is the NEXT tunnel on the same
+        // range by ascending tile index, wrapping (C-20).
+        const exit = portalExit(state.map, here);
+        if (exit >= 0 && unit.movesLeft >= PORTAL_MP * MP_SCALE
+            && tileFreeForUnit(state, exit, unit.seat, unit)) {
+          unit.tileIndex = exit;
+          unit.movesLeft -= PORTAL_MP * MP_SCALE;
+          revealAround(state, unit.seat, exit, unitSight(unit));
+        }
       }
     });
   }

@@ -664,7 +664,7 @@ export function tileFreeForUnit(
   allowEmbark = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
-  if (isImpassable(tile) && !gdrJump(state, unit, tile)) return false;
+  if (isImpassable(tile) && !gdrJump(state, unit, tile) && !tunnelAt(tile)) return false;
   // An AIRCRAFT is BASED, not stationed: several of them share one plot, none
   // of them holds it, and what gates the landing is the base's slot count
   // (`airBaseFree`), never the tile. CIV6 (Espionage): a Spy likewise
@@ -710,7 +710,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     !borderClosedTo(state, unit.seat, t, unit.type) &&
     (naval
       ? hullTile(t) && !isImpassable(t) && (canalPassage(t) || waterEnterable(state, t, unit))
-      : unitPassable(t, unit) || gdrJump(state, unit, t));
+      : unitPassable(t, unit) || gdrJump(state, unit, t) || tunnelAt(t));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
@@ -898,6 +898,17 @@ export function gdrHas(state: GameState, unit: { type: string; seat: number }, i
  *  mirrors; a gate that knows the seat's research composes this beside it. */
 export function gdrJump(state: GameState, unit: { type: string; seat: number } | undefined, tile: Tile): boolean {
   return !!unit && isMountain(tile) && gdrHas(state, unit, 'ENHANCED_MOBILITY');
+}
+
+/**
+ * CIV6 (Mountain Tunnel): "allowing units to move into it". A tunnelled
+ * mountain is ENTERABLE by anything — and only that. It does not become
+ * workable, campable or farmable, which is why this rides `gdrJump`'s two
+ * movement sites rather than `isImpassable` itself: fourteen exported flags
+ * derive from that predicate and none of them should move (C-20).
+ */
+export function tunnelAt(tile: Tile): boolean {
+  return tile.improvement === 'MOUNTAIN_TUNNEL';
 }
 
 /** the Movement a chassis draws from the tile under it at the turn's start:

@@ -94,6 +94,55 @@ export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): bool
 }
 
 /**
+ * CIV6 (Mountain Tunnel): "Can only be built on an adjacent Mountain tile."
+ *
+ * The engineer stands OFF the mountain and builds onto it — the only
+ * improvement in the game with a target that is not the builder's own tile.
+ * The action space carries no target, so the pick is deterministic: the
+ * LOWEST-index adjacent mountain that is bare. A MODEL choice, recorded in
+ * C-20, and the same shape as every other tie this engine breaks by index.
+ *
+ * Answers -1 when there is nothing to tunnel.
+ */
+/** CIV6 (Mountain Tunnel): the published exit price, "2 Movement". */
+export const PORTAL_MP = 2;
+
+/**
+ * Where a portal step from `tile` comes out: the NEXT tunnel on the same
+ * mountain range by ascending tile index, wrapping back to the lowest.
+ *
+ * The action space carries six DIRECTIONS and no target, so "another portal"
+ * has to be deterministic. Wrapping-next reaches every portal on the range
+ * under repeated use, where a fixed "lowest" would make one tunnel a hub. A
+ * MODEL choice, recorded in C-20; the install's EFFECT_MOUNTAIN_PORTAL
+ * carries no arguments at all.
+ *
+ * -1 when this tile is not a tunnel, or is the only one on its range.
+ */
+export function portalExit(map: GameMap, tile: Tile): number {
+  if (tile.improvement !== 'MOUNTAIN_TUNNEL') return -1;
+  const range = tile.mountainRange ?? -1;
+  if (range < 0) return -1;
+  let first = -1;
+  for (const t of map.tiles) {
+    if (t.index === tile.index) continue;
+    if (t.improvement !== 'MOUNTAIN_TUNNEL' || (t.mountainRange ?? -1) !== range) continue;
+    if (t.index > tile.index) return t.index;      // the next one up
+    if (first < 0) first = t.index;                 // ...else wrap to the lowest
+  }
+  return first;
+}
+
+export function tunnelTarget(map: GameMap, tile: Tile): number {
+  let best = -1;
+  for (const n of neighbors(map, tile)) {
+    if (!isMountain(n) || n.improvement) continue;
+    if (best < 0 || n.index < best) best = n.index;
+  }
+  return best;
+}
+
+/**
  * CIV6 (Military Engineer): "Can construct Roads ... (uses 1 charge)". A road
  * already laid — by a trade route or by another engineer — is nothing to lay
  * again.
