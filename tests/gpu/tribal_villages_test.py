@@ -199,6 +199,45 @@ def test_epic_quests_outpost_pays_the_same_table(rules, path) -> None:
     print("  7 Epic Quest OK — one carrier, and the outpost pays the village table")
 
 
+def test_the_real_move_path_at_three_games(rules, path) -> None:
+    """Drive `_step_verb` itself, at B=3, with only SOME games moving.
+
+    The claim is handed the mover's pool slot, and `_step_verb` keeps two
+    spellings of it: `gslot` per GAME and `gs = gslot[rows]` per position in
+    the moved subset. Indexing the second by a game id is out of bounds the
+    moment a game does not move — and identical to the first at B=1, so every
+    single-seed run passes it. This lane is the shape guard: three games, one
+    of them not moving.
+    """
+    wide = settle_all(BatchSim([load_fixture(path) for _ in range(3)],
+                               load_rules(), device="cpu", dtype=torch.float64))
+    assert wide.B == 3
+    gs = int((wide.unit_seat[B0] == ROW).nonzero().flatten()[0])
+    here = int(wide.unit_tile[B0, gs])
+    d = dest = None
+    for i, t in enumerate(wide.neigh[here].tolist()):
+        t = int(t)
+        if t >= 0 and bool(wide.passable[B0, t]) and not bool(wide.water[B0, t])                 and int((wide.unit_tile[B0] == t).sum()) == 0:
+            d, dest = i, t
+            break
+    assert dest is not None, "no free land neighbour to step onto"
+    for b in range(wide.B):
+        wide.tile_goody[b, dest] = True
+    # game 1 does NOT move: that is what makes `rows` a strict subset
+    ok = torch.tensor([True, False, True])
+    moved = wide._step_verb(ok, torch.full((wide.B,), gs, dtype=torch.long),
+                            torch.full((wide.B,), here, dtype=torch.long),
+                            torch.full((wide.B,), dest, dtype=torch.long),
+                            torch.full((wide.B,), d, dtype=torch.long),
+                            ROW, torch.ones(wide.B, dtype=torch.bool))
+    assert bool(moved[0]) and bool(moved[2]), "the moving games did not step"
+    assert not bool(moved[1]), "the held-back game stepped anyway"
+    assert not bool(wide.tile_goody[0, dest]), "game 0 did not claim its village"
+    assert not bool(wide.tile_goody[2, dest]), "game 2 did not claim its village"
+    assert bool(wide.tile_goody[1, dest]), "a game that never moved lost its village"
+    print("  8 the move path OK — B=3 with a subset moving, slots stay per GAME")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -209,6 +248,7 @@ def main() -> int:
     test_the_draw_moves_one_games_stream(rules, path)
     test_the_hut_is_its_own_live_plane(rules, path)
     test_epic_quests_outpost_pays_the_same_table(rules, path)
+    test_the_real_move_path_at_three_games(rules, path)
     print("BATTERY OK tribal_villages")
     return 0
 

@@ -130,22 +130,31 @@ def main() -> None:
     w_lo5 = NB5 + 2 + sim5.NU + nS5  # prodLayout.wonderLo
     # force a legal (wi, tile) pair deterministically: find a wonder whose wok
     # bit is set on some r0-owned base_ok tile, then grant its unlock tech.
-    base5 = sim5._wonder_base_ok(r5 + 1, j5)[0]  # absolute row: civ r is row r+1
+    # Every row we could unlock with ONE granted tech. Pre-filtering on
+    # `wok & base_ok` looked like the mask's own test and is not — the column
+    # gates on `_wonder_cand`, which is stricter — so the old search could
+    # offer a single candidate the mask then refused. Let the MASK decide.
+    cands5 = [_wi for _wi in range(sim5._wond_n)
+              if int(sim5._wond_rows[_wi].get("ut", -1)) >= 0
+              and int(sim5._wond_rows[_wi].get("uc", -1)) < 0]
+    assert cands5, "fixture has no tech-gated, civic-free wonder row"
+    # A set `wok` bit on a base_ok tile plus the unlock tech are NECESSARY, not
+    # sufficient — the production mask has the rest of the rules. So take the
+    # first candidate whose column really opens rather than the first that
+    # looks like it should; picking the first held only until the worlds
+    # changed under it.
     wi5 = None
-    for _wi in range(sim5._wond_n):
-        _wrow = sim5._wond_rows[_wi]
-        if int(_wrow.get("ut", -1)) < 0 or int(_wrow.get("uc", -1)) >= 0:
-            continue  # want a tech-gated, civic-free row we can grant
-        if int(_wrow.get("adjD", -1)) != -1 or int(_wrow.get("adjR", -1)) >= 0:
-            continue  # no adjacency arm to satisfy
-        if bool((base5 & ((sim5.wok[0] >> _wi) & 1).bool()).any()):
-            wi5 = _wi
-            sim5.civ_techs[0, r5 + 1, int(_wrow["ut"])] = True
+    for _wi in cands5:
+        _s = fresh(rules, path)
+        _s.seat_ext[0, r5 + 1] = True
+        _s.civ_techs[0, r5 + 1, int(_s._wond_rows[_wi]["ut"])] = True
+        _s.city_current[0, r5 + 1, j5, 0] = -1  # idle-gated like every base column
+        _m = _s.seat_masks(r5 + 1)["production"]
+        if bool(_m[0, j5, w_lo5 + _wi]):
+            sim5, wi5 = _s, _wi
             break
-    assert wi5 is not None, "fixture has no forceable wonder candidate near r0c0"
-    sim5.city_current[0, r5 + 1, j5, 0] = -1  # these columns are idle-gated like every base column
-    m5 = sim5.seat_masks(r5 + 1)["production"]
-    assert bool(m5[0, j5, w_lo5 + wi5]), "the granted wonder column must read legal"
+    assert wi5 is not None, (
+        f"none of the {len(cands5)} wonder candidates read legal once granted")
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
     prod5[0, j5] = w_lo5 + wi5
     sim5.apply_seat_actions(r5 + 1, production=prod5)

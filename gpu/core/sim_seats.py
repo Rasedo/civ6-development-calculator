@@ -8963,7 +8963,11 @@ class SimSeats:
         self._occ_set(rows, dest[rows], gs)
         # TS claims the village between the Pilgrim's charge and the camp
         # clear, and the rng order is the whole point of matching it (C-47)
-        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), gs)
+        # `gslot`, NOT `gs`: `gs = gslot[rows]` is indexed by position within
+        # the moved-games subset, while the claim indexes by GAME. At B=1 the
+        # two coincide, so every single-seed run passed and the battery's
+        # B=3 shard raised IndexError on the first three-game move.
+        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), gslot)
         if clear_camp:
             self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         spent = (mp - cost).clamp(min=0)

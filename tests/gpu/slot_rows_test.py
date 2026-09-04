@@ -142,12 +142,21 @@ def test_eleanor(rules, path) -> None:
             # the fixture's own cities sit past the row's range, and a skipped
             # scene proves nothing — found row 1 a SECOND city inside it
             want = 4 if near else 12
-            spot = next(t for t in range(s2.T)
-                        if bool(s2.settle_ok[B0, t]) and int(s2.tile_seat[B0, t]) < 0
-                        and int(s2.pair_dist[here_t, t]) == want)
-            s2._found_city_at(1, torch.ones(s2.B, dtype=torch.bool),
-                              torch.full((s2.B,), spot, dtype=torch.long))
-            assert bool(s2.city_alive[B0, 1, 1]), "the near city never founded"
+            # `settle_ok` answers the TERRAIN; `_found_city_at` has the rest of
+            # the rules, so a tile at the right distance can still refuse. Take
+            # the first candidate that ACTUALLY lands rather than the first
+            # that merely looks legal — picking positionally held only until
+            # the worlds changed under it.
+            cands = [t for t in range(s2.T)
+                     if bool(s2.settle_ok[B0, t]) and int(s2.tile_seat[B0, t]) < 0
+                     and int(s2.pair_dist[here_t, t]) == want]
+            assert cands, f"no settleable tile at distance {want}"
+            for spot in cands:
+                s2._found_city_at(1, torch.ones(s2.B, dtype=torch.bool),
+                                  torch.full((s2.B,), spot, dtype=torch.long))
+                if bool(s2.city_alive[B0, 1, 1]):
+                    break
+            assert bool(s2.city_alive[B0, 1, 1]),                 f"none of the {len(cands)} candidates at distance {want} founded"
             s2.city_gw_writing[B0, 1, 1] = works
         else:
             s2.city_gw_writing[B0, 1, 0] = works
