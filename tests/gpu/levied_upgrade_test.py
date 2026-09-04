@@ -35,11 +35,12 @@ def test_the_wire(rules, path) -> None:
     sim = build(path)
     rows = sim._levy_rows
     assert len(rows) == 1, f"one carrier expected, wire has {len(rows)}"
-    _c, leader, pct, envoys = rows[0]
+    _c, leader, pct, envoys, moves, combat = rows[0]
     assert leader >= 0, "the carrier names no leader"
     assert pct == 75, f"the install writes 75, wire has {pct}"
     assert envoys == 2, f"the levy hands back 2 envoys, wire has {envoys}"
-    print("  1 the wire OK — one row, 75% off, 2 envoys")
+    assert moves == 2 and combat == 5, f"the ability writes 2 and 5, wire has {moves}/{combat}"
+    print("  1 the wire OK — 75% off, 2 envoys, +2 Movement, +5 Combat")
 
 
 def test_the_mark_is_its_own_plane(rules, path) -> None:
@@ -73,6 +74,58 @@ def test_it_is_in_the_digest(rules, path) -> None:
     print("  4 the digest OK — the mark is compared turn by turn")
 
 
+def test_the_ability_pays_movement_and_combat(rules, path) -> None:
+    """CIV6 (The Raven King): a LEVIED unit carries +2 Movement and +5 Combat.
+    Both ride the ONE composer on each side — the pool builder and
+    `_roster_cs` — so a levied unit is born with the Movement rather than
+    gaining it at the next refresh (A-2r's lesson)."""
+    sim = build(path)
+    _c, li, _pct, _env, moves, combat = sim._levy_rows[0]
+    assert moves == 2 and combat == 5, f"the install writes 2 and 5, wire has {moves}/{combat}"
+    # seat the carrier, or the row pays nobody
+    sim.row_civ[B0, ROW] = sim._pair_civ[li]
+    sim.row_leader[B0, ROW] = li
+    sim._eff_version += 1
+    sim._gen_ver += 1
+
+    gs = int((sim.unit_seat[B0] == ROW).nonzero().flatten()[0])
+    seat_t = sim.unit_seat[:, gs]
+    typ_t = sim.unit_type[:, gs]
+    tile_t = sim.unit_tile[:, gs]
+    foe = torch.full((sim.B,), 1, dtype=torch.long)
+    bare = int(sim._roster_cs(seat_t, typ_t, tile_t, foe, None, False)[B0])
+    lev = torch.ones(sim.B, dtype=torch.bool)
+    got = int(sim._roster_cs(seat_t, typ_t, tile_t, foe, None, False, None, lev)[B0])
+    assert got == bare + combat, f"a levied unit got {got - bare} Combat, expected {combat}"
+
+    # ...and the MOVEMENT rides the pool builder
+    before = int(sim._full_mp("major")[B0, gs])
+    sim.major_unit_levied[B0, gs] = True
+    after = int(sim._full_mp("major")[B0, gs])
+    assert after - before == moves * sim._mp_scale,         f"a levied unit got {after - before} MP, expected {moves * sim._mp_scale}"
+    print(f"  5 the ability OK — +{moves} Movement at birth and +{combat} Combat")
+
+
+def test_a_seat_without_the_row_gets_neither(rules, path) -> None:
+    sim = build(path)
+    _c, li, _pct, _env, moves, combat = sim._levy_rows[0]
+    sim.row_civ[B0, ROW] = -1
+    sim.row_leader[B0, ROW] = -1
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    gs = int((sim.unit_seat[B0] == ROW).nonzero().flatten()[0])
+    before = int(sim._full_mp("major")[B0, gs])
+    sim.major_unit_levied[B0, gs] = True
+    assert int(sim._full_mp("major")[B0, gs]) == before, "a plain seat got the levy Movement"
+    seat_t, typ_t, tile_t = sim.unit_seat[:, gs], sim.unit_type[:, gs], sim.unit_tile[:, gs]
+    foe = torch.full((sim.B,), 1, dtype=torch.long)
+    lev = torch.ones(sim.B, dtype=torch.bool)
+    a = int(sim._roster_cs(seat_t, typ_t, tile_t, foe, None, False, None, lev)[B0])
+    b = int(sim._roster_cs(seat_t, typ_t, tile_t, foe, None, False)[B0])
+    assert a == b, "a plain seat got the levy Combat"
+    print("  6 the gate OK — a seat the roster does not name gets neither")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -80,6 +133,8 @@ def main() -> int:
     test_the_mark_is_its_own_plane(rules, path)
     test_the_mark_survives_and_is_permanent(rules, path)
     test_it_is_in_the_digest(rules, path)
+    test_the_ability_pays_movement_and_combat(rules, path)
+    test_a_seat_without_the_row_gets_neither(rules, path)
     print("BATTERY OK levied_upgrade")
     return 0
 

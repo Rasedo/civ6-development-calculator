@@ -1503,7 +1503,9 @@ export function buildRules() {
       startBoosts: START_BOOST_ROWS.map((r) => [rowCiv(r), rowLeader(r), techIdx.get(r.tech) ?? -1]),
       // [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
       postCombatLoyalty: POST_COMBAT_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount, r.goldenExtra]),
-      levy: LEVY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.upgradeDiscountPct, r.envoys]),
+      // [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat]
+      levy: LEVY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.upgradeDiscountPct,
+                                  r.envoys, r.levyMoves, r.levyCombat]),
       domesticRouteLoyalty: DOMESTIC_ROUTE_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
       incomingRouteYields: INCOMING_ROUTE_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount]),
       // [civ, leaderRow, startEra, endEra, pct] — an ERA BAND on a wonder

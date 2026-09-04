@@ -3076,8 +3076,8 @@ class SimInit:
         # [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
         self._post_combat_loyalty_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postCombatLoyalty"]]  # type: ignore[misc]
-        # [civ, leaderRow, upgradeDiscountPct, envoys]
-        self._levy_rows: list[tuple[int, int, int, int]] = [
+        # [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat] (C-66)
+        self._levy_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["levy"]]  # type: ignore[misc]
         self._domestic_route_loyalty_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["domesticRouteLoyalty"]]  # type: ignore[misc]

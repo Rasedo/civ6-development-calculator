@@ -371,6 +371,11 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     const lv = spawnUnit(state, type, cityState.centerIndex, seat);
     if (lv) {
       lv.levied = true;
+      // ...and RE-POOL: `spawnUnit` priced the pool before the mark existed,
+      // so without this a levied unit is born 2 Movement short and only comes
+      // right at the next refresh — A-2r exactly (C-66).
+      lv.movesLeft = unitFullMoves(state, lv);
+      lv.movesFull = lv.movesLeft;
     }
   }
   cityState.lastLevyTurn = state.turn;

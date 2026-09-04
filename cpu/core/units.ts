@@ -941,8 +941,13 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   }
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
+  // CIV6 (The Raven King): ABILITY_THE_RAVEN_KING gives a LEVIED unit
+  // EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 (C-66). It joins the one composer, so
+  // a levied unit is born with it — A-2r's lesson.
+  const levy = unit.levied
+    ? getModifiers(state, unit.seat).levy.reduce((n, r) => Math.max(n, r.levyMoves), 0) : 0;
   return MP_SCALE * (
-    (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + goldenMoveBonus(state, unit)
+    (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + levy + goldenMoveBonus(state, unit)
     + startTileMoves(state, unit)
     // CIV6 (Enhanced Mobility): "+3 Moves."
     + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)

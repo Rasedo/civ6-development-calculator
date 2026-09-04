@@ -3225,6 +3225,20 @@ class SimEconomy:
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre) \
             + self._start_tile_mp(pre, typ)
+        # CIV6 (The Raven King): a LEVIED unit carries
+        # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so a
+        # levied unit is born with it — A-2r's lesson (C-66).
+        if self._levy_rows:
+            _lv = getattr(self, f"{pre}_unit_levied")
+            if bool(_lv.any()):
+                _ls = getattr(self, f"{pre}_unit_seat")
+                _add = torch.zeros_like(base)
+                for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
+                    if _lm <= 0:
+                        continue
+                    _add = torch.where(_lv & self._seat_is(_ls, _lc, _ll),
+                                       torch.full_like(_add, _lm), _add)
+                base = base + _add
         # CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2
         # Movement."
         if self._gov_has_effects:

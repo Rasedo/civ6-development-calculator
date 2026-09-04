@@ -871,12 +871,18 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
   if (!isCiv(own.seat)) return 0;
   const mods = getModifiers(state, own.seat);
   const rows = mods.combatCs;
-  if (rows.length === 0 && mods.formations.length === 0) return 0;
+  // CIV6 (The Raven King): a LEVIED unit carries
+  // EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Flat and clause-free —
+  // the mark is the whole condition — so it is added here rather than as a
+  // `combatCs` row with a `when` (C-66).
+  const levyCs = own.levied
+    ? mods.levy.reduce((n, r) => Math.max(n, r.levyCombat), 0) : 0;
+  if (rows.length === 0 && mods.formations.length === 0) return levyCs;
   const def = UNITS[own.type];
   if (!def || !(def.combat ?? 0)) return 0;
   const bit = classBitOf(own.type);
   const tile = state.map.tiles[own.tileIndex];
-  let cs = 0;
+  let cs = levyCs;
   for (const r of rows) {
     if (r.classMask !== 0 && (bit & r.classMask) === 0) continue;
     const hit = r.when === 'always' ? true

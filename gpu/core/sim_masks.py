@@ -1019,15 +1019,27 @@ class SimMasks:
 
     def _roster_cs(self, seat: torch.Tensor, utype: torch.Tensor, tile: torch.Tensor,
                    foe_seat: torch.Tensor, foe_hp: torch.Tensor | None, foe_city: bool,
-                   formation: torch.Tensor | None = None) -> torch.Tensor:
+                   formation: torch.Tensor | None = None,
+                   levied: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `rosterCS`: the flat Combat Strength a unit's
         civilization or leader adds under its row's clause (`COMBAT_CS_ROWS`):
         against a city-state's unit, a wounded one, a city or district, for a
         class, on a coastal tile (a hull on Coast, a land unit on coastal
         land, never embarked)."""
         z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
+        # CIV6 (The Raven King): ABILITY_THE_RAVEN_KING gives a LEVIED unit
+        # EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Flat and clause-free
+        # — the mark is the whole condition — so it rides here rather than as a
+        # `combatCs` row with a `when`. `_seat_is` gives the row test in the
+        # caller's own shape, which is why every site can pass its unit's mark
+        # the same way it already passes that unit's formation (C-66).
+        lv = z
+        if levied is not None and self._levy_rows:
+            for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
+                if _lcs > 0:
+                    lv = lv + (levied & self._seat_is(seat, _lc, _ll)).long() * _lcs
         if not self._combat_cs_rows and not self._formation_rows:
-            return z
+            return lv
         t = utype.clamp(min=0, max=self.NU - 1)
         combat = (utype >= 0) & (self._type_combat[t] > 0)
         bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class[t].clamp(min=0)]
@@ -1037,7 +1049,7 @@ class SimMasks:
                                (self.water.gather(1, tc) & ~self.ocean_tile.gather(1, tc)).reshape(seat.shape),
                                self.coastal_land.gather(1, tc).reshape(seat.shape))
         cap = int(self.rules.combat.get("unitHp", 100))
-        out = z
+        out = lv
         for civ, lead, amt, mask, when, per in self._combat_cs_rows:
             who = self._seat_is(seat, civ, lead) & combat
             if mask:
@@ -1997,6 +2009,18 @@ class SimMasks:
                 if not bool(ok.any()):
                     continue
                 self.seat_explored[sel, o] |= dsk & ok.unsqueeze(1)
+
+    def _repool_unit(self, rows: torch.Tensor, slots: torch.Tensor) -> None:
+        """Recompute one unit's MOVEMENT pool after a mark that changes it.
+
+        `_spawn_unit` prices the pool at birth, so a flag written AFTER the
+        spawn leaves the unit short until the next refresh — the shape of A-2r.
+        The levy is the one caller (C-66)."""
+        if rows.numel() == 0:
+            return
+        full = self._full_mp("major")
+        self.major_unit_mp[rows, slots] = full[rows, slots]
+        self.major_unit_mp_full[rows, slots] = full[rows, slots]
 
     def _portal_exit(self, tiles: torch.Tensor) -> torch.Tensor:
         """[B] — where a portal step from `tiles` comes out, -1 if nowhere.
@@ -3540,7 +3564,7 @@ class SimMasks:
         # it until now (C-66).
         if self._levy_rows:
             _lpct = 0
-            for _lc, _ll, _ld, _le in self._levy_rows:
+            for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
                 if bool(self._row_is(row, _lc, _ll).any()):
                     _lpct = max(_lpct, _ld)
             if _lpct > 0:

@@ -359,7 +359,7 @@ def main() -> int:
                 ("feature_appeal", [py, "tests/gpu/feature_appeal_test.py"], 5),  # C-50 the Amazon reads a rainforest her own way
                 ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # C-70 an alliance shares what it sees
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # C-20 the portal on a mountain range
-                ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 4),  # C-66 the levy mark and its 75% discount
+                ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # C-66 the levy mark and its 75% discount
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip

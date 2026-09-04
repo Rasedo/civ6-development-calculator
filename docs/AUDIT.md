@@ -1514,36 +1514,38 @@ under their blocker so the dependency is readable, and both halves count.
   written where a work is created and read by the four rows. It is the same
   shape as C-59's theming and should be decided with it.
 
-- **C-66. THE LEVIED MARK EXISTS; ONE OF ITS TWO MODIFIERS IS PAID.**
-  Weight 1. The MARK shipped 2026-09-04 and the item stays OPEN for the
-  ability half. A
-  city-state's levied units were ordinary units re-seated under the suzerain,
-  with nothing recording that they had been LEVIED, so nothing could pay a
-  clause naming them. The mark exists now — `Unit.levied` / `unit_levied`, set
-  at the levy, and PERMANENT because nothing in this engine returns a levied
-  unit, which is what makes an upgrade discount meaningful at all. It is in
-  the statecompare digest, so the gate polices it turn by turn.
+- **C-66. NO UNIT CARRIES A LEVIED MARK. CLOSED 2026-09-04.** A city-state's
+  levied units were ordinary units re-seated under the suzerain, with nothing
+  recording that they had been LEVIED, so nothing could pay a clause naming
+  them. The mark exists now — `Unit.levied` / `unit_levied`, set at the levy,
+  PERMANENT because nothing here returns a levied unit, and in the
+  statecompare digest so the gate polices it turn by turn.
 
-  SHIPPED: `LEVY_UNITUPGRADEDISCOUNT` —
-  EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT, Amount 75, on
-  Matthias Corvinus. The row had shipped since batch 11 and NOTHING READ IT:
-  the wire carried it, a test pinned its 75, and no site consumed it. The gap
-  was the MARK, not the magnitude — the same shape as C-57 and C-47.
+  BOTH modifiers are paid:
+  * `LEVY_UNITUPGRADEDISCOUNT` — 75% off upgrading a levied unit. The row had
+    shipped since batch 11 and NOTHING READ IT: the wire carried it, a test
+    pinned its 75, no site consumed it. The gap was the MARK, not the
+    magnitude — the third time this session (C-57, C-47, this).
+  * `LEVY_UNITS_GRANT_ABILITY` — ABILITY_THE_RAVEN_KING, whose two modifiers
+    are EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 and
+    EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5.
 
-  STILL OPEN, and deliberately not half-shipped: `LEVY_UNITS_GRANT_ABILITY`
-  grants levied units ABILITY_THE_RAVEN_KING, whose two modifiers are
-  EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 and
-  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Both magnitudes are
-  sourced; the COST is the shape. The movement half is one term in each
-  engine's pool composer, but the COMBAT half has to reach `rosterCS` /
-  `_roster_cs`, and the GPU has FOURTEEN call sites across five combat paths
-  (advance, ranged, city assault, and two more), each needing the right unit's
-  mark — attacker or defender — with a different slot expression. Threading
-  that is the measure-every-path hazard, and a site missed pays nothing
-  silently. These are TWO separate modifiers with two separate ledger rows, so
-  shipping one and not the other is the granularity the ledger already uses.
+  The combat half is the one that looked expensive: it has to reach
+  `rosterCS` / `_roster_cs`, and the GPU calls that from FOURTEEN sites across
+  five combat paths, each needing the right unit's mark — attacker or
+  defender — under a different slot expression. What made it mechanical rather
+  than fourteen separate judgements is that every one of those calls ALREADY
+  passes that unit's `formation`, so the levied mask is the same expression
+  with one word changed. Verified by PARSING each call rather than grepping:
+  14 calls, 0 without the argument.
 
-  `levied_upgrade` (4 lanes) and `levied-upgrade.test.ts` (4) are the bar.
+  The movement half joins each engine's ONE pool composer, and the levy
+  RE-POOLS the unit after marking it — `spawnUnit` / `_spawn_unit` price the
+  pool before the mark exists, so without that a levied unit is born two
+  Movement short and only comes right at the next refresh, which is A-2r
+  exactly.
+
+  `levied_upgrade` (6 lanes) and `levied-upgrade.test.ts` (8) are the bar.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1. CIV6's
   agenda-style clauses that make an AI PREFER or REFUSE an action are DLL-side
   weightings, and neither engine has an AI that weighs diplomatic actions at

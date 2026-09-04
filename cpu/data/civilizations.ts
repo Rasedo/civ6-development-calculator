@@ -1219,9 +1219,15 @@ export interface LevyRow {
   /** EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT, Amount 75 */
   upgradeDiscountPct: number;
   envoys: number;
+  /** CIV6 (The Raven King): LEVY_UNITS_GRANT_ABILITY grants levied units
+   *  ABILITY_THE_RAVEN_KING, whose two modifiers are
+   *  EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 and
+   *  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5 (C-66). */
+  levyMoves: number;
+  levyCombat: number;
 }
 export const LEVY_ROWS: readonly LevyRow[] = [
-  { leader: 'MATTHIAS_CORVINUS', upgradeDiscountPct: 75, envoys: 2 },
+  { leader: 'MATTHIAS_CORVINUS', upgradeDiscountPct: 75, envoys: 2, levyMoves: 2, levyCombat: 5 },
 ];
 
 /** CIV6 (Radio Oranje, EFFECT_ADJUST_PLAYER_IDENTITY_PER_TURN_FOR_DOMESTIC_TRADE_ROUTE_ORIGIN):

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
-import { spawnUnit } from '../../../cpu/core/units';
+import { spawnUnit, unitFullMoves } from '../../../cpu/core/units';
+import { rosterCS } from '../../../cpu/core/combat';
+import { MP_SCALE } from '../../../cpu/data/constants';
 import { upgradeGoldCost } from '../../../cpu/core/stockpile';
 import { getModifiers } from '../../../cpu/core/effects';
 import { LEVY_ROWS } from '../../../cpu/data/civilizations';
@@ -50,6 +52,39 @@ describe('a levied unit upgrades cheaply', () => {
     expect(getModifiers(s, 0).levy.length).toBe(0);
     const full = upgradeGoldCost(s, 0, 'WARRIOR', false);
     expect(upgradeGoldCost(s, 0, 'WARRIOR', true)).toBe(full);
+  });
+
+  it('reads the install for the ABILITY too: +2 Movement, +5 Combat', () => {
+    expect(LEVY_ROWS[0].levyMoves).toBe(2);
+    expect(LEVY_ROWS[0].levyCombat).toBe(5);
+  });
+
+  it('gives a levied unit the ability`s Movement AT BIRTH, not a turn later', () => {
+    const s2 = scene('MATTHIAS_CORVINUS');
+    const plain = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0);
+    const base = unitFullMoves(s2, plain!);
+    // the mark alone is the whole condition
+    const lev = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 10, 10).index, 0);
+    lev!.levied = true;
+    expect(unitFullMoves(s2, lev!)).toBe(base + MP_SCALE * LEVY_ROWS[0].levyMoves);
+  });
+
+  it('gives a levied unit +5 Combat, flat and clause-free', () => {
+    const s2 = scene('MATTHIAS_CORVINUS');
+    const u = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0)!;
+    const before = rosterCS(s2, u, 1, null, false);
+    u.levied = true;
+    expect(rosterCS(s2, u, 1, null, false)).toBe(before + LEVY_ROWS[0].levyCombat);
+  });
+
+  it('gives a seat without the row neither bonus', () => {
+    const s2 = scene('VICTORIA');
+    const u = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0)!;
+    const mv = unitFullMoves(s2, u);
+    const cs = rosterCS(s2, u, 1, null, false);
+    u.levied = true;
+    expect(unitFullMoves(s2, u)).toBe(mv);
+    expect(rosterCS(s2, u, 1, null, false)).toBe(cs);
   });
 
   it('marks a levied unit, and a spawned one not', () => {
