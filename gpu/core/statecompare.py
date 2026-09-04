@@ -788,6 +788,7 @@ UNIT = {
     "bandAlbum": _unit("unit_band_album"),
     "gpAt": _unit("unit_gp_at"),
     "revealedTurn": _unit("unit_revealed_turn"),
+    "levied": _unit("unit_levied"),
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
 }

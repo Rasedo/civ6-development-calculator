@@ -1216,6 +1216,7 @@ export const POST_COMBAT_LOYALTY_ROWS: readonly PostCombatLoyaltyRow[] = [
 export interface LevyRow {
   civ?: CivId;
   leader?: LeaderId;
+  /** EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT, Amount 75 */
   upgradeDiscountPct: number;
   envoys: number;
 }

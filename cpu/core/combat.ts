@@ -866,7 +866,7 @@ export function healOnEliminate(state: GameState, victor: Unit): void {
  * civilization or leader adds under the row's clause — see `COMBAT_CS_ROWS`.
  * `foeHp` is null against a city, `foeIsCity` marks a district target.
  */
-export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number },
+export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number; levied?: boolean },
     foeSeat: number, foeHp: number | null, foeIsCity: boolean): number {
   if (!isCiv(own.seat)) return 0;
   const mods = getModifiers(state, own.seat);

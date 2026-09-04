@@ -930,7 +930,7 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   return m;
 }
 
-export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; levied?: boolean }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
@@ -1265,7 +1265,7 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
   if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
   const tile = state.map.tiles[unit.tileIndex];
   if (tileSeat(tile) !== seat) return false;
-  if (!canPayUpgradeGold(state, seat, unit.type)) return false;
+  if (!canPayUpgradeGold(state, seat, unit.type, !!unit.levied)) return false;
   const c = upgradeResourceCost(state, seat, unit.type);
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
@@ -1274,7 +1274,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
   const next = civUpgradeTarget(civOf(state, seat), unit.type)!;
   const s = seatOf(state, seat)!;
-  s.treasury -= upgradeGoldCost(state, seat, unit.type);
+  s.treasury -= upgradeGoldCost(state, seat, unit.type, !!unit.levied);
   const c = upgradeResourceCost(state, seat, unit.type);
   if (c) spendStockpile(state, seat, c.id, c.n);
   unit.type = next;

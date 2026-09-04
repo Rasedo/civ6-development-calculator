@@ -2193,6 +2193,17 @@
           "note": "TS spells 'never revealed' as absent and the GPU as -1; both read as -1 here. Only a STEALTH chassis ever writes it, so every other unit compares -1 on both engines forever."
         },
         {
+          "name": "levied",
+          "compare": "exact",
+          "why": "CIV6 (The Raven King): the unit came from a city-state LEVY. Permanent — nothing here returns a levied unit — and read by the 75% upgrade discount (C-66).",
+          "covers": [
+            "Unit.levied"
+          ],
+          "planes": [
+            "unit_levied"
+          ]
+        },
+        {
           "name": "formation",
           "compare": "exact",
           "covers": [

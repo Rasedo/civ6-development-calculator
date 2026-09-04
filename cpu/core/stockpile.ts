@@ -192,16 +192,33 @@ export function fuelShortCS(state: GameState, u: Unit): number {
  * the two chassis' own published purchase prices, floored at zero — built from
  * numbers the pages do give, with no free constant.
  */
-export function upgradeGoldCost(state: GameState, seat: number, unitType: string): number {
+export function upgradeGoldCost(
+  state: GameState,
+  seat: number,
+  unitType: string,
+  levied = false,
+): number {
   const next = civUpgradeTarget(civOf(state, seat), unitType);
   if (!next) return 0;
-  return Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
+  const raw = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
+  if (!levied) return raw;
+  // CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
+  // PERCENT): levied units upgrade at a 75% discount. The row shipped and
+  // nothing read it until now (C-66).
+  let pct = 0;
+  for (const r of getModifiers(state, seat).levy) pct = Math.max(pct, r.upgradeDiscountPct);
+  return Math.round(raw * (1 - Math.min(100, pct) / 100));
 }
 
 /** can this seat's treasury cover the upgrade? */
-export function canPayUpgradeGold(state: GameState, seat: number, unitType: string): boolean {
+export function canPayUpgradeGold(
+  state: GameState,
+  seat: number,
+  unitType: string,
+  levied = false,
+): boolean {
   const s = seatOf(state, seat);
-  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType));
+  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType, levied));
 }
 
 /** what the UPGRADE draws out of the bank: the new chassis' own charge, or

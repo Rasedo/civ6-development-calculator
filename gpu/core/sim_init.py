@@ -926,6 +926,11 @@ class SimInit:
             # IN AN ESCORT FORMATION with the military unit on its own tile —
             # the CIVILIAN half carries it, and the tile names the escort.
             ("escorted", torch.bool),
+            # CIV6 (The Raven King): this unit came from a city-state LEVY.
+            # Nothing here returns a levied unit, so the mark is permanent and
+            # survives an upgrade — which is what makes the 75% upgrade
+            # discount meaningful (C-66).
+            ("levied", torch.bool),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)

@@ -427,6 +427,11 @@ export interface Unit {
   movesFull?: number;
   hp: number;
   charges: number | null;
+  /** CIV6 (The Raven King): this unit came from a city-state LEVY. Nothing
+   *  in this engine returns a levied unit, so the mark is permanent and
+   *  survives an upgrade — which is what makes the upgrade discount
+   *  meaningful (C-66). */
+  levied?: boolean;
   /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
    *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
    *  it is in transit to; `spyLevel` its rank, capped at Master Spy. */

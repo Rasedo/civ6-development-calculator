@@ -365,7 +365,13 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   for (let i = 0; i < LEVY_UNITS; i++) {
-    spawnUnit(state, type, cityState.centerIndex, seat);
+    // CIV6 (The Raven King): the mark the three levy clauses read — the
+    // ability's +2 Movement and +5 Combat, and the 75% upgrade discount. It
+    // is set here because this is the ONLY place a levied unit is born (C-66).
+    const lv = spawnUnit(state, type, cityState.centerIndex, seat);
+    if (lv) {
+      lv.levied = true;
+    }
   }
   cityState.lastLevyTurn = state.turn;
   // CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): the levy

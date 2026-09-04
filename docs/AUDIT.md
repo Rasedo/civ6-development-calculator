@@ -163,6 +163,34 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
+- **A-4r. SEED 9001 PARTS ON CULTURE, AND THE BATTERY'S SHARDING HID IT.**
+  Weight 2. OPEN, found 2026-09-04 while verifying something else, and present
+  at a battery-GREEN head (6d90a2f2 / a67be883) with a clean tree and freshly
+  regenerated fixtures.
+
+      --seeds 9001            RED at turn 100: city[412].cultureBox
+                              GPU 25.660000000000167 vs TS 27.660000000000167
+      --seeds 9001,9014       RED at turn 218: same city, same field,
+                              GPU 187.79500000000004 vs TS 189.69500000000005
+      --seeds 9001,9014       GREEN to 120 turns
+
+  So the divergence is REAL and the batch composition moves WHEN it fires, not
+  whether. The gap is exactly 2.0 culture in both readings, with the GPU low —
+  a missing flat term rather than a rate, which is where to start.
+
+  WHY THE BATTERY MISSED IT: the serve is sharded 24 seeds over 8 lanes, three
+  to a lane, and seed 9001's own shard-mates happen not to reach the
+  divergence inside 250 turns. Every serve lane in the last green run reported
+  ok, so this is not a flaky red — it is a real difference the round bar cannot
+  currently see. That is the smoke-scale class applied to BATCH COMPOSITION
+  rather than turn count, and it means a green battery is evidence about the
+  shapes it ran, not about the pair of engines.
+
+  Worth doing alongside the fix: a lane, or a battery mode, that runs at least
+  one seed ALONE, since B=1 is a shape the round bar never exercises and the
+  two known batch-shape classes (`narrow-batch-gather`,
+  `collapsed-roster-mask`) both hide there.
+
 ## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
 
 NO GATE CAN CATCH THIS CLASS. Parity proves the two engines match, never
@@ -1486,15 +1514,36 @@ under their blocker so the dependency is readable, and both halves count.
   written where a work is created and read by the four rows. It is the same
   shape as C-59's theming and should be decided with it.
 
-- **C-66. NO UNIT CARRIES A LEVIED MARK.** Weight 1. A city-state's levied
-  units are, on both engines, ordinary units re-seated under the suzerain —
-  nothing records that they were LEVIED, so nothing can pay a clause that
-  names them. `LEVY_UNITS_GRANT_ABILITY` and `LEVY_UNITUPGRADEDISCOUNT` are
-  marked open against this item. The carrier is one flag per unit, set at the
-  levy and cleared when the suzerainty lapses; the question to settle first is
-  what happens to the mark when the unit is upgraded, since one of the two
-  rows is an upgrade discount.
+- **C-66. THE LEVIED MARK EXISTS; ONE OF ITS TWO MODIFIERS IS PAID.**
+  Weight 1. The MARK shipped 2026-09-04 and the item stays OPEN for the
+  ability half. A
+  city-state's levied units were ordinary units re-seated under the suzerain,
+  with nothing recording that they had been LEVIED, so nothing could pay a
+  clause naming them. The mark exists now — `Unit.levied` / `unit_levied`, set
+  at the levy, and PERMANENT because nothing in this engine returns a levied
+  unit, which is what makes an upgrade discount meaningful at all. It is in
+  the statecompare digest, so the gate polices it turn by turn.
 
+  SHIPPED: `LEVY_UNITUPGRADEDISCOUNT` —
+  EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT, Amount 75, on
+  Matthias Corvinus. The row had shipped since batch 11 and NOTHING READ IT:
+  the wire carried it, a test pinned its 75, and no site consumed it. The gap
+  was the MARK, not the magnitude — the same shape as C-57 and C-47.
+
+  STILL OPEN, and deliberately not half-shipped: `LEVY_UNITS_GRANT_ABILITY`
+  grants levied units ABILITY_THE_RAVEN_KING, whose two modifiers are
+  EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 and
+  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Both magnitudes are
+  sourced; the COST is the shape. The movement half is one term in each
+  engine's pool composer, but the COMBAT half has to reach `rosterCS` /
+  `_roster_cs`, and the GPU has FOURTEEN call sites across five combat paths
+  (advance, ranged, city assault, and two more), each needing the right unit's
+  mark — attacker or defender — with a different slot expression. Threading
+  that is the measure-every-path hazard, and a site missed pays nothing
+  silently. These are TWO separate modifiers with two separate ledger rows, so
+  shipping one and not the other is the granularity the ledger already uses.
+
+  `levied_upgrade` (4 lanes) and `levied-upgrade.test.ts` (4) are the bar.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1. CIV6's
   agenda-style clauses that make an AI PREFER or REFUSE an action are DLL-side
   weightings, and neither engine has an AI that weighs diplomatic actions at

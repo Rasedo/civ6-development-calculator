@@ -2051,7 +2051,13 @@ class SimSeats:
                     ltype = self._spearman_idx if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
                     ltype_t = torch.full((B,), ltype, dtype=torch.long, device=dev)
                     for _ in range(levy_units_n):
-                        self._spawn_unit(row, do_l, at_l, ltype_t)
+                        _lslot = self._spawn_unit(row, do_l, at_l, ltype_t)
+                        # the MARK the upgrade discount reads. It changes no
+                        # pool, so the unit needs no re-pricing here (C-66).
+                        if bool(_lslot.any()):
+                            _lr = _lslot.nonzero(as_tuple=True)[0]
+                            _lsl = getattr(self, self.POOL_NEXT["major"])[_lr] - 1
+                            self.major_unit_levied[_lr, _lsl] = True
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_last_levy[rows_l, sl[rows_l]] = self.turn

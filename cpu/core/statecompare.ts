@@ -695,6 +695,7 @@ const UNIT_G: Record<string, Extractor> = {
   movesFull: ((state, rows) => (rows as Unit[]).map((u) => grantedMoves(state, u))) as Extractor,
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
+  levied: overUnits((u) => (u.levied ? 1 : 0)),
   formation: overUnits((u) => u.formation ?? 0),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
   spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
