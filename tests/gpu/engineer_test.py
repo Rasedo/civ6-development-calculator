@@ -286,7 +286,21 @@ def main() -> None:
     jobs = sim._seat_engineer_job_mask(row)
     assert bool(jobs[0].any()), (
         "an engineer always has SOMEWHERE to lay road, so the column is offerable")
-    print("  9 job mask OK (the road alone keeps the column live)")
+    # ...and UNROADED means exactly `canBuildRoad`, not "no route of either
+    # tier". A roaded, unrailroaded tile is a legal RAIL site but is NOT
+    # engineer WORK: TS's twin list is canBuildRoad || improvement || charge
+    # and carries no rail arm, so a `~road | ~railroad` here walks engineers to
+    # tiles TS never considers — every unrailroaded tile in the game (A-3r).
+    cand = (~sim.water[0] & sim.passable[0] & ~sim.nwonder[0] & ~sim.road[0]
+            & ((sim.tile_seat[0] == row) | (sim.tile_seat[0] < 0)))
+    assert bool(cand.any()), "no engineer-eligible unroaded tile to road"
+    t_r = int(cand.nonzero().flatten()[0])
+    assert bool(sim._seat_engineer_job_mask(row)[0, t_r]), "an unroaded tile is engineer work"
+    sim.road[0, t_r] = True                 # now roaded, still unrailroaded
+    sim.railroad[0, t_r] = False
+    assert not bool(sim._seat_engineer_job_mask(row)[0, t_r]), (
+        f"tile {t_r} is roaded and unrailroaded — a rail SITE, not engineer WORK")
+    print("  9 job mask OK (the road alone keeps the column live, and rail is not work)")
 
     # -- 10: the RAILROAD asks a tech and a BANK, and no charge ------------
     sim = fresh(rules, path)

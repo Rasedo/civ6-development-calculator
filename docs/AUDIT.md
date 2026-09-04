@@ -1321,28 +1321,38 @@ under their blocker so the dependency is readable, and both halves count.
   `spawn-pool.test.ts` is the bar (3 lanes, verified to fail on the old code):
   a hull gets the rung AT BIRTH, every chassis is born with exactly what
   `unitFullMoves` answers, and a land unit is untouched by the naval rung.
-- **A-3r. THE VILLAGE TRAJECTORY'S NEXT LAYER.** Weight 2. OPEN, and its
-  RECORDED SYMPTOM IS SUPERSEDED — read this before hunting the old one.
+- **A-3r. AN ENGINEER WALKED TO A RAIL SITE. CLOSED 2026-09-04.** Filed twice
+  under a symptom and closed on the cause; neither symptom was a village bug.
 
-  Filed 2026-09-04 as a combat-XP divergence (seed 9300 turn 159,
-  `unit[2148].xp: GPU 9 vs TS 7`). A-2r's fix — a naval unit born with its
-  full pool — moved that trajectory, and the XP divergence is GONE. With
-  villages on and the driver steering restored, seed 9300 now runs to turn
-  210 and parts on a different decision entirely:
+  First recorded as combat XP (seed 9300 turn 159); A-2r's fix moved that
+  trajectory and the XP divergence dissolved. The seed then parted at turn 210
+  on `JOB row 16: GPU 344 vs TS 343` — the DRIVER-DECISION twin, not a state
+  digest, so the two engines' job lists disagreed on where one Military
+  Engineer should walk.
 
-      seed 9300 turn 210 seat 1: JOB row 16: GPU 344 vs TS 343
+  The cause: `_seat_engineer_job_mask` read `~road | ~railroad`, which is true
+  of every UNRAILROADED tile in the game, so a roaded city centre counted as
+  engineer work. TS's twin list is `canBuildRoad(t, owns) || <improvement
+  site> || <20% charge>` and carries no rail arm at all: a roaded,
+  unrailroaded tile is a legal RAIL SITE but is not WORK to walk to. The GPU
+  now reads `~road`, which is exactly `canBuildRoad`.
 
-  a builder job target one tile apart. Whether that is the same cause wearing
-  a new face or a fresh one is NOT established.
+  The docstring is what licensed the drift — it said "a tile with no route of
+  either tier on it", which is neither what the code did (`|` is a union, not
+  a conjunction) nor what the twin does. Prose and code are both corrected.
 
-  This is the first-fire-layers shape: the widened trajectory is a stack of
-  divergences, and each fix reveals the next. Two layers are now peeled
-  (A-2r, and the XP one it dissolved). The honest reading is that villages-on
-  is a HUNTING configuration with more layers left, not a regression.
+  Worth noting how it was found, since the tile dump did all the work: the two
+  candidates differed in exactly one readable way — 344 was a CENTRE with a
+  road, 343 held a completed district — and asking the GPU's OWN masks about
+  both tiles showed `JOBMASK False` on the tile the driver had chosen. A
+  driver picking a tile its own engine mask refuses names the mask that let it
+  through, and `_builder_jobs` runs two masks, so the second was the suspect
+  immediately.
 
-  Reproduce: `withVillages: true` in seeder/world.ts plus the driver steering
-  block in docs/A2R_REPRO.md, reseed and export, then
-  `python gpu/serve_gate.py --batched --turns 250 --seeds 9300`.
+  `engineer_test` lane 9 is the bar. Its first cut asked the fixture for a
+  roaded tile and skipped its assertion when none existed — passing on the
+  very code it was written against — so it now BUILDS the case: road a legal
+  unroaded tile, then require the mask to drop it.
 - **C-50. APPEAL IS MAP-GLOBAL. CLOSED 2026-09-04.** CIV6 (Amazon,
   TRAIT_AMAZON_RAINFOREST_EXTRA_APPEAL): "Rainforest tiles provide +1 Appeal to
   adjacent tiles, instead of the usual -1" — EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER
@@ -1647,126 +1657,21 @@ under their blocker so the dependency is readable, and both halves count.
 - **C-72. A TRADER CLAIMS NO TILE IT WALKS OVER.** Weight 1. Trade routes on
   both engines move gold and yields between two cities and never touch tile
   ownership, so `TRAIT_TRADE_GAIN_TILES_EN_ROUTE` (marked open against this
-  item) has no hook. The carrier is a border-growth write on the route's own
-  walk, which both engines already compute for the road-laying leg — so the
-  path exists and only the claim does not.
+  item) has no hook. The route's WALK exists on both engines already — the
+  road-laying leg computes it — so the path is there and only the claim is
+  not.
 
-## Reachability — what the green gate does NOT prove
-
-A green serve run proves the two engines agree over the regime the scripted
-seeds actually enter. MEASURED, 12 seeds x 250 turns driven
-(`tools/gpu/reachability_probe.py`) — counts, not estimates. Re-measure
-every row whenever the DRIVEN policy changes.
-
-Two levers widen the regime without touching the fixed seed set, and both
-are gates in their own right (each preset family holds a 250-turn serve
-green): DRIVER STYLES (`--styles` on the probe and the serve gate, presets
-in `policy/ladder.py::STYLE_PRESETS`) and WORLD PRESETS
-(`seeder/presets.ts`; per-family fixtures under `seeder/worlds/presets/`,
-selected with `CIV6_WORLDS_DIR`). Their first outing reached and killed
-three latent divergences the baseline regime never entered: the embarked
-civilian counted as Support (islands), the un-validated TS building-queue
-replay arm plus `availableBuildings` refusing every government-tier row
-(islands), and the jobs twin's missing MILITARY ENGINEER arm (abundant).
-The table below stays measured on the BASELINE family; a preset run's
-coverage is measured the same way with `CIV6_WORLDS_DIR` set.
-
-| mechanic | seeds reaching | first |
-|---|---|---|
-| a PLOT LOCK held by a citizen | 12/12 | t2 |
-| the ESCORT column offered to a civilian | 12/12 | t14 |
-| a PRESERVE placed | 12/12 | t27 |
-| a GOVERNOR TITLE earned | 12/12 | t28 |
-| a GOVERNOR APPOINTED, and SEATED in a city | 12/12 | t29 |
-| a governor ESTABLISHED (every ability opens) | 12/12 | t33 |
-| a GOVERNMENT PLAZA placed | 12/12 | t43 |
-| a GREAT PERSON standing on the map as a unit | 12/12 | t53 |
-| the ACTIVATE_GP column offered to one | 12/12 | t54 |
-| a Great Person CHARGE SPENT | 12/12 | t55 |
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t87 |
-| a SPECIALIST pinned into a slot | 12/12 | t116 |
-| an OPEN BORDERS grant standing | 11/12 | t34 |
-| a governor PROMOTION taken | 11/12 | t134 |
-| a seat entering a DARK AGE (the card pool's own gate) | 10/12 | t49 |
-| a DIPLOMATIC QUARTER placed | 10/12 | t104 |
-| a second HULL on any seat | 10/12 | t118 |
-| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t170 |
-| a unit standing against a CLOSED BORDER | 9/12 | t65 |
-| a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
-| an INTERNATIONAL trade leg | 8/12 | t61 |
-| an ALLIANCE | 8/12 | t105 |
-| a WORLD CONGRESS ballot on the wire | 8/12 | t148 |
-| a permanent PER-SEAT channel left by a spent Great Person | 7/12 | t136 |
-| WAR with a city-state | 6/12 | t78 |
-| PEACE with a city-state, through the sue column | 6/12 | t91 |
-| a permanent PER-CITY channel left by a spent Great Person | 5/12 | t156 |
-| two enemy religious units ADJACENT (theological combat) | 4/12 | t96 |
-| a GREAT WORK given away | 4/12 | t159 |
-| the FORM_UP column offered to a unit | 4/12 | t211 |
-| a DAM placed | 3/12 | t157 |
-| CONSERVATION (the Naturalist's civic) | 3/12 | t189 |
-| a CORPS or FLEET standing | 3/12 | t212 |
-| URBANIZATION civic | 3/12 | t233 |
-| a NEIGHBORHOOD placed | 3/12 | t235 |
-| any seat's lifetime CO2 above zero | 2/12 | t203 |
-| a Valletta-shaped SUZERAIN, and the class purchase it sells | 1/12 | t117 |
-| a CANAL placed | 1/12 | t228 |
-| an antiquity dig (artifact in a slot) | 1/12 | t230 |
-| a WATER PARK placed | 1/12 | t246 |
-| an ARMY or ARMADA standing (Mobilization is Modern) | 0/12 | NEVER |
-| a civilian actually IN an escort formation (no driver takes it) | 0/12 | NEVER |
-| an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
-| the world crossing into climate PHASE I | 0/12 | NEVER |
-| a MILITARY ENGINEER alive at all (and so its three verbs) | 0/12 | NEVER |
-| the ROYAL SOCIETY standing (and so the district-project payment) | 0/12 | NEVER |
-| a seat that may buy LAND COMBAT UNITS with faith | 0/12 | NEVER |
-| a DARK AGE CARD slotted (the greedy fill spends the wildcards first) | 0/12 | NEVER |
-
-- EVERY ROW IS ONE MARK the probe emits, and the table holds no row the
-  probe cannot measure. The ROCK BAND's concert had such a row and no mark
-  behind it; `concert` now exists in the probe and the row lands with the
-  next run.
-- THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) — a DECISION the
-  applier re-validates, widening coverage without changing legality.
-- THE TAIL OF THIS TABLE IS TRAJECTORY, NOT RULE. Every row below 8/12
-  moves by a seed or two whenever anything steers the late game. A row
-  that thins is a coverage loss, never a regression; each names the poke
-  lane that is its actual bar.
-- THE DRIVER RUNS TWO STYLES beside the default: DEEP (`ladder.DEEP_SHARE`
-  0.34 — research depth; what unlocked the dig and the park rows) and
-  DIPLOMATIC (`ladder.DIPLO_SHARE` 0.5 — exclusive with the grudge per
-  SEAT, measured twice: a diplomat that also denounces reaches friendship
-  on 1 seed and an alliance on none). COVERAGE COMES FROM THE MIXTURE, not
-  from any one style turned up — measured: all-deep reaches
-  NATURAL_HISTORY 12/12 but drops specPin, the international leg and the
-  slotted cards; wonder-first moved wonders 52->62 (already covered) and
-  cost three thin rows.
-- POKE-ONLY CLASSES, each named at its entry: the faith-purchase classes
-  (no Valletta suzerain, no Theocracy/Grand Master's Chapel in-gate), the
-  Warrior Monk and its tree (whether AKKAD lands is a seeder draw), the
-  climate arc (CO2 never leaves zero), the Military Engineer (0/12), the
-  space race (Information-era techs), the emergencies' CITY_STATE trigger,
-  the ROCK BAND, its concert and its twelve-row tree (Cold War is an
-  Atomic-era civic; `rock_band_test.py` and `rock-band.test.ts` hold every
-  rule), the four AIR and NAVAL promotion trees (no seed trains an
-  aircraft, a Privateer, a Submarine or a carrier inside 250 turns;
-  `air_promo_test.py` / `air-promotions.test.ts` hold them),
-  and the DARK AGE CARD POOL — the age is reached on 10/12 seeds but the
-  greedy slot fill spends every wildcard on ordinary overflow first, so
-  `governor_roster_test` poke f and the TS `dark-policies` lane are the
-  only proof the pool works.
-- THE POLICY CARDS ARE MOSTLY UNREACHED: 16 of 49 ever slot (greedy fill,
-  table order within a kind); THIRTEEN effect channels ride the digest,
-  the other nine are `policy_cards_test` + the TS `policy-cards` suite
-  alone.
-- The CULTURE VICTORY's distance at t250: visiting peaks at 5 (mean ~0.7)
-  against a domestic peak of 78 (mean ~39) — read B-20r's scope off this.
-  The per-rival bank narrows it further: each rival's cell floors on its
-  own, so the same national output buys no more tourists and often fewer.
-- A barbarian march choosing a CIV row's city while a row-0 city stands in
-  reach — the tie key was verified by reading, never by the gate.
-- The `R = 0` phantom row: no seeder configuration produces a one-major
-  world, so the solo-game arm cannot be validated by the gate.
+  SOURCED 2026-09-04, and one field is NOT placeable:
+  `EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE` carries
+  `GainTileRadius: 3`, on `TRAIT_CIVILIZATION_CREE_TRADE_GAIN_TILES` (the
+  CREE, so it is the civilization's clause and not Poundmaker's). The page
+  text — "Trade Routes claim unclaimed tiles they pass through" — says WHAT is
+  claimed and the install says the radius is 3, but nothing says what that
+  radius is measured FROM: the path tiles, the origin, or the destination. On
+  a walk of any length those three differ enormously (3 from every path tile
+  is most of a continent). So the amount is sourced and the GEOMETRY is not,
+  which makes this an ASK rather than a build — the same shape as C-46's
+  scale, and it must not ship on a guess.
 - **OPEN — THE DRIVER NEEDS A REAL STYLE MECHANISM.** Not weighted (this
   file prices fidelity; this is harness). Today a style is one boolean
   read at a single `if` inside `pick_research`; adding one style meant a

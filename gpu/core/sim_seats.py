@@ -3129,9 +3129,17 @@ class SimSeats:
         """[B, T] — the tiles a Military Engineer of seat row `row` would have
         work at. `trainableUnits` asks only for the Armory, so this is the
         GPU's own reason to offer the column: one of the engineer's own
-        improvements it could place, a tile with no route of either tier on it,
-        or a 20% charge waiting to be spent. All of them go "in your own or
-        neutral territory" (`engineerTileOk`).
+        improvements it could place, an UNROADED tile, or a 20% charge waiting
+        to be spent. All of them go "in your own or neutral territory"
+        (`engineerTileOk`).
+
+        UNROADED means exactly `canBuildRoad` — no road — and NOT "no route of
+        either tier". A railroad-able tile (roaded, unrailroaded) is a legal
+        rail site but is NOT engineer WORK the driver walks to: TS's twin list
+        is `canBuildRoad(t, owns) || <improvement site> || <20% charge>` and
+        offers no rail arm at all. This read `~road | ~railroad`, which is true
+        of every unrailroaded tile in the game, so the GPU walked engineers to
+        roaded city centres TS never considered (A-3r).
         """
         B = self.B
         dev = self.device
@@ -3144,7 +3152,7 @@ class SimSeats:
             & ~self.water
             & ~self.nwonder
         )
-        out = ground & (~self.road | ~self.railroad)
+        out = ground & ~self.road
         unpaved = (
             ground
             & (self.improvement < 0)
