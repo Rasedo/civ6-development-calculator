@@ -164,32 +164,60 @@ machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
 - **A-4r. SEED 9001 PARTS ON CULTURE, AND THE BATTERY'S SHARDING HID IT.**
-  Weight 2. OPEN, found 2026-09-04 while verifying something else, and present
-  at a battery-GREEN head (6d90a2f2 / a67be883) with a clean tree and freshly
-  regenerated fixtures.
+  Weight 2. OPEN. Found 2026-09-04 at a battery-GREEN head with a clean tree
+  and regenerated fixtures — reproduced with all uncommitted work stashed, so
+  it is nobody's edit.
 
-      --seeds 9001            RED at turn 100: city[412].cultureBox
-                              GPU 25.660000000000167 vs TS 27.660000000000167
-      --seeds 9001,9014       RED at turn 218: same city, same field,
-                              GPU 187.79500000000004 vs TS 189.69500000000005
-      --seeds 9001,9014       GREEN to 120 turns
+      --seeds 9001         RED turn 100      --seeds 9001,9014   RED turn 218
+      --seeds 9001,9014    GREEN to 120 turns
 
-  So the divergence is REAL and the batch composition moves WHEN it fires, not
-  whether. The gap is exactly 2.0 culture in both readings, with the GPU low —
-  a missing flat term rather than a rate, which is where to start.
+  The batch composition moves WHEN it fires, not whether.
 
-  WHY THE BATTERY MISSED IT: the serve is sharded 24 seeds over 8 lanes, three
-  to a lane, and seed 9001's own shard-mates happen not to reach the
-  divergence inside 250 turns. Every serve lane in the last green run reported
-  ok, so this is not a flaky red — it is a real difference the round bar cannot
-  currently see. That is the smoke-scale class applied to BATCH COMPOSITION
-  rather than turn count, and it means a green battery is evidence about the
-  shapes it ran, not about the pair of engines.
+  MEASURED at turn 100, and this is the useful part — it is a RATE, not a
+  stock:
 
-  Worth doing alongside the fix: a lane, or a battery mode, that runs at least
-  one seed ALONE, since B=1 is a shape the round bar never exercises and the
-  two known batch-shape classes (`narrow-batch-gather`,
-  `collapsed-roster-mask`) both hide there.
+      seat[2].culRate         GPU 4.9    vs TS 6.9       <- flat 2.0/turn
+      seat[2].cultureTotal    GPU 451.66 vs TS 453.66    <- one turn of it
+      seat[2].civicProgress   GPU 3.66   vs TS 5.66      <- the same 2.0
+      city[412].cultureBox    GPU 25.66  vs TS 27.66     <- one city carries it
+
+  Every OTHER compared field matches, so the state is identical and the
+  difference is in what the two engines COMPUTE from it. City 412's own
+  culture-bearing state is unchanged across the divergence — same 4 buildings,
+  1 district, no great works — but its POPULATION fell 4 -> 3 at turn 99, the
+  turn before.
+
+  LEADING HYPOTHESIS, not yet confirmed: the CITIZEN ASSIGNMENT. A pop drop
+  forces the city to give up its lowest-ranked worked tile, and the two
+  engines rank by different sums. TS's `assignWorkedTiles` scores each tile
+  with `tileScore(tileYields(yctx, t), focus)` — the WHOLE yield vector — and
+  breaks ties by ascending index. The GPU ranks with
+  `(f * w[0] + p * w[1] + oth_sc) * 1e6 - tile`, where `oth_sc` is built once
+  in `_rcy_globals` from `ty_oth`. If any culture term reaches TS's
+  `tileYields` but not the GPU's `ty_oth`, the marginal tile differs and the
+  city works a tile worth 2 less culture — which is exactly the symptom, with
+  the GPU low.
+
+  RULED OUT: `City.focus`. The manifest excludes it saying "the GPU allocates
+  one way and stores no focus", which reads like a live gap but is not one —
+  every city is created `focus: 'balanced'` and nothing ever assigns another
+  value, so the two rankings use the same weights.
+
+  THE PROBE THAT WOULD CONFIRM IT: log the WORKED TILE SET for city 412 at
+  turn 100 on both engines — TS at `assignWorkedTiles`' return, the GPU at the
+  `key.topk(M, dim=2)` in `_seat_city_yields` — and diff them. If they differ
+  by one tile whose culture differs by 2, the mechanism is settled and the
+  hunt becomes "which culture term is missing from `ty_oth`". Use the house
+  two-sided CIV6_DBG pattern, as A-2r did.
+
+  WHY THE BATTERY MISSED IT: the serve shards 24 seeds over 8 lanes, three to
+  a lane, and 9001's shard-mates never reach the divergence inside 250 turns.
+  Every serve lane in the last green run reported ok. So a green battery is
+  evidence about the SHAPES it ran, not about the pair of engines — and B=1,
+  where this fires earliest, is a shape the round bar never exercises at all.
+  Both known batch-shape classes (`narrow-batch-gather`,
+  `collapsed-roster-mask`) hide in exactly that gap. A lane or battery mode
+  that runs one seed ALONE is worth having regardless of this bug.
 
 ## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
 
