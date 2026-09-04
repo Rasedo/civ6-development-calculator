@@ -955,11 +955,29 @@ under their blocker so the dependency is readable, and both halves count.
   gate the page states. What the silo is FOR is C-31's item. OPEN:
   - **THE MOUNTAIN TUNNEL** — SOURCED (Expansion2_Improvements.xml):
     `IMPROVEMENT_MOUNTAIN_TUNNEL`, PrereqTech CHEMISTRY, built by the
-    Military Engineer alone (`Improvement_ValidBuildUnits`) on a Mountain
-    tile of any of the five mountain terrains from an ADJACENT plot
-    (`BuildOnAdjacentPlot`), `CanBuildOutsideTerritory`, `PlunderType`
-    NONE and `DisasterResistant` ("Cannot be pillaged or removed"), and
-    `AllowImpassableMovement`. Its description: "Acts as a movement portal
+    Military Engineer alone (`Improvement_ValidBuildUnits`) on any of the
+    five mountain terrains (`Improvement_ValidTerrains`:
+    GRASS/PLAINS/DESERT/TUNDRA/SNOW_MOUNTAIN), `CanBuildOutsideTerritory`,
+    `PlunderType` PLUNDER_NONE.
+
+    CORRECTION 2026-09-04: this entry previously cited `BuildOnAdjacentPlot`,
+    `DisasterResistant` and `AllowImpassableMovement` as columns on the row.
+    NONE of the three is a column in `Improvements` at all — the first two
+    were invented field names for behaviour that is real but stated in the
+    DESCRIPTION text, and the third likewise. The row's full column set is
+    exactly: Buildable, CanBuildOutsideTerritory, Description, Icon,
+    ImprovementType, Name, PlunderAmount 50, PlunderType PLUNDER_NONE,
+    PrereqTech TECH_CHEMISTRY.
+
+    The behaviour comes from the description string, which is the source for
+    it: "Acts as a movement portal on a mountain range, allowing units to move
+    into it and exit from another portal at the cost of 2 Movement. Trade
+    Routes traveling through it can multiply the Gold they get from districts
+    at their destination. Can only be built on an adjacent Mountain tile.
+    Cannot be pillaged or removed."
+
+    `EFFECT_MOUNTAIN_PORTAL` carries NO ModifierArguments, so every number
+    except the published 2 Movement is DLL-side. Its description: "Acts as a movement portal
     on a mountain range, allowing units to move into it and exit from
     another portal at the cost of 2 Movement. Trade Routes traveling
     through it can multiply the Gold they get from districts at their
