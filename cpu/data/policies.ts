@@ -463,11 +463,39 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
   ].map((p) => [p.id, p]),
 );
 
+/** CIV6: the nine `GOVERNMENTBONUS_*` names in `GovernmentBonusNames`, less
+ *  `NO_GOVERNMENTBONUS`. Each government names exactly one — which is why a
+ *  legacy card is worth a percentage of ONE thing and not the government's
+ *  whole inherent package (C-73). */
+export type GovBonusType =
+  | 'wonderConstruction' | 'combatExperience' | 'greatPeople' | 'envoys'
+  | 'faithPurchases' | 'goldPurchases' | 'unitProduction'
+  | 'overallProduction' | 'districtProjects';
+
+/** CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): the government's
+ *  accumulating bonus — `Increment` percent for every `Interval` turns held.
+ *  `Interval` is ScaleByGameSpeed in the install. */
+/** The WIRE order of `GovBonusType` — the index the GPU reads. Appended-to
+ *  only at the end, like every other catalog this engine exports. */
+export const GOV_BONUS_TYPES = [
+  'wonderConstruction', 'combatExperience', 'greatPeople', 'envoys',
+  'faithPurchases', 'goldPurchases', 'unitProduction',
+  'overallProduction', 'districtProjects',
+] as const;
+
+export interface GovBonus {
+  type: GovBonusType;
+  increment: number;
+  interval: number;
+}
+
 export interface GovernmentDef {
   id: string;
   name: string;
   tier: number;
   slots: SlotKind[];
+  /** CIV6: absent on the Chiefdom alone, which accumulates nothing. */
+  bonus?: GovBonus;
   /** The government's inherent bonus. Each row's CIV6 quote sits at its
    *  definition; where a term needs a channel this model has no shape for,
    *  the row carries the half that fits and the rest is an open AUDIT item. */
@@ -482,7 +510,23 @@ const G = (
   slots: SlotKind[],
   effects: PolicyEffects,
   description: string,
-): GovernmentDef => ({ id, name, tier, slots, effects, description });
+  bonus?: GovBonus,
+): GovernmentDef => ({ id, name, tier, slots, effects, description, bonus });
+
+/** The install's nine accumulating rows, verbatim from `Governments.xml`'s
+ *  MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS arguments. Every one is
+ *  Increment 1; only the interval differs. */
+const GOV_BONUS: Record<string, GovBonus> = {
+  OLIGARCHY: { type: 'combatExperience', increment: 1, interval: 5 },
+  MONARCHY: { type: 'envoys', increment: 1, interval: 10 },
+  DEMOCRACY: { type: 'districtProjects', increment: 1, interval: 10 },
+  FASCISM: { type: 'unitProduction', increment: 1, interval: 10 },
+  CLASSICAL_REPUBLIC: { type: 'greatPeople', increment: 1, interval: 15 },
+  MERCHANT_REPUBLIC: { type: 'goldPurchases', increment: 1, interval: 15 },
+  THEOCRACY: { type: 'faithPurchases', increment: 1, interval: 15 },
+  AUTOCRACY: { type: 'wonderConstruction', increment: 1, interval: 20 },
+  COMMUNISM: { type: 'overallProduction', increment: 1, interval: 20 },
+};
 
 const M = 'military' as const;
 const E = 'economic' as const;
@@ -542,7 +586,7 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
       { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 },
       '+5 combat strength for all units; -15% war weariness.'),
-  ].map((g) => [g.id, g]),
+  ].map((g) => [g.id, { ...g, bonus: GOV_BONUS[g.id] }]),
 );
 
 // CIV6: every government but the Chiefdom has a LEGACY policy card carrying

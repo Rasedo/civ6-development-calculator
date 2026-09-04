@@ -21,7 +21,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, t
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, getModifiers, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, getModifiers, governmentIndex, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -2629,7 +2629,17 @@ export function seatPhase(state: GameState): void {
     // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
     // government, so the seat remembers the one it is in now. Only a
     // completed civic can move it, which is why this sits at the loop's exit.
-    actor.government.held |= governmentBit(computeAdoption(rsr).government);
+    const _govNow = computeAdoption(rsr).government;
+    actor.government.held |= governmentBit(_govNow);
+    // ...and the CLOCK the legacy bonus accrues on (C-63). It rides the same
+    // line as `held` deliberately: `|=` is idempotent, so a gating difference
+    // between the engines is invisible in the mask and grows without bound in
+    // the counter. One site, one condition, both engines.
+    const _govIdx = governmentIndex(_govNow);
+    if (_govIdx >= 0) {
+      const _turns = (actor.government.govTurns ??= GOVERNMENT_LIST.map(() => 0));
+      _turns[_govIdx] += 1;
+    }
 
     // Builder actions (build best-Δ improvement or walk to a job).
     // driven-parity layer 5: the GPU stands the BUILDER POLICY down for

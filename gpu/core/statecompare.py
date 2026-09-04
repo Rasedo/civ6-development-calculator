@@ -270,6 +270,14 @@ def _gov_row(plane: str):
     return get
 
 
+def _civ_vec(plane: str):
+    """One per-seat VECTOR plane, in the catalog's own order."""
+    def get(sim, b, rows):
+        t = getattr(sim, plane)[b]
+        return [[int(x) for x in t[c].tolist()] for c in rows]
+    return get
+
+
 def _civ_scalar(plane: str):
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
@@ -516,6 +524,7 @@ SEAT = {
     "eraScore": _civ_scalar("era_score"),
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
+    "governmentTurns": _civ_vec("civ_gov_turns"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
     "goldenAges": _civ_scalar("golden_ages"),

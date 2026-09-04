@@ -41,7 +41,7 @@ import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
+import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
@@ -1981,6 +1981,7 @@ export function deserialize(json: string): GameState {
     sx.research.boosted ??= [];
     sx.government ??= { current: null, policies: [], held: 0 };
     sx.government.held ??= 0;
+    sx.government.govTurns ??= GOVERNMENT_LIST.map(() => 0);
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
     sx.religion.enhancer ??= null;
     sx.buildersTrained ??= 0;

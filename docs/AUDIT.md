@@ -1198,6 +1198,22 @@ under their blocker so the dependency is readable, and both halves count.
   `TRAIT_*_BONUS_RATE` rows at `BonusRate: 100` now have a clock to double,
   and "in half the usual time" is the interval halved.
 
+  THE CLOCK IS IN, 2026-09-04. `GovernmentState.govTurns` / `civ_gov_turns`
+  count turns held per government per seat, written on the SAME line as
+  `governmentsHeld` under the same condition — deliberately, because `|=` is
+  idempotent and hides a gating difference where a counter shows one at once.
+  That is not hypothetical: the GPU was writing `held` for a city-less seat
+  where TS's `cities.length === 0` continue skips it, and the mask could never
+  show it. The clock is gated on `active` now and both engines agree.
+  `legacyBonusPct` / `_legacy_pct` is the one composer on each side, and the
+  rate divides the interval rather than multiplying the result so the two
+  readings agree at every increment. Bar: `legacy-accrual` (5 lanes) and
+  `legacy_accrual` (6, including the per-game batch guard), plus a
+  250-turn-shaped single-seed serve. REACHABILITY: 64 government-turns banked
+  over 30 driven turns across three seats.
+  STILL OPEN AS C-73: nothing SPENDS the accrual yet. The nine BONUS_RATE
+  rows stay open against that item, not this one.
+
   A SECOND FINDING, not part of the original item. This engine's
   `LEGACY_${g.id}` card carries `effects: g.effects` — the government's whole
   inherent bonus. That is not what a legacy card is: it pays the ACCUMULATED

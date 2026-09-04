@@ -472,6 +472,7 @@ const SEAT: Record<string, Extractor> = {
   eraScore: overSeats((s) => s.eraScore ?? 0),
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
+  governmentTurns: overSeats((s) => [...(s.government.govTurns ?? [])]),
   prevAge: overSeats((s) => s.prevAge ?? 1),
   darkAges: overSeats((s) => s.darkAges ?? 0),
   goldenAges: overSeats((s) => s.goldenAges ?? 0),

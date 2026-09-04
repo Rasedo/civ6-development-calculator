@@ -640,6 +640,12 @@ class SimInit:
         # legacy card, and the one fact `_adopted_gov` cannot re-derive because
         # it depends on the ORDER the civics arrived in.
         self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # ...and the CLOCK (C-63): turns this seat has spent in each government,
+        # which is what an accumulating bonus accrues on. `civ_gov_held` answers
+        # "ever" and this answers "how long"; they are written on the same line
+        # under the same condition, because an idempotent `|=` hides a gating
+        # difference that a counter would show at once.
+        self.civ_gov_turns = torch.zeros(B, self.n_majors, max(1, len(rules.governments or [])), dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er.get("darkT", 12))
@@ -1903,6 +1909,13 @@ class SimInit:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
+            # C-63 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): [nGov] each,
+            # the bonus TYPE this government accumulates (-1 = none, the Chiefdom
+            # alone), the percent per step and the turns per step.
+            assert self.civ_gov_turns.shape[2] == self._ngov, "the clock's width is not the government roster's"
+            self._gov_bonus_type = torch.tensor([int(g["bonus"][0]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_bonus_inc = torch.tensor([int(g["bonus"][1]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_bonus_int = torch.tensor([int(g["bonus"][2]) for g in _govs], dtype=torch.long, device=device)
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
             self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_cap_y = torch.tensor([[float(x) for x in g["capitalYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
@@ -3077,6 +3090,10 @@ class SimInit:
         self._post_combat_loyalty_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postCombatLoyalty"]]  # type: ignore[misc]
         # [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat] (C-66)
+        # [civ, leaderRow, governmentIndex, ratePct] — America's nine
+        # TRAIT_*_BONUS_RATE rows, added to the base 100 (C-63).
+        self._legacy_rate_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["legacyRates"]]  # type: ignore[misc]
         self._levy_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["levy"]]  # type: ignore[misc]
         self._domestic_route_loyalty_rows: list[tuple[int, int, int]] = [

@@ -168,6 +168,12 @@ export interface GovernmentState {
    *  in. A bitmask over `GOVERNMENT_LIST` positions — the roster is a fixed
    *  catalog both engines derive from one export. */
   held: number;
+  /** CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): turns spent in
+   *  each government, indexed by `GOVERNMENT_LIST` position. `held` answers
+   *  "ever", this answers "how long" — and unlike `held`'s idempotent OR a
+   *  counter shows any gating difference between the engines immediately,
+   *  so both tick it at the ONE site that writes `held` (C-63). */
+  govTurns?: number[];
 }
 
 export interface SeatActionRecord {

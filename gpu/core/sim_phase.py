@@ -1496,8 +1496,16 @@ class SimPhase:
         # exit — the position `seatPhase` writes it at.
         if self._ngov:
             _adopted, _has = self._adopted_gov(self.civ_civics[:, row])
+            # `active` is the TS loop's `cities.length === 0` continue, which
+            # sits ABOVE this line in seatPhase — so a city-less seat writes
+            # neither the mask nor the clock. The mask never showed the
+            # difference because `|=` is idempotent; the clock would have
+            # grown by one every turn (C-63).
+            _gov_on = _has & active
             self.civ_gov_held[:, row] |= torch.where(
-                _has, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
+                _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
+            self.civ_gov_turns[:, row] += torch.nn.functional.one_hot(
+                _adopted.clamp(min=0), self.civ_gov_turns.shape[2]) * _gov_on.long().unsqueeze(1)
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
         self._advance_great_people(row, active)

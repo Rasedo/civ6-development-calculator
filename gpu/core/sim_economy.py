@@ -1545,6 +1545,33 @@ class SimEconomy:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
+    def _legacy_pct(self, row: int, gov: int) -> torch.Tensor:
+        """[B] long — the percentage seat `row` has accumulated against
+        government `gov`'s own BonusType.
+
+        CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): Increment per
+        Interval turns held, floored, kept for good. A roster row that raises
+        the RATE (America's Founding Fathers, BonusRate 100) divides the
+        interval rather than multiplying the result, so the two readings agree
+        at every whole increment and not only at the end.
+
+        ONE composer, the twin of `legacyBonusPct` (C-63).
+        """
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if not self._ngov or gov < 0 or gov >= self._ngov:
+            return z
+        interval = int(self._gov_bonus_int[gov])
+        if int(self._gov_bonus_type[gov]) < 0 or interval <= 0:
+            return z
+        inc = int(self._gov_bonus_inc[gov])
+        rate = torch.full_like(z, 100)
+        for _civ, _lead, _gov, _pct in self._legacy_rate_rows:
+            if _gov == gov:
+                rate = torch.maximum(rate, torch.where(self._row_is(row, _civ, _lead),
+                                                       torch.full_like(z, 100 + _pct), z))
+        turns = self.civ_gov_turns[:, row, gov]
+        return (turns * rate) // (100 * interval) * inc
+
     def _slotted_policies(self, civics2: torch.Tensor,
                           extra_slots: torch.Tensor | None = None,
                           dark: torch.Tensor | None = None,

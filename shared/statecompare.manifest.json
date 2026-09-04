@@ -787,6 +787,17 @@
           "note": "the bitmask of governments this seat has BEEN in, over the roster's own order. It gates every LEGACY policy card, and no other field can re-derive it: which government a seat held depends on the ORDER its civics arrived in."
         },
         {
+          "name": "governmentTurns",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.govTurns"
+          ],
+          "planes": [
+            "civ_gov_turns"
+          ],
+          "note": "turns spent in each government, in the roster's own order — what MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS accrues on. Kept beside governmentsHeld deliberately: the mask's `|=` is idempotent and hides a gating difference between the engines, where this counter shows one on the turn it happens (C-63)."
+        },
+        {
           "name": "age",
           "compare": "exact",
           "covers": [

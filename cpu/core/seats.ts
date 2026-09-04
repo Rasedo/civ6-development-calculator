@@ -9,6 +9,7 @@ import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage'
 import { RESOURCES } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
+import { GOVERNMENT_LIST } from '../data/policies';
 
 import { NO_SEAT } from './types';
 export { NO_SEAT };
@@ -104,7 +105,7 @@ export function emptySeat(seat: number): Seat {
     peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
-    government: { current: null, policies: [], held: 0 },
+    government: { current: null, policies: [], held: 0, govTurns: GOVERNMENT_LIST.map(() => 0) },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     grantedTitles: 0,
     gpp: {}, gpEarned: [],

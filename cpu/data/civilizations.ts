@@ -1213,6 +1213,25 @@ export const POST_COMBAT_LOYALTY_ROWS: readonly PostCombatLoyaltyRow[] = [
 /** CIV6 (Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT
  *  and EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): "levied units cost 75%
  *  less to upgrade" and a levy hands back two Envoys. */
+/** CIV6 (Founding Fathers): "Earn all Government legacy bonuses in half the
+ *  usual time." The install writes it as NINE separate modifiers on America's
+ *  trait — TRAIT_AUTOCRACY_BONUS_RATE and its eight siblings — each carrying
+ *  `BonusRate: 100` and NO ModifierType, which is DLL-read data rather than
+ *  an effect. Keyed by government here for the same reason: nine rows in the
+ *  install, nine rows on the wire (C-63). */
+export interface LegacyRateRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  /** a `GOVERNMENTS` id */
+  government: string;
+  /** added to the base 100, so 100 = twice the rate = half the interval */
+  ratePct: number;
+}
+export const LEGACY_RATE_ROWS: readonly LegacyRateRow[] = [
+  'AUTOCRACY', 'CLASSICAL_REPUBLIC', 'COMMUNISM', 'DEMOCRACY', 'FASCISM',
+  'MERCHANT_REPUBLIC', 'MONARCHY', 'OLIGARCHY', 'THEOCRACY',
+].map((government) => ({ civ: 'AMERICA' as CivId, government, ratePct: 100 }));
+
 export interface LevyRow {
   civ?: CivId;
   leader?: LeaderId;
