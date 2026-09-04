@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 LOG = ROOT / "stats" / "battery.jsonl"
 
 _OK, _SKIP, _BAIL = 0, -1, -3
+# #230: a lane the BOX killed for memory. Not a red — it says nothing
+# about the code — and not a green, because the lane never ran.
+_OOM = -5
 
 
 def _git(*args: str) -> str:
@@ -59,7 +62,8 @@ def _last_pass_head(rows: list[dict]) -> str:
     return ""
 
 
-def record(results, wall: float, ok: bool) -> None:
+def record(results, wall: float, ok: bool, mem: dict | None = None,
+           oom: bool = False) -> None:
     """Append one battery record. `results` is battery.py's (name, secs, rc)
     list. Never raises: a statistics writer that can fail a green battery is
     worse than no statistics."""
@@ -72,19 +76,23 @@ def record(results, wall: float, ok: bool) -> None:
         if not since:
             commits = [head] if head else []
         steps = [{"lane": n, "secs": round(s, 1),
-                  "status": "ok" if rc == _OK else "skip" if rc == _SKIP else "bail" if rc == _BAIL else "fail"}
+                  "status": "ok" if rc == _OK else "skip" if rc == _SKIP else "bail" if rc == _BAIL else "oom" if rc == _OOM else "fail"}
                  for n, s, rc in results]
         rec = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "head": head,
             "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
-            "result": "pass" if ok else "fail",
+            # #230: three outcomes, not two. `oom` never counts as a pass,
+            # so the cadence clock does not advance on one.
+            "result": "oom" if oom else "pass" if ok else "fail",
+            "mem": mem,
             "wall_s": round(wall, 1),
             "dirty": bool(_git("status", "--porcelain")),
             "since_last_pass": since,
             "commits_under_test": commits,
             "n_commits": len(commits),
             "failed_lanes": [s["lane"] for s in steps if s["status"] in ("fail", "bail")],
+            "oom_lanes": [s["lane"] for s in steps if s["status"] == "oom"],
             "steps": steps,
         }
         LOG.parent.mkdir(parents=True, exist_ok=True)

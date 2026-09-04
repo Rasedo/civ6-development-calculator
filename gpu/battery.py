@@ -46,6 +46,145 @@ NO_BAIL = "--no-bail" in sys.argv
 POKE_WORKERS = 9
 POKE_OMP = 1
 
+# ---------------------------------------------------------------- memory --
+# The battery is the heaviest thing in this repo and the box is the OWNER's,
+# often with a VM on it. It must never be able to take the machine down: when
+# memory is short it runs FEWER lanes for LONGER (#230).
+#
+# `MEM_RESERVE_MB` is what we leave for whatever else is running; the pool is
+# sized out of what remains. `MEM_LOW_WATER_MB` is where the watchdog stops
+# ADMITTING new poke lanes — running ones always drain, because killing
+# anything on a shared box is forbidden.
+MEM_RESERVE_MB = 4096
+MEM_LOW_WATER_MB = 2048
+MEM_LANE_MB_DEFAULT = 1500.0   # until a green run measures the real figure
+LOW_MEMORY = "--low-memory" in sys.argv
+
+mem_min_free = [10 ** 9]       # the low-water mark actually observed
+mem_tight = threading.Event()
+_mem_stop = threading.Event()
+
+
+def free_mb() -> float:
+    """Free PHYSICAL memory, in MB. Zero when it cannot be read, which the
+    callers treat as "no information" rather than "no memory"."""
+    over = os.environ.get("CIV6_BATTERY_MEM_MB")
+    if over:
+        try:
+            return float(over)
+        except ValueError:
+            pass
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class _MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong),
+                            ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong),
+                            ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong),
+                            ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong),
+                            ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+            st = _MS()
+            st.dwLength = ctypes.sizeof(_MS)
+            if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+                return 0.0
+            return st.ullAvailPhys / (1024.0 * 1024.0)
+        with open("/proc/meminfo", encoding="utf-8") as fh:
+            for ln in fh:
+                if ln.startswith("MemAvailable:"):
+                    return float(ln.split()[1]) / 1024.0
+    except Exception:
+        return 0.0
+    return 0.0
+
+
+def lane_mb() -> float:
+    """What ONE concurrent lane costs, in MB — measured, not guessed. Every
+    green run records the memory it actually consumed and how many lanes were
+    running; the median of the last five is the budget. Falls back to a
+    deliberately pessimistic default until that history exists."""
+    seen: list[float] = []
+    try:
+        for row in _stats._rows()[-25:]:
+            m = row.get("mem") or {}
+            used, lanes = m.get("peak_used_mb"), m.get("lanes")
+            if row.get("result") == "pass" and used and lanes:
+                seen.append(float(used) / float(lanes))
+    except Exception:
+        return MEM_LANE_MB_DEFAULT
+    if not seen:
+        return MEM_LANE_MB_DEFAULT
+    tail = sorted(seen[-5:])
+    return tail[len(tail) // 2]
+
+
+def plan_pool(want_shards: int) -> tuple[int, int, str]:
+    """(serve shards, poke workers, why) for the memory this box has free.
+
+    The battery never REFUSES for memory — it narrows. One shard and one poke
+    worker is always allowed: that run takes far longer, which is the whole
+    point of the trade.
+    """
+    free = free_mb()
+    if LOW_MEMORY:
+        free = min(free or MEM_RESERVE_MB + 3000.0, MEM_RESERVE_MB + 3000.0)
+    if free <= 0:
+        return want_shards, POKE_WORKERS, "memory unreadable — full fan-out"
+    per = lane_mb()
+    room = max(0.0, free - MEM_RESERVE_MB)
+    cap = int(room // per)
+    full = want_shards + POKE_WORKERS
+    if cap >= full:
+        return want_shards, POKE_WORKERS, (
+            f"{free:.0f}MB free, {per:.0f}MB/lane — full fan-out fits")
+    cap = max(2, cap)
+    # split what we have in the same proportion as the full pool, so neither
+    # side starves; the serve lane is the wall, so it gets the rounding.
+    shards = max(1, min(want_shards, round(cap * want_shards / full)))
+    pokes = max(1, cap - shards)
+    return shards, pokes, (
+        f"{free:.0f}MB free, {per:.0f}MB/lane, {MEM_RESERVE_MB}MB reserved "
+        f"-> room for {cap} lanes, not {full}: DEGRADING (this run will take "
+        f"longer)")
+
+
+def mem_watch() -> None:
+    """Sample free memory while the lanes run. Below the low-water mark the
+    poke pool stops ADMITTING work; it never kills anything."""
+    while not _mem_stop.wait(3.0):
+        f = free_mb()
+        if f <= 0:
+            continue
+        if f < mem_min_free[0]:
+            mem_min_free[0] = f
+        if f < MEM_LOW_WATER_MB:
+            if not mem_tight.is_set():
+                print(f"  [memory] {f:.0f}MB free — holding new lanes back", flush=True)
+            mem_tight.set()
+        elif mem_tight.is_set() and f > MEM_LOW_WATER_MB * 1.5:
+            print(f"  [memory] {f:.0f}MB free — admitting lanes again", flush=True)
+            mem_tight.clear()
+
+
+# A lane that died for MEMORY is not a red: it says nothing about the code.
+# It is not a green either — the run did not finish — so it gets a status of
+# its own and the battery reports `oom`.
+OOM_MARKS = ("MemoryError", "std::bad_alloc", "Unable to allocate",
+             "out of memory", "Cannot allocate memory", "bad_alloc")
+
+
+def looks_oom(text: str) -> bool:
+    low = text.lower()
+    return any(m.lower() in low for m in OOM_MARKS)
+
+
+oom = threading.Event()
+
 def lane_cost() -> dict[str, float]:
     """Measured lane cost — the median of each lane's last five OK timings
     from the recorded runs (stats/battery.jsonl). A lane with no history yet
@@ -131,11 +270,18 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
     with lock:
         results.append((name, dt, p.returncode))
         status = "ok" if p.returncode == 0 else f"FAIL rc={p.returncode}"
-        print(f"  {name:<14} {dt:6.1f}s  {status}", flush=True)
+        if p.returncode == 0 or not looks_oom(p.stdout + p.stderr):
+            print(f"  {name:<14} {dt:6.1f}s  {status}", flush=True)
         if p.returncode == 0 and name.startswith("eval"):
             for ln in p.stdout.strip().splitlines()[-1:]:
                 print(f"    | {ln}", flush=True)
-        if p.returncode != 0:
+        if p.returncode != 0 and looks_oom(p.stdout + p.stderr):
+            # #230: the box ran out of memory. Report it as its own thing —
+            # a red here would blame the code for the machine.
+            results[-1] = (name, dt, -5)
+            oom.set()
+            print(f"  {name:<14} {dt:6.1f}s  OOM  (memory, not a test failure)", flush=True)
+        elif p.returncode != 0:
             failed.set()
             tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-15:]
             print("    | " + "\n    | ".join(tail), flush=True)
@@ -145,8 +291,13 @@ def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads
     pos = [0]
     lk = threading.Lock()
 
-    def worker() -> None:
+    def worker(idx: int = 0) -> None:
         while True:
+            # #230: under memory pressure the pool stops ADMITTING work and
+            # the running lanes drain. Worker 0 never waits, so the pool
+            # cannot deadlock and the run always finishes — later.
+            while idx > 0 and mem_tight.is_set() and not failed.is_set():
+                time.sleep(2.0)
             with lk:
                 if pos[0] >= len(steps):
                     return
@@ -158,7 +309,7 @@ def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads
             # surface in one run.
             run(name, cmd, threads, bail=False)
 
-    ws = [threading.Thread(target=worker) for _ in range(workers)]
+    ws = [threading.Thread(target=worker, args=(i,)) for i in range(workers)]
     for w in ws:
         w.start()
     for w in ws:
@@ -244,7 +395,17 @@ def main() -> int:
         # spend total CPU to buy wall — the trade this box has cores for.
         _seeds = sorted(int(q.stem[4:]) for q in (ROOT / "seeder" / "worlds").glob("seed*.json")
                         if q.stem[4:].isdigit())
-        _k = min(8, len(_seeds))
+        # #230: how wide this run may fan out, given the memory this box
+        # actually has free right now. Never a refusal — a narrower run, which
+        # is a LONGER run.
+        _k, _pokes, _why = plan_pool(min(8, len(_seeds)))
+        print(f"memory: {_why}", flush=True)
+        if (_k, _pokes) != (min(8, len(_seeds)), POKE_WORKERS):
+            print(f"        {_k} serve shard(s) and {_pokes} poke worker(s) "
+                  f"instead of {min(8, len(_seeds))} and {POKE_WORKERS}", flush=True)
+        mem_min_free[0] = free_mb() or 10 ** 9
+        _mem_free_start = mem_min_free[0]
+        threading.Thread(target=mem_watch, daemon=True).start()
         _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
         _shards = [("serve_" + "abcdefgh"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
@@ -361,6 +522,7 @@ def main() -> int:
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # C-20 the portal on a mountain range
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # C-66 the levy mark and its 75% discount
                 ("legacy_accrual", [py, "tests/gpu/legacy_accrual_test.py"], 6),  # C-63 the government clock an accumulating bonus rides
+                ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip
@@ -418,7 +580,7 @@ def main() -> int:
 
         _poke_names = [s[0] for l in lanes if len(l) > 5 for s in l]
         threads = [
-            threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
+            threading.Thread(target=lane_parallel, args=(l, _pokes, POKE_OMP))
             if len(l) > 5
             else threading.Thread(target=lane, args=(l,))
             for l in lanes
@@ -428,6 +590,7 @@ def main() -> int:
         for th in threads:
             th.join()
 
+    _mem_stop.set()
     wall = time.time() - t0
     print(f"\n{'step':<14} {'time':>7}  status")
     for name, dt, rc in results:
@@ -444,17 +607,35 @@ def main() -> int:
         _srv = max([_t.get(_serve_names[0], 0.0) + _t.get("vitest", 0.0)]
                    + [_t.get(n, 0.0) for n in _serve_names[1:]])
         _pk = [_t.get(n, 0.0) for n in _poke_names]
-        _pool = max(sum(_pk) / POKE_WORKERS, max(_pk, default=0.0))
+        _pool = max(sum(_pk) / max(1, _pokes), max(_pk, default=0.0))
         _s0 = sum(dt for n, dt, _ in results
                   if n not in set(_serve_names) | set(_poke_names) | {"vitest"})
         print(f"budget: stage 0 {_s0:.0f}s + slowest lane {max(_srv, _pool):.0f}s"
               f"  |  serve {_srv:.0f}s over {len(_serve_names)} shards"
-              f"  vs  pokes {sum(_pk):.0f}s/{POKE_WORKERS} workers = {_pool:.0f}s"
+              f"  vs  pokes {sum(_pk):.0f}s/{_pokes} workers = {_pool:.0f}s"
               f"  ->  {'SERVE' if _srv >= _pool else 'POKES'} is the wall")
     # Every run records itself — stats/battery.jsonl, read by
     # tools/gpu/test_stats.py. Which lanes ever catch anything is a
     # question for data, not for memory.
-    _stats.record(results, wall, not failed.is_set())
+    # What this run COST in memory, so the next one can size itself from a
+    # measurement rather than the pessimistic default (#230).
+    _peak = max(0.0, _mem_free_start - mem_min_free[0]) if _mem_free_start < 10 ** 9 else 0.0
+    _mem = {"free_start_mb": round(_mem_free_start, 1) if _mem_free_start < 10 ** 9 else None,
+            "free_min_mb": round(mem_min_free[0], 1) if mem_min_free[0] < 10 ** 9 else None,
+            "peak_used_mb": round(_peak, 1) or None,
+            "lanes": _k + _pokes,
+            "shards": _k, "pokes": _pokes,
+            "lane_mb_budget": round(lane_mb(), 1)}
+    print(f"memory: peak {_peak:.0f}MB over {_k + _pokes} lanes "
+          f"({_peak / max(1, _k + _pokes):.0f}MB/lane), floor {mem_min_free[0]:.0f}MB free")
+    _stats.record(results, wall, not failed.is_set() and not oom.is_set(), mem=_mem,
+                  oom=oom.is_set())
+    if oom.is_set() and not failed.is_set():
+        # NOT a pass — the run did not finish — and NOT a fail, because the
+        # code is not what broke. The cadence clock does not advance.
+        print("BATTERY OUT OF MEMORY — narrow the run "
+              "(--low-memory, or CIV6_BATTERY_MEM_MB=<free MB>) and try again")
+        return 3
     if failed.is_set():
         print("BATTERY FAILED")
         return 1
