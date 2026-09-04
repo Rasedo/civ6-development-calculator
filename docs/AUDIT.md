@@ -979,115 +979,40 @@ under their blocker so the dependency is readable, and both halves count.
     `EFFECT_MOUNTAIN_PORTAL` carries NO ModifierArguments, so every number
     except the published 2 Movement is DLL-side.
 
-    THE BUILD, SCOPED 2026-09-04 — it is one unit of work, not two, because a
-    tunnel that is buildable but not enterable states the mechanic wrongly
-    rather than merely doing nothing:
+    THE BUILD, SCOPED 2026-09-04 — and the first scoping of it was WRONG, so
+    read this one. It said TS should make a tunnelled mountain pass
+    `isImpassable`, and that the GPU would then have to chase the FOURTEEN
+    exported flags derived from that predicate (wpass, work, camp, st and ten
+    improvement-site flags) through C-52's `nr` machinery. That is real work
+    and it is also unnecessary, because it is the wrong model: a tunnelled
+    mountain does not become WORKABLE, campable or farmable. Only ENTERABLE.
 
-    * TS costs ONE edit. `isImpassable` is the single function every movement
-      path inherits, so `isMountain(tile) -> tile.improvement !== 'MOUNTAIN_TUNNEL'`
-      covers all of them at once. `gdrJump` is the precedent for a mountain
-      that one thing may enter.
-    * THE GPU IS THE WORK, and the shape is already known. `passable` is BAKED
-      at export, and MEASURED: FOURTEEN exported flags derive from
-      `isImpassable` — wpass, work, camp, st, and ten improvement-site flags.
-      A tunnel built mid-game makes a mountain passable, so every one of them
-      goes stale exactly as the harvest's eighteen did. This is the
-      baked-derivation-of-a-new-mutable class and C-52's `nr` machinery is the
-      answer: ship a per-tile diff of what changes when the tile gains a
-      tunnel, rather than hand-listing fourteen flags and missing one.
-      A tunnel is never removed ("Cannot be pillaged or removed"), so the
-      plane only ever gains bits — monotone, which makes the diff cheap.
-    * THE PORTAL ITSELF is a new verb: enter a tunnel, leave from another at
-      2 Movement. "Another portal" is read as one on the SAME mountain range,
-      and a range is a connected component of mountain tiles — the same flood
-      fill `deriveContinents` already does for C-48. That reading is a MODEL
-      choice: the description says "on a mountain range" but no table names a
-      range, and the alternative (any tunnel anywhere) is a far larger
-      gameplay change. Record it when it ships.
-    * appending the verb SHIFTS the unit-action layout, which is the class
-      that silently killed PILLAGE in #78 — re-check the layout after. Its description: "Acts as a movement portal
-    on a mountain range, allowing units to move into it and exit from
-    another portal at the cost of 2 Movement. Trade Routes traveling
-    through it can multiply the Gold they get from districts at their
-    destination." UNBUILT: a portal between two improvements is a new
-    pathing class (every mover walks `neigh`; a tunnel pair is an edge
-    the geometry does not hold) on both engines, and the trade-route gold
-    multiplier's MAGNITUDE lives in `EFFECT_MOUNTAIN_PORTAL`, DLL-side.
-    Whether the build spends a charge is the general rule (no
-    per-improvement exemption exists in the table).
-  - **"Can Remove Tile Improvements (costs no charge)" SHIPS** — the
-    Builder's and the Military Engineer's pages carry the ability verbatim,
-    and `REMOVE_IMPROVEMENT` is one appended column for both chassis on an
-    own tile holding one: the improvement is GONE rather than pillaged, its
-    based aircraft scatter, the turn is spent and no charge is. The driver
-    never picks it, so it is poke-proven only.
-  - (The Bath in the charge's district list is Rome's unique Aqueduct —
-    C-26.)
-- **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1. The ARSENAL,
-  the GROUND and the BLAST all ship. CIV6 (Nuclear weapons): both devices are
-  catalog rows (radius 1 / fallout 10 / range 12 / 14 Gold / 10 Uranium,
-  and 2 / 20 / 15 / 16 / 20); the Manhattan Project and Operation Ivy
-  unlock the two repeatable City Center builds; a finished device "is
-  added to the player's inventory", so it is a per-seat count
-  (`Seat.wmd` / `civ_wmd`) billing its Gold beside the seat's units, and
-  Second Strike Capability halves that bill. The Missile Silo is an
-  improvement (C-20). Contaminated ground is `Tile.falloutTurns` /
-  `tile_fallout` and every clause it carries — the countdown, the 50 HP a
-  turn that spares a Giant Death Robot, the unworkable tile, the district
-  and building and unit and purchase block, the heal and repair refusal —
-  with `CLEAN_FALLOUT` to take it back. Reach is ZERO: a device needs
-  Nuclear Fission, which no seed reaches in 250 turns, so the proof is
-  `tests/gpu/fallout_test.py` and `tests/cpu/map/fallout.test.ts`.
-  THE BLOW itself now ships: `detonate` / `_detonate` walks the device's
-  own radius in tile-index order and runs the page's clauses in the order
-  it states them — the declaration on every civilization or city-state
-  whose territory or units are in the blast FIRST, then the units
-  destroyed (a Giant Death Robot instead takes `NUKE_ROBOT_DAMAGE` and
-  lives), the improvements and Districts pillaged, the fallout painted for
-  the device's own count of turns, and the City Center and Encampment left
-  with both pools empty, floored where every non-melee blow floors them
-  because a nuke never CAPTURES. A launch bills the LAUNCHER
-  `warWearinessLaunch` / `_ww_launch` per victim and raises the Nuclear
-  Emergency over the launcher's own capital. Three chassis throw it —
-  `nukeCarrier` is the bombers and the Nuclear Submarine, a bomber at its
-  own operational range and a submarine at the device's Range — and the
-  MISSILE SILO throws for the SEAT, since it is an improvement and not a
-  unit. So there are two verbs: the `NUKE_{k}_{c}` head per carrier, and
-  the seat-level launch beside the levy, both re-validating the named
-  (device, tile) pair at the apply. Reach stays ZERO; the proof is
-  `tests/gpu/nuke_test.py` and `tests/cpu/units/nuke.test.ts`. OPEN:
-  - **INTERCEPTION.** CIV6: "Destroyers, Battleships, Missile Cruisers,
-    and Mobile SAMs can protect adjacent tiles from nuclear strikes", and
-    the Mobile SAM is the only one that stops a submarine's. What no
-    source publishes is the ROLL — the chance itself, whether the escort
-    must be undamaged, and what a stopped device costs its owner.
-    `NUKE_INTERCEPTORS` and `NUKE_COVER_RANGE` are exported and read by
-    nothing until that is sourced. ASK THE OWNER.
-  - **THE CITIZENS THE BLAST KILLS.** CIV6: "Citizens 'working' the
-    affected tiles are eliminated." BLOCKED on a mechanic, not on a
-    source: neither engine exposes a worked-tile SELECTION outside its own
-    yield walk (TS derives `CityStats.workedTiles` inside
-    `assignWorkedTiles`; the GPU's pick lives inside `_seat_city_walk`'s
-    own ranking), so there is no assignment both could read the same way.
-    Extracting one is its own task; the clause is recorded rather than
-    approximated on either engine.
-  - **THE WONDER IN THE BLAST.** The pillage clause names improvements,
-    Districts and buildings and says nothing about a wonder, so neither
-    engine touches `built_wonder` / `city_wonder`. That is UNSOURCED
-    rather than decided. ASK THE OWNER.
-- **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1. Every
-  published clause on the chassis now ships. The water walk — it moves
-  and fights on Coast and Ocean "as it would on land" (`waterWalks` /
-  `unit_water_walk`: no embark, no seafaring tech, no cliff, and its own
-  pool and strength throughout). "Can only heal in friendly territory" —
-  its own ground or an ally's, a WIDER bar than Twilight Valor's "outside
-  your territory", so the two are two predicates. "Cannot earn experience
-  or Promotions" (`xpEligible` / `_xp_eligible`) and "Cannot form Corps or
-  Armies by any means" (`formationBanned`, and the FORM_UP column refuses
-  the chassis as actor and as host). "-17 Ranged Strength against District
-  defenses and naval units" — the district half is `rangedCityPenalty`,
-  which every land ranged unit already pays, so `gdrNavalCS` /
-  `_gdr_naval_cs` carries the naval half alone.
+    The right model is already in both engines. `gdrJump` — CIV6 (Enhanced
+    Mobility): the robot "can perform a Jump action to cross over mountain
+    terrain" — is exactly "a mountain this may enter", and it is consulted at
+    TWO sites on each engine and nowhere else:
+
+      TS   units.ts `tileFreeForUnit`, and the pathing arm beside it
+      GPU  sim_masks.py's `_jmp` term, and sim_orders.py's
+
+    So the ENTERABLE half is four small terms and touches none of the fourteen
+    baked flags. Mirror `gdrJump`'s sites with a tunnel plane
+    (`improvement == MOUNTAIN_TUNNEL`), which is monotone because a tunnel is
+    never removed.
+
+    THE PORTAL HALF is where the real difficulty is, and it is a DESIGN fork
+    rather than a sourcing one. "Exit from another portal at the cost of 2
+    Movement" needs a TARGET, and both engines' move space is six DIRECTIONS —
+    there is nowhere to say WHICH portal. The options are a per-portal action
+    column (widening the action space, and appending shifts the layout that
+    silently killed PILLAGE in #78), or a deterministic pick (nearest, or
+    lowest tile index) that needs no encoding but decides play. Neither is
+    published; the install's `EFFECT_MOUNTAIN_PORTAL` carries no arguments at
+    all. Settle that fork before building, and record it.
+
+    A range, if the "same mountain range" reading is kept, is a connected
+    component of mountain tiles — the flood fill `deriveContinents` already
+    does for C-48.
 
   THE FOUR FUTURE-ERA UPGRADES need no per-unit state after all: the page
   says the chassis "gains additional abilities and upgrades via Future Era
