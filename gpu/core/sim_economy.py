@@ -2814,6 +2814,7 @@ class SimEconomy:
         contrib = torch.where(d <= reach.unsqueeze(1), w.unsqueeze(1), torch.zeros_like(d))  # [B, K, K]
         onehot = ((fol.unsqueeze(2) == torch.arange(O, device=self.device).reshape(1, 1, O)) & emits.unsqueeze(2)).double()
         add = (contrib.double() @ onehot).long().reshape(B, NSC, RC, O) * liv.unsqueeze(3).long()
+        self._route_pressure_terms(add, founded, liv)
         # CIV6 (Citadel of God): "City ignores pressure ... from Religions not
         # founded by the Governor's player."
         if self.n_governors:
@@ -2839,6 +2840,73 @@ class SimEconomy:
             _conv = (self.city_followed[:, :NSC] == _g) & (was != _g) & liv
             if bool(_conv.any()):
                 self._dedication_event(_g, 3, _conv.reshape(B, -1).sum(dim=1))
+
+    def _route_pressure_share(self, base: float, pct: torch.Tensor) -> torch.Tensor:
+        """[B] long — `routePressureShare`'s twin: a per-turn route amount's
+        whole part every turn and its half on EVEN turns (the accumulator is
+        an integer)."""
+        amt = base * (100 + pct.double()) / 100
+        whole = amt.floor()
+        half = ((amt > whole) & (self.turn % 2 == 0)).double()
+        return (whole + half).long()
+
+    def _route_pressure_terms(self, add: torch.Tensor, founded: torch.Tensor, liv: torch.Tensor) -> None:
+        """CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
+        _FOR_ORIGIN 0.5): every live route carries its ORIGIN's religion to
+        the destination and the destination's back at half strength, Dharma's
+        +100% on the route OWNER's rows. Major receivers land in `add` (so the
+        Citadel and alliance masks apply); a city-state destination takes the
+        pressure straight into its row and follows nothing."""
+        B, O, NSC, S = self.B, self.n_majors, self.n_majors, self.S
+        cen_f = self.city_center[:, :NSC].reshape(B, -1)
+        fol_f = self.city_followed[:, :NSC].reshape(B, -1)
+        liv_f = liv.reshape(B, 1, -1)
+        add_f = add.reshape(B, -1, O)
+
+        def cell_of(ct: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            hit = (ct.unsqueeze(2) == cen_f.unsqueeze(1)) & liv_f & (ct >= 0).unsqueeze(2)
+            cell = hit.long().argmax(dim=2)
+            return hit.any(dim=2), cell, fol_f.gather(1, cell)
+
+        for row in range(NSC):
+            oc, dc = self._route_centres(row)
+            live = (oc >= 0) & (dc >= 0)
+            if not bool(live.any()):
+                continue
+            pct_o = torch.zeros(B, dtype=torch.long, device=self.device)
+            pct_d = torch.zeros(B, dtype=torch.long, device=self.device)
+            for civ, lead, o_f, d_f, pct in self._route_pressure_rows:
+                has = self._row_is(row, civ, lead).long() * pct
+                if o_f:
+                    pct_o = pct_o + has
+                if d_f:
+                    pct_d = pct_d + has
+            w_d = self._route_pressure_share(self._route_dest_pressure, pct_d)
+            w_o = self._route_pressure_share(self._route_origin_pressure, pct_o)
+            o_ok, o_cell, g_o = cell_of(oc)
+            d_ok, d_cell, g_d = cell_of(dc)
+            src_o = live & o_ok & (g_o >= 0) & founded.gather(1, g_o.clamp(min=0))
+            src_d = live & d_ok & (g_d >= 0) & founded.gather(1, g_d.clamp(min=0))
+            # the origin's religion lands on a MAJOR destination
+            m = src_o & d_ok & (w_d.unsqueeze(1) > 0)
+            if bool(m.any()):
+                b, k = m.nonzero(as_tuple=True)
+                add_f.index_put_((b, d_cell[b, k], g_o[b, k]), w_d[b], accumulate=True)
+            # the destination's religion lands back on the origin
+            m = src_d & o_ok & (w_o.unsqueeze(1) > 0)
+            if bool(m.any()):
+                b, k = m.nonzero(as_tuple=True)
+                add_f.index_put_((b, o_cell[b, k], g_d[b, k]), w_o[b], accumulate=True)
+            # a CITY-STATE destination takes the origin's religion into its row
+            if S > 0:
+                m0 = self._CITY_MINOR0
+                cs_c = self.city_center[:, m0:m0 + S, 0]
+                cs_hit = (dc.unsqueeze(2) == cs_c.unsqueeze(1)) & self.city_alive[:, m0:m0 + S, 0].unsqueeze(1) & (dc >= 0).unsqueeze(2)
+                cs_i = cs_hit.long().argmax(dim=2)
+                m = src_o & cs_hit.any(dim=2) & (w_d.unsqueeze(1) > 0)
+                if bool(m.any()):
+                    b, k = m.nonzero(as_tuple=True)
+                    self.city_pressure.index_put_((b, m0 + cs_i[b, k], torch.zeros_like(b), g_o[b, k]), w_d[b], accumulate=True)
 
     def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
         """(near3, terr) — [B, O, T] bool planes for the enhancer combat

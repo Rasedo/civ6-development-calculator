@@ -43,13 +43,13 @@ import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, grantFoundingPressure, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
-import { allRoadsLeadToRome } from './trade';
+import { allRoadsLeadToRome, routeDestCenter } from './trade';
 
 export const TURN_LIMIT = 250;
 
@@ -1890,6 +1890,11 @@ function theologicalCombatPhase(state: GameState): void {
   }
 }
 
+/** the per-turn pressure phase, callable alone by a test scene */
+export function spreadReligiousPressureForTest(state: GameState): void {
+  spreadReligiousPressure(state);
+}
+
 function spreadReligiousPressure(state: GameState): void {
   const nRel = state.seats.length;
   const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
@@ -1922,6 +1927,40 @@ function spreadReligiousPressure(state: GameState): void {
     // from this city."
     sources.push({ g, tile: cc, w: RELIGION_PRESSURE_PER_TURN * mult * governorTileMult(state, cc, (e) => e.pressureMult) });
   }
+  // CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 / _FOR_ORIGIN
+  // 0.5): a live route carries its origin's religion to the destination and
+  // the destination's back at half strength, Dharma's +100% on the OWNER's
+  // routes; a city-state destination takes the pressure and follows nothing
+  // (its follow set is not modelled). Keyed by the RECEIVER's centre.
+  const routeTerms = new Map<number, { g: number; w: number }[]>();
+  const byCentre = new Map(cities.map((c) => [c.centerIndex, c]));
+  for (const sx of state.seats) {
+    if (!sx.tradeRoutes?.length) continue;
+    const rows = getModifiers(state, sx.seat).routePressure;
+    const pctO = rows.filter((r) => r.origin).reduce((s, r) => s + r.pct, 0);
+    const pctD = rows.filter((r) => r.destination).reduce((s, r) => s + r.pct, 0);
+    const wD = routePressureShare(ROUTE_PRESSURE_DESTINATION * (100 + pctD) / 100, state.turn);
+    const wO = routePressureShare(ROUTE_PRESSURE_ORIGIN * (100 + pctO) / 100, state.turn);
+    for (const r of sx.tradeRoutes) {
+      const origin = sx.cities.find((c) => c.id === r.from);
+      const dCentre = routeDestCenter(state, sx, r);
+      if (!origin || dCentre < 0) continue;
+      const gO = origin.followedReligion ?? -1;
+      if (gO >= 0 && founded[gO] && wD > 0) (routeTerms.get(dCentre) ?? routeTerms.set(dCentre, []).get(dCentre)!).push({ g: gO, w: wD });
+      const gD = byCentre.get(dCentre)?.followedReligion ?? -1;
+      if (gD >= 0 && founded[gD] && wO > 0) (routeTerms.get(origin.centerIndex) ?? routeTerms.set(origin.centerIndex, []).get(origin.centerIndex)!).push({ g: gD, w: wO });
+    }
+  }
+  for (const cs of state.cityStates ?? []) {
+    const terms = routeTerms.get(cs.centerIndex);
+    if (!terms) continue;
+    let pres = cs.religionPressure;
+    if (!pres || pres.length !== nRel) {
+      pres = new Array(nRel).fill(0);
+      cs.religionPressure = pres;
+    }
+    for (const t of terms) pres[t.g] += t.w;
+  }
   for (const city of cities) {
     let pres = city.religionPressure;
     if (!pres || pres.length !== nRel) {
@@ -1940,6 +1979,11 @@ function spreadReligiousPressure(state: GameState): void {
       if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
       if (hexDistance(cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
       pres[g] += src.w;
+    }
+    for (const t of routeTerms.get(city.centerIndex) ?? []) {
+      if (deaf && t.g !== city.seat) continue;
+      if (t.g !== city.seat && alliedAtLevel(state, city.seat, t.g, ALLIANCE_RELIGIOUS, 1)) continue;
+      pres[t.g] += t.w;
     }
     const best = followedReligionOf(pres, city.population);
     const wasFollowed = city.followedReligion ?? -1;

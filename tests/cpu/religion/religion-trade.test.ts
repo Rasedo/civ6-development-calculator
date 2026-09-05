@@ -1,4 +1,7 @@
-import { grantFoundingPressure } from '../../../cpu/core/seats';
+import { grantFoundingPressure, emptySeat } from '../../../cpu/core/seats';
+import { spreadReligiousPressureForTest } from '../../../cpu/core/game';
+import { CIV_LEADERS } from '../../../cpu/data/seats';
+import type { City } from '../../../cpu/core/types';
 import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP } from '../../../cpu/data/religion';
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
@@ -196,6 +199,45 @@ describe('trade routes', () => {
 });
 
 describe('religious pressure spread', () => {
+  it("a trade route carries the origin's religion to a far destination, and the destination's back at half strength", () => {
+    // CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 / _FOR_ORIGIN
+    // 0.5); the half-point lands on EVEN turns. The GPU twin is
+    // tests/gpu/route_pressure_test.py.
+    const state = makeState(makeMap(40, 20));
+    state.sandbox = true;
+    state.seats.push(emptySeat(1));
+    const a = foundCity(state, tileAtCoords(state.map, 5, 10).index, 0).city!;
+    const b = foundCity(state, tileAtCoords(state.map, 32, 10).index, 1).city!; // 27 tiles: no ambient reach
+    for (const [seat, city] of [[0, a], [1, b]] as const) {
+      const r = seatOf(state, seat)!.religion;
+      r.founded = true;
+      r.holyTile = city.centerIndex;
+      grantFoundingPressure(state, seat);
+      city.followedReligion = seat;
+    }
+    seatOf(state, 0)!.tradeRoutes = [{ from: a.id, toSeat: 1, toSeatCity: b.id, expiresTurn: state.turn + 100 }];
+    const step = HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN; // each Holy City presses ITSELF
+    const delta = (city: City, g: number, run: () => void) => {
+      const before = city.religionPressure?.[g] ?? 0;
+      run();
+      return (city.religionPressure?.[g] ?? 0) - before;
+    };
+    // an EVEN turn: 1 down the route, the half-point back
+    state.turn = 10;
+    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(1);
+    // an ODD turn: 1 down the route, nothing back
+    state.turn = 11;
+    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(0);
+    // each Holy City's own step rides beside it
+    expect(delta(a, 0, () => spreadReligiousPressureForTest(state))).toBe(step);
+    // India: +100% on the OWNER's routes — 2 down, 1 back, on an odd turn too
+    state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'INDIA');
+    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(2);
+    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(1);
+  });
+
   it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {
     const state = makeState(makeMap(40, 20));
     state.sandbox = true;

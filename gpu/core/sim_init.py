@@ -1007,6 +1007,8 @@ class SimInit:
         self._holy_site_mult = int(rr["holySiteMult"])
         self._atheism_per_pop = int(rr["atheismPerPop"])
         self._holy_founding_per_pop = int(rr["holyCityFoundingPerPop"])
+        self._route_dest_pressure = float(rr["routeDestPressure"])
+        self._route_origin_pressure = float(rr["routeOriginPressure"])
         # pressure -> yields coupling. True: a city's FOLLOWER-belief yields key
         # on its own followedReligion (city_followed). False: on the owning
         # seat's religion.

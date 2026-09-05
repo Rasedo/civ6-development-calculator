@@ -288,7 +288,7 @@
 - leaders: GANDHI, CHANDRAGUPTA
 - unique units: INDIAN_VARU
 - unique infrastructure: STEPWELL
-- civilization ability `DHARMA`: [~C-57 a city's follower beliefs are its ONE followed religion's; Dharma stacks every religion present] EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS=Enable:true; [x] EFFECT_ADJUST_BUILDING_SPREAD_CHARGES=Amount:2; [x] EFFECT_ADJUST_RELIGION_AMENITIES_FOR_MINIMUM_FOLLOWERS=Amenities:1,Followers:1; [~C-56 a trade route carries no religious pressure on either engine] EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE=Origin:true,Destination:true,Amount:100
+- civilization ability `DHARMA`: [x] EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS=Enable:true; [x] EFFECT_ADJUST_BUILDING_SPREAD_CHARGES=Amount:2; [x] EFFECT_ADJUST_RELIGION_AMENITIES_FOR_MINIMUM_FOLLOWERS=Amenities:1,Followers:1; [x] EFFECT_ADJUST_PLAYER_TRADE_ROUTE_RELIGIOUS_PRESSURE=Origin:true,Destination:true,Amount:100
 - leader ability `GANDHI / SATYAGRAHA`: [x] EFFECT_ADJUST_PLAYER_FAITH_PEACEFUL_FOUNDERS=Amount:5; [x] EFFECT_ADJUST_WAR_WEARINESS=Amount:100,Enemy:true
 - leader ability `CHANDRAGUPTA / ARTHASHASTRA`: [~C-62 a WAR TYPE with its own prerequisite and 10-turn buff] EFFECT_ADD_DIPLOMATIC_COMBAT_MODIFIER=DiplomaticYieldSource:TERRITORIAL_EXPANSION_WAR_INITIATED,TurnsActive:10,Amount:5,ReligiousOnly:false; [~C-62 a WAR TYPE with its own prerequisite and 10-turn buff] EFFECT_ADD_DIPLOMATIC_MOVEMENT_MODIFIER=DiplomaticYieldSource:TERRITORIAL_EXPANSION_WAR_INITIATED,TurnsActive:10,Amount:2; [~C-62 a WAR TYPE with its own prerequisite and 10-turn buff] EFFECT_ADD_DIPLOMATIC_ACTION_OVERRIDE=DiplomaticAction:DIPLOACTION_DECLARE_TERRITORIAL_WAR,CivicType:CIVIC_MILITARY_TRAINING
 - leader ability `CHANDRAGUPTA / AGGRESSIVE_MILITARY`: 

@@ -246,6 +246,22 @@ export const ATHEISM_PRESSURE_PER_POP = 50;
 /** CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP 200): what a religion's
  * Holy City starts with per citizen the turn it is founded. */
 export const HOLY_CITY_FOUNDING_PRESSURE_PER_POP = 200;
+/** CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
+ * _FOR_ORIGIN 0.5): a live Trade Route carries its ORIGIN city's religion to
+ * the destination each turn, and the destination's back to the origin at
+ * half strength. READING: the accumulator is an integer, so a half-point
+ * lands on EVEN turns (`routePressureShare`). Dharma's +100% rides the
+ * route OWNER's rows (`ROUTE_PRESSURE_ROWS`). */
+export const ROUTE_PRESSURE_DESTINATION = 1.0;
+export const ROUTE_PRESSURE_ORIGIN = 0.5;
+
+/** the whole points a per-turn route amount lands THIS turn: its whole part
+ *  every turn and its half on even turns — `_route_pressure_share`'s twin */
+export function routePressureShare(amount: number, turn: number): number {
+  const whole = Math.floor(amount);
+  return whole + (amount > whole && turn % 2 === 0 ? 1 : 0);
+}
+
 /** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the lump a full-health
  * Spread lands on the target city; SCRIPTURE multiplies it x1.5 (300). */
 export const SPREAD_PRESSURE = 200;
