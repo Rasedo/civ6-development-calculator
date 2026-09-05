@@ -45,7 +45,7 @@ import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TE
 import { cityDistrictSum, pillagedDistrictTypes } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
-import { accrueStockpiles, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
@@ -1977,6 +1977,10 @@ export function seatPhase(state: GameState): void {
             actor.treasury = (actor.treasury ?? 0) - price;
             bought = true;
             u.xpPct = trainXpPct(state, spawnCity, promoClassOf(pickId));
+            // CIV6 (GS): a strategic unit pays its resource "the moment you
+            // purchase it" — the same charge `purchaseUnit` and the GPU's
+            // gold arm make; a purchase outside a queue pays full price
+            chargeUnitResource(state, actor.seat, pickId);
           }
         }
       }

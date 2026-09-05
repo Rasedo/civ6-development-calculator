@@ -165,6 +165,23 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
+- **A-10r. A GOLD-BOUGHT STRATEGIC UNIT PAID ITS RESOURCE ON THE GPU AND NOT
+  ON TS. OPENED AND CLOSED 2026-09-05.** Found by the battery at b47cd093:
+  seed 9300 t237, `seat[0].stockpile[0]` GPU 22 vs TS 42 — twenty Horses,
+  one Horseman's cost. Reproduced alone; the turn's deal moved the same 10
+  on both engines, so the extra charge was elsewhere in the turn.
+
+  Measured (one instrumented replay on each side): the GPU's gold-unit arm
+  charges `_charge_unit_resource` for the unit it buys; TS's twin — the seat
+  phase's `buy` kind-2 arm — spawned the unit, took the gold and never called
+  `chargeUnitResource`, though `purchaseUnit` beside it does and its own
+  comment says a strategic unit pays "the moment you purchase it" (CIV6, GS).
+  Latent because a driven seat rarely buys a strategic unit for gold with
+  the resource in hand; the pressure cutover's new trajectories reached it.
+
+  FIXED: the TS arm charges the resource. Bar: `gold-buy-resource` (TS —
+  the Horseman bought through the seat phase costs 20 Horses, beside the
+  turn's accrual), the GPU side under the serve gate; seed 9300 green to 250.
 - **A-9r. A RANGED HIT ON A STACKED HEX WENT TO THE FIRST-LISTED FIGHTER ON
   TS AND TO THE HULL ON THE GPU. OPENED AND CLOSED 2026-09-05.** Found by
   the battery at cb2076ee: seed 9209 t178, `unit[2145].hp` GPU 30 vs TS 71
