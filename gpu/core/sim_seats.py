@@ -6272,8 +6272,20 @@ class SimSeats:
             return self._seat_route_cache[1]
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
-        # Cleopatra's destination gold pays a city with no route of its own
-        if not bool(act.any()) and not bool(self._row_leads(row, "CLEOPATRA").any()):
+        # A seat with no route of its own can still be PAID here — by routes
+        # OTHER seats send INTO its cities. Every destination-side row has to
+        # hold this exit open, not just the one it was first written for:
+        # Cleopatra's incoming gold, the incoming-route yield rows (Radio
+        # Oranje's +2 Culture per foreign route in), and the destination side
+        # of the improvement rows. Naming only Cleopatra left Wilhelmina's +2
+        # unpaid the turn her last outgoing route expired — TS pays it
+        # regardless (seed 9001 t90, the whole of A-4r).
+        _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").any())
+                      or any(bool(self._row_is(row, r[0], r[1]).any())
+                             for r in self._incoming_route_yield_rows)
+                      or any(r[5] == 1 and bool(self._row_is(row, r[0], r[1]).any())
+                             for r in self._route_improvement_rows))
+        if not bool(act.any()) and not _dest_rows:
             self._seat_route_cache = (key, None)
             return None
         B = self.B

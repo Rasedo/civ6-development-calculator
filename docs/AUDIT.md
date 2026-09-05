@@ -41,9 +41,8 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| A-4r seed 9001 parts on culture | 1 | narrowed to the citizen assignment after a pop drop; the next probe is named in the entry |
 | A-6r the slotted policy cards are not compared | 1 | the digest carries `governmentsHeld` and the civics under it, but not the CARDS a seat slots nor the extra SLOTS it holds — A-5r lived in that gap for as long as it took one unit's XP to come out wrong |
-| **A. Engine vs engine** | **2** | |
+| **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the scored-competition catalog holds one row |
@@ -91,7 +90,7 @@ from the list below.
 | C-74 three disaster rates were stylized (CLOSED 2026-09-05, MODERATE / 500 turns; eruptions still open) | 0 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
 | **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **58** | |
+| **OPEN, TOTAL** | **57** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -168,67 +167,38 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
-- **A-4r. SEED 9001 PARTS ON CULTURE, AND THE BATTERY'S SHARDING HID IT.**
-  Weight 2. OPEN. Found 2026-09-04 at a battery-GREEN head with a clean tree
-  and regenerated fixtures — reproduced with all uncommitted work stashed, so
-  it is nobody's edit.
+- **A-4r. SEED 9001 PARTS ON CULTURE, AND THE BATTERY'S SHARDING HID IT. CLOSED 2026-09-05.**
+  A route coming IN was paid only while a route was going OUT.
 
-      --seeds 9001         RED turn 100      --seeds 9001,9014   RED turn 218
-      --seeds 9001,9014    GREEN to 120 turns
+  `_seat_route_income` returned None for a seat with no outgoing route, and
+  held that exit open for exactly one destination-side row — Cleopatra's
+  incoming gold, the row it was first written for. Radio Oranje's "+2 Culture
+  from each Trade Route another civilization sends to this one" is paid
+  inside the same walk. Seat 2 of seed 9001 is Wilhelmina; at t90 her one
+  outgoing route (412 -> seat 1, born 70) expired, the walk returned None,
+  and the +2 she was still owed for seat 1's route INTO 412 (born 75, live
+  to 95) stopped with it. TS pays it regardless, which is the 2.0/turn the
+  entry first recorded — 1.9 after the shared x0.95 amenity factor. The
+  "rows behind an early return" class, with a NAMED-LEADER exemption as the
+  door: the next destination-side row was always going to sit behind it.
 
-  The batch composition moves WHEN it fires, not whether.
+  FIXED by deriving the exemption from the rows — Cleopatra's, the
+  incoming-route yield rows, and the destination side of the improvement
+  rows all hold the walk open. Bar: `incoming-route` (4) and
+  `incoming_route` (6, verified to red against the old guard), and seed 9001
+  alone is green to 250 turns.
 
-  MEASURED at turn 100, and this is the useful part — it is a RATE, not a
-  stock:
-
-      seat[2].culRate         GPU 4.9    vs TS 6.9       <- flat 2.0/turn
-      seat[2].cultureTotal    GPU 451.66 vs TS 453.66    <- one turn of it
-      seat[2].civicProgress   GPU 3.66   vs TS 5.66      <- the same 2.0
-      city[412].cultureBox    GPU 25.66  vs TS 27.66     <- one city carries it
-
-  Every OTHER compared field matches, so the state is identical and the
-  difference is in what the two engines COMPUTE from it. City 412's own
-  culture-bearing state is unchanged across the divergence — same 4 buildings,
-  1 district, no great works — but its POPULATION fell 4 -> 3 at turn 99, the
-  turn before.
-
-  LEADING HYPOTHESIS, not yet confirmed: the CITIZEN ASSIGNMENT. A pop drop
-  forces the city to give up its lowest-ranked worked tile, and the two
-  engines rank by different sums. TS's `assignWorkedTiles` scores each tile
-  with `tileScore(tileYields(yctx, t), focus)` — the WHOLE yield vector — and
-  breaks ties by ascending index. The GPU ranks with
-  `(f * w[0] + p * w[1] + oth_sc) * 1e6 - tile`, where `oth_sc` is built once
-  in `_rcy_globals` from `ty_oth`. If any culture term reaches TS's
-  `tileYields` but not the GPU's `ty_oth`, the marginal tile differs and the
-  city works a tile worth 2 less culture — which is exactly the symptom, with
-  the GPU low.
-
-  RULED OUT: `City.focus`. The manifest excludes it saying "the GPU allocates
-  one way and stores no focus", which reads like a live gap but is not one —
-  every city is created `focus: 'balanced'` and nothing ever assigns another
-  value, so the two rankings use the same weights.
-
-  THE PROBE THAT WOULD CONFIRM IT: log the WORKED TILE SET for city 412 at
-  turn 100 on both engines — TS at `assignWorkedTiles`' return, the GPU at the
-  `key.topk(M, dim=2)` in `_seat_city_yields` — and diff them. If they differ
-  by one tile whose culture differs by 2, the mechanism is settled and the
-  hunt becomes "which culture term is missing from `ty_oth`". Use the house
-  two-sided CIV6_DBG pattern, as A-2r did.
-
-  WHY THE BATTERY MISSED IT: the serve shards 24 seeds over 8 lanes, three to
-  a lane, and 9001's shard-mates never reach the divergence inside 250 turns.
-  Every serve lane in the last green run reported ok. So a green battery is
-  evidence about the SHAPES it ran, not about the pair of engines — and B=1,
-  where this fires earliest, is a shape the round bar never exercises at all.
-  Both known batch-shape classes (`narrow-batch-gather`,
-  `collapsed-roster-mask`) hide in exactly that gap. A lane or battery mode
-  that runs one seed ALONE is worth having regardless of this bug.
-
-## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
-
-NO GATE CAN CATCH THIS CLASS. Parity proves the two engines match, never
-that either matches the real game, so every entry here closes against a
-Civ 6 source or is recorded as unverifiable.
+  WHAT THE HUNT MEASURED, so nobody re-derives it: the leading hypothesis
+  (the citizen assignment after a pop drop) was wrong — city 412's worked
+  set is IDENTICAL on both engines at t88/t89/t90 (locked 458, then 324,
+  368, 411, 455), and so are its slotted cards, loyalty (100), age (0) and
+  dedication. The culture BREAKDOWN found it in one run: TS trade culture 4
+  -> 4 -> 2 across t88-t90 where the GPU's went 4 -> 4 -> 0. Print the
+  breakdown of the diverging component FIRST next time; six eliminations
+  went before it. The sharding note stands: under the old 8-shard layout
+  this fired at t218 in its shard and at t100 alone, and the C-74 rates
+  moved it to t90 — a trajectory-dependent first-fire, which is why the
+  single-seed 250-turn run stays in the per-commit bar.
 
 - **B-20r. Tourism tails.** The mechanics ship (works, relics, artifacts,
   parks, shipwrecks, both museums' theming, provenance across capture);
