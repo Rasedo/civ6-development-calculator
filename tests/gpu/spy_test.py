@@ -478,19 +478,20 @@ def main() -> None:
     for _r in sim._spy_escape_routes:
         _r["basePct"] = -1000
     sim._spy_capture_pct = 100
-    held0 = int(sim.seat_spy_held[0, row, foe])
+    held_cell = sim.seat_spy_held[0, row, foe].clone()
+    held0 = int(held_cell.sum())
     w18 = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w18] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w18] = 1
     sim._tick_spies(row)
-    assert not bool(sim.unit_alive[0, w18]) and int(sim.seat_spy_held[0, row, foe]) == held0 + 1
+    assert not bool(sim.unit_alive[0, w18]) and int(sim.seat_spy_held[0, row, foe].sum()) == held0 + 1
     sim._spy_capture_pct = 0
     w18b = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w18b] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w18b] = 1
     sim._tick_spies(row)
-    assert not bool(sim.unit_alive[0, w18b]) and int(sim.seat_spy_held[0, row, foe]) == held0 + 1
-    sim.seat_spy_held[0, row, foe] = held0
+    assert not bool(sim.unit_alive[0, w18b]) and int(sim.seat_spy_held[0, row, foe].sum()) == held0 + 1
+    sim.seat_spy_held[0, row, foe] = held_cell
     print("  18 split OK — the cell at 100, the grave at 0")
 
     # -- 19: ACE DRIVER moves the escape and nothing else -------------------

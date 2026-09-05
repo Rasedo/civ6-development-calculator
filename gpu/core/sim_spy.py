@@ -464,9 +464,9 @@ class SimSpy:
                 self._level_up_spy(b, int(posted[0]))
             # CIV6: captured spies "are imprisoned, but not killed", and the
             # owner "can then attempt to trade with the civilization who
-            # captured the Spy, securing their release". A cell holds a
-            # COUNT, so the spy that comes home is a new one at level 1.
-            self.seat_spy_held[b, row, hr] += 1
+            # captured the Spy, securing their release" — at the level it
+            # was caught at (the cell counts by level).
+            self.seat_spy_held[b, row, hr, min(int(self.unit_spy_level[b, v]), self._spy_max_level)] += 1
         self.unit_alive[b, v] = False
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,

@@ -25,7 +25,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { civsAtWar, emptySeat, setTileOwner, setWar, setWarTurnsWith, borderTurnsFrom } from '../../../cpu/core/seats';
 import {
-  dealOfferOf, dealTermOf, setSpyHeld, spyHeldWith, cityTradeable,
+  dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable,
 } from '../../../cpu/core/deals';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN, DEAL_GREAT_WORK,
@@ -216,7 +216,7 @@ describe('the things a deal can name', () => {
 
   it('a captured spy goes home to its own capital', () => {
     const state = table();
-    setSpyHeld(state, 1, 2, 1);
+    holdSpy(state, 1, 2, 0);
     expect(spiesOf(state, 1)).toHaveLength(0);
     play(state, {
       2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
@@ -230,6 +230,29 @@ describe('the things a deal can name', () => {
     // owner's side of the ledger a little worse than the price
     expect(state.seats[2].treasury).toBe(1100);
     expect(state.seats[1].treasury).toBeLessThanOrEqual(900);
+  });
+
+  it('a captured spy goes home at the level it was caught at, the highest first', () => {
+    // STYLIZED (owner ruling 2026-09-04): the cell holds LEVELS, and when it
+    // holds several the highest goes first — the GPU twin is
+    // tests/gpu/spy_release_level_test.py
+    const state = table();
+    holdSpy(state, 1, 2, 1);
+    holdSpy(state, 1, 2, 3);
+    expect(spyHeldWith(state, 1, 2)).toBe(2);
+    play(state, {
+      2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
+      1: { accept: [2] },
+    });
+    expect(spiesOf(state, 1).map((u) => u.spyLevel)).toEqual([3]);
+    expect([...spyLevelsHeld(state, 1, 2)]).toEqual([1]);
+    for (const s of state.seats) s.treasury = 1000;
+    play(state, {
+      2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
+      1: { accept: [2] },
+    });
+    expect(spiesOf(state, 1).map((u) => u.spyLevel).sort()).toEqual([1, 3]);
+    expect(spyHeldWith(state, 1, 2)).toBe(0);
   });
 
   it('a captor with no prisoner has nothing to release', () => {

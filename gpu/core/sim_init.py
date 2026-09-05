@@ -434,7 +434,10 @@ class SimInit:
         self.deal_term_item = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
-        self.seat_spy_held = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # ...as COUNTS BY LEVEL, so the spy that is traded back is the one that
+        # was caught (C-16): [B, pw, pw, level].
+        self.seat_spy_held = torch.zeros(B, _pw, _pw, int(rules.eras["espionage"]["maxLevel"]) + 1,
+                                         dtype=torch.long, device=device)
         # THE SCORED COMPETITION running right now: which one (-1 = none), the
         # turns it has left, and the field's running scores. ONE at a time.
         # CIV6 (Nuclear accident): the reactor's AGE per city — the turns since
@@ -3130,6 +3133,12 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["combatCs"]]  # type: ignore[misc]
         self._post_kill_heal_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postKillHeal"]]  # type: ignore[misc]
+        # [civ, leaderRow, classMask] — CIV6 (Mongol Horde): a defeated unit of
+        # the mask's class may be CAPTURED by an attacker of the same class
+        self._capture_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["captureUnits"]]  # type: ignore[misc]
+        self._captured_hp = int(rules.combat["capturedHp"])
+        self._capture_base_diff = int(rules.combat["captureBaseDiff"])
         self._embark_move_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["embarkMoves"]]  # type: ignore[misc]
         self._ignore_shores_rows: list[tuple[int, int, int]] = [

@@ -356,10 +356,11 @@ export interface GameState {
    *  seat is handing over for the rest of the 30 turns, and what comes back
    *  when the clock runs out. */
   dealTerms?: Record<string, DealTerm>;
-  /** CAPTURED SPIES, keyed owner -> captor: how many of the owner's spies that
-   *  captor is holding. They are "imprisoned, but not killed" and still count
-   *  against the owner's capacity. */
-  spyHeld?: Record<string, number>;
+  /** CAPTURED SPIES, keyed owner -> captor: the LEVELS of the owner's spies
+   *  that captor is holding, one entry per spy. They are "imprisoned, but not
+   *  killed", still count against the owner's capacity, and come home at the
+   *  level they were caught at (`releaseSpy`). */
+  spyHeld?: Record<string, number[]>;
   /** the CLIMATE PHASE the world has reached, 0 = Phase I; absent or -1 =
    *  no climate change yet. Monotone: it never steps back. */
   climateIdx?: number;

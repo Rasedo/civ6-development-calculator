@@ -53,13 +53,30 @@ export function dealTermOf(state: GameState, from: number, to: number): DealTerm
 
 /** How many of `owner`'s spies `captor` is holding. */
 export function spyHeldWith(state: GameState, owner: number, captor: number): number {
-  if (owner === captor) return 0;
-  return state.spyHeld?.[grantKey(owner, captor)] ?? 0;
+  return spyLevelsHeld(state, owner, captor).length;
 }
 
-export function setSpyHeld(state: GameState, owner: number, captor: number, n: number): void {
+/** the LEVELS of `owner`'s spies in `captor`'s cell, in the order caught */
+export function spyLevelsHeld(state: GameState, owner: number, captor: number): readonly number[] {
+  if (owner === captor) return [];
+  return state.spyHeld?.[grantKey(owner, captor)] ?? [];
+}
+
+/** a spy of `owner` at `level` goes into `captor`'s cell */
+export function holdSpy(state: GameState, owner: number, captor: number, level: number): void {
   if (owner === captor) return;
-  (state.spyHeld ??= {})[grantKey(owner, captor)] = n;
+  ((state.spyHeld ??= {})[grantKey(owner, captor)] ??= []).push(level);
+}
+
+/** ONE spy leaves `captor`'s cell for `owner` and its level is returned — the
+ *  HIGHEST held when there are several: the real deal names a spy, this model
+ *  ranks them. undefined when the cell is empty. `_spy_cell_release` is the twin. */
+export function releaseSpy(state: GameState, owner: number, captor: number): number | undefined {
+  const cell = state.spyHeld?.[grantKey(owner, captor)];
+  if (!cell || cell.length === 0) return undefined;
+  const top = Math.max(...cell);
+  cell.splice(cell.indexOf(top), 1);
+  return top;
 }
 
 /** CIV6: a captured spy is "imprisoned, but not killed", and it still counts
@@ -169,9 +186,11 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       break;
     }
     case DEAL_SPY: {
-      setSpyHeld(state, receiver, giver, spyHeldWith(state, receiver, giver) - 1);
+      // the spy that comes home is the one that was caught, at its level
+      const lvl = releaseSpy(state, receiver, giver);
       const home = capitalCityOf(state, receiver);
-      if (home) spawnUnit(state, SPY_UNIT, home.centerIndex, receiver);
+      const freed = home ? spawnUnit(state, SPY_UNIT, home.centerIndex, receiver) : null;
+      if (freed && lvl !== undefined) freed.spyLevel = lvl;
       break;
     }
     case DEAL_OPEN_BORDERS:

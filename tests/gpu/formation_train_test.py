@@ -5,7 +5,7 @@
 
 CIV6 (Military Academy, Seaport): the building lets its city train a Corps or
 Army (a Fleet or Armada at sea) DIRECTLY once the formation's own civic is in
-— 150% / 225% of the unit's cost, 25% off for the building that enables the
+— 150% / 200% of the unit's cost, 25% off for the building that enables the
 order. The production layout carries the order as its own column block
 (`FORM_BASE`, corps then army), the queue stores that code, and the completion
 spawns the unit already at its tier.
@@ -14,7 +14,7 @@ Proven here:
   * a formation column lights only with the enabling building standing AND the
     tier's civic in — and the LAND building unlocks nothing at sea;
   * the queued order costs round(unit x 1.5 x 0.75) for the corps and
-    round(unit x 2.25 x 0.75) for the army, half rounding UP as Math.round does;
+    round(unit x 2.0 x 0.75) for the army, half rounding UP as Math.round does;
   * the APPLY re-validates — a fuzzed code for a chassis without combat, a city
     without the building, or a tier without its civic commits nothing;
   * the completion spawns the unit AT its tier;

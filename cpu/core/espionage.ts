@@ -9,7 +9,7 @@
  */
 import { hexDistance } from '../../world/hex';
 import { UNITS, UNIT_ERA_INDEX } from '../data/units';
-import { setSpyHeld, spiesHeldOf, spyHeldWith } from './deals';
+import { holdSpy, spiesHeldOf } from './deals';
 import { TECHS } from '../data/techs';
 import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
@@ -508,9 +508,8 @@ function spyEscape(state: GameState, unit: Unit,
     if (captor) levelUpSpy(state, captor);
     // CIV6: captured spies "are imprisoned, but not killed", and the owner
     // "can then attempt to trade with the civilization who captured the Spy,
-    // securing their release". A cell holds a COUNT, so the spy that comes
-    // home is a new one at level 1.
-    setSpyHeld(state, unit.seat, jailer, spyHeldWith(state, unit.seat, jailer) + 1);
+    // securing their release" — at the level it was caught at.
+    holdSpy(state, unit.seat, jailer, spyLevel(unit));
     disbandUnit(state, unit.id);
     return;
   }

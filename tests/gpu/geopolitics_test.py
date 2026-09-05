@@ -815,11 +815,11 @@ def poke_deal(rules, path):
     # Capital", and the captor is paid for it.
     clear_pairs(sim)
     sim.civ_treasury[:] = 1000.0
-    sim.seat_spy_held[0, a, b] = 1
+    sim.seat_spy_held[0, a, b, 0] = 1
     before = int(sim._spies_of(a).sum())
     assert int(sim._spies_held_of(a)) == 1
     deal(sim, b, a, [[K._deal_k_spy, 0, 0]], [[K._deal_k_gold, 100, 0]])
-    assert int(sim.seat_spy_held[0, a, b]) == 0
+    assert int(sim.seat_spy_held[0, a, b].sum()) == 0
     assert int(sim._spies_of(a).sum()) == before + 1, "no spy came home"
     assert float(sim.civ_treasury[0, b]) == 1100.0
 

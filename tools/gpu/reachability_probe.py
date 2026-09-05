@@ -326,7 +326,7 @@ def main() -> None:
             mark(f"visibility{_lv}", (_v >= _lv).any(dim=2).any(dim=1), t)
         mark("dealOffered", (sim.deal_offer_left > 0).any(dim=2).any(dim=1), t)
         mark("dealTerm", (sim.deal_term_left > 0).any(dim=2).any(dim=1), t)
-        mark("spyHeld", (sim.seat_spy_held > 0).any(dim=2).any(dim=1), t)
+        mark("spyHeld", (sim.seat_spy_held > 0).any(dim=3).any(dim=2).any(dim=1), t)
         # A CLOSED border is only a rule where a unit actually stands against
         # one: the refusal, not the civic.
         _ut = sim.unit_type.clamp(min=0)

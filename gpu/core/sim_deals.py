@@ -23,7 +23,19 @@ class SimDeals:
         """[B] — how many of this row's spies are sitting in someone's cell.
         CIV6: they are "imprisoned, but not killed" and still count against the
         owner's capacity. `spiesHeldOf`'s twin."""
-        return self.seat_spy_held[:, row, : self.n_majors].sum(dim=1)
+        return self.seat_spy_held[:, row, : self.n_majors].sum(dim=(1, 2))
+
+    def _spy_cell_release(self, owner: int, captor: int, ok: torch.Tensor) -> torch.Tensor:
+        """[B] long — take ONE spy out of `captor`'s cell for `owner` in the
+        games `ok` names and return its level: the highest level held, the
+        `releaseSpy` twin. 0 where the cell is empty (nothing is taken)."""
+        cell = self.seat_spy_held[:, owner, captor]
+        has = cell > 0
+        top = cell.shape[1] - 1 - has.flip(1).long().argmax(dim=1)
+        take = ok & has.any(dim=1)
+        tr = take.nonzero(as_tuple=True)[0]
+        self.seat_spy_held[tr, owner, captor, top[tr]] -= 1
+        return torch.where(take, top, torch.zeros_like(top))
 
     def _deal_capital_col(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B] city column and [B] live mask — where a released spy goes home.
@@ -77,7 +89,7 @@ class SimDeals:
             return cell.any(dim=1) & full_hp & (outer >= wmax)
         if kind == self._deal_k_spy:
             # The giver is the CAPTOR: it lets one of the taker's own spies go.
-            return self.seat_spy_held[:, taker, giver] > 0
+            return self.seat_spy_held[:, taker, giver].sum(dim=1) > 0
         if kind == self._deal_k_borders:
             return ~z
         return z
@@ -113,13 +125,18 @@ class SimDeals:
             for b in torch.nonzero(cell.any(dim=1)).flatten().tolist():
                 self._transfer_city(int(b), giver, int(cell[b].long().argmax()), taker, conquest=False)
         elif kind == self._deal_k_spy:
-            one = ok.long()
-            self.seat_spy_held[:, taker, giver] = self.seat_spy_held[:, taker, giver] - one
+            # the spy that comes home is the one that was caught, at the level
+            # it was caught at; when the cell holds several, the HIGHEST goes
+            # first — the real deal names a spy, this model ranks them
+            lvl = self._spy_cell_release(taker, giver, ok)
             col, live = self._deal_capital_col(taker)
             home = ok & live
             if bool(home.any()) and self._spy_idx >= 0:
                 at = self.city_center[:, taker].gather(1, col.unsqueeze(1)).squeeze(1)
-                self._spawn_unit(taker, home, at, self._spy_idx)
+                slot0 = getattr(self, self.POOL_NEXT["major"]).clone()
+                got = self._spawn_unit(taker, home, at, self._spy_idx)
+                gr = got.nonzero(as_tuple=True)[0]
+                self.major_unit_spy_level[gr, slot0[gr]] = lvl[gr]
         elif kind == self._deal_k_borders:
             self.seat_borders_turns[:, giver, taker] = torch.where(
                 ok, torch.full_like(self.seat_borders_turns[:, giver, taker], self._agreement_turns),

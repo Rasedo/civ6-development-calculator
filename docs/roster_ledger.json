@@ -106,7 +106,7 @@
   "TRAIT_CAPTURED_LOYALTY": "shipped",
   "TRAIT_CAPTURED_NO_POPULATION_LOSS": "shipped",
   "TRAIT_CASTLE_PRODUCTION": "shipped",
-  "TRAIT_CAVALRY_CAPTURE_CAVALRY": "open: C-58 a defeated unit is never captured on either engine",
+  "TRAIT_CAVALRY_CAPTURE_CAVALRY": "shipped",
   "TRAIT_CITY_ADJACENT_RIVER_BUILDING_PRODUCTION": "shipped",
   "TRAIT_CITY_ADJACENT_RIVER_DISTRICT_PRODUCTION": "shipped",
   "TRAIT_CITY_STATE_TOKEN_SAME_RELIGION": "open: C-64 — a seat's MAJORITY religion (neither engine holds one)",

@@ -109,6 +109,15 @@ export const SEA_MOVE_TECH_BONUS = 1;
  */
 export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] = [15, 15, 15, 30, 35, 50, 55, 55, 55];
 
+/** CIV6 (GlobalParameters.xml): COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20 —
+ *  the one number the install publishes beside the cavalry capture's
+ *  permission. The curve through it is this model's (STYLIZED, owner ruling
+ *  2026-09-04): an even fight is a coin flip, certain at +base, nothing at
+ *  -base — see `captureRoll`. */
+export const CAPTURE_BASE_STRENGTH_DIFF = 20;
+/** the hit points a captured unit arrives with — STYLIZED, no source */
+export const CAPTURED_UNIT_HP = 25;
+
 /** master switch for the LIVE scripted WATER movement (the seat
  * war-march taking water steps). N1 lands the full embark/movement MODEL and
  * plumbing but keeps the scripted water-stepping INERT (false): turning it on

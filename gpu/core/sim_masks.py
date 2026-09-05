@@ -225,6 +225,47 @@ class SimMasks:
             )
         return dmg
 
+    def _capture_roll(self, mask: torch.Tensor, diff: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """[B] bool — `captureRoll`'s twin: does the beaten unit change hands?
+
+        CIV6 (Mongol Horde) grants "a chance to capture defeated enemy cavalry
+        class units" and publishes the permission alone; the CURVE is this
+        model's, anchored on the install's COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE:
+        an even fight is a coin flip, and the chance moves linearly to certain
+        at +base and to nothing at -base. One draw from the seat's stream, in
+        the slot right after the two damage rolls on both engines."""
+        b = getattr(self, "_log_combat_b", None)
+        log_hit = b is not None and bool(mask[b])
+        c0 = int(self.rng_state[b]) if log_hit else 0
+        r = self._next_random(mask)
+        q = js_round(diff * 10).to(torch.long)
+        pct = js_round(50 + q.to(torch.float64) * 5 / self._capture_base_diff).clamp(0, 100).to(torch.long)
+        hit = mask & ((r * 100).floor().to(torch.long) < pct)
+        if log_hit:
+            self._combat_events.append(
+                f"k:cap t:{int(tile[b])} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} pct{int(pct[b])} hit{int(hit[b])}"
+            )
+        return hit
+
+    def _may_capture(self, atk_seat: torch.Tensor, a_type: torch.Tensor, d_slot: torch.Tensor) -> torch.Tensor:
+        """[B] bool — `mayCapture`'s twin: the attacker's seat carries a capture
+        row whose class holds BOTH chassis, and the loser is no passenger at
+        sea (a re-seated unit stands where it fell, and a hull's passenger has
+        no hull of its captor's to stand on)."""
+        out = torch.zeros_like(atk_seat, dtype=torch.bool)
+        if not self._capture_rows:
+            return out
+        ds = d_slot.clamp(min=0).unsqueeze(1)
+        d_type = self.unit_type.gather(1, ds).squeeze(1).clamp(min=0, max=self.NU - 1)
+        a_t = a_type.clamp(min=0, max=self.NU - 1)
+        bits = self.rules_dev.promo_class_bit
+        a_bit = bits[self.rules_dev.u_promo_class[a_t].clamp(min=0)]
+        d_bit = bits[self.rules_dev.u_promo_class[d_type].clamp(min=0)]
+        for civ, lead, mask in self._capture_rows:
+            out = out | (self._seat_is(atk_seat, civ, lead) & ((a_bit & mask) != 0) & ((d_bit & mask) != 0))
+        d_emb = self.unit_emb.gather(1, ds).squeeze(1)
+        return out & (d_slot >= 0) & ~d_emb
+
     def _city_damage_split(self, outer: torch.Tensor, walls_max: torch.Tensor,
                            roll: torch.Tensor, klass: torch.Tensor,
                            assist: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:

@@ -8321,13 +8321,13 @@ class SimSeats:
                              + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = d_seat_m
-            rows, def_dead, atk_dead, atk_raw = self._melee_exchange(
+            rows, def_dead, atk_dead, atk_raw, captured = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, a_hp, u, atk_e, def_e,
-                self._row_of(a_seat[:, u]))
+                self._row_of(a_seat[:, u]), a_type[:, u])
             self._award_pair_xp(
                 mil_att, a_kind=atk_kind, u=u, a_type=a_type[:, u], a_seat=a_seat[:, u],
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
-                ranged=False, a_died=atk_raw, d_died=def_dead)
+                ranged=False, a_died=atk_raw, d_died=def_dead | captured)
             self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
                                   vict_form=self._form_tier(d_slot))
             self._disciples_spread(a_seat[:, u], a_type[:, u], a_promos, def_is_barb,
@@ -8338,7 +8338,7 @@ class SimSeats:
                                    a_seat[:, u] == BARB_SEAT, tgt, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(_wwd), tgt,
-                            a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
+                            a_died=atk_dead, d_died=((_wwh & ~self._ww_occ(tgt)) != 0) | captured)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
@@ -10035,7 +10035,7 @@ class SimSeats:
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
                         d_slot: torch.Tensor, a_hp: torch.Tensor, u: int,
                         atk_e: torch.Tensor, def_e: torch.Tensor,
-                        atk_row: torch.Tensor):
+                        atk_row: torch.Tensor, a_type: torch.Tensor):
         """ONE melee exchange between two units — the `meleeAttack` core.
 
         The paired rolls, the defender-death write and the victor-survives rule
@@ -10052,16 +10052,28 @@ class SimSeats:
 
         The fourth return is the attacker's RAW death, before the victor
         survives: `awardBattleXp` reads the hp the rolls left, so a mutual kill
-        pays neither side.
+        pays neither side. The fifth is the CAPTURE: a beaten unit that changed
+        hands instead of dying — CIV6 (Mongol Horde). It counts as a defeat for
+        the experience and the weariness, and as no death for the kill event,
+        the disciples, the dig, the heal and the advance: `def_dead` excludes it.
         """
         d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
         d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
         def_dead = torch.zeros_like(att)
+        captured = torch.zeros_like(att)
         if len(rows) > 0:
             ds = d_slot[rows]
             self.unit_hp[rows, ds] -= d_def[rows]
             dead = self.unit_hp[rows, ds] <= 0
+            if self._capture_rows and bool(dead.any()):
+                fell = torch.zeros_like(att)
+                fell[rows[dead]] = True
+                captured = self._capture_roll(fell & self._may_capture(atk_row, a_type, d_slot),
+                                              atk_e - def_e, tgt)
+                dead = dead & ~captured[rows]
+                if bool(captured.any()):
+                    self._capture_beaten(captured, d_slot, atk_row, tile_c)
             def_dead[rows[dead]] = True
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
@@ -10069,12 +10081,13 @@ class SimSeats:
             self._dig_at(gd, td, self.unit_seat[gd, ds[dead]])
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         atk_raw = att & (a_hp[:, u] <= 0)
-        both = def_dead & atk_raw
+        beaten = def_dead | captured
+        both = beaten & atk_raw
         a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])
         # The WAR DEPARTMENT's heal, both ways: the attacker whose blow landed
         # and, where the counter killed instead, the defender who stood.
         a_hp[:, u] = self._heal_on_kill(atk_row, def_dead, a_hp[:, u])
-        d_won = atk_raw & ~def_dead
+        d_won = atk_raw & ~beaten
         if self._heal_kill_live and bool(d_won.any()):
             # the whole batch, narrowed after: a gather over a SUBSET index
             # reads batch rows 0..n-1, which are the wrong games
@@ -10084,7 +10097,18 @@ class SimSeats:
             healed = self._heal_on_kill(self._row_of(d_seat_all), d_won, hp_all)
             dr = d_won.nonzero(as_tuple=True)[0]
             self.unit_hp[dr, ds_all[dr]] = healed[dr]
-        return rows, def_dead, atk_raw & ~def_dead, atk_raw
+        return rows, def_dead, atk_raw & ~beaten, atk_raw, captured
+
+    def _capture_beaten(self, captured: torch.Tensor, d_slot: torch.Tensor,
+                        atk_row: torch.Tensor, tile_c: torch.Tensor) -> None:
+        """The beaten unit changes hands where it stands: `reseatUnit` plus the
+        captured hit points. It joins its captor's pool LAST, the position TS
+        splices it to, keeping its promotions, experience and formation."""
+        cr = captured.nonzero(as_tuple=True)[0]
+        dst = getattr(self, self.POOL_NEXT["major"])[cr] + self.POOL_LO["major"]
+        self._convert_unit(cr, d_slot[cr], atk_row[cr], tile_c[cr])
+        self.unit_hp[cr, dst] = self._captured_hp
+        self._gen_ver += 1
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int,
                                row: int | None = None) -> torch.Tensor:

@@ -1237,6 +1237,17 @@
           "note": "DIRECTED owner -> captor: how many of that seat's spies are in someone's cell, imprisoned and still counted against its capacity."
         },
         {
+          "name": "spyHeldLevels",
+          "compare": "exact",
+          "covers": [
+            "GameState.spyHeld"
+          ],
+          "planes": [
+            "seat_spy_held"
+          ],
+          "note": "the same cell as LEVELS: [captor, level, level, ...] per holding captor, levels descending — a released spy comes home at the highest level held."
+        },
+        {
           "name": "dealOffers",
           "compare": "exact",
           "covers": [

@@ -400,6 +400,29 @@ def _seat_pair_clock(plane: str):
     return get
 
 
+def _spy_held_count(sim, b, rows):
+    """The spy cell as the pair clock reads it — [captor, count, ...] over the
+    majors holding any, ascending; the count is the level buckets summed."""
+    m = sim.seat_spy_held[b].sum(dim=2).tolist()
+    return [[x for j, v in enumerate(m[c]) if v > 0 for x in (j, int(v))] for c in rows]
+
+
+def _spy_held_levels(sim, b, rows):
+    """[captor, level, level, ...] per holding captor, ascending captor, levels
+    DESCENDING with repeats — the order the release takes them in."""
+    cell = sim.seat_spy_held[b].tolist()
+    out = []
+    for c in rows:
+        line: list[int] = []
+        for j, buckets in enumerate(cell[c]):
+            if sum(buckets) > 0:
+                line.append(j)
+                for lvl in range(len(buckets) - 1, -1, -1):
+                    line.extend([lvl] * int(buckets[lvl]))
+        out.append(line)
+    return out
+
+
 def _seat_pair_mark(plane: str):
     """`allianceType`'s renderer: [opponentSeat, code, ...] where a code
     >= 0 stands, in ascending opponent order."""
@@ -582,7 +605,8 @@ SEAT = {
     # DIRECTED: the row is what that seat GRANTS, never what it holds.
     "borderTurns": _seat_pair_clock("seat_borders_turns"),
     "delegations": _seat_pair_clock("seat_delegation"),
-    "spyHeld": _seat_pair_clock("seat_spy_held"),
+    "spyHeld": _spy_held_count,
+    "spyHeldLevels": _spy_held_levels,
     "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),
     "dealTerms": _deal_line("deal_term_left", ("deal_term_item",)),
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),

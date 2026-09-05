@@ -528,6 +528,8 @@ def main() -> int:
                 ("bankruptcy_tie", [py, "tests/gpu/bankruptcy_tie_test.py"], 2),  # A-7r a bankruptcy tie goes to the earliest-spawned unit
                 ("governor_cityless", [py, "tests/gpu/governor_cityless_test.py"], 2),  # A-8r a cityless seat's governor phase does not run
                 ("stack_defender_tie", [py, "tests/gpu/stack_defender_tie_test.py"], 2),  # A-9r a ranged hit on a stacked hex goes to the hull on a tie
+                ("capture_cavalry", [py, "tests/gpu/capture_cavalry_test.py"], 2),  # C-58 a beaten cavalry unit may change hands
+                ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # C-16 the released spy is the one that was caught
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip

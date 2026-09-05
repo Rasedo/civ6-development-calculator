@@ -29,7 +29,7 @@ import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeFor
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
@@ -869,6 +869,37 @@ export function healOnEliminate(state: GameState, victor: Unit): void {
 }
 
 /**
+ * CIV6 (Mongol Horde): may this melee loser be CAPTURED rather than killed?
+ * The attacker's seat carries a capture row whose classes hold BOTH chassis,
+ * and the loser is no passenger at sea (a re-seated unit stands where it
+ * fell, and a hull's passenger has no hull of its captor's to stand on).
+ * `_may_capture` is the twin.
+ */
+export function mayCapture(state: GameState, attacker: Unit, defender: Unit): boolean {
+  if (!isCiv(attacker.seat) || defender.embarked) return false;
+  const mask = getModifiers(state, attacker.seat).captureMask;
+  return mask !== 0 && (classBitOf(attacker.type) & mask) !== 0 && (classBitOf(defender.type) & mask) !== 0;
+}
+
+/**
+ * The capture's ONE draw — `_capture_roll` is the twin. The install publishes
+ * the permission and COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE; the curve is this
+ * model's (STYLIZED): 50% at even strength, moving linearly to 100% at +base
+ * and 0% at -base, on the same quantized q the damage roll uses. The draw is
+ * taken whenever a capture is POSSIBLE, hit or miss, so the streams agree.
+ */
+export function captureRoll(state: GameState, strengthDiff: number, t = -1): boolean {
+  const q = Math.round(strengthDiff * 10);
+  const pct = Math.min(100, Math.max(0, Math.round(50 + (q * 5) / CAPTURE_BASE_STRENGTH_DIFF)));
+  const c0 = state.rngState >>> 0;
+  const r = nextRandom(state);
+  const hit = Math.floor(r * 100) < pct;
+  const cb = (globalThis as any).__cbLog;
+  if (cb) cb.push(`k:cap t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} pct${pct} hit${hit ? 1 : 0}`);
+  return hit;
+}
+
+/**
  * CIV6 (the roster's granted abilities): the flat Combat Strength a unit's
  * civilization or leader adds under the row's clause — see `COMBAT_CS_ROWS`.
  * `foeHp` is null against a city, `foeIsCity` marks a district target.
@@ -1438,16 +1469,28 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
+    // the capture roll sits right after the two damage rolls on both engines,
+    // ahead of the experience award (which may draw a promotion offer)
+    const captured = defender.hp <= 0 && mayCapture(state, attacker, defender)
+      && captureRoll(state, atkCSf - defCSf, targetIndex);
+    // a capture is a DEFEAT for the experience and the weariness...
     awardBattleXp(state, attacker, defender,
       { ranged: false, aDied: attacker.hp <= 0, dDied: defender.hp <= 0 });
     warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
       { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
     if (defender.hp <= 0) {
-      unitKillEvent(state, unitSeat(attacker), attacker, defender);
-      disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
-      killUnit(state, defender);
+      if (captured) {
+        // ...and no death for the kill event, the disciples, the dig and the
+        // heal: CIV6 (Mongol Horde) — the loser changes hands where it fell
+        reseatUnit(state, defender, attacker.seat);
+        defender.hp = CAPTURED_UNIT_HP;
+      } else {
+        unitKillEvent(state, unitSeat(attacker), attacker, defender);
+        disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
+        killUnit(state, defender);
+      }
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
-      healOnEliminate(state, attacker);
+      if (!captured) healOnEliminate(state, attacker);
     } else if (attacker.hp <= 0) {
       unitKillEvent(state, unitSeat(defender), defender, attacker);
       disciplesSpread(state, unitSeat(defender), defender, attacker.seat, targetIndex);

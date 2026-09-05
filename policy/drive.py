@@ -988,7 +988,7 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
             quiet = (pair & ~sim.war[:, a, b] & ~sim._denounce_active(a, b)
                      & ~sim._denounce_active(b, a) & (sim.deal_offer_left[:, a, b] == 0))
             # A PRISONER goes home for a price.
-            _put(a, b, quiet & (sim.seat_spy_held[:, b, a] > 0),
+            _put(a, b, quiet & (sim.seat_spy_held[:, b, a].sum(dim=1) > 0),
                  [_item(sim._deal_k_spy)], [_item(sim._deal_k_gold, DEAL_SPY_PRICE)])
             # A STRATEGIC SURPLUS is a lot with a price on it.
             if ns > 0:

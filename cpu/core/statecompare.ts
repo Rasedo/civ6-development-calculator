@@ -42,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
-import { dealOfferOf, dealTermOf, spyHeldWith } from './deals';
+import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
 import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
@@ -551,6 +551,16 @@ const SEAT: Record<string, Extractor> = {
   borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
   delegations: overSeats((s, state) => agreementClockLine(state, s.seat, delegationWith)),
   spyHeld: overSeats((s, state) => agreementClockLine(state, s.seat, spyHeldWith)),
+  // [captor, level, level, ...] per holding captor, levels DESCENDING — the
+  // order the release takes them in
+  spyHeldLevels: overSeats((s, state) => {
+    const out: number[] = [];
+    for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+      const lv = spyLevelsHeld(state, s.seat, other);
+      if (lv.length > 0) out.push(other, ...[...lv].sort((a, b) => b - a));
+    }
+    return out;
+  }),
   dealOffers: overSeats((s, state) => dealOfferLine(state, s.seat)),
   dealTerms: overSeats((s, state) => dealTermLine(state, s.seat)),
   tilesPurchased: overSeats((s) => s.tilesPurchased),

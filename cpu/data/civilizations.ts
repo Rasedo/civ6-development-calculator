@@ -336,6 +336,19 @@ export const POST_KILL_HEAL_ROWS: readonly PostKillHealRow[] = [
   { leader: 'TOMYRIS', amount: 30 },
 ];
 
+/** CIV6 (EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE, Mongol Horde): "a chance to
+ *  capture defeated enemy cavalry class units" — a melee loser of one of the
+ *  named classes, beaten by an attacker of one of them, may change hands
+ *  instead of dying (`captureRoll`). The classes gate BOTH chassis. */
+export interface CaptureRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  classes: readonly string[];
+}
+export const CAPTURE_ROWS: readonly CaptureRow[] = [
+  { leader: 'GENGHIS_KHAN', classes: ['LIGHT_CAV', 'HEAVY_CAV'] },
+];
+
 /** CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT under UNIT_EMBARKED): extra Movement
  *  while embarked — Mana's land units, Mediterranean Colonies' Settlers. */
 export interface EmbarkMoveRow {
