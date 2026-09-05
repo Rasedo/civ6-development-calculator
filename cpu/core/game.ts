@@ -10,7 +10,7 @@ import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose } from './effects';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
@@ -685,11 +685,11 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   const worship = BUILDINGS[buildingId]?.worship === true;
   if (!state.sandbox) {
     if (worship) {
-      const cost = buildingFaithCost(state, seat, buildingId);
+      const cost = faithPrice(state, seat, buildingFaithCost(state, seat, buildingId));
       if (!goldAffordable(buyer.faith, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
       buyer.faith -= cost;
     } else {
-      const cost = buildingPurchaseCost(buildingId);
+      const cost = goldPrice(state, seat, buildingPurchaseCost(buildingId));
       if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
       buyer.treasury -= cost;
     }
@@ -711,7 +711,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   // CIV6 (Spy): "Cannot be purchased with Gold."
   if (UNITS[unitType]?.noGold) return { ok: false, reason: 'This unit cannot be purchased with Gold.' };
-  const cost = unitPurchaseCost(state, unitType, seat);
+  const cost = goldPrice(state, seat, unitPurchaseCost(state, unitType, seat));
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;
@@ -739,7 +739,7 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
   if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  const cost = settlerCost(state, seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, seat);
+  const cost = goldPrice(state, seat, settlerCost(state, seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, seat));
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;
@@ -772,7 +772,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = buildingFaithCost(state, seat, wid);
+  const cost = faithPrice(state, seat, buildingFaithCost(state, seat, wid));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
@@ -797,7 +797,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!buildingCompletable(state, city, buildingId)) {
     return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
   }
-  const cost = buildingFaithCost(state, city.seat, buildingId);
+  const cost = faithPrice(state, city.seat, buildingFaithCost(state, city.seat, buildingId));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
@@ -825,7 +825,7 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
   if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
     return { ok: false, reason: 'Unit not available (enable units mode / research).' };
   }
-  const cost = unitFaithCost(unitType);
+  const cost = faithPrice(state, seat, unitFaithCost(unitType));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'Nowhere to place it.' };
@@ -1054,7 +1054,7 @@ export function purchaseReligiousUnit(
   const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
   if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
-  const cost = unitFaithCost(unitType, unitType === 'MISSIONARY' ? (eb?.missionaryCostMult ?? 1) : 1);
+  const cost = faithPrice(state, seat, unitFaithCost(unitType, unitType === 'MISSIONARY' ? (eb?.missionaryCostMult ?? 1) : 1));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   // CIV6 (Missionary / Apostle / Inquisitor): purchased "in a city that has a
   // majority religion and a Holy Site" with the tier's building — the
@@ -1099,7 +1099,7 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = unitFaithCost('WARRIOR_MONK');
+  const cost = faithPrice(state, seat, unitFaithCost('WARRIOR_MONK'));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1141,7 +1141,7 @@ export function purchaseCivilianWithFaith(
     return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   }
   const base = unitType === 'SETTLER' ? settlerCost(state, seat) : builderCost(state, seat);
-  const cost = base * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat);
+  const cost = faithPrice(state, seat, base * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1169,7 +1169,7 @@ export function purchaseNaturalist(state: GameState, cityId: number, seat: numbe
   }
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  const cost = naturalistCost(state, seat);
+  const cost = faithPrice(state, seat, naturalistCost(state, seat));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, 'NATURALIST', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1192,7 +1192,7 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
   }
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  const cost = rockBandCost(state, seat);
+  const cost = faithPrice(state, seat, rockBandCost(state, seat));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, 'ROCK_BAND', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };

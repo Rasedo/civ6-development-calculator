@@ -1307,6 +1307,22 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
   return out;
 }
 
+/** CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the accrued
+ *  percent off every GOLD purchase — a building, a unit, a settler — applied
+ *  where the purchase is priced and paid. READING: not an upgrade, a tile or a
+ *  patronage. `_gold_price` is the twin. */
+export function goldPrice(state: GameState, seat: number, price: number): number {
+  const d = getModifiers(state, seat).goldBuyDiscountPct;
+  return d ? price * (1 - d / 100) : price;
+}
+
+/** CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued percent
+ *  off every FAITH purchase — `_faith_price` is the twin. */
+export function faithPrice(state: GameState, seat: number, price: number): number {
+  const d = getModifiers(state, seat).faithBuyDiscountPct;
+  return d ? price * (1 - d / 100) : price;
+}
+
 /** The cards seat `seat` has SLOTTED and may still use: its stored choice minus
  *  any card whose unlock has lapsed — as table indices, sorted. The congress
  *  voter and the Policy Treaty read this; `_seat_slotted` is the twin. */

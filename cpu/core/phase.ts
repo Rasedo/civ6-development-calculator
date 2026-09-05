@@ -17,7 +17,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -1935,7 +1935,7 @@ export function seatPhase(state: GameState): void {
             const okBuy = goldPurchasableBuildings(state, civCity).some((b) => b.id === def.id)
               && buildingCompletable(state, civCity, def.id);
             if (okBuy) {
-              const price = def.cost * GOLD_PURCHASE_MULT;
+              const price = goldPrice(state, actor.seat, def.cost * GOLD_PURCHASE_MULT);
               const reserve = PEACE_GOLD_COST(0);
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
@@ -1959,7 +1959,7 @@ export function seatPhase(state: GameState): void {
         let pickId: string | null = null;
         let pickCombat = -Infinity;
         for (const def of goldBuyableUnits(state, actor.seat)) {
-          if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, def.id, actor.seat))) continue;
+          if (!goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat)))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
             pickId = def.id;
@@ -1967,7 +1967,7 @@ export function seatPhase(state: GameState): void {
         }
         if (pickId) {
           const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-          const price = unitPurchaseCost(state, pickId, actor.seat);
+          const price = goldPrice(state, actor.seat, unitPurchaseCost(state, pickId, actor.seat));
           const u = spawnUnit(state, pickId, spawnCity.centerIndex, actor.seat);
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;

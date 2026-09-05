@@ -2043,6 +2043,25 @@ class SimEconomy:
         self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, pols, val)
         return val
 
+    def _gold_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the
+        accrued percent off every GOLD purchase — a building, a unit, a settler
+        — applied where the purchase is priced and paid. READING: not an
+        upgrade, a tile or a patronage. `goldPrice`'s twin; `price` [B] or
+        [B/1, N]."""
+        if not self._gov_has_effects:
+            return price
+        f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
+        return price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+
+    def _faith_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued
+        percent off every FAITH purchase — `faithPrice`'s twin."""
+        if not self._gov_has_effects:
+            return price
+        f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
+        return price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+
     def _seat_slotted(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` actually holds, its AGE and era
         window included. Every reader that means "what this seat has adopted"

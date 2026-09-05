@@ -781,7 +781,7 @@ def _buy_ctx(sim, row: int) -> dict:
     sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
                  * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
     mon_g = sim._golden_ded(row, sim._ded_monumentality)
-    sett_cost = sett_base * sim.rules.gold_purchase_mult
+    sett_cost = sim._gold_price(row, sett_base * sim.rules.gold_purchase_mult)
     sett_cost = torch.where(mon_g, sett_cost * 0.7, sett_cost)
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
@@ -802,10 +802,10 @@ def _buy_ctx(sim, row: int) -> dict:
     monu_b_ok = torch.zeros_like(mon_g)
     if sim._builder_idx >= 0:
         n_bl = (sim.major_unit_alive & (sim.major_unit_seat == row) & (sim.major_unit_type == sim._builder_idx)).sum(dim=1)
-        bl_cost = sim._builder_cost(sim.civ_builders_trained[:, row]).double() * sim.rules.faith_purchase_mult * 0.7
+        bl_cost = sim._faith_price(row, sim._builder_cost(sim.civ_builders_trained[:, row]).double() * sim.rules.faith_purchase_mult * 0.7)
         monu_b_ok = active & mon_g & (n_bl < 1) & sim._afford(sim.civ_faith[:, row], bl_cost)
     monu_s_ok = active & mon_g & (_spawn_pop >= sim.rules.settler_pop_gate) \
-        & sim._afford(sim.civ_faith[:, row], sett_base * sim.rules.faith_purchase_mult * 0.7)
+        & sim._afford(sim.civ_faith[:, row], sim._faith_price(row, sett_base * sim.rules.faith_purchase_mult * 0.7))
     cls_ok, cls_j, cls_b = sim._seat_class_buy_candidate(row, active)
     ucls_ok, ucls_j, ucls_b = sim._seat_faith_unit_candidate(row, active)
     pat_f_ok, pat_f_cls, pat_g_ok, pat_g_cls = sim._seat_patronage_candidates(row, active)

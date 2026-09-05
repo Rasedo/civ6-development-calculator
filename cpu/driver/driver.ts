@@ -31,7 +31,7 @@ import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
-import { computeUnlocks, getModifiers, isCivicComplete } from '../core/effects';
+import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
@@ -120,13 +120,13 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         }
       }
     }
-    if (bd && bc && Math.round((actor.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
+    if (bd && bc && Math.round((actor.treasury ?? 0) * 1000) >= Math.round((goldPrice(state, actor.seat, bd.cost * GOLD_PURCHASE_MULT) + PEACE_GOLD_COST(0)) * 1000)) {
       buyC = bc.centerIndex;
       buyB = prodLayout().buildings.indexOf(bd.id);
     }
     const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
-      && goldAffordable(actor.treasury ?? 0, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat));
+      && goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)));
     let mil = 0;
     for (const u of state.units) {
       if (u.seat !== actor.seat) continue;
@@ -139,7 +139,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     // `unitPurchaseCost` is the price the applier charges — Mercenary
     // Companies moves it, and every column offered here is a military unit.
     const anyU = goldBuyableUnits(state, actor.seat).some(
-      (def) => goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, def.id, actor.seat)),
+      (def) => goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat))),
     );
     const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
     let tileOk = 0;
@@ -166,7 +166,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     let religC = -1;
     if (actor.religion.founded) {
       const wid = WORSHIP_BUILDINGS[actor.seat % WORSHIP_BUILDINGS.length];
-      if (goldAffordable(actor.faith ?? 0, buildingFaithCost(state, actor.seat, wid))) {
+      if (goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, buildingFaithCost(state, actor.seat, wid)))) {
         worshipC = actor.cities.find((city) => !city.buildings.includes(wid) && city.buildings.includes('TEMPLE') && hsOk(city))?.centerIndex ?? -1;
       }
       // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
@@ -179,18 +179,18 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         && city.buildings.includes('TEMPLE') && hsOk(city) && follows(city));
       const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
       const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
-      const mCost = unitFaithCost('MISSIONARY', eb?.missionaryCostMult ?? 1);
+      const mCost = faithPrice(state, actor.seat, unitFaithCost('MISSIONARY', eb?.missionaryCostMult ?? 1));
       if (shrineCity && liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
         religKind = 5;
         religC = shrineCity.centerIndex;
       } else if (templeCity) {
         const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
         const liveQ = state.units.filter((u) => u.seat === actor.seat && u.type === 'INQUISITOR').length;
-        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, unitFaithCost('APOSTLE'))) {
+        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, unitFaithCost('APOSTLE')))) {
           religKind = 6;
           religC = templeCity.centerIndex;
         } else if (actor.religion.inquisition && liveQ < INQUISITOR_CAP
-          && goldAffordable(actor.faith ?? 0, unitFaithCost('INQUISITOR'))) {
+          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, unitFaithCost('INQUISITOR')))) {
           religKind = 11;
           religC = templeCity.centerIndex;
         }
@@ -206,12 +206,12 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       if (monuSpawn) {
         const liveBuilders = state.units.filter((u) => u.seat === actor.seat && u.type === 'BUILDER').length;
         if (liveBuilders < 1
-          && goldAffordable(actor.faith ?? 0, builderCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat))) {
+          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, builderCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)))) {
           monuKind = 8;
           monuC = monuSpawn.centerIndex;
         }
         if (monuSpawn.population >= 2
-          && goldAffordable(actor.faith ?? 0, settlerCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat))) {
+          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, settlerCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)))) {
           monuKind = 9;
           monuC = monuSpawn.centerIndex;
         }
@@ -228,7 +228,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       const liveNat = state.units.filter((u) => u.seat === actor.seat && u.type === 'NATURALIST').length;
       if (natSpawn && liveNat < 1
         && isCivicComplete(state, UNITS.NATURALIST.requiresCivic!, actor.seat)
-        && goldAffordable(actor.faith ?? 0, naturalistCost(state, actor.seat))) {
+        && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, naturalistCost(state, actor.seat)))) {
         natKind = 10;
         natC = natSpawn.centerIndex;
       }

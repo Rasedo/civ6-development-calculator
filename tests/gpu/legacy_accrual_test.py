@@ -247,6 +247,41 @@ def test_a_legacy_card_is_reachable(rules, path) -> None:
     print(f"  9 the reachability OK — the legacy-first style slots {n_leg} legacy card(s); the greedy style none")
 
 
+def test_the_purchase_discounts(rules, path) -> None:
+    """C-73's last two channels: a stored Merchant Republic legacy takes its
+    accrued percent off a GOLD purchase and nothing off faith; Theocracy's the
+    other way. `_gold_price` / `_faith_price` are `goldPrice` / `faithPrice`'s
+    twins, applied where every purchase is priced and paid."""
+    import json as _json
+    from core import FIXTURES as _FX
+    pols = _json.loads((_FX / "rules.json").read_text(encoding="utf-8"))["policies"]
+    for gov_id, turns, purse, other, want in (("MERCHANT_REPUBLIC", 30, "_gold_price", "_faith_price", 98.0),
+                                             ("THEOCRACY", 45, "_faith_price", "_gold_price", 97.0)):
+        sim = build(path)
+        p_idx = next(i for i, p in enumerate(pols) if p["id"] == f"LEGACY_{gov_id}")
+        g_idx = int(sim._pol_legacy[p_idx])
+        assert g_idx >= 0, f"{gov_id}'s legacy card names no government"
+        sim.civ_civics[:, ROW] = True
+        sim.civ_gov_held[:, ROW] = (1 << sim._ngov) - 1
+        sim.civ_gov_turns[:, ROW] = 0
+        sim.civ_gov_turns[:, ROW, g_idx] = turns
+        sim._eff_version += 1
+        chosen = torch.zeros(sim.B, sim._npol, dtype=torch.bool)
+        chosen[:, p_idx] = True
+        sim.seat_ext[:, ROW] = True
+        sim.apply_seat_actions(ROW, policies=chosen)
+        sim._seat_record_apply(ROW, torch.ones(sim.B, dtype=torch.bool))
+        assert bool(sim.civ_policies[0, ROW, p_idx]), f"the {gov_id} legacy card was not stored"
+        hundred = torch.full((sim.B,), 100.0, dtype=torch.float64)
+        got = float(getattr(sim, purse)(ROW, hundred)[0])
+        assert abs(got - want) < 1e-9, f"{gov_id} at {turns} turns: 100 -> {got}, want {want}"
+        assert float(getattr(sim, other)(ROW, hundred)[0]) == 100.0, f"{gov_id}'s legacy touched the other purse"
+        # a [1, N] price row broadcasts per game too
+        row2 = getattr(sim, purse)(ROW, torch.tensor([[100.0, 50.0]], dtype=torch.float64))
+        assert row2.shape == (sim.B, 2) and abs(float(row2[0, 1]) - want / 2) < 1e-9, row2
+    print("  10 the purchase discounts OK — Merchant Republic off gold, Theocracy off faith, at the accrued percent")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -259,6 +294,7 @@ def main() -> int:
     test_the_card_pays_its_bonus_type(rules, path)
     test_the_memo_sees_the_clock(rules, path)
     test_a_legacy_card_is_reachable(rules, path)
+    test_the_purchase_discounts(rules, path)
     print("BATTERY OK legacy_accrual")
     return 0
 

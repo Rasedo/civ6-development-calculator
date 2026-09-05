@@ -923,7 +923,7 @@ class SimSeats:
         has6 = active & torch.isfinite(flat6.gather(1, best6.unsqueeze(1)).squeeze(1))
         jj6 = torch.div(best6, NB6, rounding_mode="floor")
         bb6 = best6 % NB6
-        price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
+        price6 = self._gold_price(row, rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult)
         reserve6 = float(self.rules.seats.get("peaceGold0", 150))
         can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
@@ -1289,15 +1289,15 @@ class SimSeats:
             # SCOUT skip below is the GOLD ladder's own preference, not a rule,
             # so it does not reach here.
             return mil & self._afford(self.civ_faith[:, row].unsqueeze(1),
-                                      self._type_cost.double().unsqueeze(0) * self.rules.faith_purchase_mult)
+                                      self._faith_price(row, self._type_cost.double().unsqueeze(0) * self.rules.faith_purchase_mult))
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
         # every column offered here is one.
         merc = self._congress_unit_buy_mult(0).unsqueeze(1)
         afford = self._afford(self.civ_treasury[:, row].unsqueeze(1),
-                              self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult
-                              * merc * self._land_unit_price_mult(row))
+                              self._gold_price(row, self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult
+                                               * merc * self._land_unit_price_mult(row)))
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
@@ -1421,7 +1421,7 @@ class SimSeats:
         if self._monk_idx >= 0:
             elig_k = self._seat_monk_city_ok(row)
             if bool(elig_k.any()):
-                kcost = torch.full((B,), float(round(self._monk_cost)), dtype=torch.float64, device=dev)
+                kcost = self._faith_price(row, torch.full((B,), float(round(self._monk_cost)), dtype=torch.float64, device=dev))
                 k_ok = (active & self._afford(self.civ_faith[:, row], kcost)
                         & elig_k.any(dim=1))
                 k_j = torch.where(k_ok, elig_k.long().argmax(dim=1), k_j)
@@ -1430,7 +1430,7 @@ class SimSeats:
         founded = active & self.civ_religion_done[:, row]
         elig_w = self._worship_city_ok(row)
         if bool(elig_w.any()):
-            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost_of(row)) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
+            w_ok = founded & self._afford(self.civ_faith[:, row], self._faith_price(row, self._worship_cost_of(row))) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
             w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
         elig_s = self._seat_religious_city_ok(row)
         elig_t = self._seat_religious_city_ok(row, temple=True)
@@ -1438,17 +1438,17 @@ class SimSeats:
         first_t = elig_t.long().argmax(dim=1)
         if self._missionary_idx >= 0:
             n_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
-            mcost = self._enh["mcost"][self.civ_enhancer[:, row] + 1]
+            mcost = self._faith_price(row, self._enh["mcost"][self.civ_enhancer[:, row] + 1])
             m_ok = founded & (n_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost) & elig_s.any(dim=1)
             m_j = torch.where(m_ok, first_s, m_j)
         if self._apostle_idx >= 0:
             n_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
-            acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
+            acost = self._faith_price(row, torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev))
             a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_faith[:, row], acost) & elig_t.any(dim=1)
             a_j = torch.where(a_ok, first_t, a_j)
         if getattr(self, "_inquisitor_idx", -1) >= 0:
             n_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
-            qcost = torch.full((B,), float(round(self._inquisitor_cost)), dtype=torch.float64, device=dev)
+            qcost = self._faith_price(row, torch.full((B,), float(round(self._inquisitor_cost)), dtype=torch.float64, device=dev))
             q_ok = (founded & self.civ_inquisition[:, row] & (n_q < self._inquisitor_cap)
                     & self._afford(self.civ_faith[:, row], qcost) & elig_t.any(dim=1))
             q_j = torch.where(q_ok, first_t, q_j)
@@ -1500,7 +1500,7 @@ class SimSeats:
         has = held & torch.isfinite(flat.gather(1, best.unsqueeze(1)).squeeze(1))
         jj = torch.div(best, NB, rounding_mode="floor")
         bb = best % NB
-        price = self._class_faith_cost(bb)
+        price = self._faith_price(row, self._class_faith_cost(bb))
         ok = has & self._afford(self.civ_faith[:, row], price)
         return ok, torch.where(ok, jj, neg), torch.where(ok, bb, neg.clone())
 
@@ -1564,7 +1564,7 @@ class SimSeats:
         spawn = torch.where(is_cap.any(dim=1), is_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
         live = (self.major_unit_alive & (self.major_unit_seat == row)
                 & (self.major_unit_type == self._naturalist_idx)).sum(dim=1)
-        cost = self._naturalist_cost(row)
+        cost = self._faith_price(row, self._naturalist_cost(row))
         ok = (
             active
             & alive.any(dim=1)
@@ -1594,7 +1594,7 @@ class SimSeats:
             active
             & alive.any(dim=1)
             & self.civ_civics[:, row, civ_i]
-            & self._afford(self.civ_faith[:, row], self._rock_band_cost(row))
+            & self._afford(self.civ_faith[:, row], self._faith_price(row, self._rock_band_cost(row)))
         )
         slot = torch.where(ok, spawn, slot)
         return ok, slot
@@ -1768,7 +1768,7 @@ class SimSeats:
                 _, _, _, _, elig = self._seat_buy_candidates(row, active)
                 jc = jjw.clamp(min=0, max=self.RC - 1)
                 bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
-                price = self.rules_dev.b_cost.gather(0, bc).double() * mult
+                price = self._gold_price(row, self.rules_dev.b_cost.gather(0, bc).double() * mult)
                 reserve = float(self.rules.seats.get("peaceGold0", 150))
                 ok = want & elig[torch.arange(B, device=dev), jc, bc] \
                     & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
@@ -1797,7 +1797,7 @@ class SimSeats:
             # CIV6 (GS Civilopedia, Monumentality, Golden face): "Builders and
             # Settlers are 30% cheaper to purchase with Faith and Gold."
             # Literal 0.7 applied LAST, like the TS twin (1.0 - 0.3 != 0.7 in f64).
-            sett_price = self._seat_settler_cost(row) * mult
+            sett_price = self._gold_price(row, self._seat_settler_cost(row) * mult)
             mon = self._golden_ded(row, self._ded_monumentality)
             sett_price = torch.where(mon, sett_price * 0.7, sett_price)
             ctr_s = self.city_center[bidx, row, spawn_slot].clamp(min=0)
@@ -1826,9 +1826,9 @@ class SimSeats:
                     landed_u = self._spawn_unit(
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
                         pick_ty, init_xp=xp_u)
-                    price_u = (self._type_cost.gather(0, pick_ty).double() * mult
-                               * self._congress_unit_buy_mult(0)
-                               * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
+                    price_u = self._gold_price(row, self._type_cost.gather(0, pick_ty).double() * mult
+                                               * self._congress_unit_buy_mult(0)
+                                               * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
                     for _ui, _sl, _c in self._res_slot_units:
                         self._charge_unit_resource(row, landed_u & (pick_ty == _ui), _ui)
@@ -1844,14 +1844,14 @@ class SimSeats:
             if wb >= 0:
                 jw = wj.clamp(min=0, max=self.RC - 1)
                 buy_w = active & ext & (wj >= 0) & self.civ_religion_done[:, row] \
-                    & self._afford(self.civ_faith[:, row], self._worship_cost_of(row)) \
+                    & self._afford(self.civ_faith[:, row], self._faith_price(row, self._worship_cost_of(row))) \
                     & self._worship_city_ok(row)[bidx, jw]
                 if bool(buy_w.any()):
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
                     self.city_bldg[rows_w, row, jw[rows_w], wb] = True
                     self._bldg_version += 1
                     self._eff_version += 1
-                    self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._worship_cost_of(row).to(self.civ_faith.dtype), self.civ_faith[:, row])
+                    self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._faith_price(row, self._worship_cost_of(row)).to(self.civ_faith.dtype), self.civ_faith[:, row])
         rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
         if rel_kind is not None and rel_j is not None:
             rel_city = self._seat_religious_city_ok(row)
@@ -1866,7 +1866,7 @@ class SimSeats:
             exo_chg = self._golden_ded_table(self._ded_exodus)[:, row].long() * 2
             if self._missionary_idx >= 0:
                 n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
-                mcost = self._enh["mcost"][self.civ_enhancer[:, row] + 1]
+                mcost = self._faith_price(row, self._enh["mcost"][self.civ_enhancer[:, row] + 1])
                 buy_m = base_r & (rel_kind == 5) & (n_live_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost)
                 if bool(buy_m.any()):
                     chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1] + exo_chg
@@ -1875,7 +1875,7 @@ class SimSeats:
                     bought_relig = bought_relig | landed_m
             if self._apostle_idx >= 0:
                 n_live_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
-                acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
+                acost = self._faith_price(row, torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev))
                 buy_a = base_t & (rel_kind == 6) & ~bought_relig & (n_live_a < self._apostle_cap) \
                     & self._afford(self.civ_faith[:, row], acost)
                 if bool(buy_a.any()):
@@ -1886,7 +1886,7 @@ class SimSeats:
                     bought_relig = bought_relig | landed_a
             if getattr(self, "_inquisitor_idx", -1) >= 0:
                 n_live_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
-                qcost = torch.full((B,), float(round(self._inquisitor_cost)), dtype=torch.float64, device=dev)
+                qcost = self._faith_price(row, torch.full((B,), float(round(self._inquisitor_cost)), dtype=torch.float64, device=dev))
                 buy_q = (base_t & (rel_kind == 11) & ~bought_relig & self.civ_inquisition[:, row]
                          & (n_live_q < self._inquisitor_cap)
                          & self._afford(self.civ_faith[:, row], qcost))
@@ -1897,7 +1897,7 @@ class SimSeats:
             if self._monk_idx >= 0:
                 # the WARRIOR MONK asks nothing of the BUYER's religion, only
                 # of the city's majority one, so it reads its own base.
-                kcost = torch.full((B,), float(round(self._monk_cost)), dtype=torch.float64, device=dev)
+                kcost = self._faith_price(row, torch.full((B,), float(round(self._monk_cost)), dtype=torch.float64, device=dev))
                 buy_k = (active & ext & (rel_j >= 0) & (rel_kind == 14) & ~bought_relig
                          & self._seat_monk_city_ok(row)[bidx, jr]
                          & self._afford(self.civ_faith[:, row], kcost))
@@ -1915,7 +1915,7 @@ class SimSeats:
             at_m = self.city_center[bidx, row, jm].clamp(min=0)
             base_m = active & ext & (m_j >= 0) & mon_g & self.city_alive[bidx, row, jm]
             if self._builder_idx >= 0:
-                bl_price = self._builder_cost(self.civ_builders_trained[:, row]).double() * self.rules.faith_purchase_mult * 0.7
+                bl_price = self._faith_price(row, self._builder_cost(self.civ_builders_trained[:, row]).double() * self.rules.faith_purchase_mult * 0.7)
                 buy_bl = base_m & (m_kind == 8) & self._afford(self.civ_faith[:, row], bl_price)
                 if bool(buy_bl.any()):
                     landed_bl = self._spawn_unit(row, buy_bl, at_m, self._builder_idx)
@@ -1923,7 +1923,7 @@ class SimSeats:
                     # a purchased builder escalates builderCost like a trained one
                     self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + landed_bl.long()
             if self._settler_idx >= 0:
-                s_price = self._seat_settler_cost(row) * self.rules.faith_purchase_mult * 0.7
+                s_price = self._faith_price(row, self._seat_settler_cost(row) * self.rules.faith_purchase_mult * 0.7)
                 pop_m = self.city_pop[bidx, row, jm]
                 buy_sl = base_m & (m_kind == 9) & (pop_m >= self.rules.settler_pop_gate)                     & self._afford(self.civ_faith[:, row], s_price) & ~self._no_settlers(row)
                 if bool(buy_sl.any()):
@@ -1939,7 +1939,7 @@ class SimSeats:
             civ_i = int(self._type_civic[self._naturalist_idx])
             jn = n_j.clamp(min=0, max=self.RC - 1)
             at_n = self.city_center[bidx, row, jn].clamp(min=0)
-            n_price = self._naturalist_cost(row)
+            n_price = self._faith_price(row, self._naturalist_cost(row))
             base_n = active & ext & (n_j >= 0) & (n_kind == 10) & self.city_alive[bidx, row, jn]
             if civ_i >= 0:
                 base_n = base_n & self.civ_civics[:, row, civ_i]
@@ -1955,7 +1955,7 @@ class SimSeats:
             civ_b = int(self._type_civic[self._band_idx])
             jb = b_j.clamp(min=0, max=self.RC - 1)
             at_b = self.city_center[bidx, row, jb].clamp(min=0)
-            b_price = self._rock_band_cost(row)
+            b_price = self._faith_price(row, self._rock_band_cost(row))
             base_b = active & ext & (b_j >= 0) & self.city_alive[bidx, row, jb]
             if civ_b >= 0:
                 base_b = base_b & self.civ_civics[:, row, civ_b]
@@ -1986,7 +1986,7 @@ class SimSeats:
             legal_c = self._seat_buildable(row, True)[bidx, jc, bc] & cls_b & self.city_alive[bidx, row, jc]
             if self._walls_rows:
                 legal_c = legal_c & (self._walls_build_ok(row)[bidx, jc] | (self._b_walls[bc] == 0))
-            price_c = self._class_faith_cost(bc)
+            price_c = self._faith_price(row, self._class_faith_cost(bc))
             buy_c = (active & ext & (cj >= 0) & (cb >= 0) & legal_c
                      & self._afford(self.civ_faith[:, row], price_c))
             if bool(buy_c.any()):
@@ -1996,7 +1996,7 @@ class SimSeats:
             ju = uj.clamp(min=0, max=self.RC - 1)
             bu = ub.clamp(min=0, max=self.NU - 1)
             cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row), faith=True)
-            price_u = self._type_cost.gather(0, bu).double() * self.rules.faith_purchase_mult
+            price_u = self._faith_price(row, self._type_cost.gather(0, bu).double() * self.rules.faith_purchase_mult)
             buy_u = (active & ext & (uj >= 0) & (ub >= 0) & self.city_alive[bidx, row, ju]
                      & self._seat_faith_unit_grant(row) & cand_u[bidx, bu]
                      & self._afford(self.civ_faith[:, row], price_u))
