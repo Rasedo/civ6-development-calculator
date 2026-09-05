@@ -1572,29 +1572,15 @@ class SimEconomy:
         turns = self.civ_gov_turns[:, row, gov]
         return (turns * rate) // (100 * interval) * inc
 
-    def _slotted_policies(self, civics2: torch.Tensor,
-                          extra_slots: torch.Tensor | None = None,
-                          dark: torch.Tensor | None = None,
-                          era: torch.Tensor | None = None,
-                          held: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, nPol] — the cards a seat's adopted government greedily slots,
-        `computeAdoption().policies` as a mask over the card table.
-
-        WILDCARD slots fill with the within-kind OVERFLOW in card-table order
-        (TS findIndex: a card whose kind slots are full takes the first open
-        W; every catalog government lists its W slots LAST, so kind-first
-        matches findIndex). POLICY TREATY outcome B removes one card from the
-        pool entirely, exactly as `computeAdoption`'s `blocked` does."""
+    def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
+                         era: torch.Tensor | None, held: torch.Tensor | None,
+                         adopted: torch.Tensor) -> torch.Tensor:
+        """[B, nPol] — the cards a seat may SLOT under `adopted`: the civic
+        unlock, a Dark Age card's age-and-era window, a legacy card's held
+        government (never the one the seat is in), the obsoleting civic and
+        the Policy Treaty's ban. `unlockedPolicyIds`' twin — ONE predicate the
+        greedy fill, the driver mask and the record's validator all read."""
         B, dev = civics2.shape[0], self.device
-        slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
-        if not self._gov_has_effects or not self._ngov or not self._npol:
-            return slotted
-        adopted, has_gov = self._adopted_gov(civics2)
-        nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
-        # Wonder- and congress-granted slots — TS appends them to
-        # computeAdoption's slot list; a seat with no government slots nothing.
-        if extra_slots is not None:
-            nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
         puc = self._pol_unlock_civic  # [nPol]
         pol_unlocked = torch.where(
             puc.unsqueeze(0) >= 0,
@@ -1627,8 +1613,62 @@ class SimEconomy:
             torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
         )
         banned = self._congress_policy_blocked()  # [B], -1 = nothing forbidden
-        pol_unlocked = pol_unlocked & (
+        return pol_unlocked & (
             torch.arange(self._npol, device=dev).unsqueeze(0) != banned.unsqueeze(1))
+
+    def _seat_policy_mask(self, row: int) -> torch.Tensor:
+        """[B, nPol] — the cards seat row `row` may SLOT right now. The per-kind
+        FIT is a property of the SET, so the mask is per card; the picker
+        enforces the fit and the record's apply re-validates it
+        (`_policy_set_ok`). A seat with no government slots nothing."""
+        if not self._gov_has_effects or not self._ngov or not self._npol:
+            return torch.zeros(self.B, max(self._npol, 1), dtype=torch.bool, device=self.device)
+        civ = self._seat_civics(row)
+        adopted, has_gov = self._adopted_gov(civ)
+        dark = self.civ_age[:, row] == 0
+        era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+        return self._policy_unlocked(civ, dark, era, self.civ_gov_held[:, row], adopted) & has_gov.unsqueeze(1)
+
+    def _policy_set_ok(self, row: int, chosen: torch.Tensor) -> torch.Tensor:
+        """[B] — `fitPolicies`' twin: every chosen card is unlocked for the seat
+        and the SET fits its government's slots by kind, the wildcard slots
+        taking each kind's overflow and every wildcard-kind card."""
+        unlocked = self._seat_policy_mask(row)
+        legal = ~(chosen & ~unlocked).any(dim=1)
+        civ = self._seat_civics(row)
+        adopted, has_gov = self._adopted_gov(civ)
+        nslots = (self._gov_slots[adopted] + self._wonder_extra_slots(row)) * has_gov.long().unsqueeze(1)
+        over = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for k in range(3):
+            n_k = (chosen & (self._pol_kind == k).unsqueeze(0)).sum(dim=1)
+            over = over + (n_k - nslots[:, k]).clamp(min=0)
+        n_w = (chosen & (self._pol_kind == 3).unsqueeze(0)).sum(dim=1)
+        return legal & has_gov & (over + n_w <= nslots[:, 3])
+
+    def _slotted_policies(self, civics2: torch.Tensor,
+                          extra_slots: torch.Tensor | None = None,
+                          dark: torch.Tensor | None = None,
+                          era: torch.Tensor | None = None,
+                          held: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, nPol] — the cards a seat's adopted government greedily slots,
+        `computeAdoption().policies` as a mask over the card table.
+
+        WILDCARD slots fill with the within-kind OVERFLOW in card-table order
+        (TS findIndex: a card whose kind slots are full takes the first open
+        W; every catalog government lists its W slots LAST, so kind-first
+        matches findIndex). POLICY TREATY outcome B removes one card from the
+        pool entirely, exactly as `computeAdoption`'s `blocked` does."""
+        B, dev = civics2.shape[0], self.device
+        slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
+        if not self._gov_has_effects or not self._ngov or not self._npol:
+            return slotted
+        adopted, has_gov = self._adopted_gov(civics2)
+        nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
+        # Wonder- and congress-granted slots — TS appends them to
+        # computeAdoption's slot list; a seat with no government slots nothing.
+        if extra_slots is not None:
+            nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
+        pol_unlocked = self._policy_unlocked(civics2, dark, era, held, adopted)
         for k in range(3):  # military/economic/diplomatic
             uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
             cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order

@@ -1923,6 +1923,10 @@ class SimInit:
         _pols = rules.policies or []
         self._ngov = len(_govs)
         self._npol = len(_pols)
+        # the cards a seat has SLOTTED — a DRIVER decision carried on the
+        # wire. INERT this step: the record writes it and the compare reads it;
+        # the greedy fill in `_slotted_policies` still pays every effect.
+        self.civ_policies = torch.zeros(self.B, self.n_majors, max(self._npol, 1), dtype=torch.bool, device=device)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
@@ -3221,6 +3225,7 @@ class SimInit:
         self._driven_buy_pat: dict = {}
         self._driven_buy_band: dict = {}
         self._driven_tech: dict = {}
+        self._driven_policies: dict[int, torch.Tensor] = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}

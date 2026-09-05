@@ -547,6 +547,7 @@ SEAT = {
     "eraScore": _civ_scalar("era_score"),
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
+    "policiesSlotted": _civ_mask("civ_policies"),
     "governmentTurns": _civ_vec("civ_gov_turns"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),

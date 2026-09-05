@@ -188,6 +188,9 @@ export interface SeatActionRecord {
   envoys?: number[];
   tech: number | null;
   civic: number | null;
+  /** the SLOTTED policy cards as table indices (POLICY_LIST order), a SET —
+   *  a driver decision; absent = no decision this turn */
+  policies?: number[];
   units: number[][];
   /** the ONE gold purchase: [kind, a, b]. Kind 0 building (a=centre,
    *  b=layout idx), 1 settler, 2 unit, 3 tile (a=tile, b=centre),

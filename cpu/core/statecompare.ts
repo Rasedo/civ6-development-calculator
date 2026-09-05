@@ -37,6 +37,7 @@
  * the browser build
 imports this.
  */
+import { POLICY_LIST } from '../data/policies';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -229,6 +230,7 @@ export interface CityRow {
 
 const civSeats = (state: GameState): Seat[] => state.seats;
 
+const POLICY_IDX = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
 const overSeats = (fn: (s: Seat, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as Seat[]).map((s) => fn(s, state));
 const overCities = (fn: (r: CityRow, state: GameState) => Val): Extractor =>
@@ -472,6 +474,9 @@ const SEAT: Record<string, Extractor> = {
   eraScore: overSeats((s) => s.eraScore ?? 0),
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
+  // the SLOTTED cards as a sorted index set — the stored decision
+  policiesSlotted: overSeats((s) => s.government.policies
+    .map((p) => (p ? POLICY_IDX.get(p) ?? -1 : -1)).filter((i) => i >= 0).sort((a, b) => a - b)),
   governmentTurns: overSeats((s) => [...(s.government.govTurns ?? [])]),
   prevAge: overSeats((s) => s.prevAge ?? 1),
   darkAges: overSeats((s) => s.darkAges ?? 0),

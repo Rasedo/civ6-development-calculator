@@ -1271,23 +1271,56 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   const slots = [...chosen.slots];
   for (const k of SLOT_KINDS) for (let i = 0; i < (extra?.[k] ?? 0); i++) slots.push(k);
   const policies: (string | null)[] = slots.map(() => null);
+  const open = unlockedPolicyIds(research, blocked, dark, held, chosen.id);
+  for (const card of Object.values(POLICIES)) {
+    if (!open.has(card.id)) continue;
+    const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
+    if (slot >= 0) policies[slot] = card.id;
+  }
+  return { government: chosen.id, policies };
+}
+
+/** The cards a seat may SLOT under government `chosenId`: the civic unlock,
+ *  a Dark Age card's age-and-era window, a legacy card's held government
+ *  (never the one the seat is in), and the Policy Treaty's ban. ONE gate the
+ *  greedy fill and the record's validator both read — `_policy_unlocked` is
+ *  the twin. */
+export function unlockedPolicyIds(research: ResearchState, blocked: number, dark: boolean, held: number,
+                                  chosenId: string): Set<string> {
+  const u = computeUnlocksIn(research, []);
   const banned = blocked >= 0 ? POLICY_LIST[blocked]?.id : undefined;
   // CIV6 (Dark Age policy card): a Dark Age card needs no civic — the seat's
   // AGE and the card's own era window are the whole gate.
   const era = civEraIndex(research.techs, research.civics);
+  const out = new Set<string>();
   for (const card of Object.values(POLICIES)) {
     if (card.id === banned) continue;
     // CIV6 (Legacy policy card): no civic unlocks one — having BEEN in that
     // government does, and it is unslottable while the seat is still in it.
     if (card.legacyOf !== undefined) {
-      if (!(held & governmentBit(card.legacyOf)) || card.legacyOf === chosen.id) continue;
+      if (!(held & governmentBit(card.legacyOf)) || card.legacyOf === chosenId) continue;
     } else if (card.dark
       ? !(dark && era >= card.dark.firstEra && era <= card.dark.lastEra)
       : !u.policies.has(card.id)) continue;
-    const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
-    if (slot >= 0) policies[slot] = card.id;
+    out.add(card.id);
   }
-  return { government: chosen.id, policies };
+  return out;
+}
+
+/** Lay `cards` (table order) into `slots`: each takes the first open slot of
+ *  its kind, else the first open wildcard; null when one finds no slot — the
+ *  set does not fit and is refused whole. `_policy_set_ok` is the twin. */
+export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]): (string | null)[] | null {
+  const out: (string | null)[] = slots.map(() => null);
+  for (const id of cards) {
+    const card = POLICIES[id];
+    if (!card) return null;
+    let slot = slots.findIndex((kind, i) => out[i] === null && kind !== 'wildcard' && cardFitsSlot(card, kind));
+    if (slot < 0) slot = slots.findIndex((kind, i) => out[i] === null && kind === 'wildcard');
+    if (slot < 0) return null;
+    out[slot] = id;
+  }
+  return out;
 }
 
 function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
@@ -1511,7 +1544,10 @@ export function baseYieldCtx(state: GameState): YieldCtx {
 }
 
 export function governmentSlots(state: GameState, seat: number): SlotKind[] {
-  const govId = seatOf(state, seat)!.government.current;
+  // the government IN PLAY is the one the seat's civics adopt (`computeAdoption`);
+  // `government.current` is only ever set by a hand-picked `setGovernment`
+  const s = seatOf(state, seat)!;
+  const govId = s.government.current ?? computeAdoption(s.research).government;
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];

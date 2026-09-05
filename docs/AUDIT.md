@@ -1346,6 +1346,28 @@ under their blocker so the dependency is readable, and both halves count.
   Pinned by `legacy-accrual`'s reachability lane on TS and
   `legacy_accrual`'s on the GPU: both assert ZERO legacy cards slotted, so
   the day that changes, C-73's payout goes live and both entries get re-read.
+  OWNER RULED 2026-09-04: the slotting becomes a DRIVER DECISION carried on
+  the wire, like every other decision (`.claude/scratchpad/c75-plan.md`).
+  STEP 1 SHIPPED 2026-09-05 — the INERT plumbing, byte-identical to the
+  serve: a stored set on both engines (`Seat.government.policies`, now the
+  truth-to-be; `civ_policies [B, NM, nPol]`), `seat_masks(row)["policies"]`
+  = the cards the seat may slot under its adopted government (ONE unlock
+  gate per engine, `unlockedPolicyIds` / `_policy_unlocked`, factored out of
+  the greedy fill so the fill, the mask and the validator cannot drift), the
+  record key `policies: number[]` (a SET of table indices) validated WHOLE on
+  both engines — every card unlocked, the set fitting the government's slots
+  by kind with the wildcards taking the overflow (`fitPolicies` /
+  `_policy_set_ok`) — and refused entire otherwise, and `policiesSlotted`
+  comparing the stored set. Nothing pays off the store yet: the greedy fill
+  is still the truth, the driver emits no key. Found on the way: TS's
+  `governmentSlots` read `government.current`, which nothing in play sets,
+  so it answered [] for every seat — it now falls back to the adopted
+  government. Bar: `policy-store` (TS) and `policy_store` (GPU). NEXT: step
+  2, the cutover — the driver's picker (a greedy-equivalent style first, so
+  the first cutover serve reproduces today's choices exactly), the stored
+  set replacing the fill on both engines, the government-change carry-over
+  in the one place each engine notices the change; then A-6r and C-73's
+  reachability lanes flip.
 
 - **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
   sourcing C-63 on 2026-09-04, and kept separate from it because the two fail

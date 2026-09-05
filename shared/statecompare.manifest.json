@@ -798,6 +798,17 @@
           "note": "turns spent in each government, in the roster's own order — what MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS accrues on. Kept beside governmentsHeld deliberately: the mask's `|=` is idempotent and hides a gating difference between the engines, where this counter shows one on the turn it happens (C-63)."
         },
         {
+          "name": "policiesSlotted",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.policies"
+          ],
+          "planes": [
+            "civ_policies"
+          ],
+          "note": "the cards a seat has SLOTTED, as a sorted index set over the policy table — a DRIVER decision carried on the wire (C-75). Inert until the cutover: the greedy fill still pays the effects on both engines, and this store is what replaces it."
+        },
+        {
           "name": "age",
           "compare": "exact",
           "covers": [
@@ -2677,10 +2688,6 @@
       },
       {
         "path": "GovernmentState.current",
-        "why": "no GPU plane (see Seat.government)."
-      },
-      {
-        "path": "GovernmentState.policies",
         "why": "no GPU plane (see Seat.government)."
       },
       {

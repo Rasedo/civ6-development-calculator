@@ -27,7 +27,7 @@ import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, 
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { computeAdoption, governmentBit, inDarkAge, wonderExtraSlots } from './effects';
+import { computeAdoption, governmentBit, inDarkAge, wonderExtraSlots, unlockedPolicyIds, fitPolicies, governmentSlots } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -1016,6 +1016,19 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   if (civicCol !== null && civicCol !== undefined && civicCol >= 0) {
     const c = Object.keys(CIVICS)[civicCol];
     if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
+  }
+  // The SLOTTED CARDS are a driver decision. Validated whole here —
+  // every card unlocked under the live government, the set fitting its
+  // slots — and STORED in `government.policies`; a set that does not fit is
+  // refused entire. INERT this step: the greedy fill still pays the effects.
+  if (rec.policies) {
+    const gov = computeAdoption(actor.research).government;
+    if (gov) {
+      const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, gov);
+      const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
+      const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
+      if (fit) actor.government.policies = fit;
+    }
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a

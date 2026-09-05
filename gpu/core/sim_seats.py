@@ -373,6 +373,7 @@ class SimSeats:
                 "tech": self._seat_tech_mask(row),
                 "civic": self._seat_civic_mask(row),
                 "envoy": self._seat_envoy_mask(row),
+                "policies": self._seat_policy_mask(row),
                 "war": self._seat_war_mask(row)}
 
     def apply_seat_actions(
@@ -381,6 +382,7 @@ class SimSeats:
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
+        policies: torch.Tensor | None = None,  # [B, nPol] bool — the cards to SLOT; None = no decision
         war: torch.Tensor | None = None,
         production_pref: torch.Tensor | None = None,
         production_tile: torch.Tensor | None = None,
@@ -426,7 +428,8 @@ class SimSeats:
         re-validates a plot, it never picks one. `policy/ladder.py`'s
         `pick_district_tile` is the body that chooses."""
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
-                           production=production, pref=production_pref, dtile=production_tile)
+                           production=production, pref=production_pref, dtile=production_tile,
+                           policies=policies)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band)
         if route is not None:
             self._driven_route[row] = route
@@ -684,7 +687,7 @@ class SimSeats:
                 self._make_peace(row, tgt, peace)
 
     def _stash_record(self, row: int, tech=None, civic=None, envoys=None, war=None,
-                      production=None, pref=None, dtile=None) -> None:
+                      production=None, pref=None, dtile=None, policies=None) -> None:
         """Park a seat row's applySeatActionRecord intents for
         `_seat_record_apply` to drain at the record position.
 
@@ -698,6 +701,8 @@ class SimSeats:
             self._driven_tech[row] = tech
         if civic is not None:
             self._driven_civic[row] = civic
+        if policies is not None:
+            self._driven_policies[row] = policies
         if envoys is not None and self.S > 0:
             self._driven_envoys[row] = envoys
         if war is not None:
@@ -723,6 +728,7 @@ class SimSeats:
         Every arm re-validates against the LIVE state here; nothing chooses."""
         tech = self._driven_tech.pop(row, None)
         civic = self._driven_civic.pop(row, None)
+        policies = self._driven_policies.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
         war = self._driven_war.pop(row, None)
         citizens = self._driven_citizens.pop(row, None)
@@ -742,6 +748,13 @@ class SimSeats:
             ok = active & ext & (c_act >= 0) \
                 & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, c_act, ok, is_civic=True)
+        if policies is not None:
+            # the SLOTTED CARDS — validated whole (every card unlocked,
+            # the set fits the slots) and STORED; a set that does not fit is
+            # refused entire, as `applySeatActionRecord` refuses it
+            chosen = policies.to(torch.bool)
+            ok = active & ext & self._policy_set_ok(row, chosen)
+            self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
             if e_seq.dim() == 1:

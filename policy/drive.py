@@ -1417,6 +1417,14 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     # record apply gathers on dim 1.
     tech = None if rec["tech"] is None else torch.full((sim.B,), int(rec["tech"]), dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.full((sim.B,), int(rec["civic"]), dtype=torch.long, device=dev)
+    # the slotted cards, a SET of table indices
+    _pv = rec.get("policies")
+    policies = None
+    if _pv is not None:
+        policies = torch.zeros(sim.B, max(sim._npol, 1), dtype=torch.bool, device=dev)
+        for _i in _pv:
+            if 0 <= int(_i) < sim._npol:
+                policies[:, int(_i)] = True
     _wv = rec.get("war")
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
     _ev = rec.get("envoys") or []
@@ -1524,7 +1532,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     _gpv = rec.get("gpPass")
     gp_pass = (torch.full((sim.B,), int(_gpv), dtype=torch.long, device=dev)
                if _gpv is not None and int(_gpv) >= 0 else None)
-    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
+    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic, policies=policies,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
                            monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
