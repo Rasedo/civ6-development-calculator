@@ -8741,13 +8741,15 @@ class SimSeats:
                 if int(drop[r]) > 0:
                     self.city_loyalty[r, o, host] = max(0.0, float(self.city_loyalty[r, o, host]) - int(drop[r]))
                 # CIV6 (Religious Rock): "Converts the city to the Rock Band's
-                # Religion" — its pressure rises to one past the strongest other.
+                # Religion" — its pressure rises to the smallest MAJORITY: one
+                # past every other religion's pressure and the atheism baseline
+                # together (`_followed_religion`'s more-than-half rule).
                 if bool(convert[r]):
                     pres = self.city_pressure[r, o, host]
                     others = pres.clone()
                     others[row] = 0
-                    top = int(others.max()) if others.numel() else 0
-                    pres[row] = max(int(pres[row]), top + 1)
+                    floor = int(others.sum()) + self._atheism_per_pop * int(self.city_pop[r, o, host])
+                    pres[row] = max(int(pres[row]), floor + 1)
         sc = slot[rows]
         self.unit_band_album[rows, sc] = album[rows] + rowt[rows, 0]
         promo = rowt[rows, 2] > 0

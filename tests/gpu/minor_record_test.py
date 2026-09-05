@@ -152,7 +152,7 @@ def test_minor_conversion(rules) -> None:
     assert sim.city_pressure.shape[1] > m0, "no minor row in the pressure plane"
     sim.city_pressure[0, m0 + 0, 0].zero_()
     sim.city_pressure[0, m0 + 0, 0, 0] = 500
-    got = sim._followed_religion(sim.city_pressure[0:1, m0 + 0, 0])
+    got = sim._followed_religion(sim.city_pressure[0:1, m0 + 0, 0], sim.city_pop[0:1, m0 + 0, 0])
     assert int(got[0]) == 0, f"the minor row follows the religion pressing it: {int(got[0])}"
     print("  minor conversion OK: the minor city row carries pressure and a majority")
 

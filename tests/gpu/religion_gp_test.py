@@ -105,22 +105,38 @@ def main() -> None:
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
         assert bool(sim.city_alive[:, 0, 0].all()), "fixture city 0 (capital) must be alive"
-        # Religions 1 & 2 both found their holy city AT city 0's center (dist 0,
-        # always in range) -> equal pressure each turn -> a permanent tie.
+        # Two plain cities of row 0 beside city 0 FOLLOW religions 1 and 2 (a
+        # source presses only the religion it follows, x1 without a Holy Site)
+        # -> equal pressure on city 0 each turn -> a permanent tie, and a tie
+        # is never a majority: city 0 follows nobody until one side pulls
+        # past half of its total with the atheism baseline.
         c0 = sim.city_center[:, 0, 0].clone()
         sim.holy_tile[:, 1] = c0
         sim.holy_tile[:, 2] = c0
+        near = [t for t in range(sim.T) if 1 <= int(sim.pair_dist[int(c0[0]), t]) <= 3
+                and bool(sim.passable[0, t]) and not bool(sim.wpass[0, t])
+                and int(sim.centre_slot_at[0, t]) < 0][:2]
+        assert len(near) == 2, "no two free tiles beside the capital"
+        SA, SB = sim.RC - 2, sim.RC - 1
+        for s, t, g in ((SA, near[0], 1), (SB, near[1], 2)):
+            sim.city_alive[:, 0, s] = True
+            sim.city_center[:, 0, s] = t
+            sim.city_pop[:, 0, s] = 1
+            sim.city_pressure[:, 0, s] = 0
+            sim.city_pressure[:, 0, s, g] = 9000
+            sim.city_followed[:, 0, s] = g
         sim._spread_religious_pressure()
         assert bool((sim.city_pressure[:, 0, 0, 1] == 1).all()), "religion-1 +1 pressure"
         assert bool((sim.city_pressure[:, 0, 0, 2] == 1).all()), "religion-2 +1 pressure"
-        assert bool((sim.city_followed[:, 0, 0] == 1).all()), "tie must resolve to the lower religion id"
+        assert bool((sim.city_followed[:, 0, 0] == -1).all()), "a tie is no majority"
         for _ in range(3):
             sim._spread_religious_pressure()
         assert bool((sim.city_pressure[:, 0, 0, 1] == 4).all()), "integer accumulation over turns"
-        assert bool((sim.city_followed[:, 0, 0] == 1).all()), "still tied -> id 1"
-        # Break the tie: religion 2 gains extra pressure -> majority flip to 2.
-        sim.city_pressure[:, 0, 0, 2] += 5
-        sim._spread_religious_pressure()  # r1 -> 5, r2 -> 10
+        assert bool((sim.city_followed[:, 0, 0] == -1).all()), "still tied -> nobody"
+        # Break the tie: religion 2 pulls past half of the total (the other
+        # religion's 4 plus the atheism baseline) -> majority flip to 2.
+        sim.city_pressure[:, 0, 0, 2] += 5 + int(sim._atheism_per_pop) * sim.city_pop[:, 0, 0].long()
+        sim._spread_religious_pressure()
         assert bool((sim.city_followed[:, 0, 0] == 2).all()), "majority pressure must flip to religion 2"
         # KILL hygiene: a razed city's pressure row is zeroed, follows nothing.
         sim.city_alive[:, 0, 0] = False
@@ -138,6 +154,10 @@ def main() -> None:
             assert bool((sim.city_pressure[dead_rc, 0 + 1, 0, :] == 0).all()), "dead rc-slot pressure must reset"
             assert bool((sim.city_followed[dead_rc, 0 + 1, 0] == -1).all()), "dead rc city follows nothing"
         # restore the pressure tensors for the snapshot round-trip below
+        for s in (SA, SB):
+            sim.city_alive[:, 0, s] = False
+            sim.city_center[:, 0, s] = -1
+            sim.city_pop[:, 0, s] = 0
         sim.city_pressure[:, 0, :sim.RC].zero_()
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)

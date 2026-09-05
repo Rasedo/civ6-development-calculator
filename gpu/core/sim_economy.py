@@ -2756,12 +2756,13 @@ class SimEconomy:
         self._eff_version += 1
 
     def _spread_religious_pressure(self) -> None:
-        """The spreadReligiousPressure twin: each founded religion's HOLY tile
-        (holy_tile[:, g], the founding capital center, frozen) adds +1 integer
-        pressure to every LIVE city within range; each city then follows the
-        religion with the most pressure (>0), ties to the lowest id (argmax
-        returns the first max). Religions are the unified civ ids: g=0 is
-        seat 0, g=i+1 is civ index i. Deterministic, zero-RNG.
+        """The spreadReligiousPressure twin. CIV6 (GlobalParameters): every
+        city FOLLOWING a religion presses every live city within range each
+        turn — the Holy City at x4, a city with a Holy Site at x2, any other
+        at x1, times the Bishop's doubling at the source — and each city then
+        follows the religion holding more than half of its total pressure with
+        the atheism baseline (`_followed_religion`). Religions are the seat
+        rows: g IS seat g. Deterministic, zero-RNG.
 
         KILL hygiene: dead/absent slots are zeroed each turn (torch.where on the
         alive mask), so a razed-then-reused slot starts fresh — the TS mirror is
@@ -2777,46 +2778,42 @@ class SimEconomy:
         if self._enh_any:
             RANGE += self._enh["presR"][self.civ_enhancer[:, :O] + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
-        ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
-        # ONE flip for every seat.
         NSC = self.n_majors
-        cen = self.city_center[:, :NSC].clamp(min=0)
-        d_all = self.pair_dist[cen.unsqueeze(3), ht.reshape(B, 1, 1, O)].to(torch.long)
-        liv = self.city_alive[:, :NSC]
-        add = ((d_all <= RANGE.reshape(B, 1, 1, O)) & founded.reshape(B, 1, 1, O) & liv.unsqueeze(3)).long()
+        RC = self.city_center.shape[2]
+        K = NSC * RC
+        liv = self.city_alive[:, :NSC]                                   # [B, NSC, RC]
+        cen_f = self.city_center[:, :NSC].clamp(min=0).reshape(B, K)
+        fol = self.city_followed[:, :NSC].reshape(B, K)                  # [B, K] the SOURCE's religion
+        emits = (fol >= 0) & liv.reshape(B, K) & founded.gather(1, fol.clamp(min=0))
+        # the source's step: the Holy City x4 — CIV6 (Jerusalem's suzerain):
+        # "Your cities with Holy Sites exert pressure as if they were Holy
+        # Cities", so the founder's own Holy-Site cities take that step too —
+        # a Holy Site city x2, any other x1. The two do not stack.
+        holy = emits & (cen_f == self.holy_tile.gather(1, fol.clamp(min=0)))
+        site = torch.zeros(B, NSC, RC, dtype=torch.bool, device=self.device)
+        if self._hs_idx >= 0:
+            hs = self.city_dist_tile[:, :NSC, :, self._hs_idx]
+            hsc = hs.clamp(min=0).reshape(B, K)
+            site = ((hs >= 0).reshape(B, K) & self.district_complete.gather(1, hsc)
+                    & ~self.district_pillaged.gather(1, hsc)).reshape(B, NSC, RC)
+            if self._suz_c_holy >= 0:
+                own_rel = fol.reshape(B, NSC, RC) == torch.arange(NSC, device=self.device).reshape(1, NSC, 1)
+                jm = torch.stack([self._suz_effect(g, self._suz_c_holy) for g in range(NSC)], dim=1)  # [B, NSC]
+                holy = holy | (site & own_rel & jm.unsqueeze(2)).reshape(B, K)
+        site_f = site.reshape(B, K)
+        step = torch.where(holy, self._holy_city_mult, torch.where(site_f, self._holy_site_mult, 1)) * self._pressure_per_turn
         # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
         # stronger from this city" — the SOURCE city's own governor.
         if self.n_governors:
-            for g in range(O):
-                _m = self._governor_tile_mult(g, "pressureMult").gather(1, ht[:, g:g + 1]).squeeze(1)
-                if bool((_m != 1).any()):
-                    add[:, :, :, g] = (add[:, :, :, g].double() * _m.reshape(B, 1, 1)).long()
-        # CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert
-        # pressure as if they were Holy Cities (4x Religion pressure on all
-        # cities within 10 tiles)." Only Holy Cities exert pressure in this
-        # engine, so each completed-unpillaged-Holy-Site city of the suzerain
-        # becomes one more source at the holy city's own rate and range; the
-        # Holy City itself already exerts and is not doubled.
-        if self._suz_c_holy >= 0 and self._hs_idx >= 0:
-            for g in range(O):
-                jm = self._suz_effect(g, self._suz_c_holy) & founded[:, g]
-                if not bool(jm.any()):
-                    continue
-                hs = self.city_dist_tile[:, g, :, self._hs_idx]  # [B, RC]
-                hsc = hs.clamp(min=0)
-                src_ok = (jm.unsqueeze(1) & self.city_alive[:, g] & (hs >= 0)
-                          & self.district_complete.gather(1, hsc) & ~self.district_pillaged.gather(1, hsc)
-                          & (self.city_center[:, g] != self.holy_tile[:, g].unsqueeze(1)))
-                if not bool(src_ok.any()):
-                    continue
-                sc = self.city_center[:, g].clamp(min=0)  # [B, RC] source centres
-                d_g = self.pair_dist[cen.unsqueeze(3), sc.reshape(B, 1, 1, -1)].to(torch.long)
-                within = (d_g <= RANGE[:, g].reshape(B, 1, 1, 1)) & src_ok.reshape(B, 1, 1, -1) & liv.unsqueeze(3)
-                if self.n_governors:
-                    _pm = self._governor_mult(g, "pressureMult")           # [B, RC] per SOURCE city
-                    add[:, :, :, g] += (within.double() * _pm.reshape(B, 1, 1, -1)).sum(dim=3).long()
-                else:
-                    add[:, :, :, g] += within.sum(dim=3)
+            bishop = torch.stack([self._governor_mult(g, "pressureMult") for g in range(NSC)], dim=1).reshape(B, K)
+            step = (step.double() * bishop.double()).long()
+        w = torch.where(emits, step, torch.zeros_like(step))            # [B, K]
+        # every receiver against every source: within the SOURCE religion's range
+        d = self.pair_dist[cen_f.unsqueeze(2), cen_f.unsqueeze(1)].to(torch.long)   # [B, K recv, K src]
+        reach = RANGE.gather(1, fol.clamp(min=0))                        # [B, K src]
+        contrib = torch.where(d <= reach.unsqueeze(1), w.unsqueeze(1), torch.zeros_like(d))  # [B, K, K]
+        onehot = ((fol.unsqueeze(2) == torch.arange(O, device=self.device).reshape(1, 1, O)) & emits.unsqueeze(2)).double()
+        add = (contrib.double() @ onehot).long().reshape(B, NSC, RC, O) * liv.unsqueeze(3).long()
         # CIV6 (Citadel of God): "City ignores pressure ... from Religions not
         # founded by the Governor's player."
         if self.n_governors:
@@ -2833,12 +2830,11 @@ class SimEconomy:
         self.city_pressure[:, :NSC].copy_(
             torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
         )
-        tot = self.city_pressure[:, :NSC].sum(dim=3)
-        best = self.city_pressure[:, :NSC].argmax(dim=3)                  # ties -> lowest id
+        best = self._followed_religion(self.city_pressure[:, :NSC], self.city_pop[:, :NSC])
         # EXODUS pays era score each time a city CONVERTS; compare against the
         # PRE-flip follow set, exactly like `wasFollowed`.
         was = self.city_followed[:, :NSC].clone()
-        self.city_followed[:, :NSC].copy_(torch.where(liv & (tot > 0), best, torch.full_like(best, -1)))
+        self.city_followed[:, :NSC].copy_(torch.where(liv, best, torch.full_like(best, -1)))
         for _g in range(self.n_majors):
             _conv = (self.city_followed[:, :NSC] == _g) & (was != _g) & liv
             if bool(_conv.any()):

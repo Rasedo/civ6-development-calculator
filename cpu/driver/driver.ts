@@ -15,7 +15,7 @@
  * dev server for the UI later. The record schema is the interface.
  */
 import { writeFileSync } from 'node:fs';
-import type { DistrictId, GameState, Seat, Tile } from '../core/types';
+import type { City, DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, campTiles, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
@@ -171,9 +171,12 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       }
       // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
       // TEMPLE on top, so the two arms walk to DIFFERENT cities.
-      const shrineCity = actor.cities.find((city) => city.buildings.includes('SHRINE') && hsOk(city));
+      // ...and every tier is sold only by a city WITH a majority religion —
+      // `_seat_religious_city_ok`'s clause, which the engine's applier ANDs
+      const follows = (city: City) => (city.followedReligion ?? -1) >= 0;
+      const shrineCity = actor.cities.find((city) => city.buildings.includes('SHRINE') && hsOk(city) && follows(city));
       const templeCity = actor.cities.find((city) => city.buildings.includes('SHRINE')
-        && city.buildings.includes('TEMPLE') && hsOk(city));
+        && city.buildings.includes('TEMPLE') && hsOk(city) && follows(city));
       const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
       const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
       const mCost = unitFaithCost('MISSIONARY', eb?.missionaryCostMult ?? 1);

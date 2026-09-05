@@ -1,3 +1,5 @@
+import { grantFoundingPressure } from '../../../cpu/core/seats';
+import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP } from '../../../cpu/data/religion';
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from '../helpers';
@@ -200,20 +202,29 @@ describe('religious pressure spread', () => {
     const cap = foundCity(state, tileAtCoords(state.map, 5, 10).index, 0).city!;
     const near = foundCity(state, tileAtCoords(state.map, 9, 10).index, 0).city!; // 4 tiles
     const far = foundCity(state, tileAtCoords(state.map, 32, 10).index, 0).city!; // 27 tiles
-    // Seat 0 founds a religion; the capital's center is the holy tile (id 0).
+    // Seat 0 founds a religion; the capital's center is the holy tile (id 0),
+    // and the founding grant (200 per citizen) is what makes it FOLLOW.
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = cap.centerIndex;
+    grantFoundingPressure(state, 0);
 
     endTurn(state);
     expect(cap.followedReligion).toBe(0);
-    expect(near.followedReligion).toBe(0); // within RELIGION_PRESSURE_RANGE
+    expect(near.followedReligion ?? null).toBeNull(); // nothing pressed it yet: the Holy City presses from the turn AFTER it follows
     expect(far.followedReligion ?? null).toBeNull(); // out of range — no pressure
 
-    // Integer pressure accrues +1 per in-range turn.
+    // The Holy City presses x4 a turn, itself included; the near city converts
+    // once that holds more than half of its total against its atheism
+    // baseline (50 per citizen), and the far city never hears of it.
     const p = cap.religionPressure![0];
     endTurn(state);
-    expect(cap.religionPressure![0]).toBe(p + 1);
+    expect(cap.religionPressure![0]).toBe(p + HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    expect(near.religionPressure![0]).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    const need = Math.floor((ATHEISM_PRESSURE_PER_POP * near.population) / (HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN)) + 1;
+    for (let t = 1; t < need; t++) endTurn(state);
+    expect(near.followedReligion).toBe(0); // within RELIGION_PRESSURE_RANGE
     expect(far.religionPressure?.[0] ?? 0).toBe(0);
+    expect(far.followedReligion ?? null).toBeNull();
     // The majority-pressure flip and the cross-civ tie -> lowest-id case are
     // covered by the GPU poke (gpu/religion_gp_test.py) and the parity gate,
     // where 24 seat-0 cities flip to the two civ religions turn-exact.

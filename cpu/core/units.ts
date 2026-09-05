@@ -4,6 +4,7 @@
  * training, maintenance, and builder actions. Military/combat land in 11b.
  */
 
+import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import type { GameState, City, Seat, Tile, Unit, QueueItem } from './types';
 import { seatWonderSum } from './wonders';
 import { takeItemBank } from './prodLayout';
@@ -1531,8 +1532,9 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   const drop = promoValueFor(unit, 'CONCERT_LOYALTY', 0);
   if (host && drop > 0) host.loyalty = Math.max(0, (host.loyalty ?? LOYALTY_MAX) - drop);
   // CIV6 (Religious Rock): "Converts the city to the Rock Band's Religion" —
-  // the band's civ's own, and only once it has one; its pressure rises to
-  // one past the strongest other, so the city follows it on either engine.
+  // the band's civ's own, and only once it has one; its pressure rises to the
+  // smallest MAJORITY: one past every other religion's pressure and the
+  // atheism baseline together (`followedReligionOf`'s more-than-half rule).
   if (host && promoFlag(unit, 'CONCERT_CONVERT') && band?.religion.founded) {
     const n = state.seats.length;
     let pres = host.religionPressure;
@@ -1540,9 +1542,9 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
       pres = new Array(n).fill(0);
       host.religionPressure = pres;
     }
-    let top = 0;
-    for (let g = 0; g < n; g++) if (g !== seat && pres[g] > top) top = pres[g];
-    pres[seat] = Math.max(pres[seat], top + 1);
+    let floor = ATHEISM_PRESSURE_PER_POP * host.population;
+    for (let g = 0; g < n; g++) if (g !== seat) floor += pres[g];
+    pres[seat] = Math.max(pres[seat], floor + 1);
   }
   unit.bandAlbum = album + row.album;
   if (row.promote) {

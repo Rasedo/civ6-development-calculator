@@ -102,7 +102,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
+import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -2702,6 +2702,7 @@ export function seatPhase(state: GameState): void {
         actor.religion.follower = fPick;
         actor.religion.founder = oPick;
         actor.religion.holyTile = (actor.cities.find((c) => c.isCapital) ?? actor.cities[0])?.centerIndex ?? null;
+        grantFoundingPressure(state, actor.seat);
         const name = RELIGION_NAMES[actor.seat % RELIGION_NAMES.length];
         state.eventLog.push(`${actor.name} founded ${name} — two beliefs left the pool.`);
       }

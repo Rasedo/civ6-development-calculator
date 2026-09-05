@@ -1,3 +1,4 @@
+import { ATHEISM_PRESSURE_PER_POP } from '../../../cpu/data/religion';
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE, FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
@@ -389,7 +390,8 @@ describe('the band tree', () => {
     b = band(state, tile, 0, ['RELIGIOUS_ROCK']);
     state.rngState = seedForTier(1, 2);
     expect(performConcert(state, b.id, 0).ok).toBe(true);
-    expect(theirs.religionPressure).toEqual([51, 50]);
+    // the smallest MAJORITY: one past the other religion's 50 and the atheism baseline together
+    expect(theirs.religionPressure).toEqual([50 + ATHEISM_PRESSURE_PER_POP * theirs.population + 1, 50]);
   });
 
   it('Roadies is +4 Movement', () => {

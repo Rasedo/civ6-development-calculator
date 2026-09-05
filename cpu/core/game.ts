@@ -43,10 +43,10 @@ import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
+import { BARB_SEAT, allCities, allSeats, grantFoundingPressure, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome } from './trade';
@@ -1892,36 +1892,36 @@ function theologicalCombatPhase(state: GameState): void {
 
 function spreadReligiousPressure(state: GameState): void {
   const nRel = state.seats.length;
-  const sources: number[][] = state.seats.map(() => []);
-  for (const sx of state.seats) {
-    const r = sx.religion;
-    if (r.founded && r.holyTile != null && r.holyTile >= 0) sources[sx.seat].push(r.holyTile);
-  }
-  if (!sources.some((src) => src.length > 0)) return; // no religion exists yet — nothing to spread
-  /* CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert pressure
-   * as if they were Holy Cities (4x Religion pressure on all cities within 10
-   * tiles)." Only Holy Cities exert pressure in this engine, so each
-   * completed-Holy-Site city becomes one more source at the holy city's own
-   * rate and range. */
-  for (const sx of state.seats) {
-    if (sources[sx.seat].length === 0) continue; // the perk spreads a religion, so it needs one
-    if (!suzerainEffect(state, sx.seat, 'holySitePressure')) continue;
-    for (const city of sx.cities) {
-      if (city.centerIndex === sources[sx.seat][0]) continue; // the Holy City already exerts
-      const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
-      if (!hs) continue;
-      const ht = state.map.tiles[hs.tileIndex];
-      if (ht.districtComplete && !ht.districtPillaged) sources[sx.seat].push(city.centerIndex);
-    }
-  }
+  const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
+  if (!founded.some(Boolean)) return; // no religion exists yet — nothing to spread
   const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
   for (const sx of state.seats) {
     const eb = sx.religion.enhancer;
     if (eb) range[sx.seat] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
   }
-
   const tiles = state.map.tiles;
   const cities = allCities(state) as City[];
+  // CIV6 (GlobalParameters): every city FOLLOWING a religion presses every
+  // city within range each turn — the Holy City at x4, a city with a Holy
+  // Site at x2, any other at x1 — times the Bishop's doubling at the source.
+  // CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert pressure
+  // as if they were Holy Cities (4x Religion pressure on all cities within
+  // 10 tiles)" — the founder's Holy-Site cities take the Holy City's step.
+  const sources: { g: number; tile: Tile; w: number }[] = [];
+  for (const city of cities) {
+    const g = city.followedReligion ?? -1;
+    if (g < 0 || !founded[g]) continue;
+    const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
+    const hsTile = hs ? tiles[hs.tileIndex] : undefined;
+    const hasSite = !!hsTile && !!hsTile.districtComplete && !hsTile.districtPillaged;
+    const asHoly = city.centerIndex === seatOf(state, g)!.religion.holyTile
+      || (hasSite && city.seat === g && suzerainEffect(state, g, 'holySitePressure'));
+    const mult = asHoly ? HOLY_CITY_PRESSURE_MULT : hasSite ? HOLY_SITE_PRESSURE_MULT : 1;
+    const cc = tiles[city.centerIndex];
+    // CIV6 (Bishop): "Religious pressure to adjacent cities is 100% stronger
+    // from this city."
+    sources.push({ g, tile: cc, w: RELIGION_PRESSURE_PER_TURN * mult * governorTileMult(state, cc, (e) => e.pressureMult) });
+  }
   for (const city of cities) {
     let pres = city.religionPressure;
     if (!pres || pres.length !== nRel) {
@@ -1932,27 +1932,16 @@ function spreadReligiousPressure(state: GameState): void {
     // CIV6 (Citadel of God): "City ignores pressure ... from Religions not
     // founded by the Governor's player."
     const deaf = governorFlag(state, city as City, (e) => e.ignoreForeignPressure);
-    for (let g = 0; g < nRel; g++) {
+    for (const src of sources) {
+      const g = src.g;
       if (deaf && g !== city.seat) continue;
       // CIV6 (Religious alliance 1): allies' religions exert no pressure on
       // each other's cities.
       if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
-      for (const src of sources[g]) {
-        const h = tiles[src];
-        if (hexDistance(cc.col, cc.row, h.col, h.row) > range[g]) continue;
-        // CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
-        // stronger from this city."
-        pres[g] += RELIGION_PRESSURE_PER_TURN * governorTileMult(state, h, (e) => e.pressureMult);
-      }
+      if (hexDistance(cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
+      pres[g] += src.w;
     }
-    let best = -1;
-    let bestP = 0;
-    for (let g = 0; g < nRel; g++) {
-      if (pres[g] > bestP) {
-        bestP = pres[g];
-        best = g;
-      }
-    }
+    const best = followedReligionOf(pres, city.population);
     const wasFollowed = city.followedReligion ?? -1;
     city.followedReligion = best >= 0 ? best : null;
     if (best >= 0 && best !== wasFollowed) dedicationEvent(state, best, DED_EXODUS);
@@ -2152,6 +2141,7 @@ export function foundReligion(
   state.claimedBeliefs.push(choice.follower, choice.founder); // pushed like the eager race's picks
   seatOf(state, seat)!.religion.worship = choice.worship;
   seatOf(state, seat)!.religion.holyTile = (seatOf(state, seat)!.cities.find((c) => c.isCapital) ?? seatOf(state, seat)!.cities[0])?.centerIndex ?? null;
+  grantFoundingPressure(state, seat);
   return { ok: true };
 }
 

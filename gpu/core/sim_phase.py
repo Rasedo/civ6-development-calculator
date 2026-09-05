@@ -1892,6 +1892,12 @@ class SimPhase:
         _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
         _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))
         self.holy_tile[:, row] = torch.where(ropen, _holy, self.holy_tile[:, row])
+        # CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP): the Holy City starts
+        # with that much of its own faith per citizen — `grantFoundingPressure`
+        _gr = ropen & (_holy >= 0)
+        if bool(_gr.any()):
+            gb = _gr.nonzero(as_tuple=True)[0]
+            self.city_pressure[gb, row, _h_slot[gb], row] += self._holy_founding_per_pop * self.city_pop[gb, row, _h_slot[gb]].long()
 
         edue = active & self.civ_religion_done[:, row] & ~self.civ_enhancer_done[:, row] & (self.civ_prophets[:, row] >= 2)
         eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))

@@ -61,7 +61,7 @@ from the list below.
 | B-67 the district price MODEL | 1 | the per-row BASE and the per-row under-represented DISCOUNT now come from the install (`Districts.Cost` and `CostProgressionParam1`), so an Aqueduct no longer costs a Campus and the two plaza rows take 25% where every other row takes 40. What is still one curve for all is the PROGRESSION MODEL: the install splits COST_PROGRESSION_NUM_UNDER_AVG_PLUS_TECH (the specialty rows, the Government Plaza, the Diplomatic Quarter, the Aerodrome) from COST_PROGRESSION_GAME_PROGRESS (the Aqueduct, Canal, Dam, Neighborhood and the Mbanza), and the two formulas are DLL-side — this engine runs the tech-driven one for both |
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%, blocked on C-46's scale), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |
+| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (sourced at 20%; C-46's scale is the install's since 2026-09-05, so it is buildable now), the queue-front purchase, and ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel — SOURCED (Chemistry, an adjacent mountain, a portal between tunnels at 2 Movement) and unbuilt: a movement portal is a new pathing class on both engines |
@@ -75,7 +75,6 @@ from the list below.
 | C-41 nothing places Volcanic Soil | 1 | the ADD carrier ships; WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6's queue has no published ceiling; the GPU's is a tensor dimension and must be finite, so both engines carry the same cap |
 | C-47 Tribal Villages | 1 | TS holds a six-outcome stub (`claimGoodyHut`) the exporter refuses to ship a world for, the GPU holds nothing; an outpost capture is a plain kill on both; Epic Quest's clause waits on the mechanic |
-| C-46 religious pressure is a stylized integer | 1 | the game's own pressure model (per-population, holy-city x4, holy-site x2, combat and trade-route pressure) is sourced and unbuilt; every percentage pressure modifier floors to nothing on the 1/turn integer |
 | C-60 no Free City step | 1 | a city that loses its loyalty goes straight to the highest-pressure seat on both engines (`flipCity` -> `transferCity`, `_seat_loyalty_flips` -> `_transfer_city`) — there is no ownerless intermediate at all. Eleanor's "skips the Free City step" is therefore what EVERY seat already gets, which is a fidelity gap on both engines at once rather than a divergence |
 | C-61 the capital never moves | 1 | `relocatePalace` / `_relocate_palace` move `isCapital` only when the seat holds NO capital, and `origCapitalSeat` / `civ_cap_tile` are written once at founding and never again. Dido's Cothon capital move also needs a civ-UNIQUE project, which `ProjectDef` has no field for |
 | C-62 a war TYPE | 2 | the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and _LIBERATION_WAR are war kinds with their own civic prerequisite and a 10-turn buff on the declarer. Both engines carry exactly two kinds — formal and surprise (`seat_warkind`) — with no prerequisite beyond a casus belli and no post-declaration clock. Chandragupta's and Robert the Bruce's six modifiers wait here |
@@ -88,8 +87,8 @@ from the list below.
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-74 three disaster rates were stylized (CLOSED 2026-09-05, MODERATE / 500 turns; eruptions still open) | 0 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **37** | |
-| **OPEN, TOTAL** | **56** | |
+| **C. Absent systems** | **36** | |
+| **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -912,8 +911,10 @@ under their blocker so the dependency is readable, and both halves count.
       EFFECT_ADJUST_CITY_RELIGION_PRESSURE, Amount 100 = "100% stronger")
       says pressure Amounts are PERCENTS. Both engines' accumulator is an
       INTEGER at 1 per following city per turn (`city_pressure`, long;
-      `RELIGION_PRESSURE_PER_TURN`), so +20% of 1 floors to nothing —
-      BLOCKED on C-46's pressure scale.
+      `RELIGION_PRESSURE_PER_TURN`), so +20% of 1 floors to nothing.
+      C-46 CLOSED 2026-09-05: the accumulator is on the install's scale
+      now (lumps in the hundreds, an atheism baseline of 50 per citizen),
+      so the 20% has something to multiply — BUILDABLE, still unbuilt.
     - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with
       no published text behind it. UNSOURCED meaning — ask (ledger 14).
     - The GOLD purchase of the item UNDER PRODUCTION (queue front) is
@@ -1816,46 +1817,54 @@ under their blocker so the dependency is readable, and both halves count.
   (`city_item_bank`, eight columns per city) is the same class of choice —
   a full ledger banks nothing more. Reach: the driven gate fills queues to the cap by the early
   hundreds of turns, so the refusal itself is exercised.
-- **C-46. RELIGIOUS PRESSURE IS A STYLIZED INTEGER.** Weight 1. Both
-  engines accumulate pressure as a whole number — every following city
-  within `RELIGION_PRESSURE_RANGE` adds `RELIGION_PRESSURE_PER_TURN` (1),
-  the Holy City x4, a Holy Site city x2, a missionary lump of
-  `SPREAD_PRESSURE` (10, x1.5 under Scripture), the theological swings —
-  and the declared stylization in `cpu/data/religion.ts` says so. The
-  game's own model is SOURCED now (Base GlobalParameters):
-  RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 within
-  RELIGION_SPREAD_ADJACENT_CITY_DISTANCE 10, HOLY_CITY_PRESSURE_MULTIPLIER
-  4 and HOLY_SITE_PRESSURE_MULTIPLIER 2 (the three the engines carry),
-  plus HOLY_CITY_PRESSURE_PER_POP 200, ATHEISM_PRESSURE_PER_POP 50,
-  STRENGTH_MULTIPLIER 200, COMBAT_VICTORY 250 within range 6,
-  UNIT_CAPTURE 125 within range 6, and TRADE_ROUTE_PRESSURE 1.0 at the
-  destination / 0.5 at the origin. The scale is the gap: at 1 per turn,
-  every PERCENTAGE pressure modifier the game publishes floors to nothing
-  — the Religious alliance's +20% (C-2); the Bishop's +100% lands only
-  because its site multiplies the whole per-turn sum before the cast.
-  CORRECTED 2026-09-03: this is an ASK, not a cutover. The install publishes
-  the TERMS and never the rule combining them; two readings fit the same
-  numbers and differ by ~100x — (a) the 1 is literal and the engines are
-  already faithful; (b) it multiplies a pop-scaled base whose unit is the
-  hundreds the PER_POP rows speak in. Choosing (b) means inventing the pop
-  coefficient.
-  OWNER RULED 2026-09-04: neither ships on an argument. Build a probe that
-  drives the same games under each reading and reports what each does to
-  CONVERSION, then ask again with the numbers. That probe is
-  `tools/gpu/pressure_probe.py` (2026-09-05). It holds the per-turn stream at
-  the engine's 1 per source per turn — an argmax is scale-invariant, so what
-  the scale DECIDES is the ratio of the one-shot swings to the stream — and
-  runs three columns: A the engine's swings (lump 10 / theological 15 /
-  condemn 7), B the install's (200 / 250 / 125), C the install's plus a
-  population-scaled stream at coefficient 1, shown for its direction and not
-  as a proposal. Per game it reports conversions, cities ever converted,
-  re-conversions, reversions inside 10 turns, median hold and the first
-  conversion turn, plus how many religions were founded at all (a world
-  where nobody founds measures nothing). Reachability, seed 9001 to 250
-  under A: 2 religions founded, 10 of 11 cities converted from t87, and ZERO
-  re-conversions — under the engine's swings a lead is never overturned.
-  The full 8-fixture run's table is what goes back to the owner; C-56 stays
-  behind the answer.
+- **C-46. RELIGIOUS PRESSURE IS ON THE INSTALL'S SCALE. CLOSED 2026-09-05.**
+  Both engines used to accumulate a hand-set integer: only a religion's
+  HOLY CITY pressed, 1 a turn, a missionary lumped 10, a duel swung 15,
+  and a city followed whichever column was largest. The install publishes
+  the TERMS (Base GlobalParameters, every RELIGION_SPREAD_* row) and never
+  the rule combining them, and two readings of the per-pop rows differed
+  by ~100x — so the owner RULED 2026-09-04: probe first, then choose.
+  `tools/gpu/pressure_probe.py` drove 8 fixtures x 250 turns under three
+  scalings; six of eight seeds were near-identical under all three and one
+  three-religion seed (9092) carried the whole spread. The owner's call on
+  2026-09-05: fidelity decides — the table read LITERALLY, which is neither
+  of the probe's rescalings but the model below.
+
+  SHIPPED, every term off GlobalParameters.xml: every city FOLLOWING a
+  religion presses every city within RELIGION_SPREAD_ADJACENT_CITY_DISTANCE
+  10 (plus Itinerant Preachers' range) by
+  RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 a turn — the Holy City by
+  HOLY_CITY_PRESSURE_MULTIPLIER 4 of it, a city with a complete Holy Site by
+  HOLY_SITE_PRESSURE_MULTIPLIER 2 (Jerusalem's suzerain lifts its founder's
+  Holy-Site cities to the Holy City's step), the Bishop's doubling at the
+  source, Citadel of God and the Religious alliance unchanged; every city
+  carries an ATHEISM baseline of ATHEISM_PRESSURE_PER_POP 50 per citizen;
+  a religion's Holy City starts with HOLY_CITY_PRESSURE_PER_POP 200 per
+  citizen the turn it is founded (`grantFoundingPressure` /
+  the grant in `_seat_research_tail`, both founding paths); a full-health
+  Spread lumps STRENGTH_MULTIPLIER 200 (x1.5 Scripture), a won duel swings
+  COMBAT_VICTORY 250 and a Condemn UNIT_CAPTURE 125; and a city FOLLOWS the
+  religion holding MORE THAN HALF of its total pressure with the baseline —
+  the majority of its citizens (`followedReligionOf` / `_followed_religion`,
+  ONE composer per engine, which the spread order and the buy gates read).
+  TWO READINGS recorded, not sourced: the x4 and x2 do not stack (the larger
+  applies), and a city presses ITSELF, which is how a lone Holy City keeps
+  its faith. Religious Rock now raises the band's religion to the smallest
+  MAJORITY rather than "one past the strongest other". Still absent and
+  its own item: the trade route's pressure (C-56).
+
+  FOUND ON THE WAY, the driver-twin class: the TS driver's religious-buy
+  candidate walked to a Shrine city without asking whether it FOLLOWED
+  anything, where the GPU's `_seat_religious_city_ok` does — latent while
+  the old argmax made every Holy City follow from its first turn, exposed
+  at seed 9209 t104 the moment a Shrine city could follow nobody. Bar:
+  `religion-trade` (the founding grant, the x4 self-press, the near city
+  converting on the turn the baseline is passed, the far one never),
+  `suzerain-rules` (2 / 4 steps, the Holy City's step once), `religion2`
+  (a following Holy City's reach with and without Itinerant Preachers, the
+  200 / 300 lumps), `religion_gp` (a tie is no majority; the flip past the
+  baseline; kill hygiene), `rock-band` / `rock_band` (the majority
+  convert), `missionary`; the pair 9209 / 9092 green to 200.
 
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1. Both engines hold
   religious PRESSURE per city and a followed religion per city, and neither
@@ -1992,8 +2001,8 @@ under their blocker so the dependency is readable, and both halves count.
   radius is measured FROM: the path tiles, the origin, or the destination. On
   a walk of any length those three differ enormously (3 from every path tile
   is most of a continent). So the amount is sourced and the GEOMETRY is not,
-  which makes this an ASK rather than a build — the same shape as C-46's
-  scale, and it must not ship on a guess.
+  which makes this an ASK rather than a build — the shape C-46's scale
+  had before its probe, and it must not ship on a guess.
 - **OPEN — THE DRIVER NEEDS A REAL STYLE MECHANISM.** Not weighted (this
   file prices fidelity; this is harness). Today a style is one boolean
   read at a single `if` inside `pick_research`; adding one style meant a

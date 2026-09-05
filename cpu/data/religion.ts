@@ -7,9 +7,10 @@
  * 10 tiles).
  *
  * NARROWED MARKER — still model stylizations, not Civ 6 values, and each is
- * labelled at its own definition: SPREAD_PRESSURE, MISSIONARY_CAP and
- * APOSTLE_CAP (real Civ 6 caps neither unit and varies charges by Holy Site
- * building), and the individual BELIEF magnitudes.
+ * labelled at its own definition: MISSIONARY_CAP and APOSTLE_CAP (real Civ 6
+ * caps neither unit and varies charges by Holy Site building), and the
+ * individual BELIEF magnitudes. The PRESSURE scale is the install's since
+ * 2026-09-05 (every RELIGION_SPREAD_* row of GlobalParameters.xml below).
  *
  * Per-city pressure, missionaries, apostles and theological combat are all
  * modelled on both
@@ -221,18 +222,52 @@ export const RELIGION_NAMES = [
 
 export const PANTHEON_FAITH_COST = 25;
 
-/** a founded religion's holy city spreads pressure to every city within
- * this many tiles each turn (real Civ 6's base holy-city pressure radius).
- * Itinerant Preachers adds its pressureRangeBonus to THIS religion's
- * radius (per-religion range in spreadReligiousPressure). */
+/** CIV6 (GlobalParameters.xml, RELIGION_SPREAD_ADJACENT_CITY_DISTANCE 10):
+ * every city FOLLOWING a religion presses every city within this many tiles
+ * each turn. Itinerant Preachers adds its pressureRangeBonus to THIS
+ * religion's radius (per-religion range in spreadReligiousPressure). */
 export const RELIGION_PRESSURE_RANGE = 10;
 export const JUST_WAR_RANGE = 3;
+/** CIV6 (RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1): what one following
+ * city presses per turn — the Holy City presses
+ * RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER 4 of it and a city with a
+ * Holy Site RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER 2. READING: the two
+ * do not stack, the larger applies; a city presses itself too, which is how
+ * a Holy City keeps its faith with no neighbour of its own. */
 export const RELIGION_PRESSURE_PER_TURN = 1;
-/** the lump a missionary SPREAD adds to the target city's accumulator
- * for its owner religion — a decade of ambient (+1/turn), so a spread flips
- * decisively but ambient can re-erode. Real Civ 6 spreads ~200 vs ~30/turn
- * ambient; same ratio class. SCRIPTURE multiplies ×1.5 → 15 (integer). */
-export const SPREAD_PRESSURE = 10;
+export const HOLY_CITY_PRESSURE_MULT = 4;
+export const HOLY_SITE_PRESSURE_MULT = 2;
+/** CIV6 (RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP 50): every city carries this
+ * much "no religion" pressure per citizen — the baseline a religion must
+ * outweigh. A city FOLLOWS the religion holding MORE THAN HALF of its total
+ * pressure, atheism included: the majority of its citizens
+ * (`followedReligionOf`). */
+export const ATHEISM_PRESSURE_PER_POP = 50;
+/** CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP 200): what a religion's
+ * Holy City starts with per citizen the turn it is founded. */
+export const HOLY_CITY_FOUNDING_PRESSURE_PER_POP = 200;
+/** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the lump a full-health
+ * Spread lands on the target city; SCRIPTURE multiplies it x1.5 (300). */
+export const SPREAD_PRESSURE = 200;
+
+/** the religion a city FOLLOWS: the strongest pressure, when it holds more
+ *  than half of the city's total with the atheism baseline — more than half
+ *  its citizens. -1 when none does; a tie at the top goes to the lowest id.
+ *  `_followed_religion` is the twin, and every follow read on this engine
+ *  goes through here so no two sites can disagree about a tie. */
+export function followedReligionOf(pres: readonly number[], population: number): number {
+  let best = -1;
+  let bestP = 0;
+  let total = ATHEISM_PRESSURE_PER_POP * Math.max(0, population);
+  for (let g = 0; g < pres.length; g++) {
+    total += pres[g];
+    if (pres[g] > bestP) {
+      bestP = pres[g];
+      best = g;
+    }
+  }
+  return best >= 0 && bestP * 2 > total ? best : -1;
+}
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
 /** Master switch for the city-attack religion adder, written and mirrored at
@@ -241,13 +276,11 @@ export const CITY_RELIGION_ADDER_LIVE = true;
 
 /**
  * THEOLOGICAL COMBAT. CIV6: the winner's religion gains pressure "in all
- * cities within 10 tiles" and the loser's sheds the same. The real swing is
- * 250, on a scale where a Missionary spread is ~200; `SPREAD_PRESSURE` puts
- * this model at a twentieth of that, so the SWING is scale-relative where the
- * RANGE is in tiles and is not.
+ * cities within 10 tiles" and the loser's sheds the same —
+ * RELIGION_SPREAD_COMBAT_VICTORY 250 (GlobalParameters.xml).
  */
 export const THEO_PRESSURE_RANGE = 10;
-export const THEO_PRESSURE_SWING = 15;
+export const THEO_PRESSURE_SWING = 250;
 
 /** CIV6 (Inquisitor): the Apostle's "Launch Inquisition" needs friendly
  *  territory and "at least 3 charges", and consumes the unit. */
@@ -262,10 +295,8 @@ export const REMOVE_HERESY_PCT = 75;
 /** CIV6 (Theological combat): a military unit's CONDEMN HERETIC kills the
  *  religious unit and "only the losing side loses religious influence, the
  *  Religious Pressure lost is halved ... and it only affects cities within 6
- *  tiles" — halved against the 250 the duel swings, which is
- *  THEO_PRESSURE_SWING on this model's scale. */
+ *  tiles" — RELIGION_SPREAD_UNIT_CAPTURE 125, the duel's 250 halved. */
 export const CONDEMN_PRESSURE_RANGE = 6;
-/** the halved swing, floored so it stays an integer on both engines. */
 export const CONDEMN_PRESSURE_SWING = Math.floor(THEO_PRESSURE_SWING / 2);
 
 /**

@@ -1,4 +1,5 @@
 
+import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP } from '../data/religion';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
@@ -202,6 +203,20 @@ export function citiesOf(state: GameState, seat: number): City[] {
 
 export function allCities(state: GameState): City[] {
   return state.seats.flatMap((s) => s.cities);
+}
+
+/** CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP 200): the turn a religion
+ *  is founded its Holy City starts with that much of its own faith per
+ *  citizen — what makes it the first city to FOLLOW. Both founding paths
+ *  (the seat's pick and the eager race) land here; `_grant_founding_pressure`
+ *  is the twin. */
+export function grantFoundingPressure(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  const holy = s?.cities.find((c) => c.centerIndex === s.religion.holyTile);
+  if (!holy) return;
+  const pres = (holy.religionPressure ??= []);
+  while (pres.length < state.seats.length) pres.push(0);
+  pres[seat] += HOLY_CITY_FOUNDING_PRESSURE_PER_POP * holy.population;
 }
 
 export function unitsOf(state: GameState, seat: number): Unit[] {

@@ -998,7 +998,15 @@ class SimInit:
         # accumulators and the followed religion id (-1 = none) live on the city
         # block below. Dead/absent slots are zeroed each turn, mirroring the TS
         # fresh-object reset on founding/flip.
-        self._pressure_range = int(rr.get("pressureRange", 10))  # holy-city spread radius
+        self._pressure_range = int(rr.get("pressureRange", 10))  # a following city's spread radius
+        # CIV6 (GlobalParameters, the RELIGION_SPREAD_* rows): what one following
+        # city presses per turn, the Holy City's and a Holy Site city's steps,
+        # the atheism baseline per citizen and the Holy City's founding grant
+        self._pressure_per_turn = int(rr["pressurePerTurn"])
+        self._holy_city_mult = int(rr["holyCityMult"])
+        self._holy_site_mult = int(rr["holySiteMult"])
+        self._atheism_per_pop = int(rr["atheismPerPop"])
+        self._holy_founding_per_pop = int(rr["holyCityFoundingPerPop"])
         # pressure -> yields coupling. True: a city's FOLLOWER-belief yields key
         # on its own followedReligion (city_followed). False: on the owning
         # seat's religion.

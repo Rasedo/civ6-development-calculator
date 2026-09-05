@@ -8,6 +8,7 @@ import { applySeatUnitOrders } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import type { GameState, Seat } from '../../../cpu/core/types';
+import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
 
 // civ MISSIONARY chassis (mirror of the GPU religion2_test pokes). The
 // scripted 250t rollout barely reaches a civ that has founded a religion AND
@@ -33,8 +34,8 @@ function spreadHere(state: GameState, actor: Seat, unitId: number): void {
 }
 
 describe('civ missionary chassis', () => {
-  it('a missionary within 1 of a differing city spreads +10 (15 SCRIPTURE), loses a charge, dies at 0', () => {
-    // base lump 10, charges 2 -> survives at 1.
+  it('a missionary within 1 of a differing city spreads SPREAD_PRESSURE (x1.5 SCRIPTURE), loses a charge, dies at 0', () => {
+    // base lump 200 (CIV6 RELIGION_SPREAD_STRENGTH_MULTIPLIER), charges 2 -> survives at 1.
     {
       const state = newGame();
       const civSeat = (state.seats[(0) + 1] as Seat);
@@ -46,11 +47,11 @@ describe('civ missionary chassis', () => {
       u.charges = 2;
       const uid = u.id;
       spreadHere(state, civSeat, uid);
-      expect((target.religionPressure ?? [])[1]).toBe(10);
+      expect((target.religionPressure ?? [])[1]).toBe(SPREAD_PRESSURE);
       const still = state.units.find((x) => x.id === uid);
       expect(still?.charges).toBe(1);
     }
-    // SCRIPTURE lump 15, charges 1 -> dies (disbanded) at 0.
+    // SCRIPTURE lump x1.5, charges 1 -> dies (disbanded) at 0.
     {
       const state = newGame();
       const civSeat = (state.seats[(0) + 1] as Seat);
@@ -63,7 +64,7 @@ describe('civ missionary chassis', () => {
       u.charges = 1;
       const uid = u.id;
       spreadHere(state, civSeat, uid);
-      expect((target.religionPressure ?? [])[1]).toBe(15);
+      expect((target.religionPressure ?? [])[1]).toBe(Math.round(SPREAD_PRESSURE * 1.5));
       expect(state.units.find((x) => x.id === uid)).toBeUndefined();
     }
   });

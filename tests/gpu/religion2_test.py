@@ -413,14 +413,15 @@ def poke_missionary_spread(rules, rj, path):
         return sim, u, nb
 
     # base lump 10, charges 2 -> survives at 1
-    sim, u, nb = run(None, 10, charges=2)
+    # CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the full-health lump; Scripture x1.5
+    sim, u, nb = run(None, 200, charges=2)
     assert bool(sim.major_unit_alive[0, u]) and int(sim.major_unit_charges[0, u]) == 1, "spread must drop a charge and survive at 1"
 
-    # SCRIPTURE lump 15, charges 1 -> dies at 0
-    sim2, u2, nb2 = run("SCRIPTURE", 15, charges=1)
+    # SCRIPTURE lump 300, charges 1 -> dies at 0
+    sim2, u2, nb2 = run("SCRIPTURE", 300, charges=1)
     assert not bool(sim2.major_unit_alive[0, u2]), "missionary must die at 0 charges"
     assert int(sim2.civilian_at[0, nb2]) < 0, "dead missionary's tile must be cleared"
-    print("  5 missionary spread OK (+10 base / +15 SCRIPTURE, charge -1, death at 0)")
+    print("  5 missionary spread OK (+200 base / +300 SCRIPTURE, charge -1, death at 0)")
 
 
 def poke_presr(rules, rj, path):
@@ -447,25 +448,32 @@ def poke_presr(rules, rj, path):
             break
     assert A >= 0, f"no holy tile with base+2 and base+3 receivers (base {base})"
 
-    # only religion g is founded; two dedicated civ-seat-r slots hold the receivers.
+    # only religion g is founded; its HOLY CITY stands at A and FOLLOWS g (a
+    # source presses only the religion it follows, the Holy City at x4), and
+    # two dedicated civ-seat-r slots hold the receivers.
     sim.holy_tile[0] = -1
     sim.holy_tile[0, g] = A
-    S2, S3 = 5, 6
-    for s, ct in ((S2, C2), (S3, C3)):
+    S1, S2, S3 = 4, 5, 6
+    for s, ct in ((S1, A), (S2, C2), (S3, C3)):
         sim.city_alive[0, r + 1, s] = True
         sim.city_center[0, r + 1, s] = ct
         sim.city_pressure[0, r + 1, s] = 0
+        sim.city_followed[0, r + 1, s] = -1
+    sim.city_pressure[0, r + 1, S1, g] = 9000
+    sim.city_followed[0, r + 1, S1] = g
+    step = int(sim._holy_city_mult) * int(sim._pressure_per_turn)
 
     def spread_get():
-        sim.city_pressure[0, r + 1, S2] = 0
-        sim.city_pressure[0, r + 1, S3] = 0
+        for s in (S2, S3):
+            sim.city_pressure[0, r + 1, s] = 0
+            sim.city_followed[0, r + 1, s] = -1
         sim._spread_religious_pressure()
         return int(sim.city_pressure[0, r + 1, S2, g]), int(sim.city_pressure[0, r + 1, S3, g])
 
-    # WITH ITINERANT: range base+2 -> receiver at base+2 gets +1, base+3 nothing.
+    # WITH ITINERANT: range base+2 -> receiver at base+2 gets the Holy City's step, base+3 nothing.
     sim.civ_enhancer[:, r + 1] = E["ITINERANT"]
     p2, p3 = spread_get()
-    assert p2 == 1 and p3 == 0, f"ITINERANT range wrong (base+2 {p2}, base+3 {p3})"
+    assert p2 == step and p3 == 0, f"ITINERANT range wrong (base+2 {p2}, base+3 {p3}, step {step})"
 
     # WITHOUT the enhancer: range base -> the base+2 receiver gets nothing.
     sim.civ_enhancer[:, r + 1] = -1

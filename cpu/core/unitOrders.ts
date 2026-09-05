@@ -2,7 +2,7 @@ import type { GameState, Seat, Tile, Unit } from './types';
 import { disbandUnit } from './units';
 import { neighbors } from '../../world/hex';
 import { allCities } from './seats';
-import { ENHANCER_BELIEFS, SPREAD_PRESSURE } from '../data/religion';
+import { ENHANCER_BELIEFS, SPREAD_PRESSURE, followedReligionOf } from '../data/religion';
 import { promoFirstUse, promoValue } from './promotions';
 
 export function snipeRing(state: GameState, here: Tile): number[] {
@@ -47,7 +47,7 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
     pres = new Array(nRel).fill(0);
     target.religionPressure = pres;
   }
-  const wasFollowed = argmaxPressure(pres);
+  const wasFollowed = followedReligionOf(pres, target.population);
   pres[actor.seat] += lump;
   // CIV6 (Spread Religion): the spread itself "reduces total Religious
   // Pressure of all foreign religions in the city by 25%", and PROSELYTIZER
@@ -60,8 +60,8 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   }
   // CIV6 (Indulgence Vendor): "Gain 100 Gold if this unit converts a city to
   // your Religion for the first time." The majority is `spreadReligiousPressure`'s
-  // own argmax, read here at the moment the lump lands.
-  if (argmaxPressure(pres) === actor.seat && wasFollowed !== actor.seat) {
+  // own rule, read here at the moment the lump lands.
+  if (followedReligionOf(pres, target.population) === actor.seat && wasFollowed !== actor.seat) {
     const gold = promoFirstUse(unit, 'INDULGENCE');
     if (gold > 0) actor.treasury = (actor.treasury ?? 0) + gold;
   }
@@ -70,16 +70,3 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   if (unit.charges <= 0) disbandUnit(state, unit.id);
 }
 
-/** the religion a pressure row follows — `spreadReligiousPressure`'s own
- *  strict-greater scan, so the two never disagree about a tie. */
-function argmaxPressure(pres: number[]): number {
-  let best = -1;
-  let bestP = 0;
-  for (let g = 0; g < pres.length; g++) {
-    if (pres[g] > bestP) {
-      bestP = pres[g];
-      best = g;
-    }
-  }
-  return best;
-}

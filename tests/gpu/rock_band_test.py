@@ -453,8 +453,9 @@ def test_band_promotions(rules) -> None:
     assert int(sim.city_pressure[0, 1, host, 0]) == 0, "a band with no religion converted"
     sim.civ_religion_done[0, 0] = True
     concert(slot, tier=2)
-    assert int(sim.city_pressure[0, 1, host, 0]) == 51, "Religious Rock did not put the band's religion on top"
-    assert int(sim._followed_religion(sim.city_pressure[0, 1, host])) == 0
+    want = 50 + int(sim._atheism_per_pop) * int(sim.city_pop[0, 1, host]) + 1  # the smallest majority
+    assert int(sim.city_pressure[0, 1, host, 0]) == want, f"Religious Rock left the band's religion at {int(sim.city_pressure[0, 1, host, 0])}, want {want}"
+    assert int(sim._followed_religion(sim.city_pressure[0, 1, host], sim.city_pop[0, 1, host])) == 0
     sim.unit_alive[0, slot] = False
     sim.civilian_at[0, tile] = -1
     print(f"  band promotions OK: {n} drawn per grant, four the ceiling, five effects pinned")

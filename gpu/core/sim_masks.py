@@ -644,12 +644,17 @@ class SimMasks:
         best = torch.where(held, cm, torch.zeros_like(cm)).amax(dim=1)
         return torch.maximum(best.reshape(promos.shape), ones)
 
-    def _followed_religion(self, pres: torch.Tensor) -> torch.Tensor:
-        """the religion a pressure row follows — the argmax with ties to the
-        lowest id, and -1 when nothing presses at all. The turn's own resolver
-        scans the same way, so a mid-turn read cannot disagree with it."""
-        tot = pres.sum(dim=-1)
-        return torch.where(tot > 0, pres.argmax(dim=-1), torch.full_like(tot, -1))
+    def _followed_religion(self, pres: torch.Tensor, pop: torch.Tensor) -> torch.Tensor:
+        """the religion a pressure row follows — `followedReligionOf`'s twin:
+        the strongest pressure, when it holds MORE THAN HALF of the row's total
+        with the atheism baseline (CIV6 RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP
+        per citizen) — the majority of the city's citizens. Ties to the lowest
+        id, -1 when none qualifies. The turn's own resolver reads the same
+        rule, so a mid-turn read cannot disagree with it."""
+        tot = pres.sum(dim=-1) + self._atheism_per_pop * pop.clamp(min=0).long()
+        best = pres.argmax(dim=-1)
+        top = pres.gather(-1, best.unsqueeze(-1)).squeeze(-1)
+        return torch.where((top > 0) & (top * 2 > tot), best, torch.full_like(best, -1))
 
     def _promo_first_use(self, utype: torch.Tensor, promos: torch.Tensor,
                          used: torch.Tensor, kind: str):

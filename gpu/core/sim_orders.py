@@ -1220,7 +1220,7 @@ class SimOrders:
                         )
                         pb, pr, pj = pm.nonzero(as_tuple=True)
                         if len(pb):
-                            _was = self._followed_religion(self.city_pressure[pb, pr, pj])
+                            _was = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj])
                             # CIV6 (Translator): "Religious spread is triple
                             # strength in cities of other civilizations."
                             _tr = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "TRANSLATOR")
@@ -1250,7 +1250,7 @@ class SimOrders:
                             # CIV6 (Indulgence Vendor): "Gain 100 Gold if this
                             # unit converts a city to your Religion for the
                             # first time."
-                            _now = self._followed_religion(self.city_pressure[pb, pr, pj])
+                            _now = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj])
                             _flip = (_now == row) & (_was != row)
                             if bool(_flip.any()):
                                 _gv, _gu = self._promo_first_use(
