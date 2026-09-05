@@ -256,6 +256,26 @@ def style_of(name: str) -> dict:
     return s
 
 
+def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor) -> torch.Tensor:
+    """[B, nPol] bool — the SLOTTED CARDS verb: which of the cards `mask`
+    offers the seat slots this turn, under `nslots` [B, 4] per kind
+    (military, economic, diplomatic, wildcard) with `kind` [nPol] per card.
+
+    The first style is GREEDY-EQUIVALENT — table order, each kind filling its
+    own slots, the overflow and the wildcard-kind cards taking the W slots —
+    which is exactly the fill both engines used to compute for themselves,
+    so the cutover changes WHO decides and not (yet) what is decided. Real
+    styles (legacy-first, yield-first, military) are the next step."""
+    picked = torch.zeros_like(mask)
+    for k in range(3):
+        uk = mask & (kind == k).unsqueeze(0)
+        cum = uk.long().cumsum(dim=1)
+        picked = picked | (uk & (cum <= nslots[:, k:k + 1]))
+    overflow = mask & ~picked
+    w_rank = overflow.long().cumsum(dim=1)
+    return picked | (overflow & (w_rank <= nslots[:, 3:4]))
+
+
 def pick_research(blocks: dict, mask: torch.Tensor, kind: str,
                   deep: torch.Tensor | None = None) -> torch.Tensor:
     """[B] long — the RESEARCH verb (tech or civic).

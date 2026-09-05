@@ -5,10 +5,8 @@ import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState } from './types';
 import { neighbors } from '../../world/hex';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
-import { getModifiers } from './effects';
+import { getModifiers, slottedPolicyIndices } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
-import { computeAdoption, inDarkAge, wonderExtraSlots } from './effects';
-import { congressPolicyBlocked } from './congress';
 import { DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
 import { GREAT_PEOPLE } from '../data/greatPeople';
@@ -93,14 +91,10 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
           (naturalWonderAt(t) !== null || neighbors(state.map, t).some((n) => naturalWonderAt(n) !== null)),
       );
     case 'policies': {
-      // ORACLE: the GPU counts the scripted adoption's slotted cards
-      // (`_gov_policy_mods`' slotted mask) and answers False with adoption
-      // off; the stored government is a TS-only vestige nothing writes in a
-      // driven game, so counting it would make this boost unreachable.
-      const rsr = seatOf(state, seat)?.research;
-      if (!GOVERNMENTS_ADOPTION_LIVE || !rsr) return false;
-      return computeAdoption(rsr, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), seatOf(state, seat)?.government.held ?? 0)
-        .policies.filter((p) => p !== null).length >= check.count;
+      // the cards the seat CHOSE (a driver decision, the stored set) — the
+      // GPU's `_seat_slotted` count; False with adoption off
+      if (!GOVERNMENTS_ADOPTION_LIVE || !seatOf(state, seat)) return false;
+      return slottedPolicyIndices(state, seat).length >= check.count;
     }
     case 'cities':
       return citiesOf(state, seat).length >= check.count;

@@ -754,7 +754,10 @@ class SimSeats:
             # refused entire, as `applySeatActionRecord` refuses it
             chosen = policies.to(torch.bool)
             ok = active & ext & self._policy_set_ok(row, chosen)
-            self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
+            if bool(ok.any()):
+                self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
+                # the government memo's fast path trusts this version alone
+                self._eff_version += 1
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
             if e_seq.dim() == 1:

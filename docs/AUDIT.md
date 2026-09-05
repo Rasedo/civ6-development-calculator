@@ -41,8 +41,7 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| A-6r the slotted policy cards are not compared | 1 | the digest carries `governmentsHeld` and the civics under it, but not the CARDS a seat slots nor the extra SLOTS it holds — A-5r lived in that gap for as long as it took one unit's XP to come out wrong |
-| **A. Engine vs engine** | **1** | |
+| **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 1 | the scored-competition catalog holds one row |
@@ -87,7 +86,7 @@ from the list below.
 | C-74 three disaster rates were stylized (CLOSED 2026-09-05, MODERATE / 500 turns; eruptions still open) | 0 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
 | **C. Absent systems** | **35** | |
-| **OPEN, TOTAL** | **54** | |
+| **OPEN, TOTAL** | **53** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1385,6 +1384,31 @@ under their blocker so the dependency is readable, and both halves count.
   set replacing the fill on both engines, the government-change carry-over
   in the one place each engine notices the change; then A-6r and C-73's
   reachability lanes flip.
+  STEP 2 SHIPPED 2026-09-05 — THE CUTOVER. The store is the truth on both
+  engines: `applyGovernment` pays the cards in `government.policies` (minus
+  any whose unlock lapsed), `_gov_policy_mods` pays `civ_policies` the same
+  way and its memo keys on the plane; every other reader — the congress
+  voter, the Policy Treaty's favor, the MEDIEVAL_FAIRES boost's "4+ slotted"
+  count — goes through `slottedPolicyIndices` / `_seat_slotted`, ONE
+  composer per engine (the boost detector was the fourth TS reader and the
+  one the first cutover serve missed: seed 9092 t69, TS boosted and the GPU
+  not). The driver decides every turn a seat has a government
+  (`ladder.pick_policies`) with its first style GREEDY-EQUIVALENT — table
+  order, each kind filling its own slots, the overflow and the wildcard-kind
+  cards taking the W slots — so what changed is WHO decides; the record key
+  rides the wire and both engines validate it whole. A changed government
+  keeps the stored cards that still fit (`fitPoliciesLoose` /
+  `_fit_policy_set`, the one fit the greedy reference, the picker and the
+  carry-over share) at the one place each engine notices the change.
+  `computeAdoption` still derives the GOVERNMENT and survives as the greedy
+  reference (`slotGreedily` / `_slot_greedily` fill a hand-set test scene's
+  store with it). Two memo hazards paid for on the way: the GPU's fast path
+  trusted `_eff_version` alone, so the record's store write had to bump it
+  (seed 9092 t11), and the store had to join the memo key. A-6r closes
+  here. What is left of C-75 is STEP 3 — real styles (legacy-first,
+  yield-first, military), which is what finally slots a legacy card and
+  flips `legacy_accrual` / `legacy-accrual` from "assert zero" to "assert
+  paid"; until then the reachability count stays at zero.
 
 - **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
   sourcing C-63 on 2026-09-04, and kept separate from it because the two fail
@@ -1565,7 +1589,7 @@ under their blocker so the dependency is readable, and both halves count.
   WHAT IT SAYS ABOUT THE GATE: the slotted POLICY CARD set is not in the
   statecompare manifest. This divergence lived in the cards and only surfaced
   as banked XP many turns later. That gap is open as A-6r.
-- **A-6r. THE SLOTTED POLICY CARDS ARE NOT COMPARED.** Weight 1. Opened
+- **A-6r. THE SLOTTED POLICY CARDS ARE NOT COMPARED. CLOSED 2026-09-05 — `policiesSlotted` compares the stored set, which is what both engines pay from since C-75's cutover.** Weight 1. Opened
   2026-09-04 by A-5r. `governmentsHeld` and the civics that derive the adopted
   government are both in the digest, but the CARDS a seat actually has slotted
   are not, and neither are the extra policy SLOTS a seat holds beyond its

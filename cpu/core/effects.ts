@@ -913,7 +913,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   }
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state),
+    applyGovernment(mods, s.research, s.government.policies, congressPolicyBlocked(state),
                     inDarkAge(state, seat), s.government.held,
                     (g) => legacyBonusPct(state, seat, g));
   }
@@ -1307,6 +1307,47 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
   return out;
 }
 
+/** The cards seat `seat` has SLOTTED and may still use: its stored choice minus
+ *  any card whose unlock has lapsed — as table indices, sorted. The congress
+ *  voter and the Policy Treaty read this; `_seat_slotted` is the twin. */
+export function slottedPolicyIndices(state: GameState, seat: number): number[] {
+  const s = seatOf(state, seat);
+  if (!s) return [];
+  const gov = computeAdoption(s.research).government;
+  if (!gov) return [];
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  const out: number[] = [];
+  for (const p of s.government.policies) {
+    if (!p || !open.has(p)) continue;
+    const i = POLICY_LIST.findIndex((card) => card.id === p);
+    if (i >= 0) out.push(i);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Lay `cards` into `slots` in TABLE order, DROPPING what finds no slot — a
+ *  government change's carry-over (`setGovernment`, the seat phase) and the
+ *  greedy reference's own rule; `_fit_policy_set` is the twin. */
+export function fitPoliciesLoose(slots: readonly SlotKind[], cards: readonly string[]): (string | null)[] {
+  const out: (string | null)[] = slots.map(() => null);
+  const order = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
+  for (const id of [...cards].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9))) {
+    const card = POLICIES[id];
+    if (!card) continue;
+    let slot = slots.findIndex((kind, i) => out[i] === null && kind !== 'wildcard' && cardFitsSlot(card, kind));
+    if (slot < 0) slot = slots.findIndex((kind, i) => out[i] === null && kind === 'wildcard');
+    if (slot >= 0) out[slot] = id;
+  }
+  return out;
+}
+
+/** Fill `seat`'s store with the greedy reference — what a test scene that
+ *  sets civics by hand calls in place of the driver's pick. */
+export function slotGreedily(state: GameState, seat: number): void {
+  const s = seatOf(state, seat)!;
+  s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held).policies;
+}
+
 /** Lay `cards` (table order) into `slots`: each takes the first open slot of
  *  its kind, else the first open wildcard; null when one finds no slot — the
  *  set does not fit and is refused whole. `_policy_set_ok` is the twin. */
@@ -1323,12 +1364,17 @@ export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]
   return out;
 }
 
-function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
+function applyGovernment(mods: Modifiers, research: ResearchState, stored: readonly (string | null)[],
                          blocked = -1, dark = false, held = 0,
                          legacyPct: (govId: string) => number = () => 0): void {
-  const { government, policies } = computeAdoption(research, extra, blocked, dark, held);
+  // the government is still what the civics adopt; the CARDS are what the
+  // seat chose (`government.policies`, a driver decision), minus any card
+  // whose unlock has lapsed since
+  const government = computeAdoption(research).government;
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
+  const open = unlockedPolicyIds(research, blocked, dark, held, government!);
+  const policies = stored.filter((p): p is string => !!p && open.has(p));
   applyPolicyEffects(mods, gov.effects);
   for (const cardId of policies) {
     if (!cardId) continue;

@@ -117,6 +117,7 @@ def main() -> None:
 
     # 7) The two appliers with a direction.
     sim.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "STATE_WORKFORCE", "COLONIALISM"]))
+    sim._slot_greedily(0)  # the store is the truth now; a hand-set scene fills it with the greedy reference
     sim._eff_version += 1
     types = torch.full((B,), unit_i["KNIGHT"], dtype=torch.long, device=sim.device)
     base = float(sim._type_maintenance[unit_i["KNIGHT"]])
@@ -126,6 +127,7 @@ def main() -> None:
     assert free == 0.0, "a free unit never goes negative"
 
     sim.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS"]))
+    sim._slot_greedily(0)
     sim._eff_version += 1
     mine = torch.zeros(B, dtype=torch.long, device=sim.device)
     barb = torch.full((B,), BARB_SEAT, dtype=torch.long, device=sim.device)

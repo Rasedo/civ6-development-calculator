@@ -1669,13 +1669,39 @@ class SimEconomy:
         if extra_slots is not None:
             nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
         pol_unlocked = self._policy_unlocked(civics2, dark, era, held, adopted)
+        return self._fit_policy_set(pol_unlocked, nslots)
+
+    def _fit_policy_set(self, cands: torch.Tensor, nslots: torch.Tensor) -> torch.Tensor:
+        """[B, nPol] — lay `cands` into `nslots` [B, 4] in TABLE order: each kind
+        fills its own slots first, the overflow (and every wildcard-kind card)
+        takes the W slots. `fitPoliciesLoose`'s twin — the greedy fill, the
+        driver's greedy-equivalent picker and the government-change carry-over
+        all lay cards this one way."""
+        slotted = torch.zeros_like(cands)
         for k in range(3):  # military/economic/diplomatic
-            uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
-            cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order
+            uk = cands & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
+            cum = uk.long().cumsum(dim=1)  # inclusive rank among candidates-of-kind, table order
             slotted = slotted | (uk & (cum <= nslots[:, k : k + 1]))
-        overflow = pol_unlocked & ~slotted
+        overflow = cands & ~slotted
         w_rank = overflow.long().cumsum(dim=1)
         return slotted | (overflow & (w_rank <= nslots[:, 3:4]))
+
+    def _seat_policy_slots(self, row: int) -> torch.Tensor:
+        """[B, 4] long — the slots seat row `row`'s adopted government holds by
+        kind (military, economic, diplomatic, wildcard), wonder extras included;
+        all zero without a government."""
+        civ = self._seat_civics(row)
+        adopted, has_gov = self._adopted_gov(civ)
+        return (self._gov_slots[adopted] + self._wonder_extra_slots(row)) * has_gov.long().unsqueeze(1)
+
+    def _slot_greedily(self, row: int) -> None:
+        """Fill seat row `row`'s STORE with the greedy reference — what a test
+        scene that sets civics by hand calls in place of the driver's pick."""
+        civ = self._seat_civics(row)
+        self.civ_policies[:, row] = self._slotted_policies(
+            civ, self._wonder_extra_slots(row), self.civ_age[:, row] == 0,
+            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]), self.civ_gov_held[:, row])
+        self._eff_version += 1
 
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None,
                          dark: torch.Tensor | None = None, era: torch.Tensor | None = None,
@@ -1811,7 +1837,16 @@ class SimEconomy:
                     fx["prod"].append((has_gov & (adopted == _gi), int(_r[0]), int(_r[1]),
                                        int(_r[2]), float(_r[3])))
         if self._npol:
-            slotted = self._slotted_policies(civics2, extra_slots, dark, era)
+            if row is None:
+                # no seat to hold a store: the greedy reference (pokes drive this arm)
+                slotted = self._slotted_policies(civics2, extra_slots, dark, era, held)
+            else:
+                # THE STORE is the truth: what the seat CHOSE, minus any card whose
+                # unlock has lapsed since (a Dark Age ending, the Treaty's ban)
+                _ad, _hg = self._adopted_gov(civics2)
+                slotted = (self.civ_policies[:, row]
+                           & self._policy_unlocked(civics2, dark, era, held, _ad)
+                           & _hg.unsqueeze(1))
             fx["milpol"] = (slotted & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
             sd = slotted.to(dt)
             city_y = city_y + sd @ self._pol_city_y
@@ -1977,7 +2012,7 @@ class SimEconomy:
         ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
         if ent is not None and ent[0] == ver:
-            return ent[7]
+            return ent[8]
         # `_seat_civics` hands back a VIEW of the live plane; a key that is not
         # a copy compares equal to itself forever and freezes the answer.
         civ = self._seat_civics(row).clone()
@@ -1990,14 +2025,18 @@ class SimEconomy:
         # inputs above do. Left out, the memo would freeze the accrual at
         # whatever it was when the answer was first computed (C-73).
         turns = self.civ_gov_turns[:, row].clone()
+        # ...and the STORE: the cards the seat chose are an input now, and a
+        # key that is a view of the live plane would freeze the first answer
+        pols = self.civ_policies[:, row].clone()
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
-                and torch.equal(ent[5], held) and torch.equal(ent[6], turns):
-            val = ent[7]
+                and torch.equal(ent[5], held) and torch.equal(ent[6], turns) \
+                and torch.equal(ent[7], pols):
+            val = ent[8]
         else:
             val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, val)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, pols, val)
         return val
 
     def _seat_slotted(self, row: int) -> torch.Tensor:

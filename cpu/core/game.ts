@@ -10,7 +10,7 @@ import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
@@ -1487,15 +1487,7 @@ export function setGovernment(state: GameState, governmentId: string, seat: numb
   const oldCards = seatOf(state, seat)!.government.policies.filter((p): p is string => p !== null);
   seatOf(state, seat)!.government.current = governmentId;
   const slots = governmentSlots(state, seat); // includes wonder-granted extras
-  seatOf(state, seat)!.government.policies = slots.map(() => null);
-  for (const cardId of oldCards) {
-    const card = POLICIES[cardId];
-    if (!card) continue;
-    const slot = slots.findIndex(
-      (kind, i) => seatOf(state, seat)!.government.policies[i] === null && cardFitsSlot(card, kind),
-    );
-    if (slot >= 0) seatOf(state, seat)!.government.policies[slot] = cardId;
-  }
+  seatOf(state, seat)!.government.policies = fitPoliciesLoose(slots, oldCards);
   return { ok: true };
 }
 

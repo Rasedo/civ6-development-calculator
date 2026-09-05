@@ -96,6 +96,8 @@ def _blocks(env, sim, row: int, obs: torch.Tensor | None = None) -> dict:
 #:                                  engine may pick it (v3)
 #:         "tech": col | None       None = no pick
 #:         "civic": col | None
+#:         "policies": [i, ...]     the SLOTTED policy cards as table indices, a
+#:                                  SET (v3+); absent = no decision this turn
 #:         "units": [[N], ...]      one entry per unit STEP this turn, since a
 #:                                  unit may act several times
 #:     }}
@@ -1182,6 +1184,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
                 if seeds is not None else None)
     tech = ladder.pick_research(blocks, m["tech"], "tech", deep) if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic", deep) if bool(m["civic"].any()) else None
+    # the SLOTTED CARDS — a decision every turn the seat has a government;
+    # None when no card is on offer, which the wire reads as "no decision"
+    policies = (ladder.pick_policies(m["policies"], sim._seat_policy_slots(row), sim._pol_kind)
+                if "policies" in m and bool(m["policies"].any()) else None)
     war = None
     if seeds is not None and turn is not None:
         rng_w = {
@@ -1205,7 +1211,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
-    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
+    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic, policies=policies,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
                            monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
@@ -1276,10 +1282,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -1302,6 +1308,8 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
+    if policies is not None:
+        rec["policies"] = [i for i in range(int(policies.shape[1])) if bool(policies[b, i])]
     rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]

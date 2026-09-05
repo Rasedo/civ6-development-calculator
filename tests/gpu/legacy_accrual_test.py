@@ -206,7 +206,7 @@ def test_the_memo_sees_the_clock(rules, path) -> None:
     sim = build(path)
     _ = sim._gov_mods(ROW)                       # populate
     ent = sim._gov_pol_cache[ROW]
-    assert len(ent) == 8, f"the memo entry carries {len(ent)} fields, expected 8 with the clock"
+    assert len(ent) == 9, f"the memo entry carries {len(ent)} fields, expected 9 with the clock and the store"
     import torch as _t
     assert _t.equal(ent[6], sim.civ_gov_turns[:, ROW]), "the memo's 7th input is not the clock"
     print("  8 the memo OK — the clock is part of the key")

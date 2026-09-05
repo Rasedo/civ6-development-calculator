@@ -27,7 +27,7 @@ import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, 
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { computeAdoption, governmentBit, inDarkAge, wonderExtraSlots, unlockedPolicyIds, fitPolicies, governmentSlots } from './effects';
+import { computeAdoption, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, fitPoliciesLoose, governmentSlots, slottedPolicyIndices } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -657,13 +657,9 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
  *  adoption (which reads the standing slate back) and the envoy spread. */
 function congressVoter(state: GameState, seat: number): CongressVoterCtx {
   const sx = seatOf(state, seat)!;
-  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), sx.government.held);
-  const policies: number[] = [];
-  for (const id of adoption.policies) {
-    const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
-    if (i >= 0) policies.push(i);
-  }
-  policies.sort((a, b) => a - b);
+  const adoption = computeAdoption(sx.research);
+  // the cards the seat CHOSE (a driver decision), not a fill of its own
+  const policies = slottedPolicyIndices(state, seat);
   const envoysByType = CITY_STATE_TYPES.map(() => 0);
   for (const cityState of state.cityStates ?? []) {
     const t = CITY_STATE_TYPES.indexOf(cityState.type);
@@ -2640,6 +2636,7 @@ export function seatPhase(state: GameState): void {
       if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
     const bCivic = rosterBoostPoints(state, actor.seat, true);
+    const _govBefore = computeAdoption(rsr).government;
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
       for (const fx of CIVICS[rsr.civic].effects) {
@@ -2669,6 +2666,14 @@ export function seatPhase(state: GameState): void {
     if (_govIdx >= 0) {
       const _turns = (actor.government.govTurns ??= GOVERNMENT_LIST.map(() => 0));
       _turns[_govIdx] += 1;
+    }
+    // a CHANGED government keeps the slotted cards that still fit its slots
+    // and drops the rest; the freed slots wait for the driver's next decision
+    if (_govNow && _govNow !== _govBefore) {
+      const open = unlockedPolicyIds(rsr, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, _govNow);
+      actor.government.policies = fitPoliciesLoose(
+        governmentSlots(state, actor.seat),
+        actor.government.policies.filter((p): p is string => !!p && open.has(p)));
     }
 
     // Builder actions (build best-Δ improvement or walk to a job).

@@ -6,16 +6,16 @@ import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { takeItemBank } from './prodLayout';
 import { isSuzerain } from './cityStates';
 import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
-import { computeAdoption, inDarkAge } from './effects';
+import { computeAdoption, slottedPolicyIndices } from './effects';
 import { selectResearch } from './economy';
-import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
+import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
 import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
 import { pollutionFavorPenalty } from './climate';
-import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
-import { wonderExtraSlots, tourismFavorOf, slotFavorOf } from './effects';
+import { congressPolicyFavor, congressSuzFavorMult } from './congress';
+import { tourismFavorOf, slotFavorOf } from './effects';
 
 /** Suzerained city-states, each weighted by what TREATY ORGANIZATION does to
  *  the favor its TYPE pays — x2 on outcome A, x0 on B, 1 while nothing
@@ -56,12 +56,8 @@ export function occupiedCapitals(state: GameState, seat: number): number {
 function policyTreatyFavor(state: GameState, seat: number): number {
   const sx = seatOf(state, seat);
   if (!sx) return 0;
-  const held: number[] = [];
-  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), sx.government.held).policies) {
-    const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
-    if (i >= 0) held.push(i);
-  }
-  return congressPolicyFavor(state, held);
+  // the cards the seat CHOSE (a driver decision), not a fill of its own
+  return congressPolicyFavor(state, slottedPolicyIndices(state, seat));
 }
 
 export function seatGovernmentId(state: GameState, seat: number): string | null {

@@ -1,3 +1,4 @@
+import { slotGreedily } from '../../../cpu/core/effects';
 import { describe, it, expect } from 'vitest';
 import { seatOf, setBorderTurnsFrom } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
@@ -38,6 +39,7 @@ function newGame(opponents = 1) {
 /** put seat `from` on a government whose intolerance is `n`. */
 function govern(state: GameState, from: number, civic: string): void {
   seatOf(state, from)!.research.civics.push(civic);
+  slotGreedily(state, from); // the slotted cards are a stored decision now: the greedy reference stands in
   expect(computeAdoption(seatOf(state, from)!.research).government).toBeTruthy();
 }
 
@@ -67,6 +69,8 @@ describe('the per-rival international percent', () => {
     // rival, so the pair agrees and no intolerance joins the sum
     own.research.civics.push('SOCIAL_MEDIA', 'SUFFRAGE');
     (state.seats[1] as Seat).research.civics.push('SUFFRAGE');
+    slotGreedily(state, own.seat);
+    slotGreedily(state, 1);
     const adopted = computeAdoption(own.research).policies;
     expect(adopted).toContain('ONLINE_COMMUNITIES');
     expect(tourismIntlPct(state, 0, 1)).toBe(TOURISM_ROUTE_PCT + bonus);

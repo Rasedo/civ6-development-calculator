@@ -193,6 +193,7 @@ def main() -> None:
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
     simp = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     simp.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
+    simp._slot_greedily(0)  # the store is the truth now; a hand-set scene fills it with the greedy reference
     _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civ_civics[:, 0])
     assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
     simp.civ_civic_boosted[:, 0] = False
@@ -210,6 +211,7 @@ def main() -> None:
     if simp.n_majors > 1:
         simr = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
         simr.civ_civics[:, 1].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
+        simr._slot_greedily(1)
         simr.civ_civic_boosted[:, 1:] = False
         simr._detect_seat_boosts(1, torch.ones(simr.B, dtype=torch.bool))
         assert bool(simr.civ_civic_boosted[0, 1, mf_idx]), (

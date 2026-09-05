@@ -2,20 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { seatOf } from '../../../cpu/core/seats';
 import { applySeatActionRecord } from '../../../cpu/core/phase';
-import { computeAdoption, unlockedPolicyIds, fitPolicies, governmentSlots, inDarkAge, wonderExtraSlots } from '../../../cpu/core/effects';
+import { computeAdoption, unlockedPolicyIds, fitPolicies, fitPoliciesLoose, governmentSlots, inDarkAge, wonderExtraSlots, slottedPolicyIndices } from '../../../cpu/core/effects';
 import { congressPolicyBlocked } from '../../../cpu/core/congress';
 import { POLICY_LIST, POLICIES } from '../../../cpu/data/policies';
 import type { GameState, SeatActionRecord } from '../../../cpu/core/types';
 
 /**
- * THE SLOTTED-CARD STORE (C-75, step 1 — inert plumbing).
+ * THE SLOTTED-CARD STORE (C-75).
  *
- * Which cards a seat slots is becoming a DRIVER decision on the wire. This
- * step lays the plumbing and pays nothing off it: `unlockedPolicyIds` is the
- * one gate the greedy fill and the record's validator share, `fitPolicies`
- * lays a set into the slots or refuses it whole, and `applySeatActionRecord`
- * stores an accepted set in `government.policies`. `computeAdoption` still
- * pays the effects from its own greedy fill.
+ * Which cards a seat slots is a DRIVER decision on the wire: `unlockedPolicyIds`
+ * is the one gate the greedy reference, the record's validator and the effects
+ * share, `fitPolicies` lays a set into the slots or refuses it whole,
+ * `applySeatActionRecord` stores an accepted set in `government.policies`, the
+ * effects (`applyGovernment`), the congress voter, the Policy Treaty and the
+ * boost detector read the STORE through `slottedPolicyIndices`, and a changed
+ * government keeps what still fits (`fitPoliciesLoose`).
  *
  * The GPU twin is tests/gpu/policy_store_test.py.
  */
@@ -73,5 +74,17 @@ describe('the slotted-card store', () => {
     // and no decision at all touches nothing
     applySeatActionRecord(state, s, REC());
     expect(s.government.policies).toEqual(before);
+  });
+
+  it('a government with fewer slots keeps the table-earliest cards and drops the rest', () => {
+    const { state, greedy } = scene();
+    const slots = governmentSlots(state, 0);
+    const fewer = slots.slice(0, Math.max(1, slots.length - 1));
+    const kept = fitPoliciesLoose(fewer, greedy).filter((p): p is string => p !== null);
+    expect(kept.length).toBeLessThan(greedy.length);
+    for (const id of kept) expect(greedy).toContain(id);
+    // the store, filtered by the live unlock, is what the effects and the boost detector read
+    seatOf(state, 0)!.government.policies = fitPoliciesLoose(slots, greedy);
+    expect(slottedPolicyIndices(state, 0).length).toBe(greedy.length);
   });
 });

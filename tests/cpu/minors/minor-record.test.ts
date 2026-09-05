@@ -1,3 +1,4 @@
+import { slotGreedily } from '../../../cpu/core/effects';
 import { describe, it, expect } from 'vitest';
 import { emptySeat, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
@@ -87,6 +88,7 @@ describe('Containment', () => {
     // the card is slotted off the seat's own research; give the sender the
     // civic that unlocks CONTAINMENT and a government the suzerain lacks
     sender.research.civics = Object.keys(CIVICS);
+    slotGreedily(state, sender.seat); // the slotted cards are a stored decision now: the greedy reference stands in
     expect(containmentBonus(state, cs, sender)).toBe(1);
     // ... and nothing once the suzerain runs the same one
     suz.research.civics = [...sender.research.civics];
@@ -96,6 +98,7 @@ describe('Containment', () => {
   it('pays nothing against a city-state with no suzerain, or one that is ME', () => {
     const { state, cs, sender } = scenario();
     sender.research.civics = Object.keys(CIVICS);
+    slotGreedily(state, sender.seat); // the slotted cards are a stored decision now: the greedy reference stands in
     cs.envoys = {};
     resolveSuzerain(state, cs);
     expect(containmentBonus(state, cs, sender)).toBe(0);

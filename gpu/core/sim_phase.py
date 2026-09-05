@@ -1473,6 +1473,7 @@ class SimPhase:
         self._grievance_decay(row)
         bank(self.civ_civic_prog, cul_sum)
         bank(self.civ_culture, cul_sum)
+        _gov_before = self._adopted_gov(self.civ_civics[:, row])[0] if self._ngov else None
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
             cost_c = self._eff_cost(
@@ -1510,6 +1511,19 @@ class SimPhase:
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
             self.civ_gov_turns[:, row] += torch.nn.functional.one_hot(
                 _adopted.clamp(min=0), self.civ_gov_turns.shape[2]) * _gov_on.long().unsqueeze(1)
+            # a CHANGED government keeps the slotted cards that still fit its
+            # slots and drops the rest; the freed slots wait for the driver's
+            # next decision — `setGovernment`'s carry-over, at the one place
+            # each engine notices the change
+            _chg = _gov_on & (_adopted != _gov_before)
+            if self._npol and bool(_chg.any()):
+                _civ = self.civ_civics[:, row]
+                _open = self._policy_unlocked(_civ, self.civ_age[:, row] == 0,
+                                              self._civ_era(self.civ_techs[:, row], _civ),
+                                              self.civ_gov_held[:, row], _adopted)
+                _kept = self._fit_policy_set(self.civ_policies[:, row] & _open, self._seat_policy_slots(row))
+                self.civ_policies[:, row] = torch.where(_chg.unsqueeze(1), _kept, self.civ_policies[:, row])
+                self._eff_version += 1
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
         self._advance_great_people(row, active)

@@ -1,14 +1,16 @@
-"""THE SLOTTED-CARD STORE (C-75, step 1 — inert plumbing) — the GPU half.
+"""THE SLOTTED-CARD STORE (C-75) — the GPU half.
 
     python tests/gpu/policy_store_test.py
 
 The TS twin is tests/cpu/seats/policy-store.test.ts.
 
-Which cards a seat slots is becoming a DRIVER decision on the wire. This step
-lays the plumbing and pays nothing off it: `seat_masks(row)["policies"]` is
-the cards the seat may slot, `apply_seat_actions(policies=...)` validates the
-SET whole (`_policy_set_ok`) and stores it in `civ_policies`, and the compare
-renders it. The greedy fill (`_slotted_policies`) still pays every effect.
+Which cards a seat slots is a DRIVER decision on the wire: `seat_masks(row)
+["policies"]` is the cards the seat may slot, `apply_seat_actions(policies=
+...)` validates the SET whole (`_policy_set_ok`) and stores it in
+`civ_policies`, the effects read the STORE (`_gov_mods`), the compare renders
+it, and a changed government keeps what still fits (`_fit_policy_set`). The
+greedy fill (`_slotted_policies`) survives as the reference the driver's
+first style reproduces (`ladder.pick_policies`).
 
   1. the mask is `_policy_unlocked` under the live government, nothing for
      a seat with no government.
@@ -68,6 +70,7 @@ def main() -> int:
     sim._eff_version += 1
     print(f"  1 the mask OK — {int(mask[0].sum())} cards unlocked, none without a government")
 
+    sim._slot_greedily(ROW)  # the greedy reference into the store, which `_seat_slotted` reads now
     greedy = sim._seat_slotted(ROW)
     assert int(greedy[0].sum()) > 0, "the greedy fill slots nothing"
     assert bool(sim._policy_set_ok(ROW, greedy)[0]), "the greedy fill's own set failed the validator"
@@ -97,6 +100,19 @@ def main() -> int:
     got = _civ_mask("civ_policies")(sim, 0, [ROW])[0]
     assert got == greedy[0].nonzero().flatten().tolist(), got
     print(f"  3 the store OK — {len(got)} cards kept, the refused set left it alone, the compare renders the set")
+    # the carry-over: under a government with FEWER slots the stored set keeps
+    # its table-earliest cards of each kind and drops the rest
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
+    import ladder
+    nslots = sim._seat_policy_slots(ROW)
+    assert torch.equal(ladder.pick_policies(mask, nslots, sim._pol_kind), greedy), "the driver's first style is not the greedy reference"
+    fewer = (nslots - 1).clamp(min=0)
+    kept = sim._fit_policy_set(greedy, fewer)
+    assert bool((kept & ~greedy).sum() == 0) and int(kept[0].sum()) < int(greedy[0].sum()), "the carry-over did not drop the overflow"
+    for k in range(3):
+        assert int((kept[0] & (sim._pol_kind == k)).sum()) <= int(fewer[0, k]) + int(fewer[0, 3]), f"kind {k} over its slots after the carry-over"
+    print("  4 the carry-over OK — fewer slots keep the table-earliest cards, the picker is the greedy reference")
     print("BATTERY OK policy_store")
     return 0
 
