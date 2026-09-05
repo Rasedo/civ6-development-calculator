@@ -177,7 +177,7 @@ class SimPhase:
         # THE GOVERNORS, before anything reads the roster: earned titles are
         # spent, idle governors take a city, and both clocks tick. Every
         # ability the city walk reads is settled here.
-        self._governor_phase(row)
+        self._governor_phase(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
         # resolving, and the clocks their missions left behind tick down.
         self._tick_spies(row)

@@ -48,7 +48,7 @@ class SimGovernors:
 
     # ------------------------------------------------------------ the phase
 
-    def _governor_phase(self, row: int) -> None:
+    def _governor_phase(self, row: int, active: torch.Tensor) -> None:
         """The seat's governor turn, at the top of its own turn and before
         anything reads the roster: spend the available titles, seat every idle
         governor, then tick both clocks.
@@ -60,7 +60,15 @@ class SimGovernors:
         NG = self.n_governors
         if NG == 0:
             return
-        live = self.civ_alive[:, row]
+        # `active` is the TS loop's `cities.length === 0` continue, which sits
+        # ABOVE governorPhase in seatPhase: a seat with no city runs none of
+        # this and its roster is left exactly as it stood. `civ_alive` is not
+        # that predicate — a seat can be alive and cityless — and at B=1 the
+        # seat turn's own `active.any()` early return hid the difference. A
+        # second game in the batch kept that return open, this phase ran on the
+        # cityless seat, and the tick cleared the governor of the city it had
+        # just lost where TS left him seated (seed 9248 t170).
+        live = active
         if not bool(live.any()):
             return
 
@@ -70,7 +78,7 @@ class SimGovernors:
         self._governor_spend(row, titles)
         self._governor_post_minor(row, live)
         self._governor_seat(row, live)
-        self._governor_tick(row)
+        self._governor_tick(row, live)
         # Appointing, promoting, seating and the establishment clock all move
         # `_gov_appeal_plane`, and `_tile_appeal` is version-cached — without
         # this the appeal a governor grants arrives a turn late, and the
@@ -264,7 +272,7 @@ class SimGovernors:
             est[rows, g] = self._gov_establish[g]
             taken[rows, sl] = True
 
-    def _governor_tick(self, row: int) -> None:
+    def _governor_tick(self, row: int, live: torch.Tensor) -> None:
         """Both clocks, and the governor whose city is gone goes back to the
         Palace."""
         NG = self.n_governors
@@ -281,7 +289,8 @@ class SimGovernors:
             out[:, g] = torch.where(live_g & (out[:, g] > 0), out[:, g] - 1, out[:, g])
             seated = live_g & (city[:, g] >= 0)
             still = (alive & (ids == city[:, g].unsqueeze(1))).any(dim=1)
-            gone = seated & ~still
+            # masked by `live`: TS's cityless-seat continue skips this clean-up
+            gone = seated & ~still & live
             city[:, g] = torch.where(gone, torch.full_like(city[:, g], -1), city[:, g])
             est[:, g] = torch.where(gone, torch.zeros_like(est[:, g]), est[:, g])
             # ...and a governor whose MINOR is gone comes home too: a conquered
@@ -292,7 +301,7 @@ class SimGovernors:
                     1, minor[:, g].clamp(min=0, max=S - 1).unsqueeze(1)).squeeze(1)
             else:
                 mstill = torch.zeros_like(posted)
-            mgone = posted & ~mstill
+            mgone = posted & ~mstill & live
             minor[:, g] = torch.where(mgone, torch.full_like(minor[:, g], -1), minor[:, g])
             est[:, g] = torch.where(mgone, torch.zeros_like(est[:, g]), est[:, g])
             ticking = ((seated & still) | (posted & mstill)) & (est[:, g] > 0)

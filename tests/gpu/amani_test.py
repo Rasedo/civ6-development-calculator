@@ -97,9 +97,9 @@ def main() -> int:
     post(s3, row, AMANI, 0)
     s3.civ_gov_establish[b, row, AMANI] = 2
     assert int(s3._envoys_here(row)[b, 0]) == 1, "an establishing posting counts for nothing"
-    s3._governor_tick(row)
+    s3._governor_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
     assert int(s3.civ_gov_establish[b, row, AMANI]) == 1, "the clock must run abroad"
-    s3._governor_tick(row)
+    s3._governor_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
     assert int(s3.civ_gov_establish[b, row, AMANI]) == 0
     assert int(s3._envoys_here(row)[b, 0]) == 3, "and now Messenger counts"
     print("  2 the establishment clock runs abroad and gates the ability")
@@ -171,7 +171,7 @@ def main() -> int:
     s7 = fresh(rules, paths[0])
     post(s7, row, AMANI, 0)
     s7.citystate_alive[b, 0] = False
-    s7._governor_tick(row)
+    s7._governor_tick(row, s7.civ_alive[:, row] & s7.city_alive[:, row].any(dim=1))
     assert int(s7.civ_gov_minor[b, row, AMANI]) == -1, "a dead minor keeps its governor"
     assert int(s7.civ_gov_establish[b, row, AMANI]) == 0
     # and a posted governor is never handed a city as well

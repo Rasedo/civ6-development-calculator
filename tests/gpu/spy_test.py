@@ -240,14 +240,14 @@ def main() -> None:
 
     # -- 10: a neutralized governor leaves the city, and the clock is HIS ----
     sim.civ_civics[0, foe] = True  # every title the ladder can hand out
-    sim._governor_phase(foe)
+    sim._governor_phase(foe, sim.civ_alive[:, foe] & sim.city_alive[:, foe].any(dim=1))
     gi = int(sim._governor_at(foe)[0, theirs])
     assert gi >= 0, "the holder's only city is governor-seated"
     sim.neutralize_governor(0, foe, gi, sim._spy_gov_turns)
     assert int(sim._governor_at(foe)[0, theirs]) < 0, "a neutralized governor holds no city"
     mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert not bool(mm[sim._spy_m_governor]), "no governor, no Neutralize Governor"
-    sim._governor_tick(foe)
+    sim._governor_tick(foe, sim.civ_alive[:, foe] & sim.city_alive[:, foe].any(dim=1))
     assert int(sim.civ_gov_out[0, foe, gi]) == sim._spy_gov_turns - 1
     sim.civ_gov_out[0, foe, gi] = 0
 

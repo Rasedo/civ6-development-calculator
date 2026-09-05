@@ -167,6 +167,36 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
+- **A-8r. A CITYLESS SEAT'S GOVERNOR PHASE RAN ON THE GPU — BUT ONLY IN A
+  BATCH. OPENED AND CLOSED 2026-09-05.** Found by the battery at a44e52ee:
+  seed 9248 t170, `seat[0].governorCity` GPU [-1, -1, ...] vs TS [-1, 1, ...].
+  Green alone, red with EITHER shard-mate, so a batch-shape fork and not a
+  roster leak.
+
+  Measured: seat 0 lost its last city during turn 170 on both engines.
+  TS's seatPhase `continue`s a seat with no city BEFORE governorPhase, so its
+  governor stays seated in the dead city — the roster is left as it stood.
+  The GPU's `_governor_phase` gated on `live = civ_alive[:, row]`, which a
+  cityless seat still satisfies, and `_governor_tick` took no mask at all.
+  At B=1 the seat turn's own batch-wide `if not active.any(): return` fired
+  first and hid it; a second live game kept that return open, the phase ran
+  on the cityless seat, and the tick cleared the governor of the city it had
+  just lost. The `start-state-invalidates-liveness` class: `civ_alive` is
+  not "has a city", and only a batch can tell them apart.
+
+  FIXED: the phase takes the seat's `active` (the TS predicate) as `live`,
+  and the tick's clean-up of a gone city or minor is masked by it; four poke
+  lanes that called the phase positionally now pass the mask. Bar:
+  `governor_cityless` (two games — the cityless seat's governor stays seated,
+  the live seat's tick still clears a gone city; verified to red against the
+  unmasked tick), the three governor lanes and spy/amani, the pair and the
+  failing trio green to 250.
+
+  ONE WRONG TURN, recorded because it cost a run: the first cut of this fix
+  replaced a two-line `old` string and silently dropped the `torch.where`
+  write beneath the predicate it meant to change, which turned the clear
+  off entirely and moved the red to t156 — a codemod that consumes the
+  neighbour line. Grep the line after the one you changed.
 - **A-7r. A BANKRUPTCY TIE WENT TO THE LOWEST UNIT ID ON ONE ENGINE AND THE
   LOWEST SLOT ON THE OTHER. OPENED AND CLOSED 2026-09-05.** Found by the
   battery at 88bf8a45: seed 9053 t164, a seat-2 archer alive on the GPU at

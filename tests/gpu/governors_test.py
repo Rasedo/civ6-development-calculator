@@ -302,12 +302,12 @@ def poke_governor_seat0(rules, path):
     weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column
     _grant_titles(sim, 0, 1)
     snap = sim.snapshot()
-    sim._governor_phase(0)
+    sim._governor_phase(0, sim.civ_alive[:, 0] & sim.city_alive[:, 0].any(dim=1))
     apply_loyalty_row(sim, tier)
     with_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
     sim.restore(snap)
     _grant_titles(sim, 0, 0)
-    sim._governor_phase(0)
+    sim._governor_phase(0, sim.civ_alive[:, 0] & sim.city_alive[:, 0].any(dim=1))
     apply_loyalty_row(sim, tier)
     no_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in with_gov}
     for c in with_gov:
@@ -384,7 +384,7 @@ def poke_capital_immunity(rules, path):
     pcap = int(sim2.city_is_cap[0, 0].nonzero()[0])
     sim2.city_loyalty[0, 0, pcap] = 5.0
     _grant_titles(sim2, 0, 1)
-    sim2._governor_phase(0)
+    sim2._governor_phase(0, sim2.civ_alive[:, 0] & sim2.city_alive[:, 0].any(dim=1))
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     apply_loyalty_row(sim2, tier)
     assert float(sim2.city_loyalty[0, 0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"

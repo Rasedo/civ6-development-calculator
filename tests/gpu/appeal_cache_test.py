@@ -102,7 +102,7 @@ def test_the_establishment_clock_bumps(rules, path) -> None:
     assert int(sim._tile_appeal()[B0, t]) == before, "an establishing governor already paid"
 
     # the tick that lands it — the write `_governor_phase` owes the cache
-    sim._governor_phase(ROW)
+    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
     assert int(sim.civ_gov_establish[B0, ROW, g]) == 0, "the clock did not run out"
     got, want = int(sim._tile_appeal()[B0, t]), int(uncached_appeal(sim)[B0, t])
     assert got == want, f"the cached appeal is stale: {got} vs a fresh {want}"
@@ -114,8 +114,8 @@ def test_a_quiet_turn_invalidates_nothing(rules, path) -> None:
     sim = fresh(rules, path)
     sim._tile_appeal()
     v = sim._eff_version
-    sim._governor_phase(ROW)
-    sim._governor_phase(ROW)
+    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
+    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
     assert sim._eff_version == v, (
         f"a governor phase that changed nothing bumped the version {sim._eff_version - v}x — "
         "the fingerprint gate is not holding")

@@ -145,7 +145,7 @@ def poke_establish(rules, path):
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
     sim.civ_gov_establish[0, row, :] = 0
-    sim._governor_phase(row)
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
 
     seat = cols[0]
     gi = int(sim._governor_at(row)[0, seat])
@@ -159,7 +159,7 @@ def poke_establish(rules, path):
     assert not bool(sim._governor_mask(row)[0, seat].any()), "…so it pays no promotion, not even its default"
 
     for _ in range(want):
-        sim._governor_tick(row)
+        sim._governor_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim.civ_gov_establish[0, row, gi]) == 0
     assert bool(sim._governor_established(row)[0, seat]), "the clock runs out and it establishes"
     base = int(sim._gov_base_promo[gi])
@@ -180,7 +180,7 @@ def poke_neutralize(rules, path):
     sim.civ_gov_appointed[0, row, :] = False
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
-    sim._governor_phase(row)
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     gi = int(sim._governor_at(row)[0, cols[0]])
     assert gi >= 0
 
@@ -189,13 +189,13 @@ def poke_neutralize(rules, path):
     assert int(sim._governor_at(row)[0, cols[0]]) < 0, "a neutralized governor holds no city"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and starts his next posting cold"
     for k in range(turns):
-        sim._governor_phase(row)
+        sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
         left = int(sim.civ_gov_out[0, row, gi])
         assert left == turns - 1 - k, f"the clock ticks once per phase (turn {k}: {left})"
         if left > 0:
             assert not bool((sim._governor_at(row)[0] >= 0).any()), \
                 "he cannot be assigned to ANY city while the clock runs"
-    sim._governor_phase(row)
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim._governor_at(row)[0, cols[0]]) == gi, \
         "…and takes the lowest-loyalty free city again once it is out"
     print(f"  d neutralize OK ({turns}-turn clock on the PERSON; no city holds him meanwhile)")
@@ -211,18 +211,18 @@ def poke_city_lost(rules, path):
     sim.civ_gov_appointed[0, row, :] = False
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
-    sim._governor_phase(row)
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     gi = int(sim._governor_at(row)[0, cols[0]])
     for _ in range(int(sim._gov_establish[gi])):
-        sim._governor_tick(row)
+        sim._governor_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert bool(sim._governor_established(row)[0, cols[0]])
 
     sim.city_alive[0, row, cols[0]] = False
-    sim._governor_tick(row)
+    sim._governor_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim.civ_gov_city[0, row, gi]) < 0, "the city is gone, so is the posting"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and the establishment with it"
     assert bool(sim.civ_gov_appointed[0, row, gi]), "the APPOINTMENT survives — the title is spent"
-    sim._governor_phase(row)
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim._governor_at(row)[0, cols[1]]) == gi, "he takes the surviving city next phase"
     print("  e city lost OK (posting and clock cleared, appointment kept)")
 
