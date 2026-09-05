@@ -167,6 +167,39 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
+- **A-7r. A BANKRUPTCY TIE WENT TO THE LOWEST UNIT ID ON ONE ENGINE AND THE
+  LOWEST SLOT ON THE OTHER. OPENED AND CLOSED 2026-09-05.** Found by the
+  battery at 88bf8a45: seed 9053 t164, a seat-2 archer alive on the GPU at
+  47 HP and gone on TS, a seat-2 galley alive on TS and gone on the GPU.
+
+  Measured, not inferred. The archer was a BARBARIAN converted by seat 2's
+  apostle at t163 (`convertHeathens` -> `reseatUnit`); TS kept its
+  barbarian-era id 23, the GPU gave it a fresh slot 99. Every damage roll of
+  turn 164 matches by rng counter on both engines — one hit at 249 for 53,
+  both sides. Then seat 2 went broke: treasury 1.1 at the end of 163 on
+  both, -5.5 at the end of 164 on both. The bankruptcy rule disbands the
+  priciest unit and breaks a tie; the archer and the galley both cost 1.0.
+  TS tied on the LOWEST ID and took the archer (id 23 is lower than anything
+  seat 2 trained); the GPU tied on the LOWEST SLOT and took the galley. The
+  GPU's own docstring stated the assumption: "ties break to the lowest slot
+  (= oldest, matching TS's lowest id: the window only ever appends)". True
+  for every unit a seat trains; false for one it re-seats.
+
+  FIXED on TS: the tie goes to the EARLIEST in `state.units` — spawn order,
+  the one order both engines own (`reseatUnit` pushes to the end, the GPU's
+  `_spawn_unit` appends off `unit_next` with no reuse, `disbandUnit` filters
+  in place). The unit id is no longer read by that rule. Bar:
+  `bankruptcy-tie` (TS, 2 lanes, verified to red against the old tie) and
+  `bankruptcy_tie` (GPU, 3 lanes, one of which pins that the pool appends —
+  the fact the agreement rests on); seed 9053 alone green to 250.
+
+  THE CLASS: the second time this round a re-seated unit carried a fact its
+  new owner's rules read differently (A-3r's dig-in was the first), and the
+  first time a unit's ID was found doing work that only its POSITION should
+  do. Any TS rule that orders units by `id` is suspect the moment a re-seat
+  path exists; grep for `.id <` / `.id -` over units before trusting one.
+  Exposed, like A-4r and the siege scene, by the C-74 trajectory: under the
+  stylized disaster rates no broke seat ever held a converted barbarian.
 - **A-4r. SEED 9001 PARTS ON CULTURE, AND THE BATTERY'S SHARDING HID IT. CLOSED 2026-09-05.**
   A route coming IN was paid only while a route was going OUT.
 

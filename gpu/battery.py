@@ -525,6 +525,7 @@ def main() -> int:
                 ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
                 ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # A-5r a narrowed XP award must read its own game
                 ("incoming_route", [py, "tests/gpu/incoming_route_test.py"], 2),  # A-4r a route coming in is paid with none going out
+                ("bankruptcy_tie", [py, "tests/gpu/bankruptcy_tie_test.py"], 2),  # A-7r a bankruptcy tie goes to the earliest-spawned unit
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip

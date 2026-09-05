@@ -2597,13 +2597,21 @@ export function seatPhase(state: GameState): void {
     );
     actor.treasury -= wmdUpkeep(state, actor.seat);
     if (Math.round(actor.treasury * 1000) < 0) {
+      // The priciest unit goes; a TIE goes to the EARLIEST in `state.units`,
+      // which is spawn order — the one order both engines own (the GPU's
+      // pool appends, so its lowest slot is the same unit). It used to tie on
+      // the lowest UNIT ID, which is spawn order for a unit this seat trained
+      // and is NOT for one it re-seated: a converted barbarian keeps its
+      // barbarian-era id, lower than anything the seat owns, and the two
+      // engines disbanded different units the first turn a seat holding one
+      // went broke (seed 9053 t164).
       let victim: Unit | undefined;
       for (const u of state.units) {
         if (u.seat !== actor.seat) continue;
         const m = unitUpkeep(seatMods, u.type);
         if (m <= 0) continue;
         const vm = victim ? unitUpkeep(seatMods, victim.type) : 0;
-        if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
+        if (!victim || m > vm) victim = u;
       }
       if (victim) disbandUnit(state, victim.id);
     }

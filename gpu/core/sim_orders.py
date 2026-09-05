@@ -1507,7 +1507,9 @@ class SimOrders:
         insolvent — milli-rounded test (sub-milli non-dyadic gold drift must
         not trip the < 0 boundary here but not on TS). The priciest alive
         unit goes; ties break to the lowest slot (= oldest, matching TS's
-        lowest id: the window only ever appends, so ONE seat's slots ascend in
+        FIRST in `state.units` — spawn order, NOT the unit id: a converted
+        barbarian keeps its barbarian-era id and took a new slot, and the two
+        parted on it once. The window only ever appends, so ONE seat's slots ascend in
         that seat's own spawn order even though every major seat interleaves
         into it). Only upkeep>0 units are candidates, and there is no refund.
         `active` is the TS loop's eliminated-actor continue."""
