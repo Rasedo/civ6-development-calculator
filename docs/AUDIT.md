@@ -167,6 +167,28 @@ No member is open. What is NOT a source of new members: a seat asymmetry. Seat 0
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
 
+- **A-9r. A RANGED HIT ON A STACKED HEX WENT TO THE FIRST-LISTED FIGHTER ON
+  TS AND TO THE HULL ON THE GPU. OPENED AND CLOSED 2026-09-05.** Found by
+  the battery at cb2076ee: seed 9209 t178, `unit[2145].hp` GPU 30 vs TS 71
+  and the embarked passenger `unit[2147]` 100 vs 64. The two-sided combat
+  log showed the SAME volley (`k:vrng t:715 diff50 dmg36`) landing on the
+  passenger on TS and on the hull on the GPU.
+
+  Measured: CIV6 (Flanking and Support) has the higher-Combat-Strength unit
+  of a hull-plus-passenger stack defend a ranged attack, and both engines
+  compared the same numbers. They parted on the TIE: at era 3 an embarked
+  unit defends at 30, a Galley's own strength, and TS's `stackDefender`
+  started its scan from `fighters[0]` — whichever unit came first in the
+  tile's array, here the passenger — while `_stack_fold` takes the passenger
+  only on a strict `>`. The tile array's order is a TS-only fact (spawn
+  order), so no rule may break a tie on it.
+
+  FIXED: `stackDefender` starts from the hull and takes a passenger only when
+  strictly stronger. Bar: `stack-defender-tie` (TS; scene pinned at era 3
+  and asserted to TIE before the pick, verified red against the old scan)
+  and `stack_defender_tie` (GPU; the same three cases against `_stack_fold`
+  with a hostile attacking seat), seed 9209 alone and the trio
+  9196/9209/9222 green to 250.
 - **A-8r. A CITYLESS SEAT'S GOVERNOR PHASE RAN ON THE GPU — BUT ONLY IN A
   BATCH. OPENED AND CLOSED 2026-09-05.** Found by the battery at a44e52ee:
   seed 9248 t170, `seat[0].governorCity` GPU [-1, -1, ...] vs TS [-1, 1, ...].

@@ -577,8 +577,15 @@ export function stackDefenceCS(state: GameState, u: Unit): number {
 export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean): Unit {
   const fighters = enemies.filter((u) => unitDomain(u.type) === 'military');
   if (fighters.length === 0) return enemies[0];
-  if (!ranged) return fighters.find((u) => !u.embarked) ?? fighters[0];
-  let best = fighters[0];
+  const hull = fighters.find((u) => !u.embarked) ?? fighters[0];
+  if (!ranged) return hull;
+  // CIV6 (Flanking and Support): against a ranged attack "the unit with the
+  // higher Combat Strength will defend". On a TIE the HULL does — the unit
+  // that physically holds the hex — which is the GPU's rule too. This used to
+  // start from `fighters[0]`, whichever unit happened to be first in the
+  // tile's array, so a passenger listed before its hull took a volley the
+  // hull took on the other engine (seed 9209 t178).
+  let best = hull;
   for (const u of fighters) if (stackDefenceCS(state, u) > stackDefenceCS(state, best)) best = u;
   return best;
 }
