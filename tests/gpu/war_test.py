@@ -251,7 +251,23 @@ def test_cs_siege(rules, path):
     smap = sim._seat_slot_map(0)[0]
     ua = torch.full((1, smap.shape[0]), -1, dtype=torch.long)
     ua[0, int((smap == p_).nonzero(as_tuple=True)[0][0])] = act
+    # BUILD the premise the assertions below stand on, do not inherit it from
+    # the stream: twenty decision-free turns leave this city-state wherever the
+    # barbarians left it. Under the stylized disaster rates that happened to
+    # be 150/150 with nobody near; under the install's MODERATE rates (C-74)
+    # the same twenty turns left it at 11/150 with three barbarians in reach,
+    # and "one hit must not kill a full-hp CS" failed on a CS that was not
+    # full. The capture half below already clears the barbarians for its own
+    # reasons — the first hit needs the same ground.
+    sim.citystate_hp[0, s] = int(rules.citystate["maxHp"])
+    near0 = sim.pair_dist[ctr] <= 2
+    for u in (sim.barb_unit_alive[0] & near0[sim.barb_unit_tile[0].clamp(min=0)]).nonzero(as_tuple=True)[0].tolist():
+        t_ = int(sim.barb_unit_tile[0, u])
+        sim.barb_unit_alive[0, u] = False
+        if int(sim.barb_at[0, t_]) == u:
+            sim.military_at[0, t_] = -1
     hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.major_unit_tile[0, p_])
+    assert hp0 == int(rules.citystate["maxHp"]), f"the premise did not build: hp0={hp0}"
     sim._apply_seat_unit_actions(0, ua)
     sim.step()
     assert int(sim.citystate_hp[0, s]) < hp0, "CS took no siege damage"
