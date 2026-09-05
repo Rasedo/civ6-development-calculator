@@ -1721,10 +1721,29 @@ under their blocker so the dependency is readable, and both halves count.
   every PERCENTAGE pressure modifier the game publishes floors to nothing
   — the Religious alliance's +20% (C-2); the Bishop's +100% lands only
   because its site multiplies the whole per-turn sum before the cast.
-  Moving to the game's scale is one cutover on both engines
-  (`spreadReligiousPressure` / `_spread_religious_pressure`, the
-  missionary lump, the two swings, and every test that pins a raw value)
-  — after it the alliance clause is a one-line multiplier.
+  CORRECTED 2026-09-03: this is an ASK, not a cutover. The install publishes
+  the TERMS and never the rule combining them; two readings fit the same
+  numbers and differ by ~100x — (a) the 1 is literal and the engines are
+  already faithful; (b) it multiplies a pop-scaled base whose unit is the
+  hundreds the PER_POP rows speak in. Choosing (b) means inventing the pop
+  coefficient.
+  OWNER RULED 2026-09-04: neither ships on an argument. Build a probe that
+  drives the same games under each reading and reports what each does to
+  CONVERSION, then ask again with the numbers. That probe is
+  `tools/gpu/pressure_probe.py` (2026-09-05). It holds the per-turn stream at
+  the engine's 1 per source per turn — an argmax is scale-invariant, so what
+  the scale DECIDES is the ratio of the one-shot swings to the stream — and
+  runs three columns: A the engine's swings (lump 10 / theological 15 /
+  condemn 7), B the install's (200 / 250 / 125), C the install's plus a
+  population-scaled stream at coefficient 1, shown for its direction and not
+  as a proposal. Per game it reports conversions, cities ever converted,
+  re-conversions, reversions inside 10 turns, median hold and the first
+  conversion turn, plus how many religions were founded at all (a world
+  where nobody founds measures nothing). Reachability, seed 9001 to 250
+  under A: 2 religions founded, 10 of 11 cities converted from t87, and ZERO
+  re-conversions — under the engine's swings a lead is never overturned.
+  The full 8-fixture run's table is what goes back to the owner; C-56 stays
+  behind the answer.
 
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1. Both engines hold
   religious PRESSURE per city and a followed religion per city, and neither
