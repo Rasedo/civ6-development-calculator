@@ -1847,14 +1847,18 @@ class SimEconomy:
                 slotted = (self.civ_policies[:, row]
                            & self._policy_unlocked(civics2, dark, era, held, _ad)
                            & _hg.unsqueeze(1))
-            fx["milpol"] = (slotted & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
-            sd = slotted.to(dt)
+            # a LEGACY card pays its ACCRUAL (the loop below) and never its table row,
+            # which still holds the government's whole package (C-73) — the ordinary
+            # channels read the CARDS, the returned mask and the payout loop the full set
+            cards = slotted & (self._pol_legacy < 0).unsqueeze(0)
+            fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
+            sd = cards.to(dt)
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
             hous_all = hous_all + sd @ self._pol_housing
             amen_all = amen_all + sd @ self._pol_amen
             for _pi in range(self._npol):
-                _on = slotted[:, _pi]
+                _on = cards[:, _pi]
                 if not bool(_on.any()):
                     continue
                 _neg = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -1864,16 +1868,16 @@ class SimEconomy:
                 nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
                            torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
                            torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
-            emult = emult * torch.where(slotted, self._pol_ehprod.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
-            tpmult = tpmult * torch.where(slotted, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
+            emult = emult * torch.where(cards, self._pol_ehprod.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
+            tpmult = tpmult * torch.where(cards, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             adjm = adjm * torch.where(
-                slotted.unsqueeze(2), self._pol_adj_mult.unsqueeze(0).expand(B, -1, -1),
+                cards.unsqueeze(2), self._pol_adj_mult.unsqueeze(0).expand(B, -1, -1),
                 torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
             for _pi in range(self._npol):
                 if float(self._pol_byb[_pi, 0]) >= 0:
-                    byb.append((slotted[:, _pi], self._pol_byb[_pi]))
+                    byb.append((cards[:, _pi], self._pol_byb[_pi]))
             ymult = ymult * torch.where(
-                slotted.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1),
+                cards.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1),
                 torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
             if self._pol_fx_mag > 0:
                 for _k, _t in (("bcharge", self._pol_bcharge), ("mcut", self._pol_mcut),
@@ -1887,11 +1891,11 @@ class SimEconomy:
                                ("theocs", self._pol_theocs), ("govbldy", self._pol_govbldy)):
                     fx[_k] = fx[_k] + sd @ _t
                 _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)
-                fx["rxp"] = fx["rxp"] * torch.where(slotted, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
-                fx["rplun"] = fx["rplun"] * torch.where(slotted, self._pol_rplun.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
-                fx["pillm"] = fx["pillm"] * torch.where(slotted, self._pol_pillm.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["rxp"] = fx["rxp"] * torch.where(cards, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["rplun"] = fx["rplun"] * torch.where(cards, self._pol_rplun.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["pillm"] = fx["pillm"] * torch.where(cards, self._pol_pillm.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 fx["gppmult"] = fx["gppmult"] * torch.where(
-                    slotted, self._pol_gppmult.unsqueeze(0).expand(B, -1),
+                    cards, self._pol_gppmult.unsqueeze(0).expand(B, -1),
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
                 # CIV6: a LEGACY card is worth the percentage its own
                 # government has ACCUMULATED against the ONE BonusType it
@@ -1932,15 +1936,15 @@ class SimEconomy:
                             fx["goldbuydisc"] = fx["goldbuydisc"] + _pc
                         elif _bt == self.GB_FAITH_BUY:
                             fx["faithbuydisc"] = fx["faithbuydisc"] + _pc
-                fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
-                fx["envoy2"] = fx["envoy2"] | (slotted & self._pol_envoy2.unsqueeze(0)).any(dim=1)
-                fx["tourroute"] = fx["tourroute"] + (slotted.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
-                fx["gpp"] = fx["gpp"] + slotted.double() @ self._pol_gpp
-                fx["ucst"] = fx["ucst"] + slotted.double() @ self._pol_ucs_by_type
+                fx["envoy1"] = fx["envoy1"] | (cards & self._pol_envoy1.unsqueeze(0)).any(dim=1)
+                fx["envoy2"] = fx["envoy2"] | (cards & self._pol_envoy2.unsqueeze(0)).any(dim=1)
+                fx["tourroute"] = fx["tourroute"] + (cards.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
+                fx["gpp"] = fx["gpp"] + cards.double() @ self._pol_gpp
+                fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):
                     if float(self._pol_prodb[_pi, 0]) >= 0:
                         _r = self._pol_prodb[_pi]
-                        fx["prod"].append((slotted[:, _pi], int(_r[0]), int(_r[1]),
+                        fx["prod"].append((cards[:, _pi], int(_r[0]), int(_r[1]),
                                            int(_r[2]), float(_r[3])))
                 # ---- the DARK-AGE channels ----
                 for _k, _t in (("relighome", self._pol_relig_home), ("loyall", self._pol_loyalty_all),
@@ -1948,19 +1952,19 @@ class SimEconomy:
                     fx[_k] = fx[_k] + sd @ _t
                 for _k, _t in (("routeymul", self._pol_route_ymult), ("raiderprod", self._pol_raider_prod),
                                ("projprod", self._pol_proj_prod), ("landcost", self._pol_land_cost)):
-                    fx[_k] = fx[_k] * torch.where(slotted, _t.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                    fx[_k] = fx[_k] * torch.where(cards, _t.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 for _k, _t in (("nosettler", self._pol_no_settlers), ("healhome", self._pol_heal_home),
                                ("grievhold", self._pol_griev_hold), ("noenvoy", self._pol_no_envoy)):
-                    fx[_k] = fx[_k] | (slotted & _t.unsqueeze(0)).any(dim=1)
-                fx["raidermove"] = fx["raidermove"] + (slotted.long() * self._pol_raider_moves.unsqueeze(0)).sum(dim=1)
+                    fx[_k] = fx[_k] | (cards & _t.unsqueeze(0)).any(dim=1)
+                fx["raidermove"] = fx["raidermove"] + (cards.long() * self._pol_raider_moves.unsqueeze(0)).sum(dim=1)
                 fx["domroute"] = fx["domroute"] + sd @ self._pol_dom_route
                 fx["impy"] = fx["impy"] + torch.einsum("bp,pik->bik", sd, self._pol_imp_y)
                 fx["govymul"] = fx["govymul"] * torch.where(
-                    slotted.unsqueeze(2), self._pol_gov_ymult.unsqueeze(0).expand(B, -1, -1),
+                    cards.unsqueeze(2), self._pol_gov_ymult.unsqueeze(0).expand(B, -1, -1),
                     torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
                 fx["govpercit"] = fx["govpercit"] + sd @ self._pol_gov_percit
                 for _pi in range(self._npol):
-                    _on = slotted[:, _pi]
+                    _on = cards[:, _pi]
                     if not bool(_on.any()):
                         continue
                     if int(self._pol_favor_b[_pi]) >= 0:

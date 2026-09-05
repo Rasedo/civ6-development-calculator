@@ -1186,8 +1186,18 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     civic = ladder.pick_research(blocks, m["civic"], "civic", deep) if bool(m["civic"].any()) else None
     # the SLOTTED CARDS — a decision every turn the seat has a government;
     # None when no card is on offer, which the wire reads as "no decision"
-    policies = (ladder.pick_policies(m["policies"], sim._seat_policy_slots(row), sim._pol_kind)
-                if "policies" in m and bool(m["policies"].any()) else None)
+    policies = None
+    if "policies" in m and bool(m["policies"].any()):
+        # the seat's CARD STYLE: pinned by its style preset, else one persistent
+        # draw per game (turn 0, salt 10) — a coherent player, not a coin per turn
+        if style["cards"] is not None:
+            cstyle = torch.full((sim.B,), ladder.CARD_STYLE_NAMES.index(style["cards"]), dtype=torch.long, device=sim.device)
+        elif seeds is not None:
+            cstyle = ladder.card_style_of(_policy_rng(sim, seeds, 0, row, 10))
+        else:
+            cstyle = None
+        policies = ladder.pick_policies(m["policies"], sim._seat_policy_slots(row), sim._pol_kind,
+                                        legacy=sim._pol_legacy >= 0, style=cstyle)
     war = None
     if seeds is not None and turn is not None:
         rng_w = {

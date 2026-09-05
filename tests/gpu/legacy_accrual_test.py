@@ -212,21 +212,39 @@ def test_the_memo_sees_the_clock(rules, path) -> None:
     print("  8 the memo OK — the clock is part of the key")
 
 
-def test_no_legacy_card_is_reachable(rules, path) -> None:
-    """The gap C-75 records, pinned on this engine too: the greedy fill walks
-    the card catalog in order and legacy cards are appended LAST, so an
-    earlier card takes every slot. If this ever fails, a legacy card became
-    reachable and C-73's payout went live — read both entries first."""
+def test_a_legacy_card_is_reachable(rules, path) -> None:
+    """C-75 CLOSED: the slotted cards are the driver's decision, and its
+    LEGACY-FIRST style hands the wildcard slots to the unlocked legacy cards
+    before anything else — so with every civic researched and every
+    government held, a legacy card is slotted, the store accepts it, and the
+    effects read it. The greedy style still slots none: that was the gap."""
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
+    import ladder
     sim = build(path)
     if not sim._npol or not sim._ngov:
         raise AssertionError("no policy or government catalog to test")
-    civics = torch.ones(sim.B, sim.civ_civics.shape[2], dtype=torch.bool)
-    held = torch.full((sim.B,), (1 << sim._ngov) - 1, dtype=torch.long)
-    slotted = sim._slotted_policies(civics, None, None, None, held)
-    leg = (slotted & (sim._pol_legacy.unsqueeze(0) >= 0)).any().item()
-    assert not leg, "a legacy card became reachable — re-read C-75 and C-73"
-    assert bool(slotted.any()), "nothing was slotted at all; the scene proves nothing"
-    print("  9 the reachability OK — zero legacy cards slotted, as C-75 records")
+    sim.civ_civics[:, ROW] = True
+    sim.civ_gov_held[:, ROW] = (1 << sim._ngov) - 1
+    sim._eff_version += 1
+    mask = sim.seat_masks(ROW)["policies"]
+    nslots = sim._seat_policy_slots(ROW)
+    is_leg = sim._pol_legacy >= 0
+    assert bool((mask & is_leg.unsqueeze(0)).any()), "no legacy card is even unlocked in the scene"
+    greedy = ladder.pick_policies(mask, nslots, sim._pol_kind, legacy=is_leg,
+                                  style=torch.full((sim.B,), ladder.CARDS_GREEDY, dtype=torch.long))
+    assert not bool((greedy & is_leg.unsqueeze(0)).any()), "the greedy style slotted a legacy card — the gap C-75 recorded is not what it was"
+    legacy = ladder.pick_policies(mask, nslots, sim._pol_kind, legacy=is_leg,
+                                  style=torch.full((sim.B,), ladder.CARDS_LEGACY, dtype=torch.long))
+    n_leg = int((legacy[0] & is_leg).sum())
+    assert n_leg > 0, "the legacy-first style slotted no legacy card"
+    assert n_leg <= int(nslots[0, 3]), "legacy cards beyond the wildcard slots"
+    assert bool(sim._policy_set_ok(ROW, legacy)[0]), "the legacy-first set failed the validator"
+    sim.seat_ext[:, ROW] = True
+    sim.apply_seat_actions(ROW, policies=legacy)
+    sim._seat_record_apply(ROW, torch.ones(sim.B, dtype=torch.bool))
+    assert bool((sim._seat_slotted(ROW)[0] & is_leg).any()), "the effects do not see the stored legacy card"
+    print(f"  9 the reachability OK — the legacy-first style slots {n_leg} legacy card(s); the greedy style none")
 
 
 def main() -> int:
@@ -240,7 +258,7 @@ def main() -> int:
     test_the_rate_is_per_game(rules, path)
     test_the_card_pays_its_bonus_type(rules, path)
     test_the_memo_sees_the_clock(rules, path)
-    test_no_legacy_card_is_reachable(rules, path)
+    test_a_legacy_card_is_reachable(rules, path)
     print("BATTERY OK legacy_accrual")
     return 0
 

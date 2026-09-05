@@ -231,13 +231,14 @@ STYLE_KNOBS = {
     "city_cap": None,       # None = the rules' maxCities
     "dist_pref": None,      # a district id the scaffold rotation starts from
     "tier_order": None,     # None = PROD_PRIORITY
+    "cards": None,          # None = draw at the CARD_*_SHAREs; "greedy" / "legacy" / "military" pins it
 }
 STYLE_PRESETS = {
     "default": {},
     "deep": {"deep": True},
     "broad": {"deep": False},
     "diplomat": {"diplo": True},
-    "warlord": {"diplo": False, "war_appetite": 4.0, "war_ratio": 1.1, "city_cap": 5},
+    "warlord": {"diplo": False, "war_appetite": 4.0, "war_ratio": 1.1, "city_cap": 5, "cards": "military"},
     "pacifist": {"war_appetite": 0.0, "peace_appetite": 4.0},
     "expander": {"city_cap": 10},
     "scientist": {"deep": True, "dist_pref": "CAMPUS"},
@@ -256,24 +257,72 @@ def style_of(name: str) -> dict:
     return s
 
 
-def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor) -> torch.Tensor:
-    """[B, nPol] bool — the SLOTTED CARDS verb: which of the cards `mask`
-    offers the seat slots this turn, under `nslots` [B, 4] per kind
-    (military, economic, diplomatic, wildcard) with `kind` [nPol] per card.
+# THE CARD STYLES — a coherent per-actor preference, drawn once per game per
+# seat (a style beats epsilon noise: the gate cannot see a decision, the
+# reachability probe can). Model choices, not fidelity claims — real Civ 6
+# leaves the choice to the player, and these are three players.
+CARDS_GREEDY, CARDS_LEGACY, CARDS_MILITARY = 0, 1, 2
+CARD_STYLE_NAMES = ("greedy", "legacy", "military")
+CARD_LEGACY_SHARE = 0.34     # r < this: legacy-first
+CARD_MILITARY_SHARE = 0.33   # the next band: military-first; the rest greedy
 
-    The first style is GREEDY-EQUIVALENT — table order, each kind filling its
-    own slots, the overflow and the wildcard-kind cards taking the W slots —
-    which is exactly the fill both engines used to compute for themselves,
-    so the cutover changes WHO decides and not (yet) what is decided. Real
-    styles (legacy-first, yield-first, military) are the next step."""
+
+def card_style_of(r: torch.Tensor) -> torch.Tensor:
+    """[B] long — the style a persistent draw `r` in [0, 1) lands in."""
+    out = torch.full_like(r, CARDS_GREEDY, dtype=torch.long)
+    out = torch.where(r < CARD_LEGACY_SHARE, torch.full_like(out, CARDS_LEGACY), out)
+    out = torch.where((r >= CARD_LEGACY_SHARE) & (r < CARD_LEGACY_SHARE + CARD_MILITARY_SHARE),
+                      torch.full_like(out, CARDS_MILITARY), out)
+    return out
+
+
+def _lay_by_kind(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
+                 w_first: torch.Tensor | None = None) -> torch.Tensor:
+    """the shared fit: each kind fills its own slots in table order, then the
+    W slots take `w_first` (a subset of the overflow, in table order) before
+    the rest of the overflow."""
     picked = torch.zeros_like(mask)
     for k in range(3):
         uk = mask & (kind == k).unsqueeze(0)
         cum = uk.long().cumsum(dim=1)
         picked = picked | (uk & (cum <= nslots[:, k:k + 1]))
     overflow = mask & ~picked
+    w_left = nslots[:, 3:4]
+    if w_first is not None:
+        first = overflow & w_first
+        f_rank = first.long().cumsum(dim=1)
+        took = first & (f_rank <= w_left)
+        picked = picked | took
+        overflow = overflow & ~took
+        w_left = w_left - took.long().sum(dim=1, keepdim=True)
     w_rank = overflow.long().cumsum(dim=1)
-    return picked | (overflow & (w_rank <= nslots[:, 3:4]))
+    return picked | (overflow & (w_rank <= w_left))
+
+
+def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
+                  legacy: torch.Tensor | None = None,
+                  style: torch.Tensor | None = None) -> torch.Tensor:
+    """[B, nPol] bool — the SLOTTED CARDS verb: which of the cards `mask`
+    offers the seat slots this turn, under `nslots` [B, 4] per kind
+    (military, economic, diplomatic, wildcard) with `kind` [nPol] per card,
+    `legacy` [nPol] the legacy-card flag and `style` [B] the seat's card
+    style (`card_style_of`; None = greedy everywhere).
+
+    GREEDY is the fill both engines used to compute for themselves — table
+    order, each kind filling its own slots, the overflow and the wildcard-kind
+    cards taking the W slots. LEGACY-FIRST hands the W slots to the unlocked
+    LEGACY cards before anything else — the one style that ever slots one,
+    which is what makes C-73's accrued payout reachable. MILITARY-FIRST hands
+    the W slots to the military overflow first."""
+    greedy = _lay_by_kind(mask, nslots, kind)
+    if style is None:
+        return greedy
+    leg = legacy if legacy is not None else torch.zeros_like(kind, dtype=torch.bool)
+    legacy_first = _lay_by_kind(mask, nslots, kind, w_first=leg.unsqueeze(0).expand_as(mask))
+    military_first = _lay_by_kind(mask, nslots, kind, w_first=(kind == 0).unsqueeze(0).expand_as(mask))
+    st = style.unsqueeze(1)
+    return torch.where(st == CARDS_LEGACY, legacy_first,
+                       torch.where(st == CARDS_MILITARY, military_first, greedy))
 
 
 def pick_research(blocks: dict, mask: torch.Tensor, kind: str,

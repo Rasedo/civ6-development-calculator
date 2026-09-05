@@ -753,7 +753,9 @@ class SimPhase:
                             _hit = _hit & (self._type_era[_ui] <= _eramax)
                     # every catalog row carries a scalar pct; a LEGACY
                     # card's is per GAME, because it is an accrual (C-73).
-                    _pctv = (_pct.to(_add.dtype).unsqueeze(1)
+                    # ...gathered per city row like every other per-game mask
+                    # in this walk (`_fw[bidx]`), never broadcast against it
+                    _pctv = (_pct.to(_add.dtype)[bidx]
                              if torch.is_tensor(_pct) else _pct)
                     _add = _add + (_pact & _hit).to(_add.dtype) * _pctv
         # CIV6 (Ancestral Hall): "50% increased Production toward Settlers in

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
-import { computeAdoption, governmentBit, governmentIndex, legacyBonusPct, legacyEffects, legacyRatePct } from '../../../cpu/core/effects';
-import { GOVERNMENTS, GOVERNMENT_LIST } from '../../../cpu/data/policies';
+import { computeAdoption, governmentBit, governmentIndex, legacyBonusPct, legacyEffects, legacyRatePct, slottedPolicyIndices } from '../../../cpu/core/effects';
+import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { GOVERNMENTS, GOVERNMENT_LIST, POLICY_LIST } from '../../../cpu/data/policies';
 import { LEGACY_RATE_ROWS } from '../../../cpu/data/civilizations';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { CIVICS } from '../../../cpu/data/civics';
@@ -154,12 +155,12 @@ describe('what a legacy card pays', () => {
     expect(legacyEffects(GOVERNMENTS.AUTOCRACY, 2).yieldsPerGovBuilding).toBeUndefined();
   });
 
-  it('REACHABILITY: no legacy card is ever slotted in play today', () => {
-    // Not a feature — a gap, pinned so it cannot be forgotten (C-75). The
-    // greedy fill walks the card catalog in order and legacy cards are
-    // appended LAST, so an earlier card takes every wildcard slot. With
-    // EVERY civic researched and EVERY government held, the best government
-    // in the game still slots none of them.
+  it('REACHABILITY: the greedy reference slots no legacy card; a stored one is paid', () => {
+    // C-75 CLOSED: the slotted cards are the driver's decision, carried on
+    // the wire. The greedy REFERENCE still slots none — legacy cards sit last
+    // in the table and an earlier card takes every wildcard — which was the
+    // gap; the driver's legacy-first style (policy/ladder.py) slots them, the
+    // record's validator accepts them, and the effects read the store.
     const held = GOVERNMENT_LIST.reduce((m, g) => m | governmentBit(g.id), 0);
     const research = {
       tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [],
@@ -168,8 +169,21 @@ describe('what a legacy card pays', () => {
     const a = computeAdoption(research as never, undefined, -1, false, held);
     const slotted = a.policies.filter((p) => p !== null) as string[];
     expect(slotted.length, 'the scene must fill some slots').toBeGreaterThan(0);
-    expect(slotted.filter((p) => p.startsWith('LEGACY_')),
-      'a legacy card became reachable — re-read C-75 and C-73 before changing this')
-      .toEqual([]);
+    expect(slotted.filter((p) => p.startsWith('LEGACY_'))).toEqual([]);
+    // ...and a legacy card the driver chose is stored and paid: the record
+    // names AUTOCRACY's legacy under a government that is not Autocracy
+    const state = makeState(makeMap(12, 12, 'GRASSLAND'));
+    settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
+    const s = seatOf(state, 0)!;
+    s.research.civics = Object.keys(CIVICS);
+    s.government.held = held;
+    s.government.govTurns = GOVERNMENT_LIST.map(() => 0);
+    s.government.govTurns[governmentIndex('AUTOCRACY')] = 40;
+    expect(computeAdoption(s.research).government).not.toBe('AUTOCRACY');
+    const legIdx = POLICY_LIST.findIndex((p) => p.id === 'LEGACY_AUTOCRACY');
+    expect(legIdx).toBeGreaterThanOrEqual(0);
+    applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], policies: [legIdx] });
+    expect(slottedPolicyIndices(state, 0), 'the store did not take the legacy card').toContain(legIdx);
+    expect(legacyBonusPct(state, 0, 'AUTOCRACY'), '40 turns at 1%/20').toBe(2);
   });
 });

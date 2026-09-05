@@ -78,15 +78,14 @@ from the list below.
 | C-61 the capital never moves | 1 | `relocatePalace` / `_relocate_palace` move `isCapital` only when the seat holds NO capital, and `origCapitalSeat` / `civ_cap_tile` are written once at founding and never again. Dido's Cothon capital move also needs a civ-UNIQUE project, which `ProjectDef` has no field for |
 | C-62 a war TYPE | 2 | the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and _LIBERATION_WAR are war kinds with their own civic prerequisite and a 10-turn buff on the declarer. Both engines carry exactly two kinds — formal and surprise (`seat_warkind`) — with no prerequisite beyond a casus belli and no post-declaration clock. Chandragupta's and Robert the Bruce's six modifiers wait here |
 | C-63 a legacy bonus accrues no time (SOURCED 2026-09-04, +1%/interval) | 1 | the install's GOVERNMENTBONUS rates are the SPEED at which a government earns its legacy bonus. Both engines model the legacy CARD (`legacyOf`, `_pol_legacy`) as "have you ever held this government", with no accrual to halve, so America's nine BONUS_RATE modifiers have no clock to double |
-| C-75 no legacy card is ever slotted | 1 | the greedy fill walks the catalog in order and legacy cards are appended LAST, so an earlier card takes every slot — zero legacy cards slotted with every civic and every government held, on both engines. Real Civ 6 lets the PLAYER choose; what replaces the greedy fill is an owner question |
 | C-73 a legacy card pays the whole government (7 of 9 channels ship) | 1 | this engine synthesises `LEGACY_${g.id}` with `effects: g.effects`, so slotting a legacy card re-grants that government's ENTIRE inherent bonus. The install gives each government exactly one `BonusType` and an accumulating +1%/Interval against it, which is what the card is worth. Blocked on C-63's clock, which is the accrual it must read |
 | C-59 a generic themed carrier | 1 | EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS and the themed yield/tourism modifiers — only a MUSEUM themes on either engine (`museumThemed` / `artMuseumThemed`, `_museum_themed` / `_art_museum_themed`) and a wonder never does, so Kristina's "buildings with at least three Great Work slots and wonders with at least two are automatically themed when full" has no carrier to theme. The shape is a slot-count rule over any building or wonder, plus the +100% yields and +100% Tourism a themed set then pays |
 | C-57 one follower belief per city | 1 | EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS — a city pays the follower belief of its ONE followed religion (`withFollowerBelief` / `_follower_id_for`), so Dharma's "Follower Belief bonuses from EACH Religion that has at least 1 Follower" cannot stack. The carrier is a per-religion belief walk over the city's live pressure, on both engines |
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
 | C-74 three disaster rates were stylized (CLOSED 2026-09-05, MODERATE / 500 turns; eruptions still open) | 0 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **35** | |
-| **OPEN, TOTAL** | **53** | |
+| **C. Absent systems** | **34** | |
+| **OPEN, TOTAL** | **52** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1340,7 +1339,8 @@ under their blocker so the dependency is readable, and both halves count.
   A-4r's exact shape moved forward from t100 by the new trajectory, not a new
   divergence.
 
-- **C-75. NO LEGACY CARD IS EVER SLOTTED.** Weight 1. Measured 2026-09-04
+- **C-75. NO LEGACY CARD IS EVER SLOTTED. CLOSED 2026-09-05 — the slotting is
+  the driver's decision, and its legacy-first style slots them.** Measured 2026-09-04
   while building C-73's bar, on both engines independently.
   `computeAdoption` / `_slotted_policies` fill a government's slots GREEDILY,
   walking the policy catalog in order, and the legacy cards are appended LAST
@@ -1409,6 +1409,25 @@ under their blocker so the dependency is readable, and both halves count.
   yield-first, military), which is what finally slots a legacy card and
   flips `legacy_accrual` / `legacy-accrual` from "assert zero" to "assert
   paid"; until then the reachability count stays at zero.
+  STEP 3 SHIPPED 2026-09-05 — THE STYLES. `ladder.pick_policies` takes a
+  per-seat CARD STYLE: GREEDY (the old fill), LEGACY-FIRST (the wildcard
+  slots go to the unlocked legacy cards before anything else) and
+  MILITARY-FIRST (to the military overflow first); a seat's style is its
+  preset's (`warlord` = military) or one persistent draw per game (salt 10,
+  shares 34 / 33 / 33). These are DRIVER styles — harness, not fidelity:
+  real Civ 6 leaves the choice to the player, and these are three players.
+  The reachability lanes flipped: `legacy_accrual` shows the legacy-first
+  style slotting a legacy card the store accepts and the effects read, the
+  greedy style none; `legacy-accrual` stores AUTOCRACY's legacy through the
+  record under another government and reads the accrued 2% back. C-73's
+  payout is reachable in play from here.
+  The first serve down the newly reached path paid for two GPU forks the
+  gap had hidden: `_seat_city_produce` broadcast a legacy card's per-game
+  percent against its flat city rows (a shape error at B=2), and
+  `_gov_policy_mods` paid a legacy card's TABLE ROW — the government's
+  whole package, C-73's own fault — beside its accrual (seed 9209 t131,
+  +1.05 on every yield of a legacy-first seat); the ordinary channels read
+  the cards minus the legacy ones now, as `legacyEffects` always did on TS.
 
 - **C-73. A LEGACY CARD PAYS THE WHOLE GOVERNMENT.** Weight 1. Found while
   sourcing C-63 on 2026-09-04, and kept separate from it because the two fail
