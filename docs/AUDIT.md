@@ -88,10 +88,10 @@ from the list below.
 | C-57 one follower belief per city | 1 | EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS — a city pays the follower belief of its ONE followed religion (`withFollowerBelief` / `_follower_id_for`), so Dharma's "Follower Belief bonuses from EACH Religion that has at least 1 Follower" cannot stack. The carrier is a per-religion belief walk over the city's live pressure, on both engines |
 | C-58 a defeated unit is never captured | 1 | EFFECT_ATTACH_MODIFIER / TRAIT_CAVALRY_CAPTURE_CAVALRY — Genghis Khan's cavalry has "a chance to capture defeated enemy cavalry class units". Both engines only CONVERT: `convertHeathens` turns an adjacent barbarian, and a captured Settler/Builder changes hands on capture-on-move; a unit that loses a combat is removed, never re-seated. Its +3 Combat Strength ships |
 | C-50 appeal is map-global | 1 | `tileAppeal` and its GPU plane take no seat, so a clause that changes what a FEATURE is worth to ONE civilization has nowhere to land: Brazil's Amazon ("+1 Appeal to adjacent tiles, instead of the usual -1" from Rainforest). CORRECTED 2026-09-03: Roosevelt's National Park appeal was listed here in error and SHIPPED in batch 13 — a per-CITY add is what `cityAppealResolver` / `_gp_appeal_plane` already carry, and only the FEATURE half is blocked. The carrier is a per-seat appeal read — the four consumers (housing, amenities, the Seaside Resort's gold, the National Park's site) each take the asking seat |
-| C-74 three disaster rates are stylized, and RandomEvent_Frequencies publishes them | 1 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
+| C-74 three disaster rates were stylized (CLOSED 2026-09-05, MODERATE / 500 turns; eruptions still open) | 0 | FLOOD_CHANCE, DROUGHT_CHANCE, STORM_CHANCE and FLOOD_SEVERITY_P all say NOT SOURCED in the file; the install carries OccurrencesPerGame per event per Realism setting. Which setting this engine models, and how a per-game count becomes a per-turn probability, are owner questions |
 | C-49 named random events | 1 | the install's RandomEvents (hurricanes by category, blizzards by severity) exist on neither engine: the disaster phase floods, storms, droughts and erupts, but no event carries a NAME a modifier can key on, so Divine Wind's hurricane waiver and its double damage to Japan's enemies, and Mother Russia's blizzard pair, have nothing to attach to |
-| **C. Absent systems** | **39** | |
-| **OPEN, TOTAL** | **59** | |
+| **C. Absent systems** | **38** | |
+| **OPEN, TOTAL** | **58** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -1236,12 +1236,26 @@ under their blocker so the dependency is readable, and both halves count.
   a 0.44 / 0.33 / 0.22 split where this engine writes 0.6 / 0.3 / 0.1 — and
   the storms run BLIZZARD 8 and 2, DUST_STORM 8 and 2, TORNADO 15 and 3,
   HURRICANE 15 and 3.
-  Two decisions belong to the owner before this ships, and neither is a
-  magnitude: WHICH Realism setting this engine models (it has no such
-  setting today), and how OccurrencesPerGame becomes a per-turn probability
-  (game length is the obvious divisor and the install does not say so).
-  Changing any of these moves every trajectory, so it lands on its own with a
-  battery behind it — never folded into C-49's own commit.
+  OWNER RULED 2026-09-04: model REALISM_SETTING_MODERATE, and divide
+  OccurrencesPerGame by the STANDARD game length — 500 turns, the span the
+  install's count is written over; this engine plays 250 of them and sees
+  half a game's worth. CLOSED 2026-09-05 on that ruling: FLOOD_CHANCE 0.05 ->
+  0.009 (4.5 per game), FLOOD_SEVERITY_P [0.6, 0.3, 0.1] -> [0.44, 0.33,
+  0.22], DROUGHT_CHANCE 0.02 -> 0.056 (MAJOR 23 + EXTREME 5, summed because
+  this engine has one drought kind), STORM_CHANCE 0.04 -> 0.112 (every family
+  and severity summed, because this engine's storm has neither yet — C-49
+  takes each family's own row from the same table when it lands). The wire
+  carries all four, so both engines moved together. NOT covered by the
+  ruling and still stylized: ERUPTION_CHANCE_PER_VOLCANO, because the install
+  counts eruptions per GAME where this engine rolls per VOLCANO and the
+  conversion needs the map's volcano count.
+  Fallout was the expected reseed class only: six TS disaster scenes WAITED
+  for a roll and now wait five times longer, and three of them read "this
+  tile got pillaged" as "a flood reached it", which a storm every nine turns
+  falsifies — they put a storm's scorch back and wait on. Seed 9014 alone runs
+  250 turns green; 9001 alone reds at t90 on `city[412].cultureBox`, which is
+  A-4r's exact shape moved forward from t100 by the new trajectory, not a new
+  divergence.
 
 - **C-75. NO LEGACY CARD IS EVER SLOTTED.** Weight 1. Measured 2026-09-04
   while building C-73's bar, on both engines independently.

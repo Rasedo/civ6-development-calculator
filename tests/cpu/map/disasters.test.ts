@@ -3,8 +3,35 @@ import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disasters';
+// C-74 (2026-09-04): the flood rate is the install's MODERATE 4.5 per 500-turn
+// game, ~5x rarer than the stylized 0.05 these scenes were written against.
+// Every loop below is a WAIT for a roll to land, so the budgets grew with the
+// rarity; no assertion changed.
+//
+// And STORMS are now 0.112/turn (56 per game, every family summed) where they
+// were 0.04: a scene that read "this tile got pillaged" as "a flood or an
+// eruption reached it" now sees a storm first. `stormFree` runs one phase and
+// says whether a storm fired, so a scene about floods can put a storm's
+// scorch back and wait on.
+function stormFree(state: GameState, watched: Tile[]): boolean {
+  const before = watched.map((t) => [t.pillaged, t.improvement, t.districtPillaged] as const);
+  // the log keeps its last 20 lines and SHIFTS, so a length delta goes blind
+  // after twenty events: empty it first, and whatever is there afterwards
+  // happened in this phase
+  state.eventLog.length = 0;
+  disasterPhase(state);
+  const stormed = state.eventLog.some((e) => e.startsWith('Storm'));
+  if (stormed) {
+    watched.forEach((t, i) => {
+      t.pillaged = before[i][0];
+      t.improvement = before[i][1];
+      t.districtPillaged = before[i][2];
+    });
+  }
+  return !stormed;
+}
 import { neighborTile } from '../../../world/hex';
-import type { Tile } from '../../../cpu/core/types';
+import type { GameState, Tile } from '../../../cpu/core/types';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
 import { tileYields } from '../../../cpu/core/yields';
 import { generateMap } from '../../../world/mapgen';
@@ -28,15 +55,17 @@ describe('disasters', () => {
     setTileOwner(slope, 0);
 
     let guard = 0;
-    while (!slope.pillaged && guard++ < 600) disasterPhase(state);
+    const erupted = () => state.eventLog.some((e) => e.includes('eruption'));
+    // wait for the ERUPTION itself: a storm pillages the slope first now
+    while (!erupted() && guard++ < 4000) disasterPhase(state);
+    expect(erupted()).toBe(true);
     expect(slope.pillaged).toBe(true);
     expect(slope.fertility).toBeGreaterThanOrEqual(1);
-    expect(state.eventLog.some((e) => e.includes('eruption'))).toBe(true);
 
     // fertility is capped
     slope.fertility = FERTILITY_CAP;
     const before = slope.fertility;
-    for (let i = 0; i < 200; i++) disasterPhase(state);
+    for (let i = 0; i < 1500; i++) disasterPhase(state);
     expect(slope.fertility).toBe(before);
   });
 
@@ -50,7 +79,7 @@ describe('disasters', () => {
     setTileOwner(plain, 0);
 
     let guard = 0;
-    while (!plain.districtPillaged && guard++ < 600) disasterPhase(state);
+    while (!plain.districtPillaged && guard++ < 4000) disasterPhase(state);
     expect(plain.districtPillaged).toBe(true);
     expect(state.eventLog.some((e) => e.includes('Flood'))).toBe(true);
   });
@@ -66,7 +95,7 @@ describe('disasters', () => {
     centre.district = 'CITY_CENTER';
     centre.districtComplete = true;
 
-    for (let i = 0; i < 600; i++) disasterPhase(state);
+    for (let i = 0; i < 4000; i++) disasterPhase(state);
     // both tiles were flooded many times over (the silt proves it landed)
     expect(site.fertility).toBeGreaterThan(0);
     expect(centre.fertility).toBeGreaterThan(0);
@@ -132,7 +161,7 @@ describe('disasters', () => {
     plain.improvement = 'FARM';
     let pillaged = 0;
     let destroyed = 0;
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 6000; i++) {
       const had = plain.improvement !== null;
       disasterPhase(state);
       if (had && plain.improvement === null) destroyed++;
@@ -155,7 +184,7 @@ describe('disasters', () => {
     const seen = new Set<number>();
     let popLost = 0;
     let centreHit = 0;
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 6000; i++) {
       const u = spawnUnit(state, 'WARRIOR', plain.index, 0)!;
       const pop = city.population;
       const centre = state.map.tiles[city.centerIndex];
@@ -183,7 +212,7 @@ describe('disasters', () => {
 
   it('a flood silts FOOD and PRODUCTION on their own rolls', () => {
     const { state, plain } = floodBoard();
-    for (let i = 0; i < 900 && (plain.fertility === 0 || plain.fertilityProd === 0); i++) {
+    for (let i = 0; i < 6000 && (plain.fertility === 0 || plain.fertilityProd === 0); i++) {
       disasterPhase(state);
     }
     expect(plain.fertility).toBeGreaterThan(0);
@@ -218,7 +247,7 @@ describe('disasters', () => {
     up.builtWonder = 'GREAT_BATH';
     up.builtWonderComplete = true;
     city.wonders.push({ id: 'GREAT_BATH', tileIndex: up.index });
-    for (let i = 0; i < 900; i++) disasterPhase(state);
+    for (let i = 0; i < 6000; i++) stormFree(state, [plain]);
     expect(plain.improvement).toBe('FARM');
     expect(plain.pillaged).toBeFalsy();
     expect(plain.districtPillaged).toBeFalsy();
@@ -229,7 +258,7 @@ describe('disasters', () => {
     const { state, plain, up } = shieldBoard();
     up.district = 'DAM';
     up.districtComplete = true;
-    for (let i = 0; i < 900; i++) disasterPhase(state);
+    for (let i = 0; i < 6000; i++) disasterPhase(state);
     expect(plain.improvement).toBe('FARM');
     expect(plain.districtPillaged).toBeFalsy();
 
@@ -238,7 +267,7 @@ describe('disasters', () => {
     b2.up.districtComplete = true;
     b2.up.districtPillaged = true;
     let struck = 0;
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 6000; i++) {
       disasterPhase(b2.state);
       if (b2.plain.pillaged || b2.plain.improvement === null) struck++;
       b2.plain.improvement = 'FARM';
@@ -255,7 +284,7 @@ describe('disasters', () => {
     far.builtWonderComplete = true;
     city.wonders.push({ id: 'GREAT_BATH', tileIndex: far.index });
     let struck = 0;
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 6000; i++) {
       disasterPhase(state);
       if (plain.pillaged || plain.improvement === null) struck++;
       plain.improvement = 'FARM';
@@ -312,9 +341,9 @@ describe('the flood reaches the whole river', () => {
     const struck = (t: Tile) => t.pillaged || t.improvement === null;
     let rivers = 0;
     let alone = 0;
-    for (let i = 0; i < 900 && (rivers < 3 || alone < 1); i++) {
+    for (let i = 0; i < 6000 && (rivers < 3 || alone < 1); i++) {
       for (const t of [a, b, c, off]) { t.improvement = 'FARM'; t.pillaged = false; }
-      disasterPhase(state);
+      if (!stormFree(state, [a, b, c, off])) continue;
       if (struck(a) || struck(b) || struck(c)) {
         // one river, one flood: no tile of it is spared
         expect([struck(a), struck(b), struck(c)]).toEqual([true, true, true]);
