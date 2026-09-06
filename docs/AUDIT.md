@@ -71,12 +71,12 @@ open docs/roster_ledger.json row.
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (buildable now), the queue-front purchase, ALLIANCE_POINTS_FOR_DEAL |
+| C-2 diplomatic agreements | 2 | the mission's mark, demand and discuss and the Retribution casus belli wait on C-76; the queue-front purchase; ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's trade-route gold multiplier has no published magnitude (DLL-side) |
 | C-22 the district roster | 1 | the Preserve housing table is a stylization |
-| C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 38 of the ledger's 343 modifiers are open against a named blocker |
+| C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 32 of the ledger's 343 modifiers are open against a named blocker |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills; whether a wonder in the blast is pillaged |
 | C-33 the Giant Death Robot's remaining abilities | 1 | the five-hex Range is a verb the action space lacks (the Jump's cost is STYLIZED, ruled) |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; two sources disagree on the Aerodrome's slot count |
@@ -88,7 +88,6 @@ open docs/roster_ledger.json row.
 | C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
 | C-60 no Free City step | 1 | a flipped city goes straight to the highest-pressure seat on both engines |
 | C-61 the capital never moves | 1 | `relocatePalace` moves `isCapital` only when the seat holds none; a civ-UNIQUE project has no field |
-| C-62 a war TYPE | 2 | two kinds where the install has more, no per-kind civic gate and no post-declaration clock |
 | C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
 | C-65 a Great Work of Art carries no object kind | 1 | four SCULPTURE rows have no field to read; decide with C-59 |
 | C-67 a diplomatic action has no preference weight | 1 | waits on the self-play decider, not on a carrier |
@@ -97,8 +96,9 @@ open docs/roster_ledger.json row.
 | C-71 a building's great-work slots are one table for every seat | 1 | `TRAIT_EXTRA_PALACE_SLOTS` cannot add one; widening is a layout change |
 | C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
 | C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
-| **C. Absent systems** | **37** | |
-| **OPEN, TOTAL** | **56** | |
+| C-76 no opinion scale between majors | 1 | the mission's mark, DEMAND, DISCUSS and its promises, the Retribution casus belli, the AI's agendas — every clause that reads how a leader FEELS |
+| **C. Absent systems** | **36** | |
+| **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -107,7 +107,7 @@ not add a "done" column back.
 Recounted 2026-09-05 against 068ecf39: the seven rowless entries, C-74 and
 the new A-11r each took a row; C-47, C-50, C-57 and C-63 lost theirs as
 closed; five rows that had no entry (B-61r, B-67, C-31, C-33, C-34) have
-one now.
+one now. 2026-09-06: C-62 closed and C-76 opened (weight 1).
 
 ## THE QUESTION LEDGER — genuine open asks, one line each
 
@@ -482,7 +482,11 @@ that with both allowlists empty.
   pays it there, so both engines refuse.
 - **B-63r. THE GRIEVANCE LEDGER'S UNPUBLISHED MAGNITUDES.** Weight 1.
   SHIPPED: the mechanic is whole — every published row pays, the spread, the
-  decay, the favor ladder, PUBLIC RELATIONS.
+  decay, the favor ladder, PUBLIC RELATIONS. Since 2026-09-06 a declaration,
+  a capture and a raze are priced by the declared war's OWN casus belli
+  columns for all eleven kinds (`WAR_KINDS[].pct`, the install's
+  WarmongerPercent / CaptureWarmongerPercent / RazeWarmongerPercent), read
+  off the pair's kind (`warKindWith` / `_war_kind_code`).
   OPEN — **THE GANG-UP BAR IS A HEURISTIC.** `GRIEVANCE_GANG` is a tuning
   knob wearing a sourced unit; no source publishes an AI threshold. Ask.
   Enkidu's allied-war discount (EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT
@@ -702,28 +706,33 @@ under their blocker so the dependency is readable, and both halves count.
   FIRST qualifying tech in catalog order; the level-3 percentage terms read
   the ally's most recently STORED per-turn output (`sciRate` / `culRate` /
   `tourRate`, compared state) so the two reads never compound.
+  RELIGIOUS 3'S SECOND CLAUSE SHIPS (2026-09-06): ALLIANCE_RELIGIOUS_PRESSURE
+  -> EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on
+  COLLECTION_OWNER — LOC_ALLIANCE_LV3_RELIGIOUS_EFFECT_2 "Bonus Religious
+  Pressure in cities with no followers of your ally's Religion". The holder's
+  religion presses `ALLIANCE_REL3_PRESSURE_PCT` harder into any city where the
+  ally's religion has NO accumulated pressure (`spreadReligiousPressure` /
+  `_spread_religious_pressure`: the turn's summed add for that religion is
+  scaled and floored once). READING: "no followers" is read as no pressure of
+  the ally's religion in that city — neither engine holds per-religion
+  follower counts, only the majority; an ally with no founded religion grants
+  nothing; two such allies stack their percents.
   BAR: `alliance_levels_test.py`, the dividends block of `agreements.test.ts`,
-  `geopolitics_test.py` poke m (every deal item kind).
+  `geopolitics_test.py` poke m (every deal item kind), the pressure clause in
+  `war-kinds.test.ts` / `war_kinds_test.py` poke d.
   REACH, over the driven 12x250 probe: a mission in 12/12 seeds from t4, and
   every visibility level entered — Limited 12/12 from t4, Open 12/12 from
   t105, Secret 9/12 from t115, Top Secret 2/12 from t187. The deal
   protocol's own reach is unmeasured; the round's smoke serve is what proves
   the two engines walk it together.
   OPEN:
-  - **RELIGIOUS 3'S SECOND CLAUSE** (bonus Religious Pressure to the ally's
-    religion) is SOURCED and UNBUILT: ALLIANCE_RELIGIOUS_PRESSURE ->
-    EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on the owner's
-    cities. The table gives the unit nowhere in text; the sibling pressure
-    effect (the Bishop's EFFECT_ADJUST_CITY_RELIGION_PRESSURE, Amount 100 =
-    "100% stronger") says pressure Amounts are PERCENTS. Since C-46 the
-    accumulator is on the install's scale, so the 20% has something to
-    multiply — BUILDABLE, still unbuilt.
   - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with no
     published text behind it. Ask.
   - **THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM** is refused on both engines
     (`goldPurchasableBuildings` holds the shared reading). Real Civ 6 likely
     allows it with the progress banked; no source in reach settles it. Ask.
-  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP.** The delegation ships —
+  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP** — waits on C-76, the
+    opinion scale. The delegation ships —
     "Delegations cost 10 Gold and Embassies cost 25 Gold, which is paid to
     the other leader", one directed mission per pair, indefinite, the Embassy's
     price once Diplomatic Service is in, war kicking both halves out — but the
@@ -733,7 +742,11 @@ under their blocker so the dependency is readable, and both halves count.
     Neutral will not accept" as the two states the engines can name (a war, or
     a denouncement either way), because there is no opinion scale; and the
     AI's own send is the driver's scan, not a published rule.
-  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS.** A demand is the table
+  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS** — both wait on C-76, and
+    so does the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row
+    `retribution`, RequiresBrokenPromise: "a player who has broken a promise
+    to you within the past 30 turns"), which ships in the table and reads a
+    promise nothing holds. A demand is the table
     run one-way under hostility — "select items from their side of the table
     to demand as tribute" — and Discuss asks a leader to "promise to stop
     doing" something: settling nearby, spreading religion, spying, attacking
@@ -914,8 +927,8 @@ under their blocker so the dependency is readable, and both halves count.
   the XML, 149 effect types over 344 modifiers — and docs/roster_ledger.json
   is the machine-checked ledger behind it, one row per modifier reading
   `shipped` or `open: <blocker>`; `tests/cpu/data/ledger-audit.test.ts` holds
-  every open row to a live AUDIT item. 305 of the ledger's 343 modifiers
-  ship; the other 38 are each open against a named blocker and the triage is
+  every open row to a live AUDIT item. 311 of the ledger's 343 modifiers
+  ship; the other 32 are each open against a named blocker and the triage is
   complete, with no modifier left untriaged. THIS ENTRY DOES NOT RE-LIST WHAT
   SHIPS — the ledger and ROSTER.md are the record, and a second hand-kept
   copy here rots.
@@ -947,9 +960,8 @@ under their blocker so the dependency is readable, and both halves count.
     C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
     Apostle arm, England's Royal Navy Dockyard, Georgia's Tsikhe, Spain's
     Mission — C-69. The Cree Trader's tile claim — C-72. Divine Wind's
-    hurricanes and Mother Russia's blizzards — C-49. Chandragupta's and
-    Robert the Bruce's war-kind terms — C-62. Enkidu's allied-war discount —
-    B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
+    hurricanes and Mother Russia's blizzards — C-49. Enkidu's allied-war
+    discount — B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
     suzerain rows — B-21r. Poundmaker's shared visibility SHIPPED (C-70).
   - **UNREAD DLL LOGIC, recorded rather than guessed:** whether Trajan's
     grant also fires on a CONQUERED city (the modifier's collection is
@@ -1203,18 +1215,32 @@ under their blocker so the dependency is readable, and both halves count.
   check both read.
   OPEN: the clause also needs a civ-UNIQUE project, and `ProjectDef` carries
   no civ or leader field.
-- **C-62. A WAR TYPE.** Weight 2.
-  SOURCED: the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and
-  DIPLOACTION_DECLARE_LIBERATION_WAR are war KINDS with their own civic
-  prerequisite, each granting the declarer a 10-turn buff (Chandragupta +2
-  Movement and +5 Combat Strength, Robert the Bruce +100% Production and +2
-  Movement).
-  ENGINES: exactly two kinds on `seat_warkind` — formal and surprise — decided
-  by a casus belli, with no prerequisite of their own and no clock after the
-  declaration.
-  OPEN: the carrier is a war-kind enum wide enough for the install's list, a
-  per-kind civic gate on `declareWar` / `_declare_war_major`, and a per-pair
-  countdown the buff reads. Six modifiers are marked open against this item.
+- **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 1.
+  ENGINES: a major's stance toward another is the sum of the STATES both
+  engines carry — a war and its kind, a denouncement, a friendship, an
+  alliance and its type, the grievance balance, the treaty clock — and
+  nothing in between: no number that says how a leader FEELS about another,
+  so no clause that reads "a small positive bonus in your relationship", "a
+  rival worse than Neutral", or an agenda's like or dislike has anything to
+  read. The install's DiplomaticStates table (Allied 100 ... Denounced 16,
+  War 0, `RelationshipLevel`) names the scale; what MOVES it is DLL-side.
+  OPEN — what waits on the scale, each in its own entry:
+  - the Delegation's and Embassy's "small positive bonus in your relationship"
+    (C-2), the acceptance rule the engines read as "at war or denounced";
+  - DEMAND (tribute under hostility) and DISCUSS, whose four promises
+    (PROMISE_DONT_SPY_ON_ME, ..._DONT_CONVERT_MY_CITIES,
+    ..._DONT_DIG_UP_MY_ARTIFACTS, ..._DONT_SETTLE_NEAR_ME —
+    Expansion2_DiplomaticActions.xml, FavorCost 30, GrievancesForRefusal 25,
+    GrievancesPerIncursion 25) need a per-subject breach test and an opinion
+    to bend (C-2);
+  - the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row `retribution`,
+    RequiresBrokenPromise), which ships in the table and can never be met
+    until a promise can be broken (C-2's Discuss half);
+  - the AI's AGENDAS (C-26) and the diplomatic-action preference weights
+    (C-67), both DLL-scored against the scale.
+  The carrier is a per-directed-pair opinion on both engines, compared,
+  with the install's `RelationshipLevel` anchors; what feeds it is an ASK —
+  no source publishes the per-event deltas.
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   ENGINES: both hold religious PRESSURE per city and a followed religion per
   city, and neither ever asks which religion a SEAT is majority-held by.
@@ -1425,6 +1451,56 @@ mirrored in memory.
   reachability flip (C-75) exposed the GPU paying a legacy card's TABLE ROW,
   this item's own error, beside its accrual: the ordinary channels read the
   cards minus the legacy ones now, as `legacyEffects` always did on TS.
+- **C-62. A war TYPE. CLOSED 2026-09-06 — eleven kinds, the civic gate and
+  its roster override, the declarer's ten-turn clock, six roster rows.**
+  SOURCED: every `DIPLOACTION_DECLARE_*_WAR` row of the install (Base
+  DiplomaticActions.xml, Expansion1's Defensive-Tactics updates for
+  Reconquest and Protectorate, Expansion1's Golden Age / Retribution /
+  Ideological rows) is ONE table both engines address by position
+  (`WAR_KINDS`, data/warKinds.ts, on the wire as `seats.warKinds`): the
+  civic, `DenouncementTurnsRequired`, the requirement column and the three
+  warmonger percents. ONE predicate (`warKindAllowed` / `_war_kinds_allowed`)
+  serves the record's validator (`declareWar` / `_declare_war_major`, the one
+  body every declaration runs — the nuclear strike's included), the default
+  (`defaultWarKind`) and the driver's pick (`_war_kind_pick`); the record
+  carries `warKind` (schema v3, optional) and a kind the seat may not declare
+  REFUSES the war. The kind is stored SIGNED (`Seat.warKinds` /
+  `seat_warkind` int8: +(code+1) on the declarer's cell), so "who declared"
+  rides the same compared field (`warKinds`); the pair's war clock is the
+  declaration clock. The six rows ship (`WAR_BUFF_ROWS`): Arthashastra's +5
+  Combat Strength (`rosterCS` / `_roster_cs`) and +2 Movement
+  (`unitFullMoves` / `_full_mp`), Bannockburn's +100% Production (the
+  additive percent stack in `seatPhase` / `_seat_city_produce`) and +2
+  Movement, each for `WAR_BUFF_TURNS` 10 while a war the seat DECLARED of the
+  row's kind is that young, and the two PREREQ_OVERRIDEs (Military Training,
+  Defensive Tactics) inside the civic gate.
+  READINGS, identical on both engines: the denouncement may stand in EITHER
+  direction (the LOC text: "Denounced you or that you have Denounced"); a
+  `DenouncementTurnsRequired` of 0 (Golden Age, Protectorate) still wants a
+  standing denouncement — "Can be used right after Denouncing" — where the
+  Surprise row has no such column at all, which retires the old reading that
+  the To Arms! dedicant needed none; Territorial's "2 of your cities within
+  10 tiles of 2 opponents' cities" is two declarer cities each within reach
+  of some target city AND two target cities each within reach of some
+  declarer city; Colonial's "two technology eras" is the per-civ era of techs
+  and civics; Ideological's "different Tier 3 government" is two LATE
+  governments (tier >= 3) that differ; Liberation's "captured a city from one
+  of your friends or allies" reads the city's FOUNDER; the default kind is
+  the cheapest casus belli held by the declaration percent (ties to table
+  order), and the `warlord` style prefers the leader's own buffed kind; the
+  buff's age is the compared pair clock, so a war the LOWER seat declares
+  reads 1 at its own tail and the higher seat's 0 until the next turn.
+  BAR: `war-kinds.test.ts`, `war_kinds_test.py` (the civic gate refuses a
+  kind before its civic, the override lets the leader declare early, the
+  buff pays on turn 1 and not on turn 11, the alliance pressure clause), the
+  golden-war blocks of `grievances.test.ts` and `war_test.py` rewritten to
+  the install's row, `geopolitics_test.py` on the signed plane.
+  REACH: seed 9209 x 250 driven (Chandragupta seated at row 1): 1 Surprise
+  (t77) and 3 Formal (t92) declarations, no other kind and no buff turn —
+  the conditioned kinds and the six rows are held by the new lanes alone.
+  THE LESSON: a boolean pair plane that meant "formal" was two facts short
+  (WHICH kind, WHO declared); widening it to a signed code kept one compared
+  field and let every reader stay a one-line predicate.
 - **C-75. No legacy card is ever slotted. CLOSED 2026-09-05 — the slotting is
   the driver's decision, and its legacy-first style slots them.** The greedy
   fill walked the catalog in order with the legacy and Dark Age cards appended

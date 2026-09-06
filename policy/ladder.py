@@ -228,6 +228,7 @@ STYLE_KNOBS = {
     "war_appetite": 1.0,    # multiplies the declare/raid rates in pick_war
     "peace_appetite": 1.0,  # multiplies the sue rate in pick_war
     "war_ratio": 1.3,       # the strength edge a declaration wants
+    "war_kind": None,       # None = the cheapest casus belli held; "own" = the leader's buffed kind when allowed
     "city_cap": None,       # None = the rules' maxCities
     "dist_pref": None,      # a district id the scaffold rotation starts from
     "tier_order": None,     # None = PROD_PRIORITY
@@ -238,7 +239,7 @@ STYLE_PRESETS = {
     "deep": {"deep": True},
     "broad": {"deep": False},
     "diplomat": {"diplo": True},
-    "warlord": {"diplo": False, "war_appetite": 4.0, "war_ratio": 1.1, "city_cap": 5, "cards": "military"},
+    "warlord": {"diplo": False, "war_appetite": 4.0, "war_ratio": 1.1, "city_cap": 5, "cards": "military", "war_kind": "own"},
     "pacifist": {"war_appetite": 0.0, "peace_appetite": 4.0},
     "expander": {"city_cap": 10},
     "scientist": {"deep": True, "dist_pref": "CAMPUS"},

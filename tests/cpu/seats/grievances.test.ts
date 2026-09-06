@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
-import { seatOf, setFriendTurnsWith, setWar, setWarGolden, warIsFormal, warIsGolden } from '../../../cpu/core/seats';
+import { seatOf, setFriendTurnsWith, setWar, setWarKind, clearWarKind, warIsFormal, warKindWith, warDeclaredBy } from '../../../cpu/core/seats';
+import { WAR_GRIEVANCE_PCT, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_SURPRISE } from '../../../cpu/data/warKinds';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { grantCivics, settleFirstCity } from '../helpers';
 import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS,
-  WAR_GRIEVANCE_PCT, GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
+  GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
   GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
   GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX } from '../../../cpu/data/seats';
@@ -117,7 +118,7 @@ describe('grievances', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
     expect(grievanceWith(state, foe, 0)).toBe(0);
-    expect(declareWar(state, foe, 0).ok).toBe(true);
+    expect(declareWar(state, 0, foe).ok).toBe(true);
     expect(grievanceWith(state, foe, 0)).toBe(warG('surprise', 0, GRIEVANCE_WAR_BASE));
     // and the balance is one number seen from both sides
     expect(grievanceWith(state, 0, foe)).toBe(-warG('surprise', 0, GRIEVANCE_WAR_BASE));
@@ -125,7 +126,7 @@ describe('grievances', () => {
     const s2 = newGame(1);
     const foe2 = (s2.seats[1] as Seat).seat;
     seatOf(s2, 0)!.denounced[foe2] = s2.turn - FORMAL_WAR_MIN_TURNS;
-    expect(declareWar(s2, foe2, 0).ok).toBe(true);
+    expect(declareWar(s2, 0, foe2).ok).toBe(true);
     // the denouncement itself is not paid here; only the declaration is
     expect(grievanceWith(s2, foe2, 0)).toBe(warG('formal', 0, GRIEVANCE_WAR_BASE));
   });
@@ -133,7 +134,7 @@ describe('grievances', () => {
   it('the ledger does NOT decay while that pair is still at war', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
-    declareWar(state, foe, 0);
+    declareWar(state, 0, foe);
     const before = grievanceWith(state, foe, 0);
     endTurn(state);
     expect(grievanceWith(state, foe, 0)).toBe(before);
@@ -142,7 +143,7 @@ describe('grievances', () => {
   it('at peace it decays 10/turn in the Ancient era, and stops at zero', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
-    declareWar(state, foe, 0);
+    declareWar(state, 0, foe);
     setWar(state, foe, 0, false);
     const before = grievanceWith(state, foe, 0);
     endTurn(state);
@@ -223,8 +224,8 @@ describe('grievances', () => {
 
   it('the gang threshold is a bar the ledger can reach', () => {
     const state = newGame(2);
-    declareWar(state, (state.seats[1] as Seat).seat, 0);
-    declareWar(state, (state.seats[2] as Seat).seat, 0);
+    declareWar(state, 0, (state.seats[1] as Seat).seat);
+    declareWar(state, 0, (state.seats[2] as Seat).seat);
     expect(grievancesAgainst(state, 0)).toBe(2 * warG('surprise', 0, GRIEVANCE_WAR_BASE));
     expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
   });
@@ -239,9 +240,11 @@ describe('golden age war', () => {
     s0.denounced[foe] = state.turn - FORMAL_WAR_MIN_TURNS;
     s0.age = 2;
     (s0.dedicationPicks ??= []).push(DED_TO_ARMS);
-    declareWar(state, foe, 0); // seat 0 declares on foe
-    expect(warIsGolden(state, 0, foe)).toBe(true);
-    expect(warIsGolden(state, foe, 0)).toBe(true);
+    declareWar(state, 0, foe); // seat 0 declares on foe
+    expect(warKindWith(state, 0, foe)).toBe(WAR_KIND_GOLDEN);
+    expect(warKindWith(state, foe, 0)).toBe(WAR_KIND_GOLDEN);
+    expect(warDeclaredBy(state, 0, foe)).toBe(true);
+    expect(warDeclaredBy(state, foe, 0)).toBe(false);
     expect(grievanceWith(state, foe, 0))
       .toBe(warG('golden', 0, GRIEVANCE_WAR_BASE));
     const b = grievanceWith(state, foe, 0);
@@ -254,22 +257,36 @@ describe('golden age war', () => {
     expect(grievanceWith(state, foe, 0) - b2).toBe(warG('golden', 2, GRIEVANCE_CITY_TAKEN));
   });
 
-  it('a golden war needs NO denouncement — the dedication alone is the casus belli', () => {
+  it('a golden war waives the five turns, not the denouncement itself', () => {
+    // CIV6 (Golden Age War row, DenouncementTurnsRequired 0): "Can be used
+    // right after Denouncing a civilization, without waiting the normal
+    // amount of turns" — a denouncement of ANY age opens it; none at all
+    // leaves the dedicant a Surprise war.
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
     const s0 = seatOf(state, 0)!;
     s0.age = 2;
     (s0.dedicationPicks ??= []).push(DED_TO_ARMS);
-    declareWar(state, foe, 0); // seat 0 declares on foe — never denounced
-    expect(warIsGolden(state, 0, foe)).toBe(true);
+    s0.denounced[foe] = state.turn; // denounced THIS turn
+    declareWar(state, 0, foe);
+    expect(warKindWith(state, 0, foe)).toBe(WAR_KIND_GOLDEN);
     expect(warIsFormal(state, 0, foe)).toBe(true);
     expect(grievanceWith(state, foe, 0)).toBe(warG('golden', 0, GRIEVANCE_WAR_BASE));
+
+    const s2 = newGame(1);
+    const foe2 = (s2.seats[1] as Seat).seat;
+    const t0 = seatOf(s2, 0)!;
+    t0.age = 2;
+    (t0.dedicationPicks ??= []).push(DED_TO_ARMS);
+    declareWar(s2, 0, foe2); // never denounced
+    expect(warKindWith(s2, 0, foe2)).toBe(WAR_KIND_SURPRISE);
+    expect(grievanceWith(s2, foe2, 0)).toBe(warG('surprise', 0, GRIEVANCE_WAR_BASE));
   });
 
   it('a surprise war prices its captures and razes by its OWN columns', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
-    declareWar(state, foe, 0); // no denouncement, no dedication: SURPRISE
+    declareWar(state, 0, foe); // no denouncement, no dedication: SURPRISE
     const b = grievanceWith(state, foe, 0);
     grievanceCityTaken(state, 0, foe, false);
     expect(grievanceWith(state, foe, 0) - b).toBe(warG('surprise', 1, GRIEVANCE_CITY_TAKEN));
@@ -282,19 +299,22 @@ describe('golden age war', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
     seatOf(state, 0)!.denounced[foe] = state.turn - FORMAL_WAR_MIN_TURNS;
-    declareWar(state, foe, 0); // seat 0 declares on foe
-    expect(warIsGolden(state, 0, foe)).toBe(false);
+    declareWar(state, 0, foe); // seat 0 declares on foe
+    expect(warKindWith(state, 0, foe)).toBe(WAR_KIND_FORMAL);
     expect(grievanceWith(state, foe, 0)).toBe(warG('formal', 0, GRIEVANCE_WAR_BASE));
   });
 
-  it('setWarGolden writes both cells and clears both', () => {
+  it('setWarKind writes both cells, signed by the declarer, and clearWarKind clears both', () => {
     const state = newGame(1);
     const foe = (state.seats[1] as Seat).seat;
-    setWarGolden(state, 0, foe, true);
-    expect(warIsGolden(state, 0, foe)).toBe(true);
-    expect(warIsGolden(state, foe, 0)).toBe(true);
-    setWarGolden(state, 0, foe, false);
-    expect(warIsGolden(state, 0, foe)).toBe(false);
-    expect(warIsGolden(state, foe, 0)).toBe(false);
+    setWarKind(state, 0, foe, WAR_KIND_GOLDEN);
+    expect(warKindWith(state, 0, foe)).toBe(WAR_KIND_GOLDEN);
+    expect(warKindWith(state, foe, 0)).toBe(WAR_KIND_GOLDEN);
+    expect(warDeclaredBy(state, 0, foe)).toBe(true);
+    expect(warDeclaredBy(state, foe, 0)).toBe(false);
+    expect(warIsFormal(state, foe, 0)).toBe(true);
+    clearWarKind(state, 0, foe);
+    expect(warKindWith(state, 0, foe)).toBe(-1);
+    expect(warKindWith(state, foe, 0)).toBe(-1);
   });
 });

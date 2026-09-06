@@ -12,6 +12,7 @@ import { EMERGENCY_NUCLEAR } from '../data/seats';
 import { addWmd, nukeBlast, nukeCarrier, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
 import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
+import { warBuffCS } from './casusBelli';
 import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -915,12 +916,16 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
   // `combatCs` row with a `when` (C-66).
   const levyCs = own.levied
     ? mods.levy.reduce((n, r) => Math.max(n, r.levyCombat), 0) : 0;
-  if (rows.length === 0 && mods.formations.length === 0) return levyCs;
   const def = UNITS[own.type];
   if (!def || !(def.combat ?? 0)) return 0;
+  // CIV6 (TRAIT_TERRITORIAL_WAR_COMBAT, ReligiousOnly false): the flat
+  // strength a leader's units carry for the turns after a declaration of
+  // the row's own war kind — clause-free like the levy mark (`WAR_BUFF_ROWS`)
+  const warCs = warBuffCS(state, own.seat);
+  if (rows.length === 0 && mods.formations.length === 0) return levyCs + warCs;
   const bit = classBitOf(own.type);
   const tile = state.map.tiles[own.tileIndex];
-  let cs = levyCs;
+  let cs = levyCs + warCs;
   for (const r of rows) {
     if (r.classMask !== 0 && (bit & r.classMask) === 0) continue;
     const hit = r.when === 'always' ? true

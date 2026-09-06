@@ -394,10 +394,11 @@ class SimInit:
                 if 0 <= _s < self.n_majors:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
         _pw = self.n_majors
-        self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
-        # CIV6 (Golden Age War): the To Arms! declaration's quarter-priced
-        # war, remembered per pair for the captures it discounts.
-        self.seat_wargolden = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
+        # THE KIND of each war (`Seat.warKinds`): +(code + 1) on the declarer's
+        # cell, -(code + 1) on the target's, `code` indexing the WAR_KINDS
+        # table; 0 = a war with no kind. Written at the declaration, cleared
+        # at the peace.
+        self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.int8, device=device)
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         # THE DIPLOMATIC AGREEMENT CLOCKS, turns LEFT. Friendship and the
         # alliance are symmetric; the Open Borders grant is DIRECTED - row a,
@@ -524,9 +525,13 @@ class SimInit:
         # scalars ride it); reading it off rules.seats returned {} and every
         # .get below silently DEFAULTED — hard reads keep that from recurring.
         _er2 = rules.eras
-        _wgp = _er2["warGrievancePct"]
-        self._war_griev_pct = {k: tuple(int(x) for x in _wgp[k])
-                               for k in ("surprise", "formal", "golden")}
+        # WAR_KINDS in table order: [civic (-1 none), denouncement turns (-1
+        # none), condition, declaration %, capture %, raze %]
+        self._war_kinds: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in rules.seats["warKinds"]]  # type: ignore[misc]
+        self._war_griev_pct: list[tuple[int, int, int]] = [(r[3], r[4], r[5]) for r in self._war_kinds]
+        self._war_buff_turns = int(rules.seats["warBuffTurns"])
+        self._al_rel3_pressure_pct = int(rules.seats["allianceRel3PressurePct"])
         self._griev_war_base = int(_er2["grievanceWarBase"])
         self._griev_war_on_friend = int(_er2["grievanceWarOnFriend"])
         self._griev_war_on_suzerain = int(_er2["grievanceWarOnSuzerain"])
@@ -3049,6 +3054,12 @@ class SimInit:
         # [civ, leaderRow, ban] — the ban's index is `WAR_BANS` order
         self._war_ban_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["warBans"]]  # type: ignore[misc]
+        # [civ, leaderRow, war kind, combat, moves, production %, override civic]
+        # — CIV6 (TRAIT_TERRITORIAL_WAR_*, TRAIT_LIBERATION_WAR_*): what a leader
+        # earns for `_war_buff_turns` after DECLARING a war of the kind, and the
+        # civic the kind's prerequisite is overridden to for that leader
+        self._war_buff_rows: list[tuple[int, int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["warBuffs"]]  # type: ignore[misc]
         self._tourism_favor_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["tourismFavor"]]  # type: ignore[misc]
         self._emergency_favor_rows: list[tuple[int, int, int]] = [
@@ -3230,6 +3241,7 @@ class SimInit:
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}
         self._driven_war: dict = {}
+        self._driven_war_kind: dict = {}
         # One stash per DIPLOMATIC verb, allocated once and drained in place —
         # a per-verb attribute would have to be rebound to exist.
         self._driven_geo: dict = {v: {} for v in GEO_VERBS}

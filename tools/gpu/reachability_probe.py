@@ -350,7 +350,7 @@ def main() -> None:
         # is a dragged ally rather than the victim's side of someone else's.
         _R = sim.n_majors
         _st = sim.seat_denounced[:, :_R, :_R]
-        mark("defensivePact", (sim.war[:, :_R, :_R] & sim.seat_warkind[:, :_R, :_R]
+        mark("defensivePact", (sim.war[:, :_R, :_R] & (sim.seat_warkind[:, :_R, :_R].abs() >= 2)
                               & (_st < 0) & (_st.transpose(1, 2) < 0)).any(dim=2).any(dim=1), t)
         mark("tileLock", sim.tile_locked.any(dim=1), t)
         # a DIG's product is an ARTIFACT in a museum slot; the site plane

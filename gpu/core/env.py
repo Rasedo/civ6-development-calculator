@@ -98,6 +98,7 @@ class BatchEnv:
         units: torch.Tensor | None = None,
         envoy: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
+        war_kind: torch.Tensor | None = None,
         seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         row = self._row(seat)
@@ -105,7 +106,7 @@ class BatchEnv:
         if prev is None:
             prev = self.sim.seat_score(row)
         self.sim.apply_seat_actions(row, production=production, tech=tech,
-                                    civic=civic, war=war, envoys=envoy)
+                                    civic=civic, war=war, war_kind=war_kind, envoys=envoy)
         if units is not None and self.sim.units_mode:
             self.sim._apply_seat_unit_actions(row, units)
         self.sim.step()

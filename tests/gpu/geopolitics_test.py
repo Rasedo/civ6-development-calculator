@@ -110,7 +110,7 @@ def clear_pairs(sim):
     sim.war[:, :nrow, :nrow] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.war_turns[:, :nrow, :nrow] = 0
-    sim.seat_warkind[:, :nrow, :nrow] = False
+    sim.seat_warkind[:, :nrow, :nrow] = 0
     sim.seat_denounced[:, :nrow, :nrow] = -1
     for _p in (sim.seat_friend_turns, sim.seat_ally_turns, sim.seat_borders_turns,
                sim.seat_delegation, sim.deal_offer_left, sim.deal_term_left,
@@ -230,7 +230,7 @@ def poke_agreements(rules, path):
     assert bool(sim.war[0, 0, 1]) and bool(sim.war[0, 1, 0]), (
         "the victim's ally must be dragged into the war"
     )
-    assert bool(sim.seat_warkind[0, 0, 1]), "an obligation answered is a FORMAL war"
+    assert bool(sim._war_formal(0, 1)) and bool(sim.seat_warkind[0, 0, 1] > 0), "an obligation answered is a FORMAL war the ally DECLARED"
     assert int(sim._grievances_against(0)[0]) == 0, "the dragged ally earns no grievances"
     clear_pairs(sim)
     sim.civ_grievance.zero_()
@@ -369,7 +369,7 @@ def poke_substrate(rules, path):
     made the head the one war entry made row 0 a row of these planes."""
     sim = build(rules, path)
     nrow = sim.n_majors
-    assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.bool
+    assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.int8
     assert sim.seat_denounced.dtype == torch.long and sim.war_turns.dtype == torch.long
     for _p in ("seat_warkind", "seat_denounced", "seat_friend_turns",
                "seat_ally_turns", "seat_borders_turns"):
@@ -379,9 +379,12 @@ def poke_substrate(rules, path):
         )
     diag = torch.arange(nrow)
     assert not bool(sim.war[0, diag, diag].any()), "the war diagonal must stay false"
-    for _p in ("war", "seat_warkind", "seat_friend_turns", "seat_ally_turns"):
+    for _p in ("war", "seat_friend_turns", "seat_ally_turns"):
         blk = getattr(sim, _p)[0, :nrow, :nrow]
         assert bool((blk == blk.T).all()), f"the organic major block of {_p} must be symmetric"
+    # the KIND plane is ANTI-symmetric: the declarer's cell is the target's negated
+    blk = sim.seat_warkind[0, :nrow, :nrow].long()
+    assert bool((blk == -blk.T).all()), "the war-kind block must be the negation of its transpose"
 
     snap = sim.snapshot()
     keep = {p: getattr(sim, p).clone() for p in ("war", "war_turns", "seat_warkind", "seat_denounced",
@@ -389,7 +392,7 @@ def poke_substrate(rules, path):
     sim.war[:, :nrow, :nrow] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.war_turns[:] = 11
-    sim.seat_warkind[:] = True
+    sim.seat_warkind[:] = 2
     sim.seat_friend_turns[:] = 5
     sim.seat_ally_turns[:] = 5
     sim.seat_borders_turns[:] = 5
@@ -442,22 +445,23 @@ def poke_dow_kind(rules, path):
     sim.seat_denounced[0, 1, 2] = t - fmin  # exactly at the bar -> FORMAL
     head_war(sim, 1, 2)
     assert bool(sim.war[0, 1, 2]) and bool(sim.war[0, 2, 1]), "a DoW must write the war matrix symmetrically"
-    assert bool(sim.seat_warkind[0, 1, 2]) and bool(sim.seat_warkind[0, 2, 1]), "an old-grudge war must be FORMAL"
+    assert bool(sim._war_formal(1, 2)) and bool(sim._war_formal(2, 1)), "an old-grudge war must be FORMAL"
+    assert int(sim.seat_warkind[0, 1, 2]) == 2 and int(sim.seat_warkind[0, 2, 1]) == -2, "the declarer's cell is positive, the target's negative"
 
     clear_pairs(sim)
     sim.seat_denounced[0, 1, 2] = t - (fmin - 1)  # one turn too fresh -> SURPRISE
     head_war(sim, 1, 2)
-    assert bool(sim.war[0, 1, 2]) and not bool(sim.seat_warkind[0, 1, 2]), "a fresh-grudge war must be SURPRISE"
+    assert bool(sim.war[0, 1, 2]) and not bool(sim._war_formal(1, 2)), "a fresh-grudge war must be SURPRISE"
 
     clear_pairs(sim)  # no grudge at all -> SURPRISE
     head_war(sim, 1, 2)
-    assert bool(sim.war[0, 1, 2]) and not bool(sim.seat_warkind[0, 1, 2]), "a no-grudge war must be SURPRISE"
+    assert bool(sim.war[0, 1, 2]) and not bool(sim._war_formal(1, 2)), "a no-grudge war must be SURPRISE"
 
     # ...and the casus belli EXPIRES with the denouncement that opened it.
     clear_pairs(sim)
     sim.seat_denounced[0, 1, 2] = t - int(sim._agreement_turns)
     head_war(sim, 1, 2)
-    assert bool(sim.war[0, 1, 2]) and not bool(sim.seat_warkind[0, 1, 2]), (
+    assert bool(sim.war[0, 1, 2]) and not bool(sim._war_formal(1, 2)), (
         "an EXPIRED denouncement carries no casus belli"
     )
 
@@ -466,10 +470,10 @@ def poke_dow_kind(rules, path):
     sim.seat_denounced[0, 0, 1] = t - fmin
     head_war(sim, 0, 1)
     assert bool(sim.war[0, 0, 1]) and bool(sim.war[0, 1, 0]), "seat 0's DoW must write the war matrix symmetrically"
-    assert bool(sim.seat_warkind[0, 0, 1]) and bool(sim.seat_warkind[0, 1, 0]), "seat 0's old-grudge war must be FORMAL"
+    assert bool(sim._war_formal(0, 1)) and bool(sim._war_formal(1, 0)), "seat 0's old-grudge war must be FORMAL"
     clear_pairs(sim)
     head_war(sim, 0, 1)
-    assert bool(sim.war[0, 0, 1]) and not bool(sim.seat_warkind[0, 0, 1]), "seat 0's no-grudge war must be SURPRISE"
+    assert bool(sim.war[0, 0, 1]) and not bool(sim._war_formal(0, 1)), "seat 0's no-grudge war must be SURPRISE"
 
     # ...and the head reaches seat 0 from a civ row too — the column that was
     # dead until the head became symmetric.
@@ -485,7 +489,7 @@ def poke_dow_gates(rules, path):
     is a no-op, and one declaration buys exactly one grievance."""
     sim, _, _ = controlled_pair(rules, path)
     # no denouncement stands, so it is a SURPRISE war
-    dow = int(sim._griev_war_base * sim._war_griev_pct["surprise"][0] / 100 + 0.5)
+    dow = int(sim._griev_war_base * sim._war_griev_pct[0][0] / 100 + 0.5)
 
     sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 30
     head_war(sim, 1, 2)
@@ -537,7 +541,8 @@ def poke_peace(rules, path):
     def _at_war():
         sim.war[0, 1, 2] = sim.war[0, 2, 1] = True
         sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-        sim.seat_warkind[0, 1, 2] = sim.seat_warkind[0, 2, 1] = True
+        sim.seat_warkind[0, 1, 2] = 2
+        sim.seat_warkind[0, 2, 1] = -2
         sim.seat_denounced[0, 1, 2] = 2
 
     _at_war()
@@ -555,7 +560,7 @@ def poke_peace(rules, path):
     sim.peace_turns[0, 1] = sim.peace_turns[0, 2] = 7
     head_war(sim, 1, 2, sue=True)
     assert not bool(sim.war[0, 1, 2]) and not bool(sim.war[0, 2, 1]), "peace must clear the war matrix both directions"
-    assert not bool(sim.seat_warkind[0, 1, 2]) and not bool(sim.seat_warkind[0, 2, 1]), "the ended war's FORMAL flag must clear"
+    assert int(sim.seat_warkind[0, 1, 2]) == 0 and int(sim.seat_warkind[0, 2, 1]) == 0, "the ended war's KIND must clear"
     assert int(sim.seat_denounced[0, 1, 2]) == 2, "the denouncement grudge must SURVIVE the peace"
     assert abs(float(sim.civ_treasury[0, 1]) - 25.0) < 1e-6, (
         f"the treaty must debit peaceGold0 + slope*clock = {cost} (left {float(sim.civ_treasury[0, 1])})"
@@ -609,7 +614,8 @@ def poke_ww_differential(rules, path):
     # FORMAL vs SURPRISE picks the era COLUMN, not a multiplier; at Ancient the
     # two columns are equal (16 = 16).
     sim.restore(snap)
-    sim.seat_warkind[0, 1, 2] = sim.seat_warkind[0, 2, 1] = True  # FORMAL
+    sim.seat_warkind[0, 1, 2] = 2  # FORMAL, declared by 1
+    sim.seat_warkind[0, 2, 1] = -2
     formal = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
     sim.restore(snap)
     surprise = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
@@ -694,7 +700,7 @@ def poke_transfer(rules, path):
 def poke_float32(rules, path):
     """h. A float32 build steps 30 turns with the pair machinery live."""
     sim = build(rules, path, steps=30, dtype=torch.float32)
-    assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.bool and sim.seat_denounced.dtype == torch.long
+    assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.int8 and sim.seat_denounced.dtype == torch.long
     print("  h float32 dtype OK (30 turns, pair tensors dtype-stable, no walk crash)")
 
 

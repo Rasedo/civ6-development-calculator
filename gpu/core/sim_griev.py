@@ -109,18 +109,15 @@ class SimGriev:
                                 friend.long() * self._griev_friend_share)
             self._add_grievance(s, transgressor, (share * n).div(100, rounding_mode="floor"), m)
 
-    def _grievance_war_declared(self, declarer: int, target: int, m, formal, golden=None) -> None:
-        """The casus belli's own DECLARATION column — surprise, formal or
-        golden percent of the war base — and "War declared on a Friend or
-        Ally: 75" to each of the target's."""
-        gld = golden if golden is not None else torch.zeros_like(m)
+    def _grievance_war_declared(self, declarer: int, target: int, m, kind) -> None:
+        """The casus belli's own DECLARATION column (WarmongerPercent of the
+        war base, by the WAR_KINDS code in `kind` [B]) and "War declared on a
+        Friend or Ally: 75" to each of the target's."""
         base, pct = self._griev_war_base, self._war_griev_pct
-        self._spread_grievance(target, declarer,
-                               int(base * pct["surprise"][0] / 100 + 0.5), m & ~formal & ~gld)
-        self._spread_grievance(target, declarer,
-                               int(base * pct["formal"][0] / 100 + 0.5), m & formal & ~gld)
-        self._spread_grievance(target, declarer,
-                               int(base * pct["golden"][0] / 100 + 0.5), m & gld)
+        for k in kind[m].unique().tolist():
+            kk = int(k) if 0 <= int(k) < len(pct) else 0
+            self._spread_grievance(target, declarer,
+                                   int(base * pct[kk][0] / 100 + 0.5), m & (kind == int(k)))
         for s in range(self.n_majors):
             if s in (declarer, target):
                 continue
@@ -132,12 +129,9 @@ class SimGriev:
         columns off the city base."""
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
-        kind = "surprise"
+        kind = 0  # a war with no kind prices as a Surprise war
         if taker < self.n_majors and loser < self.n_majors:
-            if bool(self.seat_wargolden[b, taker, loser]):
-                kind = "golden"
-            elif bool(self.seat_warkind[b, taker, loser]):
-                kind = "formal"
+            kind = max(0, int(self._war_kind_code(taker, loser)[b]))
         pct = self._war_griev_pct[kind][2 if razed else 1]
         n = int(self._griev_city_taken * pct / 100 + 0.5)
         self._spread_grievance(loser, taker, n, one)

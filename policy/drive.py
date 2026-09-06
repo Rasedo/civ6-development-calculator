@@ -101,7 +101,7 @@ def _blocks(env, sim, row: int, obs: torch.Tensor | None = None) -> dict:
 #:         "units": [[N], ...]      one entry per unit STEP this turn, since a
 #:                                  unit may act several times
 #:     }}
-#: plus the optional fields the extractors below document (war, envoys, buy,
+#: plus the optional fields the extractors below document (war, warKind, envoys, buy,
 #: buyFaith, levy, and the geo intents). Codes are the MASK layouts
 #: (`seat_masks`, `_seat_unit_mask`), one layout for every seat, so the same
 #: file can drive any of them.
@@ -1206,6 +1206,12 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
             "raid": _policy_rng(sim, seeds, turn, row, 3),
         }
         war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w, style=style)
+    # THE KIND the column declares under — the engine's own validator picks it
+    # (the cheapest casus belli held, or the leader's buffed kind under the
+    # style), so the record can never name a kind the applier refuses.
+    war_kind = None
+    if war is not None:
+        war_kind = sim._war_kind_pick(row, war, prefer_own=(style or {}).get("war_kind") == "own")
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
@@ -1222,7 +1228,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic, policies=policies,
-                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
+                           war=war, war_kind=war_kind, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
                            monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
@@ -1292,10 +1298,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies
+    return prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass, policies, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -1318,6 +1324,8 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
+    if _w is not None and war_kind is not None and int(war_kind[b]) >= 0:
+        rec["warKind"] = int(war_kind[b])  # the WAR_KINDS code the declaration takes
     if policies is not None:
         rec["policies"] = [i for i in range(int(policies.shape[1])) if bool(policies[b, i])]
     rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band))
@@ -1445,6 +1453,8 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 policies[:, int(_i)] = True
     _wv = rec.get("war")
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
+    _wk = rec.get("warKind")
+    war_kind = None if _wk is None else torch.full((sim.B,), int(_wk), dtype=torch.long, device=dev)
     _ev = rec.get("envoys") or []
     env_seq = torch.tensor(_ev, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1) if _ev else None
     # parse the CENTRE-KEYED buy intent back to tensors (the city resolution
@@ -1551,7 +1561,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     gp_pass = (torch.full((sim.B,), int(_gpv), dtype=torch.long, device=dev)
                if _gpv is not None and int(_gpv) >= 0 else None)
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic, policies=policies,
-                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
+                           war=war, war_kind=war_kind, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
                            monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, nuke=nuke, spec=spec, lock=lock, vote=vote, gp_pass=gp_pass)
 
     def _geo_mask(seats) -> torch.Tensor:
