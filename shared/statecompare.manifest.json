@@ -2501,6 +2501,27 @@
           ]
         },
         {
+          "name": "stormEvent",
+          "compare": "exact",
+          "covers": [
+            "Tile.stormEvent"
+          ],
+          "planes": [
+            "storm_event"
+          ],
+          "note": "the STORM_EVENTS row of the storm centred here, -1 when none is live"
+        },
+        {
+          "name": "stormTurns",
+          "compare": "exact",
+          "covers": [
+            "Tile.stormTurns"
+          ],
+          "planes": [
+            "storm_left"
+          ]
+        },
+        {
           "name": "featureId",
           "compare": "exact",
           "covers": [

@@ -1,19 +1,22 @@
 
 import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
-import { neighborTile, neighbors, tilesWithin } from '../../world/hex';
+import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatOf, tileSeat, civOf } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar } from './seats';
 import { DISTRICTS } from '../data/districts';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { UNITS } from '../data/units';
+import { rowIsFor } from '../data/civilizations';
 import { cityAtIndex } from './units';
 import { outerPool } from './rules';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
-import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, STORM_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
+import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
+import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, type StormEvent } from '../data/disasters';
 import { disasterRateMult, severitySplit } from '../data/climate';
 import { defertilize, desertificationLive, fertilityLive } from './climate';
 import { governorTileFlag } from './governors';
@@ -40,10 +43,10 @@ function scorch(state: GameState, tile: Tile): void {
   if (tile.improvement && !tile.pillaged && !envImmune(state, tile)) tile.pillaged = true;
 }
 
-/** CIV6 (Gathering Storm): a flood damages the DISTRICT on the floodplain, not
+/** CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile, not
  *  just the improvement — the buildings inside it go dark with it, which is
  *  what a Dam is built to prevent. A city CENTER is never pillaged. */
-function floodDistrict(state: GameState, tile: Tile): void {
+function pillageDistrict(state: GameState, tile: Tile): void {
   if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete
       && !tile.districtPillaged && !envImmune(state, tile)) {
     tile.districtPillaged = true;
@@ -158,7 +161,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
       tile.improvement = null;
       tile.pillaged = false;
     }
-    if (rDistrict < FLOOD_DISTRICT_P[sev]) floodDistrict(state, tile);
+    if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
     if (dmg > 0) {
@@ -244,18 +247,153 @@ export function disasterPhase(state: GameState): void {
     }
   }
 
-  if (nextRandom(state) < STORM_CHANCE * rate) {
-    const center = pick(state, map.tiles.filter((t) => !isWater(t)));
-    if (center) {
-      const area = tilesWithin(map, center.col, center.row, 1);
-      for (const t of area) {
-        scorch(state, t);
-        // sandstorms deposit silt — until the world warms past Phase IV, from
-        // where the same storms take fertility off instead of laying it down.
-        if (strip) defertilize(t);
-        else if (t.terrain === 'DESERT') fertilize(state, t);
-      }
-      log(state, `Storm at (${center.col}, ${center.row}) — improvements damaged.`);
+  // THE EIGHT STORMS: one draw per event per turn, in table order. Each
+  // family's two severities share the flood's climate ramp — the phase's melt
+  // fraction moved from the milder row onto the worse, then every draw scaled.
+  const chance = stormChances(state.climateIdx ?? -1, rate);
+  for (let e = 0; e < STORM_EVENTS.length; e++) {
+    if (nextRandom(state) >= chance[e]) continue;
+    const ev = STORM_EVENTS[e];
+    const center = pick(state, map.tiles.filter((t) => stormFamilyAt(t) === ev.family));
+    // a centre already under a storm takes no second one
+    if (!center || (center.stormTurns ?? 0) > 0) continue;
+    center.stormEvent = e;
+    center.stormTurns = ev.duration;
+    log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
+  }
+  // CIV6 (`RandomEvents`, Duration 3): a storm PERSISTS, applying its
+  // footprint's effects on the turn it forms and on each turn it lasts. Live
+  // storms walk in ascending centre index; `Movement 8` (the storm's walk
+  // across the map) is DLL logic nobody can read, and a storm stays put.
+  for (const center of map.tiles) {
+    if ((center.stormTurns ?? 0) <= 0) continue;
+    stormTurn(state, center, STORM_EVENTS[center.stormEvent!], strip);
+    center.stormTurns = (center.stormTurns ?? 0) - 1;
+    if (center.stormTurns <= 0) center.stormEvent = -1;
+  }
+}
+
+/** [8] per-turn chances at this climate phase: `severitySplit` over each
+ *  family's (severity 1, severity 2) pair, then `disasterRateMult` on all. */
+export function stormChances(phase: number, rate: number): number[] {
+  const out = STORM_EVENTS.map((ev) => ev.chance);
+  for (const fam of STORM_FAMILIES) {
+    const [a, b] = stormFamilyPair(fam);
+    const sp = severitySplit([STORM_EVENTS[a].chance, STORM_EVENTS[b].chance], phase);
+    out[a] = sp[0] * rate;
+    out[b] = sp[1] * rate;
+  }
+  return out;
+}
+
+/** The first `hexes` slots of `STORM_DISC` around a centre, on-map ones only,
+ *  in the disc's canonical order. */
+export function stormFootprint(map: GameMap, center: Tile, hexes: number): Tile[] {
+  const [cq, cr] = offsetToAxial(center.col, center.row);
+  const out: Tile[] = [];
+  for (let k = 0; k < hexes && k < STORM_DISC.length; k++) {
+    const [dq, dr] = STORM_DISC[k];
+    const [c, r] = axialToOffset(cq + dq, cr + dr);
+    const t = tileAt(map, c, r);
+    if (t) out.push(t);
+  }
+  return out;
+}
+
+function stormTurn(state: GameState, center: Tile, ev: StormEvent, strip: boolean): void {
+  for (const t of stormFootprint(state.map, center, ev.hexes)) stormTile(state, t, ev, strip);
+}
+
+/** CIV6 (NO_UNIT_DAMAGE, COLLECTION_OWNER): the unit's owner plays a row
+ *  naming this event. */
+function stormSpares(state: GameState, unitSeat: number, ev: StormEvent): boolean {
+  const civ = civOf(state, unitSeat);
+  const leader = leaderOf(state, unitSeat);
+  return STORM_UNIT_ROWS.some((r) => r.effect === 'noDamage' && r.event === ev.id && rowIsFor(r, civ, leader));
+}
+
+/** CIV6 (MODIFIED_DAMAGE_OPPOSING_PLAYER, Amount): the +percent a unit takes
+ *  standing on ground owned by a carrier it is at war with; 0 otherwise. */
+function stormExtraPct(state: GameState, unitSeat: number, owner: number, ev: StormEvent): number {
+  if (owner < 0 || owner === unitSeat || !civsAtWar(state, unitSeat, owner)) return 0;
+  const civ = civOf(state, owner);
+  const leader = leaderOf(state, owner);
+  let pct = 0;
+  for (const r of STORM_UNIT_ROWS) {
+    if (r.effect === 'doubleOpposing' && r.event === ev.id && rowIsFor(r, civ, leader)) pct += r.amount;
+  }
+  return pct;
+}
+
+/**
+ * ONE storm turn on one footprint tile.
+ *
+ * TEN draws per tile, always, whatever stands there — one per damage column
+ * plus the HP band and the two yields — so the stream never depends on the
+ * tile's contents. Order: improvement pillaged, improvement destroyed,
+ * district pillaged, population, civilian killed, land share, naval share,
+ * HP band, food, production.
+ *
+ * READINGS shared with the GPU twin: a domain's `Percentage` is one roll per
+ * tile for ALL that domain's units on it; an embarked unit is its chassis'
+ * domain; an air unit or a spy holds no tile and is neither domain; a city
+ * centre on the footprint takes nothing (no storm row names CITY_GARRISON or
+ * CITY_WALLS); BUILDING_PILLAGED rides the district's darkness.
+ */
+export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: boolean): void {
+  const rPill = nextRandom(state);
+  const rDestroy = nextRandom(state);
+  const rDistrict = nextRandom(state);
+  const rPop = nextRandom(state);
+  const rCivilian = nextRandom(state);
+  const rLand = nextRandom(state);
+  const rNaval = nextRandom(state);
+  const rHp = nextRandom(state);
+  const rFood = nextRandom(state);
+  const rProd = nextRandom(state);
+
+  const owner = tileSeat(tile);
+  const lowland = (tile.lowland ?? 0) > 0;
+  const pillP = lowland && ev.lowlandPill > 0 ? ev.lowlandPill : ev.impPill;
+  const distP = lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill;
+  if (rPill < pillP) scorch(state, tile);
+  if (rDestroy < ev.impDest && tile.improvement && !envImmune(state, tile)) {
+    tile.improvement = null;
+    tile.pillaged = false;
+  }
+  if (rDistrict < distP) pillageDistrict(state, tile);
+  if (rPop < ev.pop) {
+    const home = seatOf(state, owner)?.cities.find((c) => c.id === tile.ownerCity);
+    if (home && home.population > 1) home.population -= 1;
+  }
+  const landHit = rLand < ev.landP;
+  const navalHit = rNaval < ev.navalP;
+  const landDmg = ev.landLo + Math.floor(rHp * (ev.landHi - ev.landLo + 1));
+  const navalDmg = ev.navalLo + Math.floor(rHp * (ev.navalHi - ev.navalLo + 1));
+  for (const u of [...unitsAt(state, tile.index)]) {
+    const dom = unitDomain(u.type);
+    if (dom === 'air' || dom === 'spy') continue;
+    if (stormSpares(state, u.seat, ev)) continue;
+    if (dom === 'civilian') {
+      if (rCivilian < ev.civKill) disbandUnit(state, u.id);
+      continue;
     }
+    const naval = !!UNITS[u.type]?.naval;
+    if (!(naval ? navalHit : landHit)) continue;
+    const base = naval ? navalDmg : landDmg;
+    const dmg = base + Math.floor(base * stormExtraPct(state, u.seat, owner, ev) / 100);
+    u.hp -= dmg;
+    if (u.hp <= 0) disbandUnit(state, u.id);
+  }
+  // FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
+  // CIV6 "all Storms and Droughts now start removing fertility from tiles
+  // instead of adding it".
+  if (strip) {
+    defertilize(tile);
+    return;
+  }
+  if (rFood < ev.fertFood) fertilize(state, tile);
+  if (rProd < ev.fertProd && fertilityLive(state) && !isWater(tile) && tile.elevation !== 'MOUNTAIN') {
+    tile.fertilityProd = Math.min(FERTILITY_CAP, tile.fertilityProd + 1);
   }
 }
