@@ -394,10 +394,11 @@ class SimInit:
                 if 0 <= _s < self.n_majors:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
         _pw = self.n_majors
-        self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
-        # CIV6 (Golden Age War): the To Arms! declaration's quarter-priced
-        # war, remembered per pair for the captures it discounts.
-        self.seat_wargolden = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
+        # THE KIND of each war (`Seat.warKinds`): +(code + 1) on the declarer's
+        # cell, -(code + 1) on the target's, `code` indexing the WAR_KINDS
+        # table; 0 = a war with no kind. Written at the declaration, cleared
+        # at the peace.
+        self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.int8, device=device)
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         # THE DIPLOMATIC AGREEMENT CLOCKS, turns LEFT. Friendship and the
         # alliance are symmetric; the Open Borders grant is DIRECTED - row a,
@@ -524,9 +525,13 @@ class SimInit:
         # scalars ride it); reading it off rules.seats returned {} and every
         # .get below silently DEFAULTED — hard reads keep that from recurring.
         _er2 = rules.eras
-        _wgp = _er2["warGrievancePct"]
-        self._war_griev_pct = {k: tuple(int(x) for x in _wgp[k])
-                               for k in ("surprise", "formal", "golden")}
+        # WAR_KINDS in table order: [civic (-1 none), denouncement turns (-1
+        # none), condition, declaration %, capture %, raze %]
+        self._war_kinds: list[tuple[int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in rules.seats["warKinds"]]  # type: ignore[misc]
+        self._war_griev_pct: list[tuple[int, int, int]] = [(r[3], r[4], r[5]) for r in self._war_kinds]
+        self._war_buff_turns = int(rules.seats["warBuffTurns"])
+        self._al_rel3_pressure_pct = int(rules.seats["allianceRel3PressurePct"])
         self._griev_war_base = int(_er2["grievanceWarBase"])
         self._griev_war_on_friend = int(_er2["grievanceWarOnFriend"])
         self._griev_war_on_suzerain = int(_er2["grievanceWarOnSuzerain"])
@@ -1175,8 +1180,7 @@ class SimInit:
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.city_wonder = torch.full((B, self.n_majors, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.terrain = torch.tensor([[t["terr"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.terrain =torch.tensor([[t["terr"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         if self._wond_n:
             self._wond_cy = torch.tensor([w["cy"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
@@ -1458,6 +1462,12 @@ class SimInit:
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
         self._off1 = tiles_within_offsets(1).to(device)
+        # `STORM_DISC`: the radius-2 disc in ONE canonical order shared with
+        # TS — centre, ring 1, ring 2, each ring in ascending tile index (dr,
+        # then dq); a storm's footprint is its first `hexes` slots
+        _d2 = [tuple(o) for o in tiles_within_offsets(2).tolist()]
+        _d2.sort(key=lambda o: (max(abs(o[0]), abs(o[1]), abs(o[0] + o[1])), o[1], o[0]))
+        self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
         ids = [u["id"] for u in (rules.units or [])]
         self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
@@ -1470,7 +1480,8 @@ class SimInit:
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.desert = torch.tensor([[t.get("de", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # the storm FAMILY that may start on each tile (`stormFamilyAt`), -1 none
+        self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         n_volc = max(max((len(f.get("volcanoes", [])) for f in fixtures), default=0), 1)
         self.volcano_tile = torch.full((B, n_volc), -1, dtype=torch.long, device=device)
@@ -2215,8 +2226,35 @@ class SimInit:
         self._flood_chance = float(_ds["floodChance"])
         self._eruption_chance = float(_ds["eruptionChance"])
         self._drought_chance = float(_ds["droughtChance"])
-        self._storm_chance = float(_ds["stormChance"])
         self._drought_length = int(_ds["droughtLength"])
+        # THE EIGHT STORMS (`STORM_EVENTS`), one column per row in table order
+        _st = _ds["storms"]
+        self._st_ids = [str(e["id"]) for e in _st]
+        self._st_family = [int(e["family"]) for e in _st]
+        self._st_chance = [float(e["chance"]) for e in _st]
+
+        def _stf(k: str) -> torch.Tensor:
+            return torch.tensor([float(e[k]) for e in _st], dtype=torch.float64, device=device)
+
+        def _sti(k: str) -> torch.Tensor:
+            return torch.tensor([int(e[k]) for e in _st], dtype=torch.long, device=device)
+        self._st_hexes, self._st_duration = _sti("hexes"), _sti("duration")
+        self._st_imp_pill, self._st_imp_dest, self._st_dist_pill = _stf("impPill"), _stf("impDest"), _stf("distPill")
+        self._st_pop, self._st_civ_kill = _stf("pop"), _stf("civKill")
+        self._st_land_p, self._st_naval_p = _stf("landP"), _stf("navalP")
+        self._st_land_lo, self._st_land_hi = _sti("landLo"), _sti("landHi")
+        self._st_naval_lo, self._st_naval_hi = _sti("navalLo"), _sti("navalHi")
+        self._st_low_pill, self._st_low_dist = _stf("lowlandPill"), _stf("lowlandDist")
+        self._st_fert_food, self._st_fert_prod = _stf("fertFood"), _stf("fertProd")
+        # each family's (severity 1, severity 2) event pair, `stormFamilyPair`
+        self._st_pairs: list[tuple[int, int]] = []
+        for fam in sorted(set(self._st_family)):
+            pair = [i for i, f in enumerate(self._st_family) if f == fam]
+            self._st_pairs.append((pair[0], pair[1]))
+        # [civ, leaderRow, eventIdx, effect (0 noDamage / 1 doubleOpposing), amount]
+        # — `STORM_UNIT_ROWS`, Divine Wind's hurricanes and Mother Russia's blizzards
+        self._storm_unit_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _ds["stormUnitRows"]]  # type: ignore[misc]
         self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
         self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
         self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
@@ -2356,7 +2394,8 @@ class SimInit:
             return idx, n
         self._flood_list = cand_list(self.floodplain)
         self._droughtc_list = cand_list(self.drought_cand)
-        self._land_list = cand_list(~self.water)
+        # one start-tile list per storm family (`stormFamilyAt`)
+        self._storm_lists = [cand_list(self.storm_fam == f) for f in range(max(self._st_family) + 1)]
         # Yields sum the picked tiles sequentially to mirror the TS reduce. When
         # every value is a dyadic rational (integers and halves — true for all
         # shipped rules), every partial sum is exact in f64, so ANY summation
@@ -3049,6 +3088,12 @@ class SimInit:
         # [civ, leaderRow, ban] — the ban's index is `WAR_BANS` order
         self._war_ban_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["warBans"]]  # type: ignore[misc]
+        # [civ, leaderRow, war kind, combat, moves, production %, override civic]
+        # — CIV6 (TRAIT_TERRITORIAL_WAR_*, TRAIT_LIBERATION_WAR_*): what a leader
+        # earns for `_war_buff_turns` after DECLARING a war of the kind, and the
+        # civic the kind's prerequisite is overridden to for that leader
+        self._war_buff_rows: list[tuple[int, int, int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["warBuffs"]]  # type: ignore[misc]
         self._tourism_favor_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["tourismFavor"]]  # type: ignore[misc]
         self._emergency_favor_rows: list[tuple[int, int, int]] = [
@@ -3230,6 +3275,7 @@ class SimInit:
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}
         self._driven_war: dict = {}
+        self._driven_war_kind: dict = {}
         # One stash per DIPLOMATIC verb, allocated once and drained in place —
         # a per-verb attribute would have to be rebound to exist.
         self._driven_geo: dict = {v: {} for v in GEO_VERBS}
@@ -3324,6 +3370,10 @@ class SimInit:
         # every river-flood EPISODE a tile has taken — the Great Bath's faith
         # counts them (`Tile.floodCount`)
         self.tile_flood_ct = torch.zeros(B, T, dtype=torch.long, device=dev)
+        # a STORM centred on the tile: its `STORM_EVENTS` row (-1 none) and the
+        # turns it has left (`Tile.stormEvent` / `Tile.stormTurns`)
+        self.storm_event = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.storm_left = torch.zeros(B, T, dtype=torch.long, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
 

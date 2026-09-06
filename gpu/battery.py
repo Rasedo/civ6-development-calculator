@@ -479,6 +479,7 @@ def main() -> int:
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
                 ("parks", [py, "tests/gpu/parks_test.py"], 4),  # national parks, shipwrecks, museum theming
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
+                ("war_kinds", [py, "tests/gpu/war_kinds_test.py"], 4),  # the war KINDS: civic gate + roster override, the default kind, the 10-turn declarer buff, the level-3 Religious pressure clause
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("governor_roster", [py, "tests/gpu/governor_roster_test.py"], 4),  # titles/appointment/promotion order, the establishment and neutralize clocks, the Dark Age card pool
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
@@ -529,6 +530,7 @@ def main() -> int:
                 ("governor_cityless", [py, "tests/gpu/governor_cityless_test.py"], 2),  # A-8r a cityless seat's governor phase does not run
                 ("stack_defender_tie", [py, "tests/gpu/stack_defender_tie_test.py"], 2),  # A-9r a ranged hit on a stacked hex goes to the hull on a tie
                 ("capture_cavalry", [py, "tests/gpu/capture_cavalry_test.py"], 2),  # C-58 a beaten cavalry unit may change hands
+                ("storms", [py, "tests/gpu/storms_test.py"], 2),  # C-49 the eight named storms and the roster rows on them
                 ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # C-16 the released spy is the one that was caught
                 ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # C-56 a trade route carries religious pressure both ways
                 ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # C-75 step 1: the slotted-card store, mask and validator

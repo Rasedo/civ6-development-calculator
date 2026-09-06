@@ -71,12 +71,12 @@ open docs/roster_ledger.json row.
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | **B. Fidelity vs real Civ 6** | **18** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 2 | the mission's mark on the relationship, demand and discuss, Religious 3's pressure clause (buildable now), the queue-front purchase, ALLIANCE_POINTS_FOR_DEAL |
+| C-2 diplomatic agreements | 2 | the mission's mark, demand and discuss and the Retribution casus belli wait on C-76; the queue-front purchase; ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
 | C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, and the model values a published number would replace |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's trade-route gold multiplier has no published magnitude (DLL-side) |
 | C-22 the district roster | 1 | the Preserve housing table is a stylization |
-| C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 38 of the ledger's 343 modifiers are open against a named blocker |
+| C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 32 of the ledger's 343 modifiers are open against a named blocker |
 | C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills; whether a wonder in the blast is pillaged |
 | C-33 the Giant Death Robot's remaining abilities | 1 | the five-hex Range is a verb the action space lacks (the Jump's cost is STYLIZED, ruled) |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; two sources disagree on the Aerodrome's slot count |
@@ -84,11 +84,10 @@ open docs/roster_ledger.json row.
 | C-38 a city-state's city develops HALFWAY | 1 | the yields of any of it, and power |
 | C-41 nothing places Volcanic Soil | 1 | WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
-| C-49 named random events | 1 | no event carries a NAME a modifier can key on; the storm's footprint, duration and walk are unmodelled |
+| C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
 | C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
 | C-60 no Free City step | 1 | a flipped city goes straight to the highest-pressure seat on both engines |
 | C-61 the capital never moves | 1 | `relocatePalace` moves `isCapital` only when the seat holds none; a civ-UNIQUE project has no field |
-| C-62 a war TYPE | 2 | two kinds where the install has more, no per-kind civic gate and no post-declaration clock |
 | C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
 | C-65 a Great Work of Art carries no object kind | 1 | four SCULPTURE rows have no field to read; decide with C-59 |
 | C-67 a diplomatic action has no preference weight | 1 | waits on the self-play decider, not on a carrier |
@@ -97,6 +96,8 @@ open docs/roster_ledger.json row.
 | C-71 a building's great-work slots are one table for every seat | 1 | `TRAIT_EXTRA_PALACE_SLOTS` cannot add one; widening is a layout change |
 | C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
 | C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
+| C-76 no opinion scale between majors | 1 | the mission's mark, DEMAND, DISCUSS and its promises, the Retribution casus belli, the AI's agendas — every clause that reads how a leader FEELS |
+| C-77 the worked-tile assignment lives only inside the yield walk | 1 | which citizen works which plot is derived on both engines and exposed nowhere, so a rule that names a WORKED tile (a nuke's citizens) has nothing to read |
 | **C. Absent systems** | **37** | |
 | **OPEN, TOTAL** | **56** | |
 
@@ -107,7 +108,7 @@ not add a "done" column back.
 Recounted 2026-09-05 against 068ecf39: the seven rowless entries, C-74 and
 the new A-11r each took a row; C-47, C-50, C-57 and C-63 lost theirs as
 closed; five rows that had no entry (B-61r, B-67, C-31, C-33, C-34) have
-one now.
+one now. 2026-09-06: C-62 closed and C-76 opened (weight 1).
 
 ## THE QUESTION LEDGER — genuine open asks, one line each
 
@@ -482,7 +483,11 @@ that with both allowlists empty.
   pays it there, so both engines refuse.
 - **B-63r. THE GRIEVANCE LEDGER'S UNPUBLISHED MAGNITUDES.** Weight 1.
   SHIPPED: the mechanic is whole — every published row pays, the spread, the
-  decay, the favor ladder, PUBLIC RELATIONS.
+  decay, the favor ladder, PUBLIC RELATIONS. Since 2026-09-06 a declaration,
+  a capture and a raze are priced by the declared war's OWN casus belli
+  columns for all eleven kinds (`WAR_KINDS[].pct`, the install's
+  WarmongerPercent / CaptureWarmongerPercent / RazeWarmongerPercent), read
+  off the pair's kind (`warKindWith` / `_war_kind_code`).
   OPEN — **THE GANG-UP BAR IS A HEURISTIC.** `GRIEVANCE_GANG` is a tuning
   knob wearing a sourced unit; no source publishes an AI threshold. Ask.
   Enkidu's allied-war discount (EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT
@@ -702,28 +707,33 @@ under their blocker so the dependency is readable, and both halves count.
   FIRST qualifying tech in catalog order; the level-3 percentage terms read
   the ally's most recently STORED per-turn output (`sciRate` / `culRate` /
   `tourRate`, compared state) so the two reads never compound.
+  RELIGIOUS 3'S SECOND CLAUSE SHIPS (2026-09-06): ALLIANCE_RELIGIOUS_PRESSURE
+  -> EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on
+  COLLECTION_OWNER — LOC_ALLIANCE_LV3_RELIGIOUS_EFFECT_2 "Bonus Religious
+  Pressure in cities with no followers of your ally's Religion". The holder's
+  religion presses `ALLIANCE_REL3_PRESSURE_PCT` harder into any city where the
+  ally's religion has NO accumulated pressure (`spreadReligiousPressure` /
+  `_spread_religious_pressure`: the turn's summed add for that religion is
+  scaled and floored once). READING: "no followers" is read as no pressure of
+  the ally's religion in that city — neither engine holds per-religion
+  follower counts, only the majority; an ally with no founded religion grants
+  nothing; two such allies stack their percents.
   BAR: `alliance_levels_test.py`, the dividends block of `agreements.test.ts`,
-  `geopolitics_test.py` poke m (every deal item kind).
+  `geopolitics_test.py` poke m (every deal item kind), the pressure clause in
+  `war-kinds.test.ts` / `war_kinds_test.py` poke d.
   REACH, over the driven 12x250 probe: a mission in 12/12 seeds from t4, and
   every visibility level entered — Limited 12/12 from t4, Open 12/12 from
   t105, Secret 9/12 from t115, Top Secret 2/12 from t187. The deal
   protocol's own reach is unmeasured; the round's smoke serve is what proves
   the two engines walk it together.
   OPEN:
-  - **RELIGIOUS 3'S SECOND CLAUSE** (bonus Religious Pressure to the ally's
-    religion) is SOURCED and UNBUILT: ALLIANCE_RELIGIOUS_PRESSURE ->
-    EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on the owner's
-    cities. The table gives the unit nowhere in text; the sibling pressure
-    effect (the Bishop's EFFECT_ADJUST_CITY_RELIGION_PRESSURE, Amount 100 =
-    "100% stronger") says pressure Amounts are PERCENTS. Since C-46 the
-    accumulator is on the install's scale, so the 20% has something to
-    multiply — BUILDABLE, still unbuilt.
   - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with no
     published text behind it. Ask.
   - **THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM** is refused on both engines
     (`goldPurchasableBuildings` holds the shared reading). Real Civ 6 likely
     allows it with the progress banked; no source in reach settles it. Ask.
-  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP.** The delegation ships —
+  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP** — waits on C-76, the
+    opinion scale. The delegation ships —
     "Delegations cost 10 Gold and Embassies cost 25 Gold, which is paid to
     the other leader", one directed mission per pair, indefinite, the Embassy's
     price once Diplomatic Service is in, war kicking both halves out — but the
@@ -733,7 +743,11 @@ under their blocker so the dependency is readable, and both halves count.
     Neutral will not accept" as the two states the engines can name (a war, or
     a denouncement either way), because there is no opinion scale; and the
     AI's own send is the driver's scan, not a published rule.
-  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS.** A demand is the table
+  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS** — both wait on C-76, and
+    so does the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row
+    `retribution`, RequiresBrokenPromise: "a player who has broken a promise
+    to you within the past 30 turns"), which ships in the table and reads a
+    promise nothing holds. A demand is the table
     run one-way under hostility — "select items from their side of the table
     to demand as tribute" — and Discuss asks a leader to "promise to stop
     doing" something: settling nearby, spreading religion, spying, attacking
@@ -914,8 +928,8 @@ under their blocker so the dependency is readable, and both halves count.
   the XML, 149 effect types over 344 modifiers — and docs/roster_ledger.json
   is the machine-checked ledger behind it, one row per modifier reading
   `shipped` or `open: <blocker>`; `tests/cpu/data/ledger-audit.test.ts` holds
-  every open row to a live AUDIT item. 305 of the ledger's 343 modifiers
-  ship; the other 38 are each open against a named blocker and the triage is
+  every open row to a live AUDIT item. 311 of the ledger's 343 modifiers
+  ship; the other 32 are each open against a named blocker and the triage is
   complete, with no modifier left untriaged. THIS ENTRY DOES NOT RE-LIST WHAT
   SHIPS — the ledger and ROSTER.md are the record, and a second hand-kept
   copy here rots.
@@ -947,9 +961,9 @@ under their blocker so the dependency is readable, and both halves count.
     C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
     Apostle arm, England's Royal Navy Dockyard, Georgia's Tsikhe, Spain's
     Mission — C-69. The Cree Trader's tile claim — C-72. Divine Wind's
-    hurricanes and Mother Russia's blizzards — C-49. Chandragupta's and
-    Robert the Bruce's war-kind terms — C-62. Enkidu's allied-war discount —
-    B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
+    hurricanes and Mother Russia's blizzards SHIPPED (C-49). Chandragupta's and
+    Robert the Bruce's war-kind terms SHIPPED (C-62). Enkidu's allied-war
+    discount — B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
     suzerain rows — B-21r. Poundmaker's shared visibility SHIPPED (C-70).
   - **UNREAD DLL LOGIC, recorded rather than guessed:** whether Trajan's
     grant also fires on a CONQUERED city (the modifier's collection is
@@ -973,7 +987,7 @@ under their blocker so the dependency is readable, and both halves count.
   - INTERCEPTION has no published roll (shared with C-34, which owns the
     fighter's side of it).
   - THE CITIZENS A BLAST KILLS wait on a worked-tile selection neither engine
-    exposes.
+    exposes — C-77.
   - WHETHER A WONDER IN THE BLAST IS PILLAGED is unsourced.
 - **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1.
   SHIPPED: every published clause. STYLIZED (owner ruling 2026-09-04): the
@@ -1083,78 +1097,82 @@ under their blocker so the dependency is readable, and both halves count.
   answering alike. Raising it costs one constant and one re-export; removing
   the ceiling would cost the GPU its dense storage. Ask.
 - **C-49. NAMED RANDOM EVENTS.** Weight 1.
-  SHIPPED: `disasterPhase` floods a river, storms a tile, droughts a region
-  and erupts a volcano; units take disaster damage by a single rule.
-  SOURCED 2026-09-03/04, the whole event table, and none of it is built:
-  - The install decides the storm's FAMILY by the terrain it starts on
-    (`RandomEvent_Terrains`): HURRICANE on TERRAIN_OCEAN, BLIZZARD on snow and
-    tundra (flat and hills), DUST_STORM on desert, TORNADO on grassland and
-    plains. Each family has two severities — CAT_4/CAT_5,
-    SIGNIFICANT/CRIPPLING, GRADIENT/HABOOB, FAMILY/OUTBREAK.
-  - `RandomEvent_Damages`, every column per severity as a percentage (a
-    column absent from a row is zero, not inherited):
-
-    | family | impPill | impDest | distPill | bldgPill | pop | civKill | unitLand | unitNaval |
-    |---|---|---|---|---|---|---|---|---|
-    | HURRICANE  | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 60/100 |
-    | BLIZZARD   | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 0/60 |
-    | DUST_STORM | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/60 |
-    | TORNADO    | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/100 |
-
-  - `MinHP`/`MaxHP` beside `Percentage` are the damage BAND: 30/50 at
-    FLOOD_MAJOR and 50/70 at FLOOD_1000_YEAR, which is this engine's flood
-    band exactly. The storms' bands:
-
-    | event | land | naval |
-    |---|---|---|
-    | HURRICANE_CAT_4        | (none)      | 40-60 @ 60%  |
-    | HURRICANE_CAT_5        | 40-60 @100% | 60-80 @100%  |
-    | BLIZZARD_SIGNIFICANT   | (none)      | (none)       |
-    | BLIZZARD_CRIPPLING     | 40-60 @100% | 40-60 @ 60%  |
-    | DUST_STORM_GRADIENT    | (none)      | (none)       |
-    | DUST_STORM_HABOOB      | 40-60 @100% | 40-60 @ 60%  |
-    | TORNADO_FAMILY         | (none)      | (none)       |
-    | TORNADO_OUTBREAK       | 40-60 @100% | 40-60 @100%  |
-
-    The band is 40-60 for every storm row but CAT_5's naval, which is 60-80.
-    The milder severity of each family damages no unit at all — the absence of
-    a row, not a zero band.
-  - `RandomEvents` carries seven more columns per row, all exact:
-
-    | event | sev | hexes | duration | movement | spacing | +/degree | fertilizes |
-    |---|---|---|---|---|---|---|---|
-    | TORNADO_FAMILY       | 1 |  1 | 3 | 8 | 15 |  0 | no  |
-    | TORNADO_OUTBREAK     | 2 |  3 | 3 | 8 | 15 | 50 | no  |
-    | DUST_STORM_GRADIENT  | 1 |  3 | 3 | 8 | 15 |  0 | yes |
-    | DUST_STORM_HABOOB    | 2 |  7 | 3 | 8 | 15 | 50 | yes |
-    | BLIZZARD_SIGNIFICANT | 1 |  7 | 3 | 8 | 15 |  0 | no  |
-    | BLIZZARD_CRIPPLING   | 2 | 19 | 3 | 8 | 15 | 50 | no  |
-    | HURRICANE_CAT_4      | 1 |  7 | 3 | 8 | 15 |  0 | yes |
-    | HURRICANE_CAT_5      | 2 | 19 | 3 | 8 | 15 | 50 | yes |
-
-    `Hexes` is the footprint (1 tile, 3, a radius-1 ring of 7, a radius-2 ring
-    of 19), `Duration` 3 means a storm PERSISTS three turns and `Movement` 8
-    that it walks while it lasts — this engine's storm is a one-turn stamp on
-    a radius-1 disc, which is neither. `ChanceIncreasePerDegree` 50 on every
-    severity-2 row is the climate scaling. The FERTILITY column is
-    half-modelled: `disasters.ts` says "sandstorms deposit silt", and the
-    install agrees for dust storms and hurricanes and disagrees for blizzards
-    and tornadoes, which fertilize nothing.
+  SHIPPED 2026-09-06, both engines (`STORM_EVENTS` / `_st_*`, `stormTile` /
+  `_storm_tile`, `Tile.stormEvent`+`stormTurns` / `storm_event`+`storm_left`
+  in `_MUTABLE` and the manifest): the one land-only storm is replaced by the
+  install's EIGHT, one row each from `RandomEvents`, `RandomEvent_Terrains`,
+  `RandomEvent_Frequencies` (MODERATE, per the C-74 ruling: OccurrencesPerGame
+  / 500 — 8, 2, 8, 2, 15, 3, 15, 3 per game), `RandomEvent_Damages` and
+  `RandomEvent_Yields`. One draw per event per turn in table order; the start
+  tile is uniform over the family's terrains (blizzard: snow/tundra, dust
+  storm: desert, tornado: grassland/plains, flat and hills each, no mountain;
+  hurricane: the OCEAN terrain alone — this engine's LAKE is the install's
+  COAST); the footprint is `Hexes` (1/3/7/19) slots of the canonical
+  radius-2 disc; the storm PERSISTS `Duration` 3 turns, applying its effects
+  on its spawn turn and each turn after. Per footprint tile per turn, TEN
+  draws always: IMPROVEMENT_PILLAGED (`CoastalLowlandPercentage` on a
+  `Tile.lowland` tile for the hurricane rows), IMPROVEMENT_DESTROYED,
+  DISTRICT_PILLAGED, POPULATION_LOSS (-1 in the owning city), UNIT_KILLED_
+  CIVILIAN, the land and naval shares, one HP band roll, food and production
+  fertility. The eight roster rows ship: NO_UNIT_DAMAGE (COLLECTION_OWNER,
+  `RandomEventType` + `NoDamage`) — the owner's units take no UNIT_* column
+  of that event; MODIFIED_DAMAGE_OPPOSING_PLAYER (`Amount 100`) — a unit AT
+  WAR with the carrier, on a tile the carrier OWNS, takes +100% HP damage.
+  Divine Wind is Hojo's LEADER trait (Expansion2_Leaders.xml) over the two
+  hurricane rows, Mother Russia the CIVILIZATION's over the two blizzards; no
+  requirement set on either — the "in X's territory" clause is the trait
+  text's, read as tile ownership. The old "desert deposits silt / strips past
+  Phase IV" arm: the desert-only fertility is DELETED (the yields table keys
+  no terrain); the past-Phase-IV strip is KEPT for every family (the climate
+  page's "all Storms"). Egypt's Iteru stays flood-only. As a drive-by the GPU
+  flood's IMPROVEMENT_DESTROYED arm now honours Reinforced Materials'
+  `envDamageImmune` the way TS always did.
+  READINGS (identical on both engines):
+  - CLIMATE: each family's two rows share the flood's ramp — `severitySplit`
+    moves the phase's melt fraction from the severity-1 row onto the
+    severity-2 row, then `disasterRateMult` scales every draw
+    (`stormChances`). `ChanceIncreasePerDegree` 0/50 is not read as a number;
+    the engine has one climate ramp and this is it.
+  - FOOTPRINT ORDER: centre, ring 1, ring 2, each ring in ascending tile
+    index (`STORM_DISC` / `_storm_offs`); the 3-hex shape is the first three
+    slots; an off-map slot is absent, not re-drawn.
+  - ONE STORM PER CENTRE: a roll that picks a centre already under a storm is
+    dropped (no second draw). No cap on live storms otherwise.
+  - UNIT SHARE: a domain's `Percentage` is ONE roll per tile — all of that
+    domain's units on the tile are hit or none; one HP roll per tile feeds
+    both domains' bands. An embarked land unit is its chassis' domain; an
+    air unit or a spy holds no tile and is neither. A city centre on the
+    footprint takes nothing (no storm row names CITY_GARRISON/CITY_WALLS).
+  - PREVENTION covers every UNIT_* DamageType of the event, the civilian
+    kill included (it is a row of the same `RandomEvent_Damages` table); the
+    DOUBLE multiplies HP amounts only — a kill chance has no amount.
+  - FERTILITY: the storm rows' FeatureType FEATURE_ICE is, per the file's own
+    comment, "the equivalent of no feature" — the rows are not feature-keyed,
+    so each is the flood's reading: the chance of +1 of its yield on every
+    land tile of the footprint; `ReplaceFeature` places nothing. The BLIZZARD
+    rows ship as the table has them (food 10/20%) although the row's
+    EffectString reads NO_FERTILITY — OWNER RULING 2026-09-06: "blizzards do
+    give boost to fertility", the table stands over the label; tornadoes have
+    no row and fertilize nothing.
+  - BUILDING_PILLAGED rides the district's darkness, as the flood does.
+  BAR 2026-09-06: tsc, pyright, ruff, oxlint, seat_symmetry, statecompare
+  census, inplace discipline, `tests/cpu/map/storms.test.ts`,
+  `tests/gpu/storms_test.py` (lane `storms`), full vitest, serve 9209 x 250
+  green. REACH (seed 9209 driven 250 turns through the ladder): 38 storms
+  formed — TORNADO_FAMILY 12, HURRICANE_CAT_4 14, DUST_STORM_GRADIENT 5,
+  BLIZZARD_SIGNIFICANT 4, HURRICANE_CAT_5 2, BLIZZARD_CRIPPLING 1 — and 9
+  storm-turns had a unit inside the footprint, so the unit columns and the
+  severity-2 rows are gate-reached; the roster rows fire only when a fixture
+  seats Japan or Russia, which the two test lanes pin.
   OPEN:
-  - **NO EVENT CARRIES A NAME.** Nothing on either engine keys a modifier on
-    an event's family or severity, so Divine Wind's hurricane waiver and its
-    double damage to Japan's enemies, and Mother Russia's blizzard pair, have
-    nothing to attach to. SOURCED (Divine Wind): "Units do not receive damage
-    from Hurricanes. Civilizations that are at war with Japan receive +100%
-    unit damage from Hurricanes in Japanese territory", over categories 4 and
-    5; Mother Russia's pair is the same shape over significant and crippling
-    Blizzards. The carrier is a per-event kind on the disaster roll plus a
-    damage multiplier keyed on the tile's owner. Eight modifiers are marked
-    open against this item in docs/roster_ledger.json.
-  - **THE STORM'S FOOTPRINT, DURATION AND WALK** are none of them modelled
-    (one-turn stamp, radius-1 disc, no movement).
-  - **THE ENGINE'S STORM PICKS FROM LAND ONLY**, so a HURRICANE cannot start
-    where the install puts it until the roll can reach open water.
+  - **THE WALK.** `Movement 8` on every storm row is the storm's movement
+    across the map while it lasts, and the rule joining that number to a
+    path is DLL logic nobody can read. A storm stays on its centre for its
+    three turns. The exact question: how does a storm choose its heading
+    and how many tiles does it move per turn?
+  - **PER-BUILDING PILLAGE.** BUILDING_PILLAGED (40/60/100%) pays per
+    building once a per-building pillage flag exists; today the district's
+    darkness stands in for it.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1.
   SOURCED (Kristina): "Buildings with at least three Great Work slots and
   wonders with at least two Great Work slots are automatically themed when
@@ -1203,18 +1221,44 @@ under their blocker so the dependency is readable, and both halves count.
   check both read.
   OPEN: the clause also needs a civ-UNIQUE project, and `ProjectDef` carries
   no civ or leader field.
-- **C-62. A WAR TYPE.** Weight 2.
-  SOURCED: the install's DIPLOACTION_DECLARE_TERRITORIAL_WAR and
-  DIPLOACTION_DECLARE_LIBERATION_WAR are war KINDS with their own civic
-  prerequisite, each granting the declarer a 10-turn buff (Chandragupta +2
-  Movement and +5 Combat Strength, Robert the Bruce +100% Production and +2
-  Movement).
-  ENGINES: exactly two kinds on `seat_warkind` — formal and surprise — decided
-  by a casus belli, with no prerequisite of their own and no clock after the
-  declaration.
-  OPEN: the carrier is a war-kind enum wide enough for the install's list, a
-  per-kind civic gate on `declareWar` / `_declare_war_major`, and a per-pair
-  countdown the buff reads. Six modifiers are marked open against this item.
+- **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 1.
+  ENGINES: a major's stance toward another is the sum of the STATES both
+  engines carry — a war and its kind, a denouncement, a friendship, an
+  alliance and its type, the grievance balance, the treaty clock — and
+  nothing in between: no number that says how a leader FEELS about another,
+  so no clause that reads "a small positive bonus in your relationship", "a
+  rival worse than Neutral", or an agenda's like or dislike has anything to
+  read. The install's DiplomaticStates table (Allied 100 ... Denounced 16,
+  War 0, `RelationshipLevel`) names the scale; what MOVES it is DLL-side.
+  OPEN — what waits on the scale, each in its own entry:
+  - the Delegation's and Embassy's "small positive bonus in your relationship"
+    (C-2), the acceptance rule the engines read as "at war or denounced";
+  - DEMAND (tribute under hostility) and DISCUSS, whose four promises
+    (PROMISE_DONT_SPY_ON_ME, ..._DONT_CONVERT_MY_CITIES,
+    ..._DONT_DIG_UP_MY_ARTIFACTS, ..._DONT_SETTLE_NEAR_ME —
+    Expansion2_DiplomaticActions.xml, FavorCost 30, GrievancesForRefusal 25,
+    GrievancesPerIncursion 25) need a per-subject breach test and an opinion
+    to bend (C-2);
+  - the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row `retribution`,
+    RequiresBrokenPromise), which ships in the table and can never be met
+    until a promise can be broken (C-2's Discuss half);
+  - the AI's AGENDAS (C-26) and the diplomatic-action preference weights
+    (C-67), both DLL-scored against the scale.
+  The carrier is a per-directed-pair opinion on both engines, compared,
+  with the install's `RelationshipLevel` anchors; what feeds it is an ASK —
+  no source publishes the per-event deltas.
+- **C-77. THE WORKED-TILE ASSIGNMENT LIVES ONLY INSIDE THE YIELD WALK.** Weight 1.
+  ENGINES: `assignWorkedTiles` and the GPU walk's `topk` derive which plot each
+  citizen works every time a city's yields are computed; nothing stores it,
+  nothing compares it, and no rule outside the walk can ask it. The seed 9014
+  hunts of 2026-09-06 (A-12r, A-13r) both surfaced as a yield split because the
+  pick itself is invisible to the gate.
+  OPEN: CIV6 (Nuclear weapons): "Citizens 'working' the affected tiles are
+  eliminated" — C-20's nuke bullet waits here. The carrier is ONE exposed
+  reader per engine (the walk's own pick, returned rather than consumed) and a
+  compared per-city worked-tile list, which would also have caught both A-12r
+  and A-13r a turn earlier and at the tile.
+
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   ENGINES: both hold religious PRESSURE per city and a followed religion per
   city, and neither ever asks which religion a SEAT is majority-held by.
@@ -1301,9 +1345,8 @@ under their blocker so the dependency is readable, and both halves count.
   four so both engines moved together: FLOOD_CHANCE 0.05 -> 0.009 (4.5 per
   game), FLOOD_SEVERITY_P [0.6, 0.3, 0.1] -> [0.44, 0.33, 0.22],
   DROUGHT_CHANCE 0.02 -> 0.056 (MAJOR 23 + EXTREME 5, summed because this
-  engine has one drought kind), STORM_CHANCE 0.04 -> 0.112 (every family and
-  severity summed, because this engine's storm has neither — C-49 takes each
-  family's own row from the same table when it lands).
+  engine has one drought kind), and the storm's summed rate, since replaced
+  by C-49's eight per-event rows off the same table.
   OPEN — **ERUPTION_CHANCE_PER_VOLCANO IS NOT COVERED BY THE RULING.** The
   install counts eruptions per GAME where this engine rolls per VOLCANO, and
   the conversion needs the map's volcano count. Ask.
@@ -1327,6 +1370,22 @@ index; the full narrative is in the git log, and the durable lessons are in
 the memory files this appendix names. Delete a bullet once its class is
 mirrored in memory.
 
+- **A-13r. Silt on a natural wonder paid production on the GPU. CLOSED
+  2026-09-06.** A storm's production fertility landed on the Eye of the Sahara
+  (both engines write it: the wonder is land and no mountain) and `_neutral_prod`
+  added it where TS's wonder arm early-returns above the fertility lines; the
+  food read already carried the guard. Found the turn the storms merged (seed
+  9014 t148). Lesson: a new WRITER of an old plane reaches tiles the old writers
+  never did, so every reader of that plane is re-tested by the new reach — grep
+  the plane's readers, not the writer's. Lane: `storms` step 7 and its TS twin.
+- **A-12r. The Amazon counted a CHOPPED rainforest. CLOSED 2026-09-06.** The
+  GPU's feature-appeal term read `feat_id == fi` bare, and `feat_id` keeps a
+  chopped tile's old id; the strip flag is the live `n.feature` read TS does.
+  Latent from C-50 until a Preserve stood on a stripped rainforest beside a
+  Brazilian tile and its Grove band paid the wrong tile (seed 9014 t198, the
+  worked-tile pick). Lesson: every bare `feat_id ==` read needs the strip flag
+  or `_feature_live`; the census of the others was clean. Lane: `feature_appeal`
+  step 6.
 - **A-10r. A gold-bought strategic unit paid its resource on the GPU and not
   on TS. CLOSED 2026-09-05.** TS's seat-phase `buy` kind-2 arm spawned the
   unit and never called `chargeUnitResource`, though `purchaseUnit` beside it
@@ -1425,6 +1484,56 @@ mirrored in memory.
   reachability flip (C-75) exposed the GPU paying a legacy card's TABLE ROW,
   this item's own error, beside its accrual: the ordinary channels read the
   cards minus the legacy ones now, as `legacyEffects` always did on TS.
+- **C-62. A war TYPE. CLOSED 2026-09-06 — eleven kinds, the civic gate and
+  its roster override, the declarer's ten-turn clock, six roster rows.**
+  SOURCED: every `DIPLOACTION_DECLARE_*_WAR` row of the install (Base
+  DiplomaticActions.xml, Expansion1's Defensive-Tactics updates for
+  Reconquest and Protectorate, Expansion1's Golden Age / Retribution /
+  Ideological rows) is ONE table both engines address by position
+  (`WAR_KINDS`, data/warKinds.ts, on the wire as `seats.warKinds`): the
+  civic, `DenouncementTurnsRequired`, the requirement column and the three
+  warmonger percents. ONE predicate (`warKindAllowed` / `_war_kinds_allowed`)
+  serves the record's validator (`declareWar` / `_declare_war_major`, the one
+  body every declaration runs — the nuclear strike's included), the default
+  (`defaultWarKind`) and the driver's pick (`_war_kind_pick`); the record
+  carries `warKind` (schema v3, optional) and a kind the seat may not declare
+  REFUSES the war. The kind is stored SIGNED (`Seat.warKinds` /
+  `seat_warkind` int8: +(code+1) on the declarer's cell), so "who declared"
+  rides the same compared field (`warKinds`); the pair's war clock is the
+  declaration clock. The six rows ship (`WAR_BUFF_ROWS`): Arthashastra's +5
+  Combat Strength (`rosterCS` / `_roster_cs`) and +2 Movement
+  (`unitFullMoves` / `_full_mp`), Bannockburn's +100% Production (the
+  additive percent stack in `seatPhase` / `_seat_city_produce`) and +2
+  Movement, each for `WAR_BUFF_TURNS` 10 while a war the seat DECLARED of the
+  row's kind is that young, and the two PREREQ_OVERRIDEs (Military Training,
+  Defensive Tactics) inside the civic gate.
+  READINGS, identical on both engines: the denouncement may stand in EITHER
+  direction (the LOC text: "Denounced you or that you have Denounced"); a
+  `DenouncementTurnsRequired` of 0 (Golden Age, Protectorate) still wants a
+  standing denouncement — "Can be used right after Denouncing" — where the
+  Surprise row has no such column at all, which retires the old reading that
+  the To Arms! dedicant needed none; Territorial's "2 of your cities within
+  10 tiles of 2 opponents' cities" is two declarer cities each within reach
+  of some target city AND two target cities each within reach of some
+  declarer city; Colonial's "two technology eras" is the per-civ era of techs
+  and civics; Ideological's "different Tier 3 government" is two LATE
+  governments (tier >= 3) that differ; Liberation's "captured a city from one
+  of your friends or allies" reads the city's FOUNDER; the default kind is
+  the cheapest casus belli held by the declaration percent (ties to table
+  order), and the `warlord` style prefers the leader's own buffed kind; the
+  buff's age is the compared pair clock, so a war the LOWER seat declares
+  reads 1 at its own tail and the higher seat's 0 until the next turn.
+  BAR: `war-kinds.test.ts`, `war_kinds_test.py` (the civic gate refuses a
+  kind before its civic, the override lets the leader declare early, the
+  buff pays on turn 1 and not on turn 11, the alliance pressure clause), the
+  golden-war blocks of `grievances.test.ts` and `war_test.py` rewritten to
+  the install's row, `geopolitics_test.py` on the signed plane.
+  REACH: seed 9209 x 250 driven (Chandragupta seated at row 1): 1 Surprise
+  (t77) and 3 Formal (t92) declarations, no other kind and no buff turn —
+  the conditioned kinds and the six rows are held by the new lanes alone.
+  THE LESSON: a boolean pair plane that meant "formal" was two facts short
+  (WHICH kind, WHO declared); widening it to a signed code kept one compared
+  field and let every reader stay a one-line predicate.
 - **C-75. No legacy card is ever slotted. CLOSED 2026-09-05 — the slotting is
   the driver's decision, and its legacy-first style slots them.** The greedy
   fill walked the catalog in order with the legacy and Dark Age cards appended

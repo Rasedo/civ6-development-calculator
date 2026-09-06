@@ -12,12 +12,12 @@
  * against one seat), so no caller ever touches the key.
  */
 import type { GameState } from './types';
-import { warIsFormal, warIsGolden, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
+import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
+import { WAR_KINDS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
 import { getModifiers } from './effects';
-import { WAR_GRIEVANCE_PCT,
-  GRIEVANCE_ALLY_SHARE,
+import { GRIEVANCE_ALLY_SHARE,
   GRIEVANCE_CITY_TAKEN,
   GRIEVANCE_WAR_BASE,
   GRIEVANCE_CS_CONQUERED,
@@ -126,14 +126,15 @@ export function decayGrievances(state: GameState, seat: number): void {
 }
 
 /**
- * A DECLARATION. CIV6 pays the target "Surprise War declared: 150" or
- * "Formal War declared: 100", and every friend or ally of the target
- * "War declared on a Friend or Ally: 75".
+ * A DECLARATION. CIV6 (DiplomaticActions.xml, WarmongerPercent) prices the
+ * target the kind's own declaration column of the war base — "Surprise War
+ * declared: 150", "Formal War declared: 100" — and every friend or ally of
+ * the target "War declared on a Friend or Ally: 75".
  */
-export function grievanceWarDeclared(state: GameState, declarer: number, target: number, formal: boolean, golden = false): void {
-  const kind = golden ? 'golden' : formal ? 'formal' : 'surprise';
+export function grievanceWarDeclared(state: GameState, declarer: number, target: number, kind: number): void {
+  const pct = (WAR_KINDS[kind] ?? WAR_KINDS[WAR_KIND_SURPRISE]).pct;
   spreadGrievance(state, target, declarer,
-    Math.round((GRIEVANCE_WAR_BASE * WAR_GRIEVANCE_PCT[kind][0]) / 100));
+    Math.round((GRIEVANCE_WAR_BASE * pct[0]) / 100));
   for (const s of state.seats) {
     if (s.seat === declarer || s.seat === target) continue;
     if (seatsAllied(state, s.seat, target) || friendTurnsWith(state, s.seat, target) > 0) {
@@ -162,12 +163,14 @@ export function grievanceCityStateWar(
   }
 }
 
-/** A capture or a raze, priced by the pair's OWN casus belli columns. */
+/** A capture or a raze, priced by the pair's OWN casus belli columns
+ *  (CaptureWarmongerPercent / RazeWarmongerPercent); a war with no kind
+ *  prices as a Surprise war. */
 export function grievanceCityTaken(state: GameState, taker: number, loser: number, razed: boolean): void {
-  const kind = warIsGolden(state, taker, loser) ? 'golden'
-    : warIsFormal(state, taker, loser) ? 'formal' : 'surprise';
+  const k = warKindWith(state, taker, loser);
+  const pct = (k >= 0 ? WAR_KINDS[k] : WAR_KINDS[WAR_KIND_SURPRISE]).pct;
   spreadGrievance(state, loser, taker,
-    Math.round((GRIEVANCE_CITY_TAKEN * WAR_GRIEVANCE_PCT[kind][razed ? 2 : 1]) / 100));
+    Math.round((GRIEVANCE_CITY_TAKEN * pct[razed ? 2 : 1]) / 100));
 }
 
 /**

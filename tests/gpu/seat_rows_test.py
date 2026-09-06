@@ -128,6 +128,7 @@ def test_thermopylae(rules, path) -> None:
         sim.civ_civics[B0, 0, civics.index(name)] = True
     sim._eff_version += 1
     sim._gov_pol_cache.clear()
+    sim._slot_greedily(0)  # the store is the driver's; a hand-set scene fills it with the greedy reference
     n = int(sim._military_policies(T(0))[B0])
     assert n > 0, "no Military policy slotted — the scene measures nothing"
     assert cs() == n, f"the per-policy magnitude read {cs()} against {n} slotted"

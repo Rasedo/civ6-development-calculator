@@ -174,7 +174,7 @@ def test_reinforced_materials(rules, path) -> None:
     assert bool(sim._env_immune()[B0, imp]) and bool(sim._env_immune()[B0, dist])
     assert not bool(sim._env_immune()[B0, other]), "unowned ground is not covered"
     sim._scorch(rows, tiles)
-    sim._flood_district(rows, tiles)
+    sim._pillage_district(rows, tiles)
     assert not bool(sim.pillaged[B0, imp]), "the governed improvement was scorched"
     assert not bool(sim.district_pillaged[B0, dist]), "the governed district was pillaged"
     assert bool(sim.pillaged[B0, other]), "the UNGOVERNED tile must still burn"

@@ -160,7 +160,8 @@ class SimEconomy:
         rr = (row >= 0) & (row < self.n_majors) & (foe_row >= 0) & (foe_row < self.n_majors)
         n = self.seat_warkind.shape[1]
         flat = row.clamp(0, n - 1) * n + foe_row.clamp(0, n - 1)
-        kind = self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        # every kind but the Surprise war (code 0) reads the FORMAL column
+        kind = (self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1).abs() >= 2) & rr
         return torch.where(kind, formal[era], surprise[era])
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
@@ -559,7 +560,11 @@ class SimEconomy:
         when it builds the yield context from `getModifiers(state,
         city.seat)`. Cached per _eff_version (improvement/pillage changes
         bump it)."""
-        base = self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype)
+        # a natural-wonder tile keeps the wonder's fixed production, as its
+        # food does in `_food_tail`: tileYields early-returns above the
+        # fertility lines, so silt that lands there never pays
+        base = torch.where(self.nwonder, self.tile_yields[:, :, 1],
+                           self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype))
         if not self.improvements_on:
             return base
         if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:
@@ -600,11 +605,11 @@ class SimEconomy:
               & ~self._env_immune()[rows, tiles])
         self.pillaged[rows[ok], tiles[ok]] = True
 
-    def _flood_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        """CIV6 (Gathering Storm): a flood damages the DISTRICT on the
-        floodplain, not just the improvement — the buildings inside go dark with
-        it, which is what a Dam is built to prevent. The `district` plane never
-        encodes a city CENTRE, so centres are outside this by construction."""
+    def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile,
+        not just the improvement — the buildings inside go dark with it, which
+        is what a Dam is built to prevent. The `district` plane never encodes a
+        city CENTRE, so centres are outside this by construction."""
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self.district_pillaged[rows[ok], tiles[ok]] = True
@@ -961,22 +966,199 @@ class SimEconomy:
             dry = on & strip[rowm]
             self._defertilize(rowm[dry], af[dry])
 
-        r = self._next_random(every)
-        hit, tile = self._pick_static(r < self._storm_chance * rate, self._land_list)
-        if bool(hit.any()):
-            rows = hit.nonzero(as_tuple=True)[0]
-            area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)
-            M = area.shape[1]
-            rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
-            af = area.reshape(-1)
-            valid = af >= 0
-            self._scorch(rowm[valid], af[valid])
-            # sandstorms deposit silt — until the world warms past Phase IV,
-            # from where the same storms take fertility off instead.
-            wet = valid & self.desert[rowm, af.clamp(min=0)] & ~strip[rowm] & self._fertility_live()[rowm]
-            self._fertilize(rowm[wet], af[wet])
-            dry = valid & strip[rowm]
-            self._defertilize(rowm[dry], af[dry])
+        # THE EIGHT STORMS: one draw per event per turn, in table order. Each
+        # family's two severities share the flood's climate ramp — the melt
+        # fraction moved from the milder row onto the worse, then `rate` on
+        # every draw (`stormChances`).
+        chance = torch.zeros(B, len(self._st_chance), dtype=torch.float64, device=dev)
+        for a, b in self._st_pairs:
+            sp = self._severity_split([self._st_chance[a], self._st_chance[b]])
+            chance[:, a] = sp[:, 0] * rate
+            chance[:, b] = sp[:, 1] * rate
+        for e in range(len(self._st_chance)):
+            r = self._next_random(every)
+            hit, tile = self._pick_static(r < chance[:, e], self._storm_lists[self._st_family[e]])
+            # a centre already under a storm takes no second one
+            busy = self.storm_left.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) > 0
+            free = hit & ~busy
+            if bool(free.any()):
+                rows = free.nonzero(as_tuple=True)[0]
+                self.storm_event[rows, tile[rows]] = e
+                self.storm_left[rows, tile[rows]] = int(self._st_duration[e])
+        # CIV6 (`RandomEvents`, Duration 3): a storm PERSISTS, applying its
+        # footprint's effects on the turn it forms and on each turn it lasts.
+        # Live storms walk in ascending centre index, the TS walk's order;
+        # `Movement 8` (the storm's walk across the map) is DLL logic nobody
+        # can read, and a storm stays put.
+        live = self.storm_left > 0
+        order = live.long().cumsum(dim=1) * live.long()
+        for k in range(1, int(order.max()) + 1):
+            at = order == k
+            hit_k = at.any(dim=1)
+            if not bool(hit_k.any()):
+                break
+            self._storm_turn(hit_k, at.long().argmax(dim=1), strip)
+        self.storm_left.copy_((self.storm_left - 1).clamp(min=0))
+        self.storm_event.copy_(torch.where(self.storm_left > 0, self.storm_event,
+                                           torch.full_like(self.storm_event, -1)))
+        self._eff_version += 1
+
+    def _storm_turn(self, hit: torch.Tensor, centre: torch.Tensor, strip: torch.Tensor) -> None:
+        """`stormTurn` — one turn of one storm: the first `hexes` slots of the
+        canonical radius-2 disc (`STORM_DISC`, `_storm_offs`) around its
+        centre, an off-map slot simply absent."""
+        ev = self.storm_event.gather(1, centre.unsqueeze(1)).squeeze(1).clamp(min=0)
+        hexes = self._st_hexes[ev]
+        area = tiles_from_offsets(centre, self._storm_offs, self.W, self.H)  # [B, 19]
+        for j in range(area.shape[1]):
+            on = hit & (hexes > j) & (area[:, j] >= 0)
+            if not bool(on.any()):
+                continue
+            self._storm_tile(on, area[:, j].clamp(min=0), ev, strip)
+
+    def _storm_spares(self, seat: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
+        """[B] — `stormSpares`: CIV6 (NO_UNIT_DAMAGE, COLLECTION_OWNER) the
+        unit's owner plays a row naming this event."""
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for civ, lead, e, eff, _amt in self._storm_unit_rows:
+            if eff == 0:
+                out = out | ((ev == e) & self._seat_is(seat, civ, lead))
+        return out
+
+    def _storm_extra_pct(self, seat: torch.Tensor, owner: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
+        """[B] long — `stormExtraPct`: CIV6 (MODIFIED_DAMAGE_OPPOSING_PLAYER,
+        Amount) the +percent a unit takes on ground owned by a carrier it is
+        at war with (`civsAtWar`: the war matrix, never a barbarian)."""
+        B = self.B
+        pct = torch.zeros(B, dtype=torch.long, device=self.device)
+        ok = ((owner >= 0) & (owner != seat) & (seat >= 0)
+              & (seat != BARB_SEAT) & (owner != BARB_SEAT))
+        ra = self._seat_row[seat.clamp(min=0)]
+        rb = self._seat_row[owner.clamp(min=0)]
+        at_war = self.war[torch.arange(B, device=self.device), ra, rb]
+        for civ, lead, e, eff, amt in self._storm_unit_rows:
+            if eff == 1:
+                take = ok & at_war & (ev == e) & self._seat_is(owner, civ, lead)
+                pct = pct + take.long() * amt
+        return pct
+
+    def _storm_tile(self, hit: torch.Tensor, tile: torch.Tensor, ev: torch.Tensor,
+                    strip: torch.Tensor) -> None:
+        """`stormTile` — one storm turn on one footprint tile, at the event
+        `ev` names per game.
+
+        TEN draws per tile, always, whatever stands there — one per damage
+        column plus the HP band and the two yields. Order: improvement
+        pillaged, improvement destroyed, district pillaged, population,
+        civilian killed, land share, naval share, HP band, food, production.
+
+        READINGS shared with the TS twin: a domain's `Percentage` is one roll
+        per tile for ALL that domain's units on it; an embarked unit is its
+        chassis' domain; an air unit or a spy holds no tile and is neither
+        domain; a city centre on the footprint takes nothing (no storm row
+        names CITY_GARRISON or CITY_WALLS); BUILDING_PILLAGED rides the
+        district's darkness."""
+        B, dev = self.B, self.device
+        r_pill = self._next_random(hit)
+        r_destroy = self._next_random(hit)
+        r_district = self._next_random(hit)
+        r_pop = self._next_random(hit)
+        r_civilian = self._next_random(hit)
+        r_land = self._next_random(hit)
+        r_naval = self._next_random(hit)
+        r_hp = self._next_random(hit)
+        r_food = self._next_random(hit)
+        r_prod = self._next_random(hit)
+        if not bool(hit.any()):
+            return
+        tc = tile
+        tcu = tc.unsqueeze(1)
+        owner = self.tile_seat.gather(1, tcu).squeeze(1)
+        lowland = self.tile_lowland.gather(1, tcu).squeeze(1) > 0
+        pill_p = torch.where(lowland & (self._st_low_pill[ev] > 0), self._st_low_pill[ev], self._st_imp_pill[ev])
+        dist_p = torch.where(lowland & (self._st_low_dist[ev] > 0), self._st_low_dist[ev], self._st_dist_pill[ev])
+        rows = (hit & (r_pill < pill_p)).nonzero(as_tuple=True)[0]
+        if rows.numel():
+            self._scorch(rows, tc[rows])
+        gone = (hit & (r_destroy < self._st_imp_dest[ev])).nonzero(as_tuple=True)[0]
+        if gone.numel():
+            gone = gone[(self.improvement[gone, tc[gone]] >= 0) & ~self._env_immune()[gone, tc[gone]]]
+            self.improvement[gone, tc[gone]] = -1
+            self.pillaged[gone, tc[gone]] = False
+        dist = (hit & (r_district < dist_p)).nonzero(as_tuple=True)[0]
+        if dist.numel():
+            self._pillage_district(dist, tc[dist])
+        # a CITIZEN of the tile's owning city, on its own roll — only a major
+        # keeps a city list
+        pr = (hit & (r_pop < self._st_pop[ev])).nonzero(as_tuple=True)[0]
+        if pr.numel():
+            for _r in range(self.n_majors):
+                sel = pr[owner[pr] == _r]
+                if sel.numel() == 0:
+                    continue
+                # gather over the WHOLE batch, then take `sel`
+                sl = self.city_slot_at(_r).gather(1, tcu).squeeze(1)[sel]
+                ok = sl >= 0
+                sel, sl = sel[ok], sl[ok].clamp(min=0)
+                if sel.numel() == 0:
+                    continue
+                pop = self.city_pop[sel, _r, sl]
+                self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
+        # UNITS: one share roll per domain, one HP band per tile
+        land_hit = hit & (r_land < self._st_land_p[ev])
+        naval_hit = hit & (r_naval < self._st_naval_p[ev])
+        civ_hit = hit & (r_civilian < self._st_civ_kill[ev])
+        lo, hi = self._st_land_lo[ev], self._st_land_hi[ev]
+        land_dmg = lo + torch.floor(r_hp * (hi - lo + 1).double()).to(torch.long)
+        lo, hi = self._st_naval_lo[ev], self._st_naval_hi[ev]
+        naval_dmg = lo + torch.floor(r_hp * (hi - lo + 1).double()).to(torch.long)
+        bidx = torch.arange(B, device=dev)
+        for pool in ("major", "barb"):
+            alive = getattr(self, f"{pool}_unit_alive")
+            hp = getattr(self, f"{pool}_unit_hp")
+            u_type = getattr(self, f"{pool}_unit_type")
+            u_seat = getattr(self, f"{pool}_unit_seat")
+            lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
+            for plane in (self.military_at, self.civilian_at, self.embarked_at):
+                slot = plane.gather(1, tcu).squeeze(1)
+                on = hit & (slot >= lo_p) & (slot < hi_p)
+                if not bool(on.any()):
+                    continue
+                us = (slot - lo_p).clamp(min=0, max=alive.shape[1] - 1)
+                utype = u_type[bidx, us].clamp(min=0, max=self.NU - 1)
+                useat = torch.where(on, u_seat[bidx, us], torch.full_like(slot, -1))
+                spared = self._storm_spares(useat, ev)
+                civilian = self._type_civilian[utype]
+                naval = self.unit_naval[utype]
+                kill = on & civilian & civ_hit & ~spared
+                base = torch.where(naval, naval_dmg, land_dmg)
+                pct = self._storm_extra_pct(useat, owner, ev)
+                dmg = base + torch.div(base * pct, 100, rounding_mode="floor")
+                hurt = on & ~civilian & torch.where(naval, naval_hit, land_hit) & ~spared
+                hr = hurt.nonzero(as_tuple=True)[0]
+                if hr.numel():
+                    hp[hr, us[hr]] = hp[hr, us[hr]] - dmg[hr]
+                dead = torch.zeros_like(on)
+                dead[hr] = hp[hr, us[hr]] <= 0
+                gone_u = (kill | dead).nonzero(as_tuple=True)[0]
+                if gone_u.numel():
+                    alive[gone_u, us[gone_u]] = False
+                    self._vacate(pool, gone_u, us[gone_u])
+        # FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
+        # CIV6 "all Storms and Droughts now start removing fertility from
+        # tiles instead of adding it".
+        dry = (hit & strip).nonzero(as_tuple=True)[0]
+        if dry.numel():
+            self._defertilize(dry, tc[dry])
+        live = hit & ~strip & self._fertility_live()
+        fr = (live & (r_food < self._st_fert_food[ev])).nonzero(as_tuple=True)[0]
+        if fr.numel():
+            self._fertilize(fr, tc[fr])
+        pr2 = (live & (r_prod < self._st_fert_prod[ev])).nonzero(as_tuple=True)[0]
+        if pr2.numel():
+            ok = self.fertilizable[pr2, tc[pr2]]
+            r2, t2 = pr2[ok], tc[pr2][ok]
+            self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
 
     def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
         """`floodRiver` — CIV6 (Flood): "The level of the water rises, flooding
@@ -1071,13 +1253,14 @@ class SimEconomy:
         if rows.numel():
             self._scorch(rows, tc[rows])
             gone = rows[(r_destroy[rows] < self._flood_destroy_p[sev[rows]])
-                        & (self.improvement[rows, tc[rows]] >= 0)]
+                        & (self.improvement[rows, tc[rows]] >= 0)
+                        & ~self._env_immune()[rows, tc[rows]]]
             if gone.numel():
                 self.improvement[gone, tc[gone]] = -1
                 self.pillaged[gone, tc[gone]] = False
             dist = rows[r_district[rows] < self._flood_district_p[sev[rows]]]
             if dist.numel():
-                self._flood_district(dist, tc[dist])
+                self._pillage_district(dist, tc[dist])
         lo, hi = self._flood_dmg_lo[sev], self._flood_dmg_hi[sev]
         dmg = lo + torch.floor(r_damage * (hi - lo + 1).double()).to(torch.long)
         dmg = torch.where(raw, dmg, torch.zeros_like(dmg))
@@ -2930,6 +3113,24 @@ class SimEconomy:
                & (self.seat_ally_turns[:, :NSC, :O] > 0))
         if bool(_rp.any()):
             add = torch.where(_rp.unsqueeze(2), torch.zeros_like(add), add)
+        # CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
+        # Religious Pressure in cities with no followers of your ally's
+        # Religion" — per founder g, each level-3 Religious ally whose own
+        # religion exists and has NO pressure in the receiving city raises g's
+        # whole per-turn add there by the percent; the SUM is scaled and
+        # floored once, as `spreadReligiousPressure` floors `addG`.
+        if self._al_rel3_pressure_pct:
+            for g in range(O):
+                allies = self._allied_type(g, 4, 3) & founded                   # [B, O]
+                if not bool(allies.any()):
+                    continue
+                pct = torch.zeros(B, NSC, RC, dtype=torch.long, device=self.device)
+                for a in range(O):
+                    if a == g or not bool(allies[:, a].any()):
+                        continue
+                    nofol = self.city_pressure[:, :NSC, :, a] == 0
+                    pct = pct + (allies[:, a].view(B, 1, 1) & nofol).long() * self._al_rel3_pressure_pct
+                add[..., g] = (add[..., g] * (100 + pct)).div(100, rounding_mode="floor")
         self.city_pressure[:, :NSC].copy_(
             torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
         )
@@ -3474,6 +3675,12 @@ class SimEconomy:
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre) \
             + self._start_tile_mp(pre, typ)
+        # CIV6 (TRAIT_*_WAR_MOVEMENT, Amount 2): the flat Movement a leader's
+        # units carry for the turns after a declaration of the row's own war
+        # kind — a unit's own stat, overridden by the embark pool below exactly
+        # as the golden dedication's is (`WAR_BUFF_ROWS`)
+        if self._war_buff_rows:
+            base = base + self._seat_war_buff(getattr(self, f"{pre}_unit_seat"), 2)
         # CIV6 (The Raven King): a LEVIED unit carries
         # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so a
         # levied unit is born with it — A-2r's lesson (C-66).

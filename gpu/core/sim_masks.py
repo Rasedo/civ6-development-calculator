@@ -1092,10 +1092,16 @@ class SimMasks:
             for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
                 if _lcs > 0:
                     lv = lv + (levied & self._seat_is(seat, _lc, _ll)).long() * _lcs
-        if not self._combat_cs_rows and not self._formation_rows:
-            return lv
         t = utype.clamp(min=0, max=self.NU - 1)
         combat = (utype >= 0) & (self._type_combat[t] > 0)
+        # CIV6 (TRAIT_TERRITORIAL_WAR_COMBAT, ReligiousOnly false): the flat
+        # strength a leader's combat units carry for the turns after a
+        # declaration of the row's own war kind — clause-free like the levy
+        # mark (`WAR_BUFF_ROWS`); `rosterCS` returns 0 for a non-combat unit
+        if self._war_buff_rows:
+            lv = lv + self._seat_war_buff(seat, 1) * combat.long()
+        if not self._combat_cs_rows and not self._formation_rows:
+            return lv
         bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class[t].clamp(min=0)]
         tc = tile.clamp(min=0).reshape(self.B, -1)
         naval = self.unit_naval[t]

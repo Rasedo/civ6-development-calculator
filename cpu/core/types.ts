@@ -191,6 +191,11 @@ export interface SeatActionRecord {
    * capture. A missing center = that engine has no such city. */
   production: [number, number, number?][];
   war?: number | null;
+  /** the KIND the war column declares under — a `WAR_KINDS` code, a driver
+   *  decision validated by `warKindAllowed` on both engines; absent on a
+   *  declare column = `defaultWarKind` (the cheapest casus belli the seat
+   *  holds), meaningless on a sue or a minor's column */
+  warKind?: number | null;
   envoys?: number[];
   tech: number | null;
   civic: number | null;
@@ -666,10 +671,16 @@ export interface Seat {
    * what has to agree is the SET, not any packing of it.
    */
   wars: number[];
-  formalWars: number[];
-  /** CIV6 (Golden Age War): wars this seat declared under the To Arms
-   *  casus belli — 25% grievances on the declaration and on captures. */
-  goldenWars?: number[];
+  /**
+   * THE KIND of each war, keyed by absolute foe seat: `+(code + 1)` where
+   * this seat DECLARED it, `-(code + 1)` where the foe did, `code` indexing
+   * `WAR_KINDS` (data/warKinds.ts). Written only through `setWarKind` at the
+   * declaration, cleared at the peace; a foe with no entry is a war with no
+   * kind (a minor's, or one that predates the store). The GPU's twin is the
+   * signed `seat_warkind[b, i, j]` plane; the gate compares the `warKinds`
+   * digest field — each seat's [foe, value] pairs in foe order.
+   */
+  warKinds: Record<number, number>;
   /** Directed denouncement stamps keyed by absolute seat: `denounced[b] = t`
    *  means this seat denounced b at turn t. The stamp IS the clock: the
    *  denouncement is live while `turn - t` is under AGREEMENT_TURNS, and the

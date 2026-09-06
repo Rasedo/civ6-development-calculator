@@ -8,19 +8,18 @@ import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disa
 // Every loop below is a WAIT for a roll to land, so the budgets grew with the
 // rarity; no assertion changed.
 //
-// And STORMS are now 0.112/turn (56 per game, every family summed) where they
-// were 0.04: a scene that read "this tile got pillaged" as "a flood or an
-// eruption reached it" now sees a storm first. `stormFree` runs one phase and
-// says whether a storm fired, so a scene about floods can put a storm's
+// And STORMS run eight draws a turn (56 per game across the families) and
+// PERSIST three turns each: a scene that read "this tile got pillaged" as "a
+// flood or an eruption reached it" now sees a tornado first. `stormFree` runs
+// one phase and says whether any storm was live during it — one already
+// raging or one that formed — so a scene about floods can put a storm's
 // scorch back and wait on.
 function stormFree(state: GameState, watched: Tile[]): boolean {
   const before = watched.map((t) => [t.pillaged, t.improvement, t.districtPillaged] as const);
-  // the log keeps its last 20 lines and SHIFTS, so a length delta goes blind
-  // after twenty events: empty it first, and whatever is there afterwards
-  // happened in this phase
-  state.eventLog.length = 0;
+  const live = () => state.map.tiles.some((t) => (t.stormTurns ?? 0) > 0);
+  const raging = live();
   disasterPhase(state);
-  const stormed = state.eventLog.some((e) => e.startsWith('Storm'));
+  const stormed = raging || live();
   if (stormed) {
     watched.forEach((t, i) => {
       t.pillaged = before[i][0];
@@ -258,7 +257,8 @@ describe('disasters', () => {
     const { state, plain, up } = shieldBoard();
     up.district = 'DAM';
     up.districtComplete = true;
-    for (let i = 0; i < 6000; i++) disasterPhase(state);
+    // a storm over the DAM itself would pillage it and open the river
+    for (let i = 0; i < 6000; i++) stormFree(state, [plain, up]);
     expect(plain.improvement).toBe('FARM');
     expect(plain.districtPillaged).toBeFalsy();
 

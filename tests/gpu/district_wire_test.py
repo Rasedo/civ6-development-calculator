@@ -170,10 +170,13 @@ def main() -> None:
     prod6[0, j] = rec_sim.DISTRICT_BASE + si
     dt6 = torch.full((1, rec_sim.RC, len(rec_sim._scaffold)), -1, dtype=torch.long)
     dt6[0, j, si] = t6
-    rec = drive._extract_record(rec_sim, row, prod6, dt6, None, None, None, None,
-                                torch.full((1, 1, 1), -1, dtype=torch.long),
-                                None, None, None, None, None, None, None, None, None,
-                                None, None, None, None, None, None, None, 0)
+    # every decision slot by NAME: the record grows a slot most rounds, and a
+    # positional call here broke on two of them in one week
+    import inspect
+    kw = {name: None for name in inspect.signature(drive._extract_record).parameters}
+    kw.update(sim=rec_sim, row=row, prod=prod6, dtile=dt6,
+              seq=torch.full((1, 1, 1), -1, dtype=torch.long), b=0)
+    rec = drive._extract_record(**kw)
     ent = next(e for e in rec["production"] if int(e[1]) == rec_sim.DISTRICT_BASE + si)
     assert len(ent) == 3, f"a district entry must carry its tile, got {ent}"
     assert int(ent[2]) == t6, f"the record wrote tile {ent[2]}, the policy chose {t6}"

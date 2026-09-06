@@ -534,8 +534,9 @@ const SEAT: Record<string, Extractor> = {
   beliefEnhancer: overSeats((s) => idx(ENHANCER_IDX, s.religion.enhancer)),
   scienceTotal: overSeats((s) => s.scienceTotal),
   nextCityId: overSeats((s) => s.nextCityId),
-  formalWars: overSeats((s) => [...s.formalWars].sort((a, b) => a - b)),
-  goldenWars: overSeats((s) => [...(s.goldenWars ?? [])].sort((a, b) => a - b)),
+  // each war's KIND, signed by who declared it: [foe, value] pairs in foe order
+  warKinds: overSeats((s) => Object.keys(s.warKinds ?? {}).map(Number).sort((a, b) => a - b)
+    .flatMap((f) => [f, s.warKinds[f]])),
   denounced: overSeats((s) =>
     Object.keys(s.denounced)
       .map(Number)
@@ -750,6 +751,8 @@ const TILE: Record<string, Extractor> = {
   fertility: overTiles((t) => t.fertility),
   fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),
+  stormEvent: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormEvent ?? -1) : -1)),
+  stormTurns: overTiles((t) => t.stormTurns ?? 0),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),

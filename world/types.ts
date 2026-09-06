@@ -230,6 +230,11 @@ export interface Tile {
    *  production on separate rolls, so the two accumulate apart. */
   fertilityProd: number;
   droughtTurns: number;
+  /** CIV6 (`RandomEvents`, Duration 3): a STORM centred here — the
+   *  `STORM_EVENTS` row it is, and the turns it has left to apply its
+   *  footprint's effects. Absent or 0 turns = no storm. */
+  stormEvent?: number;
+  stormTurns?: number;
 }
 
 export interface GameMap {

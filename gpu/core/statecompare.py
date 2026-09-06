@@ -370,6 +370,15 @@ def _seat_pair_relation(plane: str, live):
 
 
 
+def _seat_pair_kind(plane: str):
+    """A signed seat<->seat plane read as each seat's [foe, value] pairs in
+    foe order, flattened — `Seat.warKinds` as the TS digest lays it out."""
+    def get(sim, b, rows):
+        m = getattr(sim, plane)[b].tolist()
+        return [[x for j, v in enumerate(m[c]) if v != 0 for x in (j, int(v))] for c in rows]
+    return get
+
+
 def _deal_line(clock: str, planes: tuple):
     """A DEAL's table, flat: [otherRow, clock, ...slots...] for every row this
     one has one with, in ascending row order. `dealOfferLine` /
@@ -596,8 +605,7 @@ SEAT = {
     "beliefEnhancer": _civ_scalar("civ_enhancer"),
     "nextCityId": _civ_scalar("civ_next_city_id"),
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
-    "formalWars": _seat_pair_relation("seat_warkind", lambda v: bool(v)),
-    "goldenWars": _seat_pair_relation("seat_wargolden", lambda v: bool(v)),
+    "warKinds": _seat_pair_kind("seat_warkind"),
     "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
     "friendTurns": _seat_pair_clock("seat_friend_turns"),
     "allyTurns": _seat_pair_clock("seat_ally_turns"),
@@ -880,6 +888,8 @@ TILE = {
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),
     "droughtTurns": _tile("drought"),
+    "stormEvent": _tile("storm_event"),
+    "stormTurns": _tile("storm_left"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),

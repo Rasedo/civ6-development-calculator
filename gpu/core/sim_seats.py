@@ -384,6 +384,7 @@ class SimSeats:
         civic: torch.Tensor | None = None,
         policies: torch.Tensor | None = None,  # [B, nPol] bool — the cards to SLOT; None = no decision
         war: torch.Tensor | None = None,
+        war_kind: torch.Tensor | None = None,  # [B] the WAR_KINDS code the war column declares under; -1/None = the default kind
         production_pref: torch.Tensor | None = None,
         production_tile: torch.Tensor | None = None,
         envoys: torch.Tensor | None = None,
@@ -427,7 +428,7 @@ class SimSeats:
         district column whose tile is -1 (or absent) is REFUSED: this function
         re-validates a plot, it never picks one. `policy/ladder.py`'s
         `pick_district_tile` is the body that chooses."""
-        self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
+        self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war, war_kind=war_kind,
                            production=production, pref=production_pref, dtile=production_tile,
                            policies=policies)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band)
@@ -452,10 +453,7 @@ class SimSeats:
         self.war[:, row, tgt] &= ~peace
         self.war[:, tgt, row] &= ~peace  # the MIRROR cell
         # the ended war's KIND clears; the grudge stamp is permanent
-        self.seat_warkind[:, row, tgt] &= ~peace
-        self.seat_warkind[:, tgt, row] &= ~peace
-        self.seat_wargolden[:, row, tgt] &= ~peace
-        self.seat_wargolden[:, tgt, row] &= ~peace
+        self._clear_war_kind(row, tgt, peace)
         self._ww_peace(peace, row, tgt)  # -2000 on the treaty
         # both sides shed the city-states the other dragged in
         self._citystate_suzerain_release(row, tgt, peace)
@@ -526,20 +524,36 @@ class SimSeats:
     def _denounce_active(self, a: int, b: int) -> torch.Tensor:
         return self._denounce_left(a, b) > 0
 
-    def _declare_war_major(self, row: int, tgt: int, declare: torch.Tensor) -> None:
+    def _declare_war_major(self, row: int, tgt: int, declare: torch.Tensor,
+                           kind: torch.Tensor | None = None) -> None:
         """`declareWar`'s body — every path that opens a war between two majors
         runs exactly this: the war axis and both clocks, the routes the war
-        cancels, the border grant and the missions it ends, the casus belli
-        that decides the war's KIND, the grievance it opens and the pacts it
-        drags in. The CALLER owns the gates (already at war, a treaty still
-        binding, a friendship the head refuses to break)."""
+        cancels, the border grant and the missions it ends, the KIND the
+        declarer holds the casus belli for, the grievance it opens and the
+        pacts it drags in. The CALLER owns the gates (already at war, a treaty
+        still binding, a friendship the head refuses to break).
+
+        `kind` [B] long is the WAR_KINDS code the record declares under; None
+        or -1 takes `_default_war_kind`. A kind the declarer may not declare
+        REFUSES the declaration (`warKindAllowed`), it never falls back."""
+        if not bool(declare.any()):
+            return
+        allowed = self._war_kinds_allowed(row, tgt)                       # [B, K]
+        K = allowed.shape[1]
+        want = self._default_war_kind(allowed)
+        if kind is not None:
+            _k = kind.to(torch.long)
+            want = torch.where(_k >= 0, _k, want)
+        _ok = (want >= 0) & (want < K) & allowed.gather(1, want.clamp(min=0, max=K - 1).unsqueeze(1)).squeeze(1)
+        declare = declare & _ok
         if not bool(declare.any()):
             return
         # CIV6 (Faces of Peace): "Cannot declare war on ... surprise wars.
         # Surprise wars cannot be declared on Canada." The war KIND is what the
         # ban reads, so it is decided here BEFORE the first mutation, exactly
-        # as `declareWar` orders it (`WAR_BAN_ROWS`).
-        _wf = (declare & self._denounce_casus_belli(row, tgt)) | (declare & self._golden_ded(row, self._ded_to_arms))
+        # as `declareWar` orders it (`WAR_BAN_ROWS`); every kind but the
+        # Surprise war (code 0) sits in the FORMALWAR group.
+        _wf = declare & (want != 0)
         if self._war_ban_rows:
             _ban = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             for _bc, _bl, _bw in self._war_ban_rows:
@@ -567,18 +581,8 @@ class SimSeats:
             self.seat_delegation[:, _g, _h] = torch.where(
                 declare, torch.zeros_like(self.seat_delegation[:, _g, _h]),
                 self.seat_delegation[:, _g, _h])
-        _formal = declare & self._denounce_casus_belli(row, tgt)
-        # CIV6 (Golden Age War row, DiplomaticActions.xml): the To Arms!
-        # dedicant's casus belli requires NO denouncement and sits in the
-        # FORMALWAR group, so a golden declaration is a formal war either
-        # way; the pair remembers it for the captures.
-        _golden = declare & self._golden_ded(row, self._ded_to_arms)
-        _formal = _formal | _golden
-        self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
-        self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
-        self.seat_wargolden[:, row, tgt] = torch.where(declare, _golden, self.seat_wargolden[:, row, tgt])
-        self.seat_wargolden[:, tgt, row] = torch.where(declare, _golden, self.seat_wargolden[:, tgt, row])
-        self._grievance_war_declared(row, tgt, declare, _formal, _golden)
+        self._stamp_war_kind(row, tgt, want, declare)
+        self._grievance_war_declared(row, tgt, declare, want)
         self._defensive_pact(row, tgt, declare)
 
     def _declare_war_minor(self, row: int, s: int, declare: torch.Tensor) -> None:
@@ -602,13 +606,213 @@ class SimSeats:
         # ...and it pays the minor's patrons, suzerain and envoy holder alike.
         self._grievance_cs_war(row, s, declare)
 
+    def _denounce_aged(self, a: int, b: int, turns: int) -> torch.Tensor:
+        """[B] bool — `denounceAged`: has `a`'s denouncement of `b` stood for
+        `turns` and not yet expired?"""
+        dt = self.seat_denounced[:, a, b]
+        age = int(self.turn) - dt
+        return (dt >= 0) & (age >= turns) & (age < self._agreement_turns)
+
     def _denounce_casus_belli(self, a: int, b: int) -> torch.Tensor:
         """CIV6: "Five turns after denouncing a rival, you gain a Formal War
         Casus Belli against them" - and it expires with the denouncement that
         opened it. `denounceCasusBelli`'s twin."""
-        dt = self.seat_denounced[:, a, b]
-        age = int(self.turn) - dt
-        return (dt >= 0) & (age >= self._formal_war_min) & (age < self._agreement_turns)
+        return self._denounce_aged(a, b, self._formal_war_min)
+
+    def _war_denounce_held(self, a: int, b: int, turns: int) -> torch.Tensor:
+        """CIV6 (Formal War): "a player that Denounced you or that you have
+        Denounced at least 5 turns ago" — a kind's DenouncementTurnsRequired
+        is met by a standing denouncement of that age in EITHER direction."""
+        return self._denounce_aged(a, b, turns) | self._denounce_aged(b, a, turns)
+
+    # ------------------------------------------------------------ war kinds
+    def _war_kind_code(self, a: int, b: int) -> torch.Tensor:
+        """[B] long — `warKindWith`: the pair's war as a WAR_KINDS code, -1
+        where it carries none. The plane holds +(code + 1) on the declarer's
+        cell and -(code + 1) on the target's."""
+        v = self.seat_warkind[:, a, b].long()
+        return torch.where(v != 0, v.abs() - 1, torch.full_like(v, -1))
+
+    def _war_formal(self, a: int, b: int) -> torch.Tensor:
+        """[B] bool — `warIsFormal`: every kind but the Surprise war (code 0)
+        sits in the install's FORMALWAR group."""
+        return self.seat_warkind[:, a, b].abs() >= 2
+
+    def _stamp_war_kind(self, declarer: int, target: int, kind: torch.Tensor, m: torch.Tensor) -> None:
+        """`setWarKind`: the declarer's cell positive, the target's negative."""
+        v = (kind.to(torch.long).clamp(min=0) + 1).to(self.seat_warkind.dtype)
+        self.seat_warkind[:, declarer, target] = torch.where(m, v, self.seat_warkind[:, declarer, target])
+        self.seat_warkind[:, target, declarer] = torch.where(m, -v, self.seat_warkind[:, target, declarer])
+
+    def _clear_war_kind(self, a: int, b: int, m: torch.Tensor) -> None:
+        """`clearWarKind`: the ended war's kind leaves both cells."""
+        z = torch.zeros_like(self.seat_warkind[:, a, b])
+        self.seat_warkind[:, a, b] = torch.where(m, z, self.seat_warkind[:, a, b])
+        self.seat_warkind[:, b, a] = torch.where(m, z, self.seat_warkind[:, b, a])
+
+    def _war_buff_rows_of(self, row: int) -> list[tuple[int, int, int, int, int, torch.Tensor]]:
+        """the roster's declared-war rows for one seat row, each with its
+        per-game [B] mask — `warBuffRowsOf`: (kind, combat, moves, prod %,
+        override civic, who)."""
+        out = []
+        for _c, _l, _k, _cs, _mv, _pp, _ov in self._war_buff_rows:
+            who = self._row_is(row, _c, _l)
+            if bool(who.any()):
+                out.append((_k, _cs, _mv, _pp, _ov, who))
+        return out
+
+    def _war_kind_civic_ok(self, row: int, k: int) -> torch.Tensor:
+        """[B] bool — `warKindCivicOk`: CIV6 (InitiatorPrereqCivic,
+        EFFECT_ADD_DIPLOMATIC_ACTION_OVERRIDE): the kind's own civic, or the
+        civic a roster row overrides it to."""
+        civic = self._war_kinds[k][0]
+        ok = (torch.ones(self.B, dtype=torch.bool, device=self.device) if civic < 0
+              else self.civ_civics[:, row, civic].clone())
+        for _k, _cs, _mv, _pp, _ov, who in self._war_buff_rows_of(row):
+            if _k == k and _ov >= 0:
+                ok = ok | (who & self.civ_civics[:, row, _ov])
+        return ok
+
+    def _war_condition(self, row: int, tgt: int, cond: int) -> torch.Tensor:
+        """[B] bool — `warConditionHolds`: the kind's own requirement column
+        (WAR_CONDITIONS order) for `row` declaring on `tgt`."""
+        B, NM = self.B, self.n_majors
+        zero = torch.zeros(B, dtype=torch.bool, device=self.device)
+        if cond == 0:
+            return ~zero
+        if cond == 1:
+            # CIV6 (Holy War): "a power that has religiously converted one of
+            # your cities" — a religion is keyed by its founder's row
+            return ((self.city_followed[:, row] == tgt) & self.city_alive[:, row]).any(dim=1) \
+                & (self.holy_tile[:, tgt] >= 0)
+        if cond in (2, 3):
+            # the city's FOUNDER is the seat it was taken from (`founderSeat`)
+            cf = self.city_founder[:, tgt]
+            f = torch.where(cf >= 0, cf, torch.full_like(cf, tgt))
+            alive = self.city_alive[:, tgt]
+            if cond == 3:
+                # CIV6 (Reconquest War): "a power that has captured one of your cities"
+                return ((f == row) & alive).any(dim=1)
+            # CIV6 (Liberation War): "a power that has captured a city from one
+            # of your friends or allies"
+            fi = f.clamp(min=0, max=NM - 1)
+            friend = (self.seat_friend_turns[:, row, :NM].gather(1, fi) > 0) \
+                | (self.seat_ally_turns[:, row, :NM].gather(1, fi) > 0)
+            return ((f != tgt) & (f != row) & (f >= 0) & (f < NM) & friend & alive).any(dim=1)
+        if cond == 4:
+            # CIV6 (Protectorate War): "a power that has attacked one of your
+            # allied city-states" — a city-state this row is Suzerain of
+            if self.S == 0:
+                return zero
+            return (self._suzerain_mask(row)[:, : self.S] & self.war[:, tgt, NM:NM + self.S]).any(dim=1)
+        if cond == 5:
+            # CIV6 (Colonial War): "a power that is two technology eras behind you"
+            mine = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+            theirs = self._civ_era(self.civ_techs[:, tgt], self.civ_civics[:, tgt])
+            return (mine - theirs) >= 2
+        if cond == 6:
+            # CIV6 (Territorial War): "Must have 2 of your cities within 10
+            # tiles of 2 opponents' cities" — two of the declarer's cities each
+            # within reach of some target city, AND two of the target's each
+            # within reach of some declarer city (`empiresAdjacent`)
+            cm = self.city_center[:, row].clamp(min=0)
+            ct = self.city_center[:, tgt].clamp(min=0)
+            d = self.pair_dist[cm.unsqueeze(2), ct.unsqueeze(1)].long()          # [B, RC, RC]
+            near = (d <= 10) & self.city_alive[:, row].unsqueeze(2) & self.city_alive[:, tgt].unsqueeze(1)
+            return (near.any(dim=2).sum(dim=1) >= 2) & (near.any(dim=1).sum(dim=1) >= 2)
+        if cond == 7:
+            # CIV6 (Golden Age War): "while you are in a Golden Age with a 'To
+            # Arms!' Dedication"
+            return self._golden_ded(row, self._ded_to_arms)
+        if cond == 9:
+            # CIV6 (Ideological War): "a player who is in a different Tier 3
+            # government" — both LATE, and not the same one
+            if not self._ngov:
+                return zero
+            g1, h1 = self._adopted_gov(self.civ_civics[:, row])
+            g2, h2 = self._adopted_gov(self.civ_civics[:, tgt])
+            return h1 & h2 & (g1 != g2) & (self._gov_tier[g1] >= 3) & (self._gov_tier[g2] >= 3)
+        # 8: a broken promise — neither engine holds a promise
+        return zero
+
+    def _war_kinds_allowed(self, row: int, tgt: int) -> torch.Tensor:
+        """[B, K] bool — `warKindAllowed` for every kind: the civic (or its
+        roster override), the denouncement age, then the requirement column."""
+        cols = []
+        for k, (_civic, dturns, cond, _p0, _p1, _p2) in enumerate(self._war_kinds):
+            ok = self._war_kind_civic_ok(row, k)
+            if dturns >= 0:
+                ok = ok & self._war_denounce_held(row, tgt, dturns)
+            cols.append(ok & self._war_condition(row, tgt, cond))
+        return torch.stack(cols, dim=1)
+
+    def _default_war_kind(self, allowed: torch.Tensor) -> torch.Tensor:
+        """[B] long — `defaultWarKind`: the CHEAPEST casus belli held by the
+        declaration percent, the first in table order on a tie; -1 with none."""
+        K = allowed.shape[1]
+        key = torch.tensor([p[0] * K + i for i, p in enumerate(self._war_griev_pct)],
+                           dtype=torch.long, device=self.device).unsqueeze(0).expand(allowed.shape[0], -1)
+        big = torch.full_like(key, 10 ** 9)
+        best = torch.where(allowed, key, big).argmin(dim=1)
+        return torch.where(allowed.any(dim=1), best, torch.full_like(best, -1))
+
+    def _war_kind_pick(self, row: int, war: torch.Tensor, prefer_own: bool = False) -> torch.Tensor:
+        """[B] long — the KIND the driver records for its war column: the
+        default (cheapest) kind against the major the column declares on, or,
+        with `prefer_own`, the leader's own buffed kind when it is allowed
+        (`WAR_BUFF_ROWS`); -1 on a sue, a minor or no column. The driver's
+        twin of the record validator, built from the validator itself."""
+        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        targets = self.war_targets(row)
+        w = war.to(torch.long)
+        for k, tgt in enumerate(targets[: self.n_majors - 1]):
+            sel = w == k
+            if not bool(sel.any()):
+                continue
+            allowed = self._war_kinds_allowed(row, tgt)
+            pick = self._default_war_kind(allowed)
+            if prefer_own:
+                for _k, _cs, _mv, _pp, _ov, who in self._war_buff_rows_of(row):
+                    own = who & allowed[:, _k]
+                    pick = torch.where(own, torch.full_like(pick, _k), pick)
+            out = torch.where(sel, pick, out)
+        return out
+
+    def _war_buff_live(self, row: int, kind: int) -> torch.Tensor:
+        """[B] bool — `warBuffLive`: is this row inside the `_war_buff_turns`
+        window of a war of `kind` it DECLARED? The pair's own clock is the age."""
+        NM = self.n_majors
+        mine = self.seat_warkind[:, row, :NM] == kind + 1
+        young = self.war_turns[:, row, :NM] < self._war_buff_turns
+        return (mine & young).any(dim=1)
+
+    def _war_buff_table(self, col: int) -> torch.Tensor:
+        """[B, n_majors] long — per seat row, the live declared-war buff of one
+        column (1 combat, 2 moves, 3 production %), summed over the row's rows."""
+        out = torch.zeros(self.B, self.n_majors, dtype=torch.long, device=self.device)
+        if not self._war_buff_rows:
+            return out
+        for row in range(self.n_majors):
+            for _k, _cs, _mv, _pp, _ov, who in self._war_buff_rows_of(row):
+                val = (_cs, _mv, _pp)[col - 1]
+                if val:
+                    out[:, row] += (who & self._war_buff_live(row, _k)).long() * val
+        return out
+
+    def _seat_war_buff(self, seat: torch.Tensor, col: int) -> torch.Tensor:
+        """long, `seat`'s shape — `_war_buff_table` per absolute seat; anything
+        outside the major rows carries nothing."""
+        NM = self.n_majors
+        if not self._war_buff_rows:
+            return torch.zeros(seat.shape, dtype=torch.long, device=self.device)
+        r = seat.clamp(min=0, max=NM - 1).reshape(self.B, -1)
+        return self._war_buff_table(col).gather(1, r).reshape(seat.shape) * ((seat >= 0) & (seat < NM)).long()
+
+    def _war_buff_prod_pct(self, row: int) -> torch.Tensor:
+        """[B] long — `warBuffProdPct`."""
+        if not self._war_buff_rows:
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
+        return self._war_buff_table(3)[:, row]
 
     def _defensive_pact(self, aggressor: int, victim: int, declared: torch.Tensor) -> None:
         """CIV6 (Defensive Pact, Rise and Fall onward): "allies automatically
@@ -635,8 +839,7 @@ class SimSeats:
             self.war[:, ally, aggressor] |= join
             self.war[:, aggressor, ally] |= join
             self._reset_war_clock(ally, aggressor, join)
-            self.seat_warkind[:, ally, aggressor] |= join
-            self.seat_warkind[:, aggressor, ally] |= join
+            self._stamp_war_kind(ally, aggressor, torch.ones(self.B, dtype=torch.long, device=self.device), join)
             self.treaty_turns[:, ally, aggressor] = torch.where(
                 join, torch.zeros_like(self.treaty_turns[:, ally, aggressor]),
                 self.treaty_turns[:, ally, aggressor])
@@ -652,7 +855,7 @@ class SimSeats:
                     join, torch.zeros_like(self.seat_delegation[:, _g, _h]),
                     self.seat_delegation[:, _g, _h])
 
-    def _apply_war_column(self, row: int, war: torch.Tensor) -> None:
+    def _apply_war_column(self, row: int, war: torch.Tensor, kind: torch.Tensor | None = None) -> None:
         targets = self.war_targets(row)
         if not targets:
             return
@@ -674,7 +877,7 @@ class SimSeats:
                        & (self.seat_ally_turns[:, row, tgt] == 0)
                        & (self.seat_friend_turns[:, row, tgt] == 0)
                        & (self.treaty_turns[:, row, tgt] == 0))
-            self._declare_war_major(row, tgt, declare)
+            self._declare_war_major(row, tgt, declare, kind)
             wt = self.war_turns[:, row, tgt]
             pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
             peace = (
@@ -686,7 +889,7 @@ class SimSeats:
                 self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost, self.civ_treasury[:, row])
                 self._make_peace(row, tgt, peace)
 
-    def _stash_record(self, row: int, tech=None, civic=None, envoys=None, war=None,
+    def _stash_record(self, row: int, tech=None, civic=None, envoys=None, war=None, war_kind=None,
                       production=None, pref=None, dtile=None, policies=None) -> None:
         """Park a seat row's applySeatActionRecord intents for
         `_seat_record_apply` to drain at the record position.
@@ -707,6 +910,8 @@ class SimSeats:
             self._driven_envoys[row] = envoys
         if war is not None:
             self._driven_war[row] = war
+        if war_kind is not None:
+            self._driven_war_kind[row] = war_kind
         if production is not None or pref is not None:
             self._driven_picks[row] = (production, pref, dtile)
 
@@ -731,6 +936,7 @@ class SimSeats:
         policies = self._driven_policies.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
         war = self._driven_war.pop(row, None)
+        war_kind = self._driven_war_kind.pop(row, None)
         citizens = self._driven_citizens.pop(row, None)
         vote = self._driven_vote.pop(row, None)
         gp_pass = self._driven_gp_pass.pop(row, None)
@@ -798,7 +1004,7 @@ class SimSeats:
                     self._eff_version += 1
         if war is not None:
             w_act = war.to(torch.long)
-            self._apply_war_column(row, torch.where(active, w_act, torch.full_like(w_act, -1)))
+            self._apply_war_column(row, torch.where(active, w_act, torch.full_like(w_act, -1)), war_kind)
         if citizens is not None:
             self._apply_citizens(row, active, *citizens)
         if vote is not None:

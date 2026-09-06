@@ -719,9 +719,7 @@ export const HEROIC_DEDICATIONS = 3;
 export const GOLDEN_MOVE_BONUS = 2;
 
 export const GOVERNOR_LOYALTY = 8;
-/** A civ↔civ war is FORMAL iff the aggressor denounced
- *  the target at least this many turns before declaring; otherwise SURPRISE. */
-export const FORMAL_WAR_MIN_TURNS = 5;
+export { FORMAL_WAR_MIN_TURNS } from './warKinds';
 
 /**
  * EVERY DIPLOMATIC AGREEMENT RUNS THE SAME CLOCK.
@@ -922,6 +920,12 @@ export const ALLIANCE_REL2_THEO_CS = 10;
 /** CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens following
  *  your ally's religion." */
 export const ALLIANCE_REL3_FAITH_PER_POP = 1;
+/** CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE ->
+ *  EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20): "Bonus Religious
+ *  Pressure in cities with no followers of your ally's Religion" — the
+ *  holder's religion presses 20% harder into a city where the ally's
+ *  religion has no pressure at all. */
+export const ALLIANCE_REL3_PRESSURE_PCT = 20;
 
 /**
  * GRIEVANCES (GS). CIV6: "a score which each pair of civilizations keep for
@@ -933,19 +937,8 @@ export const ALLIANCE_REL3_FAITH_PER_POP = 1;
  *
  * Every magnitude below is the Grievances page's own table row.
  */
-/** CIV6 (DiplomaticActions.xml, the casus belli rows): each war kind
- *  carries its OWN three percent columns — declaration, city capture,
- *  raze — applied to the bases below. SURPRISE 150/150/450; FORMAL
- *  100/100/300 (a standing denouncement); GOLDEN AGE 25/25/300, the
- *  To Arms! dedicant's war, whose row requires NO denouncement
- *  (DenouncementTurnsRequired 0). */
-export const WAR_GRIEVANCE_PCT: Readonly<
-  Record<'surprise' | 'formal' | 'golden', readonly [number, number, number]>
-> = {
-  surprise: [150, 150, 450],
-  formal: [100, 100, 300],
-  golden: [25, 25, 300],
-};
+/** CIV6 (DiplomaticActions.xml): every war kind's own three percent columns
+ *  live on its row in `WAR_KINDS` (data/warKinds.ts). */
 /** the declaration base the percent columns scale. */
 export const GRIEVANCE_WAR_BASE = 100;
 /** "War declared on a Friend or Ally": 75, to the friend or ally. */
