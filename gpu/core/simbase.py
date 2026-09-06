@@ -758,6 +758,7 @@ _MUTABLE = [
     "_fa_f_c", "_fa_h_c", "_mi_c",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
+    "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
     "tile_goody",  # TRIBAL VILLAGES: claimed and gone (C-47)
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature

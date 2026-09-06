@@ -750,6 +750,8 @@ const TILE: Record<string, Extractor> = {
   fertility: overTiles((t) => t.fertility),
   fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),
+  stormEvent: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormEvent ?? -1) : -1)),
+  stormTurns: overTiles((t) => t.stormTurns ?? 0),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),

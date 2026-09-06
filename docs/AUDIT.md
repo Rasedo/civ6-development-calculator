@@ -84,7 +84,7 @@ open docs/roster_ledger.json row.
 | C-38 a city-state's city develops HALFWAY | 1 | the yields of any of it, and power |
 | C-41 nothing places Volcanic Soil | 1 | WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
-| C-49 named random events | 1 | no event carries a NAME a modifier can key on; the storm's footprint, duration and walk are unmodelled |
+| C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
 | C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
 | C-60 no Free City step | 1 | a flipped city goes straight to the highest-pressure seat on both engines |
 | C-61 the capital never moves | 1 | `relocatePalace` moves `isCapital` only when the seat holds none; a civ-UNIQUE project has no field |
@@ -947,7 +947,7 @@ under their blocker so the dependency is readable, and both halves count.
     C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
     Apostle arm, England's Royal Navy Dockyard, Georgia's Tsikhe, Spain's
     Mission — C-69. The Cree Trader's tile claim — C-72. Divine Wind's
-    hurricanes and Mother Russia's blizzards — C-49. Chandragupta's and
+    hurricanes and Mother Russia's blizzards SHIPPED (C-49). Chandragupta's and
     Robert the Bruce's war-kind terms — C-62. Enkidu's allied-war discount —
     B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
     suzerain rows — B-21r. Poundmaker's shared visibility SHIPPED (C-70).
@@ -1083,78 +1083,82 @@ under their blocker so the dependency is readable, and both halves count.
   answering alike. Raising it costs one constant and one re-export; removing
   the ceiling would cost the GPU its dense storage. Ask.
 - **C-49. NAMED RANDOM EVENTS.** Weight 1.
-  SHIPPED: `disasterPhase` floods a river, storms a tile, droughts a region
-  and erupts a volcano; units take disaster damage by a single rule.
-  SOURCED 2026-09-03/04, the whole event table, and none of it is built:
-  - The install decides the storm's FAMILY by the terrain it starts on
-    (`RandomEvent_Terrains`): HURRICANE on TERRAIN_OCEAN, BLIZZARD on snow and
-    tundra (flat and hills), DUST_STORM on desert, TORNADO on grassland and
-    plains. Each family has two severities — CAT_4/CAT_5,
-    SIGNIFICANT/CRIPPLING, GRADIENT/HABOOB, FAMILY/OUTBREAK.
-  - `RandomEvent_Damages`, every column per severity as a percentage (a
-    column absent from a row is zero, not inherited):
-
-    | family | impPill | impDest | distPill | bldgPill | pop | civKill | unitLand | unitNaval |
-    |---|---|---|---|---|---|---|---|---|
-    | HURRICANE  | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 60/100 |
-    | BLIZZARD   | 50/100 | 25/50 | 15/50 | 40/100 | 0/15 | 0/20 | 0/100 | 0/60 |
-    | DUST_STORM | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/60 |
-    | TORNADO    | 75/100 | 35/75 | 20/75 | 60/100 | 0/20 | 0/20 | 0/100 | 0/100 |
-
-  - `MinHP`/`MaxHP` beside `Percentage` are the damage BAND: 30/50 at
-    FLOOD_MAJOR and 50/70 at FLOOD_1000_YEAR, which is this engine's flood
-    band exactly. The storms' bands:
-
-    | event | land | naval |
-    |---|---|---|
-    | HURRICANE_CAT_4        | (none)      | 40-60 @ 60%  |
-    | HURRICANE_CAT_5        | 40-60 @100% | 60-80 @100%  |
-    | BLIZZARD_SIGNIFICANT   | (none)      | (none)       |
-    | BLIZZARD_CRIPPLING     | 40-60 @100% | 40-60 @ 60%  |
-    | DUST_STORM_GRADIENT    | (none)      | (none)       |
-    | DUST_STORM_HABOOB      | 40-60 @100% | 40-60 @ 60%  |
-    | TORNADO_FAMILY         | (none)      | (none)       |
-    | TORNADO_OUTBREAK       | 40-60 @100% | 40-60 @100%  |
-
-    The band is 40-60 for every storm row but CAT_5's naval, which is 60-80.
-    The milder severity of each family damages no unit at all — the absence of
-    a row, not a zero band.
-  - `RandomEvents` carries seven more columns per row, all exact:
-
-    | event | sev | hexes | duration | movement | spacing | +/degree | fertilizes |
-    |---|---|---|---|---|---|---|---|
-    | TORNADO_FAMILY       | 1 |  1 | 3 | 8 | 15 |  0 | no  |
-    | TORNADO_OUTBREAK     | 2 |  3 | 3 | 8 | 15 | 50 | no  |
-    | DUST_STORM_GRADIENT  | 1 |  3 | 3 | 8 | 15 |  0 | yes |
-    | DUST_STORM_HABOOB    | 2 |  7 | 3 | 8 | 15 | 50 | yes |
-    | BLIZZARD_SIGNIFICANT | 1 |  7 | 3 | 8 | 15 |  0 | no  |
-    | BLIZZARD_CRIPPLING   | 2 | 19 | 3 | 8 | 15 | 50 | no  |
-    | HURRICANE_CAT_4      | 1 |  7 | 3 | 8 | 15 |  0 | yes |
-    | HURRICANE_CAT_5      | 2 | 19 | 3 | 8 | 15 | 50 | yes |
-
-    `Hexes` is the footprint (1 tile, 3, a radius-1 ring of 7, a radius-2 ring
-    of 19), `Duration` 3 means a storm PERSISTS three turns and `Movement` 8
-    that it walks while it lasts — this engine's storm is a one-turn stamp on
-    a radius-1 disc, which is neither. `ChanceIncreasePerDegree` 50 on every
-    severity-2 row is the climate scaling. The FERTILITY column is
-    half-modelled: `disasters.ts` says "sandstorms deposit silt", and the
-    install agrees for dust storms and hurricanes and disagrees for blizzards
-    and tornadoes, which fertilize nothing.
+  SHIPPED 2026-09-06, both engines (`STORM_EVENTS` / `_st_*`, `stormTile` /
+  `_storm_tile`, `Tile.stormEvent`+`stormTurns` / `storm_event`+`storm_left`
+  in `_MUTABLE` and the manifest): the one land-only storm is replaced by the
+  install's EIGHT, one row each from `RandomEvents`, `RandomEvent_Terrains`,
+  `RandomEvent_Frequencies` (MODERATE, per the C-74 ruling: OccurrencesPerGame
+  / 500 — 8, 2, 8, 2, 15, 3, 15, 3 per game), `RandomEvent_Damages` and
+  `RandomEvent_Yields`. One draw per event per turn in table order; the start
+  tile is uniform over the family's terrains (blizzard: snow/tundra, dust
+  storm: desert, tornado: grassland/plains, flat and hills each, no mountain;
+  hurricane: the OCEAN terrain alone — this engine's LAKE is the install's
+  COAST); the footprint is `Hexes` (1/3/7/19) slots of the canonical
+  radius-2 disc; the storm PERSISTS `Duration` 3 turns, applying its effects
+  on its spawn turn and each turn after. Per footprint tile per turn, TEN
+  draws always: IMPROVEMENT_PILLAGED (`CoastalLowlandPercentage` on a
+  `Tile.lowland` tile for the hurricane rows), IMPROVEMENT_DESTROYED,
+  DISTRICT_PILLAGED, POPULATION_LOSS (-1 in the owning city), UNIT_KILLED_
+  CIVILIAN, the land and naval shares, one HP band roll, food and production
+  fertility. The eight roster rows ship: NO_UNIT_DAMAGE (COLLECTION_OWNER,
+  `RandomEventType` + `NoDamage`) — the owner's units take no UNIT_* column
+  of that event; MODIFIED_DAMAGE_OPPOSING_PLAYER (`Amount 100`) — a unit AT
+  WAR with the carrier, on a tile the carrier OWNS, takes +100% HP damage.
+  Divine Wind is Hojo's LEADER trait (Expansion2_Leaders.xml) over the two
+  hurricane rows, Mother Russia the CIVILIZATION's over the two blizzards; no
+  requirement set on either — the "in X's territory" clause is the trait
+  text's, read as tile ownership. The old "desert deposits silt / strips past
+  Phase IV" arm: the desert-only fertility is DELETED (the yields table keys
+  no terrain); the past-Phase-IV strip is KEPT for every family (the climate
+  page's "all Storms"). Egypt's Iteru stays flood-only. As a drive-by the GPU
+  flood's IMPROVEMENT_DESTROYED arm now honours Reinforced Materials'
+  `envDamageImmune` the way TS always did.
+  READINGS (identical on both engines):
+  - CLIMATE: each family's two rows share the flood's ramp — `severitySplit`
+    moves the phase's melt fraction from the severity-1 row onto the
+    severity-2 row, then `disasterRateMult` scales every draw
+    (`stormChances`). `ChanceIncreasePerDegree` 0/50 is not read as a number;
+    the engine has one climate ramp and this is it.
+  - FOOTPRINT ORDER: centre, ring 1, ring 2, each ring in ascending tile
+    index (`STORM_DISC` / `_storm_offs`); the 3-hex shape is the first three
+    slots; an off-map slot is absent, not re-drawn.
+  - ONE STORM PER CENTRE: a roll that picks a centre already under a storm is
+    dropped (no second draw). No cap on live storms otherwise.
+  - UNIT SHARE: a domain's `Percentage` is ONE roll per tile — all of that
+    domain's units on the tile are hit or none; one HP roll per tile feeds
+    both domains' bands. An embarked land unit is its chassis' domain; an
+    air unit or a spy holds no tile and is neither. A city centre on the
+    footprint takes nothing (no storm row names CITY_GARRISON/CITY_WALLS).
+  - PREVENTION covers every UNIT_* DamageType of the event, the civilian
+    kill included (it is a row of the same `RandomEvent_Damages` table); the
+    DOUBLE multiplies HP amounts only — a kill chance has no amount.
+  - FERTILITY: the storm rows' FeatureType FEATURE_ICE is, per the file's own
+    comment, "the equivalent of no feature" — the rows are not feature-keyed,
+    so each is the flood's reading: the chance of +1 of its yield on every
+    land tile of the footprint; `ReplaceFeature` places nothing. The BLIZZARD
+    rows are shipped as the table has them (food 10/20%) although the row's
+    EffectString reads NO_FERTILITY — the data table is what the game reads;
+    tornadoes have no row and fertilize nothing. Two booleans if the owner
+    rules the label over the table.
+  - BUILDING_PILLAGED rides the district's darkness, as the flood does.
+  BAR 2026-09-06: tsc, pyright, ruff, oxlint, seat_symmetry, statecompare
+  census, inplace discipline, `tests/cpu/map/storms.test.ts`,
+  `tests/gpu/storms_test.py` (lane `storms`), full vitest, serve 9209 x 250
+  green. REACH (seed 9209 driven 250 turns through the ladder): 38 storms
+  formed — TORNADO_FAMILY 12, HURRICANE_CAT_4 14, DUST_STORM_GRADIENT 5,
+  BLIZZARD_SIGNIFICANT 4, HURRICANE_CAT_5 2, BLIZZARD_CRIPPLING 1 — and 9
+  storm-turns had a unit inside the footprint, so the unit columns and the
+  severity-2 rows are gate-reached; the roster rows fire only when a fixture
+  seats Japan or Russia, which the two test lanes pin.
   OPEN:
-  - **NO EVENT CARRIES A NAME.** Nothing on either engine keys a modifier on
-    an event's family or severity, so Divine Wind's hurricane waiver and its
-    double damage to Japan's enemies, and Mother Russia's blizzard pair, have
-    nothing to attach to. SOURCED (Divine Wind): "Units do not receive damage
-    from Hurricanes. Civilizations that are at war with Japan receive +100%
-    unit damage from Hurricanes in Japanese territory", over categories 4 and
-    5; Mother Russia's pair is the same shape over significant and crippling
-    Blizzards. The carrier is a per-event kind on the disaster roll plus a
-    damage multiplier keyed on the tile's owner. Eight modifiers are marked
-    open against this item in docs/roster_ledger.json.
-  - **THE STORM'S FOOTPRINT, DURATION AND WALK** are none of them modelled
-    (one-turn stamp, radius-1 disc, no movement).
-  - **THE ENGINE'S STORM PICKS FROM LAND ONLY**, so a HURRICANE cannot start
-    where the install puts it until the roll can reach open water.
+  - **THE WALK.** `Movement 8` on every storm row is the storm's movement
+    across the map while it lasts, and the rule joining that number to a
+    path is DLL logic nobody can read. A storm stays on its centre for its
+    three turns. The exact question: how does a storm choose its heading
+    and how many tiles does it move per turn?
+  - **PER-BUILDING PILLAGE.** BUILDING_PILLAGED (40/60/100%) pays per
+    building once a per-building pillage flag exists; today the district's
+    darkness stands in for it.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1.
   SOURCED (Kristina): "Buildings with at least three Great Work slots and
   wonders with at least two Great Work slots are automatically themed when
@@ -1301,9 +1305,8 @@ under their blocker so the dependency is readable, and both halves count.
   four so both engines moved together: FLOOD_CHANCE 0.05 -> 0.009 (4.5 per
   game), FLOOD_SEVERITY_P [0.6, 0.3, 0.1] -> [0.44, 0.33, 0.22],
   DROUGHT_CHANCE 0.02 -> 0.056 (MAJOR 23 + EXTREME 5, summed because this
-  engine has one drought kind), STORM_CHANCE 0.04 -> 0.112 (every family and
-  severity summed, because this engine's storm has neither — C-49 takes each
-  family's own row from the same table when it lands).
+  engine has one drought kind), and the storm's summed rate, since replaced
+  by C-49's eight per-event rows off the same table.
   OPEN — **ERUPTION_CHANCE_PER_VOLCANO IS NOT COVERED BY THE RULING.** The
   install counts eruptions per GAME where this engine rolls per VOLCANO, and
   the conversion needs the map's volcano count. Ask.

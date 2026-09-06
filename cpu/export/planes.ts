@@ -22,6 +22,7 @@ import { terrainMp, unitPassable } from '../core/units';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
+import { stormFamilyAt, STORM_FAMILIES } from '../data/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -89,7 +90,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // feat_stripped/tdef writes on this bit.
       frm: t.feature && FEATURES[t.feature].removable ? 1 : 0,
       rid: t.resource ? RESOURCE_IDS.indexOf(t.resource) : -1,
-      des: t.terrain === 'DESERT' ? 1 : 0,
       terr: TERRAIN_IDS.indexOf(t.terrain),
       wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 | (wonderStaticOk(w, t, map) ? 1 << i : 0), 0),
       pass: unitPassable(t) ? 1 : 0,
@@ -285,7 +285,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       mrange: t.mountainRange ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
       dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,
-      de: t.terrain === 'DESERT' ? 1 : 0,
+      // the storm FAMILY that may start here (`STORM_FAMILIES` index), -1 none
+      sf: (() => { const f = stormFamilyAt(t); return f ? STORM_FAMILIES.indexOf(f) : -1; })(),
       fz: !isWater(t) && t.elevation !== 'MOUNTAIN' ? 1 : 0,
     };
   };
