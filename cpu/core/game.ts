@@ -21,7 +21,7 @@ import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect } from './cityStates';
 import { minorBuildPhase } from './minorBuild';
-import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
+import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
@@ -1529,7 +1529,9 @@ export function endTurn(state: GameState): void {
   cityStatePhase(state);
   minorBuildPhase(state);
   seatPhase(state);
-
+  // CIV6's Free Cities player takes its turn after every major's; the GPU
+  // twin runs `_free_cities_phase` at the same position.
+  freeCitiesPhase(state);
 
   theologicalCombatPhase(state);
   spreadReligiousPressure(state);

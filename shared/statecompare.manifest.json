@@ -1840,6 +1840,17 @@
           ]
         },
         {
+          "name": "freePressure",
+          "compare": "milli",
+          "covers": [
+            "City.freePressure"
+          ],
+          "planes": [
+            "city_free_press"
+          ],
+          "note": "a FREE CITY's race: the loyalty pressure each major has put on it since it revolted, per major; zeros for a city that is not Free."
+        },
+        {
           "name": "greatWorksWriting",
           "compare": "exact",
           "covers": [
@@ -2894,6 +2905,10 @@
       {
         "plane": "unit_next",
         "why": "unit-pool allocation cursor (see next_slot)."
+      },
+      {
+        "plane": "free_next_city_id",
+        "why": "the Free Cities seat's city-id allocation cursor (TS `freeSeat.nextCityId`, a seat the seat group does not enumerate); the ids it hands out ride the free row's compared cities and tiles (ownerCity)."
       },
       {
         "plane": "district_dead",

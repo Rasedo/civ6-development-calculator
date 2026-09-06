@@ -25,7 +25,7 @@ import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../
 import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { gpCityPermOf } from '../data/greatPeople';
-import { allCities, campTiles, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
+import { campTiles, cityHolders, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 import { getModifiers } from './effects';
 import { irradiated } from './nuclear';
 
@@ -62,7 +62,9 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
   if (tileClaimed(tile) && tileSeat(tile) !== seat) return no('Foreign territory.');
-  for (const c of allCities(state)) {
+  // every centre on the map, a Free City's included (the GPU reads the
+  // centre plane)
+  for (const c of cityHolders(state).flatMap((s) => s.cities)) {
     const centre = state.map.tiles[c.centerIndex];
     if (hexDistance(centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
       return no(`Too close to ${c.name} (min ${CITY_MIN_DIST} tiles).`);

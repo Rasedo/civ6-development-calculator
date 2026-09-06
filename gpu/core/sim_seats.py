@@ -2909,9 +2909,8 @@ class SimSeats:
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         a_seat = _seat_p[:, u]
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cneg = torch.full_like(ctr, -1)
         city = att & (self._type_air[at0] == 2) & self._seats_hostile(
-            row, torch.where((ctr >= 0) & (ctr < 100), ctr, cneg))
+            row, self._centre_target_seat(ctr))
         if bool(city.any()):
             fired = self._ranged_attack(city, tgt, atk_kind, u, row)
             _mp0 = getattr(self, f"{atk_kind}_unit_mp")
@@ -3889,7 +3888,7 @@ class SimSeats:
         cap = self.city_bldg[:, : self.n_majors, :, self._relic_bidx].long() * self._relic_slots
         if getattr(self, "_wond_relic", None) is None or int(self._wond_relic.sum()) == 0:
             return cap
-        wreg = self.city_wonder  # [B, n_majors, RC, nW] tile index per wonder
+        wreg = self.city_wonder[:, : self.n_majors]  # [B, n_majors, RC, nW] tile index per wonder
         compw = (wreg >= 0) & self.built_wonder_complete.gather(
             1, wreg.clamp(min=0).reshape(self.B, -1)
         ).reshape_as(wreg)
@@ -4689,11 +4688,12 @@ class SimSeats:
         out.scatter_add_(1, sl.clamp(min=0), (plane & (sl >= 0)).long())
         return out
 
-    def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+    def _built_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
         """[n] f64 — CIV6 (Monument): "+1 Loyalty", and (Government Plaza)
-        "+8 Loyalty to this city": the flat per-turn term everything standing in
-        the city adds. A district pays only complete and unpillaged, and a dark
-        district takes its buildings with it."""
+        "+8 Loyalty to this city": the flat per-turn term of what STANDS in the
+        city, paid to whoever holds it, the Free Cities row included. A
+        district pays only complete and unpillaged, and a dark district takes
+        its buildings with it (`builtLoyalty`)."""
         out = torch.zeros(bidx.shape[0], dtype=torch.float64, device=self.device)
         reg = self.city_dist_tile[bidx, row, col]  # [n, nD]
         if self.districts_on and reg.shape[-1]:
@@ -4705,6 +4705,13 @@ class SimSeats:
         if w.numel() and bool((w != 0).any()):
             stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg)
             out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        return out
+
+    def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """[n] f64 — the whole flat per-turn term a MAJOR's city takes: what
+        stands in it, then its owner's roster, route, garrison, governor and
+        policy rows (`standingLoyalty`)."""
+        out = self._built_loyalty(row, bidx, col)
         # CIV6 (Great Turkish Bombard): "+4 Loyalty per turn" in a city
         # not founded here
         out = out + self._not_founded_sum(row, 1)[bidx, col]
@@ -7692,6 +7699,7 @@ class SimSeats:
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
+        self.city_free_press[b, row, col, :] = 0
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -7702,8 +7710,10 @@ class SimSeats:
         so the column is that id's position in this row's ALIVE
         registry; ids are per-seat monotonic, so an alive match is unique."""
         ids = self.city_id[rows, row]
+        # a row's tiles carry its SEAT id — the row itself for a major, 100+c
+        # for a minor, FREE_SEAT for the Free Cities row
         m = (
-            (self.tile_seat[rows, tiles] == row).unsqueeze(1)
+            (self.tile_seat[rows, tiles] == int(self._ROW_SEAT[row])).unsqueeze(1)
             & (self.tile_city[rows, tiles].unsqueeze(1) == ids)
             & self.city_alive[rows, row]
         )
@@ -7744,7 +7754,7 @@ class SimSeats:
         # CONQUERING a city earns GRIEVANCES — accrued at the TOP like TS's, so
         # a raze at the cap earns them too, and the loser's LAST city pays the
         # whole world. A LOYALTY FLIP earns none: nobody declared anything.
-        if conquest and src_row < self.n_majors and dst_row < self.n_majors:
+        if conquest and dst_row < self.n_majors:
             # CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
             # Production in all Cities for 5 turns" — the window opens on the
             # CAPTURE, so a city taken only to be razed opens it too.
@@ -7752,6 +7762,8 @@ class SimSeats:
                 _cqt = int(self._seat_building_sum(dst_row, self._b_conquest_turns)[b])
                 if _cqt > 0:
                     self.conquest_turns[b, dst_row] = _cqt
+        # A Free City belongs to nobody, so taking one aggrieves nobody.
+        if conquest and src_row < self.n_majors and dst_row < self.n_majors:
             self._grievance_city_taken(
                 b, dst_row, src_row,
                 bool(self.city_alive[b, dst_row].sum() >= int(self.rules.seats.get("maxCities", 6))))
@@ -7775,12 +7787,16 @@ class SimSeats:
         # indexed, so the fact has to be carried across by hand.
         old_fol = int(self.city_followed[b, src_row, src_col])
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
+        old_hp = int(self.city_hp[b, src_row, src_col])
+        old_outer = int(self.city_outer_hp[b, src_row, src_col])
         self._clear_city_slot(b, src_row, src_col)
         self.centre_slot_at[b, c_t] = -1
         # ...and the loser re-crowns immediately, BEFORE the route prune and
-        # BEFORE the raze early-out — the TS call order.
+        # BEFORE the raze early-out — the TS call order. The Free Cities seat
+        # crowns nothing.
         _b1 = torch.tensor([b], dtype=torch.long, device=dev)
-        self._relocate_palace(_b1, torch.tensor([src_row], dtype=torch.long, device=dev))
+        if src_row < self.n_majors:
+            self._relocate_palace(_b1, torch.tensor([src_row], dtype=torch.long, device=dev))
         kill = (self.seat_routes[b, src_row, :, 0] == cid) | (self.seat_routes[b, src_row, :, 1] == cid)
         self.seat_routes[b, src_row][kill] = -1
         self.seat_route_dseat[b, src_row][kill] = -1
@@ -7789,7 +7805,9 @@ class SimSeats:
         self.seat_route_born[b, src_row][kill] = -1
         self.seat_route_walk[b, src_row][kill] = -1
         self.seat_route_leg[b, src_row][kill] = -1
-        owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
+        # a row's tiles carry its SEAT id (the row itself for a major)
+        src_seat, dst_seat = int(self._ROW_SEAT[src_row]), int(self._ROW_SEAT[dst_row])
+        owned = (self.tile_seat[b] == src_seat) & (self.tile_city[b] == cid)
         # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
         self.tile_locked[b] &= ~owned
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
@@ -7800,14 +7818,19 @@ class SimSeats:
             self._tile_owner_ver += 1
             self._eff_version += 1
             return False
-        new_id = int(self.civ_next_city_id[b, dst_row])
-        self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], dst_row), self.tile_seat[b])
+        # the receiver's next persistent city id — a major's from its civ
+        # block, the Free Cities seat's from its own counter
+        dst_major = dst_row < self.n_majors
+        new_id = int(self.civ_next_city_id[b, dst_row]) if dst_major else int(self.free_next_city_id[b])
+        self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], dst_seat), self.tile_seat[b])
         self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
         self._tile_owner_ver += 1  # seat + which city: the two halves TS calls ownerSeat/ownerCity
         col = self._seat_city_append(b, dst_row)
         self.city_alive[b, dst_row, col] = True
-        self._add_era_score(dst_row, self._era_pts["conquer"], self._row_hot(b))
-        self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
+        # the Free Cities seat scores no era and explores nothing
+        if dst_major:
+            self._add_era_score(dst_row, self._era_pts["conquer"], self._row_hot(b))
+            self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
         self.city_founder[b, dst_row, col] = old_founder
@@ -7826,25 +7849,37 @@ class SimSeats:
                 torch.full((self.B,), new_id, dtype=torch.long, device=dev), _aff, _hot)
         self.city_center[b, dst_row, col] = c_t
         self.city_id[b, dst_row, col] = new_id
-        self.civ_next_city_id[b, dst_row] += 1
+        if dst_major:
+            self.civ_next_city_id[b, dst_row] += 1
+        else:
+            self.free_next_city_id[b] += 1
         self.centre_slot_at[b, c_t] = col
         if conquest:
             _one = torch.tensor([b], dtype=torch.long, device=self.device)
             self._all_roads_lead_to_rome(_one, dst_row, torch.tensor([c_t], dtype=torch.long, device=self.device))
         # CIV6 (Great Turkish Bombard): "Conquered cities do not lose
         # Population" — `keepPct` of what stood, over the usual quarter lost
+        # A transfer by loyalty is not a conquest: the install prices
+        # population after a CONQUEST only, so a city that revolts or joins
+        # keeps its people and its health — and starts at
+        # LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY.
         _keep = 75
         for _cc, _cl, _cp in self._conquest_pop_rows:
             if bool(self._row_is(dst_row, _cc, _cl)[b]):
                 _keep = max(_keep, _cp)
-        self.city_pop[b, dst_row, col] = max(1, (old_pop * _keep) // 100)
+        self.city_pop[b, dst_row, col] = max(1, (old_pop * _keep) // 100) if conquest else old_pop
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
         self.city_acquired[b, dst_row, col] = old_acq
-        self.city_loyalty[b, dst_row, col] = 100.0
-        self.city_hp[b, dst_row, col] = half_hp
-        self.city_outer_hp[b, dst_row, col] = 0  # the Walls ride along, the perimeter does not: a captured city stands behind a breach until it runs the repair project
+        self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
+        self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
+        # the Walls ride along; on a conquest the perimeter does not — a
+        # captured city stands behind a breach until it runs the repair project
+        self.city_outer_hp[b, dst_row, col] = 0 if conquest else old_outer
         self.city_last_hit[b, dst_row, col] = 0
+        # the race a FREE CITY runs starts at nothing "since the Free City
+        # became independent"; any other arrival carries none
+        self.city_free_press[b, dst_row, col, :] = 0
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_gw_writing[b, dst_row, col] = old_gww
@@ -7887,7 +7922,9 @@ class SimSeats:
         # captor — TS's `plunder` defaults to `why === 'conquered'`.
         if conquest:
             self.civ_treasury[b, dst_row] += 40.0
-        if not bool(self.city_alive[b, src_row].any()):
+        # a major that loses its last city is eliminated; the Free Cities seat
+        # simply holds nothing until the next revolt
+        if src_row < self.n_majors and not bool(self.city_alive[b, src_row].any()):
             _elim = torch.zeros(self.B, dtype=torch.bool, device=dev)
             _elim[b] = True
             self._ww_peace(_elim, dst_row, src_row)
@@ -8141,9 +8178,11 @@ class SimSeats:
             & (self.district.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
         )
+        # every centre on the map keeps the 4-hex spacing — the majors', then
+        # the Free Cities row's (`canFoundCity` walks `cityHolders`)
         nrows = self.n_majors
-        ctr_all = self.city_center[:, :nrows].reshape(self.B, -1)
-        live_all = self.city_alive[:, :nrows].reshape(self.B, -1)
+        ctr_all = torch.cat((self.city_center[:, :nrows], self.city_center[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1).reshape(self.B, -1)
+        live_all = torch.cat((self.city_alive[:, :nrows], self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1).reshape(self.B, -1)
         d_all = torch.where(live_all, self.pair_dist[tc.unsqueeze(1), ctr_all.clamp(min=0)].to(torch.long), 999)
         d_cs = torch.where(
             self.citystate_alive, self.pair_dist[tc.unsqueeze(1), self.citystate_center.clamp(min=0)].to(torch.long),
@@ -9044,7 +9083,7 @@ class SimSeats:
         if hit is None or hit[0] != self._tile_owner_ver:
             ids = self.city_id[:, row, : self.RC]
             m = (
-                (self.tile_seat == row).unsqueeze(2)
+                (self.tile_seat == int(self._ROW_SEAT[row])).unsqueeze(2)
                 & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
                 & self.city_alive[:, row].unsqueeze(1)
             )
@@ -9060,37 +9099,76 @@ class SimSeats:
     def citystate_at(self) -> torch.Tensor:
         if self._citystate_at_ver != self._tile_owner_ver:
             self._citystate_at_cache = torch.where(
-                self.tile_seat >= 100, self.tile_seat - 100,
+                (self.tile_seat >= 100) & (self.tile_seat < BARB_SEAT), self.tile_seat - 100,
                 torch.full_like(self.tile_seat, -1),
             )
             self._citystate_at_ver = self._tile_owner_ver
         return self._citystate_at_cache
 
 
+    def _holder_row(self, ctr_seat: torch.Tensor) -> torch.Tensor:
+        """[n] long — the city-plane ROW holding the centre whose tile carries
+        `ctr_seat`: a major's own row, `FREE_ROW` for FREE_SEAT. A seat with no
+        city row (a minor, nobody) clamps to a major row; every caller masks
+        such tiles out before it reads."""
+        return torch.where(ctr_seat == FREE_SEAT, torch.full_like(ctr_seat, self.FREE_ROW),
+                           ctr_seat.clamp(min=0, max=self.n_majors - 1))
+
+    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
+                         gar: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`cityDefenseStrength` for whichever row holds the city, [B] each:
+        the holder's best melee unit (floor 15), +5 for a garrison, the walls
+        tier (each pre-modern tier "+3 Combat Strength", stacking), and — for a
+        MAJOR — its government's city-defense effect and CIV6 (Redoubt):
+        "Increase city garrison Combat Strength by 5." The Free Cities seat
+        trains nothing and seats nobody, so its city stands at the floor plus
+        its walls. Returns `(def_cs, walls_tier)`."""
+        bidx = torch.arange(self.B, device=self.device)
+        major = hrow < self.n_majors
+        h0 = hrow.clamp(max=self.n_majors - 1)
+        best = torch.where(major, self.civ_best_melee[bidx, h0], torch.zeros_like(hrow))
+        wtier = self._walls_tier_at(hrow, hcol)
+        def_cs = torch.maximum(best, torch.full_like(best, 15)) + gar * 5 + self._walls_tier_cs[wtier]
+        if self._gov_has_effects:
+            def_cs = def_cs + torch.where(major, self._fx_at_seat("cdef", h0).to(def_cs.dtype),
+                                          torch.zeros_like(def_cs))
+        if self.n_governors:
+            def_cs = def_cs + torch.where(major, self._governor_city_defense(h0, hcol).to(def_cs.dtype),
+                                          torch.zeros_like(def_cs))
+        return def_cs, wtier
+
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
         # A seat is never hostile to ITSELF, stated explicitly below: leaving it
         # to the war matrix's unwritten diagonal would make the answer depend on
         # a value nothing maintains.
+        # CIV6 (DIPLO_STATE_FREE_CITIES_NEUTRAL): a FREE CITY is at war with
+        # nobody and anyone may attack it without a declaration — the
+        # `alwaysHostile` bit of `SEAT_CAPS["free"]`, hostile to every other
+        # seat on either side of the pair, barbarians included.
         B = self.B
         valid = b_plane >= 0
         b_barb = b_plane == BARB_SEAT
+        b_free = b_plane == FREE_SEAT
         rb = self._seat_row[b_plane.clamp(min=0)]
         if torch.is_tensor(a_seat):
             a = a_seat.reshape(B, 1)
             ra = self._seat_row[a.clamp(min=0)]
             at_war = self.war[self._bidx1, ra, rb]
             a_barb = a == BARB_SEAT
-            return valid & (a != b_plane) & ((a_barb ^ b_barb) | (~a_barb & ~b_barb & at_war))
+            a_free = a == FREE_SEAT
+            return valid & (a != b_plane) & (a_free | b_free | (a_barb ^ b_barb) | (~a_barb & ~b_barb & at_war))
         # An INT acting seat is the common case (the walkers probe on behalf of
         # one seat): one row of the war matrix gathered by the other side's row,
         # with no [B, 1] fill and no advanced index. The two arms below are the
         # tensor formula above with `a_barb` folded out.
         not_same = b_plane != a_seat
+        if a_seat == FREE_SEAT:  # a Free City is hostile to everyone but itself
+            return valid & not_same
         if a_seat == BARB_SEAT:  # a barbarian is hostile to every non-barbarian
             return valid & not_same & ~b_barb
         at_war = self.war[:, int(self._seat_row[max(int(a_seat), 0)])].gather(
             1, rb.reshape(B, -1)).reshape(rb.shape)
-        return valid & not_same & (b_barb | at_war)
+        return valid & not_same & (b_barb | b_free | at_war)
 
     def _step_verb(
         self,
@@ -9398,12 +9476,16 @@ class SimSeats:
         is the city behind the district; without one (a district whose city has
         fallen) the roll lands whole on its own pool."""
         hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        hrow = hseat.clamp(min=0, max=self.n_majors - 1)
+        hrow = self._holder_row(hseat)
         bidx = torch.arange(self.B, device=self.device)
         hcol = self._owner_city_col(hseat, tc)
         wtier = self._walls_tier_at(hrow, hcol)
         held = hcol >= 0
-        def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
+        # the Free Cities seat trains nothing: its district stands at the floor
+        _major = hrow < self.n_majors
+        _best = torch.where(_major, self.civ_best_melee[bidx, hrow.clamp(max=self.n_majors - 1)],
+                            torch.zeros_like(hrow))
+        def_cs = (torch.maximum(_best, torch.full_like(hrow, 15))
                   + torch.where(held, self._walls_tier_cs[wtier],
                                 torch.zeros_like(self._walls_tier_cs[wtier])))
         # a CITY-STATE's Encampment fights at the minor's own centre
@@ -9939,20 +10021,12 @@ class SimSeats:
         bidx = torch.arange(B, device=dev)
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         ttc = tgt.clamp(min=0)
-        hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
+        hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        hrow = self._holder_row(hseat)
         slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
         gslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == hrow)).long()
-        best_r = self.civ_best_melee[bidx, hrow]
-        # each pre-modern walls tier is "+3 Combat Strength" and they stack
-        _wtier = self._walls_tier_at(hrow, slot)
-        def_cs = (torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
-                  + self._walls_tier_cs[_wtier])
-        if self._gov_has_effects:
-            def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
-        # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5."
-        if self.n_governors:
-            def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == hseat)).long()
+        def_cs, _wtier = self._city_defense_cs(hrow, slot, gar)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -9980,7 +10054,7 @@ class SimSeats:
                       f"atk_e={float(atk_e[_b]):.1f} def_cs={float(def_cs[_b]):.1f} "
                       f"combat={float(self._type_combat[int(a_type[_b, u])]):.0f} "
                       f"wound={float(self._wound(a_hp[:, u])[_b]):.1f} "
-                      f"xp={int(a_xp[_b, u])} best_r={float(best_r[_b]):.0f} gar={int(gar[_b])}")
+                      f"xp={int(a_xp[_b, u])} gar={int(gar[_b])}")
         # DRAW ORDER is the parity contract: the city's damage first, the
         # counter second, exactly as TS's cityAssault draws them.
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
@@ -10354,24 +10428,16 @@ class SimSeats:
         # holder, and a seat is never hostile to itself.
         _bidx = torch.arange(self.B, device=self.device)
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-        _cneg = torch.full_like(ctr, -1)
         city_att = att & self._seats_hostile(
-            a_seat.unsqueeze(1), torch.where((ctr >= 0) & (ctr < 100), ctr, _cneg).unsqueeze(1)).squeeze(1)
+            a_seat.unsqueeze(1), self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
         # both city arms split the roll by the attacker's hit class
         _klass = self._hit_class(ut0, True)
         if bool(city_att.any()):
-            hrow = ctr.clamp(min=0, max=self.n_majors - 1)
+            hrow = self._holder_row(ctr)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             _gm = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == hrow)).long()
-            _wtier = self._walls_tier_at(hrow, hcol)
-            def_cs = (torch.maximum(self.civ_best_melee[_bidx, hrow], torch.full_like(hrow, 15))
-                      + gar * 5 + self._walls_tier_cs[_wtier])
-            if self._gov_has_effects:
-                def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
-            # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5."
-            if self.n_governors:
-                def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
+            gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == ctr)).long()
+            def_cs, _wtier = self._city_defense_cs(hrow, hcol, gar)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -10626,7 +10692,7 @@ class SimSeats:
             ttc, aseat, mslot, m_seat, ok_m, cslot, c_seat, ok_c, ranged=True)
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
         city_t = self._seats_hostile(
-            aseat.unsqueeze(1), torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
+            aseat.unsqueeze(1), self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
         cs_t = torch.zeros_like(att)
         if self.S > 0:
             _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -10644,17 +10710,11 @@ class SimSeats:
         _klass = self._hit_class(at0, True)
 
         if bool(city_att.any()):
-            hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
+            hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            hrow = self._holder_row(hseat)
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            gar = ((mslot >= 0) & (m_seat == hrow)).long()
-            _wtier = self._walls_tier_at(hrow, slot)
-            def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
-                      + gar * 5 + self._walls_tier_cs[_wtier])
-            if self._gov_has_effects:
-                def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
-            # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5."
-            if self.n_governors:
-                def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
+            gar = ((mslot >= 0) & (m_seat == hseat)).long()
+            def_cs, _wtier = self._city_defense_cs(hrow, slot, gar)
             outer_all = self.city_outer_hp[bidx, hrow, slot]
             _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)

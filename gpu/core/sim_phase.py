@@ -411,6 +411,8 @@ class SimPhase:
         held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, n_majors]
         others = torch.cat((held[:, :row], held[:, row + 1:]), dim=1)
         others = others.any(dim=1) if others.shape[1] else torch.zeros(B, dtype=torch.bool, device=dev)
+        # ...or the Free Cities seat holds one (`cityHolders`)
+        others = others | self.city_alive[:, self.FREE_ROW].any(dim=1)
         here = self.city_center[bidx, row, col].clamp(min=0)
         loy_gov = self._ungoverned_loyalty(row)
         ctr = self.city_center[:, :nrow].reshape(B, -1).clamp(min=0)
@@ -428,6 +430,9 @@ class SimPhase:
                     & (self.seat_ally_turns[:, row, :nrow] > 0))
         keep = torch.where(cul_ally, torch.zeros_like(keep), keep)
         foreign = (sub * keep).sum(dim=1)
+        # CIV6: a Free City's citizens press on their neighbours like any other
+        # city's; the Free Cities player has no age, so its factor is 1
+        foreign = foreign + self._citizen_pressure_from(here, self.FREE_ROW)
         tot = own + foreign
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         delta = (press
@@ -459,43 +464,124 @@ class SimPhase:
             upd & cap, torch.full_like(nxt, lmax), nxt).to(self.city_loyalty.dtype)
         return upd & ~cap & (self.city_loyalty[bidx, row, col] <= 0)
 
+    def _citizen_pressure_from(self, here: torch.Tensor, row: int) -> torch.Tensor:
+        """[B] f64 — the CITIZEN pressure row `row`'s cities put on tile `here`
+        ([B]): each city's population weighted down by distance inside
+        loyaltyRange, no age factor (`citizenPressure`)."""
+        rng = int(self.rules.seats.get("loyaltyRange", 9))
+        ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
+        d = self.pair_dist[here.unsqueeze(1), ctr].to(torch.float64)
+        w = (rng + 1 - d).clamp(min=0) * self.city_pop[:, row].double() * self.city_alive[:, row].double()
+        return w.sum(dim=1)
+
+    def _skips_free_city(self, row: int) -> torch.Tensor:
+        """[B] bool — CIV6 (Eleanor, EFFECT_ADJUST_PLAYER_SKIP_FREE_CITY_STEP):
+        does a city whose loyalty collapses under this row's pull join it at
+        once? The RECEIVER's roster row (`skipsFreeCityStep`)."""
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for _c, _l in self._skip_free_city_rows:
+            out = out | self._row_is(row, _c, _l)
+        return out
+
     def _seat_loyalty_flips(self, row: int, flip: torch.Tensor) -> None:
         """flipCity for every column of seat row `row` that hit 0 — resolved
         AFTER the seat's city loop, the TS defectors-list position.
 
-        The city defects to the major seat exerting the most RAW pressure: no
-        age factor here, which is flipCity's deliberate difference from
-        loyaltyDelta. Its own owner is excluded (a city does not defect to
-        itself) and so is a seat that does not exist; a seat that EXISTS but
-        holds no city still exerts 0 and still beats the sentinel, exactly as
-        the TS scan's `best = -1` does. Ties go to the lowest seat id (the
-        strict-`>` scan == first_argmax).
+        CIV6: "When Loyalty reaches 0, the city revolts against its owner and
+        becomes a Free City" — unless the major exerting the most RAW pressure
+        on it right now skips that step (Eleanor), in which case it joins that
+        seat directly. No age factor here, which is flipCity's deliberate
+        difference from loyaltyDelta. The owner is excluded, and so is a seat
+        that does not exist and a cultural ally; a seat that EXISTS but holds
+        no city still exerts 0 and still beats the sentinel, exactly as the TS
+        scan's `best = -1` does. Ties go to the lowest seat id (the strict-`>`
+        scan == first_argmax).
 
-        Defections resolve in ARRAY order with pressures read LIVE: an earlier
+        Revolts resolve in ARRAY order with pressures read LIVE: an earlier
         transfer moves pops a later one must see."""
         nrow = self.n_majors
-        rng = int(self.rules.seats.get("loyaltyRange", 9))
         for j in range(self.RC):
             fl = flip[:, j] & self.city_alive[:, row, j]
             if not bool(fl.any()):
                 continue
             for b in fl.nonzero(as_tuple=True)[0].tolist():
-                here = int(self.city_center[b, row, j])
-                d = self.pair_dist[here, self.city_center[b, :nrow].reshape(-1).clamp(min=0)].to(torch.float64)
-                w = ((rng + 1 - d).clamp(min=0)
-                     * self.city_pop[b, :nrow].reshape(-1).double()
-                     * self.city_alive[b, :nrow].reshape(-1).double())
-                press = w.reshape(nrow, self.RC).sum(dim=1)
+                here = torch.full((self.B,), int(self.city_center[b, row, j]), dtype=torch.long, device=self.device)
+                press = torch.stack([self._citizen_pressure_from(here, _o)[b] for _o in range(nrow)])
                 press = torch.where(self.civ_alive[b, :nrow], press, torch.full_like(press, -1.0))
                 press[row] = -1.0
                 # CIV6 (Cultural alliance 1): an ally exerts nothing, so it
                 # never receives the flip either.
                 for _o in range(nrow):
-                    if _o != row and int(self.seat_alliance_type[b, row, _o]) == 1                             and int(self.seat_ally_turns[b, row, _o]) > 0:
+                    if _o != row and int(self.seat_alliance_type[b, row, _o]) == 1 \
+                            and int(self.seat_ally_turns[b, row, _o]) > 0:
                         press[_o] = -1.0
-                # A flip is never a conquest, so it never razes and never
+                win = int(first_argmax(press.unsqueeze(0))[0])
+                if float(press[win]) < 0:
+                    win = -1
+                # A revolt is never a conquest, so it never razes and never
                 # plunders, whoever receives.
-                self._transfer_city(b, row, j, int(first_argmax(press.unsqueeze(0))[0]), conquest=False)
+                if win >= 0 and bool(self._skips_free_city(win)[b]):
+                    self._transfer_city(b, row, j, win, conquest=False)
+                else:
+                    self._transfer_city(b, row, j, self.FREE_ROW, conquest=False)
+
+    def _free_cities_phase(self) -> None:
+        """The FREE CITIES player's turn, after every major's — the
+        `freeCitiesPhase` twin. Each Free City heals as any unbesieged city
+        does and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
+        the flat base, the pressure term with every Free City's citizens on
+        its own side and every major's (at that major's age factor) against,
+        and the flat loyalty of what stands in it — no amenity, governor,
+        policy or roster term, which are an OWNER's and the Free Cities player
+        carries none. Each major's share accrues into the city's race
+        (`city_free_press`). A city that reaches 0 joins the race's winner,
+        after the walk, in slot order: CIV6 "it will join the Civilization that
+        has exerted the most Loyalty pressure on it since the Free City became
+        independent". A seat that pulled nothing, or holds no city any more,
+        takes nothing; with no taker the city stays Free at 0."""
+        row = self.FREE_ROW
+        alive = self.city_alive[:, row]
+        if not bool(alive.any()):
+            return
+        B, dev, F = self.B, self.device, torch.float64
+        bidx, nrow = self._bidx, self.n_majors
+        scale = float(self.rules.seats.get("loyaltyScale", 20))
+        lmax = float(self.rules.seats.get("loyaltyMax", 100))
+        alive_c = alive.clone()
+        joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
+        for j in range(self.RC):
+            act = alive_c[:, j]
+            if not bool(act.any()):
+                continue
+            jc = torch.full((B,), j, dtype=torch.long, device=dev)
+            self._city_heal(row, jc, act)
+            here = self.city_center[bidx, row, jc].clamp(min=0)
+            own = self._citizen_pressure_from(here, row)
+            foreign = torch.zeros(B, dtype=F, device=dev)
+            for _o in range(nrow):
+                sub = self._citizen_pressure_from(here, _o) * self._age_factor[self.civ_age[:, _o]]
+                foreign = foreign + sub
+                self.city_free_press[bidx, row, jc, _o] = torch.where(
+                    act, self.city_free_press[bidx, row, jc, _o] + sub.to(self.city_free_press.dtype),
+                    self.city_free_press[bidx, row, jc, _o])
+            tot = own + foreign
+            press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
+            delta = self._free_city_loyalty + press + self._built_loyalty(row, bidx, jc)
+            loy = self.city_loyalty[bidx, row, jc]
+            nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
+            self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
+            joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
+        for j in range(self.RC):
+            jl = joins[:, j] & self.city_alive[:, row, j]
+            if not bool(jl.any()):
+                continue
+            for b in jl.nonzero(as_tuple=True)[0].tolist():
+                race = self.city_free_press[b, row, j, :nrow].double()
+                ok = self.civ_alive[b, :nrow] & self.city_alive[b, :nrow].any(dim=1) & (race > 0)
+                if not bool(ok.any()):
+                    continue
+                win = int(first_argmax(torch.where(ok, race, torch.full_like(race, -1.0)).unsqueeze(0))[0])
+                self._transfer_city(b, row, j, win, conquest=False)
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
                           eff: torch.Tensor, need: torch.Tensor) -> None:
@@ -1144,6 +1230,51 @@ class SimPhase:
                             # the craft; the win fires on ARRIVAL, in step().
                             self.space_ly[hit, row] = 0
 
+    def _city_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> torch.Tensor:
+        """A city's unbesieged HEAL for whichever row holds it — the majors'
+        in their own turn, the Free Cities row's in `_free_cities_phase`.
+        Returns the [B] mask of cities that healed, which the Encampment's
+        repair shares.
+
+        CIV6's siege: "if the invading army manages to establish zone of
+        control on all passable tiles surrounding the City Center, it will no
+        longer be able to repair the damage it suffers". EVERY passable
+        neighbour has to be held by a unit that EXERTS one: a civilian does
+        not, "Ranged and Bombard class units do not exert ZOC" (SUPPRESSION
+        hands it back), and CIV6 gives the two submarines "Does not exert
+        zone of control". `encircled` is the twin. "The city will
+        automatically regain 20 HP per turn" until it is encircled; the outer
+        defenses are NOT on this gate: "once damaged, the outer defenses of a
+        City Center or defensible district will not regenerate on their own",
+        and come back only through the repair project."""
+        Bn, dev2 = self.B, self.device
+        bidx = torch.arange(Bn, device=dev2)
+        heal = int(self.rules.combat.get("cityHealPerTurn", 20))
+        ctr = self.city_center[bidx, row, col].clamp(min=0)
+        nbh = self.neigh[ctr]
+        nbc = nbh.clamp(min=0)
+        _am = self.military_at.gather(1, nbc)
+        _at = self.unit_type.gather(1, _am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
+        _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
+        _ap = self.unit_promos.gather(1, _am.clamp(min=0))
+        _apc = self.rules_dev.u_promo_class[_at]
+        _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege)) & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
+        held = self._seats_hostile(int(self._ROW_SEAT[row]), _as) & (_am >= 0) & ~self._type_zoc_none[_at] & ~_no_ex
+        passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
+        besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
+        # CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
+        # may close and the heal still runs. A governor seats in a major's city.
+        if self.n_governors and row < self.n_majors:
+            besieged = besieged & ~self._governor_flag(row, "noSiege")[bidx, col]
+        # CIV6: a City Center caught in a blast has its HP reduced to 0 and
+        # "Healing is impossible ... while the fallout lasts".
+        _fo = self._fallout()
+        ok = act & ~besieged & ~_fo[bidx, ctr]
+        hp = self.city_hp[bidx, row, col]
+        self.city_hp[bidx, row, col] = torch.where(
+            ok, (hp + heal).clamp(max=int(self.rules.combat.get("cityMaxHp", 200))), hp)
+        return ok
+
     def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
         """A city's WALLS strike, its ADDITIONAL Encampment strike and the
         unbesieged heal — ONE body, every seat row, at the per-city position
@@ -1185,42 +1316,9 @@ class SimPhase:
             _efire = _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0)
             for _sk in range(n_strike):
                 self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk", origin=e0)
-        ctr = self.city_center[bidx, row, col].clamp(min=0)
-        nbh = self.neigh[ctr]
-        nbc = nbh.clamp(min=0)
-        _am = self.military_at.gather(1, nbc)
-        _at = self.unit_type.gather(1, _am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
-        # CIV6's siege: "if the invading army manages to establish zone of
-        # control on all passable tiles surrounding the City Center, it will no
-        # longer be able to repair the damage it suffers". EVERY passable
-        # neighbour has to be held by a unit that EXERTS one: a civilian does
-        # not, "Ranged and Bombard class units do not exert ZOC" (SUPPRESSION
-        # hands it back), and CIV6 gives the two submarines "Does not exert
-        # zone of control". `encircled` is the twin.
-        _ap = self.unit_promos.gather(1, _am.clamp(min=0))
-        _apc = self.rules_dev.u_promo_class[_at]
-        _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege))             & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
-        held = self._seats_hostile(row, _as) & (_am >= 0) & ~self._type_zoc_none[_at] & ~_no_ex
-        passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
-        besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
-        # CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
-        # may close and the heal still runs.
-        if self.n_governors:
-            besieged = besieged & ~self._governor_flag(row, "noSiege")[bidx, col]
-        # CIV6: a City Center caught in a blast has its HP reduced to 0 and
-        # "Healing is impossible ... while the fallout lasts".
-        _fo = self._fallout()
-        ok = act & ~besieged & ~_fo[bidx, self.city_center[bidx, row, col].clamp(min=0)]
-        # "The city will automatically regain 20 HP per turn" until it is
-        # encircled. The outer defenses are NOT on this gate: "once damaged,
-        # the outer defenses of a City Center or defensible district will not
-        # regenerate on their own", and come back only through the repair
-        # project.
-        hp = self.city_hp[bidx, row, col]
-        self.city_hp[bidx, row, col] = torch.where(
-            ok, (hp + heal).clamp(max=int(self.rules.combat.get("cityMaxHp", 200))), hp)
+        ok = self._city_heal(row, col, act)
         if e0 is not None:
+            _fo = self._fallout()
             # "This is an automatic action, which happens if its tile is not
             # occupied" — an enemy standing on the district holds it silent.
             _em = self.military_at.gather(1, e0.unsqueeze(1)).squeeze(1)
@@ -2019,8 +2117,16 @@ class SimPhase:
         layout must hold through this step's applies. The trigger is the
         step's own hole test, so every death compacts and the layout is never
         seen with a hole in it."""
-        nrows = self.n_majors
-        alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
+        # the majors' block, then the Free Cities row — two contiguous row
+        # ranges, so every plane compacts through an in-place VIEW
+        self._compact_city_rows(0, self.n_majors)
+        self._compact_city_rows(self.FREE_ROW, self.FREE_ROW + 1)
+        self._eff_version += 1  # no (row, j)-keyed cache may survive the permutation
+        self._tile_owner_ver += 1  # owner / center_at derive slots from permuted state
+
+    def _compact_city_rows(self, lo: int, hi: int) -> None:
+        """Stably compact the city slots of rows [lo, hi), living first."""
+        alive = self.city_alive[:, lo:hi]  # [B, n, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
         # EVERY city plane rides the permutation, the list DERIVED from
         # `_MUTABLE` by geometry <EM> a hand-transcribed list drifts and silently
@@ -2033,28 +2139,30 @@ class SimPhase:
             if not name.startswith("city_"):
                 continue
             full = getattr(self, name)
-            assert full.dim() >= 3 and full.shape[2] == self.RC and full.shape[1] >= nrows,                 f"{name} is not a (B, rows, RC, ...) city-slot plane"
-            t = full[:, :nrows]
+            assert full.dim() >= 3 and full.shape[2] == self.RC and full.shape[1] >= hi, \
+                f"{name} is not a (B, rows, RC, ...) city-slot plane"
+            t = full[:, lo:hi]
             p = perm if t.dim() == 3 else perm.reshape(
                 perm.shape + (1,) * (t.dim() - 3)).expand_as(t)
             t.copy_(t.gather(2, p))
         # centre_slot_at: the owning row's slot at each live centre, re-mapped
         # through the inverse permutation. This also ends the civ-row
         # staleness latent — center_at's value-readers see
-        # fresh slots after every compaction.
-        inv = torch.argsort(perm, dim=2)  # [B, nrows, RC] slot -> new slot
+        # fresh slots after every compaction. A tile names its holder by SEAT
+        # id; the row is `_seat_row` of it.
+        inv = torch.argsort(perm, dim=2)  # [B, n, RC] slot -> new slot
         seat_t = self.tile_seat
-        is_major_ctr = (seat_t >= 0) & (seat_t < nrows) & (self.centre_slot_at >= 0)
-        rowt = seat_t.clamp(min=0, max=nrows - 1)
+        row_t = self._seat_row[seat_t.clamp(min=0)]
+        in_pass = (seat_t >= 0) & (row_t >= lo) & (row_t < hi) & (self.centre_slot_at >= 0)
+        rowt = (row_t - lo).clamp(min=0, max=hi - lo - 1)
         inv_flat = inv.reshape(self.B, -1)
         idx = (rowt * self.RC + self.centre_slot_at.clamp(min=0)).clamp(max=inv_flat.shape[1] - 1)
-        self.centre_slot_at.copy_(torch.where(is_major_ctr, inv_flat.gather(1, idx), self.centre_slot_at))
-        self._eff_version += 1  # no (row, j)-keyed cache may survive the permutation
-        self._tile_owner_ver += 1  # owner / center_at derive slots from permuted state
+        self.centre_slot_at.copy_(torch.where(in_pass, inv_flat.gather(1, idx), self.centre_slot_at))
 
     def _check_rc_registry_invariant(self) -> None:
         B = self.B
-        for row in range(self.n_majors):
+        for row in (*range(self.n_majors), self.FREE_ROW):
+            row_seat = int(self._ROW_SEAT[row])  # a tile names its holder by SEAT id
             expect = self.city_id[:, row].unsqueeze(2)  # [B, RC, 1] this city's id
             alive = self.city_alive[:, row].unsqueeze(2)  # [B, RC, 1]
             for name in ("city_dist_tile", "city_wonder"):
@@ -2066,7 +2174,7 @@ class SimPhase:
                 rt = self.tile_city.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
                 ra = self.tile_seat.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
                 bad_fwd = has & (rt != expect)  # (1) registers to a sibling / no one
-                bad_bwd = has & (ra != row)     # (2) tile no longer owned by this seat
+                bad_bwd = has & (ra != row_seat)  # (2) tile no longer owned by this seat
                 bad = bad_fwd | bad_bwd
                 if bool(bad.any()):
                     idx = bad.nonzero(as_tuple=False)[0]

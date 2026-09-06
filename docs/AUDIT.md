@@ -86,7 +86,7 @@ open docs/roster_ledger.json row.
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
 | C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
 | C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
-| C-60 no Free City step | 1 | a flipped city goes straight to the highest-pressure seat on both engines |
+| C-60 the Free City's own defence, amenities and religion | 1 | the Free Cities seat is in on both engines (revolt, race, join, Eleanor's skip, open to attack); what it spawns, its amenity tier and its religion walks are not |
 | C-61 the capital never moves | 1 | `relocatePalace` moves `isCapital` only when the seat holds none; a civ-UNIQUE project has no field |
 | C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
 | C-65 a Great Work of Art carries no object kind | 1 | four SCULPTURE rows have no field to read; decide with C-59 |
@@ -1200,17 +1200,94 @@ under their blocker so the dependency is readable, and both halves count.
   Nkisi's Palace slots wait on (C-71) and the same shape as C-65's object
   kind; decide the three together. Kristina's four modifiers are marked open
   against this item in docs/roster_ledger.json.
-- **C-60. NO FREE CITY STEP.** Weight 1.
-  SOURCED: a city that revolts for loyalty becomes a Free City, and only later
-  joins whoever pulls hardest; Eleanor's leaders skip that step.
-  ENGINES: both go straight from the flip to the new owner — `flipCity` calls
-  `transferCity(..., 'loyalty collapsed')`, `_seat_loyalty_flips` calls
-  `_transfer_city(..., conquest=False)` — handing the city to the non-allied
-  living seat with the highest raw pressure, ties to the lowest seat id. So
-  every seat already behaves as Eleanor alone should. A FIDELITY gap both
-  engines share, not a divergence: the parity gate cannot see it.
-  OPEN: the carrier is an ownerless city class plus the turns it sits in one;
-  `SKIP_FREE_CITY_ROWS` is sourced and deliberately off the wire.
+- **C-60. THE FREE CITY'S OWN DEFENCE, ITS AMENITIES AND ITS RELIGION.**
+  Weight 1.
+  SHIPPED (2026-09-06): CIV6's Free Cities player as one seat on both engines
+  — `FREE_SEAT` 300 (`state.freeSeat`, `freeSeatOf`, `cityHolders`) and the
+  `FREE_ROW` of every city plane (`CITY_ROWS`, the barbarian row after it;
+  `_seat_row`/`_ROW_SEAT` carry it; `city_slot_at`, `_city_col_at`,
+  `_owner_city_col`, `_reclaim_cities` and the registry invariant match a
+  row's tiles by SEAT id). A city at 0 loyalty REVOLTS into it (`flipCity` /
+  `_seat_loyalty_flips` -> `transferCity(..., 'revolted')` /
+  `_transfer_city(b, row, j, FREE_ROW)`) unless the seat pressing hardest on
+  it plays Eleanor (`SKIP_FREE_CITY_ROWS` on the wire as `skipFreeCity`,
+  `skipsFreeCityStep` / `_skips_free_city` — the RECEIVER's row). The Free
+  Cities player takes its turn after every major's (`freeCitiesPhase` /
+  `_free_cities_phase`, `_city_heal` shared with the majors' walk): each
+  Free City heals, runs `freeCityLoyaltyDelta` and accrues the RACE
+  (`City.freePressure` / `city_free_press`, compared as `freePressure`); at
+  0 it joins the race's leader (`joinFromFreeCity`, ties to the lowest seat
+  id; a seat that pulled nothing or holds no city takes nothing). A Free
+  City's citizens press on every major's loyalty walk as a foreign term at
+  factor 1, and count as "another holder" for the loyalty gate. Hostility is
+  `SEAT_CAPS.free.alwaysHostile` / the `_seats_hostile` free clause — anyone
+  may attack it with no declaration and no war opens; `warKindAllowed` /
+  `_war_kinds_allowed` refuse it as a target by construction (`isCiv` both
+  sides). Every city-target gate routes through one predicate per side
+  (`unitsHostile(state, attacker, { seat: holder })`; `_centre_target_seat`
+  + `_holder_row` + `_city_defense_cs`), and the founding spacing counts a
+  Free City's centre on both engines.
+  SOURCED: LOYALTY page — "When Loyalty reaches 0, the city revolts against
+  its owner and becomes a Free City ... If a Free City's Loyalty drops to 0
+  ... it will join the Civilization that has exerted the most Loyalty
+  pressure on it since the Free City became independent";
+  IDENTITY_PER_TURN_FROM_FREE_CITIES 10; LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY
+  100; IDENTITY_PER_TURN_FROM_ORIGINAL_OWNER_ON_FREE_CITY 0 and
+  ..._OWNER_BEFORE_OCCUPATION_ON_FREE_CITY 0 (no extra owner term);
+  CIVILIZATION_LEVEL_FREE_CITIES (founds nothing, annexes nothing, earns no
+  Great People, builds no wonders); DIPLO_STATE_FREE_CITIES_NEUTRAL with
+  every level; TRAIT_LEADER_ELEANOR_LOYALTY -> SKIP_FREE_CITY
+  (MODIFIER_PLAYER_ADJUST_SKIP_FREE_CITY_STEP, Skip true, both leaders);
+  the pedia's "belong to no civilization and will seek to defend themselves
+  from military intrusion".
+  READING (identical on both engines): (1) a transfer by loyalty — the
+  revolt and the joining — is not a conquest: the city keeps its population,
+  its HP and its walls' pool, and starts at loyalty 100 (the install prices
+  population after a CONQUEST only, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST;
+  before this round both engines took the conquest's quarter and half HP on
+  a loyalty flip too). (2) A Free City's loyalty per turn = 10 + the
+  citizen-pressure term (its own side every Free City's citizens at factor
+  1, the Free Cities player having no age; the foreign side every major's at
+  that major's age factor) + the flat loyalty of what STANDS in it
+  (`builtLoyalty` / `_built_loyalty`: Monument, Government Plaza) — no
+  amenity, governor, policy, emergency or roster term, which are an OWNER's.
+  (3) The race is the sum of each major's age-factored citizen pressure
+  since the revolt, from zero; OWNER_IDENTITY_PERCENT_LOST_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY
+  50 acts on an identity stock this engine does not hold, so it moves
+  nothing here. (4) The pull that decides Eleanor's skip is the RAW citizen
+  pressure at the revolt (the same scan the old flip used); with no puller
+  at all the city still becomes Free. (5) A Free City fields no unit and
+  fires no strike of its own; taking one aggrieves nobody, opens no
+  emergency and scores no era.
+  BAR: tests/cpu/city/free-city.test.ts (7), tests/gpu/free_city_test.py
+  (6 scenes, `free_city` lane); the merged war-kind gate and the casus belli
+  conditions read only majors' cities and founders, so the sentinel never
+  reaches them.
+  REACH: `tools/gpu/reachability_probe.py` counts `freeCity` / `freeLeft`;
+  see the round's report for the driven measurement.
+  OPEN — each an exact question, none a magnitude this round may invent:
+  - the Free City's OWN DEFENCE: the pedia says it "will repair pillaged
+    improvements and spawn units to defend itself, and may build walls", and
+    "if attacked by a civilization, the Free City will try to retaliate".
+    No XML row names the unit, the cadence or the walls; its centre's
+    ranged strike would need a target rule (whom does a Free City shoot —
+    every foreign military unit in range, or its attackers?). Until sourced
+    a Free City stands at the floor-15 defence plus the walls it revolted
+    with and heals 20 a turn.
+  - a Free City's AMENITIES: real Civ 6 gives it an amenity tier that feeds
+    its loyalty; this model's tier is computed per OWNER (`computeCityStats`
+    with the seat's luxuries and policies) and the Free Cities player has
+    none, so the term is left out — what does the install give a Free City
+    for amenities (its own luxuries only, no policies)?
+  - the RELIGION walks skip a Free City on both engines (`allCities` and the
+    GPU's `[:, :n_majors]` pressure rows): a Free City neither receives nor
+    exerts religious pressure while Free, and a Missionary cannot spread
+    into it. Widening those walks to the free row is the same class of edit
+    as this round's loyalty walk and belongs to the religion items.
+  (EMERGENCY_PREVENT_FREE_CITY_BUFF — EFFECT_ADJUST_CITY_IDENTITY_PER_TURN 20
+  on the emergency's target city — was already in: `emergencyLoyalty` /
+  `_emergency_loyalty` pay `EMERGENCY_TARGET_LOYALTY` 20 while the emergency
+  runs, and a city held at loyalty never reaches the revolt.)
 - **C-61. THE CAPITAL NEVER MOVES.** Weight 1.
   SOURCED (Founder of Carthage): "Can move their original Capital to any city
   with a Cothon they founded by completing a unique project in that city."

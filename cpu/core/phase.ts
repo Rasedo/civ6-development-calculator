@@ -7,7 +7,7 @@ import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production
 import { isExplored, revealAround, unitSight } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from '../../world/query';
-import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP } from '../data/civilizations';
+import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest } from './units';
@@ -96,13 +96,13 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
+import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -411,37 +411,68 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
 }
 
 
+/** The CITIZEN pressure a list of cities puts on the tile `here`: each
+ *  city's population, weighted down by distance inside `LOYALTY_RANGE`. */
+function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
+  let sub = 0;
+  for (const c of cities) {
+    const t = state.map.tiles[c.centerIndex];
+    const d = hexDistance(here.col, here.row, t.col, t.row);
+    if (d <= LOYALTY_RANGE) sub += c.population * (LOYALTY_RANGE + 1 - d);
+  }
+  return sub;
+}
+
+/** The own-against-foreign pressure term, `LOYALTY_PRESSURE_SCALE` wide. */
+function pressureTerm(own: number, foreign: number): number {
+  return own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+}
+
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
   const here = state.map.tiles[city.centerIndex];
-  const pressureFrom = (cities: City[]): number => {
-    let sub = 0;
-    for (const c of cities) {
-      const t = state.map.tiles[c.centerIndex];
-      const d = hexDistance(here.col, here.row, t.col, t.row);
-      if (d <= LOYALTY_RANGE) sub += c.population * (LOYALTY_RANGE + 1 - d);
-    }
-    return sub;
-  };
   let own = 0;
   let foreign = 0;
   for (const s of state.seats) {
-    const sub = pressureFrom(s.cities) * agePressureFactor(state, s.seat);
+    const sub = citizenPressure(state, here, s.cities) * agePressureFactor(state, s.seat);
     if (s.seat === city.seat) own += sub;
     // CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure on
     // each other."
     else if (!alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) foreign += sub;
   }
-  const pressure =
-    own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
-  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city)
+  // CIV6: a Free City's citizens press on their neighbours like any other
+  // city's. The Free Cities player has no age, so its factor is 1.
+  if (state.freeSeat) foreign += citizenPressure(state, here, state.freeSeat.cities);
+  return pressureTerm(own, foreign) + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city)
     + greatWorkLoyalty(state, city);
 }
 
+/** A FREE CITY's loyalty per turn. CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES):
+ *  the Free Cities player makes `FREE_CITY_LOYALTY_PER_TURN` for its city,
+ *  where a major's city takes its owner's amenity, governor, policy and roster
+ *  terms — and the Free Cities player carries none of those. Its own side of
+ *  the pressure term is every Free City's citizens; the foreign side is every
+ *  major's, at that major's age factor; and what STANDS in the city pays its
+ *  flat loyalty to whoever holds it. Each major's share also accrues into the
+ *  city's `freePressure` race — "the most Loyalty pressure on it since the
+ *  Free City became independent". */
+export function freeCityLoyaltyDelta(state: GameState, city: City): number {
+  const here = state.map.tiles[city.centerIndex];
+  const own = citizenPressure(state, here, state.freeSeat?.cities ?? []);
+  const race = (city.freePressure ??= state.seats.map(() => 0));
+  let foreign = 0;
+  for (const s of state.seats) {
+    const sub = citizenPressure(state, here, s.cities) * agePressureFactor(state, s.seat);
+    foreign += sub;
+    race[s.seat] = (race[s.seat] ?? 0) + sub;
+  }
+  return FREE_CITY_LOYALTY_PER_TURN + pressureTerm(own, foreign) + builtLoyalty(state, city);
+}
+
 /** CIV6 (Monument): "+1 Loyalty", and (Government Plaza) "+8 Loyalty to this
- *  city" — the flat per-turn term everything standing in the city adds. A
- *  district pays only once complete and unpillaged, and a dark district takes
- *  its buildings with it. */
-export function standingLoyalty(state: GameState, city: City): number {
+ *  city" — the flat per-turn term of what STANDS in the city, paid to whoever
+ *  holds it, the Free Cities player included. A district pays only once
+ *  complete and unpillaged, and a dark district takes its buildings with it. */
+export function builtLoyalty(state: GameState, city: City): number {
   const dark = pillagedDistrictTypes(state.map, city.districts);
   let n = cityDistrictSum(state, city, 'loyalty');
   for (const b of city.buildings) {
@@ -449,6 +480,13 @@ export function standingLoyalty(state: GameState, city: City): number {
     if (!def || dark.has(def.district)) continue;
     n += def.loyalty ?? 0;
   }
+  return n;
+}
+
+/** The whole flat per-turn term a MAJOR's city takes: what stands in it, then
+ *  its owner's roster, route, garrison, governor and policy rows. */
+export function standingLoyalty(state: GameState, city: City): number {
+  let n = builtLoyalty(state, city);
   // CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's rows
   // for a garrisoned unit, the second only for a Corps or an Army
   const mods = getModifiers(state, city.seat);
@@ -504,7 +542,7 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
 
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false): boolean {
   const govBonus = hasGovernor ? GOVERNOR_LOYALTY : ungovernedLoyalty(state, city.seat);
-  if (!state.seats.some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
+  if (!cityHolders(state).some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
   // CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia and
   // located on the same continent as the Phoenician Capital are 100% Loyal."
   const phoen = getModifiers(state, city.seat).coastalHomeLoyal
@@ -521,6 +559,19 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
   return city.loyalty <= 0;
 }
 
+/** CIV6 (Eleanor, EFFECT_ADJUST_PLAYER_SKIP_FREE_CITY_STEP): does a city
+ *  whose loyalty collapses under this seat's pull join it at once? The
+ *  RECEIVER's roster row (`SKIP_FREE_CITY_ROWS`). */
+export function skipsFreeCityStep(state: GameState, seat: number): boolean {
+  return SKIP_FREE_CITY_ROWS.some((r) => rowIsFor(r, civOf(state, seat), leaderOf(state, seat)));
+}
+
+/** A city at 0 loyalty REVOLTS. CIV6: "When Loyalty reaches 0, the city
+ *  revolts against its owner and becomes a Free City" — unless the seat
+ *  pressing hardest on it right now skips that step (Eleanor), in which case
+ *  it joins that seat directly. The pull is the RAW citizen pressure, no age
+ *  factor, the owner and its cultural allies excluded; ties to the lowest
+ *  seat id. */
 export function flipCity(state: GameState, city: City): void {
   const here = state.map.tiles[city.centerIndex];
   let winner: Seat | null = null;
@@ -530,19 +581,58 @@ export function flipCity(state: GameState, city: City): void {
     // CIV6 (Cultural alliance 1): an ally exerts nothing, so it never
     // receives the flip either.
     if (alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) continue;
-    let pressure = 0;
-    for (const c of s.cities) {
-      const t = state.map.tiles[c.centerIndex];
-      const d = hexDistance(here.col, here.row, t.col, t.row);
-      if (d <= LOYALTY_RANGE) pressure += c.population * (LOYALTY_RANGE + 1 - d);
-    }
+    const pressure = citizenPressure(state, here, s.cities);
     if (pressure > best) {
       best = pressure;
       winner = s;
     }
   }
+  if (winner && skipsFreeCityStep(state, winner.seat)) {
+    transferCity(state, city.seat, winner, city, 'loyalty collapsed');
+    return;
+  }
+  transferCity(state, city.seat, freeSeatOf(state), city, 'revolted');
+}
+
+/** A Free City at 0 loyalty JOINS a seat. CIV6: "it will join the
+ *  Civilization that has exerted the most Loyalty pressure on it since the
+ *  Free City became independent" — the `freePressure` race, ties to the
+ *  lowest seat id. A seat that pulled nothing, or holds no city any more,
+ *  takes nothing; with no taker the city stays Free at 0. */
+function joinFromFreeCity(state: GameState, city: City): void {
+  const race = city.freePressure ?? [];
+  let winner: Seat | null = null;
+  let best = 0;
+  for (const s of state.seats) {
+    if (s.cities.length === 0) continue;
+    const pulled = race[s.seat] ?? 0;
+    if (pulled > best) {
+      best = pulled;
+      winner = s;
+    }
+  }
   if (!winner) return;
-  transferCity(state, city.seat, winner, city, 'loyalty collapsed');
+  transferCity(state, FREE_SEAT, winner, city, 'joined');
+}
+
+/** The FREE CITIES player's turn, after every major's: each Free City heals
+ *  as any unbesieged city does and runs `freeCityLoyaltyDelta`; the ones that
+ *  reach 0 join their race's winner, in array order, after the walk. It
+ *  fields no units and runs no strike of its own. */
+export function freeCitiesPhase(state: GameState): void {
+  const free = state.freeSeat;
+  if (!free || free.cities.length === 0) return;
+  const joiners: City[] = [];
+  for (const city of [...free.cities]) {
+    const centre = state.map.tiles[city.centerIndex];
+    if (!encircled(state, centre, FREE_SEAT) && !irradiated(centre)) {
+      city.hp = Math.min(CITY_MAX_HP, city.hp + CITY_HEAL_PER_TURN);
+    }
+    const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
+    city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
+    if (city.loyalty <= 0) joiners.push(city);
+  }
+  for (const city of joiners) joinFromFreeCity(state, city);
 }
 
 /**
@@ -859,15 +949,18 @@ export function transferCity(
     // so a city taken only to be razed opens it too.
     const _cq = seatBuildingSum(state, to.seat, 'conquestProdTurns');
     if (_cq > 0) to.conquestProdTurns = _cq;
-    grievanceCityTaken(state, to.seat, fromSeat, to.cities.length >= MAX_CITIES_PER_SEAT);
-    // "Captured the final city of a civilization: 150 (all remaining civs
-    // gain Grievances against you)" — the loser's list is about to lose this
-    // one, so one city left IS the last.
-    if ((loser?.cities.length ?? 0) <= 1) grievanceLastCity(state, to.seat);
+    // A Free City belongs to nobody, so taking one aggrieves nobody.
+    if (isCiv(fromSeat)) {
+      grievanceCityTaken(state, to.seat, fromSeat, to.cities.length >= MAX_CITIES_PER_SEAT);
+      // "Captured the final city of a civilization: 150 (all remaining civs
+      // gain Grievances against you)" — the loser's list is about to lose this
+      // one, so one city left IS the last.
+      if ((loser?.cities.length ?? 0) <= 1) grievanceLastCity(state, to.seat);
+    }
   }
   if (loser) {
     loser.cities = loser.cities.filter((c) => c.id !== civCity.id);
-    relocatePalace(loser.cities);
+    if (isCiv(fromSeat)) relocatePalace(loser.cities);
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
@@ -909,8 +1002,12 @@ export function transferCity(
     seat: to.seat,
     centerIndex: civCity.centerIndex,
     // CIV6 (Great Turkish Bombard): "Conquered cities do not lose
-    // Population" — `keepPct` of what stood, over the usual quarter lost
-    population: Math.max(1, Math.floor(civCity.population * Math.max(0.75, getModifiers(state, to.seat).conquestKeepPct / 100))),
+    // Population" — `keepPct` of what stood, over the usual quarter lost. A
+    // transfer by loyalty is not a conquest: the install prices population
+    // after a CONQUEST only, and a city that revolts or joins keeps its own.
+    population: why === 'conquered'
+      ? Math.max(1, Math.floor(civCity.population * Math.max(0.75, getModifiers(state, to.seat).conquestKeepPct / 100)))
+      : civCity.population,
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: civCity.tilesAcquired,
@@ -949,11 +1046,21 @@ export function transferCity(
     artifactSeats: civCity.artifactSeats ? [...civCity.artifactSeats] : undefined,
     gwArtType: civCity.gwArtType ? [...civCity.gwArtType] : undefined,
     gwArtArtist: civCity.gwArtArtist ? [...civCity.gwArtArtist] : undefined,
-    hp: Math.round(CITY_MAX_HP / 2),
+    // a CONQUERED city is taken at half health; a city that revolts or joins
+    // was never hit, and keeps what it had
+    hp: why === 'conquered' ? Math.round(CITY_MAX_HP / 2) : civCity.hp,
+    // CIV6 (LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY): a loyalty
+    // transfer starts the city at 100 — the revolt and the joining alike
+    loyalty: why === 'conquered' ? undefined : LOYALTY_AFTER_CULTURAL_TRANSFER,
+    // the race a FREE CITY runs: every major starts at nothing "since the
+    // Free City became independent"
+    freePressure: isFreeSeat(to.seat) ? state.seats.map(() => 0) : undefined,
     foundedTurn: state.turn,
   };
-  // walls kept, outer pool 0 — a captured city stands behind a breach
-  if (keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
+  // walls kept, outer pool 0 — a captured city stands behind a breach; a
+  // transfer by loyalty breaches nothing
+  if (why === 'conquered' && keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
+  else if (why !== 'conquered') flipped.outerHp = civCity.outerHp;
   to.cities.push(flipped);
   if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
@@ -961,12 +1068,15 @@ export function transferCity(
   if (why === 'conquered' && isCiv(fromSeat) && isCiv(to.seat)) {
     raiseEmergency(state, EMERGENCY_MILITARY, to.seat, flipped.id, [fromSeat]);
   }
-  addEraScore(state, to.seat, ERA_SCORE_CONQUER);
-  revealAround(state, to.seat, civCity.centerIndex, 3);
+  // the Free Cities player scores no era and explores nothing
+  if (isCiv(to.seat)) {
+    addEraScore(state, to.seat, ERA_SCORE_CONQUER);
+    revealAround(state, to.seat, civCity.centerIndex, 3);
+  }
   // Real Civ 6 pays the captor gold for taking a city. One rate, every captor.
   if (plunder) to.treasury += 40;
   state.eventLog.push(`${civCity.name} defected to ${to.name}! (${why})`);
-  if (loser && loser.cities.length === 0) {
+  if (loser && loser.cities.length === 0 && isCiv(fromSeat)) {
     setWar(state, loser.seat, to.seat, false);
     warWearinessPeace(state, to.seat, loser.seat);
     state.eventLog.push(`${loser.name} has been eliminated.`);
@@ -1420,7 +1530,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // no-opped on the GPU (9029 rng 2026006086 t239, esc +3600).
         if (!((UNITS[unit.type]?.combat ?? 0) > 0)) return;
         const raidable = (t: Tile): boolean => isTerritorial(tileSeat(t))
-          && civsAtWar(state, unitSeat(unit), tileSeat(t));
+          && unitsHostile(state, unit, { seat: tileSeat(t) });
         const hereOwned = raidable(here);
         // CIV6: pillaging takes "3 Movement Points, or all of your movement";
         // Depredation prices it at 1.

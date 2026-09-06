@@ -704,7 +704,7 @@ class SimOrders:
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
-                        row, torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
+                        row, self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
                     cs_t = torch.zeros_like(valid)
                     if self.S > 0:
                         _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -1731,7 +1731,8 @@ class SimOrders:
             ctr = self.centre_slot_at.gather(1, nbc) >= 0
             # the CENTRE tile only — TS's cityStateTarget arm keys on
             # `centerIndex`, never on territory, and only for a LIVE minor
-            cs_nb = self._centre_seat_plane().gather(1, nbc) >= 100
+            _ctr_nb = self._centre_seat_plane().gather(1, nbc)
+            cs_nb = (_ctr_nb >= 100) & (_ctr_nb < BARB_SEAT)
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
@@ -1781,7 +1782,7 @@ class SimOrders:
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             _csp = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            cs_here = _csp >= 100
+            cs_here = (_csp >= 100) & (_csp < BARB_SEAT)
             _csi = (_csp - 100).clamp(min=0)
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
             _enc_here = (

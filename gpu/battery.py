@@ -530,6 +530,7 @@ def main() -> int:
                 ("governor_cityless", [py, "tests/gpu/governor_cityless_test.py"], 2),  # A-8r a cityless seat's governor phase does not run
                 ("stack_defender_tie", [py, "tests/gpu/stack_defender_tie_test.py"], 2),  # A-9r a ranged hit on a stacked hex goes to the hull on a tie
                 ("capture_cavalry", [py, "tests/gpu/capture_cavalry_test.py"], 2),  # C-58 a beaten cavalry unit may change hands
+                ("free_city", [py, "tests/gpu/free_city_test.py"], 2),  # C-60 a revolt makes a Free City; Eleanor skips the step; anyone may take it
                 ("storms", [py, "tests/gpu/storms_test.py"], 2),  # C-49 the eight named storms and the roster rows on them
                 ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # C-16 the released spy is the one that was caught
                 ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # C-56 a trade route carries religious pressure both ways

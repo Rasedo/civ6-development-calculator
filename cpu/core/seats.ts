@@ -128,7 +128,26 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
     return state.cityStates?.find((c) => c.id === id);
   }
   if (isBarbSeat(seat)) return state.barbSeat;
+  if (isFreeSeat(seat)) return state.freeSeat;
   return state.seats[seat];
+}
+
+/** The FREE CITIES seat, made at the first revolt. It plays no civilization,
+ *  researches nothing and never acts; it exists so a Free City has a holder
+ *  every city walk resolves through `seatOf`. */
+export function freeSeatOf(state: GameState): Seat {
+  if (!state.freeSeat) {
+    state.freeSeat = { ...emptySeat(FREE_SEAT), name: 'Free Cities', color: '#7f7f7f' };
+  }
+  return state.freeSeat;
+}
+
+/** Every seat whose `cities` list can hold a City object: the majors, then
+ *  the Free Cities seat when it exists — what `cityAtIndex` and the
+ *  cross-engine city walk read. City-states hold their one city on
+ *  themselves, not as a City. */
+export function cityHolders(state: GameState): Seat[] {
+  return state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
 }
 
 /** the civilization a seat plays (`CIV_IDS`), or null for a seat without
@@ -182,13 +201,17 @@ export const isCiv = (seat: number): boolean => seat >= 0 && seat < CITY_STATE_S
 
 /** A seat that HOLDS TERRITORY and can be warred: a major or a city-state.
  *  What a pillage, a war march and a hostile tile test all ask. */
-export const isTerritorial = (seat: number): boolean => seat >= 0 && seat < BARB_SEAT;
+export const isTerritorial = (seat: number): boolean => (seat >= 0 && seat < BARB_SEAT) || seat === FREE_SEAT;
+
+/** CIV6's Free Cities player: holds cities and territory, never a civ. */
+export const isFreeSeat = (seat: number): boolean => seat === FREE_SEAT;
 
 /** Is this a city-state? They hold territory and act, but are never civs. */
 export const isCityStateSeat = (seat: number): boolean => seat >= CITY_STATE_SEAT_BASE && seat < BARB_SEAT;
 
 export function seatClass(seat: number): SeatClass {
   if (isBarbSeat(seat)) return 'hostile';
+  if (isFreeSeat(seat)) return 'free';
   if (isCityStateSeat(seat)) return 'minor';
   return 'major';
 }

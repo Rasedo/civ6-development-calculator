@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
-import { BARB_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { BARB_SEAT, FREE_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
@@ -248,7 +248,7 @@ describe('loyalty', () => {
     );
   });
 
-  it('a city at zero loyalty defects to the pressuring civ', () => {
+  it('a city at zero loyalty revolts into a Free City, not to the pressuring civ', () => {
     const state = makeState(makeMap(20, 14));
     foundCity(state, tileAtCoords(state.map, 2, 7).index, 0);
     const border = foundCity(state, tileAtCoords(state.map, 12, 7).index, 0).city!;
@@ -258,12 +258,13 @@ describe('loyalty', () => {
 
     flipCity(state, border);
     expect(seatOf(state, 0)!.cities.some((c) => c.id === border.id)).toBe(false);
-    expect(civ.cities.some((c) => c.name === border.name)).toBe(true);
+    // CIV6: the city becomes a Free City first; only Eleanor's pull skips
+    // that step (tests/cpu/city/free-city.test.ts)
+    expect(civ.cities.some((c) => c.name === border.name)).toBe(false);
+    expect(state.freeSeat!.cities.some((c) => c.name === border.name)).toBe(true);
     const center = state.map.tiles[border.centerIndex];
-    // The tile now belongs to the OTHER civ, which the one seat field says
-    // directly.
-    expect(tileSeat(center)).toBe(civ.seat);
-    expect(state.eventLog.some((e) => e.includes('defected'))).toBe(true);
+    expect(tileSeat(center)).toBe(FREE_SEAT);
+    expect(state.eventLog.some((e) => e.includes('revolted'))).toBe(true);
   });
 
   it('loyalty never moves in civ-free games', () => {

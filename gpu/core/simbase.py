@@ -556,6 +556,10 @@ WW_BATTLE_KEYS = frozenset({
 })
 
 BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT
+# CIV6's FREE CITIES player (CIVILIZATION_FREE_CITIES) — cpu/core/seats.ts
+# FREE_SEAT. One seat holding every city loyalty took from its owner; its
+# row in the city planes is `FREE_ROW`, its tiles carry this id.
+FREE_SEAT = 300
 
 # WHAT A SEAT MAY DO — the twin of cpu/data/seats.ts, same two bits. See that
 # file for the ADMISSIBILITY RULE that keeps the set this small: a bit earns a
@@ -568,6 +572,10 @@ SEAT_CAPS = {
     "major": {"xp": True, "always_hostile": False},   # seat 0 and the civ seats
     "minor": {"xp": True, "always_hostile": False},   # city-states
     "hostile": {"xp": False, "always_hostile": True},  # barbarians
+    # CIV6: a Free City "will seek to defend themselves from military
+    # intrusion" and may be taken by anyone — the barbarians' hostility bit,
+    # though a Free City fields no unit of its own here
+    "free": {"xp": False, "always_hostile": True},
 }
 
 POOL_CLASS = {"major": "major", "barb": "hostile"}
@@ -579,6 +587,8 @@ def seat_class(seat: int) -> str:
     duplicate."""
     if seat == BARB_SEAT:
         return "hostile"
+    if seat == FREE_SEAT:
+        return "free"
     if 100 <= seat < BARB_SEAT:
         return "minor"
     return "major"
@@ -739,6 +749,7 @@ _MUTABLE = [
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
+    "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
     "civ_gov_appointed", "civ_gov_city", "civ_gov_minor", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)

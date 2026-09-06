@@ -324,8 +324,11 @@ class SimMasks:
             tier = torch.maximum(tier, torch.where(bl[:, bi], torch.full_like(tier, t),
                                                    torch.zeros_like(tier)))
         if self._urban_def_tech >= 0:
-            tier = torch.where(self.civ_techs[b, r0, self._urban_def_tech],
-                               torch.full_like(tier, self._walls_tier_urban), tier)
+            # a MAJOR's tech; the Free Cities row researches nothing, so its
+            # city keeps the walls it has (`seatOf(FREE_SEAT).research` is empty)
+            major = r0 < self.n_majors
+            urban = self.civ_techs[b, r0.clamp(max=self.n_majors - 1), self._urban_def_tech] & major
+            tier = torch.where(urban, torch.full_like(tier, self._walls_tier_urban), tier)
         return torch.where((row >= 0) & (col >= 0), tier, torch.zeros_like(tier))
 
     def _owner_city_col(self, seat_row: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
@@ -333,9 +336,10 @@ class SimMasks:
         row owns it, over the whole batch. -1 where nobody does."""
         t0 = tile.clamp(min=0)
         out = torch.full_like(t0, -1)
-        for r in range(self.n_majors):
+        # the majors' rows, then the Free Cities row (matched by its SEAT id)
+        for r in (*range(self.n_majors), self.FREE_ROW):
             sl = self.city_slot_at(r).gather(1, t0.unsqueeze(1)).squeeze(1)
-            out = torch.where((seat_row == r) & (sl >= 0), sl, out)
+            out = torch.where((seat_row == int(self._ROW_SEAT[r])) & (sl >= 0), sl, out)
         return torch.where(tile >= 0, out, torch.full_like(out, -1))
 
     def _walls_max_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
@@ -2676,6 +2680,14 @@ class SimMasks:
         out[bs, rank[bs, slots]] = slots + self.POOL_LO["major"]
         return out
 
+    def _centre_target_seat(self, ctr: torch.Tensor) -> torch.Tensor:
+        """`ctr` (a gather of `_centre_seat_plane`) with every centre that is
+        not a CITY-row target masked to -1: a major's centre and a FREE CITY's
+        stay (both answer through `_seats_hostile` and `_holder_row`); a
+        city-state's centre takes its own `_citystate_target` arm; nobody's
+        tile is nothing."""
+        return torch.where((ctr >= 0) & ((ctr < 100) | (ctr == FREE_SEAT)), ctr, torch.full_like(ctr, -1))
+
     def _centre_seat_plane(self) -> torch.Tensor:
         """[B, T] — the ABSOLUTE seat holding a CITY CENTRE at each tile, -1
         elsewhere: `cityAtIndex` and `cityStateAt` answered by one plane. A
@@ -2818,8 +2830,7 @@ class SimMasks:
         ).reshape(B, N, 6)
         ctr_seat = self._centre_seat_plane()
         ctr_nb = ctr_seat.gather(1, nbc)
-        ctr_major = (ctr_nb >= 0) & (ctr_nb < 100)
-        city_t = (self._seats_hostile(row, torch.where(ctr_major, ctr_nb, neg))).reshape(B, N, 6)
+        city_t = (self._seats_hostile(row, self._centre_target_seat(ctr_nb))).reshape(B, N, 6)
         cs_t = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
         if self.S > 0:
             _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -3373,7 +3384,7 @@ class SimMasks:
             sea = sea | (h & nav)
             land = land | (h & ~nav)
         cs = self._centre_seat_plane()
-        ctr = self._seats_hostile(row, torch.where((cs >= 0) & (cs < 100), cs, neg))
+        ctr = self._seats_hostile(row, self._centre_target_seat(cs))
         return land, sea, ctr
 
     def _air_wreckable(self, row: int) -> torch.Tensor:
