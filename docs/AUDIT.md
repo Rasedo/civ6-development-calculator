@@ -1330,6 +1330,14 @@ index; the full narrative is in the git log, and the durable lessons are in
 the memory files this appendix names. Delete a bullet once its class is
 mirrored in memory.
 
+- **A-13r. Silt on a natural wonder paid production on the GPU. CLOSED
+  2026-09-06.** A storm's production fertility landed on the Eye of the Sahara
+  (both engines write it: the wonder is land and no mountain) and `_neutral_prod`
+  added it where TS's wonder arm early-returns above the fertility lines; the
+  food read already carried the guard. Found the turn the storms merged (seed
+  9014 t148). Lesson: a new WRITER of an old plane reaches tiles the old writers
+  never did, so every reader of that plane is re-tested by the new reach — grep
+  the plane's readers, not the writer's. Lane: `storms` step 7 and its TS twin.
 - **A-12r. The Amazon counted a CHOPPED rainforest. CLOSED 2026-09-06.** The
   GPU's feature-appeal term read `feat_id == fi` bare, and `feat_id` keeps a
   chopped tile's old id; the strip flag is the live `n.feature` read TS does.

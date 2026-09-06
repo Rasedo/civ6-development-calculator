@@ -559,7 +559,11 @@ class SimEconomy:
         when it builds the yield context from `getModifiers(state,
         city.seat)`. Cached per _eff_version (improvement/pillage changes
         bump it)."""
-        base = self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype)
+        # a natural-wonder tile keeps the wonder's fixed production, as its
+        # food does in `_food_tail`: tileYields early-returns above the
+        # fertility lines, so silt that lands there never pays
+        base = torch.where(self.nwonder, self.tile_yields[:, :, 1],
+                           self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype))
         if not self.improvements_on:
             return base
         if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:

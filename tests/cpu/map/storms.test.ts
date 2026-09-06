@@ -6,6 +6,8 @@ import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { disasterPhase, stormChances, stormFootprint, stormTile } from '../../../cpu/core/disasters';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair } from '../../../cpu/data/disasters';
 import { disasterRateMult } from '../../../cpu/data/climate';
+import { makeYieldCtx } from '../../../cpu/core/effects';
+import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
 /**
@@ -139,6 +141,17 @@ describe('the eight storms are the install\'s table', () => {
     expect(stormFootprint(map, tileAtCoords(map, 0, 0), 19).length).toBeLessThan(19);
   });
 
+  it('silt on a natural wonder pays nothing: the wonder keeps its own row', () => {
+    const state = board(null);
+    const t = tileAtCoords(state.map, 5, 5);
+    t.feature = 'EYE_OF_THE_SAHARA';
+    t.terrain = 'DESERT';
+    t.elevation = 'HILLS';
+    const before = tileYields(makeYieldCtx(state, 0), t);
+    t.fertility = 2;
+    t.fertilityProd = 1;
+    expect(tileYields(makeYieldCtx(state, 0), t)).toEqual(before);
+  });
   it('a storm tile draws ten times whatever stands there', () => {
     const state = board(null);
     const tile = tileAtCoords(state.map, 5, 5);
