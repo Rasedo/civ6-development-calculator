@@ -174,10 +174,14 @@ def main() -> None:
                      (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)]
         for row in seats:
             rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
-            relig = rec[9]
+            # `_decide_turn`'s record, by position: prod, dtile, tech, civic,
+            # war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat,
+            # cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass,
+            # policies — a new column shifts everything after it
+            relig = rec[10]
             if isinstance(relig, tuple) and len(relig) == 2 and relig[0] is not None:
                 mark("apostleBuy", (relig[0] == 6), t)
-            vote = rec[18]
+            vote = rec[22]
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
