@@ -1263,8 +1263,11 @@ under their blocker so the dependency is readable, and both halves count.
   (6 scenes, `free_city` lane); the merged war-kind gate and the casus belli
   conditions read only majors' cities and founders, so the sentinel never
   reaches them.
-  REACH: `tools/gpu/reachability_probe.py` counts `freeCity` / `freeLeft`;
-  see the round's report for the driven measurement.
+  REACH, measured 2026-09-07 over 24 seeds x 250 driven turns: ONE city
+  revolts into the Free class (`freeCity` 1/24, first at t202) and none
+  leaves it again inside the horizon (`freeLeft` 0/24) — the join race is
+  held by `free_city_test` / `free-city.test.ts` alone. The moving capital
+  has no reach at all until C-69's Cothon lands the project row.
   OPEN — each an exact question, none a magnitude this round may invent:
   - the Free City's OWN DEFENCE: the pedia says it "will repair pillaged
     improvements and spawn units to defend itself, and may build walls", and
