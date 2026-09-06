@@ -96,6 +96,12 @@ export interface City {
    *  up when it is queued again. Invalidated work banks to `productionBank`. */
   itemBank?: Record<number, number>;
   loyalty?: number;
+  /** A FREE CITY's race: the loyalty pressure each major seat has exerted on
+   *  it "since the Free City became independent", dense over seats. CIV6:
+   *  at 0 loyalty "it will join the Civilization that has exerted the most
+   *  Loyalty pressure on it since the Free City became independent". Held
+   *  only while the city is Free. */
+  freePressure?: number[];
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */
   spySources?: number[];
@@ -407,6 +413,10 @@ export interface GameState {
    * its width for the whole game. The GPU's `S`. */
   cityStateMax?: number;
   barbSeat: Seat;
+  /** CIV6's FREE CITIES player (`FREE_SEAT`): the cities loyalty took from
+   *  their owners, until each joins whoever pulled hardest. Created by
+   *  `freeSeatOf` at the first revolt; absent until then. */
+  freeSeat?: Seat;
   claimedPantheons: string[];
   claimedBeliefs: string[];
   claimedEnhancers?: string[];

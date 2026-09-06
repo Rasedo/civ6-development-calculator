@@ -1,6 +1,10 @@
 
 
-export type SeatClass = 'major' | 'minor' | 'hostile';
+/** `free` is the FREE CITIES player of CIV6 (CIVILIZATION_FREE_CITIES,
+ *  CIVILIZATION_LEVEL_FREE_CITIES): it holds the cities loyalty took from
+ *  their owners, founds nothing, and stands in DIPLO_STATE_FREE_CITIES_NEUTRAL
+ *  with everyone — anyone may attack it without a declaration. */
+export type SeatClass = 'major' | 'minor' | 'hostile' | 'free';
 
 export interface SeatCaps {
   /**
@@ -18,6 +22,10 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
   major: { xp: true, alwaysHostile: false },
   minor: { xp: true, alwaysHostile: false },
   hostile: { xp: false, alwaysHostile: true },
+  // CIV6: a Free City "will seek to defend themselves from military
+  // intrusion" and may be taken by anyone — the barbarians' hostility bit,
+  // though a Free City fields no unit of its own here.
+  free: { xp: false, alwaysHostile: true },
 };
 
 /**
@@ -79,6 +87,13 @@ export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 
 export const LOYALTY_MAX = 100;
 export const LOYALTY_RANGE = 9;
+/** CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES 10): the loyalty a Free City
+ *  makes for itself each turn, where a city-state makes 20. */
+export const FREE_CITY_LOYALTY_PER_TURN = 10;
+/** CIV6 (LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY 100): what a city
+ *  starts at after a loyalty transfer — the revolt into a Free City and the
+ *  Free City's later joining alike. */
+export const LOYALTY_AFTER_CULTURAL_TRANSFER = 100;
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = 20;
 /** Per-turn loyalty by amenity tier name. Real Civ 6 ±6/±3. */

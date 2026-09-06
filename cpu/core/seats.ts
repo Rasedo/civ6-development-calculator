@@ -16,6 +16,9 @@ import { NO_SEAT } from './types';
 export { NO_SEAT };
 const CITY_STATE_SEAT_BASE = 100;
 export const BARB_SEAT = 200;
+/** CIV6's FREE CITIES player — one seat holding every city loyalty has
+ *  taken from its owner. Above every id space the predicates below bound. */
+export const FREE_SEAT = 300;
 
 export const seatOfCityState = (cityStateId: number): number => CITY_STATE_SEAT_BASE + cityStateId;
 export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_BASE;
