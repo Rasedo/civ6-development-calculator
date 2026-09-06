@@ -9,6 +9,7 @@ import type { YieldKey } from '../core/types';
 import type { Era } from './techs';
 import type { SlotKind } from './policies';
 import type { CivId, LeaderId } from './seats';
+import type { WarKindId } from './warKinds';
 
 /** CIV6 (Iteru, TRAIT_RIVER_FASTER_BUILDTIME_DISTRICT / _WONDER): "+15%
  *  Production towards Districts and Wonders built next to a River." */
@@ -347,6 +348,35 @@ export interface CaptureRow {
 }
 export const CAPTURE_ROWS: readonly CaptureRow[] = [
   { leader: 'GENGHIS_KHAN', classes: ['LIGHT_CAV', 'HEAVY_CAV'] },
+];
+
+/** CIV6 (Expansion1_Leaders.xml, the DiplomaticYieldSource modifiers): what a
+ *  leader's units and cities earn for `WAR_BUFF_TURNS` after DECLARING a war
+ *  of one kind (`kind` is a `WAR_KINDS` id), and the civic at which the
+ *  leader may declare that kind (EFFECT_ADD_DIPLOMATIC_ACTION_OVERRIDE, in
+ *  place of the row's own `InitiatorPrereqCivic`).
+ *  - Arthashastra (TRAIT_TERRITORIAL_WAR_COMBAT Amount 5 ReligiousOnly false,
+ *    TRAIT_TERRITORIAL_WAR_MOVEMENT Amount 2, TRAIT_TERRITORIAL_WAR_PREREQ_OVERRIDE
+ *    CIVIC_MILITARY_TRAINING), all TurnsActive 10;
+ *  - Bannockburn (TRAIT_LIBERATION_WAR_PRODUCTION YIELD_PRODUCTION Amount 100,
+ *    TRAIT_LIBERATION_WAR_MOVEMENT Amount 2, TRAIT_LIBERATION_WAR_PREREQ_OVERRIDE
+ *    CIVIC_DEFENSIVE_TACTICS), all TurnsActive 10. */
+export interface WarBuffRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  kind: WarKindId;
+  /** flat Combat Strength on every combat unit */
+  combat: number;
+  /** flat Movement on every unit */
+  moves: number;
+  /** percent Production in every city */
+  prodPct: number;
+  /** the civic the row's `civic` prerequisite is overridden to */
+  civicOverride: string;
+}
+export const WAR_BUFF_ROWS: readonly WarBuffRow[] = [
+  { leader: 'CHANDRAGUPTA', kind: 'territorial', combat: 5, moves: 2, prodPct: 0, civicOverride: 'MILITARY_TRAINING' },
+  { leader: 'ROBERT_THE_BRUCE', kind: 'liberation', combat: 0, moves: 2, prodPct: 100, civicOverride: 'DEFENSIVE_TACTICS' },
 ];
 
 /** CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT under UNIT_EMBARKED): extra Movement

@@ -3,6 +3,7 @@ import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP } from '../data/religion';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
+import { WAR_KIND_SURPRISE } from '../data/warKinds';
 import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
 import { gpPermOf } from '../data/greatPeople';
@@ -101,7 +102,7 @@ export function emptySeat(seat: number): Seat {
     cities: [], nextCityId: 0,
     name: '', color: '', aggression: 0, civ: -1,
     ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
-    wars: [], formalWars: [], denounced: {},
+    wars: [], warKinds: {}, denounced: {},
     influencePoints: 0, envoysAvailable: 0,
     peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
@@ -278,45 +279,42 @@ export function setTreatyTurnsWith(state: GameState, a: number, b: number, v: nu
   state.treatyTurns[warClockKey(a, b)] = v;
 }
 
+/** The KIND of the war between `a` and `b` as a `WAR_KINDS` code; -1 when
+ *  the pair's war carries none. */
+export function warKindWith(state: GameState, a: number, b: number): number {
+  const v = seatOf(state, a)?.warKinds?.[b] ?? 0;
+  return v === 0 ? -1 : Math.abs(v) - 1;
+}
+
+/** Did `a` DECLARE the war it is fighting with `b`? */
+export function warDeclaredBy(state: GameState, a: number, b: number): boolean {
+  return (seatOf(state, a)?.warKinds?.[b] ?? 0) > 0;
+}
+
+/** CIV6 (DiplomaticActions.xml, UIGroup FORMALWAR): every casus belli but the
+ *  Surprise war sits in the Formal War group — what the war-weariness table
+ *  and the roster's Surprise-war bans read. */
 export function warIsFormal(state: GameState, a: number, b: number): boolean {
-  return seatOf(state, a)?.formalWars.includes(b) ?? false;
+  return warKindWith(state, a, b) > WAR_KIND_SURPRISE;
 }
 
-export function warIsGolden(state: GameState, a: number, b: number): boolean {
-  return seatOf(state, a)?.goldenWars?.includes(b) ?? false;
+/** Stamp a declaration's kind on both cells: the declarer's positive, the
+ *  target's negative. */
+export function setWarKind(state: GameState, declarer: number, target: number, kind: number): void {
+  if (declarer === target) return;
+  const sa = seatOf(state, declarer);
+  const sb = seatOf(state, target);
+  if (!sa || !sb) return;
+  (sa.warKinds ??= {})[target] = kind + 1;
+  (sb.warKinds ??= {})[declarer] = -(kind + 1);
 }
 
-export function setWarGolden(state: GameState, a: number, b: number, on: boolean): void {
-  if (a === b) return;
+/** The ended war's kind clears from both cells. */
+export function clearWarKind(state: GameState, a: number, b: number): void {
   const sa = seatOf(state, a);
   const sb = seatOf(state, b);
-  if (!sa || !sb) return;
-  const put = (s: Seat, other: number) => {
-    const g = (s.goldenWars ??= []);
-    if (on) {
-      if (!g.includes(other)) g.push(other);
-    } else {
-      s.goldenWars = g.filter((x) => x !== other);
-    }
-  };
-  put(sa, b);
-  put(sb, a);
-}
-
-export function setWarFormal(state: GameState, a: number, b: number, on: boolean): void {
-  if (a === b) return;
-  const sa = seatOf(state, a);
-  const sb = seatOf(state, b);
-  if (!sa || !sb) return;
-  const put = (s: Seat, other: number) => {
-    if (on) {
-      if (!s.formalWars.includes(other)) s.formalWars.push(other);
-    } else {
-      s.formalWars = s.formalWars.filter((x) => x !== other);
-    }
-  };
-  put(sa, b);
-  put(sb, a);
+  if (sa?.warKinds) delete sa.warKinds[b];
+  if (sb?.warKinds) delete sb.warKinds[a];
 }
 
 /** The DIRECTED key an Open Borders grant is stored under: `a` grants `b`. */
@@ -564,12 +562,24 @@ export function denounceLeft(state: GameState, a: number, b: number): number {
   return Math.max(0, AGREEMENT_TURNS - (state.turn - t));
 }
 
+/** Has `a`'s denouncement of `b` stood for `turns` and not yet expired? */
+export function denounceAged(state: GameState, a: number, b: number, turns: number): boolean {
+  const t = seatOf(state, a)?.denounced[b];
+  return t !== undefined && state.turn - t >= turns && state.turn - t < AGREEMENT_TURNS;
+}
+
 /** Does `a` hold a FORMAL-WAR casus belli against `b`? CIV6: "Five turns after
  *  denouncing a rival, you gain a Formal War Casus Belli against them" — and
  *  it expires with the denouncement that opened it. */
 export function denounceCasusBelli(state: GameState, a: number, b: number): boolean {
-  const t = seatOf(state, a)?.denounced[b];
-  return t !== undefined && state.turn - t >= FORMAL_WAR_MIN_TURNS && state.turn - t < AGREEMENT_TURNS;
+  return denounceAged(state, a, b, FORMAL_WAR_MIN_TURNS);
+}
+
+/** CIV6 (Formal War): "a player that Denounced you or that you have Denounced
+ *  at least 5 turns ago" — a war kind's `DenouncementTurnsRequired` is met by
+ *  a standing denouncement of that age in EITHER direction. */
+export function warDenounceHeld(state: GameState, a: number, b: number, turns: number): boolean {
+  return denounceAged(state, a, b, turns) || denounceAged(state, b, a, turns);
 }
 
 /**

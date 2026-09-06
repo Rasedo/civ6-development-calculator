@@ -102,10 +102,12 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setWarGolden, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
+import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
+import { defaultWarKind, warBuffProdPct, warKindAllowed } from './casusBelli';
+import { WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
@@ -244,31 +246,52 @@ export function seatProximity(state: GameState, a: number, b: number): number {
 }
 
 
-export function declareWar(state: GameState, actorSeat: number, seat: number): RuleResult {
-  const actor = seatOf(state, actorSeat);
-  if (!actor) return no('No such civilization.');
-  if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
-  const bound = treatyTurnsWith(state, actor.seat, seat);
+/**
+ * `declarer` DECLARES a war of `kind` on `target` — the ONE body every path
+ * that opens a war between two majors runs (the record's war column, the
+ * nuclear strike's blast): the gates, then the war axis and its clock, the
+ * routes the war cancels, the border grant and the missions it ends, the
+ * kind and the grievance it prices, and the pacts it drags in. The GPU twin
+ * is `_declare_war_major`.
+ *
+ * CIV6 (DiplomaticActions.xml): `kind` is a `WAR_KINDS` code the declarer
+ * must hold the casus belli for (`warKindAllowed`); -1 takes
+ * `defaultWarKind`. CIV6 (Declaring Friendship): Declared Friends "cannot
+ * undertake hostile actions (such as Denouncing or going to war) against
+ * each other"; an ally is a friend twice over.
+ */
+export function declareWar(state: GameState, declarer: number, target: number, kind = -1): RuleResult {
+  const actor = seatOf(state, declarer);
+  const foe = seatOf(state, target);
+  if (!actor || !foe || declarer === target) return no('No such civilization.');
+  if (civsAtWar(state, declarer, target)) return no('Already at war.');
+  if (seatsAllied(state, declarer, target) || seatsFriends(state, declarer, target)) return no('A friend cannot be attacked.');
+  const bound = treatyTurnsWith(state, declarer, target);
   if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
-  const denounced = denounceCasusBelli(state, seat, actor.seat);
-  // CIV6 (Golden Age War row, DiplomaticActions.xml): the To Arms!
-  // dedicant's casus belli requires NO denouncement and sits in the
-  // FORMALWAR group, so a golden declaration is a formal war either way.
-  const golden = goldenDedication(state, seat, DED_TO_ARMS);
-  const formal = denounced || golden;
-  // CIV6 (Faces of Peace): the war kind is what the ban reads, so the three
-  // pure reads above move AHEAD of the first mutation (`WAR_BAN_ROWS`)
-  if (warBanned(state, actor.seat, seat, formal)) {
+  const k = kind < 0 ? defaultWarKind(state, declarer, target) : kind;
+  if (!warKindAllowed(state, declarer, target, k)) return no('No casus belli for that war.');
+  // CIV6 (Faces of Peace): the war kind is what the ban reads, so every pure
+  // read above moves AHEAD of the first mutation (`WAR_BAN_ROWS`)
+  if (warBanned(state, declarer, target, k !== WAR_KIND_SURPRISE)) {
     return no('This civilization may not declare that war.');
   }
-  setWar(state, actor.seat, seat, true);
-  setWarTurnsWith(state, actor.seat, seat, 0);
-  // CIV6: war cancels every route between the two civs; the Traders return.
-  cancelRoutesBetween(state, actor.seat, seat);
-  setWarFormal(state, actor.seat, seat, formal);
-  setWarGolden(state, actor.seat, seat, golden);
-  grievanceWarDeclared(state, seat, actor.seat, formal, golden);
-  state.eventLog.push(`War declared on ${actor.name}!`);
+  setWar(state, declarer, target, true);
+  setWarTurnsWith(state, declarer, target, 0);
+  // CIV6 (Trade Route): "When war is declared, any existing Trade Routes
+  // between the two civilizations are cancelled, and the Traders servicing
+  // them are immediately recalled to their origin cities."
+  cancelRoutesBetween(state, declarer, target);
+  // An OPEN BORDERS grant cannot outlive the peace it was signed in; war
+  // opens the border it was lifting.
+  setBorderTurnsFrom(state, declarer, target, 0);
+  setBorderTurnsFrom(state, target, declarer, 0);
+  // CIV6: "when war is declared, delegations and ambassadors are kicked out"
+  // — the pair loses both halves, not the declarer's.
+  clearDelegations(state, declarer, target);
+  setWarKind(state, declarer, target, k);
+  grievanceWarDeclared(state, declarer, target, k);
+  state.eventLog.push(`${actor.name} declares a ${WAR_KINDS[k].id} war on ${foe.name}!`);
+  defensivePact(state, declarer, target);
   return ok;
 }
 
@@ -310,7 +333,7 @@ function defensivePact(state: GameState, aggressor: number, victim: number): voi
     if (civsAtWar(state, ally.seat, aggressor)) continue;
     setWar(state, ally.seat, aggressor, true);
     setWarTurnsWith(state, ally.seat, aggressor, 0);
-    setWarFormal(state, ally.seat, aggressor, true);
+    setWarKind(state, ally.seat, aggressor, WAR_KIND_FORMAL);
     setTreatyTurnsWith(state, ally.seat, aggressor, 0);
     cancelRoutesBetween(state, ally.seat, aggressor);
     setBorderTurnsFrom(state, ally.seat, aggressor, 0);
@@ -322,8 +345,7 @@ function defensivePact(state: GameState, aggressor: number, victim: number): voi
 
 function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWar(state, actor.seat, foe, false);
-  setWarFormal(state, actor.seat, foe, false);
-  setWarGolden(state, actor.seat, foe, false);
+  clearWarKind(state, actor.seat, foe);
   warWearinessPeace(state, foe, actor.seat);
   setWarTurnsWith(state, actor.seat, foe, 0);
   setTreatyTurnsWith(state, actor.seat, foe, PEACE_TREATY_TURNS);
@@ -1064,34 +1086,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       if (declaring) declareWarOnCityState(state, csId, actor.seat);
       else sueForPeaceWithCityState(state, csId, actor.seat);
     } else if (foe !== undefined && actor.seat !== foe) {
-      if (declaring && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)
-          // CIV6 (Declaring Friendship): Declared Friends "cannot undertake
-          // hostile actions (such as Denouncing or going to war) against each
-          // other".
-          && !seatsFriends(state, actor.seat, foe)
-          && treatyTurnsWith(state, actor.seat, foe) === 0) {
-        setWar(state, actor.seat, foe, true);
-        setWarTurnsWith(state, actor.seat, foe, 0);
-        // CIV6 (Trade Route): "When war is declared, any existing Trade Routes
-        // between the two civilizations are cancelled, and the Traders
-        // servicing them are immediately recalled to their origin cities."
-        cancelRoutesBetween(state, actor.seat, foe);
-        // An OPEN BORDERS grant cannot outlive the peace it was signed in;
-        // war opens the border it was lifting.
-        setBorderTurnsFrom(state, actor.seat, foe, 0);
-        setBorderTurnsFrom(state, foe, actor.seat, 0);
-        // CIV6: "when war is declared, delegations and ambassadors are kicked
-        // out" — the pair loses both halves, not the declarer's.
-        clearDelegations(state, actor.seat, foe);
-        const denounced = denounceCasusBelli(state, actor.seat, foe);
-        // CIV6 (Golden Age War row): NO denouncement required, FORMALWAR group.
-        const golden = goldenDedication(state, actor.seat, DED_TO_ARMS);
-        const formal = denounced || golden;
-        setWarFormal(state, actor.seat, foe, formal);
-        setWarGolden(state, actor.seat, foe, golden);
-        grievanceWarDeclared(state, actor.seat, foe, formal, golden);
-        state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
-        defensivePact(state, actor.seat, foe);
+      if (declaring) {
+        // every gate is the verb's own; a refused kind refuses the war
+        declareWar(state, actor.seat, foe, rec.warKind ?? -1);
       } else if (!declaring && civsAtWar(state, actor.seat, foe)) {
         const waited = warTurnsWith(state, actor.seat, foe);
         const cost = PEACE_GOLD_COST(waited);
@@ -2192,6 +2189,7 @@ export function seatPhase(state: GameState): void {
     for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
     // CIV6 (Military alliance 2): "+15% Production toward military units
     // when you or your ally are at war."
+    const warBuffPct = warBuffProdPct(state, actor.seat) / 100;
     const milAllyWarPct = state.seats.some((x) => x.seat !== actor.seat
       && alliedAtLevel(state, actor.seat, x.seat, ALLIANCE_MILITARY, 2)
       && (atWarWithAny(state, actor.seat) || atWarWithAny(state, x.seat))) ? ALLIANCE_M2_MIL_PROD_PCT / 100 : 0;
@@ -2307,6 +2305,9 @@ export function seatPhase(state: GameState): void {
           _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
         }
         if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
+        // CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
+        // a percent on every item for the turns after the declaration
+        _bpct += warBuffPct;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         q.progress += production * _em;

@@ -44,7 +44,8 @@ import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
   promoValue, promoValueFor, stepAttacksLeft,
 } from './promotions';
-import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
+import { dedicationEvent, goldenMoveBonus } from './eras';
+import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
@@ -950,6 +951,11 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   return MP_SCALE * (
     (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + levy + goldenMoveBonus(state, unit)
     + startTileMoves(state, unit)
+    // CIV6 (TRAIT_*_WAR_MOVEMENT, Amount 2): the flat Movement a leader's
+    // units carry for the turns after a declaration of the row's own war
+    // kind — a unit's own stat, so the embarked pool above overrides it
+    // exactly as it overrides the golden dedication's (`WAR_BUFF_ROWS`)
+    + warBuffMoves(state, unit.seat)
     // CIV6 (Enhanced Mobility): "+3 Moves."
     + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)
     // an emergency member marches faster on its target's ground

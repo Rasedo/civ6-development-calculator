@@ -88,8 +88,10 @@ def test_declare(rules, path):
     sim.restore(snap)
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
-    sim._grievance_war_declared(0, 1, torch.ones(sim.B, dtype=torch.bool, device=sim.device),
-                                sim._denounce_casus_belli(0, 1))  # declareWar's ledger stamp
+    _one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    _kind = sim._default_war_kind(sim._war_kinds_allowed(0, 1))  # the kind the head takes
+    sim._stamp_war_kind(0, 1, _kind, _one)
+    sim._grievance_war_declared(0, 1, _one, _kind)  # declareWar's ledger stamp
     sim.step()
     d = drift(sim, after)
     assert not d, f"declare != poked declareWar + plain step: {d}"
@@ -125,6 +127,7 @@ def test_peace(rules, path):
     sim.civ_treasury[:, 0] -= cost  # IN PLACE — treasury is a view of civ_treasury
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = False
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
+    sim._clear_war_kind(0, 1, torch.ones(sim.B, dtype=torch.bool))  # the ended war's kind clears
     sim._stamp_treaty(0, 1, torch.ones(sim.B, dtype=torch.bool))  # peace BINDS the pair
     sim.peace_turns[:, 0] = 0  # the treaty restarts BOTH parties' peace clocks
     sim.peace_turns[:, 1 + 0] = 0
@@ -321,16 +324,19 @@ def test_golden_war(rules, path):
     for _ in range(20):
         sim.step()
     one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-    pct = sim._war_griev_pct["golden"]
+    GOLDEN, FORMAL, SURPRISE = 8, 1, 0  # WAR_KINDS codes
+    pct = sim._war_griev_pct[GOLDEN]
     assert pct == (25, 25, 300), f"the golden columns should be 25/25/300, got {pct}"
     sim.civ_age[0, 0] = 2
     sim.ded_picks[0, 0, 0] = sim._ded_to_arms
     sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
     g0 = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one)
-    assert bool(sim.seat_warkind[0, 0, 1]), "the golden war is FORMAL"
-    assert bool(sim.seat_wargolden[0, 0, 1]) and bool(sim.seat_wargolden[0, 1, 0]), \
+    assert bool(sim._war_formal(0, 1)), "the golden war is FORMAL"
+    assert int(sim._war_kind_code(0, 1)[0]) == GOLDEN and int(sim._war_kind_code(1, 0)[0]) == GOLDEN, \
         "golden must stand in BOTH cells"
+    assert int(sim.seat_warkind[0, 0, 1]) == GOLDEN + 1 and int(sim.seat_warkind[0, 1, 0]) == -(GOLDEN + 1), \
+        "the declarer's cell is positive, the target's negative"
     want = int(sim._griev_war_base * pct[0] / 100 + 0.5)
     assert float(sim.civ_grievance[0, 1, 0]) - g0 == want, \
         f"the golden DoW should price {want}, moved {float(sim.civ_grievance[0, 1, 0]) - g0}"
@@ -344,24 +350,30 @@ def test_golden_war(rules, path):
     assert float(sim.civ_grievance[0, 1, 0]) - g2 == want_r, (
         "the razing prices by the golden raze column")
     sim._make_peace(0, 1, one)
-    assert not bool(sim.seat_wargolden[0, 0, 1]) and not bool(sim.seat_wargolden[0, 1, 0]), \
-        "peace must forget the discount"
-    # the dedication alone is the casus belli — NO denouncement needed
-    sim.seat_denounced[:, 0, 1] = -(10 ** 9)
+    assert int(sim.seat_warkind[0, 0, 1]) == 0 and int(sim.seat_warkind[0, 1, 0]) == 0, \
+        "peace must forget the kind"
+    # CIV6 (Golden Age War row, DenouncementTurnsRequired 0): "Can be used
+    # right after Denouncing" — a denouncement of ANY age opens it...
+    sim.seat_denounced[:, 0, 1] = int(sim.turn)
     g2b = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one)
-    assert bool(sim.seat_wargolden[0, 0, 1]) and bool(sim.seat_warkind[0, 0, 1]), (
-        "a golden DoW without denouncement must be golden AND formal")
+    assert int(sim._war_kind_code(0, 1)[0]) == GOLDEN and bool(sim._war_formal(0, 1)), (
+        "a golden DoW right after the denouncement must be golden AND formal")
     assert float(sim.civ_grievance[0, 1, 0]) - g2b == want, "and price the golden column"
+    sim._make_peace(0, 1, one)
+    # ...and with NO denouncement at all the dedicant declares a Surprise war
+    sim.seat_denounced[:, 0, 1] = -(10 ** 9)
+    sim._declare_war_major(0, 1, one)
+    assert int(sim._war_kind_code(0, 1)[0]) == SURPRISE, "no denouncement, no golden casus belli"
     sim._make_peace(0, 1, one)
     # WITHOUT the Golden age the same declaration is formal at full price
     sim.civ_age[0, 0] = 1
     sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
     g3 = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one)
-    assert bool(sim.seat_warkind[0, 0, 1]) and not bool(sim.seat_wargolden[0, 0, 1])
+    assert int(sim._war_kind_code(0, 1)[0]) == FORMAL
     assert float(sim.civ_grievance[0, 1, 0]) - g3 == int(
-        sim._griev_war_base * sim._war_griev_pct["formal"][0] / 100 + 0.5)
+        sim._griev_war_base * sim._war_griev_pct[FORMAL][0] / 100 + 0.5)
     print(f"  golden-age war OK (DoW {want}, capture {want_t}, raze {want_r}, peace forgets)")
 
 

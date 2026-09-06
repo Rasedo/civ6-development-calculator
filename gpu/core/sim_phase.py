@@ -780,6 +780,10 @@ class SimPhase:
                 _m2i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
                     & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
                 _add = _add + (_m2w & _m2i).to(_add.dtype) * (self._al_m2_mil_prod_pct / 100)
+        # CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
+        # a percent on every item for the turns after the declaration
+        if self._war_buff_rows:
+            _add = _add + (self._war_buff_prod_pct(row).to(_add.dtype) / 100)[bidx]
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
         _emall = _emall * (1 + _add)

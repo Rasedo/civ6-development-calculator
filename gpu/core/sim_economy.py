@@ -160,7 +160,8 @@ class SimEconomy:
         rr = (row >= 0) & (row < self.n_majors) & (foe_row >= 0) & (foe_row < self.n_majors)
         n = self.seat_warkind.shape[1]
         flat = row.clamp(0, n - 1) * n + foe_row.clamp(0, n - 1)
-        kind = self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        # every kind but the Surprise war (code 0) reads the FORMAL column
+        kind = (self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1).abs() >= 2) & rr
         return torch.where(kind, formal[era], surprise[era])
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
@@ -3112,6 +3113,24 @@ class SimEconomy:
                & (self.seat_ally_turns[:, :NSC, :O] > 0))
         if bool(_rp.any()):
             add = torch.where(_rp.unsqueeze(2), torch.zeros_like(add), add)
+        # CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
+        # Religious Pressure in cities with no followers of your ally's
+        # Religion" — per founder g, each level-3 Religious ally whose own
+        # religion exists and has NO pressure in the receiving city raises g's
+        # whole per-turn add there by the percent; the SUM is scaled and
+        # floored once, as `spreadReligiousPressure` floors `addG`.
+        if self._al_rel3_pressure_pct:
+            for g in range(O):
+                allies = self._allied_type(g, 4, 3) & founded                   # [B, O]
+                if not bool(allies.any()):
+                    continue
+                pct = torch.zeros(B, NSC, RC, dtype=torch.long, device=self.device)
+                for a in range(O):
+                    if a == g or not bool(allies[:, a].any()):
+                        continue
+                    nofol = self.city_pressure[:, :NSC, :, a] == 0
+                    pct = pct + (allies[:, a].view(B, 1, 1) & nofol).long() * self._al_rel3_pressure_pct
+                add[..., g] = (add[..., g] * (100 + pct)).div(100, rounding_mode="floor")
         self.city_pressure[:, :NSC].copy_(
             torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
         )
@@ -3656,6 +3675,12 @@ class SimEconomy:
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre) \
             + self._start_tile_mp(pre, typ)
+        # CIV6 (TRAIT_*_WAR_MOVEMENT, Amount 2): the flat Movement a leader's
+        # units carry for the turns after a declaration of the row's own war
+        # kind — a unit's own stat, overridden by the embark pool below exactly
+        # as the golden dedication's is (`WAR_BUFF_ROWS`)
+        if self._war_buff_rows:
+            base = base + self._seat_war_buff(getattr(self, f"{pre}_unit_seat"), 2)
         # CIV6 (The Raven King): a LEVIED unit carries
         # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so a
         # levied unit is born with it — A-2r's lesson (C-66).

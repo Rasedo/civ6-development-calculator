@@ -1145,23 +1145,13 @@
           ]
         },
         {
-          "name": "formalWars",
+          "name": "warKinds",
           "compare": "exact",
           "covers": [
-            "Seat.formalWars"
+            "Seat.warKinds"
           ],
           "planes": [
             "seat_warkind"
-          ]
-        },
-        {
-          "name": "goldenWars",
-          "compare": "exact",
-          "covers": [
-            "Seat.goldenWars"
-          ],
-          "planes": [
-            "seat_wargolden"
           ]
         },
         {

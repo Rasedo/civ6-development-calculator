@@ -49,7 +49,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     government: { current: null, policies: [], held: 0 },
     cities: [],
     nextCityId: 0,
-    wars: [], formalWars: [], denounced: {}, allies: [],
+    wars: [], warKinds: {}, denounced: {}, allies: [],
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     gpp: {},

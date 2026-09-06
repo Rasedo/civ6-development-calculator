@@ -479,6 +479,7 @@ def main() -> int:
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
                 ("parks", [py, "tests/gpu/parks_test.py"], 4),  # national parks, shipwrecks, museum theming
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
+                ("war_kinds", [py, "tests/gpu/war_kinds_test.py"], 4),  # the war KINDS: civic gate + roster override, the default kind, the 10-turn declarer buff, the level-3 Religious pressure clause
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("governor_roster", [py, "tests/gpu/governor_roster_test.py"], 4),  # titles/appointment/promotion order, the establishment and neutralize clocks, the Dark Age card pool
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food

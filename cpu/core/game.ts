@@ -25,7 +25,7 @@ import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ALLIANCE_RELIGIOUS, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP, NATURALIST_COST_STEP, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
@@ -1953,6 +1953,15 @@ function spreadReligiousPressure(state: GameState): void {
     }
     for (const t of terms) pres[t.g] += t.w;
   }
+  // CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
+  // Religious Pressure in cities with no followers of your ally's Religion"
+  // — per founder, the level-3 Religious allies whose own religion exists;
+  // each one whose religion has NO pressure in the receiving city raises the
+  // founder's whole per-turn add there by ALLIANCE_REL3_PRESSURE_PCT.
+  const rel3Allies: number[][] = state.seats.map((sx) => founded[sx.seat]
+    ? state.seats.filter((o) => o.seat !== sx.seat && founded[o.seat]
+      && alliedAtLevel(state, sx.seat, o.seat, ALLIANCE_RELIGIOUS, 3)).map((o) => o.seat)
+    : []);
   for (const city of cities) {
     let pres = city.religionPressure;
     if (!pres || pres.length !== nRel) {
@@ -1963,6 +1972,9 @@ function spreadReligiousPressure(state: GameState): void {
     // CIV6 (Citadel of God): "City ignores pressure ... from Religions not
     // founded by the Governor's player."
     const deaf = governorFlag(state, city as City, (e) => e.ignoreForeignPressure);
+    // this turn's add per religion, summed BEFORE the alliance percent so
+    // the GPU's one matmul column and this walk floor the same number
+    const addG: number[] = new Array(nRel).fill(0);
     for (const src of sources) {
       const g = src.g;
       if (deaf && g !== city.seat) continue;
@@ -1970,12 +1982,18 @@ function spreadReligiousPressure(state: GameState): void {
       // each other's cities.
       if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
       if (hexDistance(cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
-      pres[g] += src.w;
+      addG[g] += src.w;
     }
     for (const t of routeTerms.get(city.centerIndex) ?? []) {
       if (deaf && t.g !== city.seat) continue;
       if (t.g !== city.seat && alliedAtLevel(state, city.seat, t.g, ALLIANCE_RELIGIOUS, 1)) continue;
-      pres[t.g] += t.w;
+      addG[t.g] += t.w;
+    }
+    for (let g = 0; g < nRel; g++) {
+      if (addG[g] === 0) continue;
+      let pct = 0;
+      for (const a of rel3Allies[g] ?? []) if (pres[a] === 0) pct += ALLIANCE_REL3_PRESSURE_PCT;
+      pres[g] += pct ? Math.floor((addG[g] * (100 + pct)) / 100) : addG[g];
     }
     const best = followedReligionOf(pres, city.population);
     const wasFollowed = city.followedReligion ?? -1;
@@ -2039,7 +2057,7 @@ export function deserialize(json: string): GameState {
   resolveSuzerains(state);
   for (const s of allSeats(state)) {
     s.wars ??= [];
-    s.formalWars ??= [];
+    s.warKinds ??= {};
     s.denounced ??= {};
   }
   for (const s of allSeats(state)) {
