@@ -1154,6 +1154,12 @@ class SimInit:
         self._proj_rows = list(_pj.get("rows", []))
         self._proj_didx = torch.tensor([int(p.get("d", -1)) for p in self._proj_rows]
                                        or [-1], dtype=torch.long, device=device)
+        # a civilization-UNIQUE row: [civ, leaderRow] like every roster row
+        # (-1/-1 for everyone's), and the row that moves the ORIGINAL capital
+        # on completion (`ProjectDef.civ` / `.leader` / `.movesCapital`)
+        self._proj_seat_rows: list[tuple[int, int]] = [
+            (int(p.get("cv", -1)), int(p.get("ld", -1))) for p in self._proj_rows]
+        self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p.get("mc", 0))}
         self._proj_yf = float(_pj.get("yieldFraction", 0.15))
         self._proj_gf = float(_pj.get("gppFraction", 0.22))
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,

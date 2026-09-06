@@ -1157,6 +1157,11 @@ export function buildRules() {
         // `rep` marks the repair, whose price is the perimeter HP it restores.
         cc: p.district === 'CITY_CENTER' ? 1 : 0,
         rep: p.repair ? 1 : 0,
+        // a civilization-UNIQUE row: [civ, leaderRow] like every roster row,
+        // -1/-1 for everyone's; `mc` moves the ORIGINAL capital on completion
+        cv: rowCiv(p),
+        ld: rowLeader(p),
+        mc: p.movesCapital ? 1 : 0,
         // the reactor reset, whose gate is a BUILDING rather than a ledger
         rec: p.recommission ? 1 : 0,
       })),

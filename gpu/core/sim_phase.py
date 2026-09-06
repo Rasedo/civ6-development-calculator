@@ -1210,6 +1210,10 @@ class SimPhase:
                         # CIV6: the finished device joins the seat INVENTORY,
                         # not any city's.
                         self.civ_wmd[:, row, _wk - 1] += hit.long()
+                    if pidx in self._proj_move_cap:
+                        # CIV6 (Founder of Carthage): "When complete, the
+                        # Phoenician Capital moves to this city"
+                        self._move_capital(row, hit, col)
                     if int(prow["one"]):
                         step_k = self._once_step[pidx]
                         self.project_done[hit, row, step_k] = True

@@ -142,6 +142,32 @@ export function freeSeatOf(state: GameState): Seat {
   return state.freeSeat;
 }
 
+/** CIV6 (Founder of Carthage): "Can move their original Capital to any city
+ *  with a Cothon they founded by completing a unique project in that city."
+ *  ONE composer for everything the capital IDENTITY reaches: `isCapital` and
+ *  the PALACE leave every other city of the seat for `city`; `capitalTile`
+ *  (the domination anchor and the home continent) moves; and the ORIGINAL
+ *  capital mark moves too — the city that carried `origCapitalSeat === seat`,
+ *  wherever it stands now, stops being the seat's first city and `city`
+ *  becomes it, which is what the occupied-capital favor penalty and the
+ *  grievance decay read. The GPU twin is `_move_capital`. */
+export function moveCapital(state: GameState, owner: Seat, city: City): void {
+  for (const c of owner.cities) {
+    if (c === city) continue;
+    c.isCapital = false;
+    c.buildings = c.buildings.filter((b) => b !== 'PALACE');
+  }
+  for (const holder of cityHolders(state)) {
+    for (const c of holder.cities) {
+      if ((c.origCapitalSeat ?? -1) === owner.seat) c.origCapitalSeat = -1;
+    }
+  }
+  city.isCapital = true;
+  if (!city.buildings.includes('PALACE')) city.buildings.push('PALACE');
+  city.origCapitalSeat = owner.seat;
+  owner.capitalTile = city.centerIndex;
+}
+
 /** Every seat whose `cities` list can hold a City object: the majors, then
  *  the Free Cities seat when it exists — what `cityAtIndex` and the
  *  cross-engine city walk read. City-states hold their one city on

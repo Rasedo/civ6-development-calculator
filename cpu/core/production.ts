@@ -1,6 +1,6 @@
 import type { City, GameState, Seat, Unit } from './types';
 import type { QueueItem } from './types';
-import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo } from './seats';
+import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital } from './seats';
 import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
@@ -73,6 +73,14 @@ export function completeProject(state: GameState, city: City, projectId: string,
     // Encampment's) Outer Defenses" — each to its OWN full pool.
     city.outerHp = wallsMax(state, city);
     fitEncampOuter(state, city);
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
+  if (def.movesCapital) {
+    // CIV6 (Founder of Carthage): "When complete, the Phoenician Capital moves
+    // to this city" — the ORIGINAL capital, so the domination anchor and the
+    // occupied-capital reading move with it. Repeatable, no ledger.
+    moveCapital(state, owner, city);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }

@@ -1301,6 +1301,41 @@ class SimOrders:
         self.city_is_cap[rows[need], seat_row[need], pick[need]] = True
         self._eff_version += 1
 
+    def _proj_seat_ok(self, row: int, pi: int) -> torch.Tensor:
+        """[B] bool — may seat row `row` run project row `pi` at all? A
+        civilization-UNIQUE row (`cv` / `ld` on the wire) is refused to every
+        other seat, the `_row_is` reading every roster row takes; a row naming
+        neither is everyone's. `projectSeatOk`'s twin, in the production mask
+        and the applier alike."""
+        civ, lead = self._proj_seat_rows[pi]
+        if civ < 0 and lead < 0:
+            return torch.ones(self.B, dtype=torch.bool, device=self.device)
+        return self._row_is(row, civ, lead)
+
+    def _move_capital(self, row: int, hit: torch.Tensor, col: torch.Tensor) -> None:
+        """CIV6 (Founder of Carthage): "Can move their original Capital to any
+        city with a Cothon they founded by completing a unique project in that
+        city." ONE composer for everything the capital IDENTITY reaches, per
+        game in `hit` for seat row `row`'s city at slot `col` [B]: `city_is_cap`
+        (the Palace's terms) leaves every other city of the row for it;
+        `civ_cap_tile` (the domination anchor and the home continent) moves;
+        and the ORIGINAL capital mark moves too — whichever city anywhere
+        carried `city_orig_cap == row` stops being the row's first city and
+        this one becomes it, which is what the occupied-capital favor penalty
+        and the grievance decay read. `moveCapital`'s twin."""
+        if not bool(hit.any()):
+            return
+        rows = hit.nonzero(as_tuple=True)[0]
+        cc = col[rows]
+        self.city_is_cap[rows, row, :] = False
+        self.city_is_cap[rows, row, cc] = True
+        was = self.city_orig_cap[rows] == row  # [n, CITY_ROWS, RC]
+        self.city_orig_cap[rows] = torch.where(was, torch.full_like(self.city_orig_cap[rows], -1),
+                                               self.city_orig_cap[rows])
+        self.city_orig_cap[rows, row, cc] = row
+        self.civ_cap_tile[rows, row] = self.city_center[rows, row, cc]
+        self._eff_version += 1
+
     def _capture_city_state(self, rows: torch.Tensor, citystate_of: torch.Tensor, dst_rows) -> None:
         """Annex a city-state into ANY seat row — the `captureCityState` twin.
 

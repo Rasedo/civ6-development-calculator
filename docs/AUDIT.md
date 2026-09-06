@@ -87,12 +87,12 @@ open docs/roster_ledger.json row.
 | C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
 | C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
 | C-60 the Free City's own defence, amenities and religion | 1 | the Free Cities seat is in on both engines (revolt, race, join, Eleanor's skip, open to attack); what it spawns, its amenity tier and its religion walks are not |
-| C-61 the capital never moves | 1 | `relocatePalace` moves `isCapital` only when the seat holds none; a civ-UNIQUE project has no field |
+| C-61 the Cothon's project has no Cothon to stand in | 1 | the civ-unique gate and `moveCapital` / `_move_capital` are in; the row waits on the Cothon district (C-69) and its game-progress price curve |
 | C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
 | C-65 a Great Work of Art carries no object kind | 1 | four SCULPTURE rows have no field to read; decide with C-59 |
 | C-67 a diplomatic action has no preference weight | 1 | waits on the self-play decider, not on a carrier |
 | C-68 two unique chassis are not in the unit roster | 1 | the Janissary and the Saka Horse Archer |
-| C-69 three unique districts, buildings and improvements are absent | 1 | M'banza, Royal Navy Dockyard, Tsikhe, Mission |
+| C-69 three unique districts, buildings and improvements are absent | 1 | M'banza, Royal Navy Dockyard, Tsikhe, Mission — and the Cothon, which C-61's project stands in |
 | C-71 a building's great-work slots are one table for every seat | 1 | `TRAIT_EXTRA_PALACE_SLOTS` cannot add one; widening is a layout change |
 | C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
 | C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
@@ -1288,16 +1288,47 @@ under their blocker so the dependency is readable, and both halves count.
   on the emergency's target city — was already in: `emergencyLoyalty` /
   `_emergency_loyalty` pay `EMERGENCY_TARGET_LOYALTY` 20 while the emergency
   runs, and a city held at loyalty never reaches the revolt.)
-- **C-61. THE CAPITAL NEVER MOVES.** Weight 1.
-  SOURCED (Founder of Carthage): "Can move their original Capital to any city
-  with a Cothon they founded by completing a unique project in that city."
-  ENGINES: `relocatePalace` / `_relocate_palace` move `isCapital` only when
-  the seat holds NO capital (the old one having fallen), and
-  `origCapitalSeat` / `civ_cap_tile` are written once at founding and never
-  again — which is what the occupied-capital favor penalty and the domination
-  check both read.
-  OPEN: the clause also needs a civ-UNIQUE project, and `ProjectDef` carries
-  no civ or leader field.
+- **C-61. THE COTHON'S PROJECT HAS NO COTHON TO STAND IN.** Weight 1.
+  SHIPPED (2026-09-06): a civilization-UNIQUE project is a data-model fact on
+  both engines — `ProjectDef.civ` / `.leader` (the `rowIsFor` reading every
+  roster row takes), `projectSeatOk` in `availableProjects` and
+  `_proj_seat_ok` in the GPU's production mask AND its applier (the wire's
+  `cv` / `ld` columns); and the capital MOVES through one composer per side,
+  `moveCapital` / `_move_capital` (`ProjectDef.movesCapital`, the wire's
+  `mc`, fired at `completeProject` and the GPU completion): `isCapital` and
+  the PALACE leave every other city of the seat, `capitalTile` /
+  `civ_cap_tile` move (the domination anchor and the home continent), and
+  the ORIGINAL-capital mark (`origCapitalSeat` / `city_orig_cap`) clears in
+  the city that carried it — wherever it stands now — and lands in the new
+  one, which is what `occupiedCapitals` and the grievance decay read.
+  SOURCED: Expansion2_Projects.xml PROJECT_COTHON_CAPITAL_MOVE — Cost 100,
+  COST_PROGRESSION_GAME_PROGRESS 1500, PrereqDistrict DISTRICT_COTHON,
+  MaxSimultaneousInstances 1; Expansion2_Leaders_Major.xml
+  TRAIT_LEADER_FOUNDER_CARTHAGE -> DISTRICT_COMPLETE_MOVE_CAPITAL
+  (MODIFIER_PLAYER_ADJUST_CAPITAL / EFFECT_ADJUST_PLAYER_CAPITAL, ProjectType
+  PROJECT_COTHON_CAPITAL_MOVE); the trait text "Can move their original
+  Capital to any city with a Cothon they founded by completing a unique
+  project in that city"; the project text "available to any city with a
+  Cothon. When complete, the Phoenician Capital moves to this city".
+  READING: the moved capital IS the original capital for every reader — the
+  old one is no longer anyone's first city (its mark clears rather than
+  standing beside the new one); the home continent follows `capitalTile`
+  as it always did (`homeContinent`), so Mediterranean Colonies re-reads it.
+  BAR: tests/cpu/city/move-capital.test.ts (3), tests/gpu/move_capital_test.py
+  (4 scenes, `move_capital` lane) — the gate and the composer, driven
+  directly; no shipped row is gated yet, and the tests pin that.
+  REACH: nothing reaches it — the row is not in the catalog (below).
+  OPEN: the project row itself. Its PrereqDistrict is the COTHON, Phoenicia's
+  unique Harbor, which neither engine's district catalog holds (C-69's
+  list, now with the Cothon in it); a `ProjectDef` names a `DistrictId`, so
+  the row cannot be added ahead of the district. When C-69 lands the Cothon
+  the row is `{ id: 'COTHON_CAPITAL_MOVE', district: 'COTHON', civ:
+  'PHOENICIA', movesCapital: true, cost: 100 }` plus the game-progress
+  price curve (COST_PROGRESSION_GAME_PROGRESS 1500 — the one number here no
+  existing project takes; source its formula against the other progression
+  rows before shipping). "They founded" is a second gate the clause names:
+  the Cothon must stand in a city Phoenicia FOUNDED (`founderSeat` /
+  `city_founder`), not one it took.
 - **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 1.
   ENGINES: a major's stance toward another is the sum of the STATES both
   engines carry — a war and its kind, a denouncement, a friendship, an
@@ -1382,7 +1413,11 @@ under their blocker so the dependency is readable, and both halves count.
   have no row on either engine, so four clauses have nothing to attach to:
   `TRAIT_FREE_APOSTLE_FINISH_MBANZA`, `TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT`,
   `TRAIT_TSIKHE_PRODUCTION` and `TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER`,
-  all marked open against this item.
+  all marked open against this item. Phoenicia's COTHON (district, the
+  unique Harbor: Expansion2_Districts_Major.xml DISTRICT_COTHON, TraitType
+  TRAIT_CIVILIZATION_DISTRICT_COTHON) is a fifth: it is the PrereqDistrict of
+  PROJECT_COTHON_CAPITAL_MOVE, whose gate and capital move are in (C-61) and
+  whose row waits on this district.
   OPEN, a second gap of the Dockyard row's own: a district's granted unit is
   NAMED by its row on both engines, and nothing picks the strongest naval unit
   of a class the way `bestTrainableOfClass` picks a land one.
