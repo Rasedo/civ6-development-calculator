@@ -1383,8 +1383,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const seatTarget = (() => {
     const civCity = cityAtIndex(state, targetIndex);
     if (!civCity) return undefined;
-    return capsOf(attacker.seat).alwaysHostile
-      || civsAtWar(state, unitSeat(attacker), civCity.holder.seat)
+    // `unitsHostile`'s own question: a barbarian needs no war, a FREE CITY
+    // may be taken by anyone, and every other pair is the war relation
+    return unitsHostile(state, attacker, { seat: civCity.holder.seat })
       ? civCity
       : undefined;
   })();
@@ -1402,7 +1403,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const encamp = encampmentDefense(state, attacker, target);
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp) {
     const civCityHere = cityAtIndex(state, targetIndex);
-    if (civCityHere && !civsAtWar(state, unitSeat(attacker), civCityHere.holder.seat)) {
+    if (civCityHere && !unitsHostile(state, attacker, { seat: civCityHere.holder.seat })) {
       return no(`You are at peace with ${civCityHere.holder.name} — declare war first.`);
     }
     return no('Nothing to attack there.');
@@ -1425,8 +1426,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     // The refusal mirrors seatTarget's own predicate: an alwaysHostile
     // attacker (barbarians) has no peace to respect, so only a seat that
     // NEEDS a war to target the city can be refused for lacking one.
-    if (attacker.seat === seat && !capsOf(attacker.seat).alwaysHostile
-        && !civsAtWar(state, seatTarget.holder.seat, seat)) {
+    if (attacker.seat === seat && !unitsHostile(state, attacker, { seat: seatTarget.holder.seat })) {
       return no(`You are at peace with ${seatTarget.holder.name} — declare war first.`);
     }
     attackCity(state, attacker, seatTarget.holder, seatTarget.city);
@@ -1602,7 +1602,7 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
     return { ok: false, reason: 'Not a target this aircraft answers.' };
   }
   const holder = cityAtIndex(state, targetIndex);
-  if (kind === 'BOMBER' && holder && civsAtWar(state, seat, holder.holder.seat)) {
+  if (kind === 'BOMBER' && holder && unitsHostile(state, attacker, { seat: holder.holder.seat })) {
     const r = rangedAttack(state, attackerId, targetIndex);
     if (r.ok) attacker.movesLeft = 0;
     return r;
@@ -1699,7 +1699,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     ? religionAttackCS(state, attacker, targetIndex)
     : 0;
   const civCity = cityAtIndex(state, targetIndex);
-  if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
+  if (civCity && unitsHostile(state, attacker, { seat: civCity.holder.seat })) {
     const defCS = cityDefenseStrength(state, civCity.city);
     const outer = outerPool(state, civCity.city);
     const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, civCity.holder.seat, null, true)) - defCS, 'rngrc', targetIndex);
@@ -1796,8 +1796,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   // and a barbSeat war row is never set, so gating them on `civsAtWar` alone
   // left the barbarian raider unable to bombard anything.
   const enemyCity =
-    held && held.holder.seat !== attacker.seat
-    && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, unitSeat(attacker), held.holder.seat))
+    held && unitsHostile(state, attacker, { seat: held.holder.seat })
       ? held.city
       : undefined;
   if (enemyCity) {
@@ -1890,10 +1889,10 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     const holder = cityAtIndex(state, t.index);
     const cityTarget =
       holder !== undefined &&
-      holder.holder.seat !== unit.seat &&
+      unitsHostile(state, unit, { seat: holder.holder.seat }) &&
       (capsOf(unit.seat).alwaysHostile
         ? d === 1
-        : civsAtWar(state, unitSeat(unit), holder.holder.seat) && d <= (def.ranged ? range : 1));
+        : d <= (def.ranged ? range : 1));
 
     // A CITY-STATE centre answers exactly like a major's: adjacent for an
     // alwaysHostile attacker whatever the weapon, and within range for a
@@ -2271,7 +2270,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // non-barbarian hostile walker still needs its war.
   const here = tile();
   const hereOwned = isTerritorial(tileSeat(here))
-    && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
+    && unitsHostile(state, unit, { seat: tileSeat(here) });
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
     pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
@@ -2299,7 +2298,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let bestDist = 13;
   for (const t of map.tiles) {
     const tOwned = isTerritorial(tileSeat(t))
-      && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(t)));
+      && unitsHostile(state, unit, { seat: tileSeat(t) });
     if (!tOwned) continue;
     const impJob = t.improvement !== null && !t.pillaged;
     const distJob =
@@ -2329,7 +2328,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     // then the seat id (wide enough for a 100+ minor), then the centre tile.
     for (const other of state.seats) {
       if (other.seat === unit.seat) continue;
-      if (!capsOf(unit.seat).alwaysHostile && !civsAtWar(state, unitSeat(unit), other.seat)) continue;
+      if (!unitsHostile(state, unit, other)) continue;
       for (const oc of other.cities) {
         const t = map.tiles[oc.centerIndex];
         const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 256)

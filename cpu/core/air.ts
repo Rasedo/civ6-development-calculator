@@ -12,7 +12,7 @@ import { UNITS, UNIT_HP, GDR_DRONE_AA } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { citiesOf, civsAtWar, isTerritorial, seatOf, tileSeat, unitSeat } from './seats';
+import { citiesOf, isTerritorial, seatOf, tileSeat } from './seats';
 import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
@@ -215,7 +215,7 @@ export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number
 export function airPillageOffers(state: GameState, unit: Unit, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
   if (!t || UNITS[unit.type]?.air !== 'BOMBER') return false;
-  if (!isTerritorial(tileSeat(t)) || !civsAtWar(state, unitSeat(unit), tileSeat(t))) return false;
+  if (!isTerritorial(tileSeat(t)) || !unitsHostile(state, unit, { seat: tileSeat(t) })) return false;
   if (t.improvement && !t.pillaged) return true;
   return t.district !== null && t.district !== 'CITY_CENTER' && t.district !== 'ENCAMPMENT'
     && !!t.districtComplete && !t.districtPillaged;

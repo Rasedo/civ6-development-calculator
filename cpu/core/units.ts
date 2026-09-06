@@ -62,7 +62,7 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
+import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -1691,7 +1691,8 @@ export function cityAtIndex(
   state: GameState,
   tileIndex: number,
 ): { holder: Seat; city: City } | undefined {
-  for (const actor of state.seats) {
+  // every holder of a City object — the majors and the Free Cities seat
+  for (const actor of cityHolders(state)) {
     const city = actor.cities.find((c) => c.centerIndex === tileIndex);
     if (city) return { holder: actor, city };
   }

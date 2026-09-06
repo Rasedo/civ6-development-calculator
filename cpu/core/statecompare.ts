@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
@@ -670,6 +670,12 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.religionPressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
+  // a FREE CITY's race — the pressure each major has put on it since it
+  // revolted; all zeros for a city that is not Free
+  freePressure: overCities((r, st) => {
+    const p = r.city.freePressure ?? [];
+    return civSeats(st).map((_s, g) => p[g] ?? 0);
+  }),
   greatWorksWriting: overCities((r) => r.city.greatWorksWriting ?? 0),
   greatWorksArt: overCities((r) => r.city.greatWorksArt ?? 0),
   greatWorksMusic: overCities((r) => r.city.greatWorksMusic ?? 0),
@@ -789,7 +795,9 @@ export function groupRows(state: GameState, group: string): readonly unknown[] {
     case 'cityState':
       return state.cityStates ?? [];
     case 'city':
-      return civSeats(state).flatMap((s) => s.cities.map((city) => ({ seat: s.seat, city })));
+      // the majors' cities, then the Free Cities seat's — the GPU walks its
+      // major rows and then the free row in the same order
+      return cityHolders(state).flatMap((s) => s.cities.map((city) => ({ seat: s.seat, city })));
     case 'unit':
       return state.units;
     case 'tile':

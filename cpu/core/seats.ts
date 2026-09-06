@@ -17,6 +17,9 @@ import { NO_SEAT } from './types';
 export { NO_SEAT };
 const CITY_STATE_SEAT_BASE = 100;
 export const BARB_SEAT = 200;
+/** CIV6's FREE CITIES player — one seat holding every city loyalty has
+ *  taken from its owner. Above every id space the predicates below bound. */
+export const FREE_SEAT = 300;
 
 export const seatOfCityState = (cityStateId: number): number => CITY_STATE_SEAT_BASE + cityStateId;
 export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_BASE;
@@ -125,7 +128,52 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
     return state.cityStates?.find((c) => c.id === id);
   }
   if (isBarbSeat(seat)) return state.barbSeat;
+  if (isFreeSeat(seat)) return state.freeSeat;
   return state.seats[seat];
+}
+
+/** The FREE CITIES seat, made at the first revolt. It plays no civilization,
+ *  researches nothing and never acts; it exists so a Free City has a holder
+ *  every city walk resolves through `seatOf`. */
+export function freeSeatOf(state: GameState): Seat {
+  if (!state.freeSeat) {
+    state.freeSeat = { ...emptySeat(FREE_SEAT), name: 'Free Cities', color: '#7f7f7f' };
+  }
+  return state.freeSeat;
+}
+
+/** CIV6 (Founder of Carthage): "Can move their original Capital to any city
+ *  with a Cothon they founded by completing a unique project in that city."
+ *  ONE composer for everything the capital IDENTITY reaches: `isCapital` and
+ *  the PALACE leave every other city of the seat for `city`; `capitalTile`
+ *  (the domination anchor and the home continent) moves; and the ORIGINAL
+ *  capital mark moves too — the city that carried `origCapitalSeat === seat`,
+ *  wherever it stands now, stops being the seat's first city and `city`
+ *  becomes it, which is what the occupied-capital favor penalty and the
+ *  grievance decay read. The GPU twin is `_move_capital`. */
+export function moveCapital(state: GameState, owner: Seat, city: City): void {
+  for (const c of owner.cities) {
+    if (c === city) continue;
+    c.isCapital = false;
+    c.buildings = c.buildings.filter((b) => b !== 'PALACE');
+  }
+  for (const holder of cityHolders(state)) {
+    for (const c of holder.cities) {
+      if ((c.origCapitalSeat ?? -1) === owner.seat) c.origCapitalSeat = -1;
+    }
+  }
+  city.isCapital = true;
+  if (!city.buildings.includes('PALACE')) city.buildings.push('PALACE');
+  city.origCapitalSeat = owner.seat;
+  owner.capitalTile = city.centerIndex;
+}
+
+/** Every seat whose `cities` list can hold a City object: the majors, then
+ *  the Free Cities seat when it exists — what `cityAtIndex` and the
+ *  cross-engine city walk read. City-states hold their one city on
+ *  themselves, not as a City. */
+export function cityHolders(state: GameState): Seat[] {
+  return state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
 }
 
 /** the civilization a seat plays (`CIV_IDS`), or null for a seat without
@@ -179,13 +227,17 @@ export const isCiv = (seat: number): boolean => seat >= 0 && seat < CITY_STATE_S
 
 /** A seat that HOLDS TERRITORY and can be warred: a major or a city-state.
  *  What a pillage, a war march and a hostile tile test all ask. */
-export const isTerritorial = (seat: number): boolean => seat >= 0 && seat < BARB_SEAT;
+export const isTerritorial = (seat: number): boolean => (seat >= 0 && seat < BARB_SEAT) || seat === FREE_SEAT;
+
+/** CIV6's Free Cities player: holds cities and territory, never a civ. */
+export const isFreeSeat = (seat: number): boolean => seat === FREE_SEAT;
 
 /** Is this a city-state? They hold territory and act, but are never civs. */
 export const isCityStateSeat = (seat: number): boolean => seat >= CITY_STATE_SEAT_BASE && seat < BARB_SEAT;
 
 export function seatClass(seat: number): SeatClass {
   if (isBarbSeat(seat)) return 'hostile';
+  if (isFreeSeat(seat)) return 'free';
   if (isCityStateSeat(seat)) return 'minor';
   return 'major';
 }

@@ -1600,10 +1600,8 @@ export interface SkipFreeCityRow {
   civ?: CivId;
   leader?: LeaderId;
 }
-/** OPEN against C-60: neither engine models a Free City at all — a city that
- *  loses its loyalty goes straight to the highest-pressure seat — so every
- *  seat already behaves as Eleanor alone should. Not on the wire
- *  (docs/roster_ledger.json). */
+/** The RECEIVER's row: read at the revolt for the seat pressing hardest
+ *  (`skipsFreeCityStep`); on the wire as `skipFreeCity`. */
 export const SKIP_FREE_CITY_ROWS: readonly SkipFreeCityRow[] = [
   { leader: 'ELEANOR_ENGLAND' },
   { leader: 'ELEANOR_FRANCE' },

@@ -113,9 +113,10 @@ def _civ_seats(sim) -> list[int]:
 
 
 def _city_rows(sim, b: int) -> list[tuple[int, int]]:
+    # the majors' cities, then the Free Cities row's — TS's `cityHolders` order
     alive = sim.city_alive[b].tolist()
     rows = []
-    for c in _civ_seats(sim):
+    for c in (*_civ_seats(sim), sim.FREE_ROW):
         rows += [(c, s) for s in range(sim.RC) if alive[c][s]]
     return rows
 
@@ -774,6 +775,9 @@ CITY = {
     "religionPressure": lambda sim, b, rows: [
         [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
     ],
+    "freePressure": lambda sim, b, rows: [
+        [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
+    ],
     "greatWorksWriting": _cty("city_gw_writing"),
     "greatWorksArt": _cty("city_gw_art"),
     "greatWorksMusic": _cty("city_gw_music"),
@@ -857,12 +861,15 @@ def _prov(era: str, seat: str):
 
 
 def _owner_city(sim, b, rows):
+    # a major's or a FREE CITY's tile names its city; a minor's and nobody's
+    # is -1 (TS `setTileOwner`)
+    free = int(sim._ROW_SEAT[sim.FREE_ROW])
     if _np is not None:
         seat = sim.tile_seat[b].numpy()
-        return _np.where((seat >= 0) & (seat < 100), sim.tile_city[b].numpy(), -1)
+        return _np.where(((seat >= 0) & (seat < 100)) | (seat == free), sim.tile_city[b].numpy(), -1)
     seat = sim.tile_seat[b].tolist()
     city = sim.tile_city[b].tolist()
-    return [city[t] if 0 <= seat[t] < 100 else -1 for t in rows]
+    return [city[t] if (0 <= seat[t] < 100 or seat[t] == free) else -1 for t in rows]
 
 
 TILE = {

@@ -19,6 +19,7 @@
  */
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
+import type { CivId, LeaderId } from '../../world/roster';
 import { GAME_SPEED } from './constants';
 
 export interface ProjectDef {
@@ -75,6 +76,16 @@ export interface ProjectDef {
    *  civilization's lifetime carbon emissions by 50 CO2 points", and "allows
    *  the lifetime carbon emissions of a civilization to go below 0". */
   carbonRecapture?: boolean;
+  /** A civilization-UNIQUE project: offered only to a seat playing `civ`
+   *  (or `leader`), the `rowIsFor` reading every roster row takes. CIV6
+   *  (PROJECT_COTHON_CAPITAL_MOVE): "Phoenician unique project available to
+   *  any city with a Cothon." */
+  civ?: CivId;
+  leader?: LeaderId;
+  /** CIV6 (Founder of Carthage, EFFECT_ADJUST_PLAYER_CAPITAL): "When complete,
+   *  the Phoenician Capital moves to this city" — the ORIGINAL capital,
+   *  `moveCapital`. */
+  movesCapital?: boolean;
 }
 
 const P = (def: ProjectDef) => def;

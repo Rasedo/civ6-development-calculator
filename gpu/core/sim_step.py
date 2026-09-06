@@ -54,6 +54,9 @@ class SimStep:
             self._disaster_phase()
         self._city_state_phase()
         self._seat_phase()
+        # CIV6's Free Cities player takes its turn after every major's
+        # (`freeCitiesPhase`)
+        self._free_cities_phase()
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so
@@ -73,7 +76,9 @@ class SimStep:
         # trigger, ONE body, every row — the seat whose deaths compact
         # EAGERLY and the seat that waits for a threshold were the same rule
         # written twice, and only the eager one is TS's.
-        _alive_m = self.city_alive[:, :self.n_majors]
+        # ...the Free Cities row too, whose holes a joining city leaves
+        _alive_m = torch.cat((self.city_alive[:, :self.n_majors],
+                              self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1)
         _hw = (_alive_m.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
         if bool((_hw > _alive_m.sum(dim=2)).any()):
             self._reclaim_cities()

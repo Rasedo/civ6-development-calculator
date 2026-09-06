@@ -94,7 +94,8 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
-        "darkAge", "darkCard") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "darkAge", "darkCard",
+        "freeCity", "freeLeft") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -156,6 +157,7 @@ def main() -> None:
     cs_lo, cs_hi = sim.n_majors, sim.n_majors + sim.S
     minor_war_turns = torch.zeros(sim.B, dtype=torch.long)
     was_minor_war = torch.zeros(sim.B, dtype=torch.bool)
+    free_seen = torch.zeros(sim.B, dtype=torch.long)
 
     def mark(key: str, mask, turn: int) -> None:
         for b in range(sim.B):
@@ -172,10 +174,14 @@ def main() -> None:
                      (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)]
         for row in seats:
             rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
-            relig = rec[9]
+            # `_decide_turn`'s record, by position: prod, dtile, tech, civic,
+            # war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat,
+            # cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass,
+            # policies — a new column shifts everything after it
+            relig = rec[10]
             if isinstance(relig, tuple) and len(relig) == 2 and relig[0] is not None:
                 mark("apostleBuy", (relig[0] == 6), t)
-            vote = rec[18]
+            vote = rec[22]
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
@@ -316,6 +322,12 @@ def main() -> None:
         minor_war_turns += minor_war.long()
         mark("csPeace", was_minor_war & ~minor_war, t)
         was_minor_war = minor_war
+        # a FREE CITY on the map (a revolt happened), and one that has LEFT the
+        # free row since — joined a seat or was taken (the live count dropping)
+        free_now = sim.city_alive[:, sim.FREE_ROW].sum(dim=1)
+        mark("freeCity", free_now > 0, t)
+        mark("freeLeft", free_now < free_seen, t)
+        free_seen = torch.maximum(free_seen, free_now)
         mark("specPin", (sim.city_spec_pin >= 0).any(dim=3).any(dim=2).any(dim=1), t)
         mark("friendship", (sim.seat_friend_turns > 0).any(dim=2).any(dim=1), t)
         mark("alliance", (sim.seat_ally_turns > 0).any(dim=2).any(dim=1), t)

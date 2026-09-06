@@ -704,7 +704,7 @@ class SimOrders:
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
-                        row, torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
+                        row, self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
                     cs_t = torch.zeros_like(valid)
                     if self.S > 0:
                         _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -1301,6 +1301,41 @@ class SimOrders:
         self.city_is_cap[rows[need], seat_row[need], pick[need]] = True
         self._eff_version += 1
 
+    def _proj_seat_ok(self, row: int, pi: int) -> torch.Tensor:
+        """[B] bool — may seat row `row` run project row `pi` at all? A
+        civilization-UNIQUE row (`cv` / `ld` on the wire) is refused to every
+        other seat, the `_row_is` reading every roster row takes; a row naming
+        neither is everyone's. `projectSeatOk`'s twin, in the production mask
+        and the applier alike."""
+        civ, lead = self._proj_seat_rows[pi]
+        if civ < 0 and lead < 0:
+            return torch.ones(self.B, dtype=torch.bool, device=self.device)
+        return self._row_is(row, civ, lead)
+
+    def _move_capital(self, row: int, hit: torch.Tensor, col: torch.Tensor) -> None:
+        """CIV6 (Founder of Carthage): "Can move their original Capital to any
+        city with a Cothon they founded by completing a unique project in that
+        city." ONE composer for everything the capital IDENTITY reaches, per
+        game in `hit` for seat row `row`'s city at slot `col` [B]: `city_is_cap`
+        (the Palace's terms) leaves every other city of the row for it;
+        `civ_cap_tile` (the domination anchor and the home continent) moves;
+        and the ORIGINAL capital mark moves too — whichever city anywhere
+        carried `city_orig_cap == row` stops being the row's first city and
+        this one becomes it, which is what the occupied-capital favor penalty
+        and the grievance decay read. `moveCapital`'s twin."""
+        if not bool(hit.any()):
+            return
+        rows = hit.nonzero(as_tuple=True)[0]
+        cc = col[rows]
+        self.city_is_cap[rows, row, :] = False
+        self.city_is_cap[rows, row, cc] = True
+        was = self.city_orig_cap[rows] == row  # [n, CITY_ROWS, RC]
+        self.city_orig_cap[rows] = torch.where(was, torch.full_like(self.city_orig_cap[rows], -1),
+                                               self.city_orig_cap[rows])
+        self.city_orig_cap[rows, row, cc] = row
+        self.civ_cap_tile[rows, row] = self.city_center[rows, row, cc]
+        self._eff_version += 1
+
     def _capture_city_state(self, rows: torch.Tensor, citystate_of: torch.Tensor, dst_rows) -> None:
         """Annex a city-state into ANY seat row — the `captureCityState` twin.
 
@@ -1731,7 +1766,8 @@ class SimOrders:
             ctr = self.centre_slot_at.gather(1, nbc) >= 0
             # the CENTRE tile only — TS's cityStateTarget arm keys on
             # `centerIndex`, never on territory, and only for a LIVE minor
-            cs_nb = self._centre_seat_plane().gather(1, nbc) >= 100
+            _ctr_nb = self._centre_seat_plane().gather(1, nbc)
+            cs_nb = (_ctr_nb >= 100) & (_ctr_nb < BARB_SEAT)
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
@@ -1781,7 +1817,7 @@ class SimOrders:
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             _csp = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            cs_here = _csp >= 100
+            cs_here = (_csp >= 100) & (_csp < BARB_SEAT)
             _csi = (_csp - 100).clamp(min=0)
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
             _enc_here = (

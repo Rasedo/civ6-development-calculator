@@ -21,7 +21,7 @@ import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect } from './cityStates';
 import { minorBuildPhase } from './minorBuild';
-import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
+import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
@@ -46,7 +46,9 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, grantFoundingPressure, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
+import { rowIsFor } from '../data/civilizations';
+import type { CivId, LeaderId } from '../../world/roster';
+import { BARB_SEAT, allCities, allSeats, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -524,10 +526,20 @@ export function repairAvailable(state: GameState, city: City): boolean {
   return state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
 }
 
+/** May this seat run a project at all? A civilization-UNIQUE row (`civ` /
+ *  `leader`) is refused to every other seat — the same `rowIsFor` reading
+ *  every roster row takes; a row naming neither is everyone's. The GPU twin
+ *  is `_proj_seat_ok`, in the production mask and the applier alike. */
+export function projectSeatOk(state: GameState, def: { civ?: string; leader?: string }, seat: number): boolean {
+  if (def.civ === undefined && def.leader === undefined) return true;
+  return rowIsFor(def as { civ?: CivId; leader?: LeaderId }, civOf(state, seat), leaderOf(state, seat));
+}
+
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
   const owner = seatOf(state, city.seat);
   const done = owner?.projectsDone ?? [];
   return Object.values(PROJECTS).filter((p) => {
+    if (!projectSeatOk(state, p, city.seat)) return false;
     // CIV6: "Production cannot be applied to anything in tiles containing
     // contamination" — a project runs in a district, so that district's tile
     // has to be clean as well as complete.
@@ -1529,7 +1541,9 @@ export function endTurn(state: GameState): void {
   cityStatePhase(state);
   minorBuildPhase(state);
   seatPhase(state);
-
+  // CIV6's Free Cities player takes its turn after every major's; the GPU
+  // twin runs `_free_cities_phase` at the same position.
+  freeCitiesPhase(state);
 
   theologicalCombatPhase(state);
   spreadReligiousPressure(state);
