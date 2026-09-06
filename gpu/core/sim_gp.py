@@ -105,7 +105,9 @@ class SimGp:
         for _fc, _fl, _fi, _fa in self._feature_appeal_rows:
             if _fi < 0:
                 continue
-            src = self.feat_id == _fi                              # [B, T]
+            # `feat_id` keeps a chopped tile's old id; the strip flag makes
+            # this the live `n.feature` read the TS resolver does.
+            src = (self.feat_id == _fi) & ~self.feat_stripped          # [B, T]
             nb = self.neigh
             cnt = (src[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)  # [B, T]
             for r in range(self.n_majors):

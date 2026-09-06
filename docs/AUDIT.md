@@ -1327,6 +1327,14 @@ index; the full narrative is in the git log, and the durable lessons are in
 the memory files this appendix names. Delete a bullet once its class is
 mirrored in memory.
 
+- **A-12r. The Amazon counted a CHOPPED rainforest. CLOSED 2026-09-06.** The
+  GPU's feature-appeal term read `feat_id == fi` bare, and `feat_id` keeps a
+  chopped tile's old id; the strip flag is the live `n.feature` read TS does.
+  Latent from C-50 until a Preserve stood on a stripped rainforest beside a
+  Brazilian tile and its Grove band paid the wrong tile (seed 9014 t198, the
+  worked-tile pick). Lesson: every bare `feat_id ==` read needs the strip flag
+  or `_feature_live`; the census of the others was clean. Lane: `feature_appeal`
+  step 6.
 - **A-10r. A gold-bought strategic unit paid its resource on the GPU and not
   on TS. CLOSED 2026-09-05.** TS's seat-phase `buy` kind-2 arm spawned the
   unit and never called `chargeUnitResource`, though `purchaseUnit` beside it

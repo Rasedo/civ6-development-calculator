@@ -157,6 +157,24 @@ def test_the_clause_is_per_game(rules, path) -> None:
     print("  5 the batch OK — the clause is per game, not per batch")
 
 
+def test_a_chopped_rainforest_no_longer_counts(rules, path) -> None:
+    """`feat_id` keeps a chopped tile's old id; the strip flag is what makes
+    the count the live `n.feature` read TS does (seed 9014 t198: a Preserve
+    tile's stripped rainforest paid Brazil +2 appeal next door)."""
+    _c, _l, fi, amt = build(path)._feature_appeal_rows[0]
+    sim = build(path)
+    _seat(sim, ROW, sim._civ_ids[_c])
+    t = _owned_tile(sim, ROW)
+    _paint(sim, t, 2, fi)
+    both = float(sim._gp_appeal_plane()[B0, t])
+    nb = [int(x) for x in sim.neigh[t].tolist() if x >= 0]
+    sim.feat_stripped[B0, nb[0]] = True
+    sim._eff_version += 1
+    one = float(sim._gp_appeal_plane()[B0, t])
+    assert both - one == amt, f"a chopped rainforest still paid: {both} -> {one}"
+    print("  6 the chop OK — a stripped rainforest stops counting")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -165,6 +183,7 @@ def main() -> int:
     test_it_scales_with_the_count_and_pays_nothing_at_zero(rules, path)
     test_an_unowned_tile_and_a_plain_seat_take_none(rules, path)
     test_the_clause_is_per_game(rules, path)
+    test_a_chopped_rainforest_no_longer_counts(rules, path)
     print("BATTERY OK feature_appeal")
     return 0
 
