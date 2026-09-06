@@ -97,8 +97,9 @@ open docs/roster_ledger.json row.
 | C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
 | C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
 | C-76 no opinion scale between majors | 1 | the mission's mark, DEMAND, DISCUSS and its promises, the Retribution casus belli, the AI's agendas — every clause that reads how a leader FEELS |
-| **C. Absent systems** | **36** | |
-| **OPEN, TOTAL** | **55** | |
+| C-77 the worked-tile assignment lives only inside the yield walk | 1 | which citizen works which plot is derived on both engines and exposed nowhere, so a rule that names a WORKED tile (a nuke's citizens) has nothing to read |
+| **C. Absent systems** | **37** | |
+| **OPEN, TOTAL** | **56** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -986,7 +987,7 @@ under their blocker so the dependency is readable, and both halves count.
   - INTERCEPTION has no published roll (shared with C-34, which owns the
     fighter's side of it).
   - THE CITIZENS A BLAST KILLS wait on a worked-tile selection neither engine
-    exposes.
+    exposes — C-77.
   - WHETHER A WONDER IN THE BLAST IS PILLAGED is unsourced.
 - **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1.
   SHIPPED: every published clause. STYLIZED (owner ruling 2026-09-04): the
@@ -1246,6 +1247,18 @@ under their blocker so the dependency is readable, and both halves count.
   The carrier is a per-directed-pair opinion on both engines, compared,
   with the install's `RelationshipLevel` anchors; what feeds it is an ASK —
   no source publishes the per-event deltas.
+- **C-77. THE WORKED-TILE ASSIGNMENT LIVES ONLY INSIDE THE YIELD WALK.** Weight 1.
+  ENGINES: `assignWorkedTiles` and the GPU walk's `topk` derive which plot each
+  citizen works every time a city's yields are computed; nothing stores it,
+  nothing compares it, and no rule outside the walk can ask it. The seed 9014
+  hunts of 2026-09-06 (A-12r, A-13r) both surfaced as a yield split because the
+  pick itself is invisible to the gate.
+  OPEN: CIV6 (Nuclear weapons): "Citizens 'working' the affected tiles are
+  eliminated" — C-20's nuke bullet waits here. The carrier is ONE exposed
+  reader per engine (the walk's own pick, returned rather than consumed) and a
+  compared per-city worked-tile list, which would also have caught both A-12r
+  and A-13r a turn earlier and at the tile.
+
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   ENGINES: both hold religious PRESSURE per city and a followed religion per
   city, and neither ever asks which religion a SEAT is majority-held by.
