@@ -1150,10 +1150,10 @@ under their blocker so the dependency is readable, and both halves count.
     comment, "the equivalent of no feature" — the rows are not feature-keyed,
     so each is the flood's reading: the chance of +1 of its yield on every
     land tile of the footprint; `ReplaceFeature` places nothing. The BLIZZARD
-    rows are shipped as the table has them (food 10/20%) although the row's
-    EffectString reads NO_FERTILITY — the data table is what the game reads;
-    tornadoes have no row and fertilize nothing. Two booleans if the owner
-    rules the label over the table.
+    rows ship as the table has them (food 10/20%) although the row's
+    EffectString reads NO_FERTILITY — OWNER RULING 2026-09-06: "blizzards do
+    give boost to fertility", the table stands over the label; tornadoes have
+    no row and fertilize nothing.
   - BUILDING_PILLAGED rides the district's darkness, as the flood does.
   BAR 2026-09-06: tsc, pyright, ruff, oxlint, seat_symmetry, statecompare
   census, inplace discipline, `tests/cpu/map/storms.test.ts`,

@@ -60,14 +60,17 @@ def main() -> None:
     print(f"  a complete district on a floodplain is pillaged (after {n} phases)")
 
     # ...and the same tile, with the district still BUILDING, survives every
-    # flood. The silt proves the floods kept landing on it, so the negative is
-    # about completeness and not about a tile the flood stopped picking.
+    # flood. The flood is DRIVEN onto the tile and its count proves each one
+    # landed, so the negative is about completeness and not about the walk.
     sim.district_pillaged[0, t] = False
     sim.district_complete[0, t] = False
-    sim.fertility[0, t] = 0
-    for _ in range(600):
-        sim._disaster_phase()
-    assert int(sim.fertility[0, t]) > 0, "the flood never reached the tile again"
+    hit = torch.zeros(sim.B, dtype=torch.bool)
+    hit[0] = True
+    at = torch.full((sim.B,), t, dtype=torch.long)
+    before = int(sim.tile_flood_ct[0, t])
+    for _ in range(200):
+        sim._flood_river(hit, at)
+    assert int(sim.tile_flood_ct[0, t]) - before == 200, "the flood did not land on the tile every time"
     assert not bool(sim.district_pillaged[0, t]), "a district still building was pillaged"
     print("  an unfinished district is left alone")
 

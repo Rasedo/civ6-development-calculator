@@ -170,7 +170,7 @@ def main() -> None:
     prod6[0, j] = rec_sim.DISTRICT_BASE + si
     dt6 = torch.full((1, rec_sim.RC, len(rec_sim._scaffold)), -1, dtype=torch.long)
     dt6[0, j, si] = t6
-    rec = drive._extract_record(rec_sim, row, prod6, dt6, None, None, None, None,
+    rec = drive._extract_record(rec_sim, row, prod6, dt6, None, None, None, None, None,
                                 torch.full((1, 1, 1), -1, dtype=torch.long),
                                 None, None, None, None, None, None, None, None, None,
                                 None, None, None, None, None, None, None, None, 0)
