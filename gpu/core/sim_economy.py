@@ -4090,7 +4090,7 @@ class SimEconomy:
 
         valid = (
             (tiles >= 0)
-            & (gat(self.tile_seat) == row)
+            & (gat(self.tile_seat) == int(self._ROW_SEAT[row]))  # a tile names its holder by SEAT id
             & (gat(self.tile_city) == ids.unsqueeze(2))
             & gat(self._work_ground(row) & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))
@@ -4220,7 +4220,7 @@ class SimEconomy:
 
         valid = (
             (tiles >= 0)
-            & (gat(self.tile_seat) == row)
+            & (gat(self.tile_seat) == int(self._ROW_SEAT[row]))  # a tile names its holder by SEAT id
             & (gat(self.tile_city) == ids.unsqueeze(2))
             & gat(self._work_ground(row) & ~self._fallout())
             & (tiles != ctr.unsqueeze(2))

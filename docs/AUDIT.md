@@ -1485,6 +1485,17 @@ index; the full narrative is in the git log, and the durable lessons are in
 the memory files this appendix names. Delete a bullet once its class is
 mirrored in memory.
 
+- **A-14r. A Free City could not work its own tiles on the GPU. CLOSED
+  2026-09-07.** The work window and the yield walk matched a tile's holder by
+  city-plane ROW INDEX (`tile_seat == row`), which equals the seat id for a
+  major and never for the Free row (its tiles carry seat 300): zero workable
+  plots, every citizen a specialist, and the compare rendered the holder as
+  the row index and counted the city among the majors' (seed 9027 t202, the
+  one revolt the probe had measured). A row's seat id is `_ROW_SEAT[row]`;
+  the other `tile_seat == row` sites are reached with major rows only. Lesson:
+  a new ROW CLASS in a plane whose index used to equal a seat id turns every
+  `== row` read into a fork — census the READS of the plane, not the writes.
+  Lane: `free_city` step 2.
 - **A-13r. Silt on a natural wonder paid production on the GPU. CLOSED
   2026-09-06.** A storm's production fertility landed on the Eye of the Sahara
   (both engines write it: the wonder is land and no mountain) and `_neutral_prod`

@@ -255,7 +255,7 @@ GAME = {
         [int(x) for x in sim.gp_passed_by[b].tolist()],
     ],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
-    "cityCount": lambda sim, b, rows: [len(_city_rows(sim, b))],
+    "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
@@ -739,7 +739,7 @@ def _qfront(sim, b, c, s):
 
 
 CITY = {
-    "seat": lambda sim, b, rows: [c for c, _ in rows],
+    "seat": lambda sim, b, rows: [int(sim._ROW_SEAT[c]) for c, _ in rows],  # the Free row renders 300
     "gpPerm": lambda sim, b, rows: [[int(x) for x in sim.city_gp_perm[b, c, s].tolist()] for c, s in rows],
     "population": _cty("city_pop"),
     "hp": _cty("city_hp"),

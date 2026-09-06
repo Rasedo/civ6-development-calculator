@@ -158,7 +158,15 @@ def test_revolt_makes_free_city(rules, path) -> None:
     owned = (sim.tile_seat[B0] == FREE_SEAT).sum()
     assert int(owned) >= 1 and bool((sim.tile_city[B0][sim.tile_seat[B0] == FREE_SEAT] == int(sim.city_id[B0, F, col])).all())
     sim._check_rc_registry_invariant()
-    print("  2 the revolt OK — a Free City, kept whole, on the free row")
+    # its tiles carry seat 300, not the row index: the work window still
+    # finds them, so nobody is pushed into a specialist slot (seed 9027 t202)
+    assert int(sim._workable_count(F)[B0, col]) == int(owned) - 1, "the Free City cannot work its own tiles"
+    assert int(sim._city_specialists(F)[B0, col].sum()) == 0, "a Free City's citizens were all made specialists"
+    from core.statecompare import CITY, GAME
+    rows = [(F, col)]
+    assert CITY["seat"](sim, B0, rows) == [FREE_SEAT], "the compare renders the Free row by its index"
+    assert GAME["cityCount"](sim, B0, rows) == [n0 + n1 + int(sim.city_alive[B0, 2:sim.n_majors].sum())], "the majors' city count took the Free City"
+    print("  2 the revolt OK — a Free City, kept whole, on the free row, working its tiles")
 
 
 def test_eleanor_skips(rules, path) -> None:
