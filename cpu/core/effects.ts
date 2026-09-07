@@ -108,7 +108,9 @@ export function computeUnlocksIn(
   // the override REPLACES the district's own edge: where the row plays, only
   // its named tech opens that door
   for (const r of districtPrereq) {
-    if (research.techs.includes(r.tech)) u.districts.add(r.district);
+    const has = r.tech !== undefined ? research.techs.includes(r.tech)
+      : r.civic !== undefined ? research.civics.includes(r.civic) : false;
+    if (has) u.districts.add(r.district);
     else u.districts.delete(r.district);
   }
   return u;

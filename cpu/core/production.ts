@@ -2,7 +2,7 @@ import type { City, GameState, Seat, Unit } from './types';
 import { repairBuilding } from './yields';
 import { scoreDecommission } from './competition';
 import type { QueueItem } from './types';
-import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital } from './seats';
+import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf } from './seats';
 import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
@@ -22,7 +22,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
-import { spawnUnit } from './units';
+import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
 import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
@@ -252,6 +252,18 @@ export function completeQueueItem(
       // a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
       for (const r of getModifiers(state, city.seat).districtUnits) {
         if (dt.district === r.district) spawnUnit(state, r.unit, dt.index, city.seat);
+      }
+      // CIV6 (M'banza): a free Apostle when it finishes; (Royal Navy
+      // Dockyard): a naval unit the install does not name, so the strongest
+      // hull this seat can train. Both are the VARIANT's own clause, so a
+      // seat that does not carry it sees nothing.
+      const dv = dt.district
+        ? DISTRICTS[dt.district].civVariants?.find((v) => v.civ === civOf(state, city.seat))
+        : undefined;
+      if (dv?.grantsUnit) spawnUnit(state, dv.grantsUnit, dt.index, city.seat);
+      if (dv?.grantsNavalUnit) {
+        const hull = bestTrainableNaval(state, city.seat);
+        if (hull) spawnUnit(state, hull, dt.index, city.seat);
       }
       const ddef = dt.district ? DISTRICTS[dt.district] : null;
       // CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City

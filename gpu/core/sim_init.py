@@ -1145,6 +1145,7 @@ class SimInit:
         # counted, so those are counted live from these two tables.
         self._adj_src_feat = [int(x) for x in _bl.get("adjSrcFeat", [])]
         self._adj_src_terr = [int(x) for x in _bl.get("adjSrcTerr", [])]
+        self._adj_src_names = [str(x) for x in _bl.get("adjSrcNames", [])]
         # ...and the sources any belief row actually names, per district type.
         self._bel_adj_srcs: dict[int, list[int]] = {}
         if self._bel_any:
@@ -2265,6 +2266,7 @@ class SimInit:
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
         self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CAMPUS"), -1)
         self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
+        self._entcomplex_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENTERTAINMENT_COMPLEX"), -1)
         self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "INDUSTRIAL_ZONE"), -1)
         self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AERODROME"), -1)
         self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "SPACEPORT"), -1)
@@ -2414,6 +2416,27 @@ class SimInit:
         # CIV6 (DistrictReplaces): a civilization's unique district standing in
         # for a row — {district idx: [{civ, costMult, housing, amenities}]}
         self._d_variants = {i: list(d["variants"]) for i, d in enumerate(self.districts_cat) if d.get("variants")}
+        # a UNIQUE district's OWN adjacency rows, {districtIdx: {civ: [(src, amount)]}}
+        self._d_variant_adj: dict[int, dict[int, list[tuple[int, float]]]] = {}
+        for _di, _vs in self._d_variants.items():
+            for _v in _vs:
+                _rows = [(int(a), float(b)) for a, b in _v.get("adj", [])]
+                if _rows:
+                    self._d_variant_adj.setdefault(_di, {})[int(_v["civ"])] = _rows
+        # the flat yields a unique district pays of its own, {di: {civ: [6]}}
+        self._d_variant_flat: dict[int, dict[int, list[float]]] = {}
+        for _di, _vs in self._d_variants.items():
+            for _v in _vs:
+                _f = [float(x) for x in _v.get("flat", [])]
+                if any(_f):
+                    self._d_variant_flat.setdefault(_di, {})[int(_v["civ"])] = _f
+        # finishing one grants a unit (-1 none) or the strongest hull
+        self._d_variant_grant: dict[int, dict[int, tuple[int, bool]]] = {}
+        for _di, _vs in self._d_variants.items():
+            for _v in _vs:
+                _gu, _gn = int(_v.get("grantUnit", -1)), bool(_v.get("grantNaval", 0))
+                if _gu >= 0 or _gn:
+                    self._d_variant_grant.setdefault(_di, {})[int(_v["civ"])] = (_gu, _gn)
         self._d_loyalty = torch.tensor([float(d.get("loyalty", 0)) for d in self.districts_cat], dtype=dtype, device=device)
         self._d_gov_title = torch.tensor([int(d.get("governorTitle", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_envoy_centre = torch.tensor([int(d.get("envoysNextToCenter", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
@@ -3163,7 +3186,7 @@ class SimInit:
         self._boost_pct_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["boostPct"]]  # type: ignore[misc]
         # [civ, leaderRow, district, tech] — REPLACES the district's own unlock
-        self._district_prereq_rows: list[tuple[int, int, int, int]] = [
+        self._district_prereq_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["districtPrereq"]]  # type: ignore[misc]
         self._war_weariness_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["warWeariness"]]  # type: ignore[misc]

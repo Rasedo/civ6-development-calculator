@@ -51,7 +51,12 @@ describe('the wire', () => {
     expect(EXTRA_DISTRICT_ROWS.length).toBe(1);
     expect(CITY_TILES_ROWS.length).toBe(1);
     expect(BOOST_PCT_ROWS.length).toBe(2);
-    expect(DISTRICT_PREREQ_ROWS.length).toBe(1);
+    expect(DISTRICT_PREREQ_ROWS.length).toBe(2);
+    // a row REPLACES the district's own edge, so it names exactly one of the
+    // two research tracks
+    for (const r of DISTRICT_PREREQ_ROWS) {
+      expect((r.tech !== undefined) !== (r.civic !== undefined), 'one track, not both').toBe(true);
+    }
     expect(WAR_WEARINESS_ROWS.length).toBe(1);
     expect(PEACEFUL_FOUNDER_ROWS.length).toBe(1);
     expect(YIELD_PER_SUZERAIN_ROWS.length).toBe(1);

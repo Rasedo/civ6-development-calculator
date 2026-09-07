@@ -1028,6 +1028,24 @@ class SimPhase:
                     _dat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
                     _dat[dr] = dt
                     self._spawn_unit(row, _dw, _dat, _du)
+            # CIV6 (M'banza): a free Apostle when it finishes; (Royal Navy
+            # Dockyard): a naval unit the install does not name, so the
+            # strongest hull this seat can train. The VARIANT's own clause,
+            # so a seat that does not play the civilization sees nothing.
+            for _vdi, _vcivs in self._d_variant_grant.items():
+                for _vciv, (_vu, _vnav) in _vcivs.items():
+                    _vw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    _vw[dr] = self.district[dr, dt] == _vdi
+                    _vw = _vw & self._row_plays_idx(row, _vciv)
+                    if not bool(_vw.any()):
+                        continue
+                    _vat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                    _vat[dr] = dt
+                    if _vu >= 0:
+                        self._spawn_unit(row, _vw, _vat, _vu)
+                    if _vnav:
+                        _hull = self._best_trainable_naval(row)
+                        self._spawn_unit(row, _vw & (_hull >= 0), _vat, _hull.clamp(min=0))
             # MONUMENTALITY pays era score per SPECIALTY district completed
             # (a city centre is never queued here).
             mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)

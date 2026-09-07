@@ -2750,6 +2750,86 @@ class SimEconomy:
             self._dadj_cache[1][key] = v
         return v
 
+    def _variant_adj_floor(self, row: int, di: int) -> torch.Tensor | None:
+        """[B, T] — a UNIQUE district's OWN adjacency, floored, or None where
+        this row plays no civilization carrying one for `di`. The install
+        gives every unique district its own `District_Adjacencies` rows rather
+        than adding to the base row's, so this REPLACES `_district_adj_floor`
+        rather than joining it — `districtAdjacency`'s `own` argument.
+
+        Built from the same per-source counters the base walk uses, so a new
+        source lands in one place on each engine."""
+        rows = self._d_variant_adj.get(di)
+        if not rows or row >= self.n_majors:
+            return None
+        for civ, srcs in rows.items():
+            who = self._row_plays_idx(row, civ)
+            if not bool(who.any()):
+                continue
+            key = ("var", di, civ)
+            if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
+                self._dadj_cache = (self._eff_version, {})
+            v = self._dadj_cache[1].get(key)
+            if v is None:
+                acc = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+                for src, amt in srcs:
+                    acc = acc + amt * self._adj_source_plane(src)
+                v = torch.floor(acc)
+                self._dadj_cache[1][key] = v
+            # a row that does not play the civilization keeps the base walk
+            return torch.where(who.unsqueeze(1), v, self._district_adj_floor(di))
+        return None
+
+    def _adj_source_plane(self, src: int) -> torch.Tensor:
+        """[B, T] — how much ONE adjacency source answers at each tile, in the
+        district walk's own units. `districtAdjacency`'s `matchesAdjacency`
+        arm by arm; RIVER and SELF read no neighbour at all."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        on_map = (nb >= 0).unsqueeze(0)
+        name = self._adj_src_names[src] if src < len(self._adj_src_names) else ""
+        if name == "SELF":
+            return torch.ones(self.B, self.T, dtype=self.dtype, device=self.device)
+        if name == "RIVER":
+            return self.tile_river.to(self.dtype)
+        if name == "DISTRICT":
+            return self._adj_district_count().to(self.dtype)
+        if name == "CITY_CENTER":
+            return self._adj_center_count().to(self.dtype)
+        if name == "HARBOR_DISTRICT":
+            return self._adj_harbor_count().to(self.dtype)
+        if name == "BUILT_WONDER":
+            cnt = ((self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc] & on_map).sum(dim=2)
+            return cnt.to(self.dtype)
+        if name == "NATURAL_WONDER":
+            return (self.nwonder[:, nbc] & on_map).sum(dim=2).to(self.dtype)
+        if name == "SEA_RESOURCE":
+            cnt = (self.water[:, nbc] & (self.res_id[:, nbc] >= 0) & on_map).sum(dim=2)
+            return cnt.to(self.dtype)
+        if name == "RESOURCE":
+            cnt = (~self.water[:, nbc] & (self.res_id[:, nbc] >= 0) & on_map).sum(dim=2)
+            return cnt.to(self.dtype)
+        if name == "MOUNTAIN":
+            cnt = (self.tile_mountain[:, nbc] & ~self.nwonder[:, nbc] & on_map).sum(dim=2)
+            return cnt.to(self.dtype)
+        if name == "MINE":
+            return ((self.improvement[:, nbc] == self._mine_iidx) & on_map).sum(dim=2).to(self.dtype)
+        if name == "QUARRY":
+            return ((self.improvement[:, nbc] == self._quarry_iidx) & on_map).sum(dim=2).to(self.dtype)
+        _dmap = {"AQUEDUCT": self._aqueduct_idx, "DAM": self._dam_didx,
+                 "CANAL": self._canal_didx, "GOV_PLAZA": self._govplaza_didx,
+                 "COMMERCIAL_HUB": self._commhub_idx, "HOLY_SITE_DISTRICT": self._hs_idx,
+                 "ENTERTAINMENT_COMPLEX": self._entcomplex_idx}
+        if name in _dmap:
+            _idx = _dmap[name]
+            if _idx < 0:
+                return torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+            cnt = ((self.district[:, nbc] == _idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
+            return cnt.to(self.dtype)
+        # everything left names a FEATURE or a TERRAIN, which `_adj_src_count`
+        # already answers off the live map
+        return self._adj_src_count(src)
+
     def _district_adj_seat(self, row: int, di: int) -> torch.Tensor:
         """[B, T] — `effectiveAdjacency`: the FLOORED adjacency of a district
         of type `di`, times this seat's adjacencyMult for that type. TS floors
@@ -2759,6 +2839,11 @@ class SimEconomy:
             base = self._district_adj_belief_floor(row, di)
         else:
             base = self._district_adj_floor(di)
+        # a UNIQUE district's own rows REPLACE the base walk's for the seat
+        # that carries it (`effectiveAdjacency`'s `own`).
+        _var = self._variant_adj_floor(row, di)
+        if _var is not None:
+            base = _var
         out = base * self._gov_mods(row)[10][:, di].unsqueeze(1)
         if self.n_governors and row < self.n_majors:
             out = out * self._governor_tile_adj(row, di).to(out.dtype)
@@ -4630,6 +4715,18 @@ class SimEconomy:
                 fi_adj = add if fi_adj is None else fi_adj + add
             elif di == self._campus_idx:
                 st_adj = add
+        # CIV6 (M'banza, `MODIFIER_PLAYER_DISTRICT_ADJUST_BASE_YIELD_CHANGE`):
+        # a unique district's own FLAT yields, on top of its adjacency.
+        if self._d_variant_flat and row < self.n_majors:
+            for _fdi, _fcivs in self._d_variant_flat.items():
+                for _fciv, _fvec in _fcivs.items():
+                    _fw = self._row_plays_idx(row, _fciv)
+                    if not bool(_fw.any()):
+                        continue
+                    _flive = dlive[:, :, _fdi] & _fw.unsqueeze(1)
+                    for _fy, _fa in enumerate(_fvec):
+                        if _fa:
+                            dist_y[:, :, _fy] = dist_y[:, :, _fy] + _flive.double() * _fa
         # CIV6 (Nan Madol): "+2 Culture" from EVERY live district on or next to
         # shallow water — every slot, not only the ones with an adjacency yield.
         if self._suz_c_water_cul >= 0 and row < self.n_majors:

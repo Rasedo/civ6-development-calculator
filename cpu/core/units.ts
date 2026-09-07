@@ -1179,6 +1179,20 @@ export function bestTrainableOfClass(state: GameState, seat: number, promoClass:
   return best?.id ?? null;
 }
 
+/** CIV6 (Royal Navy Dockyard,
+ *  `MODIFIER_PLAYER_ADJUST_DISTRICT_ADD_NAVAL_UNIT`): the install names NO
+ *  chassis, so the grant takes the strongest NAVAL unit this seat can train —
+ *  `bestTrainableOfClass`'s rule, over the hulls rather than over a promotion
+ *  class, because the naval line spans three of them. */
+export function bestTrainableNaval(state: GameState, seat: number): string | null {
+  let best: UnitDef | undefined;
+  for (const d of trainableUnits(state, seat)) {
+    if (!d.naval) continue;
+    if (!best || (d.combat ?? 0) > (best.combat ?? 0)) best = d;
+  }
+  return best?.id ?? null;
+}
+
 export function trainableUnits(
   state: GameState,
   seat: number,

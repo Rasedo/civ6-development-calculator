@@ -70,6 +70,8 @@ const RESOURCE_IDS = Object.keys(RESOURCES);
 const BUILT_WONDER_LIST = Object.values(BUILT_WONDERS);
 const wonderStaticOk = (w: (typeof BUILT_WONDER_LIST)[number], t: Tile, m: GameState['map']): boolean =>
   wonderTerrainOk(w, t, m);
+// the SELF source reads no neighbour at all, so it is never a per-tile
+// static count — the district's own row carries it.
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
   'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',

@@ -512,6 +512,16 @@ export function projectCost(state: GameState, seat: number, projectId?: string, 
   // so the whole repair costs exactly the perimeter HP it puts back.
   if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city));
   const fixed = def?.cost;
+  // CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price climbs with the game's
+  // own progress, which this engine reads exactly where `districtCostIn`
+  // reads it — the larger of the tech and civic shares researched.
+  if (fixed !== undefined && def?.costProgressGame !== undefined) {
+    const r = seatOf(state, seat)?.research;
+    const pct = r
+      ? Math.max(r.techs.length / Object.keys(TECHS).length, r.civics.length / Object.keys(CIVICS).length)
+      : 0;
+    return fixed + Math.floor(Math.round(def.costProgressGame * GAME_SPEED) * pct);
+  }
   if (fixed !== undefined) return fixed;
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
 }

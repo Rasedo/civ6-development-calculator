@@ -53,9 +53,13 @@ describe('a civilization-unique project', () => {
     expect(projectSeatOk(state, {}, rival.seat)).toBe(true);
     rival.civ = leaderRow('DIDO');
     expect(projectSeatOk(state, { civ: 'PHOENICIA' }, rival.seat)).toBe(true);
-    // the Cothon's project cannot be in the catalog until the Cothon is a
-    // district (docs/AUDIT.md C-61 / C-69): no shipped row is gated yet
-    expect(Object.values(PROJECTS).every((p) => p.civ === undefined && p.leader === undefined && !p.movesCapital)).toBe(true);
+    // the Cothon's project is the ONE gated row in the catalog, and the one
+    // that moves a capital
+    const gated = Object.values(PROJECTS).filter((p) => p.civ !== undefined || p.leader !== undefined);
+    expect(gated.map((p) => p.id)).toEqual(['COTHON_CAPITAL_MOVE']);
+    expect(gated[0].civ).toBe('PHOENICIA');
+    expect(gated[0].movesCapital).toBe(true);
+    expect(Object.values(PROJECTS).filter((p) => p.movesCapital).length).toBe(1);
   });
 });
 

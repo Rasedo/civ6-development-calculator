@@ -1314,12 +1314,15 @@ class SimSeats:
         base = (self.civ_techs[:, row, utech] if utech >= 0
                 else (self.civ_civics[:, row, uciv] if uciv >= 0
                       else torch.ones(self.B, dtype=torch.bool, device=self.device)))
-        for _pc, _pl, _pd, _pt in self._district_prereq_rows:
-            if _pd != di or _pt < 0:
+        for _pc, _pl, _pd, _pt, _pv in self._district_prereq_rows:
+            if _pd != di or (_pt < 0 and _pv < 0):
                 continue
             _w = self._row_is(row, _pc, _pl)
-            # REPLACES: where the row plays, only its own tech opens the door
-            base = torch.where(_w, self.civ_techs[:, row, _pt], base)
+            # REPLACES: where the row plays, only its own TECH or its own
+            # CIVIC opens the door (the M'banza's is a civic)
+            _open = (self.civ_techs[:, row, _pt] if _pt >= 0
+                     else self.civ_civics[:, row, _pv])
+            base = torch.where(_w, _open, base)
         return base
 
     def _district_cap(self, row: int, j: int) -> torch.Tensor:
@@ -1471,6 +1474,24 @@ class SimSeats:
         """`_up_to_row` read at each unit's chassis — `utype` [B] or [B, N]."""
         up = self._up_to_row(row)
         return up.gather(1, utype.clamp(min=0).reshape(self.B, -1)).reshape(utype.shape)
+
+    def _best_trainable_naval(self, row: int) -> torch.Tensor:
+        """`bestTrainableNaval`'s twin, [B] long (-1 none) — the strongest HULL
+        this row can train, PER GAME. The install names no chassis for the
+        Royal Navy Dockyard's grant, so the roster picks one; ties keep the
+        FIRST, which is catalog order, exactly as TS's strictly-greater walk
+        does. A batch-wide pick would read the WRONG GAME wherever two games
+        hold different research."""
+        tr = self._seat_trainable_units(row)  # [B, NU]
+        naval = self.unit_naval[: self.NU].unsqueeze(0)
+        cs = self._type_combat[: self.NU].unsqueeze(0)
+        # rank by strength, ties by the LOWER catalog index
+        key = torch.where(tr & naval,
+                          cs * self.NU - torch.arange(self.NU, device=self.device).unsqueeze(0),
+                          torch.full_like(cs, -(1 << 30)))
+        pick = key.argmax(dim=1)
+        any_ok = (tr & naval).any(dim=1)
+        return torch.where(any_ok, pick, torch.full_like(pick, -1))
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
         """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
@@ -2540,8 +2561,17 @@ class SimSeats:
                     # Space steps and laser stations carry their REAL fixed
                     # price (`pc`); everything else takes the generic curve.
                     pc_fixed = int(prow_a.get("pc", -1))
+                    pc_prog = int(prow_a.get("pcg", 0))
                     if int(prow_a.get("rep", 0)):
                         price_a = self._repair_cost(row, j)
+                    elif pc_fixed >= 0 and pc_prog:
+                        # CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price
+                        # climbs with the game's own progress, read exactly
+                        # where `_seat_proj_cost` reads it.
+                        _tp = self.civ_techs[:, row].to(torch.float64).mean(dim=1)
+                        _cp = self.civ_civics[:, row].to(torch.float64).mean(dim=1)
+                        price_a = (torch.full_like(pc_a, float(pc_fixed))
+                                   + torch.floor(pc_prog * torch.maximum(_tp, _cp)))
                     elif pc_fixed >= 0:
                         price_a = torch.full_like(pc_a, float(pc_fixed))
                     else:

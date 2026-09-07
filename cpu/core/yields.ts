@@ -209,6 +209,18 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return neighbor.district === 'CANAL' && neighbor.districtComplete;
     case 'GOV_PLAZA':
       return neighbor.district === 'GOVERNMENT_PLAZA' && neighbor.districtComplete;
+    // the three district neighbours a UNIQUE district's own row names
+    case 'COMMERCIAL_HUB':
+      return neighbor.district === 'COMMERCIAL_HUB' && neighbor.districtComplete;
+    case 'ENTERTAINMENT_COMPLEX':
+      return neighbor.district === 'ENTERTAINMENT_COMPLEX' && neighbor.districtComplete;
+    case 'HOLY_SITE_DISTRICT':
+      return neighbor.district === 'HOLY_SITE' && neighbor.districtComplete;
+    // CIV6 (Hansa): "for each adjacent Resource" — any resource on land
+    case 'RESOURCE':
+      return !isWater(neighbor) && neighbor.resource !== null;
+    case 'SELF':
+      return false; // handled separately (it reads no neighbour at all)
     case 'RIVER':
       return false; // handled separately (it's about the tile itself)
   }
@@ -221,16 +233,22 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
  */
 export function districtAdjacency(
   map: GameState['map'], tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [],
+  own?: readonly AdjacencyRule[],
 ): number {
   const def = DISTRICTS[type];
-  if (!def.adjacencyYield || (def.adjacency.length === 0 && extra.length === 0)) return 0;
+  // a UNIQUE district ships its OWN adjacency rows rather than adding to the
+  // base row's, so `own` REPLACES the list when the seat carries a variant.
+  const rows = own ?? def.adjacency;
+  if (!def.adjacencyYield || (rows.length === 0 && extra.length === 0)) return 0;
   let sum = 0;
   const around = neighbors(map, tile);
-  for (const rule of [...def.adjacency, ...extra]) {
+  for (const rule of [...rows, ...extra]) {
     if (rule.source === 'RIVER') {
       if (hasRiver(tile)) sum += rule.amount;
       continue;
     }
+    // CIV6 (Seowon): a FLAT bonus that reads no neighbour at all.
+    if (rule.source === 'SELF') { sum += rule.amount; continue; }
     for (const n of around) {
       if (matchesAdjacency(rule, n)) sum += rule.amount;
     }
@@ -239,7 +257,8 @@ export function districtAdjacency(
 }
 
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
-  return districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra])
+  const own = DISTRICTS[type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.adjacency;
+  return districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra], own)
     * (ctx.mods.adjacencyMult[type] ?? 1);
 }
 
@@ -335,6 +354,11 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     const def = DISTRICTS[d.type];
     const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
     if (cityStateAdd) addYields(out, cityStateAdd);
+    // CIV6 (M'banza, `MODIFIER_PLAYER_DISTRICT_ADJUST_BASE_YIELD_CHANGE`): a
+    // unique district's own flat yields, on top of whatever it takes from its
+    // neighbours.
+    const flat = DISTRICTS[d.type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.flatYield;
+    if (flat) addYields(out, { ...emptyYields(), ...flat });
     // CIV6 (Nan Madol): "+2 Culture" from every district on or next to water
     if (nanMadol && onOrNextToShallowWater(ctx.map, tile)) out.culture += nanMadol;
     if (def.adjacencyYield) {

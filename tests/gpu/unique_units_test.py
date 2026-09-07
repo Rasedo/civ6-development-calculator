@@ -193,6 +193,56 @@ def main() -> int:
         "the Janissary costs ONE citizen, in a founded city")
     print("  7 roster rows OK — the Saka's second copy and the Janissary's citizen")
 
+    # 8 — the ten unique DISTRICTS reached the wire as variants
+    _dvar = {}
+    for _i, _d in enumerate(rules.districts):
+        for _v in _d.get("variants", []):
+            _dvar[(_d["id"], civs[int(_v["civ"])])] = _v
+    WANT = [
+        ("THEATER_SQUARE", "GREECE"), ("INDUSTRIAL_ZONE", "GERMANY"),
+        ("CAMPUS", "KOREA"), ("COMMERCIAL_HUB", "MALI"), ("HOLY_SITE", "RUSSIA"),
+        ("ENCAMPMENT", "ZULU"), ("NEIGHBORHOOD", "KONGO"),
+        ("HARBOR", "ENGLAND"), ("HARBOR", "PHOENICIA"),
+        ("ENTERTAINMENT_COMPLEX", "BRAZIL"),
+    ]
+    for _k in WANT:
+        assert _k in _dvar, f"{_k[1]}'s variant of {_k[0]} never reached the wire"
+        assert abs(float(_dvar[_k]["costMult"]) - 1.0) < 1e-9, f"{_k} is not priced like its base row"
+    assert int(_dvar[("ENCAMPMENT", "ZULU")]["housing"]) == 1, "the Ikanda's Housing"
+    assert int(_dvar[("NEIGHBORHOOD", "KONGO")]["housing"]) == 5, "the M'banza's Housing"
+    assert int(_dvar[("ENTERTAINMENT_COMPLEX", "BRAZIL")]["amenities"]) == 2, "the Carnival's Amenity"
+    # the Seowon's own set: a flat FOUR and a MINUS one per district
+    _seo = _dvar[("CAMPUS", "KOREA")]["adj"]
+    _names = list(rules.beliefs["adjSrcNames"])
+    _by = {_names[int(a)]: float(b) for a, b in _seo}
+    assert _by.get("SELF") == 4 and _by.get("DISTRICT") == -1, f"the Seowon's rows are {_by}"
+    assert "MOUNTAIN" not in _by, "the Seowon still reads a mountain"
+    # the M'banza pays its own Food and Gold, and grants an Apostle
+    _mb = _dvar[("NEIGHBORHOOD", "KONGO")]
+    assert [float(x) for x in _mb["flat"]][:3] == [2.0, 0.0, 4.0], f"the M'banza's flat {_mb['flat']}"
+    assert ids[int(_mb["grantUnit"])] == "APOSTLE", "the M'banza grants no Apostle"
+    assert int(_dvar[("HARBOR", "ENGLAND")]["grantNaval"]) == 1, "the Dockyard grants no hull"
+    assert int(_dvar[("HARBOR", "PHOENICIA")]["grantNaval"]) == 0, "the Cothon grants a hull"
+    print(f"  8 unique districts OK — {len(WANT)} variants, the Seowon's own set, "
+          "the M'banza's yields and the Dockyard's hull")
+
+    # 9 — the Cothon's project, priced off the game's own progress
+    # a project row carries no id — its INDEX is its action code, so the row
+    # is read where the catalog puts it: LAST, so nothing earlier shifted.
+    _prows = list(rules.projects["rows"])
+    _cot = _prows[-1]
+    assert int(_cot["mc"]) == 1, "the last project moves no capital"
+    assert int(_cot["pcg"]) > 0, "the project takes no game-progress curve"
+    assert int(_cot["pc"]) > 0, "the project has no base price"
+    assert int(_cot["cv"]) == civs.index("PHOENICIA"), "the project is not Phoenicia's"
+    _harb = next(i for i, d in enumerate(rules.districts) if d["id"] == "HARBOR")
+    assert int(_cot["d"]) == _harb, "the project asks for no Harbor — the Cothon IS one"
+    # exactly ONE row moves a capital, and exactly one is civilization-gated
+    assert sum(int(r["mc"]) for r in _prows) == 1, "more than one project moves a capital"
+    assert sum(1 for r in _prows if int(r["cv"]) >= 0 or int(r["ld"]) >= 0) == 1, (
+        "more than one project is gated to a civilization")
+    print("  9 cothon project OK — last in the catalog, Phoenicia's, priced off game progress")
+
     print("UNIQUE UNITS OK")
     return 0
 

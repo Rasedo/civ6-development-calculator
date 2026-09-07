@@ -1042,10 +1042,16 @@ export interface DistrictPrereqRow {
   civ?: CivId;
   leader?: LeaderId;
   district: DistrictId;
-  tech: string;
+  /** exactly ONE of the two — the row REPLACES the district's own edge. */
+  tech?: string;
+  civic?: string;
 }
 export const DISTRICT_PREREQ_ROWS: readonly DistrictPrereqRow[] = [
   { leader: 'QIN', district: 'CANAL', tech: 'MASONRY' },
+  // CIV6 (M'banza, Districts.xml `PrereqCivic="CIVIC_GUILDS"`): Kongo's
+  // Neighborhood arrives at Guilds, where everyone else waits for
+  // Urbanization.
+  { civ: 'KONGO', district: 'NEIGHBORHOOD', civic: 'GUILDS' },
 ];
 
 /** CIV6 (Satyagraha, EFFECT_ADJUST_WAR_WEARINESS): "Opposing civilizations

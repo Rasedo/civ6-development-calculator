@@ -96,6 +96,11 @@ export interface ProjectDef {
    *  the Phoenician Capital moves to this city" — the ORIGINAL capital,
    *  `moveCapital`. */
   movesCapital?: boolean;
+  /** CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS, Param1): this project's price
+   *  climbs with the game's own progress rather than taking the generic
+   *  half-a-district curve — `cost + param x progress`. The engine's one
+   *  notion of that progress is `districtCostIn`'s max(tech, civic) share. */
+  costProgressGame?: number;
 }
 
 const P = (def: ProjectDef) => def;
@@ -236,6 +241,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', accordsOnly: true, description: 'Removes the Coal Power Plant and all its effects from this city.' }),
     P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', accordsOnly: true, description: 'Removes the Oil Power Plant and all its effects from this city.' }),
     P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', accordsOnly: true, description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
+
+    // CIV6 (Expansion2_Projects.xml, PROJECT_COTHON_CAPITAL_MOVE):
+    // PrereqDistrict DISTRICT_COTHON, Cost 100,
+    // COST_PROGRESSION_GAME_PROGRESS Param1 1500,
+    // `MaxSimultaneousInstances=1`. APPENDED LAST — a project's catalog index
+    // IS its action code, so an insert would shift every later one.
+    P({ id: 'COTHON_CAPITAL_MOVE', name: 'Move the Capital', district: 'HARBOR', civ: 'PHOENICIA', yield: null, gpClass: null, cost: 100, costProgressGame: 1500, movesCapital: true, description: 'When complete, this seat capital moves to this city.' }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 

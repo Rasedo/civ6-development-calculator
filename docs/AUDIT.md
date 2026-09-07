@@ -58,17 +58,16 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-45 queue depth five | 1 | ask |
 | C-49 named storms | 1 | the storm's walk (DLL) |
 | C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
-| C-61 the Cothon's project | 1 | the row and its GAME_PROGRESS price, after C-79's Cothon |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
-| C-69 five unique rows with trait clauses | 2 | M'banza, Royal Navy Dockyard, Tsikhe, Mission, Cothon, and a strongest-naval-unit picker |
+| C-69 two unique rows with trait clauses | 1 | the Tsikhe and the Mission, both with C-79's rows |
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
-| C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them); the Toa's Pā waits here |
-| **C. Absent systems** | **35** | |
-| **OPEN, TOTAL** | **52** | |
+| C-79 unique INFRASTRUCTURE absent | 3 | the ten DISTRICTS are built; 21 buildings and improvements are left, and the Toa's Pā waits here |
+| **C. Absent systems** | **31** | |
+| **OPEN, TOTAL** | **48** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -275,8 +274,8 @@ Nothing open.
     ceiling at Breathtaking; the middle bands are this model's own.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 332 of 343 modifiers and `open: <item>` on 11, each under
-  C-61, C-64, C-67, C-69 or B-63r. Unique units are C-78,
+  `shipped` on 335 of 343 modifiers and `open: <item>` on 8, each under
+  C-64, C-67, C-69 or B-63r. Unique units are C-78,
   unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
@@ -287,8 +286,8 @@ Nothing open.
     Bombard's strike on a city.
   - THE ROCK BAND's four venue clauses (`Expansion2_UnitPromotions.xml`:
     Arena Rock / Street Carnival, Reggae Rock / Copacabana, Glam Rock /
-    Acropolis, Surf Band / Royal Navy Dockyard) — each a `BAND_VENUE_BIT`
-    whose district C-79 or C-69 does not yet hold.
+    Acropolis, Surf Band / Royal Navy Dockyard) — three of the four venues
+    are now built; the promotion's own venue bit is not read yet.
   - The engine has no resource VISIBILITY, so the Stave Church counts every
     coastal resource where the install counts the visible ones.
   - The site census (`tests/cpu/seats/combat-rows.test.ts`,
@@ -359,13 +358,6 @@ Nothing open.
   - THE RELIGION WALKS skip the free row (`allCities`, the GPU's
     `[:, :n_majors]` pressure rows): no pressure in or out, no Missionary
     spread. The same class of widening as the loyalty walk took.
-- **C-61. THE COTHON'S PROJECT.** Weight 1.
-  - The gate and `moveCapital` / `_move_capital` are in. When C-79 lands the
-    Cothon the row is `{ id: 'COTHON_CAPITAL_MOVE', district: 'COTHON', civ:
-    'PHOENICIA', movesCapital: true, cost: 100 }` plus
-    COST_PROGRESSION_GAME_PROGRESS 1500 (no existing project takes that
-    curve — source its formula first) and the "they founded" gate
-    (`founderSeat` / `city_founder`).
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   - Three ledger rows wait (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
     `TRAIT_COMBAT_BONUS_OTHER_RELIGION`,
@@ -376,16 +368,13 @@ Nothing open.
   - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
     `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
     preference needs a decider with alternatives — P8's, not a carrier's.
-- **C-69. FIVE UNIQUE ROWS WITH TRAIT CLAUSES.** Weight 2.
-  - Kongo's M'banza (district), England's Royal Navy Dockyard (district),
-    Georgia's Tsikhe (building), Spain's Mission (improvement) and
-    Phoenicia's Cothon (district, C-61's PrereqDistrict) have no catalog
-    row; `TRAIT_FREE_APOSTLE_FINISH_MBANZA`,
-    `TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT`, `TRAIT_TSIKHE_PRODUCTION` and
-    `TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER` wait on them.
-  - The Dockyard's granted unit is NAMED by its row on both engines;
-    nothing picks the strongest naval unit of a class the way
-    `bestTrainableOfClass` picks a land one.
+- **C-69. TWO UNIQUE ROWS WITH TRAIT CLAUSES.** Weight 1.
+  - The three DISTRICTS are built — Kongo's M'banza (with its free Apostle),
+    England's Royal Navy Dockyard (with `bestTrainableNaval`, the strongest
+    hull the seat can train) and Phoenicia's Cothon. What is left is
+    Georgia's Tsikhe (a building, +50% production toward itself) and Spain's
+    Mission (an improvement, +2 Loyalty in a city beside one on a foreign
+    continent), both C-79's.
 - **C-74. PER-GAME COUNTS OVER PER-OBJECT ROLLS.** Weight 1.
   - `ERUPTION_CHANCE_PER_VOLCANO` is not covered by the MODERATE / 500
     ruling: the install counts eruptions per GAME, this engine rolls per
@@ -411,18 +400,21 @@ Nothing open.
   - Two halves of a built row wait on another entry: the Ngao Mbeba's "can
     see through features" needs the sight-BLOCKING this engine does not
     model (B-56r), and the Toa's Pā improvement needs C-79's row.
-- **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 5.
-  - Five of 36 have a catalog row (the Bath as a `civVariants` entry, the
-    Stave Church's `civ`, the Sphinx, Terrace Farm and Ziggurat's
-    `uniqueTo`). Beside C-69's five, 26 do not — each a district, building
-    or improvement row with its placement, adjacency and yields off the
-    install, on both engines and the exporter: Film Studio, Madrasa, Street
-    Carnival and Copacabana, Ice Hockey Rink, Great Wall, Mekewap, Château,
-    Hansa, Acropolis, Thermal Bath, Stepwell, Electronics Factory, Seowon,
-    Suguba, Marae, Pā, Chemamull, Ordu, Polder, Grand Bazaar, Lavra, Golf
-    Course, Kurgan, Open-Air Museum, Ikanda.
-  - The Rock Band's venue bits (C-26) and the Cothon's project (C-61) read
-    rows from this list.
+- **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 3.
+  - The ten unique DISTRICTS are built, each a `civVariants` entry on the row
+    it replaces with its own adjacency set: Acropolis, Hansa, Seowon, Suguba,
+    Lavra, Ikanda, M'banza, Royal Navy Dockyard, Cothon, Street Carnival.
+  - What is left is the BUILDINGS and IMPROVEMENTS — 16 rows with their
+    placement and yields off the install, on both engines and the exporter:
+    Film Studio, Madrasa, Copacabana, Ice Hockey Rink, Great Wall, Mekewap,
+    Château, Thermal Bath, Stepwell, Electronics Factory, Marae, Pā,
+    Chemamull, Ordu, Polder, Grand Bazaar, Golf Course, Kurgan, Open-Air
+    Museum, and C-69's Tsikhe and Mission.
+  - Two clauses wait here: the Rock Band's Reggae Rock venue (C-26, the
+    Copacabana) and the Toa's Pā (C-78).
+  - LEY LINE adjacency is out of scope by construction: it is a Secret
+    Societies resource class this engine's map never places, so every
+    `LeyLine_*` row on a unique district is unreachable.
 
 ## Harness — not weighted
 

@@ -41,7 +41,18 @@ export type AdjacencySource =
   // The two TERRAIN sources no district row names for itself — Dance of the
   // Aurora and Desert Folklore each hand one to the Holy Site.
   | 'TUNDRA'
-  | 'DESERT';
+  | 'DESERT'
+  // CIV6 (Hansa, Suguba, Acropolis): the three district neighbours only a
+  // UNIQUE district's own adjacency row names.
+  | 'COMMERCIAL_HUB'
+  | 'ENTERTAINMENT_COMPLEX'
+  | 'HOLY_SITE_DISTRICT'
+  // CIV6 (Hansa): "+1 Production for each adjacent Resource" — ANY resource
+  // on land, which no base row asks for.
+  | 'RESOURCE'
+  // CIV6 (Seowon): "+4 Science" flat, and the only source that reads no
+  // neighbour at all — the district's own tile.
+  | 'SELF';
 
 export interface AdjacencyRule {
   source: AdjacencySource;
@@ -57,6 +68,20 @@ export interface DistrictVariant {
   cost: number;
   housing: number;
   amenities: number;
+  /** the variant's OWN adjacency set, REPLACING the base row's — every
+   *  unique district in the install ships its own `District_Adjacencies`
+   *  rows rather than adding to the base one's. */
+  adjacency?: AdjacencyRule[];
+  /** CIV6 (M'banza, `MODIFIER_PLAYER_DISTRICT_ADJUST_BASE_YIELD_CHANGE`):
+   *  flat yields the district itself pays, on top of its adjacency. */
+  flatYield?: Partial<Record<YieldKey, number>>;
+  /** CIV6 (M'banza): finishing one grants this unit, free. */
+  grantsUnit?: string;
+  /** CIV6 (Royal Navy Dockyard,
+   *  `MODIFIER_PLAYER_ADJUST_DISTRICT_ADD_NAVAL_UNIT`): finishing one grants
+   *  a NAVAL unit the install does not name — the strongest this seat can
+   *  train. */
+  grantsNavalUnit?: boolean;
 }
 
 export interface DistrictDef {
@@ -172,6 +197,16 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   CAMPUS: D({
     id: 'CAMPUS',
+    // CIV6 (Seowon): "+4 Science, and -1 for each adjacent district" — it
+    // reads NOTHING the Campus reads, mountains and rainforest included.
+    civVariants: [{
+      civ: 'KOREA', name: 'Seowon', cost: 54, housing: 0, amenities: 0,
+      adjacency: [
+        { source: 'SELF', amount: 4 },
+        { source: 'DISTRICT', amount: -1 },
+        { source: 'GOV_PLAZA', amount: 1 },
+      ],
+    }],
     plunder: { kind: 'science', amount: 25 },
     name: 'Campus',
     code: 'CA',
@@ -198,6 +233,17 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   HOLY_SITE: D({
     id: 'HOLY_SITE',
+    // CIV6 (Lavra): the Holy Site's own rows, unchanged in kind.
+    civVariants: [{
+      civ: 'RUSSIA', name: 'Lavra', cost: 54, housing: 0, amenities: 0,
+      adjacency: [
+        { source: 'NATURAL_WONDER', amount: 2 },
+        { source: 'MOUNTAIN', amount: 1 },
+        { source: 'WOODS', amount: 0.5 },
+        { source: 'DISTRICT', amount: 0.5 },
+        { source: 'GOV_PLAZA', amount: 1 },
+      ],
+    }],
     plunder: { kind: 'faith', amount: 25 },
     name: 'Holy Site',
     code: 'HS',
@@ -220,6 +266,19 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   THEATER_SQUARE: D({
     id: 'THEATER_SQUARE',
+    // CIV6 (Acropolis): the Theater Square's rows plus a City Centre, an
+    // Entertainment Complex and a Water Park, and its district rows pay per
+    // ONE neighbour instead of per two.
+    civVariants: [{
+      civ: 'GREECE', name: 'Acropolis', cost: 54, housing: 0, amenities: 0,
+      adjacency: [
+        { source: 'BUILT_WONDER', amount: 1 },
+        { source: 'DISTRICT', amount: 1 },
+        { source: 'CITY_CENTER', amount: 1 },
+        { source: 'GOV_PLAZA', amount: 1 },
+        { source: 'ENTERTAINMENT_COMPLEX', amount: 2 },
+      ],
+    }],
     plunder: { kind: 'culture', amount: 25 },
     name: 'Theater Square',
     code: 'TS',
@@ -242,6 +301,16 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   COMMERCIAL_HUB: D({
     id: 'COMMERCIAL_HUB',
+    // CIV6 (Suguba): a Holy Site beside it pays like a river does.
+    civVariants: [{
+      civ: 'MALI', name: 'Suguba', cost: 54, housing: 0, amenities: 0,
+      adjacency: [
+        { source: 'RIVER', amount: 2 },
+        { source: 'HOLY_SITE_DISTRICT', amount: 2 },
+        { source: 'DISTRICT', amount: 0.5 },
+        { source: 'GOV_PLAZA', amount: 1 },
+      ],
+    }],
     plunder: { kind: 'gold', amount: 50 },
     name: 'Commercial Hub',
     code: 'CH',
@@ -263,6 +332,30 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   HARBOR: D({
     id: 'HARBOR',
+    // CIV6 (Royal Navy Dockyard, Cothon): both read the Harbor's own rows
+    // with a CITY CENTRE worth 2 instead of the base row's own amount; the
+    // Dockyard grants a naval unit when it finishes.
+    civVariants: [
+      {
+        civ: 'ENGLAND', name: 'Royal Navy Dockyard', cost: 54, housing: 0, amenities: 0,
+        adjacency: [
+          { source: 'SEA_RESOURCE', amount: 1 },
+          { source: 'DISTRICT', amount: 0.5 },
+          { source: 'CITY_CENTER', amount: 2 },
+          { source: 'GOV_PLAZA', amount: 1 },
+        ],
+        grantsNavalUnit: true,
+      },
+      {
+        civ: 'PHOENICIA', name: 'Cothon', cost: 54, housing: 0, amenities: 0,
+        adjacency: [
+          { source: 'SEA_RESOURCE', amount: 1 },
+          { source: 'DISTRICT', amount: 0.5 },
+          { source: 'CITY_CENTER', amount: 2 },
+          { source: 'GOV_PLAZA', amount: 1 },
+        ],
+      },
+    ],
     plunder: { kind: 'gold', amount: 50 },
     name: 'Harbor',
     code: 'HB',
@@ -286,6 +379,20 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   INDUSTRIAL_ZONE: D({
     id: 'INDUSTRIAL_ZONE',
+    // CIV6 (Hansa): a Commercial Hub and any adjacent Resource pay it, and it
+    // keeps the three engineering districts the base row already reads.
+    civVariants: [{
+      civ: 'GERMANY', name: 'Hansa', cost: 54, housing: 0, amenities: 0,
+      adjacency: [
+        { source: 'COMMERCIAL_HUB', amount: 2 },
+        { source: 'DISTRICT', amount: 0.5 },
+        { source: 'RESOURCE', amount: 1 },
+        { source: 'GOV_PLAZA', amount: 1 },
+        { source: 'AQUEDUCT', amount: 2 },
+        { source: 'CANAL', amount: 2 },
+        { source: 'DAM', amount: 2 },
+      ],
+    }],
     plunder: { kind: 'science', amount: 25 },
     name: 'Industrial Zone',
     code: 'IZ',
@@ -310,6 +417,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   ENCAMPMENT: D({
     id: 'ENCAMPMENT',
+    // CIV6 (Ikanda): the Encampment with a Housing of its own.
+    civVariants: [{
+      civ: 'ZULU', name: 'Ikanda', cost: 54, housing: 1, amenities: 0,
+    }],
     name: 'Encampment',
     code: 'EN',
     color: '#9c3c3c',
@@ -344,6 +455,11 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   ENTERTAINMENT_COMPLEX: D({
     id: 'ENTERTAINMENT_COMPLEX',
+    // CIV6 (Street Carnival): `Entertainment="2"` — twice the Complex's own
+    // Amenity, on the same ground.
+    civVariants: [{
+      civ: 'BRAZIL', name: 'Street Carnival', cost: 54, housing: 0, amenities: 2,
+    }],
     plunder: { kind: 'heal', amount: 50 },
     name: 'Entertainment Complex',
     code: 'EC',
@@ -361,6 +477,16 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   NEIGHBORHOOD: D({
     id: 'NEIGHBORHOOD',
+    // CIV6 (M'banza): FIVE Housing whatever the tile's Appeal, +2 Food and
+    // +4 Gold of its own, unlocked at Guilds rather than Urbanization, and a
+    // free Apostle when it finishes.
+    civVariants: [{
+      civ: 'KONGO', name: "M'banza", cost: 54, housing: 5, amenities: 0,
+      flatYield: { food: 2, gold: 4 },
+      // its EARLIER unlock is a `DISTRICT_PREREQ_ROWS` override, the same
+      // door The First Emperor's Canal comes through
+      grantsUnit: 'APOSTLE',
+    }],
     plunder: { kind: 'gold', amount: 50 },
     name: 'Neighborhood',
     code: 'NH',

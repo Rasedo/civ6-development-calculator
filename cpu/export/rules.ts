@@ -381,11 +381,14 @@ const researchImpYields = (rows: readonly { effects: readonly ResearchEffect[] }
     return y;
   }));
 
+// APPEND ONLY — both engines address a source by this position.
 const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
   'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE',
   'MINE', 'QUARRY', 'AQUEDUCT', 'DAM', 'CANAL', 'GOV_PLAZA',
   'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',
+  // the five a UNIQUE district's own adjacency row names
+  'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX', 'HOLY_SITE_DISTRICT', 'RESOURCE', 'SELF',
 ];
 
 const SCRIPTED_CAMPUS = true;
@@ -987,6 +990,9 @@ export function buildRules() {
       // never names, so the static adjacency export cannot have counted it.
       adjSrcFeat: ADJ_SRC.map((s) => FEAT_IDS.indexOf(s as never)),
       adjSrcTerr: ADJ_SRC.map((s) => TERRAIN_IDS.indexOf(s)),
+      // the source NAMES, so the GPU's variant walk can spell each arm the
+      // way `matchesAdjacency` does rather than by a hardcoded position
+      adjSrcNames: ADJ_SRC,
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
       founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
@@ -1183,6 +1189,9 @@ export function buildRules() {
         rc: p.resourceCost ?? 0,
         vic: p.victory ? 1 : 0,
         pc: p.cost ?? -1,
+        // CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): what the price climbs by
+        // over the whole game, 0 where the row takes no such curve
+        pcg: p.costProgressGame === undefined ? 0 : Math.round(p.costProgressGame * GAME_SPEED),
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
         // the CIVIC half of the research gate, and the carbon the row takes
         // back out of the air
@@ -1621,7 +1630,11 @@ export function buildRules() {
       cityTiles: CITY_TILES_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
       // [civ, leaderRow, tech(1)/civic(0), PERCENTAGE POINTS on the boost]
       boostPct: BOOST_PCT_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.tech ? 1 : 0, r.points]),
-      districtPrereq: DISTRICT_PREREQ_ROWS.map((r) => [rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district), techIdx.get(r.tech) ?? -1]),
+      // [civ, leaderRow, districtIdx, techIdx (-1 none), civicIdx (-1 none)]
+      districtPrereq: DISTRICT_PREREQ_ROWS.map((r) => [
+        rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district),
+        r.tech === undefined ? -1 : techIdx.get(r.tech) ?? -1,
+        r.civic === undefined ? -1 : civicIdx.get(r.civic) ?? -1]),
       warWeariness: WAR_WEARINESS_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.enemyPct]),
       peacefulFounders: PEACEFUL_FOUNDER_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
       yieldPerSuzerain: YIELD_PER_SUZERAIN_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.pct]),
@@ -1912,6 +1925,14 @@ export function buildRules() {
         // a civilization's UNIQUE DISTRICT standing in for this row (the Bath)
         variants: (d.civVariants ?? []).map((v) => ({
           civ: CIV_IDS.indexOf(v.civ), costMult: v.cost / d.cost, housing: v.housing, amenities: v.amenities,
+          // the variant's OWN adjacency set, REPLACING the base row's when
+          // present (an empty list means "take the base row's")
+          adj: (v.adjacency ?? []).map((r) => [ADJ_SRC.indexOf(r.source), r.amount]),
+          // the flat yields the district itself pays (the M'banza's)
+          flat: YIELD_KEYS.map((k) => v.flatYield?.[k] ?? 0),
+          // finishing one grants this unit (-1 none), or the strongest hull
+          grantUnit: v.grantsUnit === undefined ? -1 : Object.keys(UNITS).indexOf(v.grantsUnit),
+          grantNaval: v.grantsNavalUnit ? 1 : 0,
         })),
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
         allowMultiple: d.allowMultiple ? 1 : 0,
