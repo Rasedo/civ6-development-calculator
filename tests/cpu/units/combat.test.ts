@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
+import type { CityState } from '../../../cpu/core/types';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
