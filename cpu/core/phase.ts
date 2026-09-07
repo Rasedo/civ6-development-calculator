@@ -23,7 +23,7 @@ import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentIndex, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -42,7 +42,7 @@ import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasabl
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost } from '../data/constants';
-import { cityDistrictSum, pillagedDistrictTypes } from './yields';
+import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
@@ -386,13 +386,18 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     seatOf(state, seat)!.treasury -= cost;
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+  // CIV6 (Barracks, Stable): "+25% combat experience for all <classes> units
+  // trained in this city" — the MINOR's city trained the levy, so its
+  // standing Encampment line pays the same percentage a major's would.
+  const xpPct = trainXpPct(state, minorCity(cityState), promoClassOf(type));
   for (let i = 0; i < LEVY_UNITS; i++) {
     // CIV6 (The Raven King): the mark the three levy clauses read — the
     // ability's +2 Movement and +5 Combat, and the 75% upgrade discount. It
-    // is set here because this is the ONLY place a levied unit is born (C-66).
+    // is set here because this is the ONLY place a levied unit is born.
     const lv = spawnUnit(state, type, cityState.centerIndex, seat);
     if (lv) {
       lv.levied = true;
+      lv.xpPct = xpPct;
       // ...and RE-POOL: `spawnUnit` priced the pool before the mark existed,
       // so without this a levied unit is born 2 Movement short and only comes
       // right at the next refresh — A-2r exactly (C-66).
@@ -473,11 +478,11 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  *  holds it, the Free Cities player included. A district pays only once
  *  complete and unpillaged, and a dark district takes its buildings with it. */
 export function builtLoyalty(state: GameState, city: City): number {
-  const dark = pillagedDistrictTypes(state.map, city.districts);
+  const dark = darkBuildings(state.map, city);
   let n = cityDistrictSum(state, city, 'loyalty');
   for (const b of city.buildings) {
     const def = BUILDINGS[b];
-    if (!def || dark.has(def.district)) continue;
+    if (!def || dark.has(b)) continue;
     n += def.loyalty ?? 0;
   }
   return n;
@@ -1019,6 +1024,9 @@ export function transferCity(
     origCapitalSeat: civCity.origCapitalSeat ?? -1,
     founderSeat: civCity.founderSeat ?? -1,
     buildings: keptBuildings,
+    // a pillaged building stays pillaged in the new owner's hands — the
+    // repair is the queue's, whoever holds the queue
+    pillagedBuildings: civCity.pillagedBuildings?.filter((b) => keptBuildings.includes(b)),
     districts: keptDistricts,
     wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
     // GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6: the

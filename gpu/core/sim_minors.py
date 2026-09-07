@@ -13,35 +13,61 @@ class SimMinors:
             self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         citystate_max = int(self.rules.citystate.get("maxHp", 150))
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
-        # CIV6 (City-state): a minor "develops scientifically and culturally...
-        # it will apparently research certain techs" — the record is real, the
-        # pace unpublished. POPULATION points a turn into each pot; the
-        # cheapest available row completes (table order on a price tie), at
-        # most one per pot per turn (`minorResearch` twin). Early Empire is
-        # the row the border refusal reads.
-        alive = self.citystate_alive
-        pop = torch.where(alive, self.citystate_pop.to(torch.float64), torch.zeros_like(self.citystate_tech_prog))
-        self.citystate_tech_prog += pop
-        self.citystate_civic_prog += pop
+        # each minor in turn: its city's yields, then the research they buy,
+        # then the build they pay for — the `minorPhase` order, one minor at a
+        # time because a district one minor lands may lend a neighbour's
+        # district adjacency across the border
+        for s in range(self.S):
+            if not bool(self.citystate_alive[:, s].any()):
+                continue
+            self._minor_accrue(s)
+            self._minor_research(s)
+            self._minor_build(s)
+
+    def _minor_accrue(self, s: int) -> None:
+        """THE MINOR'S CITY PAYS ITS YIELDS. CIV6 (City-state): a city-state's
+        city is an ordinary city — its Campus yields Science, its Commercial
+        Hub Gold — and "it will apparently research certain techs" on that
+        output. The minor's row rides `_seat_city_walk`, the walk every major's
+        city rides, over the minor's own research record and no roster row:
+        Science and Culture feed the two research pots, Production the build
+        pot, Gold and Faith are banked (`citystate_treasury` /
+        `citystate_faith`) and nothing spends either yet. Food is not
+        consumed: the minor's population keeps its own clock."""
+        row = self._CITY_MINOR0 + s
+        keep = self.citystate_alive[:, s].double()
+        yf = self._seat_amenity(row)[2][:, 0:1]
+        tot = self._seat_city_walk(row, 0, amen_yf=yf)[:, 0]  # [B, 6], zero where the city is dead
+        self.citystate_prod[:, s] += tot[:, 1] * keep
+        self.citystate_treasury[:, s] += tot[:, 2] * keep
+        self.citystate_tech_prog[:, s] += tot[:, 3] * keep
+        self.citystate_civic_prog[:, s] += tot[:, 4] * keep
+        self.citystate_faith[:, s] += tot[:, 5] * keep
+
+    def _minor_research(self, s: int) -> None:
+        """The cheapest available row completes (table order on a price tie),
+        at most one per pot per turn — the `minorResearch` twin. Early Empire
+        is the row the border refusal reads."""
+        alive = self.citystate_alive[:, s]
         rdv = self.rules_dev
         for have, prog, cost, pre in (
             (self.citystate_techs, self.citystate_tech_prog, rdv.t_cost.to(self.device), self._prereq_t),
             (self.citystate_civics, self.citystate_civic_prog, rdv.c_cost.to(self.device), self._prereq_c),
         ):
-            for s in range(self.S):
-                avail = self._available_mask(have[:, s], pre)
-                if not bool(avail.any()):
-                    continue
-                key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
-                                  torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
-                key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
-                pick = key.argmin(dim=1)
-                cval = cost[pick]
-                fire = alive[:, s] & avail.any(dim=1) & (prog[:, s] >= cval)
-                if bool(fire.any()):
-                    have[fire, s, pick[fire]] = True
-                    prog[fire, s] = prog[fire, s] - cval[fire]
-        self._minor_build()
+            avail = self._available_mask(have[:, s], pre)
+            if not bool(avail.any()):
+                continue
+            key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
+                              torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
+            key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
+            pick = key.argmin(dim=1)
+            cval = cost[pick]
+            fire = alive & avail.any(dim=1) & (prog[:, s] >= cval)
+            if bool(fire.any()):
+                have[fire, s, pick[fire]] = True
+                prog[fire, s] = prog[fire, s] - cval[fire]
+                # the minor's record now feeds its own yield walk (`_seat_techs`)
+                self._eff_version += 1
 
 
     def _minor_walls_tier(self, s: int) -> torch.Tensor:
@@ -86,16 +112,15 @@ class SimMinors:
         elig[torch.arange(B, device=dev), center] = False
         return elig
 
-    def _minor_build(self) -> None:
-        """`minorBuildPhase` — CIV6 (City-state): a city-state "will build a
+    def _minor_build(self, only: int | None = None) -> None:
+        """`minorBuild` — CIV6 (City-state): a city-state "will build a
         district within their territory that corresponds to their type", a
-        Harbor when it sits on the coast, and walls. The PACE is the
-        `minorResearch` stylization: POPULATION points a turn into a
-        production pot, and the ladder's first buildable item completes when
-        the pot covers it, at most one a turn. The ladder order is the
-        model's; each item's own gates — the minor's researched unlock, a
-        legal plot, an intact perimeter under a higher wall — are the rules a
-        major pays."""
+        Harbor when it sits on the coast, and walls. The pot is the city's
+        own Production (`_minor_accrue`), and the ladder's first buildable
+        item completes when the pot covers it, at most one a turn. The ladder
+        order is the model's; each item's own gates — the minor's researched
+        unlock, a legal plot, an intact perimeter under a higher wall — are
+        the rules a major pays. `only` narrows the walk to one minor."""
         if self.S == 0 or not self.districts_on:
             return
         rd = self.rules_dev
@@ -103,14 +128,12 @@ class SimMinors:
         alive_all = self.citystate_alive
         if not bool(alive_all.any()):
             return
-        self.citystate_prod += torch.where(
-            alive_all, self.citystate_pop.to(torch.float64), torch.zeros_like(self.citystate_prod))
         sc_map = {int(di): (int(ut), int(uc), int(plc)) for (di, ut, uc, plc, _fc) in self._scaffold}
         walls_by_tier = sorted(self._walls_rows, key=lambda bi: int(rd.b_walls[bi]))
         nT_c = max(int(rd.t_cost.shape[0]), 1)
         nC_c = max(int(rd.c_cost.shape[0]), 1)
         ones_b = torch.ones(self.B, dtype=torch.bool, device=self.device)
-        for s in range(self.S):
+        for s in (range(self.S) if only is None else (only,)):
             row = self._CITY_MINOR0 + s
             alive = alive_all[:, s]
             if not bool(alive.any()):

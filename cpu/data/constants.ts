@@ -139,6 +139,9 @@ export const CITIZEN_SCIENCE = 0.5;
 export const CITIZEN_CULTURE = 0.3;
 
 export const CITY_CENTER_MIN_FOOD = 2;
+/** CIV6 (GlobalParameters, PILLAGE_BUILDING_REPAIR_PERCENT 25): a pillaged
+ *  building is repaired from its city's queue for this share of its price. */
+export const PILLAGE_BUILDING_REPAIR_PERCENT = 25;
 export const CITY_CENTER_MIN_PRODUCTION = 1;
 
 /** Food needed to grow from `pop` to `pop`+1 (Civ 6 formula). */

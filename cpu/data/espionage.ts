@@ -41,8 +41,14 @@ export const SPY_TRAVELLING = -2;
 
 export interface SpyMissionDef {
   id: string;
-  /** the district the mission is run in — CIV6 gives each one a Location. */
+  /** the district the mission is run in — CIV6 (UnitOperations) gives each
+   *  one a `TargetDistrict`, the CITY_CENTER where it names none. The spy
+   *  STANDS on that tile: the travel head lands it there, the mission is
+   *  offered there and nowhere else in the city. */
   district: DistrictId;
+  /** the counterspy post: guarded from ANY district of the city, the one it
+   *  stands on being the one it defends. */
+  anyDistrict?: boolean;
   /** an OFFENSIVE operation: run in a rival's city, earns the spy a level and
    *  pays Bodyguard of Lies. Counter-espionage and the two intelligence
    *  missions are not. */
@@ -79,7 +85,7 @@ export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'FOMENT_UNREST', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 56 },
   { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 35 },
   { id: 'BREACH_DAM', district: 'DAM', offensive: true, turns: 8, successPct: 20 },
-  { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true, turns: 16 },
+  { id: 'COUNTERSPY', district: 'CITY_CENTER', anyDistrict: true, offensive: false, athome: true, turns: 16 },
   // CIV6 (the chassis' mission table): "16 (Standard Speed)" turns at 56%;
   // (Fabricate Scandal) performed "in a City-State that you are not Suzerain
   // over". Appended LAST — the mission head is THE WIRE and every later verb
@@ -106,8 +112,12 @@ export const SPY_M_BREACH_DAM = mi('BREACH_DAM');
 export const SPY_M_COUNTERSPY = mi('COUNTERSPY');
 export const SPY_M_FABRICATE_SCANDAL = mi('FABRICATE_SCANDAL');
 
-/** how many destinations the TRAVEL head offers, cities in centre-tile order. */
-export const SPY_TRAVEL_COLS = 8;
+/** how many destinations the TRAVEL head offers — district tiles, nearest
+ *  first. A city is several tiles now, so the head is three times the eight
+ *  centres it once held (a MODEL width). */
+export const SPY_TRAVEL_COLS = 24;
+/** CIV6 (Surveillance): "+1 level at districts within 1 hex" of the post. */
+export const SPY_SURVEILLANCE_REACH = 1;
 
 // ---------------------------------------------------------------------------
 // THE MODEL. Each mission's DURATION and its base success RATE are the Spy

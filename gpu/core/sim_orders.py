@@ -1437,6 +1437,7 @@ class SimOrders:
             self.city_spec_pin[b, row, col, :] = -1
             self.city_wonder[b, row, col, :] = -1
             self.city_bldg[b, row, col, :] = self.city_bldg[b, self._CITY_MINOR0 + s, 0, :]
+            self.city_bldg_pillaged[b, row, col, :] = self.city_bldg_pillaged[b, self._CITY_MINOR0 + s, 0, :]
             self._bldg_version += 1
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0

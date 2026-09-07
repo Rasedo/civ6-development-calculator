@@ -608,6 +608,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
   techProgress: overCityStates((cityState) => cityState.research.techProgress),
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
+  minorTreasury: overCityStates((cityState) => cityState.treasury),
+  minorFaith: overCityStates((cityState) => cityState.faith),
+  minorBuildingsPillaged: overCityStates((cityState) => (cityState.pillagedBuildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorBuildings: overCityStates((cityState) => (cityState.buildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),
   minorOuterHp: overCityStates((cityState) => cityState.outerHp ?? 0),
@@ -639,6 +642,12 @@ const CITY: Record<string, Extractor> = {
   // encoded as -1 — a -1 would compare against a column that does not exist.
   buildings: overCities((r) =>
     r.city.buildings
+      .map((b) => BUILDING_IDX.get(b))
+      .filter((i): i is number => i !== undefined)
+      .sort((a, b) => a - b),
+  ),
+  buildingsPillaged: overCities((r) =>
+    (r.city.pillagedBuildings ?? [])
       .map((b) => BUILDING_IDX.get(b))
       .filter((i): i is number => i !== undefined)
       .sort((a, b) => a - b),

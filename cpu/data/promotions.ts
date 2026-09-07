@@ -111,6 +111,7 @@ export const PROMO_KINDS = [
   'SPY_NO_ESTABLISH',    // the spy arrives ready, with no travel clock at all
   'SPY_HOME_ALLY_LEVEL', // posted at home, every own spy operates at +v levels
   'SPY_HOME_ENEMY_LEVEL',// posted at home, enemy spies here operate v levels down
+  'SPY_SURVEIL',         // a counterspy post guards every district of its city, +v levels within reach
   'PILLAGE_CHEAP',       // pillaging costs v movement
   'HOLD_THE_LINE',       // adjacent OWN units of another class get +v vs cavalry
   'TERRAIN_MOVE_WOODS',  // woods and rainforest cost 1
@@ -374,7 +375,9 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('SATCHEL_CHARGES', 'ESPIONAGE', 1, [], op(SPY_M_BREACH_DAM)),
   P('SEDUCTION', 'ESPIONAGE', 1, [], op(SPY_M_COUNTERSPY)),
   P('SMEAR_CAMPAIGN', 'ESPIONAGE', 1, [], op(SPY_M_FABRICATE_SCANDAL)),
-  P('SURVEILLANCE', 'ESPIONAGE', 1, [], none),
+  // CIV6 (Surveillance): "When Counterspying all city districts are defended
+  // (and +1 level at districts within 1 hex)."
+  P('SURVEILLANCE', 'ESPIONAGE', 1, [], cs('SPY_SURVEIL', 1)),
   P('TECHNOLOGIST', 'ESPIONAGE', 1, [], op(SPY_M_STEAL_TECH_BOOST)),
 
   // ---- ROCK BAND ------------------------------------------------------

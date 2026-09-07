@@ -1,5 +1,5 @@
 import type { City, GameState, Governor, Seat, Tile } from './types';
-import { cityAtTile, citiesOf, seatOf } from './seats';
+import { cityAtTile, citiesOf, isCityStateSeat, seatOf } from './seats';
 import { hexDistance, neighbors } from '../../world/hex';
 import { type FeatureAppealRow } from '../data/civilizations';
 import { GP_CITY_PERM } from '../data/greatPeople';
@@ -98,6 +98,9 @@ export function promotionLegal(g: Governor, gIndex: number, promoIndex: number):
 
 /** The governor sitting in this city, or -1. */
 export function governorAt(state: GameState, city: City): number {
+  // a city-state appoints no governor of its own — Amani sits at a minor on
+  // her PATRON's roster (`minorGovernorEffects`), never on the minor's
+  if (isCityStateSeat(city.seat)) return -1;
   const s = seatOf(state, city.seat);
   if (!s) return -1;
   const roster = governorsOf(s);

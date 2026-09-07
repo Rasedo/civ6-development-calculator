@@ -88,6 +88,12 @@ export interface City {
   queue: QueueItem[];
   isCapital: boolean;
   buildings: string[];
+  /** the members of `buildings` standing PILLAGED — dark until repaired.
+   *  CIV6 (Sabotage Production): "Pillage all buildings in the industrial
+   *  zone"; a pillaged building is repaired from the city's own queue at
+   *  PILLAGE_BUILDING_REPAIR_PERCENT of its cost. ONE reader:
+   *  `buildingPillaged`. Absent = none. */
+  pillagedBuildings?: string[];
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
@@ -767,8 +773,17 @@ export interface CityState extends Seat {
    *  captured City. Absent = nothing built yet. */
   districts?: { type: DistrictId; tileIndex: number }[];
   buildings?: string[];
+  /** `City.pillagedBuildings` for the minor's city — the same ONE reader. */
+  pillagedBuildings?: string[];
   outerHp?: number;
+  /** the build pot: the city's own Production, banked until the ladder's
+   *  next item is covered (`minorPhase`). */
   prodProgress?: number;
+  /** the minor city's GOLD and FAITH, banked — what its yield walk pays and
+   *  nothing spends yet. A Seat's own fields, declared here so the census
+   *  compares them for a minor (`minorTreasury` / `minorFaith`). */
+  treasury: number;
+  faith: number;
   /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];

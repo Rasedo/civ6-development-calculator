@@ -11,8 +11,6 @@ import { isWater, isImpassable, hasFreshWater, naturalWonderAt } from '../../wor
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
-import { TECHS } from '../data/techs';
-import { CIVICS } from '../data/civics';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -521,42 +519,38 @@ export function cityStatePhase(state: GameState): void {
   for (const cityState of state.cityStates) {
     if (cityState.hp !== undefined && cityState.hp < CITY_STATE_MAX_HP) cityState.hp = Math.min(CITY_STATE_MAX_HP, cityState.hp + 10);
   }
-  for (const cityState of state.cityStates) minorResearch(cityState);
 }
 
 /**
- * CIV6 (City-state): a minor "develops scientifically and culturally... it
- * will apparently research certain techs which will allow it to progress" —
- * the record is real, the pace unpublished. Model: POPULATION points a turn
- * into each pot; the cheapest available row completes (table order on a
- * price tie), at most one per pot per turn. Early Empire is the row
- * `borderClosedTo` reads.
+ * THE MINOR'S ONE CITY, as the city rules see it. CIV6 (City-state): a
+ * city-state's city is an ordinary city — it works its tiles, its districts
+ * pay their adjacency and its buildings their yields — so every city rule
+ * (`computeCityStats`, `canPlaceDistrictIn`, `trainXpPct`) reads the minor's
+ * record through this shape rather than through a rule of its own. Its id
+ * is -1: a city-state's ground carries no `ownerCity`, and `tileBelongsTo`
+ * matches on exactly that. Its centre is the CITY_CENTER instance every real
+ * city's district list opens with.
  */
-function minorResearch(cityState: CityState): void {
-  const r = cityState.research;
-  r.techProgress += cityState.population;
-  r.civicProgress += cityState.population;
-  const tech = cheapestAvailable(TECHS, r.techs);
-  if (tech && r.techProgress >= TECHS[tech].cost) {
-    r.techProgress -= TECHS[tech].cost;
-    r.techs.push(tech);
-  }
-  const civic = cheapestAvailable(CIVICS, r.civics);
-  if (civic && r.civicProgress >= CIVICS[civic].cost) {
-    r.civicProgress -= CIVICS[civic].cost;
-    r.civics.push(civic);
-  }
-}
-
-function cheapestAvailable(
-  catalog: Record<string, { cost: number; prereqs: string[] }>,
-  have: string[],
-): string | null {
-  let best: string | null = null;
-  for (const [id, def] of Object.entries(catalog)) {
-    if (have.includes(id)) continue;
-    if (!def.prereqs.every((p) => have.includes(p))) continue;
-    if (!best || def.cost < catalog[best].cost) best = id;
-  }
-  return best;
+export function minorCity(cityState: CityState): City {
+  return {
+    id: -1,
+    seat: cityState.seat,
+    name: cityState.name,
+    foundedTurn: 0,
+    hp: cityState.hp ?? CITY_STATE_MAX_HP,
+    centerIndex: cityState.centerIndex,
+    population: cityState.population,
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: 0,
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: cityState.buildings ?? [],
+    pillagedBuildings: cityState.pillagedBuildings,
+    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
+    wonders: [],
+    outerHp: cityState.outerHp,
+    religionPressure: cityState.religionPressure,
+  };
 }

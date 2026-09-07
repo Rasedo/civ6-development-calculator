@@ -1,9 +1,9 @@
 /**
  * ESPIONAGE: capacity, the jump, the mission heads and what each one does.
  *
- * A Spy is the one civilian that never walks — it holds no plot, jumps between
- * revealed city CENTRES and runs one mission at a time out of a district of
- * the city it stands in. Every lane below drives the same entry points
+ * A Spy is the one civilian that never walks — it holds no plot, jumps to the
+ * DISTRICT tile of a revealed city it will work out of, and runs one mission
+ * at a time from that district. Every lane below drives the same entry points
  * `phase.ts` uses, so a rule that only the applier knows cannot hide.
  */
 import { describe, it, expect } from 'vitest';
@@ -84,11 +84,12 @@ function district(state: GameState, city: City, type: string): number {
   return t.index;
 }
 
-/** Put an idle spy of `seat` on `city`'s centre. */
-function spyAt(state: GameState, seat: number, city: City) {
+/** Put an idle spy of `seat` on `city`'s centre — or on `tile`, the district
+ *  it will work out of. */
+function spyAt(state: GameState, seat: number, city: City, tile = city.centerIndex) {
   const u = spawnUnit(state, SPY_UNIT, city.centerIndex, seat)!;
   expect(u).toBeTruthy();
-  u.tileIndex = city.centerIndex;
+  u.tileIndex = tile;
   return u;
 }
 
@@ -184,12 +185,17 @@ describe('what a city offers', () => {
     expect(missionOffered(state, spy, SPY_M_GAIN_SOURCES)).toBe(true);
   });
 
-  it('a district mission waits for a LIVE district of that type', () => {
+  it('a district mission waits for a LIVE district of that type UNDER the spy', () => {
     const { state, theirs } = spyState();
     const spy = spyAt(state, 0, theirs);
     expect(missionOffered(state, spy, SPY_M_SABOTAGE_PRODUCTION)).toBe(false);
     const iz = district(state, theirs, 'INDUSTRIAL_ZONE');
+    // the Zone stands, but the spy stands on the centre — not there
+    expect(missionOffered(state, spy, SPY_M_SABOTAGE_PRODUCTION)).toBe(false);
+    spy.tileIndex = iz;
     expect(missionOffered(state, spy, SPY_M_SABOTAGE_PRODUCTION)).toBe(true);
+    // ...and the centre's missions are not offered from the Zone
+    expect(missionOffered(state, spy, SPY_M_FOMENT_UNREST)).toBe(false);
     state.map.tiles[iz].districtPillaged = true;
     expect(missionOffered(state, spy, SPY_M_SABOTAGE_PRODUCTION)).toBe(false);
   });
@@ -205,8 +211,8 @@ describe('what a city offers', () => {
 
   it("Steal Tech Boost waits for a tech the thief doesn't hold", () => {
     const { state, theirs, them } = spyState();
-    district(state, theirs, 'CAMPUS');
-    const spy = spyAt(state, 0, theirs);
+    const campus = district(state, theirs, 'CAMPUS');
+    const spy = spyAt(state, 0, theirs, campus);
     expect(missionOffered(state, spy, SPY_M_STEAL_TECH_BOOST)).toBe(false);
     them.research.techs.push('MINING');
     expect(missionOffered(state, spy, SPY_M_STEAL_TECH_BOOST)).toBe(true);
@@ -214,8 +220,8 @@ describe('what a city offers', () => {
 
   it('Great Work Heist waits for a work to steal', () => {
     const { state, theirs } = spyState();
-    district(state, theirs, 'THEATER_SQUARE');
-    const spy = spyAt(state, 0, theirs);
+    const theater = district(state, theirs, 'THEATER_SQUARE');
+    const spy = spyAt(state, 0, theirs, theater);
     expect(missionOffered(state, spy, SPY_M_GREAT_WORK_HEIST)).toBe(false);
     theirs.greatWorksArt = 1;
     expect(missionOffered(state, spy, SPY_M_GREAT_WORK_HEIST)).toBe(true);
@@ -308,8 +314,7 @@ describe('the Espionage Pact reaches the spy', () => {
 
   it('outcome B takes the operation off every mask', () => {
     const { state, theirs } = spyState();
-    const spy = spyAt(state, 0, theirs);
-    district(state, theirs, 'COMMERCIAL_HUB');
+    const spy = spyAt(state, 0, theirs, district(state, theirs, 'COMMERCIAL_HUB'));
     expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
     pactOn(state, SPY_M_SIPHON_FUNDS, 1);
     expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(false);
@@ -317,7 +322,7 @@ describe('the Espionage Pact reaches the spy', () => {
     // the applier is the mask's own reader, so the banned order is refused
     expect(beginMission(state, spy, SPY_M_SIPHON_FUNDS)).toBe(false);
     // ...and a mission the pact did not name is untouched
-    pactOn(state, SPY_M_FOMENT_UNREST, 1);
+    pactOn(state, SPY_M_STEAL_TECH_BOOST, 1);
     expect(missionOffered(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
   });
 });
@@ -422,10 +427,13 @@ describe('the espionage promotion pool', () => {
     expect(promoReady(spy)).toBe(false);
   });
 
-  it('the rows that ship inert, and the two that came alive', () => {
-    // Surveillance still waits on a spy that stands anywhere but the centre.
+  it('every row of the pool does something now', () => {
+    // CIV6 (Surveillance): "When Counterspying all city districts are
+    // defended (and +1 level at districts within 1 hex)" — live since a spy
+    // stands on the district it works from.
     const surv = promoRows('ESPIONAGE').find((p) => p.id === 'SURVEILLANCE')!;
-    expect(surv.effects).toEqual([{ kind: 'NONE' }]);
+    expect(surv.effects).toEqual([{ kind: 'SPY_SURVEIL', v: 1, mask: 0 }]);
+    for (const p of promoRows('ESPIONAGE')) expect(p.effects.some((e) => e.kind === 'NONE')).toBe(false);
     // CIV6 (Ace Driver): "If caught on a mission, have a much higher chance
     // of escape (+4 levels)" — the escape roll's own level term.
     const ace = promoRows('ESPIONAGE').find((p) => p.id === 'ACE_DRIVER')!;
@@ -457,8 +465,7 @@ describe('what a finished mission does', () => {
 
   it('Siphon Funds moves the hub gold from the victim to the thief', () => {
     const { state, theirs, me, them } = spyState();
-    district(state, theirs, 'COMMERCIAL_HUB');
-    const spy = spyAt(state, 0, theirs);
+    const spy = spyAt(state, 0, theirs, district(state, theirs, 'COMMERCIAL_HUB'));
     const before = { mine: me.treasury, theirs: them.treasury };
     state.rngState = WINS;
     run(state, spy, SPY_M_SIPHON_FUNDS);
@@ -491,8 +498,7 @@ describe('what a finished mission does', () => {
     let killed = false;
     for (let seed = 1; seed < 200 && !(celled && killed); seed++) {
       const { state, theirs } = spyState();
-      district(state, theirs, 'COMMERCIAL_HUB');
-      const spy = spyAt(state, 0, theirs);
+      const spy = spyAt(state, 0, theirs, district(state, theirs, 'COMMERCIAL_HUB'));
       state.rngState = seed;
       run(state, spy, SPY_M_SIPHON_FUNDS);
       // the spy leaves the map either way — no escape route stands
@@ -517,10 +523,11 @@ describe('what a finished mission does', () => {
     // offensive operations, or capturing an enemy Spy".
     for (let seed = 1; seed < 200; seed++) {
       const { state, theirs } = spyState();
-      district(state, theirs, 'COMMERCIAL_HUB');
-      const guard = spyAt(state, 1, theirs);
+      const hub = district(state, theirs, 'COMMERCIAL_HUB');
+      // the post guards the district it stands on — the Hub the thief works from
+      const guard = spyAt(state, 1, theirs, hub);
       expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
-      const spy = spyAt(state, 0, theirs);
+      const spy = spyAt(state, 0, theirs, hub);
       state.rngState = seed;
       run(state, spy, SPY_M_SIPHON_FUNDS);
       expect(state.units.some((u) => u.id === spy.id)).toBe(false);
@@ -604,18 +611,18 @@ describe('what a finished mission does', () => {
     // CIV6 (Espionage): "a single city may contain more than one Spy, but no
     // two Spies may perform the same Mission in the same city."
     const { state, theirs } = spyState();
-    district(state, theirs, 'COMMERCIAL_HUB');
-    const a = spyAt(state, 0, theirs);
-    const b = spyAt(state, 0, theirs);
+    const hub = district(state, theirs, 'COMMERCIAL_HUB');
+    const a = spyAt(state, 0, theirs, hub);
+    const b = spyAt(state, 0, theirs, hub);
     expect(beginMission(state, a, SPY_M_SIPHON_FUNDS)).toBe(true);
     expect(missionOffered(state, b, SPY_M_SIPHON_FUNDS)).toBe(false);
+    b.tileIndex = theirs.centerIndex;
     expect(missionOffered(state, b, SPY_M_FOMENT_UNREST)).toBe(true);
   });
 
   it('a catch with nobody posted pays nobody', () => {
     const { state, theirs } = spyState();
-    district(state, theirs, 'COMMERCIAL_HUB');
-    const spy = spyAt(state, 0, theirs);
+    const spy = spyAt(state, 0, theirs, district(state, theirs, 'COMMERCIAL_HUB'));
     state.rngState = LOSES;
     run(state, spy, SPY_M_SIPHON_FUNDS);
     expect(spiesOf(state, 1)).toHaveLength(0);
@@ -654,7 +661,7 @@ describe('what a finished mission does', () => {
   it('Recruit Partisans raises barbarians and darkens the Neighborhood', () => {
     const { state, theirs } = spyState();
     const nb = district(state, theirs, 'NEIGHBORHOOD');
-    const spy = spyAt(state, 0, theirs);
+    const spy = spyAt(state, 0, theirs, nb);
     state.rngState = WINS;
     const before = state.units.filter((u) => u.seat === BARB_SEAT).length;
     run(state, spy, SPY_M_RECRUIT_PARTISANS);

@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, buildingPillaged, effectiveAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -95,10 +95,10 @@ export function seatBuildingSum(
 ): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {
-    const dark = pillagedDistrictTypes(state.map, city.districts);
+    const dark = darkBuildings(state.map, city);
     for (const id of city.buildings) {
       const def = BUILDINGS[id];
-      if (!def || dark.has(def.district)) continue;
+      if (!def || dark.has(id)) continue;
       n += def[key] ?? 0;
     }
   }
@@ -111,14 +111,14 @@ export function seatBuildingSum(
  */
 export function cityBuildingSum(
   state: GameState,
-  city: { buildings: string[]; districts?: City['districts'] },
+  city: { buildings: string[]; districts?: City['districts']; pillagedBuildings?: string[] },
   key: 'settlerProdPct' | 'anyWorkSlots',
 ): number {
-  const dark = pillagedDistrictTypes(state.map, city.districts ?? []);
+  const dark = darkBuildings(state.map, city);
   let n = 0;
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (!def || dark.has(def.district)) continue;
+    if (!def || dark.has(id)) continue;
     n += def[key] ?? 0;
   }
   return n;
@@ -128,10 +128,10 @@ export function cityBuildingSum(
  *  standing building hands every city this seat founds, or null. */
 export function newCityGrantUnit(state: GameState, seat: number): string | null {
   for (const city of citiesOf(state, seat)) {
-    const dark = pillagedDistrictTypes(state.map, city.districts);
+    const dark = darkBuildings(state.map, city);
     for (const id of city.buildings) {
       const def = BUILDINGS[id];
-      if (def?.grantUnitNewCity && !dark.has(def.district)) return def.grantUnitNewCity;
+      if (def?.grantUnitNewCity && !dark.has(id)) return def.grantUnitNewCity;
     }
   }
   return null;
@@ -173,7 +173,8 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
     if (!SPECIALIST_YIELDS[d.type]) continue;
     const dt = state.map.tiles[d.tileIndex];
     if (!dt.districtComplete || dt.districtPillaged) continue; // pillaged district has no working specialists
-    const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type).length;
+    // ...and a pillaged building seats nobody
+    const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type && !buildingPillaged(city, b)).length;
     if (slots > 0) out.set(d.tileIndex, slots);
   }
   return out;
@@ -321,7 +322,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     water += civVariantOf(state, city.seat, DISTRICTS.AQUEDUCT.civVariants)?.housing ?? 0;
   }
 
-  const pillaged = pillagedDistrictTypes(map, city.districts);
+  const dark = darkBuildings(map, city);
   const camps = campTiles(state);
   const gpa = cityAppealResolver(state);
   let total = water;
@@ -339,7 +340,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (def && pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
+    if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
     if (def?.housing) total += def.housing;
     // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
     if (def?.autoCapital) for (const r of m.capital) total += r.palaceHousing ?? 0;
@@ -380,11 +381,11 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
  *  Government Plaza's and the Diplomatic Quarter's, and the Palace. A dark
  *  district takes its buildings with it, as it does for their yields. */
 export function govYieldBuildingCount(state: GameState, city: City): number {
-  const dark = pillagedDistrictTypes(state.map, city.districts);
+  const dark = darkBuildings(state.map, city);
   let n = 0;
   for (const b of city.buildings) {
     const def = BUILDINGS[b];
-    if (def && !dark.has(def.district) && isGovYieldBuilding(def)) n += 1;
+    if (def && !dark.has(b) && isGovYieldBuilding(def)) n += 1;
   }
   return n;
 }

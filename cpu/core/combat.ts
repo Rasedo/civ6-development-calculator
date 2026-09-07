@@ -1,5 +1,6 @@
 
 import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from './types';
+import { darkBuildings } from './yields';
 import { ENKIDU_SHARE_RANGE } from '../data/civilizations';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt , isCoastalLand } from '../../world/query';
@@ -141,8 +142,10 @@ export function trainXpPct(
 ): number {
   if (!cls) return 0;
   let pct = 0;
+  const dark = darkBuildings(state.map, city);
   for (const b of city.buildings) {
     const def = BUILDINGS[b];
+    if (dark.has(b)) continue; // a pillaged line trains nobody
     if (def?.trainXpPct && def.trainXpClasses?.includes(cls as never)) pct += def.trainXpPct;
   }
   // CIV6 (Toqui): "+10% experience in combat towards all units trained in
@@ -2169,6 +2172,9 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     // what the minor BUILT comes along — the tiles already carry the
     // districts, so a registry that said "none" would disagree with them
     buildings: [...(cityState.buildings ?? [])],
+    // a pillaged building stays pillaged in the conqueror's hands — the
+    // repair is the queue's, whoever holds the queue
+    pillagedBuildings: cityState.pillagedBuildings ? [...cityState.pillagedBuildings] : undefined,
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
@@ -2216,6 +2222,9 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     isCapital: false,
     founderSeat: -1,   // a minor founded it, and minors keep no ledger
     buildings: [...(cityState.buildings ?? [])],
+    // a pillaged building stays pillaged in the conqueror's hands — the
+    // repair is the queue's, whoever holds the queue
+    pillagedBuildings: cityState.pillagedBuildings ? [...cityState.pillagedBuildings] : undefined,
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,

@@ -534,6 +534,8 @@ def main() -> int:
                 ("move_capital", [py, "tests/gpu/move_capital_test.py"], 2),  # C-61 a civ-unique project's seat gate; the original capital moves whole
                 ("storms", [py, "tests/gpu/storms_test.py"], 2),  # C-49 the eight named storms and the roster rows on them
                 ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # C-16 the released spy is the one that was caught
+                ("spy_district", [py, "tests/gpu/spy_district_test.py"], 4),  # C-16 the spy stands on the district it works from; Surveillance's reach; Sabotage pillages the Zone's buildings and the queue repairs them
+                ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # C-38 the minor's city pays its yields; its research and build pots take them; the levy's Barracks experience
                 ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # C-56 a trade route carries religious pressure both ways
                 ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # C-75 step 1: the slotted-card store, mask and validator
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity

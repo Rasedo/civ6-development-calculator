@@ -660,9 +660,13 @@ CITY_STATE = {
     "suzerain": lambda sim, b, rows: [int(sim.citystate_suzerain[b, s]) for s in rows],
     "techs": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_techs[b, s].tolist()) if on] for s in rows],
     "civics": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on] for s in rows],
-    "techProgress": lambda sim, b, rows: [int(sim.citystate_tech_prog[b, s]) for s in rows],
-    "civicProgress": lambda sim, b, rows: [int(sim.citystate_civic_prog[b, s]) for s in rows],
-    "prodProgress": lambda sim, b, rows: [int(sim.citystate_prod[b, s]) for s in rows],
+    "techProgress": lambda sim, b, rows: [float(sim.citystate_tech_prog[b, s]) for s in rows],
+    "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
+    "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
+    "minorTreasury": lambda sim, b, rows: [float(sim.citystate_treasury[b, s]) for s in rows],
+    "minorFaith": lambda sim, b, rows: [float(sim.citystate_faith[b, s]) for s in rows],
+    "minorBuildingsPillaged": lambda sim, b, rows: [
+        [i for i, on in enumerate(sim.city_bldg_pillaged[b, sim._CITY_MINOR0 + s, 0].tolist()) if on] for s in rows],
     "minorBuildings": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg[b, sim._CITY_MINOR0 + s, 0].tolist()) if on] for s in rows],
     "minorDistricts": lambda sim, b, rows: [
@@ -759,6 +763,9 @@ CITY = {
     ],
     "buildings": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows
+    ],
+    "buildingsPillaged": lambda sim, b, rows: [
+        [i for i, on in enumerate(sim.city_bldg_pillaged[b, c, s].tolist()) if on] for c, s in rows
     ],
     "productionBank": lambda sim, b, rows: [
         float(sim.city_prod_bank[b, c, s]) for c, s in rows
