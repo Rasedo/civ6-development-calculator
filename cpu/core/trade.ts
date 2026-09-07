@@ -6,7 +6,7 @@
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
@@ -17,7 +17,7 @@ import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnU
 import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
-import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
+import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
 import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
@@ -588,6 +588,15 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         const aty = allianceTypeWith(state, seat, route.toSeat);
         if (aty >= 0 && ALLIANCE_ROUTE_TO[aty] > 0) {
           out[ALLIANCE_ROUTE_YKEY[aty] as YieldKey] += ALLIANCE_ROUTE_TO[aty];
+        }
+        // CIV6 (Democracy): a route to an ALLY's city, or to a minor this seat
+        // is SUZERAIN of, pays the government's own flat yields.
+        const csDest = isCityStateSeat(route.toSeat)
+          ? (state.cityStates ?? []).find((c) => c.seat === route.toSeat)
+          : undefined;
+        if (seatsAllied(state, seat, route.toSeat)
+            || (csDest && isSuzerain(state, csDest, seat))) {
+          addYields(out, getModifiers(state, seat).allyRouteYield);
         }
         out.gold += routePostGold(state, seat, civCity.centerIndex);
         // CIV6 (University of Sankore): "Other Civilizations' Trade Routes

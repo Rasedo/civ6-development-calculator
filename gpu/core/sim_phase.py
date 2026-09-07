@@ -307,7 +307,16 @@ class SimPhase:
                     _qpr = self._al_qp_route * torch.where(_cl, self._cleo_trade_qp_mult, 1)
                     _gl = self._leads_vec("GILGAMESH") | self._row_leads(row, "GILGAMESH").unsqueeze(1)
                     _common = (self.war[:, row, :].unsqueeze(1) & self.war[:, :NM, :]).any(dim=2)  # [B, NM]
-                    add = run.long() * (self._al_qp_turn + _qpr * (to_o.long() + from_o.long())
+                    # CIV6 (Democracy): "Alliance Points with all allies increase
+                    # by an additional .25 per turn" — each side's own government
+                    # pays it, in the quarter-points this store keeps.
+                    _gp = torch.zeros(self.B, NM, dtype=torch.long, device=self.device)
+                    if self._gov_has_effects:
+                        _gp = _gp + self._gov_mods(row)[12]["allypts"].unsqueeze(1)
+                        for _o in range(NM):
+                            _gp[:, _o] = _gp[:, _o] + self._gov_mods(_o)[12]["allypts"]
+                    add = run.long() * (self._al_qp_turn + _gp
+                                        + _qpr * (to_o.long() + from_o.long())
                                         + self._enkidu_qp * (_common & _gl).long())
                     self.seat_alliance_pts[:, row] += add
                     self.seat_alliance_pts[:, :, row] += add

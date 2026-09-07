@@ -11,7 +11,7 @@ import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/c
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
-import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
+import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult, goldPurchasableBuildings } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
@@ -702,7 +702,13 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   if (!city) return { ok: false, reason: 'No such city.' };
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
+  // The applier asks the LIST the mask offers: a worship row sells for faith
+  // off the ordinary list, everything else off the gold one, whose queue term
+  // is dropped so the item under production sells like any other.
+  const sellable = BUILDINGS[buildingId]?.worship
+    ? availableBuildings(state, city)
+    : goldPurchasableBuildings(state, city);
+  if (!sellable.some((b) => b.id === buildingId)) {
     return { ok: false, reason: 'Building not available in this city.' };
   }
   if (!buildingCompletable(state, city, buildingId)) {

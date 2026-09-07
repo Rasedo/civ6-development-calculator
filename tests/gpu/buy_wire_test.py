@@ -111,6 +111,27 @@ def case_building(sim, base, row: int, mon: int) -> None:
         f"row {row}: building charged {g0 - float(sim.civ_treasury[0, row])}, want {pr}"
     )
 
+    # CIV6: the item UNDER PRODUCTION sells too — the entry is invalidated,
+    # its progress banks (`dropQueuedBuilding`) and the queue closes up.
+    sim.restore(base)
+    prep(sim, row)
+    sim.city_bldg[0, row, :, mon] = False
+    sim.civ_treasury[0, row] = RICH
+    jq = cap_slot(sim, row)
+    sim._q_push(row, jq, ACTIVE.clone(), torch.tensor([mon]), torch.tensor([99.0]))
+    sim.city_progress[0, row, jq, 0] = 7.0
+    sim._eff_version += 1
+    assert int(sim.city_current[0, row, jq, 0]) == mon, "the queue did not take the row"
+    assert bool(sim._seat_buildable(row, True, gold=True)[0, jq, mon]), (
+        f"row {row}: the item under production was refused to the gold arm")
+    bank0 = float(sim.city_prod_bank[0, row, jq])
+    sim._stash_buy(row, buy=(t1(0), t1(jq), t1(mon)))
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
+    assert bool(sim.city_bldg[0, row, jq, mon]), f"row {row}: the queue-front buy did not land"
+    assert int(sim.city_current[0, row, jq, 0]) != mon, "the queue entry survived the purchase"
+    assert abs(float(sim.city_prod_bank[0, row, jq]) - (bank0 + 7.0)) < 1e-6, (
+        f"row {row}: the spent hammers did not bank")
+
     # the peace-gold RESERVE: one milli below price + reserve buys nothing
     sim.restore(base)
     prep(sim, row)

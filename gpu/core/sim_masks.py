@@ -1024,7 +1024,8 @@ class SimMasks:
                 _fok = _fok & cv[:, _fv]
             if bool(_fok.any()):
                 out = out | (_fok.unsqueeze(1) & (self.terrain == _ft)
-                             & (self.hills == bool(_fh)) & (self.feat_id < 0))
+                             & (self.hills == bool(_fh))
+                             & ~self._feat_blocks_ground())
         return out
 
     def _military_policies(self, seat: torch.Tensor) -> torch.Tensor:

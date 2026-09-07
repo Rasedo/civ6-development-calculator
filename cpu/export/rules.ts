@@ -205,6 +205,8 @@ const effectRow = (fx: PolicyEffects) => ({
   buildingYieldMult: (fx.buildingYieldMult ?? []).map((r) =>
     [buildingIdx.get(r.building) ?? -1, YIELD_KEYS.indexOf(r.yield), Math.round(r.mult * 1000)]),
   domesticRouteYield: YIELD_KEYS.map((k) => fx.domesticRouteYield?.[k] ?? 0),
+  allyRouteYield: YIELD_KEYS.map((k) => fx.allyRouteYield?.[k] ?? 0),
+  alliancePointsPerTurn: fx.alliancePointsPerTurn ?? 0,
   routeYieldMult: fx.routeYieldMult ?? 1,
   noSettlers: fx.noSettlers ? 1 : 0,
   healOnlyHome: fx.healOnlyHome ? 1 : 0,
@@ -1230,7 +1232,19 @@ export function buildRules() {
       // the feature ids the deforestation level counts, and the polar ice
       clearFids: clearableFeatures().map((f) => featIdx.get(f) ?? -1),
       iceFid: featIdx.get('ICE') ?? -1,
-    },
+      // the one feature an improvement may stand ON (Improvement_ValidFeatures)
+      soilFid: featIdx.get('VOLCANIC_SOIL') ?? -1,
+      // What a feature ARRIVING does to the bare-ground jobs the exporter
+      // baked per tile, as [farmFlat, farmHill, mine, lumberMill] and -1 for
+      // "leave the baked value". TS reads `tile.feature` live in
+      // `validImprovementsIn`, so the GPU's static planes must move with it:
+      // VOLCANIC_SOIL is bare ground (`bareGround`), FLOODPLAINS earn the FARM
+      // outright, WOODS earn the LUMBER_MILL and cost the rest.
+      featJobs: FEAT_IDS.map((f) => (
+        f === 'VOLCANIC_SOIL' ? [-1, -1, -1, 0]
+          : f === 'FLOODPLAINS' ? [1, 0, 0, 0]
+            : f === 'WOODS' ? [0, 0, 0, 1]
+              : [0, 0, 0, 0])),    },
     combat: {
       unitHp: UNIT_HP,
       capturedHp: CAPTURED_UNIT_HP,

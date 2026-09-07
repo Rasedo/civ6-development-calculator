@@ -1995,6 +1995,10 @@ class SimInit:
             # yields only a seated one.
             self._gov_gov_ymult = torch.tensor([[float(x) for x in g.get("governorYieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)
             self._gov_gov_percit = torch.tensor([[float(x) for x in g.get("governorPerCitizen", [0] * 6)] for g in _govs], dtype=dtype, device=device)
+            # CIV6 (Democracy): the ally/suzerain route yields and the extra
+            # quarter-point a turn, both the GOVERNMENT's own
+            self._gov_ally_route = torch.tensor([[float(x) for x in g.get("allyRouteYield", [0] * 6)] for g in _govs], dtype=dtype, device=device)
+            self._gov_ally_pts = torch.tensor([int(g.get("alliancePointsPerTurn", 0)) for g in _govs], dtype=torch.long, device=device)
             self._gov_ehprod = torch.tensor([float(g.get("encampHarborProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
             self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov]
             # The amenity + district-conditional channels, applied for EVERY
@@ -3427,6 +3431,8 @@ class SimInit:
         self._clear_fids = torch.tensor([int(x) for x in c["clearFids"] if int(x) >= 0],
                                         dtype=torch.long, device=dev)
         self._ice_fid = int(c["iceFid"])
+        self._soil_fid = int(c["soilFid"])
+        self._feat_jobs = [[int(x) for x in r] for r in c["featJobs"]]
         _clear = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for _f in self._clear_fids.tolist():
             _clear |= self.feat_id == _f

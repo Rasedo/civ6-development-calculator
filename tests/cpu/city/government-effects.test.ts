@@ -57,9 +57,12 @@ describe('the sourced government rows', () => {
       { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
     expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 });
     expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ governorPerCitizen: { production: 0.6 } });
-    // Democracy's inherent bonus is its ally/suzerain trade route and its
-    // alliance points, and this model has no alliances.
-    expect(GOVERNMENTS.DEMOCRACY.effects).toEqual({});
+    // CIV6 (Democracy, GS): "Your Trade Routes to an Ally or Suzerain's city
+    // provide +4 Food and +4 Production for both cities. Alliance Points with
+    // all allies increase by an additional .25 per turn." The ORIGIN half and
+    // the quarter-point ship; the destination's half pays another seat's city.
+    expect(GOVERNMENTS.DEMOCRACY.effects).toEqual(
+      { allyRouteYield: { food: 4, production: 4 }, alliancePointsPerTurn: 1 });
     expect(GOVERNMENTS.CHIEFDOM.effects).toEqual({});
   });
 

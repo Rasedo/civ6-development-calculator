@@ -2887,6 +2887,10 @@ export function seatPhase(state: GameState): void {
           .some((f) => f !== actor.seat && f !== other && civsAtWar(state, actor.seat, f) && civsAtWar(state, other, f));
         setAlliancePtsWith(state, actor.seat, other, alliancePtsWith(state, actor.seat, other)
           + ALLIANCE_QP_TURN
+          // CIV6 (Democracy): "Alliance Points with all allies increase by an
+          // additional .25 per turn" — each side's own government pays it.
+          + getModifiers(state, actor.seat).alliancePointsPerTurn
+          + getModifiers(state, other).alliancePointsPerTurn
           + (hasRouteToSeat(state, actor.seat, other) ? tradeQp : 0)
           + (hasRouteToSeat(state, other, actor.seat) ? tradeQp : 0)
           + (commonFoe ? ENKIDU_COMMON_FOE_QP : 0));

@@ -5,6 +5,7 @@ import { queueBuilding, purchaseBuilding, purchaseUnit, purchaseSettler, queuePr
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
+import { goldPurchasableBuildings } from '../../../cpu/core/rules';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
@@ -41,6 +42,25 @@ describe('gold & faith purchases', () => {
     seatOf(state, 0)!.treasury = 10000;
     // Library needs a completed Campus — not even offered without one.
     expect(purchaseBuilding(state, city.id, 'LIBRARY', 0).ok).toBe(false);
+  });
+
+  it('sells the item under production, and banks what was spent on it', () => {
+    // CIV6: the gold purchase of the QUEUE-FRONT item is allowed — the entry
+    // is invalidated and its progress banks, exactly as a queued row further
+    // back already did.
+    const state = makeState();
+    const city = foundAt(state, 5, 5);
+    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    city.queue[0]!.progress = 7;
+    expect(city.queue[0]?.kind).toBe('building');
+    expect(goldPurchasableBuildings(state, city).map((b) => b.id)).toContain('MONUMENT');
+
+    const bank = city.productionBank ?? 0;
+    seatOf(state, 0)!.treasury = buildingPurchaseCost('MONUMENT');
+    expect(purchaseBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    expect(city.buildings).toContain('MONUMENT');
+    expect(city.queue.some((q) => q.kind === 'building' && q.building === 'MONUMENT')).toBe(false);
+    expect(city.productionBank).toBe(bank + 7);
   });
 
   it('buys worship buildings with faith', () => {

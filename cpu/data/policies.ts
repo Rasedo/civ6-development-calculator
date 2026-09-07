@@ -153,6 +153,16 @@ export interface PolicyEffects {
   buildingYieldMult?: { building: string; yield: keyof Yields; mult: number }[];
   /** flat yields added to each DOMESTIC trade route (Isolationism). */
   domesticRouteYield?: Partial<Yields>;
+  /** CIV6 (Democracy, GS): "Your Trade Routes to an Ally or Suzerain's city
+   *  provide +4 Food and +4 Production for both cities" — the ORIGIN half,
+   *  which is this seat's own (Expansion2_Governments.xml
+   *  DEMOCRACY_TRADEROUTE{FOOD,PRODUCTION}FROMALLY, Amount 4). The
+   *  destination's half pays another seat's city and has no channel here. */
+  allyRouteYield?: Partial<Yields>;
+  /** CIV6 (Democracy, GS): "Alliance Points with all allies increase by an
+   *  additional .25 per turn" — one QUARTER-point, the unit this store keeps
+   *  (DEMOCRACY_ALLIANCEPOINTS, ADJUST_ALLIANCE_POINTS Amount 1). */
+  alliancePointsPerTurn?: number;
   /** every trade route's yields, multiplied (Letters of Marque). */
   routeYieldMult?: number;
   /** Isolationism: no Settler may be trained, bought, or founded with. */
@@ -580,8 +590,12 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // provide +4 Food and +4 Production for both cities. Alliance Points
     // with all allies increase by an additional .25 per turn." Both halves
     // want ALLIANCES, which this model has not got.
-    G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], {},
-      'No modeled bonus yet.'),
+    // CIV6 (GS) INHERENT: "Your Trade Routes to an Ally or Suzerain's city
+    // provide +4 Food and +4 Production for both cities. Alliance Points with
+    // all allies increase by an additional .25 per turn."
+    G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W],
+      { allyRouteYield: { food: 4, production: 4 }, alliancePointsPerTurn: 1 },
+      '+4 food and production on your ally and suzerain trade routes; alliances accrue a quarter-point faster.'),
     // CIV6 (GS) INHERENT: "+0.6 Production per Citizen in cities with
     // Governors."
     G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { governorPerCitizen: { production: 0.6 } },

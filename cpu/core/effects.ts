@@ -356,6 +356,8 @@ export interface Modifiers {
   districtYieldMult: { district: DistrictId; yield: keyof Yields; mult: number }[];
   buildingYieldMult: { building: string; yield: keyof Yields; mult: number }[];
   domesticRouteYield: Partial<Yields>;
+  allyRouteYield: Partial<Yields>;
+  alliancePointsPerTurn: number;
   routeYieldMult: number;
   noSettlers: boolean;
   healOnlyHome: boolean;
@@ -573,6 +575,8 @@ export function defaultModifiers(): Modifiers {
     districtYieldMult: [],
     buildingYieldMult: [],
     domesticRouteYield: {},
+    allyRouteYield: {},
+    alliancePointsPerTurn: 0,
     routeYieldMult: 1,
     noSettlers: false,
     healOnlyHome: false,
@@ -656,6 +660,8 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   for (const r of fx.districtYieldMult ?? []) mods.districtYieldMult.push(r);
   for (const r of fx.buildingYieldMult ?? []) mods.buildingYieldMult.push(r);
   addPartial(mods.domesticRouteYield, fx.domesticRouteYield);
+  addPartial(mods.allyRouteYield, fx.allyRouteYield);
+  mods.alliancePointsPerTurn += fx.alliancePointsPerTurn ?? 0;
   if (fx.routeYieldMult) mods.routeYieldMult *= fx.routeYieldMult;
   if (fx.noSettlers) mods.noSettlers = true;
   if (fx.healOnlyHome) mods.healOnlyHome = true;

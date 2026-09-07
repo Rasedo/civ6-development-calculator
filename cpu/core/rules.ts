@@ -161,6 +161,16 @@ export function canBuildRailroad(tile: Tile, ownsTile: (t: Tile) => boolean): bo
   return !tile.railroad && engineerTileOk(tile, ownsTile);
 }
 
+/** CIV6 (Improvement_ValidFeatures, Expansion2_Improvements.xml):
+ *  FEATURE_VOLCANIC_SOIL is listed valid for the Farm, the Mine, the Fort,
+ *  the Beach Resort, the Airstrip and the Missile Silo (and the Moai, the
+ *  Colossal Head, the Great Wall, the Roman Fort and a barbarian camp), so
+ *  the soil does not occupy a tile the way Woods do. Every clause that asks
+ *  for BARE GROUND reads it through here. */
+export function bareGround(tile: Tile): boolean {
+  return tile.feature === null || tile.feature === 'VOLCANIC_SOIL';
+}
+
 export function validImprovementsIn(
   tile: Tile,
   opts: {
@@ -199,7 +209,7 @@ export function validImprovementsIn(
     for (const def of Object.values(IMPROVEMENTS)) {
       // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech.
       if (fortBuilder ? def.id !== 'FORT' : (!def.engineer || !unlocked(def.id))) continue;
-      if (def.noFeature && tile.feature) continue;
+      if (def.noFeature && !bareGround(tile)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.excludeTerrains?.includes(tile.terrain)) continue;
       if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -252,18 +262,18 @@ export function validImprovementsIn(
   const hillFarmsOk = !unlocks || unlocks.hillFarms;
 
   // CIV6 (EFFECT_ADJUST_IMPROVEMENT_VALID_TERRAIN): the roster's extra ground
-  const rowFarm = tile.feature === null && (opts.farmTerrain ?? []).some(
+  const rowFarm = bareGround(tile) && (opts.farmTerrain ?? []).some(
     (r) => r.terrain === tile.terrain && r.hills === hills && (r.civic === undefined || (opts.civics ?? []).includes(r.civic)));
   if (
     unlocked('FARM') &&
-    ((tile.feature === null &&
+    ((bareGround(tile) &&
       (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS') &&
       (flat || (hills && hillFarmsOk))) ||
       tile.feature === 'FLOODPLAINS' || rowFarm)
   ) {
     out.push('FARM');
   }
-  if (unlocked('MINE') && hills && tile.feature === null) out.push('MINE');
+  if (unlocked('MINE') && hills && bareGround(tile)) out.push('MINE');
   // FORT — Military Engineer only, and only on open ground. Real
   // Civ 6 allows it on any passable land tile the owner holds; the district /
   // wonder / impassable paves are already refused above, and a resource tile
@@ -277,7 +287,7 @@ export function validImprovementsIn(
     unlocked('SEASIDE_RESORT') &&
     opts.map &&
     flat &&
-    tile.feature === null &&
+    bareGround(tile) &&
     (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
     neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
     tileAppeal(opts.map, tile, opts.camps, opts.gpAppeal) >= SEASIDE_RESORT_MIN_APPEAL
@@ -290,7 +300,7 @@ export function validImprovementsIn(
   for (const def of Object.values(IMPROVEMENTS)) {
     if (!def.groundOnly || !unlocked(def.id)) continue;
     if (def.requiresFeature && tile.feature !== def.requiresFeature) continue;
-    if (def.noFeature && tile.feature) continue;
+    if (def.noFeature && !bareGround(tile)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -679,12 +689,12 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   return buildableBuildings(state, city, false);
 }
 
-/** The GOLD-purchase list — `availableBuildings` with the queue term relaxed
- * to the item being WORKED (real Civ 6 sells a queued building: the entry is
- * invalidated and its progress banks) and an exclusion firing off built rows
- * alone; worship rows never sell for Gold. Buying out the item under
- * production stays refused on both engines — an open fidelity question. Pair
- * with `buildingCompletable`, exactly as the purchase appliers do. */
+/** The GOLD-purchase list — `availableBuildings` with the QUEUE term dropped
+ * altogether and an exclusion firing off built rows alone; worship rows never
+ * sell for Gold. CIV6: a building in the queue sells, the item being WORKED
+ * included — the entry is invalidated (`dropQueuedBuilding`) and its progress
+ * banks. Pair with `buildingCompletable`, exactly as the purchase appliers
+ * do. */
 export function goldPurchasableBuildings(state: GameState, city: City): BuildingDef[] {
   return buildableBuildings(state, city, true);
 }
@@ -698,7 +708,7 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
   const placed = new Set(
     city.districts.filter((d) => !irradiated(map.tiles[d.tileIndex])).map((d) => d.type),
   );
-  const queuedSrc = gold ? city.queue.slice(0, 1) : city.queue;
+  const queuedSrc = gold ? [] : city.queue;
   const queued = new Set(
     queuedSrc.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
   );

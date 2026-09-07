@@ -136,6 +136,30 @@ def main() -> None:
     else:
         print("  5 resort eligibility SKIPPED (no Seaside Resort row)")
 
+    # 5b — the SOIL leaves the bare-ground jobs standing; WOODS take them
+    # CIV6 (Improvement_ValidFeatures): FEATURE_VOLCANIC_SOIL is listed valid
+    # for the Farm, the Mine and the Fort, so it is bare ground (`bareGround`).
+    soil = getattr(sim, "_soil_fid", -1)
+    assert soil >= 0, "the catalog carries no VOLCANIC_SOIL row"
+    sim5 = fresh(rules, path)
+    hills = (~sim5.water[B0] & sim5.passable[B0] & (sim5.feat_id[B0] < 0)
+             & (sim5.district[B0] < 0) & (sim5.improvement[B0] < 0) & sim5.mine_ok[B0])
+    hidx = hills.nonzero(as_tuple=True)[0]
+    if len(hidx):
+        t5 = int(hidx[0])
+        att5, tt5 = one_at(sim5, t5)
+        assert bool(sim5._add_feature(att5, tt5, soil).any()), "the soil did not plant"
+        assert bool(sim5.mine_ok[B0, t5]), "the SOIL took the mine job with it"
+        assert not bool(sim5._feat_blocks_ground()[B0, t5]), "the soil read as occupying"
+        sim6 = fresh(rules, path)
+        att6, tt6 = one_at(sim6, t5)
+        assert bool(sim6._add_feature(att6, tt6, woods).any())
+        assert not bool(sim6.mine_ok[B0, t5]), "planted WOODS left the mine job standing"
+        assert bool(sim6._feat_blocks_ground()[B0, t5]), "woods read as bare ground"
+        print("  5b soil is bare ground OK — the mine job survives it and dies under Woods")
+    else:
+        print("  5b soil-as-bare-ground SKIPPED (no bare mineable tile on this map)")
+
     # 6 — statecompare's featureId reads the arrival
     from core import statecompare as sc
     fid_row = sc.TILE["featureId"](sim2, B0, None)

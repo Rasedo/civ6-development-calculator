@@ -497,6 +497,14 @@ class SimEconomy:
         if rows.numel():
             self.feat_id[rows, tt[rows]] = fid
             self.feat_stripped[rows, tt[rows]] = False
+            # TS reads `tile.feature` LIVE for every bare-ground job, so the
+            # planes the exporter baked per tile move with the arrival
+            # (`featJobs`); -1 leaves the baked value, which is what the soil
+            # asks for.
+            _jobs = self._feat_jobs[fid] if fid < len(self._feat_jobs) else [0, 0, 0, 0]
+            for _pl, _v in zip((self.farm_flat, self.farm_hill, self.mine_ok, self.lumber_ok), _jobs):
+                if _v >= 0:
+                    _pl[rows, tt[rows]] = bool(_v)
             self._eff_version += 1
         return ok
 
@@ -1405,8 +1413,8 @@ class SimEconomy:
         satisfy twice — the whole queue, not merely the item being worked.
 
         `gold=True` is the GOLD-purchase reading: real Civ 6 sells a building
-        that sits in the queue (the entry is invalidated and its progress
-        banks), so only the item being WORKED — queue slot 0 — refuses, and an
+        that sits in the queue, the item being WORKED included — the entry is
+        invalidated and its progress banks — so the queue term drops, and an
         exclusion fires off built rows alone, `city.buildings` like the
         prerequisite term.
         """
@@ -1428,7 +1436,7 @@ class SimEconomy:
             ones_nb,
         )  # Temple/Amphitheater/... gate on a CIVIC (availableBuildings' unlocks.buildings)
         cur = self.city_current[:, row]  # [B, C, QD]; layout: [0, NB) IS the building range
-        _qsrc = cur[:, :, :1] if gold else cur
+        _qsrc = cur[:, :, :0] if gold else cur
         queued = (torch.nn.functional.one_hot(_qsrc.clamp(min=0, max=NB - 1), NB).bool()
                   & ((_qsrc >= 0) & (_qsrc < NB)).unsqueeze(3)).any(dim=2)
         # hasRiver at each centre, read off the static tile plane (a dead
@@ -1967,6 +1975,8 @@ class SimEconomy:
             "gpp": torch.zeros(B, self._gov_gpp.shape[1], dtype=torch.float64, device=dev),
             # ---- the DARK-AGE channels ----
             "routeymul": _o.clone(), "domroute": torch.zeros(B, 6, dtype=dt, device=dev),
+            "allyroute": torch.zeros(B, 6, dtype=dt, device=dev),
+            "allypts": torch.zeros(B, dtype=torch.long, device=dev),
             "nosettler": torch.zeros(B, dtype=torch.bool, device=dev),
             "healhome": torch.zeros(B, dtype=torch.bool, device=dev),
             "relighome": _z.clone(),
@@ -2001,6 +2011,8 @@ class SimEconomy:
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         fx["govymul"] = torch.where(has_gov.unsqueeze(1), self._gov_gov_ymult[adopted], fx["govymul"])
         fx["govpercit"] = fx["govpercit"] + self._gov_gov_percit[adopted] * gmask
+        fx["allyroute"] = fx["allyroute"] + self._gov_ally_route[adopted] * gmask
+        fx["allypts"] = fx["allypts"] + self._gov_ally_pts[adopted] * has_gov.long()
         emult = torch.where(has_gov, self._gov_ehprod[adopted], emult)
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         adjm = adjm * torch.where(has_gov.unsqueeze(1), self._gov_adj_mult[adopted],

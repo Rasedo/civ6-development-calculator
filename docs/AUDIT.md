@@ -42,10 +42,10 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-63r gang-up bar | 1 | ask; Enkidu's allied-war discount waits on it |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
-| B-D unsourced data values | 1 | Democracy's alliance tail; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
+| B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
 | **B. Fidelity vs real Civ 6** | **21** | |
 | C-1 power | 2 | accident roll and damage tables (sourced), three decommission projects (sourced), a minor's grid when C-38 gives one a load |
-| C-2 diplomatic agreements | 2 | queue-front purchase (sourced), joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76 |
+| C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
@@ -56,7 +56,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
 | C-38 a city-state's city | 2 | growth and border from its own food and culture, what it spends gold and faith on |
-| C-41 Volcanic Soil | 1 | improvement clauses accept the soil (sourced); where an eruption lays it is an ask |
+| C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
 | C-45 queue depth five | 1 | ask |
 | C-49 named storms | 1 | the storm's walk (DLL); one roll per tile or per building for BUILDING_PILLAGED |
 | C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
@@ -100,6 +100,10 @@ the entry and the line leaves.
 9. **C-76 — the opinion deltas.** The install names every
    `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
    nothing.
+10. **C-2 — what a mid-build gold purchase does to the hammers.** One
+    tested report says a UNIT keeps its progress and a BUILDING's is wasted;
+    this engine banks both, on the standing rule that hammers never burn.
+    One forum post against a principle — the owner's call.
 
 ## A. Engine vs engine
 
@@ -197,8 +201,11 @@ Nothing open.
     Dam, Neighborhood and Mbanza and NUM_UNDER_AVG_PLUS_TECH for the rest;
     this engine runs the tech-driven one for all. Both formulas are DLL.
 - **B-D. UNSOURCED DATA VALUES.** Weight 2.
-  - DEMOCRACY'S TAIL: the Trade Route to an ally's or suzerain's city and
-    its alliance points — alliances exist now (C-2); buildable.
+  - DEMOCRACY'S ROUTE PAYS ONLY ITS OWN CITY. SOURCED (GS): "Your Trade
+    Routes to an Ally or Suzerain's city provide +4 Food and +4 Production
+    for BOTH CITIES." The ORIGIN half ships on both engines, and so does the
+    extra quarter-point a turn; the DESTINATION's half pays another seat's
+    city, and no channel here pays a foreign city for an incoming route.
   - THE PER-CITY WAR-WEARINESS SPLIT: the install's numbers are
     `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0,
     NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`,
@@ -244,11 +251,14 @@ Nothing open.
     `minor_yields_test::test_power_vacuous`); due when C-38's ladder
     reaches a building with a load.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 2.
-  - THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM is refused on both engines
-    (`goldPurchasableBuildings`). SOURCED (one tested report,
-    steamcommunity.com/app/289070/discussions/0/1848072002747657088):
-    allowed; a UNIT keeps its progress, a BUILDING's is wasted. Buildable:
-    the unit's progress moves to the next item of its kind.
+  - WHAT A MID-BUILD PURCHASE DOES TO THE HAMMERS. The queue-front sale
+    itself ships (`goldPurchasableBuildings` drops the queue term;
+    `dropQueuedBuilding` banks the progress and closes the entry). The one
+    tested report found (steamcommunity.com/app/289070/discussions/0/
+    1848072002747657088) says a UNIT keeps its progress and a BUILDING's is
+    WASTED — which contradicts this engine's standing rule that hammers
+    never burn, on one forum post. Both engines BANK; the disposition is an
+    ask.
   - JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT (unpublished science)
     and ASK-FOR-PROMISE (C-76) — four agreements the table can carry and
     nothing acts on.
@@ -344,13 +354,6 @@ Nothing open.
   - Foreign Investor and Affluence (B-24r) wait on a minor that improves
     and accumulates.
 - **C-41. VOLCANIC SOIL.** Weight 1.
-  - SOURCED `Improvement_ValidFeatures`: FEATURE_VOLCANIC_SOIL is valid
-    under FARM, MINE, FORT, AIRSTRIP, BEACH_RESORT, MISSILE_SILO, the Roman
-    Fort, the Great Wall, the Moai, the Colossal Head and the barbarian
-    camp; `Feature_ValidTerrains` grass, plains, desert, tundra, snow, flat
-    or hills; ValidDistrictPlacement, ValidWonderPlacement and
-    ValidForReplacement all true. The three improvement clauses that read
-    `tile.feature === null` must ACCEPT the soil. Buildable.
   - WHERE an eruption lays it — ask 2. The carrier (`addFeature` /
     `_add_feature`) is in.
 - **C-45. THE QUEUE'S DEPTH.** Weight 1.

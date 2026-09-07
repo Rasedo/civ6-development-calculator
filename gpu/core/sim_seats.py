@@ -3216,7 +3216,7 @@ class SimSeats:
                 allow |= self.hills if e == 1 else ~self.hills
             ok &= allow
         if self._imp_no_feat[k]:
-            ok &= ~((self.feat_id >= 0) & ~self.feat_stripped)
+            ok &= ~self._feat_blocks_ground()
         feats = self._imp_feats_ok[k]
         if feats:
             live = (self.feat_id >= 0) & ~self.feat_stripped
@@ -3230,6 +3230,16 @@ class SimSeats:
             same = ((self.improvement[:, nbc] == k) & (nb >= 0).unsqueeze(0)).any(dim=2)
             ok &= ~same
         return ok
+
+    def _feat_blocks_ground(self) -> torch.Tensor:
+        """[B, T] — a LIVE feature that occupies the tile, `bareGround`'s
+        twin. CIV6 (Improvement_ValidFeatures): VOLCANIC_SOIL is listed valid
+        for the Farm, the Mine, the Fort, the Beach Resort, the Airstrip and
+        the Missile Silo, so it blocks none of them."""
+        live = (self.feat_id >= 0) & ~self.feat_stripped
+        if self._soil_fid >= 0:
+            live = live & (self.feat_id != self._soil_fid)
+        return live
 
     def _builder_ground(self) -> torch.Tensor:
         """[B, T] — the ground `validImprovementsIn` reaches its catalog rows
@@ -6642,6 +6652,17 @@ class SimSeats:
                              + pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
+            # CIV6 (Democracy): a route to a minor this seat is SUZERAIN of pays
+            # the government's own +4 Food and +4 Production, the same clause the
+            # ally leg takes.
+            if self._gov_has_effects:
+                _arc = self._gov_mods(row)[12]["allyroute"].double()
+                if bool((_arc != 0).any()):
+                    _suz_d = pays_c & self._suzerain_mask(row)[:, :S].gather(1, css)
+                    if bool(_suz_d.any()):
+                        for _kc in range(6):
+                            inc.scatter_add_(1, from_j * 6 + _kc,
+                                             _arc[:, _kc].unsqueeze(1) * _suz_d.double())
             # CIV6 (Kumasi's suzerain): routes to ANY city-state pay "+2
             # Culture and +1 Gold for every specialty district in the origin
             # city" — the ORIGIN's registry count, on each paying CS leg.
@@ -6779,6 +6800,17 @@ class SimSeats:
             if bool(_hit.any()):
                 inc.scatter_add_(1, from_j * 6 + _yc.clamp(min=0),
                                  self._al_route_to[_aty.clamp(min=0)].double() * _hit.double())
+            # CIV6 (Democracy): "Your Trade Routes to an Ally or Suzerain's
+            # city provide +4 Food and +4 Production for both cities" — this
+            # seat's own half, on a route to an ALLY.
+            if self._gov_has_effects:
+                _ar = self._gov_mods(row)[12]["allyroute"].double()
+                if bool((_ar != 0).any()):
+                    _ally_d = pays_i & (self.seat_ally_turns[:, row].gather(1, dr) > 0)
+                    if bool(_ally_d.any()):
+                        for _kc in range(6):
+                            inc.scatter_add_(1, from_j * 6 + _kc,
+                                             _ar[:, _kc].unsqueeze(1) * _ally_d.double())
         # CIV6 (Trading Post): "Every Trading Post for your civilization
         # through which a route passes along its course adds +1 Gold", and
         # "Each foreign Trading Post also adds +1 Gold to the yields of every

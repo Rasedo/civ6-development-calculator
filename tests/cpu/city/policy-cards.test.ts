@@ -208,10 +208,7 @@ describe('the empire-wide channels', () => {
 
   it('every card carries a live effect set — none is inert', () => {
     const inert = POLICY_LIST.filter((p) => Object.keys(p.effects).length === 0).map((p) => p.id);
-    // LEGACY_DEMOCRACY carries Democracy's own inherent bonus, and that bonus
-    // asks for ALLIANCES, which this model has not got — the government row
-    // is empty for the same reason and by the same open item.
-    expect(inert.sort()).toEqual(['LEGACY_DEMOCRACY']);
+    expect(inert.sort()).toEqual([]);
   });
 
   it('every government but the Chiefdom has a legacy card', () => {
