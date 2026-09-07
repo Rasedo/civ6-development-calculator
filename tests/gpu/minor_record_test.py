@@ -81,7 +81,14 @@ def test_minor_research(rules) -> None:
     sim._city_state_phase()
     assert float(sim.citystate_tech_prog[0, 0]) == sci, "the pot takes the city's own Science"
     assert int(sim.citystate_techs[0, 0].sum()) == 0, "and nothing completes below the price"
-    turns = int(float(cost[cheapest]) // sci) + 2
+    # the horizon covers BOTH pots: the tech at the walk's Science and the
+    # cheapest available civic at its Culture
+    cul = float(sim._seat_city_walk(row, 0, amen_yf=yf)[0, 0, 4])
+    assert cul > 0, "a live minor's city yields Culture"
+    ccost = sim.rules_dev.c_cost
+    cavail = sim._available_mask(sim.citystate_civics[0:1, 0], sim._prereq_c)[0]
+    ccheap = float(torch.where(cavail, ccost.to(sim.device), torch.full_like(ccost.to(sim.device), float("inf"))).min())
+    turns = max(int(float(cost[cheapest]) // sci), int(ccheap // cul)) + 2
     for _ in range(turns):
         sim._city_state_phase()
     assert bool(sim.citystate_techs[0, 0, cheapest]), "the cheapest available row lands first"

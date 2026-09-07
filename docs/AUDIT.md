@@ -1593,6 +1593,20 @@ mirrored in memory.
   Amphitheater's) and `relics` (St. Basil's three, additive with the
   Temple's) on both engines. Lesson: declared-gaps-are-not-the-gap-list —
   the "blocked" bullet named a restriction the install does not have.
+- **A-15r. TS paid Support to a unit standing in a city-state's centre. CLOSED
+  2026-09-07.** CIV6 (Support): "Units will not gain Support when inside
+  defensible Districts (City Center, Encampment)". TS tested `district ===
+  'CITY_CENTER'`, and TS never paves a minor's centre with a district, so a
+  Scythian Slinger inside Hunza took +2 Support against a Roman Warrior where
+  the GPU's `_centre_seat_plane` (majors and minors in one plane) paid none
+  (seed 9170 t114, the combat log's `mel` q 80 vs 100). The GPU was right;
+  `defensibleDistrict` now answers for both `supportCount` and
+  `theoSupportCount`. Latent since the minors' centres existed; reached once
+  the minor's city became an ordinary city a foreign unit may stand in.
+  Lesson: a TS predicate spelled on `tile.district` misses every city the TS
+  model keeps OFF the tile (a minor's centre) — the "is there a city here"
+  question has one composer per engine, ask it. Lanes: `combat_mod` H2 and
+  the TS support scene.
 - **A-14r. A Free City could not work its own tiles on the GPU. CLOSED
   2026-09-07.** The work window and the yield walk matched a tile's holder by
   city-plane ROW INDEX (`tile_seat == row`), which equals the seat id for a

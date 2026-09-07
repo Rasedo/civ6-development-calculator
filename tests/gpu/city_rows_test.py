@@ -72,7 +72,9 @@ def T(*xs) -> torch.Tensor:
 
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
-    assert len(sim._center_adj_rows) == 2 and len(sim._great_work_yield_rows) == 8
+    # Nkisi: three object kinds (sculpture, relic, artifact) x four yields, off
+    # the install's per-kind rows since the works moved onto their holders
+    assert len(sim._center_adj_rows) == 2 and len(sim._great_work_yield_rows) == 12
     assert len(sim._gpp_class_rows) == 3 and len(sim._powered_yield_rows) == 5
     assert len(sim._stockpile_rate_rows) == 4 and len(sim._stockpile_cap_rows) == 3
     # the charge family grew with Qin's Builder, Philip's Inquisitor and

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
-import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, setWar } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
@@ -355,6 +355,35 @@ describe('flanking & support', () => {
     expect(d1).toBe(d0 - SUPPORT_CS * 10); // defender +2 CS -> −20 in diff·10
   });
 
+  it('CIV6: no Support inside a defensible district — a city-state\'s centre included', () => {
+    // TS never paves a minor's centre with a district, so the gate must ask
+    // the minor's own centre list (seed 9170 t114 paid +2 there)
+    const setup = (minorCentre: boolean) => {
+      const { state } = armed();
+      const atkTile = tileAtCoords(state.map, 11, 9).index;
+      const defTile = tileAtCoords(state.map, 12, 9).index;
+      if (minorCentre) {
+        const minor = {
+          ...emptySeat(seatOfCityState(7)), id: 7, name: 'Hunza', type: 'trade',
+          centerIndex: defTile, population: 1, envoys: {}, met: [],
+        } as CityState;
+        state.cityStates.push(minor);
+        setTileOwner(state.map.tiles[defTile], minor.seat);
+      }
+      const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
+      atk.tileIndex = atkTile;
+      const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
+      def.tileIndex = defTile;
+      const sn = freeNeighbor(state, defTile, atkTile);
+      const helper = spawnUnit(state, 'WARRIOR', sn.index, BARB_SEAT)!;
+      helper.tileIndex = sn.index;
+      return { state, def, defTile };
+    };
+    const open = setup(false);
+    expect(supportCount(open.state, open.defTile, open.def)).toBe(1);
+    const inside = setup(true);
+    expect(supportCount(inside.state, inside.defTile, inside.def)).toBe(0);
+  });
   it('CIV6: "ranged attacks ignore any Support received by the defender"', () => {
     const setup = () => {
       const { state } = armed();

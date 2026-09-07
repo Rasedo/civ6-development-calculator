@@ -247,6 +247,13 @@ def test_support_in_district(sim) -> None:
     _, s_off = sim._flank_support(off_ctr, dseat, noatk, dseat)
     assert int(s_ctr[0]) == 0, "a defender on a City Center must gain no Support"
     assert int(s_off[0]) >= int(s_ctr[0]), "the same neighbours off the centre still support"
+    # a CITY-STATE's centre is a City Center too: a foreign unit standing in
+    # one gains no Support either (seed 9170 t114 — TS paid it there)
+    if sim.S > 0 and bool(sim.citystate_alive[0, 0]):
+        mc = torch.full((sim.B,), int(sim.citystate_center[0, 0]), dtype=torch.long, device=sim.device)
+        _, s_minor = sim._flank_support(mc, dseat, noatk, dseat)
+        assert int(s_minor[0]) == 0, "a defender on a city-state's centre must gain no Support"
+        print("  H2. a city-state's centre is defensible too: no Support inside it")
     print(f"  H. district support OK: {int(s_ctr[0])} on the centre, {int(s_off[0])} one tile off")
 
 

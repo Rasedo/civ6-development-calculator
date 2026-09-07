@@ -355,10 +355,21 @@ export function flankCount(state: GameState, defTileIndex: number, attacker: Uni
  * units inside one still provide it. Support is a MELEE-only term, and the
  * callers hold that gate: a ranged attacker never asks for it.
  */
+/** CIV6 (Support): "Units will not gain Support when inside defensible
+ *  Districts (City Center, Encampment)" — a CITY CENTER is any live city's,
+ *  a city-state's included: TS never paves a minor's centre with a district,
+ *  so the minor's own centre list answers for it (the GPU's
+ *  `_centre_seat_plane` names both in one plane). */
+export function defensibleDistrict(state: GameState, dt: Tile): boolean {
+  if (dt.district === 'CITY_CENTER' || encampmentIntact(dt)) return true;
+  const cs = cityStateAt(state, dt.index);
+  return !!cs && cs.centerIndex === dt.index;
+}
+
 export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   if (!flankSupportLive(state, defender.seat)) return 0;
   const dt = state.map.tiles[defTileIndex];
-  if (dt.district === 'CITY_CENTER' || encampmentIntact(dt)) return 0;
+  if (defensibleDistrict(state, dt)) return 0;
   let n = 0;
   for (const t of neighbors(state.map, dt)) {
     for (const u of unitsAt(state, t.index)) {
@@ -449,7 +460,7 @@ export function theoFlankCount(state: GameState, defTileIndex: number, attacker:
 export function theoSupportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   if (!flankSupportLive(state, defender.seat)) return 0;
   const dt = state.map.tiles[defTileIndex];
-  if (dt.district === 'CITY_CENTER' || encampmentIntact(dt)) return 0;
+  if (defensibleDistrict(state, dt)) return 0;
   let n = 0;
   for (const t of neighbors(state.map, dt)) {
     for (const u of unitsAt(state, t.index)) {

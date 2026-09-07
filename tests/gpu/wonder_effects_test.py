@@ -96,7 +96,11 @@ def main() -> None:
     # --- 2) per-turn Great Person points reach the seat ---------------------
     before = [float(sim._seat_wonder_sum(0, sim._wond_gpp[:, c])[0]) for c in range(ncls)]
     assert sum(before) == 0.0, "no wonder stands yet, so no wonder pays points"
-    hermitage = _find(rows, lambda r: r["gwslots"] == [0, 4, 0], "wonder with four Great Work of Art slots")
+    # the works live on their holders now: the Hermitage is the wonder holder
+    # with four slots in the holder table, which names the wonder row
+    _hh = [i for i, (w, n) in enumerate(zip(sim._gw_holder_wonder, sim._gw_holder_slots)) if w and n == 4]
+    assert len(_hh) == 1, f"expected exactly one four-slot wonder holder, got {_hh}"
+    hermitage = int(sim._gw_holder_widx[_hh[0]])
     plant(sim, 0, 0, hermitage)
     after = [float(sim._seat_wonder_sum(0, sim._wond_gpp[:, c])[0]) for c in range(ncls)]
     assert sum(after) == 3.0, f"the Hermitage pays 3 points to one class, got {after}"
