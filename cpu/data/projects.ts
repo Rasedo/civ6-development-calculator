@@ -209,13 +209,6 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // "resets the age of the reactor to 0". 400 Production, and the cost
     // "does not scale with further research".
     P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.' }),
-    // CIV6 (Expansion2_Projects.xml): the three DECOMMISSION projects —
-    // Cost 400 apiece, PrereqDistrict DISTRICT_INDUSTRIAL_ZONE,
-    // `UnlocksFromEffect` (the Climate Accords competition opens them), and
-    // each one's `Project_BuildingCosts` row names the plant it consumes.
-    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', accordsOnly: true, description: 'Removes the Coal Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', accordsOnly: true, description: 'Removes the Oil Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', accordsOnly: true, description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
     P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
     P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
     P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
@@ -235,6 +228,14 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     P({ id: 'OPERATION_IVY', name: 'Operation Ivy', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'MANHATTAN_PROJECT', description: 'Opens the Build Thermonuclear Device project.' }),
     P({ id: 'BUILD_NUCLEAR_DEVICE', name: 'Build Nuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 1, cost: 800, requiresTech: 'NUCLEAR_FISSION', requiresProject: 'MANHATTAN_PROJECT', resource: 'URANIUM', resourceCost: 10, description: 'Repeatable: adds one Nuclear Device to this seat inventory.' }),
     P({ id: 'BUILD_THERMONUCLEAR_DEVICE', name: 'Build Thermonuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 2, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'OPERATION_IVY', resource: 'URANIUM', resourceCost: 20, description: 'Repeatable: adds one Thermonuclear Device to this seat inventory.' }),
+
+    // CIV6 (Expansion2_Projects.xml): the three DECOMMISSION projects —
+    // Cost 400 apiece, PrereqDistrict DISTRICT_INDUSTRIAL_ZONE,
+    // `UnlocksFromEffect` (the Climate Accords competition opens them), and
+    // each one's `Project_BuildingCosts` row names the plant it consumes.
+    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', accordsOnly: true, description: 'Removes the Coal Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', accordsOnly: true, description: 'Removes the Oil Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', accordsOnly: true, description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 
