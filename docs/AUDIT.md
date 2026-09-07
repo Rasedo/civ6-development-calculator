@@ -33,7 +33,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities, the Accords' decommission half (C-1) |
 | B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
-| B-34r flood tails | 1 | coastal floods and the Phase IV fertilization end |
+| B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
 | B-56r inert promotions | 1 | Sentry needs sight-blocking; Ground Crews needs PATROL (C-34); Boarding has no magnitude |
@@ -58,7 +58,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-38 a city-state's city | 2 | growth and border from its own food and culture, what it spends gold and faith on |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
 | C-45 queue depth five | 1 | ask |
-| C-49 named storms | 1 | the storm's walk (DLL); one roll per tile or per building for BUILDING_PILLAGED |
+| C-49 named storms | 1 | the storm's walk (DLL) |
 | C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
 | C-61 the Cothon's project | 1 | the row and its GAME_PROGRESS price, after C-79's Cothon |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
@@ -164,8 +164,11 @@ Nothing open.
   - The destination is one candidate row plus take/skip; the free-choice
     head is P8 work.
 - **B-34r. FLOOD TAILS.** Weight 1.
-  - COASTAL floods, and climate change ending fertilization at Phase IV,
-    are not modelled.
+  - COASTAL floods are not modelled: a flood reaches a river's own tiles
+    (`_flood_river` / the river walk), and a coastal one needs a shoreline
+    reach and the lowland bands to drive it.
+  - The EGYPTIAN ability's flood half and the SOOTHSAYER's are C-26's and
+    an absent chassis'.
 - **B-51r. THE ENCAMPMENT'S POOL ON CAPTURE.** Weight 1.
   - `city_outer_hp` zeroes on a city capture; `Tile.encampOuterHp` /
     `encamp_outer_hp` rides through. Ask 5.
@@ -361,9 +364,6 @@ Nothing open.
   - THE WALK: `Movement 8` on every storm row is DLL logic; a storm stays on
     its centre for its three turns. How does it choose a heading and how far
     does it move per turn?
-  - BUILDING_PILLAGED (40/60/100%) rides the district's darkness; the
-    per-building flag exists now (`buildingPillaged` / `_bldg_dark`). One
-    roll per tile pillaging every building, or one per building?
 - **C-60. THE FREE CITY'S OWN PLAY.** Weight 2.
   The seat is in on both engines (revolt, race, join, Eleanor's skip, open
   to attack). Each bullet is an exact question, no magnitude to invent:

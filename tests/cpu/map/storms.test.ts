@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
@@ -152,15 +152,40 @@ describe('the eight storms are the install\'s table', () => {
     t.fertilityProd = 1;
     expect(tileYields(makeYieldCtx(state, 0), t)).toEqual(before);
   });
-  it('a storm tile draws ten times whatever stands there', () => {
+  it('a storm tile draws eleven times whatever stands there', () => {
     const state = board(null);
     const tile = tileAtCoords(state.map, 5, 5);
     for (const [ev, unit] of [['TORNADO_FAMILY', null], ['HURRICANE_CAT_5', 'WARRIOR']] as const) {
       if (unit) spawnUnit(state, unit, tile.index, 0);
       const s0 = state.rngState;
       stormTile(state, tile, EV(ev), false);
-      expect(draws(s0, state.rngState)).toBe(10);
+      // improvement, destroy, district, BUILDING, population, civilian, land,
+      // naval, one HP band, and the two fertility yields
+      expect(draws(s0, state.rngState)).toBe(11);
     }
+  });
+
+  it('darkens a district BUILDINGS on its own column, not the district one', () => {
+    // CIV6 (RandomEvent_Damages): BUILDING_PILLAGED carries its own
+    // Percentage — a flood pillages the district at 50 and its buildings at
+    // 100, and the MODERATE row has no district column at all — so a building
+    // goes dark whether or not the district around it does.
+    const state = board(null);
+    const city = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
+    const dt = tileAtCoords(state.map, 6, 5);
+    setTileOwner(dt, 0, city.id);
+    dt.district = 'CAMPUS';
+    dt.districtComplete = true;
+    city.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
+    city.buildings.push('LIBRARY', 'MONUMENT');
+
+    // an event whose building column is CERTAIN darkens the district's own
+    // rows and leaves the City Center's alone
+    const ev = STORM_EVENTS.find((e) => e.bldgPill >= 1)!;
+    expect(ev).toBeTruthy();
+    stormTile(state, dt, ev, false);
+    expect(city.pillagedBuildings ?? []).toContain('LIBRARY');
+    expect(city.pillagedBuildings ?? []).not.toContain('MONUMENT');
   });
 
   it('the climate ramp is the flood\'s: mass moves to the worse severity, then every draw scales', () => {

@@ -1,20 +1,22 @@
 
-import type { GameState, Tile } from './types';
+import type { City, GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
 import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar } from './seats';
 import { DISTRICTS } from '../data/districts';
+import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
 import { rowIsFor } from '../data/civilizations';
 import { cityAtIndex } from './units';
 import { outerPool } from './rules';
+import { pillageBuilding } from './yields';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
-import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
+import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
 import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, type StormEvent } from '../data/disasters';
 import { disasterRateMult, severitySplit } from '../data/climate';
@@ -51,6 +53,37 @@ function pillageDistrict(state: GameState, tile: Tile): void {
       && !tile.districtPillaged && !envImmune(state, tile)) {
     tile.districtPillaged = true;
   }
+}
+
+/**
+ * CIV6 (RandomEvent_Damages): BUILDING_PILLAGED is a column of its OWN, with
+ * its own Percentage — a flood pillages the district at 50 and its buildings
+ * at 100, so the two are independent and a building goes dark whether or not
+ * the district around it does.
+ *
+ * READING: the table carries one Percentage per event per damage type and no
+ * per-building granularity, so the roll is ONE PER TILE — the same shape this
+ * engine already reads the unit and population columns at — and a hit darkens
+ * every building of the district standing there.
+ */
+function pillageTileBuildings(state: GameState, tile: Tile): void {
+  if (!tile.district || !tile.districtComplete || envImmune(state, tile)) return;
+  const held = cityAtIndex(state, tile.index);
+  const city = held?.city ?? cityHoldingDistrict(state, tile);
+  if (!city) return;
+  for (const id of [...(city.buildings ?? [])]) {
+    if (BUILDINGS[id]?.district === tile.district) pillageBuilding(city, id);
+  }
+}
+
+/** the city whose registry holds the district standing on this tile. */
+function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
+  for (const s of state.seats) {
+    for (const c of s.cities) {
+      if (c.districts.some((d) => d.tileIndex === tile.index)) return c;
+    }
+  }
+  return undefined;
 }
 
 function fertilize(state: GameState, tile: Tile): void {
@@ -143,6 +176,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
   tile.floodCount = (tile.floodCount ?? 0) + 1;
   const rDestroy = nextRandom(state);
   const rDistrict = nextRandom(state);
+  const rBldg = nextRandom(state);
   const rDamage = nextRandom(state);
   const rCivilian = nextRandom(state);
   const rPop = nextRandom(state);
@@ -162,6 +196,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
       tile.pillaged = false;
     }
     if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile);
+    if (rBldg < FLOOD_BLDG_P[sev]) pillageTileBuildings(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
     if (dmg > 0) {
@@ -328,7 +363,7 @@ function stormExtraPct(state: GameState, unitSeat: number, owner: number, ev: St
 /**
  * ONE storm turn on one footprint tile.
  *
- * TEN draws per tile, always, whatever stands there — one per damage column
+ * ELEVEN draws per tile, always, whatever stands there — one per damage column
  * plus the HP band and the two yields — so the stream never depends on the
  * tile's contents. Order: improvement pillaged, improvement destroyed,
  * district pillaged, population, civilian killed, land share, naval share,
@@ -338,12 +373,13 @@ function stormExtraPct(state: GameState, unitSeat: number, owner: number, ev: St
  * tile for ALL that domain's units on it; an embarked unit is its chassis'
  * domain; an air unit or a spy holds no tile and is neither domain; a city
  * centre on the footprint takes nothing (no storm row names CITY_GARRISON or
- * CITY_WALLS); BUILDING_PILLAGED rides the district's darkness.
+ * CITY_WALLS); BUILDING_PILLAGED is its own per-tile roll.
  */
 export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: boolean): void {
   const rPill = nextRandom(state);
   const rDestroy = nextRandom(state);
   const rDistrict = nextRandom(state);
+  const rBldgS = nextRandom(state);
   const rPop = nextRandom(state);
   const rCivilian = nextRandom(state);
   const rLand = nextRandom(state);
@@ -362,6 +398,7 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
     tile.pillaged = false;
   }
   if (rDistrict < distP) pillageDistrict(state, tile);
+  if (rBldgS < ev.bldgPill) pillageTileBuildings(state, tile);
   if (rPop < ev.pop) {
     const home = seatOf(state, owner)?.cities.find((c) => c.id === tile.ownerCity);
     if (home && home.population > 1) home.population -= 1;

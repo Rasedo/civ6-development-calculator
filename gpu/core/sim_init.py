@@ -2276,6 +2276,7 @@ class SimInit:
             return torch.tensor([int(e[k]) for e in _st], dtype=torch.long, device=device)
         self._st_hexes, self._st_duration = _sti("hexes"), _sti("duration")
         self._st_imp_pill, self._st_imp_dest, self._st_dist_pill = _stf("impPill"), _stf("impDest"), _stf("distPill")
+        self._st_bldg_pill = _stf("bldgPill")
         self._st_pop, self._st_civ_kill = _stf("pop"), _stf("civKill")
         self._st_land_p, self._st_naval_p = _stf("landP"), _stf("navalP")
         self._st_land_lo, self._st_land_hi = _sti("landLo"), _sti("landHi")
@@ -2293,6 +2294,7 @@ class SimInit:
             tuple(int(x) for x in r) for r in _ds["stormUnitRows"]]  # type: ignore[misc]
         self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
         self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
+        self._flood_bldg_p = torch.tensor([float(x) for x in _ds["floodBldgP"]], dtype=torch.float64, device=device)
         self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
         self._flood_dmg_lo = torch.tensor([int(x) for x in _ds["floodDmgLo"]], dtype=torch.long, device=device)
         self._flood_dmg_hi = torch.tensor([int(x) for x in _ds["floodDmgHi"]], dtype=torch.long, device=device)

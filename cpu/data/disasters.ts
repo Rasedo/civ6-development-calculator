@@ -75,8 +75,9 @@ export interface StormEvent {
   impPill: number;
   impDest: number;
   distPill: number;
-  /** BUILDING_PILLAGED — folded into the district's darkness until a
-   *  per-building pillage flag exists; carried so nothing re-sources it */
+  /** BUILDING_PILLAGED — ONE roll per tile, darkening every building of the
+   *  district standing there. A column of its own: a flood pillages the
+   *  district at 50 and its buildings at 100. */
   bldgPill: number;
   pop: number;
   civKill: number;
@@ -207,6 +208,10 @@ export const FLOOD_DESTROY_P = [0, 0.5, 0.8] as const;
 /** "District — 0 / 50% / 80%". A damaged district takes its buildings dark
  *  with it, which is the page's "Building 100%" column. */
 export const FLOOD_DISTRICT_P = [0, 0.5, 0.8] as const;
+/** CIV6 (RandomEvent_Damages): BUILDING_PILLAGED is 100 on all three flood
+ *  rows — including MODERATE, which carries no DISTRICT_PILLAGED row at all,
+ *  so the two columns are plainly independent. */
+export const FLOOD_BLDG_P = [1, 1, 1] as const;
 /** "Population" and "Civilians killed", which the page gives the same
  *  percentage at every severity. */
 export const FLOOD_POP_P = [0, 0.15, 0.25] as const;

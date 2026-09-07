@@ -626,6 +626,42 @@ class SimEconomy:
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self.district_pillaged[rows[ok], tiles[ok]] = True
 
+    def _pillage_tile_buildings(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`pillageTileBuildings` — CIV6 (RandomEvent_Damages):
+        BUILDING_PILLAGED is a column of its OWN, with its own Percentage (a
+        flood pillages the district at 50 and its buildings at 100, and its
+        MODERATE row carries no district column at all), so a building goes
+        dark whether or not the district around it does. The table carries no
+        per-building granularity, so the roll is ONE PER TILE and a hit
+        darkens every building of the district standing there."""
+        if not rows.numel():
+            return
+        di = self.district[rows, tiles]
+        ok = ((di >= 0) & self.district_complete[rows, tiles]
+              & ~self._env_immune()[rows, tiles])
+        if not bool(ok.any()):
+            return
+        rr, tt, dd = rows[ok], tiles[ok], di[ok]
+        seat_at = self.tile_seat[rr, tt]
+        hit = False
+        for r in (*range(self.n_majors), self.FREE_ROW):
+            sel = seat_at == int(self._ROW_SEAT[r])
+            if not bool(sel.any()):
+                continue
+            br, bt, bd = rr[sel], tt[sel], dd[sel]
+            col = self._city_col_at(r, br, bt)
+            good = col >= 0
+            if not bool(good.any()):
+                continue
+            br, bd, col = br[good], bd[good], col[good]
+            mine = (self.city_bldg[br, r, col]
+                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1)))
+            if bool(mine.any()):
+                self.city_bldg_pillaged[br, r, col] |= mine
+                hit = True
+        if hit:
+            self._eff_version += 1
+
     def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         idx, cnt = cand_list
         has = mask_hit & (cnt > 0)
@@ -1059,7 +1095,7 @@ class SimEconomy:
         """`stormTile` — one storm turn on one footprint tile, at the event
         `ev` names per game.
 
-        TEN draws per tile, always, whatever stands there — one per damage
+        ELEVEN draws per tile, always, whatever stands there — one per damage
         column plus the HP band and the two yields. Order: improvement
         pillaged, improvement destroyed, district pillaged, population,
         civilian killed, land share, naval share, HP band, food, production.
@@ -1068,12 +1104,13 @@ class SimEconomy:
         per tile for ALL that domain's units on it; an embarked unit is its
         chassis' domain; an air unit or a spy holds no tile and is neither
         domain; a city centre on the footprint takes nothing (no storm row
-        names CITY_GARRISON or CITY_WALLS); BUILDING_PILLAGED rides the
-        district's darkness."""
+        names CITY_GARRISON or CITY_WALLS); BUILDING_PILLAGED is its own
+        per-tile roll."""
         B, dev = self.B, self.device
         r_pill = self._next_random(hit)
         r_destroy = self._next_random(hit)
         r_district = self._next_random(hit)
+        r_bldg = self._next_random(hit)
         r_pop = self._next_random(hit)
         r_civilian = self._next_random(hit)
         r_land = self._next_random(hit)
@@ -1100,6 +1137,9 @@ class SimEconomy:
         dist = (hit & (r_district < dist_p)).nonzero(as_tuple=True)[0]
         if dist.numel():
             self._pillage_district(dist, tc[dist])
+        bld = (hit & (r_bldg < self._st_bldg_pill[ev])).nonzero(as_tuple=True)[0]
+        if bld.numel():
+            self._pillage_tile_buildings(bld, tc[bld])
         # a CITIZEN of the tile's owning city, on its own roll — only a major
         # keeps a city list
         pr = (hit & (r_pop < self._st_pop[ev])).nonzero(as_tuple=True)[0]
@@ -1248,6 +1288,7 @@ class SimEconomy:
         self.tile_flood_ct[_fr, tile[_fr]] += 1
         r_destroy = self._next_random(hit)
         r_district = self._next_random(hit)
+        r_bldg_f = self._next_random(hit)
         r_damage = self._next_random(hit)
         r_civilian = self._next_random(hit)
         r_pop = self._next_random(hit)
@@ -1273,6 +1314,9 @@ class SimEconomy:
             dist = rows[r_district[rows] < self._flood_district_p[sev[rows]]]
             if dist.numel():
                 self._pillage_district(dist, tc[dist])
+            bld = rows[r_bldg_f[rows] < self._flood_bldg_p[sev[rows]]]
+            if bld.numel():
+                self._pillage_tile_buildings(bld, tc[bld])
         lo, hi = self._flood_dmg_lo[sev], self._flood_dmg_hi[sev]
         dmg = lo + torch.floor(r_damage * (hi - lo + 1).double()).to(torch.long)
         dmg = torch.where(raw, dmg, torch.zeros_like(dmg))

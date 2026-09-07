@@ -13,7 +13,7 @@ over blizzards.
 
   1. the wire: eight rows in table order, the canonical disc, one start list
      per family off the `sf` plane (ocean = hurricane, grass = tornado)
-  2. a storm tile draws TEN times whatever stands there; a footprint is its
+  2. a storm tile draws ELEVEN times whatever stands there; a footprint is its
      first `hexes` disc slots (1 / 3 / 7 / 19 tiles' worth of draws)
   3. a CAT_5 hurricane hits a hull for 60-80 and a land unit for 40-60;
      CAT_4 spares land; the milder severities spare every unit
@@ -165,11 +165,13 @@ def main() -> int:
     hit = torch.tensor([True])
     s0 = int(sim.rng_state[0])
     sim._storm_tile(hit, torch.tensor([land]), torch.tensor([TOR1]), torch.tensor([False]))
-    assert draws(s0, int(sim.rng_state[0])) == 10, "a storm tile draws TEN times"
+    # improvement, destroy, district, BUILDING, population, civilian, land,
+    # naval, one HP band, and the two fertility yields
+    assert draws(s0, int(sim.rng_state[0])) == 11, "a storm tile draws ELEVEN times"
     put(sim, FOE, land, "WARRIOR")
     s0 = int(sim.rng_state[0])
     sim._storm_tile(hit, torch.tensor([land]), torch.tensor([TOR1]), torch.tensor([False]))
-    assert draws(s0, int(sim.rng_state[0])) == 10, "...whatever stands there"
+    assert draws(s0, int(sim.rng_state[0])) == 11, "...whatever stands there"
     drop(sim, int(sim.military_at[0, land]))
     # a footprint is the first `hexes` slots of the disc: 1 / 3 / 7 / 19 tiles' draws
     centre = None
@@ -183,7 +185,7 @@ def main() -> int:
         sim.storm_event[0, centre] = ev
         s0 = int(sim.rng_state[0])
         sim._storm_turn(hit, torch.tensor([centre]), torch.tensor([False]))
-        assert draws(s0, int(sim.rng_state[0]), 200) == 10 * n, f"{ids[ev]} footprint"
+        assert draws(s0, int(sim.rng_state[0]), 260) == 11 * n, f"{ids[ev]} footprint"
     sim.storm_event[0, centre] = -1
     print("  2 the draws OK — ten per tile, a footprint of 1 / 3 / 7 / 19 tiles")
 
