@@ -9769,6 +9769,20 @@ class SimSeats:
             self._dig_at(dr, a_tile[dr, u], _as)
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
 
+    def _nuke_intercepted(self, row: int, tile: torch.Tensor) -> torch.Tensor:
+        """[B] — is a strike on `tile` STOPPED? `nukeInterceptor`'s twin. CIV6:
+        "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can protect
+        adjacent tiles from nuclear strikes" — the chassis the exporter marks
+        `nukeCover`, at `coverRange`, and hostile to the launcher: a seat never
+        shoots down its own."""
+        cover = (self.pair_dist[tile] <= self._nuke_cover_range)  # [B, T]
+        live = self.unit_alive & (self.unit_tile >= 0)
+        guard = live & self._type_nuke_cover[self.unit_type.clamp(min=0)]
+        guard = guard & (self.unit_seat != int(self._ROW_SEAT[row]))
+        if not bool(guard.any()):
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return (guard & cover.gather(1, self.unit_tile.clamp(min=0))).any(dim=1)
+
     def _detonate(self, fire: torch.Tensor, row: int, k: int, tile: torch.Tensor) -> None:
         """`detonate` — the blast. CIV6 (Nuclear weapons), in the order both
         engines walk it: the declarations first, then the units, then what the
@@ -9786,6 +9800,14 @@ class SimSeats:
         tt = tile.clamp(min=0)
         blast = (self.pair_dist[tt] <= int(self._nuke_radius[k])) & fire.unsqueeze(1)
         self.civ_wmd[:, row, k] = (self.civ_wmd[:, row, k] - fire.long()).clamp(min=0)
+        # CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
+        # protect adjacent tiles from nuclear strikes", and the interception
+        # tests find no roll behind it — a covered target takes nothing, and the
+        # device is spent either way (`nukeInterceptor`).
+        fire = fire & ~self._nuke_intercepted(row, tt)
+        if not bool(fire.any()):
+            return
+        blast = blast & fire.unsqueeze(1)
         u_live = self.unit_alive & (self.unit_tile >= 0)
         u_here = u_live & blast.gather(1, self.unit_tile.clamp(min=0))
         # CIV6: "Using nuclear weapons counts as a declaration of war against

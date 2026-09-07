@@ -3,8 +3,8 @@ import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setTileOwner, civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { detonate, nukeReach, nukeTargets, siloReaches, siloTargets, siloTiles } from '../../../cpu/core/combat';
-import { addWmd, irradiated, nukeBlast, nukeOffers, nukeVictims, wmdHeld } from '../../../cpu/core/nuclear';
-import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE } from '../../../cpu/data/nuclear';
+import { addWmd, irradiated, nukeBlast, nukeInterceptor, nukeOffers, nukeVictims, wmdHeld } from '../../../cpu/core/nuclear';
+import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, NUKE_INTERCEPTORS } from '../../../cpu/data/nuclear';
 import { EMERGENCY_NUCLEAR } from '../../../cpu/data/seats';
 import { wwGet } from '../../../cpu/core/weariness';
 import { UNITS } from '../../../cpu/data/units';
@@ -96,6 +96,47 @@ describe('the blast', () => {
     expect(foe.hp).toBe(1);
     expect(foe.outerHp).toBe(0);
     expect(seatOf(state, 1)!.cities.some((c) => c.id === foe.id)).toBe(true);
+  });
+});
+
+describe('what stops one', () => {
+  it('a covering weapon takes the blast off the map, and spends the device', () => {
+    // CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
+    // protect adjacent tiles from nuclear strikes", and the interception tests
+    // find NO percent chance behind it.
+    const state = world();
+    const at = tileAtCoords(state.map, 10, 8);
+    const victim = spawnUnit(state, 'WARRIOR', at.index, 1)!;
+    const guard = spawnUnit(state, 'MOBILE_SAM',
+      tileAtCoords(state.map, 11, 8).index, 1)!;
+    expect(NUKE_INTERCEPTORS).toContain('MOBILE_SAM');
+    expect(nukeInterceptor(state, 0, at.index)).toBe(guard.id);
+
+    addWmd(state, 0, DEV, 1);
+    detonate(state, 0, DEV, at.index);
+    // the device is spent either way, and the victim is untouched
+    expect(wmdHeld(state, 0, DEV)).toBe(0);
+    expect(state.units.some((u) => u.id === victim.id)).toBe(true);
+    expect(irradiated(state.map.tiles[at.index])).toBe(false);
+  });
+
+  it('a weapon of the LAUNCHER own seat shoots nothing down', () => {
+    const state = world();
+    const at = tileAtCoords(state.map, 10, 8);
+    spawnUnit(state, 'WARRIOR', at.index, 1);
+    spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 11, 8).index, 0);
+    expect(nukeInterceptor(state, 0, at.index)).toBe(-1);
+    addWmd(state, 0, DEV, 1);
+    detonate(state, 0, DEV, at.index);
+    expect(irradiated(state.map.tiles[at.index])).toBe(true);
+  });
+
+  it('a weapon BEYOND the cover range stops nothing', () => {
+    const state = world();
+    const at = tileAtCoords(state.map, 10, 8);
+    spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 13, 8).index, 1);
+    expect(NUKE_COVER_RANGE).toBe(1);
+    expect(nukeInterceptor(state, 0, at.index)).toBe(-1);
   });
 });
 

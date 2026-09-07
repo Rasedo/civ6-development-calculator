@@ -15,7 +15,7 @@ import type { Tile } from '../../world/types';
 import { tilesWithin } from '../../world/hex';
 import { NO_SEAT, seatOf, seatsAllied, tileSeat, unitSeat } from './seats';
 import { getModifiers } from './effects';
-import { NUCLEAR_DEVICES, NUKE_CARRIERS } from '../data/nuclear';
+import { NUCLEAR_DEVICES, NUKE_CARRIERS, NUKE_COVER_RANGE, NUKE_INTERCEPTORS } from '../data/nuclear';
 
 /** how many of device `k` this seat holds. */
 export function wmdHeld(state: GameState, seat: number, k: number): number {
@@ -97,6 +97,41 @@ export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile
     if (s !== seat) out.add(s);
   }
   return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * The weapon that STOPS a strike on `tileIndex`, or none.
+ *
+ * CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
+ * protect adjacent tiles from nuclear strikes" — `NUKE_INTERCEPTORS` at
+ * `NUKE_COVER_RANGE`, read like an anti-air weapon's own cover: one hex out,
+ * and the tile it stands on. The weapon must be HOSTILE to the launcher; a
+ * seat never shoots down its own.
+ *
+ * CIV6 (Gathering Storm interception tests, forums.civfanatics.com/threads/
+ * ...665241, Dec 2020): the tests find NO percent chance, so the protection is
+ * deterministic and the stopped device is lost from the inventory. What those
+ * tests add and the page does not carry — that a silo launch answers to the
+ * Gun AA, the Battleship and the SAM while a submarine launch answers to the
+ * SAM alone, and that a BOMBER's delivery turns on the interception taking it
+ * under 50% HP — needs the interception DAMAGE the install never publishes
+ * (C-34), so the page's own list stands for every delivery.
+ *
+ * Ties: the lowest tile index, then the tile's own occupancy order — the same
+ * total order `airCoverAgainst` walks.
+ */
+export function nukeInterceptor(state: GameState, seat: number, tileIndex: number): number {
+  const at = state.map.tiles[tileIndex];
+  if (!at) return -1;
+  for (const t of tilesWithin(state.map, at.col, at.row, NUKE_COVER_RANGE)) {
+    for (const u of state.units) {
+      if (u.tileIndex !== t.index || u.hp <= 0) continue;
+      if (!NUKE_INTERCEPTORS.includes(u.type)) continue;
+      if (unitSeat(u) === seat) continue;
+      return u.id;
+    }
+  }
+  return -1;
 }
 
 /** CIV6: a device is deployed by "bomber aircraft, Nuclear Submarines, and the

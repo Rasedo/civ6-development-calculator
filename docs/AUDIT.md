@@ -51,7 +51,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
-| C-31 the nuclear strike's last clauses | 1 | 50%-HP interception (sourced, with C-34), citizens killed (C-77), wonder in the blast (ask) |
+| C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed (C-77), wonder in the blast (ask) |
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
@@ -305,12 +305,16 @@ Nothing open.
     own ranged strike composes its defender without the roster's rows
     (`cityStrikeStrength`'s block in `seatPhase`).
 - **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1.
-  - INTERCEPTION. SOURCED (community tests,
-    forums.civfanatics.com/threads/...665241, Dec 2020): no percent roll —
-    an anti-air unit whose interception takes the delivering bomber under
-    50% HP stops the drop and the device is lost; silo launches are stopped
-    by Gun AA, Battleships and Mobile SAM, submarine launches by Mobile SAM
-    only. Buildable as a threshold, shared with C-34's fighter side.
+  - WHICH DELIVERY A COVER STOPS. The page's own rule ships — "Destroyers,
+    Battleships, Missile Cruisers, and Mobile SAMs can protect adjacent
+    tiles from nuclear strikes", deterministically, the device spent either
+    way (`nukeInterceptor` / `_nuke_intercepted`). What the community tests
+    add and no published text carries is the per-DELIVERY split (a silo
+    answering to the Gun AA, the Battleship and the SAM; a submarine to the
+    SAM alone) and the BOMBER's own threshold, its drop stopped when the
+    interception takes it under 50% HP — which needs the interception
+    DAMAGE the install never publishes (C-34). Until that is sourced the
+    page's list answers every delivery alike.
   - THE CITIZENS A BLAST KILLS wait on C-77.
   - A WONDER IN THE BLAST — ask 8.
 - **C-33. THE GIANT DEATH ROBOT'S RANGE.** Weight 1.

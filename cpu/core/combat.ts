@@ -10,7 +10,7 @@ import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE } from '../data/nuclear';
 import { EMERGENCY_NUCLEAR } from '../data/seats';
-import { addWmd, nukeBlast, nukeCarrier, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
+import { addWmd, nukeBlast, nukeCarrier, nukeInterceptor, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
 import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
@@ -2019,6 +2019,14 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
   const tiles = nukeBlast(state, targetIndex, k);
   if (!def || !tiles.length || wmdHeld(state, seat, k) <= 0) return;
   addWmd(state, seat, k, -1);
+  // CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
+  // protect adjacent tiles from nuclear strikes" — and the interception tests
+  // find no roll behind it, so a covered target simply takes nothing. The
+  // device is spent either way.
+  if (nukeInterceptor(state, seat, targetIndex) >= 0) {
+    state.eventLog.push(`${def.name} intercepted.`);
+    return;
+  }
   const victims = nukeVictims(state, seat, tiles);
   for (const v of victims) {
     if (isCiv(v)) { declareWar(state, seat, v); continue; }

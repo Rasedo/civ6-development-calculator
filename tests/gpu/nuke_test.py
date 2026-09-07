@@ -314,6 +314,34 @@ def main() -> int:
         "the delivery costs the carrier its whole turn")
     print(f"  7 the carrier head OK (column {col} -> tile {aim})")
 
+    # --- 8) a covering weapon STOPS the strike -------------------------------
+    # CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
+    # protect adjacent tiles from nuclear strikes", and the interception tests
+    # find NO percent chance behind it. `nukeInterceptor`'s twin.
+    guard_ty = next((i for i, u in enumerate(units) if int(u.get("nukeCover", 0))), -1)
+    assert guard_ty >= 0, "the roster marks no chassis `nukeCover`"
+    s8 = fresh(rules, paths[0])
+    s8.civ_wmd[b, row, 0] = 1
+    vic8 = place_mil(s8, foe, cap1, plain)
+    nb8 = [int(t) for t in s8.neigh[cap1].tolist() if t >= 0]
+    assert nb8, "the rival capital has no neighbour to guard from"
+    g8 = place_mil(s8, foe, nb8[0], guard_ty)
+    s8._eff_version += 1
+    assert bool(s8._nuke_intercepted(row, L(s8, cap1))[b]), "the cover did not answer"
+    s8._detonate(torch.ones(s8.B, dtype=torch.bool), row, 0, L(s8, cap1))
+    assert int(s8.civ_wmd[b, row, 0]) == 0, "the stopped device is spent anyway"
+    assert bool(s8.major_unit_alive[b, vic8]), "the target was hit through its cover"
+    assert bool(s8.major_unit_alive[b, g8]), "the weapon that stopped it died"
+
+    # ...and a weapon of the LAUNCHER's own seat shoots nothing down
+    s9 = fresh(rules, paths[0])
+    s9.civ_wmd[b, row, 0] = 1
+    place_mil(s9, row, nb8[0], guard_ty)
+    s9._eff_version += 1
+    assert not bool(s9._nuke_intercepted(row, L(s9, cap1))[b]), (
+        "a seat shot down its own device")
+    print("  8 interception OK — a hostile cover stops it, the launcher's own does not")
+
     print("BATTERY OK nuke")
     return 0
 
