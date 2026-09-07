@@ -11973,8 +11973,11 @@ class SimSeats:
         # it takes the raider off it.
         if bool((self._type_guards_traders > 0).any()) and row < self.n_majors:
             _gt = self._type_guards_traders
-            _d = self.pair_dist[tiles]                                  # [n, T]
-            _near = _d.gather(1, self.major_unit_tile[bb].clamp(min=0)) <= 1
+            # `pair_dist` is the unbatched [T, T] table, so the Trader's tile
+            # and the unit's tile index it directly — no gather, and nothing
+            # that could pair a selection row with the wrong game.
+            _mt = self.major_unit_tile[bb].clamp(min=0)                 # [n, U]
+            _near = self.pair_dist[tiles.unsqueeze(1), _mt] <= 1
             # 1 guards LAND ground, 2 guards WATER — the Trader's own tile decides
             _want = torch.where(self.water[bb, tiles], 2, 1).unsqueeze(1)
             _guard = (self.major_unit_alive[bb] & _near & (self.major_unit_hp[bb] > 0)
