@@ -23,7 +23,7 @@ import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boos
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentIndex, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
-import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
@@ -2198,6 +2198,7 @@ export function seatPhase(state: GameState): void {
           r.walkTile = next;
           // roads go on LAND only — a sea leg lays nothing
           if (!isWater(state.map.tiles[next])) state.map.tiles[next].road = true;
+          claimTileEnRoute(state, actor.seat, next);
         }
         if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
         else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;

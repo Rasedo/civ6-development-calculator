@@ -65,14 +65,13 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-68 Janissary and Saka Horse Archer | 1 | two chassis rows with their clauses |
 | C-69 five unique rows with trait clauses | 2 | M'banza, Royal Navy Dockyard, Tsikhe, Mission, Cothon, and a strongest-naval-unit picker |
-| C-72 the Cree Trader's claim | 1 | tiles within 3 of a Cree city on the Trader's first entry (sourced) |
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
 | C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
 | C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
-| **C. Absent systems** | **43** | |
-| **OPEN, TOTAL** | **64** | |
+| **C. Absent systems** | **42** | |
+| **OPEN, TOTAL** | **63** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -296,8 +295,8 @@ Nothing open.
     ceiling at Breathtaking; the middle bands are this model's own.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 329 of 343 modifiers and `open: <item>` on 14, each under
-  C-61, C-64, C-67, C-68, C-69, C-72 or B-63r. Unique units are C-78,
+  `shipped` on 330 of 343 modifiers and `open: <item>` on 13, each under
+  C-61, C-64, C-67, C-68, C-69 or B-63r. Unique units are C-78,
   unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
@@ -410,12 +409,6 @@ Nothing open.
   - The Dockyard's granted unit is NAMED by its row on both engines;
     nothing picks the strongest naval unit of a class the way
     `bestTrainableOfClass` picks a land one.
-- **C-72. THE CREE TRADER'S CLAIM.** Weight 1.
-  - SOURCED `EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE`
-    `GainTileRadius: 3` and `LOC_TRAIT_CIVILIZATION_NIHITHAW_DESCRIPTION`:
-    "Unclaimed tiles within 3 tiles of a Cree CITY come under Cree control
-    when a Trader first moves into them" — measured from the city. The
-    route's walk exists; the claim does not. Buildable.
 - **C-74. PER-GAME COUNTS OVER PER-OBJECT ROLLS.** Weight 1.
   - `ERUPTION_CHANCE_PER_VOLCANO` is not covered by the MODERATE / 500
     ruling: the install counts eruptions per GAME, this engine rolls per

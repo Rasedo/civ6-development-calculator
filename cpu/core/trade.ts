@@ -6,7 +6,7 @@
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
@@ -387,6 +387,28 @@ export function specialtyDistricts(state: GameState, city: City): number {
   return city.districts.filter(
     (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
   ).length;
+}
+
+/**
+ * CIV6 (Cree, TRAIT_CIVILIZATION_CREE_TRADE_GAIN_TILES): "Unclaimed tiles
+ * within 3 tiles of a Cree City come under Cree control when a Trader first
+ * moves into them." The radius (`tradeGainTileRadius`,
+ * EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE GainTileRadius 3) is measured
+ * from the CITY, so a long course claims nothing far from home. An owned tile
+ * never changes hands — only unclaimed ground does.
+ */
+export function claimTileEnRoute(state: GameState, seat: number, tileIndex: number): boolean {
+  const radius = getModifiers(state, seat).tradeGainTileRadius;
+  if (radius <= 0) return false;
+  const t = state.map.tiles[tileIndex];
+  if (!t || tileSeat(t) !== NO_SEAT) return false;
+  const near = citiesOf(state, seat).some((c) => {
+    const ctr = state.map.tiles[c.centerIndex];
+    return ctr !== undefined && hexDistance(ctr.col, ctr.row, t.col, t.row) <= radius;
+  });
+  if (!near) return false;
+  setTileOwner(t, seat);
+  return true;
 }
 
 export function routeYields(state: GameState, dest: City): Yields {

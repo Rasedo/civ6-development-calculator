@@ -307,7 +307,7 @@
   "TRAIT_TOURISM_INTO_FAVOR": "shipped",
   "TRAIT_TRADE_FOOD_FROM_CAMPS": "shipped",
   "TRAIT_TRADE_FOOD_FROM_PASTURES": "shipped",
-  "TRAIT_TRADE_GAIN_TILES_EN_ROUTE": "open: C-72 — a Trader claims no tile it walks over on either engine",
+  "TRAIT_TRADE_GAIN_TILES_EN_ROUTE": "shipped",
   "TRAIT_TRADE_GOLD_FROM_CAMPS": "shipped",
   "TRAIT_TRADE_GOLD_FROM_PASTURES": "shipped",
   "TRAIT_TRADING_POST_DIPLO_VISIBILITY": "shipped",

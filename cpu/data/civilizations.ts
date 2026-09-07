@@ -1629,6 +1629,20 @@ export const PARK_APPEAL_ROWS: readonly ParkAppealRow[] = [
   { leader: 'T_ROOSEVELT', amount: 1 },
 ];
 
+/** CIV6 (EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE, GainTileRadius 3 on
+ *  TRAIT_CIVILIZATION_CREE_TRADE_GAIN_TILES): "Unclaimed tiles within 3 tiles
+ *  of a Cree City come under Cree control when a Trader first moves into
+ *  them" — the radius is measured from the CITY, not from the path or the
+ *  route's ends. */
+export interface TradeGainTileRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  radius: number;
+}
+export const TRADE_GAIN_TILE_ROWS: readonly TradeGainTileRow[] = [
+  { civ: 'CREE', radius: 3 },
+];
+
 export const SPY_PROMO_ROWS: readonly SpyPromoRow[] = [
   { leader: 'CATHERINE_DE_MEDICI', promotions: 1 },
 ];

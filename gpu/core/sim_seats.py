@@ -11369,6 +11369,42 @@ class SimSeats:
         tile_min, slot = t.min(dim=1)
         return tile_min < (1 << 30), slot, tile_min
 
+    def _claim_tile_en_route(self, row: int, bb: torch.Tensor, tiles: torch.Tensor,
+                             moved: torch.Tensor) -> None:
+        """`claimTileEnRoute` — CIV6 (Cree): "Unclaimed tiles within 3 tiles of
+        a Cree City come under Cree control when a Trader first moves into
+        them." The radius is measured from the CITY, so a long course claims
+        nothing far from home. An owned tile never changes hands."""
+        if not self._trade_gain_tile_rows or not bool(moved.any()):
+            return
+        rad = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for _rc, _rl, _rr in self._trade_gain_tile_rows:
+            rad = torch.maximum(rad, self._row_is(row, _rc, _rl).long() * _rr)
+        if not bool((rad > 0).any()):
+            return
+        tc = tiles.clamp(min=0)
+        hit = moved & (tiles >= 0) & (rad[bb] > 0) & (self.tile_seat[bb, tc] == NO_SEAT)
+        if not bool(hit.any()):
+            return
+        ctr = self.city_center[:, row]
+        alive = self.city_alive[:, row]
+        near = torch.zeros_like(hit)
+        for _c in range(ctr.shape[1]):
+            _cc = ctr[bb, _c]
+            _ok = alive[bb, _c] & (_cc >= 0)
+            if not bool(_ok.any()):
+                continue
+            _d = self.pair_dist[_cc.clamp(min=0), tc].long()
+            near = near | (_ok & (_d <= rad[bb]))
+        take = hit & near
+        if not bool(take.any()):
+            return
+        # `setTileOwner`'s two halves: a plot changing HANDS drops its LOCK
+        self.tile_locked[bb[take], tiles[take]] = False
+        self.tile_seat[bb[take], tiles[take]] = int(self._ROW_SEAT[row])
+        self.tile_city[bb[take], tiles[take]] = -1
+        self._eff_version += 1
+
     def _route_centres(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, K] (origin centre, dest centre) per route slot, -1 where an
         endpoint no longer names a living city — routeDestCenter plus the
@@ -11451,6 +11487,7 @@ class SimSeats:
                 moved = (nxt != cur) & self.passable[bb, nxt.clamp(min=0)]
                 if bool(moved.any()):
                     self.road[bb[moved], nxt[moved]] = True
+                self._claim_tile_en_route(row, bb, nxt, nxt != cur)
                 new_leg = torch.where((lg == 0) & (nxt == dc[bb, kk]), torch.ones_like(lg),
                                       torch.where((lg == 1) & (nxt == oc[bb, kk]), torch.zeros_like(lg), lg))
                 self.seat_route_leg[bb, row, kk] = new_leg

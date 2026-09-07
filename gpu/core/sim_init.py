@@ -3100,6 +3100,10 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["greatWorkLoyalty"]]  # type: ignore[misc]
         self._park_appeal_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["parkAppeal"]]  # type: ignore[misc]
+        # [civ, leaderRow, radius] — the Cree Trader claims an unclaimed tile
+        # within `radius` of one of its own cities when it steps onto it
+        self._trade_gain_tile_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["tradeGainTile"]]  # type: ignore[misc]
         # [civ, leaderRow, pct, founded]
         self._governor_xp_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["governorXp"]]  # type: ignore[misc]
