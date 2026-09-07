@@ -1425,6 +1425,38 @@ class SimInit:
         self._artifact_prov_w = max(int(rr.get("artifactProvW", self._artifact_slots)), 1)
         self._theming_mult = int(rr["themingMult"])
         self._artist_works = [[int(x) for x in w] for w in rr.get("artistWorks", [])]
+        # GREAT WORKS PER HOLDER: the layout every city's works index into
+        # (`GW_LAYOUT`), each holder's building or wonder column and theming
+        # rule, the slot-type acceptance table and the per-object yields.
+        _gw = rr["greatWorks"]
+        self.GW_W = int(_gw["w"])
+        self._gw_slot_holder = torch.tensor([int(x) for x in _gw["slotHolder"]], dtype=torch.long, device=device)
+        self._gw_slot_type = torch.tensor([int(x) for x in _gw["slotType"]], dtype=torch.long, device=device)
+        self._gw_slot_extra = torch.tensor([int(x) for x in _gw["slotExtraRank"]], dtype=torch.long, device=device)
+        self._gw_holder_bidx = [int(h["bidx"]) for h in _gw["holders"]]
+        self._gw_holder_widx = [int(h["widx"]) for h in _gw["holders"]]
+        self._gw_holder_wonder = [bool(h["wonder"]) for h in _gw["holders"]]
+        self._gw_holder_theme = [int(h["theme"]) for h in _gw["holders"]]
+        self._gw_holder_slots = [int(h["slots"]) for h in _gw["holders"]]
+        self.GW_H = len(self._gw_holder_bidx)
+        self._gw_accepts = torch.tensor([[bool(x) for x in a] for a in _gw["accepts"]], dtype=torch.bool, device=device)
+        self._gw_obj_culture = torch.tensor([float(x) for x in _gw["objCulture"]], dtype=torch.float64, device=device)
+        self._gw_obj_faith = torch.tensor([float(x) for x in _gw["objFaith"]], dtype=torch.float64, device=device)
+        self._gw_obj_tourism = torch.tensor([int(x) for x in _gw["objTourism"]], dtype=torch.long, device=device)
+        self._gw_obj_kind = torch.tensor([int(x) for x in _gw["objKind"]], dtype=torch.long, device=device)
+        self._gw_theming_mult = int(_gw["themingMult"])
+        self._gw_extra_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _gw["extraSlots"]]  # type: ignore[misc]
+        self._gw_auto_theme_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _gw["autoTheme"]]  # type: ignore[misc]
+        assert self.GW_W == self._gw_slot_holder.numel() == self._gw_slot_type.numel() == self._gw_slot_extra.numel(), "great-work layout width"
+        assert self.GW_W > 0 and int(self._gw_slot_holder.max()) < self.GW_H, "great-work layout names a holder off the table"
+        for _h, (_b, _w, _is_w) in enumerate(zip(self._gw_holder_bidx, self._gw_holder_widx, self._gw_holder_wonder)):
+            # a building holder names its `city_bldg` column, or -2 for the
+            # Palace, which the capital flag stands for
+            _col_ok = (_w >= 0 and _b < 0 and _w < max(self._wond_n, 1)) if _is_w else (_w < 0 and (_b == -2 or 0 <= _b < len(rules.b_cost)))
+            assert _col_ok, f"great-work holder {_h} names no catalog column"
+        assert tuple(self._gw_accepts.shape) == (7, 8) and self._gw_obj_kind.numel() == 8, "great-work object tables"
         _ri = rules.improvements or {}
         self._park_min_appeal = int(_ri["parkMinAppeal"])
         self._park_amen_owner = int(_ri["parkAmenitiesOwner"])
