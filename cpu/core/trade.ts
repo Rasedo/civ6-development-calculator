@@ -9,7 +9,7 @@ import { BUILDINGS } from '../data/buildings';
 import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
-import { hexDistance, tilesWithin } from '../../world/hex';
+import { hexDistance, tilesWithin, neighbors } from '../../world/hex';
 import { isCoastalLand, isWater, isMountain } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -17,6 +17,7 @@ import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnU
 import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
+import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
 import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, VENICE_DEST_LUXURY_GOLD } from '../data/cityStates';
@@ -324,6 +325,14 @@ export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_ROAD_MAX_STEPS;
 export function routePlunderer(state: GameState, tileIndex: number, seat: number): number | null {
   if (!state.unitsMode) return null;
   if (goldenDedication(state, seat, DED_COINAGE)) return null;
+  // CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from Plunder"
+  // — a guard of this seat's own on the Trader's tile or beside it.
+  const here = state.map.tiles[tileIndex];
+  if (here) {
+    const near = [here, ...neighbors(state.map, here)];
+    if (state.units.some((g) => g.seat === seat && g.hp > 0
+      && UNITS[g.type]?.guardsTraders && near.some((t) => t.index === g.tileIndex))) return null;
+  }
   let raider: number | null = null;
   for (const u of state.units) {
     if (u.tileIndex !== tileIndex) continue;

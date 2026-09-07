@@ -1183,7 +1183,11 @@ class SimOrders:
                         self.civ_treasury[_r[_lm], row] += _lg[_lm].to(self.dtype)
                     # CIV6: pillaging takes "3 Movement Points, or all of
                     # your movement"; Depredation prices it at 1.
-                    _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")
+                    # CIV6 (Malon Raider): "Pillaging costs 1 Movement" — the
+                    # same discount Depredation gives, on the chassis.
+                    _pc = torch.maximum(
+                        self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP"),
+                        self._type_pillage_cost[utp[_r].clamp(min=0, max=self.NU - 1)])
                     _cost = self._mp_scale * torch.where(_pc > 0, _pc, torch.full_like(_pc, 3))
                     _left = self.unit_mp[_r, sc[_r]]
                     self.unit_mp[_r, sc[_r]] = (_left - _cost).clamp(min=0)

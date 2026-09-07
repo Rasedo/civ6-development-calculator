@@ -1536,7 +1536,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         const hereOwned = raidable(here);
         // CIV6: pillaging takes "3 Movement Points, or all of your movement";
         // Depredation prices it at 1.
-        const pillageCost = promoValue(unit, 'PILLAGE_CHEAP');
+        // CIV6 (Malón Raider): "Pillaging costs 1 Movement" — the same
+        // discount Depredation gives, written on the chassis.
+        const pillageCost = Math.max(promoValue(unit, 'PILLAGE_CHEAP'),
+          UNITS[unit.type]?.pillageCost ?? 0);
         // CIV6 (Loot): "+50 Gold from coastal raids", flat and on top of
         // whatever the wrecked target's own plunder row pays.
         const raidGold = (): void => { actor.treasury += promoValue(unit, 'RAID_GOLD'); };

@@ -150,6 +150,21 @@ export function unitKillEvent(
   // CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories provide
   // Culture/Faith equal to 50% of the Combat Strength of the defeated unit" —
   // a BARBARIAN victim pays too, so this stands above the era-score gate
+  // CIV6 (Mandekalu Cavalry): on a kill, "Gain Gold equal to 100% that unit's
+  // base Combat Strength." (Garde Impériale): "+10 Great General points for
+  // kills." Both are the KILLER chassis's own clause, paid on any victim.
+  if (killer) {
+    const kd = UNITS[killer.type];
+    const ks = seatOf(state, killerSeat);
+    if (ks && kd) {
+      if (kd.killGoldPct) {
+        ks.treasury += Math.floor(((UNITS[victim.type]?.combat ?? 0) * kd.killGoldPct) / 100);
+      }
+      if (kd.generalPointsOnKill) {
+        ks.gpp.GENERAL = (ks.gpp.GENERAL ?? 0) + kd.generalPointsOnKill;
+      }
+    }
+  }
   const rows = getModifiers(state, killerSeat).postCombatYields;
   if (rows.length) {
     const s = seatOf(state, killerSeat);

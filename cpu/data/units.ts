@@ -226,6 +226,83 @@ export interface UnitDef {
   /** CIV6 (Legion): "Can build a Roman Fort" — a Fort in every stat,
    *  laid with the chassis' own charge and no tech. */
   fortBuilder?: boolean;
+
+  // ---- UNIQUE-UNIT ABILITIES (UnitAbilities.xml, one field per clause) ----
+  /** CIV6 (Khevsureti, Highlander): Combat Strength on named ground. The
+   *  install spells each as one ability with its own terrain list. */
+  groundCS?: { amount: number; hills?: boolean; features?: readonly string[] };
+  /** CIV6 (Khevsureti, Ngao Mbeba): "No Movement penalty in X terrain" — the
+   *  named ground costs this chassis a plain move. */
+  ignoresHillCost?: boolean;
+  ignoresWoodsCost?: boolean;
+  /** CIV6 (Hoplite): "+10 Combat Strength if there is at least one Hoplite
+   *  adjacent" — the SAME chassis, this seat's own. */
+  adjacentSameCS?: number;
+  /** CIV6 (Varu, Toa): "Adjacent enemy units receive -5 Combat Strength" — a
+   *  penalty this chassis lays on its neighbours, not a bonus it takes. */
+  adjacentEnemyCS?: number;
+  /** CIV6 (Ngao Mbeba): "+10 Combat Strength when defending against ranged
+   *  units." */
+  defendRangedCS?: number;
+  /** CIV6 (Samurai): "This unit does not suffer combat penalties when
+   *  damaged" — `woundPenalty` reads zero for it. */
+  noWoundPenalty?: boolean;
+  /** CIV6 (Carolean): "+3 Combat Strength per unused Movement." */
+  unusedMoveCS?: number;
+  /** CIV6 (Huszár): "+3 Combat Strength from each active Alliance." */
+  allianceCS?: number;
+  /** CIV6 (Cossack, Malón Raider): Combat Strength within `range` tiles of
+   *  this seat's own territory. The Cossack's "in or adjacent to" is range 1;
+   *  the Raider's "within 4 hexes of friendly territory" is range 4. */
+  nearTerritoryCS?: { amount: number; range: number };
+  /** CIV6 (Garde Impériale): "+10 Combat Strength when on the same continent
+   *  as the Capital." */
+  homeContinentCS?: number;
+  /** CIV6 (Conquistador): "+10 Combat Strength when there is a religious unit
+   *  within one hex." */
+  nearReligiousCS?: number;
+  /** CIV6 (Mountie): "+5 Combat Strength when fighting within 2 tiles of a
+   *  National Park owned by you." */
+  nearParkCS?: number;
+  /** CIV6 (Mamluk): "This unit heals every turn, even after moving or
+   *  combat." */
+  healsAlways?: boolean;
+  /** CIV6 (Cossack): "Can move after attacking." */
+  moveAfterAttack?: boolean;
+  /** CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): "Cannot move and attack in the
+   *  same turn." */
+  noMoveAndShoot?: boolean;
+  /** CIV6 (Warak'aq, ABILITY_EXPERT_MARKSMAN): "+1 additional attack per turn
+   *  if unit has not used all its movement." */
+  extraAttack?: boolean;
+  /** CIV6 (Impi): "+100% Flanking bonus" — a multiplier on the flanking term
+   *  this chassis takes as the attacker. */
+  flankMult?: number;
+  /** CIV6 (Impi): "Earns experience 25% faster" — a multiplier on every
+   *  experience award. */
+  xpRate?: number;
+  /** CIV6 (Okihtcitaw): "Starts with 1 free Promotion." */
+  freePromotions?: number;
+  /** CIV6 (Garde Impériale): "+10 Great General points for kills." */
+  generalPointsOnKill?: number;
+  /** CIV6 (Mandekalu Cavalry): on a kill, "Gain Gold equal to 100% that
+   *  unit's base Combat Strength." */
+  killGoldPct?: number;
+  /** CIV6 (Mountie, ParkCharges): this chassis founds National Parks, the
+   *  Naturalist's own verb, off its own `charges` — the Legion's shape. */
+  parkBuilder?: boolean;
+  /** CIV6 (Keshig): "Can escort moving civilian and support units at their
+   *  higher Movement speed" — the escorted member takes the ESCORT's moves. */
+  escortSpeed?: boolean;
+  /** CIV6 (Malón Raider): "Pillaging costs 1 Movement." */
+  pillageCost?: number;
+  /** CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from
+   *  Plunder." */
+  guardsTraders?: boolean;
+  /** CIV6 (Conquistador): "If this unit captures a city or is adjacent to a
+   *  city when it's captured, the city will automatically convert to the
+   *  Conquistador player's majority Religion." */
+  captureConverts?: boolean;
   description: string;
 }
 
@@ -1449,6 +1526,415 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       upgradesTo: 'KNIGHT',
       uniqueTo: 'SUMERIA',
       description: 'Sumerian Ancient heavy cavalry, available from the start.',
+    }),
+
+    // ================= THE UNIQUE LAND UNITS =================
+    // Every stat below is the install's own row (Units.xml, layered
+    // Base <- Expansion1 <- Expansion2), and every ability is one
+    // UnitAbilities.xml clause. A REPLACEMENT keeps the upgrade target of the
+    // chassis it stands in for — that is what replacing it means for the
+    // ladder; a chassis that replaces nothing takes the install's own
+    // UnitUpgrades row.
+    U({
+      id: 'MAMLUK',
+      name: 'Mamluk',
+      cost: 180,
+      maintenance: 3,
+      moves: 4,
+      combat: 50,
+      cavalry: true,
+      cavalryTag: 'heavy',
+      requiresTech: 'STIRRUPS',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_MAMLUK): "This unit heals every turn, even after moving
+      // or combat."
+      healsAlways: true,
+      upgradesTo: 'CUIRASSIER',
+      uniqueTo: 'ARABIA',
+      replaces: 'KNIGHT',
+      description: 'Arabian Medieval heavy cavalry that heals every turn.',
+    }),
+    U({
+      id: 'MOUNTIE',
+      name: 'Mountie',
+      cost: 290,
+      maintenance: 3,
+      moves: 5,
+      combat: 62,
+      cavalry: true,
+      cavalryTag: 'light',
+      sight: 4,
+      requiresCivic: 'CONSERVATION',
+      // CIV6 (ABILITY_MOUNTIE): "Can create a National Park" (ParkCharges 2)
+      // and "+5 Combat Strength when fighting within 2 tiles of a National
+      // Park owned by you."
+      charges: 2,
+      parkBuilder: true,
+      nearParkCS: 5,
+      uniqueTo: 'CANADA',
+      description: 'Canadian light cavalry that founds National Parks.',
+    }),
+    U({
+      id: 'CROUCHING_TIGER',
+      name: 'Crouching Tiger',
+      cost: 140,
+      maintenance: 3,
+      moves: 2,
+      combat: 30,
+      ranged: { strength: 50, range: 1 },
+      requiresTech: 'MACHINERY',
+      // the install gives it no ResourceCost — the Crossbowman's Niter is
+      // what it is built INSTEAD of, and it replaces nothing.
+      upgradesTo: 'FIELD_CANNON',
+      uniqueTo: 'CHINA',
+      description: 'Chinese Medieval ranged unit, short-ranged and cheap.',
+    }),
+    U({
+      id: 'OKIHTCITAW',
+      name: 'Okihtcitaw',
+      cost: 40,
+      maintenance: 0,
+      moves: 3,
+      combat: 20,
+      recon: true,
+      // CIV6 (ABILITY_CREE_OKIHTCITAW): "Starts with 1 free Promotion."
+      freePromotions: 1,
+      upgradesTo: 'SKIRMISHER',
+      uniqueTo: 'CREE',
+      replaces: 'SCOUT',
+      description: 'Cree recon unit that starts promoted.',
+    }),
+    U({
+      id: 'GARDE_IMPERIALE',
+      name: 'Garde Impériale',
+      cost: 360,
+      maintenance: 5,
+      moves: 2,
+      combat: 70,
+      melee: true,
+      requiresTech: 'MILITARY_SCIENCE',
+      requiresResource: 'NITER',
+      // CIV6 (ABILITY_GARDE): "+10 Combat Strength when on the same continent
+      // as the Capital" and "+10 Great General points for kills."
+      homeContinentCS: 10,
+      generalPointsOnKill: 10,
+      upgradesTo: 'INFANTRY',
+      uniqueTo: 'FRANCE',
+      replaces: 'LINE_INFANTRY',
+      description: 'French Industrial melee unit, strongest at home.',
+    }),
+    U({
+      id: 'KHEVSURETI',
+      name: 'Khevsureti',
+      cost: 160,
+      maintenance: 3,
+      moves: 2,
+      combat: 48,
+      melee: true,
+      requiresTech: 'MILITARY_TACTICS',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_GEORGIAN_KHEVSURETI): "+7 Combat Strength bonus when
+      // fighting in Hill terrain" and "No Movement penalty in Hill terrain."
+      groundCS: { amount: 7, hills: true },
+      ignoresHillCost: true,
+      upgradesTo: 'MUSKETMAN',
+      uniqueTo: 'GEORGIA',
+      replaces: 'MAN_AT_ARMS',
+      description: 'Georgian Medieval melee unit, at home in the hills.',
+    }),
+    U({
+      id: 'HOPLITE',
+      name: 'Hoplite',
+      cost: 65,
+      maintenance: 1,
+      moves: 2,
+      combat: 28,
+      antiCavalry: true,
+      requiresTech: 'BRONZE_WORKING',
+      // CIV6 (ABILITY_HOPLITE): "+10 Combat Strength if there is at least one
+      // Hoplite adjacent."
+      adjacentSameCS: 10,
+      upgradesTo: 'PIKEMAN',
+      uniqueTo: 'GREECE',
+      replaces: 'SPEARMAN',
+      description: 'Greek Ancient anti-cavalry unit, stronger in a line.',
+    }),
+    U({
+      id: 'HUSZAR',
+      name: 'Huszár',
+      cost: 335,
+      maintenance: 5,
+      moves: 5,
+      combat: 65,
+      cavalry: true,
+      cavalryTag: 'light',
+      requiresTech: 'MILITARY_SCIENCE',
+      requiresResource: 'HORSES',
+      // CIV6 (ABILITY_HUSZAR): "+3 Combat Strength from each active Alliance."
+      allianceCS: 3,
+      upgradesTo: 'HELICOPTER',
+      uniqueTo: 'HUNGARY',
+      replaces: 'CAVALRY',
+      description: 'Hungarian light cavalry, stronger with every ally.',
+    }),
+    U({
+      id: 'WARAKAQ',
+      name: "Warak'aq",
+      cost: 165,
+      maintenance: 2,
+      moves: 3,
+      combat: 20,
+      ranged: { strength: 40, range: 1 },
+      recon: true,
+      requiresTech: 'MACHINERY',
+      // CIV6 (ABILITY_EXPERT_MARKSMAN): "+1 additional attack per turn if
+      // unit has not used all its movement."
+      extraAttack: true,
+      upgradesTo: 'RANGER',
+      uniqueTo: 'INCA',
+      replaces: 'SKIRMISHER',
+      description: 'Incan recon skirmisher that can strike twice.',
+    }),
+    U({
+      id: 'VARU',
+      name: 'Varu',
+      cost: 120,
+      maintenance: 3,
+      moves: 2,
+      combat: 40,
+      cavalry: true,
+      cavalryTag: 'heavy',
+      sight: 3,
+      requiresTech: 'HORSEBACK_RIDING',
+      // CIV6 (ABILITY_VARU): "-5 Combat Strength to adjacent enemy units."
+      adjacentEnemyCS: -5,
+      upgradesTo: 'TANK',
+      uniqueTo: 'INDIA',
+      description: 'Indian war elephant; enemies beside it fight weaker.',
+    }),
+    U({
+      id: 'SAMURAI',
+      name: 'Samurai',
+      cost: 160,
+      maintenance: 3,
+      moves: 2,
+      combat: 48,
+      melee: true,
+      requiresCivic: 'FEUDALISM',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_SAMURAI): "This unit does not suffer combat penalties
+      // when damaged."
+      noWoundPenalty: true,
+      upgradesTo: 'MUSKETMAN',
+      uniqueTo: 'JAPAN',
+      replaces: 'MAN_AT_ARMS',
+      description: 'Japanese Medieval melee unit that fights on undiminished.',
+    }),
+    U({
+      id: 'NGAO_MBEBA',
+      name: 'Ngao Mbeba',
+      cost: 110,
+      maintenance: 2,
+      moves: 2,
+      combat: 38,
+      melee: true,
+      requiresTech: 'IRON_WORKING',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_NAGAO): "+10 Combat Strength when defending against
+      // ranged units" and "Can move through Woods and Rainforest without
+      // Movement penalty." (Its "can see through features" half waits on the
+      // sight-blocking this engine does not model yet.)
+      defendRangedCS: 10,
+      ignoresWoodsCost: true,
+      upgradesTo: 'MAN_AT_ARMS',
+      uniqueTo: 'KONGO',
+      replaces: 'SWORDSMAN',
+      description: 'Kongolese shield bearer, hard to shoot and quick in the trees.',
+    }),
+    U({
+      id: 'HWACHA',
+      name: 'Hwacha',
+      cost: 250,
+      maintenance: 3,
+      moves: 2,
+      combat: 45,
+      ranged: { strength: 60, range: 2 },
+      requiresTech: 'GUNPOWDER',
+      // CIV6 (ABILITY_NO_MOVE_AND_SHOOT, CLASS_FIELD_SETUP): "Cannot move and
+      // attack in the same turn."
+      noMoveAndShoot: true,
+      upgradesTo: 'MACHINE_GUN',
+      uniqueTo: 'KOREA',
+      replaces: 'FIELD_CANNON',
+      description: 'Korean rocket artillery that must set up before firing.',
+    }),
+    U({
+      id: 'MANDEKALU_CAVALRY',
+      name: 'Mandekalu Cavalry',
+      cost: 220,
+      maintenance: 4,
+      moves: 4,
+      combat: 55,
+      cavalry: true,
+      cavalryTag: 'heavy',
+      requiresTech: 'STIRRUPS',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_MANDEKALU): "Protects nearby land Trade units from
+      // Plunder" and "Gain Gold equal to 100% that unit's base Combat
+      // Strength" on a kill.
+      guardsTraders: true,
+      killGoldPct: 100,
+      upgradesTo: 'CUIRASSIER',
+      uniqueTo: 'MALI',
+      replaces: 'KNIGHT',
+      description: 'Malian heavy cavalry that guards caravans and takes plunder.',
+    }),
+    U({
+      id: 'TOA',
+      name: 'Toa',
+      cost: 120,
+      maintenance: 2,
+      moves: 2,
+      combat: 38,
+      melee: true,
+      requiresTech: 'CONSTRUCTION',
+      requiresResource: 'IRON',
+      // CIV6 (ABILITY_TOA): "Adjacent enemy units receive -5 Combat Strength."
+      // (Its Pā improvement waits on the unique-infrastructure roster.)
+      adjacentEnemyCS: -5,
+      upgradesTo: 'MAN_AT_ARMS',
+      uniqueTo: 'MAORI',
+      replaces: 'SWORDSMAN',
+      description: 'Māori melee unit; enemies beside it fight weaker.',
+    }),
+    U({
+      id: 'MALON_RAIDER',
+      name: 'Malón Raider',
+      cost: 230,
+      maintenance: 4,
+      moves: 4,
+      combat: 55,
+      cavalry: true,
+      cavalryTag: 'light',
+      requiresTech: 'GUNPOWDER',
+      // CIV6 (ABILITY_MAPUCHE_MALON_RAIDER): "+5 Combat Strength bonus within
+      // 4 hexes of friendly territory" and "Pillaging costs 1 Movement."
+      nearTerritoryCS: { amount: 5, range: 4 },
+      pillageCost: 1,
+      upgradesTo: 'CAVALRY',
+      uniqueTo: 'MAPUCHE',
+      description: 'Mapuche raider that pillages at a walk.',
+    }),
+    U({
+      id: 'KESHIG',
+      name: 'Keshig',
+      cost: 160,
+      maintenance: 3,
+      moves: 4,
+      combat: 35,
+      ranged: { strength: 45, range: 2 },
+      cavalry: true, // CLASS_RANGED_CAVALRY — no light/heavy tag
+      requiresTech: 'STIRRUPS',
+      requiresResource: 'HORSES',
+      // CIV6 (ABILITY_MONGOLIAN_KESHIG): "Can escort moving civilian and
+      // support units at their higher Movement speed."
+      escortSpeed: true,
+      upgradesTo: 'FIELD_CANNON',
+      uniqueTo: 'MONGOLIA',
+      description: 'Mongolian ranged cavalry that carries civilians along.',
+    }),
+    U({
+      id: 'COSSACK',
+      name: 'Cossack',
+      cost: 340,
+      maintenance: 5,
+      moves: 5,
+      combat: 67,
+      cavalry: true,
+      cavalryTag: 'light',
+      requiresTech: 'MILITARY_SCIENCE',
+      requiresResource: 'HORSES',
+      // CIV6 (ABILITY_COSSACK): "Can move after attacking" and "+5 Combat
+      // Strength in or adjacent to your territory."
+      moveAfterAttack: true,
+      nearTerritoryCS: { amount: 5, range: 1 },
+      upgradesTo: 'HELICOPTER',
+      uniqueTo: 'RUSSIA',
+      replaces: 'CAVALRY',
+      description: 'Russian light cavalry, deadliest on its own ground.',
+    }),
+    U({
+      id: 'HIGHLANDER',
+      name: 'Highlander',
+      cost: 380,
+      maintenance: 5,
+      moves: 3,
+      combat: 50,
+      ranged: { strength: 65, range: 1 },
+      recon: true,
+      requiresTech: 'RIFLING',
+      // CIV6 (ABILITY_SCOTTISH_HIGHLANDER): "+5 Combat Strength bonus in
+      // Hills and Forest."
+      // the install's FEATURE_FOREST is this engine's WOODS
+      groundCS: { amount: 5, hills: true, features: ['WOODS'] },
+      upgradesTo: 'SPEC_OPS',
+      uniqueTo: 'SCOTLAND',
+      replaces: 'RANGER',
+      description: 'Scottish ranger, at home in hill and wood.',
+    }),
+    U({
+      id: 'CONQUISTADOR',
+      name: 'Conquistador',
+      cost: 250,
+      maintenance: 4,
+      moves: 2,
+      combat: 58,
+      melee: true,
+      requiresTech: 'GUNPOWDER',
+      requiresResource: 'NITER',
+      // CIV6 (ABILITY_CONQUISTADOR): "+10 Combat Strength when there is a
+      // religious unit within one hex" and a captured city converts to this
+      // seat's majority religion.
+      nearReligiousCS: 10,
+      captureConverts: true,
+      upgradesTo: 'LINE_INFANTRY',
+      uniqueTo: 'SPAIN',
+      replaces: 'MUSKETMAN',
+      description: 'Spanish Renaissance melee unit that converts what it takes.',
+    }),
+    U({
+      id: 'CAROLEAN',
+      name: 'Carolean',
+      cost: 250,
+      maintenance: 3,
+      moves: 3,
+      combat: 55,
+      antiCavalry: true,
+      requiresTech: 'METAL_CASTING',
+      // CIV6 (ABILITY_CAROLEAN): "+3 Combat Strength per unused Movement."
+      unusedMoveCS: 3,
+      upgradesTo: 'AT_CREW',
+      uniqueTo: 'SWEDEN',
+      replaces: 'PIKE_AND_SHOT',
+      description: 'Swedish anti-cavalry unit that fights best standing still.',
+    }),
+    U({
+      id: 'IMPI',
+      name: 'Impi',
+      cost: 125,
+      maintenance: 1,
+      moves: 2,
+      combat: 45,
+      antiCavalry: true,
+      requiresTech: 'MILITARY_TACTICS',
+      // CIV6 (ABILITY_ZULU_IMPI): "+100% Flanking bonus" and "Earns experience
+      // 25% faster."
+      flankMult: 2,
+      xpRate: 1.25,
+      upgradesTo: 'PIKE_AND_SHOT',
+      uniqueTo: 'ZULU',
+      replaces: 'PIKEMAN',
+      description: 'Zulu anti-cavalry unit that flanks twice as hard.',
     }),
   ].map((u) => [u.id, u]),
 );

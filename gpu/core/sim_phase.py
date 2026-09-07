@@ -131,7 +131,7 @@ class SimPhase:
         def_hp = self.unit_hp[bidx, ds0]
         # a CITY STRIKE is a ranged attack, and "ranged attacks ignore any
         # Support received by the defender"
-        def_e = def_cs - self._wound(def_hp)
+        def_e = def_cs - self._wound(def_hp, d_type)
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
         _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)

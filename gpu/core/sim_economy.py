@@ -3899,7 +3899,11 @@ class SimEconomy:
         spends an aircraft's turn, so a spent attack excuses the spent movement.
         The fortify gate keeps `_spent_mp` itself — no aircraft digs in."""
         struck = getattr(self, f"{pre}_unit_attacks") < self._full_attacks(pre)
-        return self._spent_mp(pre) & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK"))
+        # CIV6 (Mamluk): "This unit heals every turn, even after moving or
+        # combat" — the rest gate does not reach that chassis at all.
+        _t = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return (self._spent_mp(pre) & ~self._type_heals_always[_t]
+                & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK")))
 
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
@@ -4026,8 +4030,11 @@ class SimEconomy:
         additional attack per turn if unit has not moved", whose own note reads
         it as "the unit cannot make the additional attack if it moves AFTER
         making its first attack. It can still move BEFORE it attacks"."""
+        # CIV6 (Warak'aq, ABILITY_EXPERT_MARKSMAN): the still-bonus, written on
+        # the chassis instead of on a promotion.
         return (self._attacks_after_moving(utype, promos)
-                + self._promo_val(utype, promos, "EXTRA_ATTACK_STILL"))
+                + self._promo_val(utype, promos, "EXTRA_ATTACK_STILL")
+                + self._type_extra_attack[utype.clamp(min=0, max=self.NU - 1)].long())
 
     def _step_attacks_left(self, utype: torch.Tensor, promos: torch.Tensor,
                            left: torch.Tensor) -> torch.Tensor:

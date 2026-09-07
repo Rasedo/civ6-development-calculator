@@ -502,7 +502,10 @@ class SimMasks:
         this unit was GRANTED last refresh, not its type's base moves.
         CIV6 (Expert Crew): "Can attack after moving" lifts the gate outright."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-        return ((self._type_bombard[typ] <= 0) | ~self._spent_mp(pre)
+        # CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): the same gate, on a chassis
+        # that carries no Bombard Strength.
+        return (((self._type_bombard[typ] <= 0) & ~self._type_no_move_shoot[typ])
+                | ~self._spent_mp(pre)
                 | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
                 | (self._full_mp(pre) > self._mp_scale * self._type_moves[typ]))
 
@@ -565,12 +568,21 @@ class SimMasks:
         base = self._type_ranged_strength[t].double() + beam - pen
         return torch.where(self._type_bombard[t] > 0, self._type_bombard[t].double(), base)
 
-    def _wound(self, hp: torch.Tensor) -> torch.Tensor:
+    def _wound(self, hp: torch.Tensor, types: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6: "Damage of wounded units is diminished... The formula is
         `round(10 - HP/10)`". The `woundPenalty` twin, RELIGIOUS Strength
         included. hp is a unit-HP tensor; cities / city-states / walls are NOT
-        units and never pass through here."""
-        return js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
+        units and never pass through here.
+
+        CIV6 (Samurai): "This unit does not suffer combat penalties when
+        damaged" — the curve reads zero for that chassis. `types` is the
+        chassis at each slot; the callers that hold no type pass none, and a
+        build whose roster carries the clause must pass it."""
+        w = js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
+        if types is None:
+            return w
+        return torch.where(self._type_no_wound[types.clamp(min=0, max=self.NU - 1)],
+                           torch.zeros_like(w), w)
 
     # ---- PROMOTIONS ------------------------------------------------------
     # `promoCS` and its siblings, one body each. A unit's `promos` is a bitmask
@@ -870,9 +882,12 @@ class SimMasks:
         pct: torch.Tensor, mult: torch.Tensor,
     ) -> torch.Tensor:
         adds = (XP_RANGED_BATTLE if ranged else XP_MELEE_BATTLE) + (XP_INITIATOR if initiated else 0)
-        num = (foe_cs * torch.where(foe_died, 2, 1) + adds * own_cs) * (100 + pct) * mult
-        den = (own_cs * 100).clamp(min=1)
-        out = torch.div(2 * num + den, 2 * den, rounding_mode="floor")
+        # `mult` may be FRACTIONAL (the Impi's 1.25), so the division runs in
+        # f64 and floors exactly as TS's `Math.floor` does — every quantity
+        # here is a small integer, which f64 carries exactly.
+        num = ((foe_cs * torch.where(foe_died, 2, 1) + adds * own_cs) * (100 + pct)).double() * mult.double()
+        den = (own_cs * 100).clamp(min=1).double()
+        out = torch.floor((2 * num + den) / (2 * den)).long()
         return torch.where(own_cs > 0, out.clamp(max=XP_BATTLE_CAP), torch.zeros_like(out))
 
     def _city_xp(self, base: torch.Tensor, pct: torch.Tensor, mult: torch.Tensor) -> torch.Tensor:
@@ -908,6 +923,9 @@ class SimMasks:
         mult = self._recon_xp_mult(own_seat, own_type, rows)
         if initiated:
             mult = mult * self._suz_xp_mult(own_seat, rows)
+        # CIV6 (Impi): "Earns experience 25% faster" — the chassis's own rate,
+        # a FRACTION, so the product leaves the integer lane here.
+        mult = mult.double() * self._type_xp_rate[own_type.clamp(min=0, max=self.NU - 1)]
         g = self._battle_xp(own_cs, foe_cs, foe_died=foe_died, ranged=ranged,
                             initiated=initiated, pct=own_pct, mult=mult)
         vet = foe_is_barb & (own_level >= 2)
@@ -1491,7 +1509,7 @@ class SimMasks:
         if self.n_governors:
             for _g in range(self.n_majors):
                 _gov = _gov + (seat == _g).double() * self._governor_tile_sum(_g, "theologyCS").gather(1, _t1).squeeze(1)
-        base = (self._rel_strength[utype.clamp(min=0)] - self._wound(hp)
+        base = (self._rel_strength[utype.clamp(min=0)] - self._wound(hp, utype)
                 + self._promo_val(utype, promos, "RELIG_CS")
                 + self._congress_relig_cs(seat)
                 + (_card + _gov).to(self._rel_strength.dtype))
@@ -1601,11 +1619,16 @@ class SimMasks:
         tm = self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1)
         if utype is not None and promos is not None:
             d1 = dc.unsqueeze(1)
+            # CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the
+            # CHASSIS instead of on a promotion.
+            _ut0 = utype.clamp(min=0, max=self.NU - 1)
             hill = self.hills.gather(1, d1).squeeze(1)
-            tm = tm - (hill & self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS")).long() * self._mp_scale
+            _hw = self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS") | self._type_no_hill_cost[_ut0]
+            tm = tm - (hill & _hw).long() * self._mp_scale
             if self._woods_feats.numel():
                 wood = self._feature_live(d1, self._woods_feats).squeeze(1)
-                tm = tm - (wood & self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS")).long() * self._mp_scale
+                _ww = self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS") | self._type_no_woods_cost[_ut0]
+                tm = tm - (wood & _ww).long() * self._mp_scale
             tm = tm.clamp(min=0)
         fc, dcc = frm.clamp(min=0).unsqueeze(1), dest.clamp(min=0).unsqueeze(1)
         f_rr = self.railroad.gather(1, fc).squeeze(1)
@@ -2154,13 +2177,14 @@ class SimMasks:
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.
-        if free_promo is None:
-            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
-        else:
-            _cls = self.rules_dev.u_promo_class[type_idx[rows].clamp(min=0)]
-            getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(
-                free_promo[rows] & (_cls >= 0),
-                self._xp_to_next(torch.ones_like(slot)), torch.zeros_like(slot))
+        # CIV6 (Okihtcitaw): "Starts with 1 free Promotion" — the same shape,
+        # written on the CHASSIS instead of on the training city's building.
+        _cls = self.rules_dev.u_promo_class[type_idx[rows].clamp(min=0)]
+        _chassis_free = self._type_free_promos[type_idx[rows].clamp(min=0, max=self.NU - 1)] > 0
+        _free = _chassis_free if free_promo is None else (free_promo[rows] | _chassis_free)
+        getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(
+            _free & (_cls >= 0),
+            self._xp_to_next(torch.ones_like(slot)), torch.zeros_like(slot))
         getattr(self, f"{pre}_unit_level")[rows, slot] = 1
         getattr(self, f"{pre}_unit_promos")[rows, slot] = 0
         getattr(self, f"{pre}_unit_promo_offer")[rows, slot] = 0
@@ -2498,10 +2522,14 @@ class SimMasks:
     def _park_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the PARK column: a Naturalist standing on a tile that
         anchors at least one legal rhombus."""
-        if getattr(self, "_naturalist_idx", -1) < 0:
+        _u0 = utype.clamp(min=0, max=self.NU - 1)
+        _may = self._type_park_builder[_u0]
+        if getattr(self, "_naturalist_idx", -1) >= 0:
+            _may = _may | (utype == self._naturalist_idx)
+        if not bool(_may.any()):
             return torch.zeros_like(tc, dtype=torch.bool)
         legal = self._park_cluster_legal(row, self._park_cluster(tc)).any(dim=2)
-        return (utype == self._naturalist_idx) & legal
+        return _may & legal
 
     def _golden_ded_table(self, kind: int) -> torch.Tensor:
         """[B, n_majors] bool — which civs are in a GOLDEN age holding `kind`."""

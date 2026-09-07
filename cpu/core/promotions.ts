@@ -11,7 +11,7 @@ import {
   PROMOTIONS, PROMO_INDEX, PROMO_OFFER_DRAW, UNIT_PROMO_CLASS, classBitOf, promoRows,
   type PromoDef, type PromoKind,
 } from '../data/promotions';
-import { UNIT_HP } from '../data/units';
+import { UNIT_HP, UNITS } from '../data/units';
 import { nextRandom } from './rand';
 
 /** CIV6: "A unit will require an amount of XP equal to 15 times the level it
@@ -101,7 +101,10 @@ export function bankXp(unit: Unit, amount: number): void {
  *  it attacks" — so the bonus is handed out at the refresh, survives a step
  *  taken before any blow, and `stepAttacksLeft` revokes it after one. */
 export function attacksPerTurn(unit: { type: string; promos?: number }): number {
-  return attacksAfterMoving(unit) + promoValue(unit, 'EXTRA_ATTACK_STILL');
+  // CIV6 (Warak'aq, ABILITY_EXPERT_MARKSMAN): "+1 additional attack per turn
+  // if unit has not used all its movement" — the still-bonus, on the chassis.
+  return attacksAfterMoving(unit) + promoValue(unit, 'EXTRA_ATTACK_STILL')
+    + (UNITS[unit.type]?.extraAttack ? 1 : 0);
 }
 
 /** CIV6 (Sweeping Wind / Elite Guard / Breakthrough): "+1 additional attack

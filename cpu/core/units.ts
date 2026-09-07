@@ -43,7 +43,7 @@ import {
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
-  promoValue, promoValueFor, stepAttacksLeft,
+  promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
@@ -206,8 +206,10 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   // CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
   // with the appropriate terrain or terrain feature at the cost of only 1
   // Movement". Ranger names Woods and Jungle; Marsh is nobody's.
-  const hills = !mover || !promoFlag(mover, 'TERRAIN_MOVE_HILLS');
-  const woods = !mover || !promoFlag(mover, 'TERRAIN_MOVE_WOODS');
+  // CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the CHASSIS
+  // instead of on a promotion.
+  const hills = !mover || (!promoFlag(mover, 'TERRAIN_MOVE_HILLS') && !UNITS[mover.type]?.ignoresHillCost);
+  const woods = !mover || (!promoFlag(mover, 'TERRAIN_MOVE_WOODS') && !UNITS[mover.type]?.ignoresWoodsCost);
   if (tile.elevation === 'HILLS' && hills) cost += MP_SCALE;
   if (tile.feature === 'MARSH') cost += MP_SCALE;
   else if ((tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') && woods) cost += MP_SCALE;
@@ -1004,7 +1006,10 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.
   const riders = escortRiders(state, unit);
-  const riderFree = riders.length > 0 && promoFlag(unit, 'ESCORT_SPEED');
+  // CIV6 (Keshig): "Can escort moving civilian and support units at their
+  // higher Movement speed" — Escort Mobility's clause, on the chassis.
+  const riderFree = riders.length > 0
+    && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
   for (const rider of riders) {
     if (!tileFreeForUnit(state, to.index, seat, rider, true)) return 'blocked';
     const rFull = rider.movesFull ?? unitFullMoves(state, rider);
@@ -1405,7 +1410,10 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
 export function naturalistPark(state: GameState, unitId: number, seat: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit || unit.seat !== seat) return no('No such unit.');
-  if (!UNITS[unit.type]?.naturalist) return no('Only a Naturalist can designate a park.');
+  // CIV6 (Mountie): "Can create a National Park" — the Naturalist's verb, on
+  // a chassis that spends a CHARGE for it and rides on.
+  const pdef = UNITS[unit.type];
+  if (!pdef?.naturalist && !pdef?.parkBuilder) return no('This unit cannot designate a park.');
   const here = state.map.tiles[unit.tileIndex];
   if (!here) return no('No such tile.');
   // The anchor's own neighbours, in TILE order, are the candidate partners;
@@ -1416,7 +1424,13 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
     // the cluster comes back SORTED, so its first tile is the anchor both
     // engines name the park by.
     for (const i of cluster) state.map.tiles[i].park = cluster[0];
-    disbandUnit(state, unit.id);
+    if (pdef.parkBuilder) {
+      unit.charges = Math.max(0, (unit.charges ?? 0) - 1);
+      unit.movesLeft = 0;
+      if (unit.charges <= 0) disbandUnit(state, unit.id);
+    } else {
+      disbandUnit(state, unit.id);
+    }
     state.eventLog.push('A National Park was designated.');
     return ok;
   }
@@ -1678,6 +1692,16 @@ export function spawnUnit(
   // FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
   if (capsOf(seat).xp) unit.xp = 0;
+  // CIV6 (Okihtcitaw): "Starts with 1 free Promotion" — the unit is born with
+  // the experience its first level costs, so the engine's own promotion offer
+  // reaches it at the next opening. The Spy's `spyPromos` is the same shape:
+  // a LEVEL at birth, never a drawn card (which would move the RNG stream).
+  const freeP = def.freePromotions ?? 0;
+  if (freeP > 0 && capsOf(seat).xp) {
+    let owed = 0;
+    for (let l = 1; l <= freeP; l++) owed += XP_PER_LEVEL * l;
+    unit.xp = owed;
+  }
   state.units.push(unit);
   revealAround(state, seat, unit.tileIndex, unitSight(unit));
   // Track the strongest MELEE unit each civ has ever fielded —
@@ -1829,7 +1853,10 @@ export function refreshUnits(state: GameState): void {
     // on the bomber's list alone, and a sortie is the only thing that spends an
     // aircraft's turn, so a spent attack excuses the spent movement. The
     // fortify gate below keeps the plain reading — no aircraft digs in.
+    // CIV6 (Mamluk): "This unit heals every turn, even after moving or
+    // combat" — the rest gate does not apply to that chassis at all.
     const rested = unit.movesLeft >= grantedLast
+      || !!UNITS[unit.type]?.healsAlways
       || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'));
     if (rested && !starved && !healBlocked) {
       const home = ownGround;

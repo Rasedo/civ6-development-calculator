@@ -66,7 +66,13 @@ describe('the wire', () => {
     // the LIGHT half is what People of the Steppe copies; a chariot archer is
     // PROMOTION_CLASS_RANGED in the install and carries no tag
     const light = Object.values(UNITS).filter((u) => isLightCavalry(u)).map((u) => u.id).sort();
-    expect(light).toEqual(['CAVALRY', 'COURSER', 'HELICOPTER', 'HORSEMAN']);
+    expect(light).toEqual([
+      'CAVALRY', 'COSSACK', 'COURSER', 'HELICOPTER', 'HORSEMAN', 'HUSZAR',
+      'MALON_RAIDER', 'MOUNTIE',
+    ]);
+    // the ranged-cavalry Keshig is PROMOTION_CLASS_RANGED in the install and
+    // carries no light/heavy tag, exactly as the two chariot archers do not
+    expect(isLightCavalry(UNITS.KESHIG)).toBe(false);
     expect(isLightCavalry(UNITS.KNIGHT)).toBe(false);
     expect(isLightCavalry(UNITS.WAR_CART)).toBe(false);
     expect(isLightCavalry(UNITS.MARYANNU_CHARIOT_ARCHER)).toBe(false);

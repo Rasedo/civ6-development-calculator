@@ -19,6 +19,7 @@ import type { PlunderRow, ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
+import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, VENICE_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
@@ -1494,10 +1495,43 @@ export function buildRules() {
       fortBuilder: u.fortBuilder ? 1 : 0,
       trader: u.trader ? 1 : 0,
       naturalist: u.naturalist ? 1 : 0,
+      // ---- the UNIQUE-UNIT ability clauses, one column apiece ----
+      groundCs: u.groundCS?.amount ?? 0,
+      groundHills: u.groundCS?.hills ? 1 : 0,
+      groundFeat: (u.groundCS?.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
+      noHillCost: u.ignoresHillCost ? 1 : 0,
+      noWoodsCost: u.ignoresWoodsCost ? 1 : 0,
+      adjSameCs: u.adjacentSameCS ?? 0,
+      adjEnemyCs: u.adjacentEnemyCS ?? 0,
+      defRangedCs: u.defendRangedCS ?? 0,
+      noWound: u.noWoundPenalty ? 1 : 0,
+      unusedMoveCs: u.unusedMoveCS ?? 0,
+      allianceCs: u.allianceCS ?? 0,
+      nearTerrCs: u.nearTerritoryCS?.amount ?? 0,
+      nearTerrRange: u.nearTerritoryCS?.range ?? 0,
+      homeContCs: u.homeContinentCS ?? 0,
+      nearRelCs: u.nearReligiousCS ?? 0,
+      nearParkCs: u.nearParkCS ?? 0,
+      healsAlways: u.healsAlways ? 1 : 0,
+      moveAfterAttack: u.moveAfterAttack ? 1 : 0,
+      noMoveShoot: u.noMoveAndShoot ? 1 : 0,
+      extraAttack: u.extraAttack ? 1 : 0,
+      flankMult: u.flankMult ?? 1,
+      xpRate: u.xpRate ?? 1,
+      freePromos: u.freePromotions ?? 0,
+      killGpGeneral: u.generalPointsOnKill ?? 0,
+      killGoldPct: u.killGoldPct ?? 0,
+      parkBuilder: u.parkBuilder ? 1 : 0,
+      escortSpeed: u.escortSpeed ? 1 : 0,
+      pillageCost: u.pillageCost ?? 0,
+      guardsTraders: u.guardsTraders ? 1 : 0,
+      captureConverts: u.captureConverts ? 1 : 0,
     })),
     uniques: {
       civs: CIV_IDS,
       openTerrains: OPEN_TERRAINS.map((t) => TERRAIN_IDS.indexOf(t)),
+      // CIV6 (Mountie): "within 2 tiles of a National Park."
+      parkCsRange: MOUNTIE_PARK_RANGE,
       coastTerrain: TERRAIN_IDS.indexOf('COAST'),
       abilities: {
         iteruProdMult: ITERU_RIVER_PROD_MULT,

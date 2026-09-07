@@ -26,7 +26,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody } from './units';
+import { drawAndPayGoody, unitReligious } from './units';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -46,6 +46,7 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
+import { seatsAllied } from './seats';
 import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
@@ -114,9 +115,102 @@ export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
  * theological combat. Cities / city-states / walls are not units and never call
  * this.
  */
-export function woundPenalty(unit: { hp: number }): number {
+/** CIV6 (Samurai): "This unit does not suffer combat penalties when damaged" —
+ *  the wound curve reads zero for that chassis, attacking and defending. */
+export function woundPenalty(unit: { hp: number; type?: string }): number {
+  if (unit.type !== undefined && UNITS[unit.type]?.noWoundPenalty) return 0;
   return Math.round(10 - Math.max(0, unit.hp) / (UNIT_HP / 10));
 }
+
+/** CIV6 (Impi): "+100% Flanking bonus" — the chassis's own multiplier on the
+ *  flanking term, beside the promotion's. */
+export function chassisFlankMult(u: { type: string }): number {
+  return UNITS[u.type]?.flankMult ?? 1;
+}
+
+/**
+ * EVERY POSITION-DEPENDENT UNIQUE-UNIT CLAUSE, in one composer. Each term is
+ * one UnitAbilities.xml ability, and each is read at the tile the unit FIGHTS
+ * FROM — the same tile `cavalryHillCS` and `generalAuraCS` read. `ranged` says
+ * the unit is defending against a ranged strike, which one clause needs.
+ */
+export function chassisAbilityCS(
+  state: GameState,
+  u: { type: string; seat: number; movesLeft?: number },
+  atTile: number,
+  ctx?: { defendingRanged?: boolean },
+): number {
+  const def = UNITS[u.type];
+  if (!def) return 0;
+  const tile = state.map.tiles[atTile];
+  if (!tile) return 0;
+  let out = 0;
+  // CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
+  if (def.groundCS) {
+    const g = def.groundCS;
+    if ((g.hills && tile.elevation === 'HILLS')
+      || (g.features && tile.feature !== null && g.features.includes(tile.feature))) {
+      out += g.amount;
+    }
+  }
+  // CIV6 (Hoplite): "if there is at least one Hoplite adjacent" — this seat's
+  // own, the same chassis, once however many stand there.
+  if (def.adjacentSameCS) {
+    for (const n of neighbors(state.map, tile)) {
+      if (state.units.some((o) => o.tileIndex === n.index && o.seat === u.seat
+        && o.type === u.type && o.hp > 0)) { out += def.adjacentSameCS; break; }
+    }
+  }
+  // CIV6 (Varu, Toa): the penalty an adjacent enemy carrier lays on this unit.
+  // The install's tooltip states it as a condition, not a stack, so a second
+  // carrier beside the same tile adds nothing. HOSTILITY is the engine's own
+  // `unitsHostile`, which a war matrix alone cannot express: a barbarian needs
+  // no declaration, and neither does a Free City.
+  outer: for (const n of neighbors(state.map, tile)) {
+    for (const o of state.units) {
+      if (o.tileIndex !== n.index || o.hp <= 0) continue;
+      const pen = UNITS[o.type]?.adjacentEnemyCS ?? 0;
+      if (pen === 0 || !unitsHostile(state, u, o)) continue;
+      out += pen;
+      break outer;
+    }
+  }
+  // CIV6 (Ngao Mbeba): "+10 Combat Strength when defending against ranged units."
+  if (def.defendRangedCS && ctx?.defendingRanged) out += def.defendRangedCS;
+  // CIV6 (Carolean): "+3 Combat Strength per unused Movement."
+  if (def.unusedMoveCS) out += def.unusedMoveCS * Math.floor(Math.max(0, u.movesLeft ?? 0) / MP_SCALE);
+  // CIV6 (Huszár): "+3 Combat Strength from each active Alliance."
+  if (def.allianceCS) {
+    let n = 0;
+    for (const o of state.seats) if (o.seat !== u.seat && seatsAllied(state, u.seat, o.seat)) n += 1;
+    out += def.allianceCS * n;
+  }
+  // CIV6 (Cossack, Malón Raider): Combat Strength near this seat's own ground.
+  if (def.nearTerritoryCS) {
+    const { amount, range } = def.nearTerritoryCS;
+    if (tilesWithin(state.map, tile.col, tile.row, range).some((t) => tileSeat(t) === u.seat)) out += amount;
+  }
+  // CIV6 (Garde Impériale): "+10 Combat Strength when on the same continent as
+  // the Capital."
+  if (def.homeContinentCS && onHomeContinent(state, u.seat, atTile)) out += def.homeContinentCS;
+  // CIV6 (Conquistador): "+10 Combat Strength when there is a religious unit
+  // within one hex" — this seat's own missionary, apostle or inquisitor.
+  if (def.nearReligiousCS) {
+    const near = [tile, ...neighbors(state.map, tile)];
+    if (state.units.some((o) => o.seat === u.seat && o.hp > 0 && unitReligious(o.type)
+      && near.some((t) => t.index === o.tileIndex))) out += def.nearReligiousCS;
+  }
+  // CIV6 (Mountie): "+5 Combat Strength when fighting within 2 tiles of a
+  // National Park owned by you."
+  if (def.nearParkCS) {
+    if (tilesWithin(state.map, tile.col, tile.row, MOUNTIE_PARK_RANGE)
+      .some((t) => (t.park ?? -1) >= 0 && tileSeat(t) === u.seat)) out += def.nearParkCS;
+  }
+  return out;
+}
+
+/** CIV6 (Mountie): "within 2 tiles of a National Park." */
+export const MOUNTIE_PARK_RANGE = 2;
 
 // flanking & support. Real Civ 6: a melee attacker gains +2 CS per
 // OTHER unit adjacent to the defender that is hostile to the defender
@@ -166,7 +260,10 @@ export function trainXpPct(
 function xpMult(state: GameState, unit: Unit, initiated: boolean): number {
   const recon = UNITS[unit.type]?.recon ? getModifiers(state, unitSeat(unit)).reconXpMult : 1;
   const kabul = initiated && suzerainEffect(state, unitSeat(unit), 'xpDouble') ? KABUL_XP_MULT : 1;
-  return recon * kabul;
+  // CIV6 (Impi): "Earns experience 25% faster" — the chassis's own rate, over
+  // every award the same way the recon card's is.
+  const chassis = UNITS[unit.type]?.xpRate ?? 1;
+  return recon * kabul * chassis;
 }
 
 /** may this unit bank XP at all? Barbarians have no promotions in Civ 6
@@ -651,6 +748,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     (vs ? holdTheLineCS(state, defender, defTileIndex, vs.attacker.type) : 0) +
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
     cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
+    chassisAbilityCS(state, defender, defTileIndex, { defendingRanged: vs ? !vs.melee : false }) +
     generalAuraCS(state, defender, defTileIndex) + // Great General/Admiral aura
     (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat)
       + visibilityCS(state, defender.seat, vs.attacker.seat)
@@ -785,7 +883,9 @@ export function siegeAssist(state: GameState, attacker: Unit, targetIndex: numbe
  */
 export function siegeMayShoot(state: GameState, unit: Unit): boolean {
   const def = UNITS[unit.type];
-  if (def?.bombard === undefined) return true;
+  // CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): "Cannot move and attack in the
+  // same turn" — the siege rule, written on a chassis that carries no Bombard.
+  if (def?.bombard === undefined && !def?.noMoveAndShoot) return true;
   // CIV6 (Expert Crew): "Can attack after moving."
   if (promoFlag(unit, 'SIEGE_MOVE_SHOOT')) return true;
   if (unit.movesLeft >= grantedMoves(state, unit)) return true;
@@ -1076,6 +1176,7 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
       ? religionAttackCS(state, attacker, targetIndex)
       : 0) +
     cavalryHillCS(state, attacker, attacker.tileIndex) + // Preslav's suzerain
+    chassisAbilityCS(state, attacker, attacker.tileIndex) +
     generalAuraCS(state, attacker, attacker.tileIndex) +
     gdrBeamCS(state, attacker) + // the beam "applies to both melee and ranged attacks"
     congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
@@ -1467,7 +1568,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return ok;
     }
   } else {
-    const atkCSf = atkCS + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * flankCount(state, targetIndex, attacker)
+    const atkCSf = atkCS + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),
         UNITS[attacker.type]?.naval ? 'flankPctNaval' : 'flankPctLand') / 100)
       + promoCS(attacker, {
@@ -1477,7 +1578,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
         tile: from,
       })
       + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
-      + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+      + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
       + classMatchupCS(attacker.type, defender.type)
       + emergencyAttackCS(state, attacker.seat, defender.seat) // an emergency MEMBER hits its target harder
       + barbarianCombatCS(state, attacker.seat, defender.seat)
@@ -1756,7 +1857,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rng', targetIndex);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
@@ -1777,7 +1878,10 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
  *  `endsTurn` is the city / district / air path, which stops a unit dead. */
 function spendAttack(unit: Unit, endsTurn = false): void {
   unit.attacksLeft = Math.max(0, attacksLeftOf(unit) - 1);
-  if (endsTurn || !promoFlag(unit, 'MOVE_AFTER_ATTACK')) unit.movesLeft = 0;
+  // CIV6 (Cossack): "Can move after attacking" — the promotion's clause,
+  // written on the chassis.
+  const keeps = promoFlag(unit, 'MOVE_AFTER_ATTACK') || !!UNITS[unit.type]?.moveAfterAttack;
+  if (endsTurn || !keeps) unit.movesLeft = 0;
 }
 
 
@@ -1863,7 +1967,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemies.length === 0) return false; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
@@ -2093,10 +2197,27 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City):
       if (tier > (attacker.formation ?? 0)) attacker.formation = tier;
     }
     transferCity(state, holder.seat, captor, city, 'conquered');  // pays the plunder itself
+    conquistadorConvert(state, attacker, city);
   } else {
     sackCity(state, city, holder.seat);
     state.eventLog.push(`Barbarians sacked ${city.name} (${holder.name}).`);
   }
+}
+
+/** CIV6 (Conquistador): "If this unit captures a city or is adjacent to a
+ *  city when it's captured, the city will automatically convert to the
+ *  Conquistador player's majority Religion." The captor's OWN founded
+ *  religion is what this engine can name today — a per-seat MAJORITY read is
+ *  its own open item, and until it lands a seat that founded nothing converts
+ *  nothing. */
+export function conquistadorConvert(state: GameState, captor: Unit, city: City): void {
+  const own = seatOf(state, captor.seat);
+  if (!own?.religion.founded) return;
+  const here = state.map.tiles[city.centerIndex];
+  const near = [here, ...neighbors(state.map, here)];
+  const has = state.units.some((u) => u.seat === captor.seat && u.hp > 0
+    && UNITS[u.type]?.captureConverts && near.some((t) => t.index === u.tileIndex));
+  if (has) city.followedReligion = captor.seat;
 }
 
 function attackCityState(state: GameState, attacker: Unit, cityState: CityState): void {

@@ -35,14 +35,14 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
-| B-56r inert promotions | 1 | Sentry needs sight-blocking; Ground Crews needs PATROL (C-34); Boarding has no magnitude |
+| B-56r inert promotions | 1 | Sentry needs sight-blocking (the Ngao Mbeba's see-through half waits with it); Ground Crews needs PATROL (C-34); Boarding has no magnitude |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
 | B-63r gang-up bar | 1 | ask; Enkidu's allied-war discount waits on it |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **20** | |
+| **B. Fidelity vs real Civ 6** | **17** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 7), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
@@ -66,10 +66,10 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
-| C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
-| C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
-| **C. Absent systems** | **41** | |
-| **OPEN, TOTAL** | **61** | |
+| C-78 unique UNITS absent | 2 | the 22 LAND rows are built; seven naval and air rows are left, and two clauses wait on B-56r and C-79 |
+| C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them); the Toa's Pā waits here |
+| **C. Absent systems** | **37** | |
+| **OPEN, TOTAL** | **54** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -408,18 +408,16 @@ Nothing open.
     yield walk; nothing stores or compares it. The carrier is one exposed
     reader per engine and a compared per-city worked-tile list. C-31's
     "Citizens 'working' the affected tiles are eliminated" waits on it.
-- **C-78. UNIQUE UNITS ABSENT.** Weight 5.
-  - Four of the roster's 34 unique units have a `UnitDef` row (`uniqueTo`
-    / `replaces`: Legion, Maryannu Chariot Archer, Berserker, War-Cart;
-    Harald's Longship beside them). The other 29 do not — one row each off `Units.xml` with its
-    abilities off `UnitAbilities` / `UnitPromotions`, on both engines:
-    P-51, Mamluk, Minas Geraes, Mountie, Crouching Tiger, Okihtcitaw, Sea
-    Dog, Garde Impériale, Khevsureti, U-Boat, Hoplite, Huszár, Warak'aq,
-    Varu, Samurai, Ngao Mbeba, Hwacha, Mandekalu Cavalry, Toa, Malón
-    Raider, Keshig, De Zeven Provinciën, Barbary Corsair, Bireme, Cossack,
-    Highlander, Conquistador, Carolean, Impi (the Saka Horse Archer and
-    Janissary are C-68). The leader units (Rough Rider, Black Army, ...)
-    are the nine blank rows of `docs/ROSTER.md`.
+- **C-78. UNIQUE UNITS ABSENT.** Weight 2.
+  - The twenty-two unique LAND units are BUILT — row, abilities and pins on
+    both engines. Seven are left, all at sea or in the air: P-51 Mustang,
+    Minas Geraes, Sea Dog, U-Boat, De Zeven Provinciën, Barbary Corsair,
+    Bireme (the Saka Horse Archer and Janissary are C-68). The leader units
+    (Rough Rider, Black Army, ...) are the nine blank rows of
+    `docs/ROSTER.md`.
+  - Two halves of a built row wait on another entry: the Ngao Mbeba's "can
+    see through features" needs the sight-BLOCKING this engine does not
+    model (B-56r), and the Toa's Pā improvement needs C-79's row.
   - A seat whose civilization has no row trains the base chassis; B-54r's
     stacks wait here.
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 5.

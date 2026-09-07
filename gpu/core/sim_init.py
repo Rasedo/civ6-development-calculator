@@ -2953,10 +2953,48 @@ class SimInit:
         self._type_atk_cs = torch.tensor([int(u["atkCs"]) for u in ru], dtype=torch.long, device=device)
         self._type_def_melee_cs = torch.tensor([int(u["defMeleeCs"]) for u in ru], dtype=torch.long, device=device)
         self._type_fort_builder = torch.tensor([bool(u["fortBuilder"]) for u in ru], dtype=torch.bool, device=device)
+        # ---- the UNIQUE-UNIT ability clauses, one plane apiece ----
+        def _uc(k, cast=int, dt=torch.long):
+            return torch.tensor([cast(u[k]) for u in ru], dtype=dt, device=device)
+        self._type_ground_cs = _uc("groundCs")
+        self._type_ground_hills = _uc("groundHills", bool, torch.bool)
+        _gf = [list(u["groundFeat"]) for u in ru]
+        _gfw = max(max((len(x) for x in _gf), default=1), 1)
+        # [NU, w] feature indices the ground clause names, -1 padded
+        self._type_ground_feat = torch.tensor(
+            [list(x) + [-1] * (_gfw - len(x)) for x in _gf], dtype=torch.long, device=device)
+        self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
+        self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
+        self._type_adj_same_cs = _uc("adjSameCs")
+        self._type_adj_enemy_cs = _uc("adjEnemyCs")
+        self._type_def_ranged_cs = _uc("defRangedCs")
+        self._type_no_wound = _uc("noWound", bool, torch.bool)
+        self._type_unused_mp_cs = _uc("unusedMoveCs")
+        self._type_alliance_cs = _uc("allianceCs")
+        self._type_near_terr_cs = _uc("nearTerrCs")
+        self._type_near_terr_rng = _uc("nearTerrRange")
+        self._type_home_cont_cs = _uc("homeContCs")
+        self._type_near_rel_cs = _uc("nearRelCs")
+        self._type_near_park_cs = _uc("nearParkCs")
+        self._type_heals_always = _uc("healsAlways", bool, torch.bool)
+        self._type_move_after_atk = _uc("moveAfterAttack", bool, torch.bool)
+        self._type_no_move_shoot = _uc("noMoveShoot", bool, torch.bool)
+        self._type_extra_attack = _uc("extraAttack", bool, torch.bool)
+        self._type_flank_mult = _uc("flankMult", float, torch.float64)
+        self._type_xp_rate = _uc("xpRate", float, torch.float64)
+        self._type_free_promos = _uc("freePromos")
+        self._type_kill_gp_general = _uc("killGpGeneral")
+        self._type_kill_gold_pct = _uc("killGoldPct")
+        self._type_park_builder = _uc("parkBuilder", bool, torch.bool)
+        self._type_escort_speed = _uc("escortSpeed", bool, torch.bool)
+        self._type_pillage_cost = _uc("pillageCost")
+        self._type_guards_traders = _uc("guardsTraders", bool, torch.bool)
+        self._type_capture_converts = _uc("captureConverts", bool, torch.bool)
         _uq = rules.uniques
         self._civ_ids: list[str] = list(_uq["civs"])
         self._open_terr = torch.tensor([int(t) for t in _uq["openTerrains"]], dtype=torch.long, device=device)
         self._coast_terr = int(_uq["coastTerrain"])
+        self._park_cs_range = int(_uq["parkCsRange"])
         # `civReplacement` as a table: row c = civilization c's unique standing
         # in for each base chassis (-1 where none); the LAST row plays none.
         _nc = len(self._civ_ids)
