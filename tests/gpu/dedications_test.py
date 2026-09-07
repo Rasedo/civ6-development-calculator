@@ -21,7 +21,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, works_of, clear_works
 
 
 def build():
@@ -43,6 +43,17 @@ def commit(sim, row: int, kind: int, golden: bool = False) -> None:
 
 def score(sim, row: int) -> int:
     return int(sim.era_score[0, row])
+
+
+def holder_bidx(sim, hid: str) -> int:
+    """the building column of one great-work holder (`GW_HOLDERS`)"""
+    return sim._gw_holder_bidx[[h["id"] for h in sim.rules.seats["greatWorks"]["holders"]].index(hid)]
+
+
+def holder_slots(sim, hid: str) -> list[int]:
+    """the layout slots of one great-work holder"""
+    h = [x["id"] for x in sim.rules.seats["greatWorks"]["holders"]].index(hid)
+    return (sim._gw_slot_holder == h).nonzero(as_tuple=True)[0].tolist()
 
 
 def main() -> None:
@@ -242,8 +253,8 @@ def main() -> None:
     # NORMAL: "+1 Era Score for each Artifact extracted."
     row = 0
     col = int(sim.city_alive[0, row].nonzero()[0])
-    sim.city_bldg[0, row, col, sim._artifact_bidx] = True
-    sim.city_artifacts[0, row, col] = 0
+    sim.city_bldg[0, row, col, holder_bidx(sim, "ARCHAEOLOGICAL_MUSEUM")] = True
+    clear_works(sim)
     dig = next(t for t in range(sim.T)
                if int(sim.tile_seat[0, t]) == row and int(sim.centre_slot_at[0, t]) < 0)
     sim.antiquity[0, dig] = True
@@ -252,7 +263,7 @@ def main() -> None:
     commit(sim, row, sim._ded_wish)
     sim._do_excavate(row, torch.ones(B, dtype=torch.bool), torch.full((B,), dig, dtype=torch.long),
                      torch.zeros(B, dtype=torch.long))
-    assert int(sim.city_artifacts[0, row, col]) == 1, "the excavation never landed"
+    assert works_of(sim, 0, row, col, [4]) == 1, "the excavation never landed"
     assert score(sim, row) == sim._ded_event_score[sim._ded_wish], score(sim, row)
     print("wish artifact era score ok")
 
@@ -267,15 +278,15 @@ def main() -> None:
     alive_c = sim.city_alive[:, row]
     own = sim.tile_seat == row
     era_c = sim._civ_era(sim.civ_techs[:, row], sim.civ_civics[:, row])
-    plain = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c)[0])
+    plain = int(sim._tourism_of(zc, alive_c, own, era_c)[0])
     sim.built_wonder_complete[0, wsite] = False
     sim._eff_version += 1
-    floor_t = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c)[0])
+    floor_t = int(sim._tourism_of(zc, alive_c, own, era_c)[0])
     sim.built_wonder_complete[0, wsite] = True
     sim._eff_version += 1
     base = plain - floor_t
     assert base > 0, "the planted wonder paid no tourism"
-    with_gov = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c, gov_tile=own)[0])
+    with_gov = int(sim._tourism_of(zc, alive_c, own, era_c, gov_tile=own)[0])
     assert with_gov - floor_t == (base * sim._wish_wond_num) // sim._wish_wond_den, (with_gov, floor_t, base)
     # ...and the plane only lights up under the GOLDEN face
     commit(sim, row, sim._ded_wish, golden=True)

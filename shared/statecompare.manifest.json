@@ -1895,34 +1895,18 @@
           "note": "a FREE CITY's race: the loyalty pressure each major has put on it since it revolted, per major; zeros for a city that is not Free. The Free Cities seat itself (GameState.freeSeat / the GPU's FREE_ROW) is enumerated by this group: its cities are city rows after the majors' (`cityHolders` / `_city_rows`), and every city field, this one included, compares them."
         },
         {
-          "name": "greatWorksWriting",
+          "name": "greatWorks",
           "compare": "exact",
           "covers": [
-            "City.greatWorksWriting"
+            "City.greatWorks"
           ],
           "planes": [
-            "city_gw_writing"
-          ]
-        },
-        {
-          "name": "greatWorksArt",
-          "compare": "exact",
-          "covers": [
-            "City.greatWorksArt"
+            "city_gw_obj",
+            "city_gw_maker",
+            "city_gw_era",
+            "city_gw_seat"
           ],
-          "planes": [
-            "city_gw_art"
-          ]
-        },
-        {
-          "name": "greatWorksMusic",
-          "compare": "exact",
-          "covers": [
-            "City.greatWorksMusic"
-          ],
-          "planes": [
-            "city_gw_music"
-          ]
+          "note": "every layout slot's work (`GW_LAYOUT`, W wide): object type, maker, era, civilization, -1s for an empty slot — the theming rules' and the yields' inputs"
         },
         {
           "name": "powered",
@@ -1933,52 +1917,6 @@
           "planes": [
             "city_powered"
           ]
-        },
-        {
-          "name": "relics",
-          "compare": "exact",
-          "covers": [
-            "City.relics"
-          ],
-          "planes": [
-            "city_relics"
-          ]
-        },
-        {
-          "name": "artifacts",
-          "compare": "exact",
-          "covers": [
-            "City.artifacts"
-          ],
-          "planes": [
-            "city_artifacts"
-          ]
-        },
-        {
-          "name": "artifactProv",
-          "compare": "exact",
-          "covers": [
-            "City.artifactEras",
-            "City.artifactSeats"
-          ],
-          "planes": [
-            "city_artifact_era",
-            "city_artifact_seat"
-          ],
-          "note": "era and civilization per artifact SLOT — the theming rule's inputs"
-        },
-        {
-          "name": "gwArtProv",
-          "compare": "exact",
-          "covers": [
-            "City.gwArtType",
-            "City.gwArtArtist"
-          ],
-          "planes": [
-            "city_gwart_type",
-            "city_gwart_artist"
-          ],
-          "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot — the other theming rule's inputs"
         },
         {
           "name": "spySources",

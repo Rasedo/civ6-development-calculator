@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { settleFirstCity, holdWorks } from '../helpers';
 import { TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, HOLY_CITY_TOURISM } from '../../../cpu/data/seats';
-import { RELIC_TOURISM } from '../../../cpu/data/greatPeople';
+import { GWO_RELIC, GWO_TOURISM } from '../../../cpu/data/greatWorks';
+const RELIC_TOURISM = GWO_TOURISM[GWO_RELIC]!;
 import { seatTourism, seatTourismReligious } from '../../../cpu/core/city';
 import { seatAccumulators } from '../../../cpu/core/seatTurn';
 
@@ -182,7 +183,7 @@ describe('the RELIGIOUS half and its per-rival halvings', () => {
   function relicGame() {
     const state = newGame(1);
     const own = seatOf(state, 0)!;
-    own.cities[0].relics = RELICS;
+    holdWorks(own.cities[0], GWO_RELIC, RELICS);
     own.tourismTo = [];
     own.tourismReligiousTo = [];
     return { state, own, rival: state.seats[1] as Seat };
@@ -260,7 +261,7 @@ describe('the religious-tourism BANK', () => {
     const own = seatOf(state, 0)!;
     const city = own.cities[0];
     const generalBefore = seatTourism(state, 0);
-    city.relics = 2;
+    holdWorks(city, GWO_RELIC, 2);
     own.religion.founded = true;
     own.religion.holyTile = city.centerIndex;
     expect(seatTourism(state, 0)).toBe(generalBefore); // relics left the general body

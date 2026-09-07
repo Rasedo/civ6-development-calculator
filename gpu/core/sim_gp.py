@@ -173,17 +173,8 @@ class SimGp:
             & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc)
         # 1 anywhere the unit can already stand
         a_any = torch.ones_like(a_dist)
-        # 2 a city of this seat with a free slot of the class's work kind
-        a_gw = torch.zeros_like(a_dist)
-        for kind, k_cls in enumerate(self._gw_cls):
-            if k_cls < 0:
-                continue
-            col = self.city_slot_at(row).gather(1, tc)
-            used = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind][:, row]
-            cap = self._gw_capacity(row, kind)
-            free = ((cap - used) > 0) & self.city_alive[:, row]
-            here = torch.where(col >= 0, free.gather(1, col.clamp(min=0)), torch.zeros_like(col, dtype=torch.bool))
-            a_gw = a_gw | (own & here & (cls == k_cls))
+        # 2 a city of this seat with an open slot taking one of the person's works
+        a_gw = own & self._gw_activation_room_at(row, cls, at, tc)
         # 3 inside a city-state's territory
         _ts_here = self.tile_seat.gather(1, tc)
         a_cs = (_ts_here >= 100) & (_ts_here < BARB_SEAT)
@@ -231,7 +222,7 @@ class SimGp:
         # city."
         _asci = col("artifactScience")
         if bool((_asci != 0).any()):
-            _n = self.city_artifacts[:, row].gather(1, cc.unsqueeze(1)).squeeze(1)
+            _n = self._gw_counts_by_obj(row)[:, :, 4].gather(1, cc.unsqueeze(1)).squeeze(1)
             self.civ_tech_prog[:, row] = (self.civ_tech_prog[:, row]
                                           + _asci * (_n.to(dt) * has_city.to(dt)))
         # CIV6 (Marina Raskova): "District in this tile gains +1 air unit
@@ -241,13 +232,11 @@ class SimGp:
         if bool(_ab.any()):
             _r = _ab.nonzero(as_tuple=True)[0]
             self.tile_air_bonus[_r, hc[_r]] += _asb[_r].long()
-        gw_cls = [k for k, c in enumerate(self._gw_cls) if c >= 0]
         wrote = torch.zeros_like(m)
-        for kind in gw_cls:
-            k_hit = m & (cls == self._gw_cls[kind])
-            if bool(k_hit.any()):
-                self._place_works(row, k_hit, self._gp_fx(cls, at, "culture").double(), kind, at, only_col=ccol)
-                wrote = wrote | k_hit
+        for k_cls in self._gw_cls:
+            if k_cls >= 0:
+                wrote = wrote | (m & (cls == k_cls))
+        self._gw_place_person(row, wrote, ccol, cls, at, self._gp_fx(cls, at, "culture").double())
         self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + col("culture") * (~wrote).to(dt)
         self.civ_faith[:, row] = self.civ_faith[:, row] + col("faith")
         self.civ_treasury[:, row] = self.civ_treasury[:, row] + col("gold")
@@ -288,12 +277,16 @@ class SimGp:
                 self.city_progress[_r, row, cc[_r], 0] += _space[_r].to(self.city_progress.dtype)
         self._gp_per_adjacent(row, m, cls, at, hc)
         self._gp_luxuries(row, m, cls, at)
+        # CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
-        for kind in range(3):
-            _km = has_city & (_gwk == kind) & ~wrote
-            if bool(_km.any()):
-                self._place_works(row, _km, torch.zeros(B, dtype=dt, device=dev), kind,
-                                  torch.zeros_like(at), only_col=ccol)
+        _km = has_city & (_gwk >= 0) & ~wrote
+        if bool(_km.any()):
+            _obj = torch.full((B,), -1, dtype=torch.long, device=dev)
+            for kind in range(3):
+                _obj = torch.where(_gwk == kind, torch.full_like(_obj, self._gw_kind_objs(kind)[0]), _obj)
+            self._gw_place(row, _km, ccol, _obj, at.clamp(min=0),
+                           torch.full((B,), -1, dtype=torch.long, device=dev),
+                           torch.full((B,), int(self._ROW_SEAT[row]), dtype=torch.long, device=dev))
 
         # ---- the seat's own ledgers
         self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + col("envoys").to(self.civ_envoys_avail.dtype)

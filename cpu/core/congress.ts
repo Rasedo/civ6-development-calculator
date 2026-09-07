@@ -13,6 +13,7 @@ import { nextRandom } from './rand';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
+import { gwCountKind } from './greatWorks';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -256,11 +257,7 @@ export function preference(state: GameState, res: number, seat: number,
     }
     default: { // CONGRESS_HERITAGE
       const counts = [0, 0, 0];
-      for (const city of sx.cities) {
-        counts[0] += city.greatWorksWriting ?? 0;
-        counts[1] += city.greatWorksArt ?? 0;
-        counts[2] += city.greatWorksMusic ?? 0;
-      }
+      for (const city of sx.cities) for (let k = 0; k < 3; k++) counts[k]! += gwCountKind(city, k);
       return { outcome: 0, target: argmaxLow(counts) };
     }
   }

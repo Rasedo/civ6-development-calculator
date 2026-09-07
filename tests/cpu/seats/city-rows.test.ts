@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt, grantTechs, grantCivics } from '../helpers';
+import { makeMap, makeState, tileAtCoords, settleAt, grantTechs, grantCivics, holdWorks } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { getModifiers, prodMultFor } from '../../../cpu/core/effects';
@@ -18,6 +18,7 @@ import { PROD_MULT_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, POWERED_YIELD_R
 import { STRATEGIC_IDS, STOCKPILE_CAP_BASE } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
 import type { GameState } from '../../../cpu/core/types';
+import { GWO_ARTIFACT, GWO_RELIC } from '../../../cpu/data/greatWorks';
 
 /**
  * THE CITY'S ROSTER ROWS (CIV6, the install's TraitModifiers): the centre's
@@ -82,16 +83,16 @@ describe("Songs of the Jeli", () => {
 
 describe('Nkisi', () => {
   it("pays Kongo per Relic and Artifact, and 50% more points for three classes", () => {
-    expect(GREAT_WORK_YIELD_ROWS.length).toBe(8);
+    expect(GREAT_WORK_YIELD_ROWS.length).toBe(12);
     const state = sceneAs(seatRow('KONGO'));
     const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
-    city.relics = 2;
-    city.artifacts = 1;
+    holdWorks(city, GWO_RELIC, 2);
+    holdWorks(city, GWO_ARTIFACT, 1);
     const kongo = computeCityStats(state, city).breakdown.buildings;
     const plain = sceneAs(seatRow('AMERICA'));
     const pc = settleAt(plain, tileAtCoords(plain.map, 7, 7).index, 0);
-    pc.relics = 2;
-    pc.artifacts = 1;
+    holdWorks(pc, GWO_RELIC, 2);
+    holdWorks(pc, GWO_ARTIFACT, 1);
     const none = computeCityStats(plain, pc).breakdown.buildings;
     expect(kongo.gold - none.gold).toBe(4 * 3);
     expect(kongo.food - none.food).toBe(2 * 3);

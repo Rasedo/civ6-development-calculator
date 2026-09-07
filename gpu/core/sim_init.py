@@ -81,15 +81,12 @@ class SimInit:
             ("progress", dtype, 0, None, self.QD),
             ("cost", dtype, 0, None, self.QD),
             ("qtile", torch.long, -1, None, self.QD),
-            ("gw_writing", torch.long, 0, None, None),
-            ("gw_art", torch.long, 0, None, None),
-            ("gw_music", torch.long, 0, None, None),
-            ("relics", torch.long, 0, None, None),
-            ("artifacts", torch.long, 0, None, None),
-            ("artifact_era", torch.long, -1, None, max(int((rules.seats or {}).get("artifactProvW", 3)), 1)),
-            ("artifact_seat", torch.long, -1, None, max(int((rules.seats or {}).get("artifactProvW", 3)), 1)),
-            ("gwart_type", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
-            ("gwart_artist", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
+            # the GREAT WORKS held, one column per layout slot (`GW_LAYOUT`):
+            # object type (-1 = empty), maker, era, civilization
+            ("gw_obj", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_maker", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_era", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_seat", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
             # the members of `city_bldg` standing PILLAGED — dark until the
             # city's own queue repairs them; read through `_bldg_dark` alone
@@ -1283,11 +1280,6 @@ class SimInit:
             self._wond_freetech = torch.tensor([int(w["freeTechs"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_treasury = torch.tensor([float(w["treasuryMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_erascore = torch.tensor([int(w["eraScorePerMoment"]) for w in self._wond_rows], dtype=torch.long, device=device)
-            # Per-wonder Great Work slots [nW, 3] in kind order (writing, art,
-            # music), additive with the GW_BUILDINGS slots.
-            self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)
-            # Per-wonder RELIC slots [nW], additive with the relic building's.
-            self._wond_relic = torch.tensor([int(w["relicslots"]) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # ONE roster: a natural wonder is a FEATURE row, and this plane is a
@@ -1404,39 +1396,53 @@ class SimInit:
         self.civ_gp_lux = torch.zeros(B, self.n_majors, simbase.GP_LUX_MAX, dtype=torch.long, device=device)
         self.civ_gp_lux_n = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self._alloc_civ_pairs(B, self.n_majors, dtype, device)
-        # GREAT WORKS, in three slotted kinds (0 WRITING / 1 ART / 2 MUSIC). A
-        # claimed WRITER / ARTIST / MUSICIAN (gwClsByKind) slots gwWorksByKind
-        # works into its seat's cities, into the building column gwBidxByKind
-        # names (b_cost catalog order), gwSlotsByKind per building; overflow
-        # charges fall back to the instant culture lump. Per-city work counts
-        # feed a culture/turn yield BY KIND (greatWorkCulture is the TS twin).
-        # Every write bumps _eff_version — this is yield-bearing state.
-        self._gw_cls = [int(x) for x in rr.get("gwClsByKind", [-1, -1, -1])]
-        self._gw_bidx = [int(x) for x in rr.get("gwBidxByKind", [-1, -1, -1])]
-        self._gw_slots_k = [int(x) for x in rr.get("gwSlotsByKind", [2, 3, 1])]
-        self._gw_works_k = [int(x) for x in rr.get("gwWorksByKind", [2, 3, 2])]
+        # GREAT WORKS. A claimed WRITER / ARTIST / MUSICIAN (gwClsByKind)
+        # makes gwWorksByKind works, each seeking an open slot that takes it
+        # (`_gw_place`); a work with no slot falls back to the instant culture
+        # lump. Every write bumps _eff_version — this is yield-bearing state.
+        self._gw_cls = [int(x) for x in rr["gwClsByKind"]]
+        self._gw_works_k = [int(x) for x in rr["gwWorksByKind"]]
         self._modern_era_index = int(rr.get("modernEraIndex", 5))
-        self._artifact_bidx = int(rr.get("artifactBidx", -1))
-        self._artifact_slots = int(rr.get("artifactSlots", 3))
-        self._artifact_culture = int(rr.get("artifactCulture", 3))
-        self._artifact_tourism = int(rr.get("artifactTourism", 3))
-        # every slot an Artifact can STAND in per city — the museum's own
-        # plus the whole any-work pool; the provenance arrays' width.
-        self._artifact_prov_w = max(int(rr.get("artifactProvW", self._artifact_slots)), 1)
-        self._theming_mult = int(rr["themingMult"])
-        self._artist_works = [[int(x) for x in w] for w in rr.get("artistWorks", [])]
+        # the three works each Great Artist makes, as object types [NA, 3]
+        self._gw_artist_objs = torch.tensor([[int(x) for x in w] for w in rr["artistWorks"]], dtype=torch.long, device=device).reshape(-1, 3)
+        # GREAT WORKS PER HOLDER: the layout every city's works index into
+        # (`GW_LAYOUT`), each holder's building or wonder column and theming
+        # rule, the slot-type acceptance table and the per-object yields.
+        _gw = rr["greatWorks"]
+        self.GW_W = int(_gw["w"])
+        self._gw_slot_holder = torch.tensor([int(x) for x in _gw["slotHolder"]], dtype=torch.long, device=device)
+        self._gw_slot_type = torch.tensor([int(x) for x in _gw["slotType"]], dtype=torch.long, device=device)
+        self._gw_slot_extra = torch.tensor([int(x) for x in _gw["slotExtraRank"]], dtype=torch.long, device=device)
+        self._gw_holder_bidx = [int(h["bidx"]) for h in _gw["holders"]]
+        self._gw_holder_widx = [int(h["widx"]) for h in _gw["holders"]]
+        self._gw_holder_wonder = [bool(h["wonder"]) for h in _gw["holders"]]
+        self._gw_holder_theme = [int(h["theme"]) for h in _gw["holders"]]
+        self._gw_holder_slots = [int(h["slots"]) for h in _gw["holders"]]
+        self.GW_H = len(self._gw_holder_bidx)
+        self._gw_accepts = torch.tensor([[bool(x) for x in a] for a in _gw["accepts"]], dtype=torch.bool, device=device)
+        self._gw_obj_culture = torch.tensor([float(x) for x in _gw["objCulture"]], dtype=torch.float64, device=device)
+        self._gw_obj_faith = torch.tensor([float(x) for x in _gw["objFaith"]], dtype=torch.float64, device=device)
+        self._gw_obj_tourism = torch.tensor([int(x) for x in _gw["objTourism"]], dtype=torch.long, device=device)
+        self._gw_obj_kind = torch.tensor([int(x) for x in _gw["objKind"]], dtype=torch.long, device=device)
+        self._gw_theming_mult = int(_gw["themingMult"])
+        self._gw_extra_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _gw["extraSlots"]]  # type: ignore[misc]
+        self._gw_auto_theme_rows: list[tuple[int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _gw["autoTheme"]]  # type: ignore[misc]
+        assert self.GW_W == self._gw_slot_holder.numel() == self._gw_slot_type.numel() == self._gw_slot_extra.numel(), "great-work layout width"
+        assert self.GW_W > 0 and int(self._gw_slot_holder.max()) < self.GW_H, "great-work layout names a holder off the table"
+        for _h, (_b, _w, _is_w) in enumerate(zip(self._gw_holder_bidx, self._gw_holder_widx, self._gw_holder_wonder)):
+            # a building holder names its `city_bldg` column, or -2 for the
+            # Palace, which the capital flag stands for
+            _col_ok = (_w >= 0 and _b < 0 and _w < max(self._wond_n, 1)) if _is_w else (_w < 0 and (_b == -2 or 0 <= _b < len(rules.b_cost)))
+            assert _col_ok, f"great-work holder {_h} names no catalog column"
+        assert tuple(self._gw_accepts.shape) == (7, 8) and self._gw_obj_kind.numel() == 8, "great-work object tables"
         _ri = rules.improvements or {}
         self._park_min_appeal = int(_ri["parkMinAppeal"])
         self._park_amen_owner = int(_ri["parkAmenitiesOwner"])
         self._park_amen_near = int(_ri["parkAmenitiesNear"])
         self._park_amen_cities = int(_ri["parkAmenityCities"])
         self._shipwreck_civic = int(_ri["shipwreckCivic"])
-        self._relic_bidx = int(rr.get("relicBidx", -1))
-        self._relic_slots = int(rr.get("relicSlots", 1))
-        self._relic_faith = int(rr.get("relicFaith", 4))
-        self._relic_tour = int(rr.get("relicTourism", 8))
-        self._gw_cul_k = [float(x) for x in rr.get("gwCultureByKind", [2, 2, 4])]
-        self._gw_tour_k = [int(x) for x in rr.get("gwTourismByKind", [2, 2, 4])]
         self._gw_printing_tech = int(rr.get("gwPrintingTech", -1))
         self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
         self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
@@ -2518,8 +2524,6 @@ class SimInit:
         self._b_settler_prod = rules.b_settler_prod.to(device)
         self._b_conquest_pct = rules.b_conquest_pct.to(device)
         self._b_conquest_turns = rules.b_conquest_turns.to(device)
-        self._b_any_work = rules.b_any_work.to(device)
-        self._any_work_live = bool((self._b_any_work != 0).any())
         self._b_heal_kill = rules.b_heal_kill.to(device)
         self._heal_kill_live = bool((self._b_heal_kill != 0).any())
         self._b_project_charge = rules.b_project_charge.to(device)
@@ -2623,8 +2627,9 @@ class SimInit:
         # religious unit heals off (`holySiteFaith`).
         self._b_hs_faith = (rules.b_yields[:, 5].to(device).long()
                             * (self._b_req_district == self._hs_idx).long())  # [NB]
+        # the buildings holding Great Work slots (`GW_HOLDERS`, the Palace aside)
         self._b_gwslot = torch.zeros(self.NB, dtype=torch.bool, device=device)
-        for _k in self._gw_bidx:
+        for _k in self._gw_holder_bidx:
             if _k >= 0:
                 self._b_gwslot[_k] = True
         self._worship_bidx = [int(x) for x in rules.worship_bidx]

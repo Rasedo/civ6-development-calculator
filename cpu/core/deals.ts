@@ -19,9 +19,9 @@ import {
 } from '../data/seats';
 import { STRATEGIC_IDS } from '../data/constants';
 import { CITY_MAX_HP } from '../data/units';
-import { GW_KINDS, gwCapacity, gwCount, gwGive, gwTake } from '../data/greatPeople';
+import { GW_KINDS, type GreatWork } from '../data/greatWorks';
 import { SPY_UNIT } from '../data/espionage';
-import { gwExtraSlots } from './greatPeople';
+import { gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { outerPool, wallsMax } from './rules';
 import {
   civsAtWar, grantKey, isCiv, seatOf, setBorderTurnsFrom, warTurnsWith,
@@ -103,13 +103,17 @@ export function cityTradeable(state: GameState, city: City): boolean {
   return city.hp >= CITY_MAX_HP && outerPool(state, city) >= wallsMax(state, city);
 }
 
-function gwFrom(state: GameState, seat: number, kind: number): City | undefined {
-  return seatOf(state, seat)?.cities.find((c) => gwCount(c, kind) > 0);
+/** the giver's first city holding a work of the kind, and the LAST-placed
+ *  such work in it — the one the deal hands over */
+function gwFrom(state: GameState, seat: number, kind: number): { city: City; work: GreatWork } | undefined {
+  const city = seatOf(state, seat)?.cities.find((c) => gwCountKind(c, kind) > 0);
+  const work = city ? gwLastOfKind(city, kind) : undefined;
+  return city && work ? { city, work } : undefined;
 }
 
-function gwTo(state: GameState, seat: number, kind: number): City | undefined {
-  const slots = gwExtraSlots(state, kind);
-  return seatOf(state, seat)?.cities.find((c) => gwCount(c, kind) < gwCapacity(c, kind, slots(c)));
+/** the receiver's first city with an open slot that takes the work */
+function gwTo(state: GameState, seat: number, obj: number): City | undefined {
+  return seatOf(state, seat)?.cities.find((c) => gwHasRoom(state, c, obj));
 }
 
 /** Can `giver` actually hand `receiver` this one thing, right now? */
@@ -133,7 +137,9 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
       // a boolean access gate, with nothing to hand over a lump of.
       return a >= 0 && a < STRATEGIC_IDS.length && b > 0 && stockOf(state, giver, STRATEGIC_IDS[a]) >= b;
     case DEAL_GREAT_WORK:
-      return a >= 0 && a < GW_KINDS && !!gwFrom(state, giver, a) && !!gwTo(state, receiver, a);
+      if (a < 0 || a >= GW_KINDS) return false;
+      const give = gwFrom(state, giver, a);
+      return !!give && !!gwTo(state, receiver, give.work.obj);
     case DEAL_CITY: {
       const city = gs.cities.find((c) => c.centerIndex === a);
       return !!city && cityTradeable(state, city);
@@ -175,9 +181,9 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       break;
     }
     case DEAL_GREAT_WORK: {
-      const from = gwFrom(state, giver, a);
-      const home = gwTo(state, receiver, a);
-      if (from && home) gwGive(home, a, gwTake(from, a));
+      const give = gwFrom(state, giver, a);
+      const home = give ? gwTo(state, receiver, give.work.obj) : undefined;
+      if (give && home) moveGreatWork(state, give.city, give.work.slot, home);
       break;
     }
     case DEAL_CITY: {

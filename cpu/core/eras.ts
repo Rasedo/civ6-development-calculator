@@ -8,7 +8,7 @@ import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREK
 import { TECHS } from '../data/techs';
 import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
-import { GW_BUILDINGS } from '../data/greatPeople';
+import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
 import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
@@ -134,7 +134,7 @@ export function buildingDedications(state: GameState, seat: number, buildingId: 
   // constructed."
   if (BUILDINGS[buildingId]?.district === 'AERODROME') dedicationEvent(state, seat, DED_SKY);
   if ((BUILDINGS[buildingId]?.yields?.science ?? 0) > 0) dedicationEvent(state, seat, DED_FREE_INQUIRY);
-  if ((GW_BUILDINGS as readonly string[]).includes(buildingId)) dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+  if (GW_HOLDERS.some((h) => !h.wonder && h.id === buildingId)) dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
 }
 
 /** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a

@@ -22,7 +22,9 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
-import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/greatPeople';
+import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
+import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
@@ -107,12 +109,12 @@ export function seatBuildingSum(
 
 /**
  * The same sum over ONE city — the shape of a Plaza term that names "this
- * city" rather than the empire, and of the any-Great-Work slot pool.
+ * city" rather than the empire.
  */
 export function cityBuildingSum(
   state: GameState,
   city: { buildings: string[]; districts?: City['districts']; pillagedBuildings?: string[] },
-  key: 'settlerProdPct' | 'anyWorkSlots',
+  key: 'settlerProdPct',
 ): number {
   const dark = darkBuildings(state.map, city);
   let n = 0;
@@ -725,8 +727,7 @@ export function seatTourism(
   const cities = citiesOf(state, seat);
   for (const c of cities) {
     // CIV6 (Curator): "+100% Tourism from Great Works in this city."
-    t += (greatWorkTourism(c, printing, km) + artifactTourism(c))
-      * governorMult(state, c, (e) => e.gwTourismMult);
+    t += greatWorkTourism(state, c, printing, km) * governorMult(state, c, (e) => e.gwTourismMult);
   }
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
@@ -753,7 +754,7 @@ export function seatTourismReligious(state: GameState, seat: number): number {
   const cities = citiesOf(state, seat);
   let t = 0;
   for (const c of cities) {
-    t += relicTourism(c) * wonderMult(state, [c], 'religiousTourismMult');
+    t += relicTourism(state, c) * wonderMult(state, [c], 'religiousTourismMult');
   }
   for (const g of state.seats) {
     const ht = g.religion.holyTile;
@@ -912,12 +913,13 @@ export function computeCityStats(
     if (n) addYields(buildings, perImp.yields, n);
   }
   if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
-  buildings.culture += greatWorkCulture(city);
-  buildings.culture += artifactCulture(city); // +3 culture per artifact
+  // the Great Works held here, a themed holder's paying twice
+  const gwy = greatWorkYields(state, city);
+  buildings.culture += gwy.culture;
   // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district, from
   // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
-  buildings.faith += relicFaith(city);
+  buildings.faith += gwy.faith;
   // CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — seat-wide,
   // per standing Workshop.
   const wcult = gpPermOf(seatOf(state, city.seat), 'workshopCulture');
@@ -928,15 +930,14 @@ export function computeCityStats(
   }
   // CIV 6, Anshan's suzerain: "+2 Science from each Great Work of Writing.
   // +1 Science from each Relic and Artifact."
+  const byObj = gwCountsByObj(city);
   if (suzerainEffect(state, city.seat, 'worksScience')) {
-    buildings.science += ANSHAN_WRITING_SCIENCE * (city.greatWorksWriting ?? 0)
-      + ANSHAN_RELIC_SCIENCE * ((city.relics ?? 0) + (city.artifacts ?? 0));
+    buildings.science += ANSHAN_WRITING_SCIENCE * byObj[GWO_WRITING]!
+      + ANSHAN_RELIC_SCIENCE * (byObj[GWO_RELIC]! + byObj[GWO_ARTIFACT]!);
   }
   // CIV6 (EFFECT_ADJUST_CITY_GREATWORK_YIELD): the roster's per-work rows
-  // (`GREAT_WORK_YIELD_ROWS`) — a Relic or an Artifact held here
-  for (const r of ctx.mods.greatWorkYields) {
-    buildings[r.yield] += r.amount * (r.kind === 'relic' ? (city.relics ?? 0) : (city.artifacts ?? 0));
-  }
+  // (`GREAT_WORK_YIELD_ROWS`), per work of the row's object type held here
+  for (const r of ctx.mods.greatWorkYields) buildings[r.yield] += r.amount * byObj[r.obj]!;
 
   const trade = cityTradeYields(state, city, m.routeGold);
 

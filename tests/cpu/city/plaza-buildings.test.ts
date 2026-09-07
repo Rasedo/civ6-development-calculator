@@ -3,8 +3,8 @@ import { makeState, settleFirstCity } from '../helpers';
 import { boostProject, endTurn, queueSettler, foundCityAt, projectBoostCity } from '../../../cpu/core/game';
 import { transferCity } from '../../../cpu/core/phase';
 import { cityBuildingSum, newCityGrantUnit, seatBuildingSum } from '../../../cpu/core/city';
-import { anyWorkFree, gwExtraSlots, relicSlotsIn } from '../../../cpu/core/greatPeople';
-import { gwCapacity, gwCount, gwGive, placeRelic, GW_WRITING, GW_ART } from '../../../cpu/data/greatPeople';
+import { gwFreeSlot, gwHasRoom, placeGreatWork, workContext } from '../../../cpu/core/greatWorks';
+import { GW_HOLDERS, GWO_ARTIFACT, GWO_MUSIC, GWO_RELIC, GWO_SCULPTURE, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
 import { healOnEliminate } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
@@ -129,39 +129,47 @@ describe("the Warlord's Throne — the conquest window", () => {
 });
 
 describe('the National History Museum — four slots for any Great Work', () => {
-  it('opens the pool to every kind, and shrinks as the pool fills', () => {
-    const { state, city } = cityWith('NATIONAL_HISTORY_MUSEUM');
-    expect(anyWorkFree(state, city)).toBe(4);
-    // no Amphitheater: the writing slots are the pool's alone
-    expect(gwCapacity(city, GW_WRITING, gwExtraSlots(state, GW_WRITING)(city))).toBe(4);
-    gwGive(city, GW_WRITING, [-1, -1]);
-    gwGive(city, GW_WRITING, [-1, -1]);
-    expect(anyWorkFree(state, city)).toBe(2);
-    expect(gwCapacity(city, GW_ART, gwExtraSlots(state, GW_ART)(city))).toBe(2);
-    // a RELIC takes from the same pool
-    expect(placeRelic([city], relicSlotsIn(state))).toBe(true);
-    expect(city.relics).toBe(1);
-    expect(anyWorkFree(state, city)).toBe(1);
+  const NHM = GW_HOLDERS.findIndex((h) => h.id === 'NATIONAL_HISTORY_MUSEUM');
+  const AMPH = GW_HOLDERS.findIndex((h) => h.id === 'AMPHITHEATER');
+  /** CIV6 (Building_GreatWorks): GREATWORKSLOT_PALACE x4, a slot type that
+   *  takes every object. The capital's own Palace slot is filtered out so
+   *  the museum alone answers. */
+  const scene = (...buildings: string[]) => {
+    const out = cityWith(...buildings);
+    out.city.buildings = out.city.buildings.filter((b) => b !== 'PALACE');
+    return out;
+  };
+  const free = (state: GameState, city: City, obj: number) => gwFreeSlot(workContext(state, city), city, obj);
+
+  it('opens four slots to every kind, and they fill in slot order', () => {
+    const { state, city } = scene('NATIONAL_HISTORY_MUSEUM');
+    const slots = holderSlots(NHM);
+    expect(slots).toHaveLength(4);
+    for (const obj of [GWO_WRITING, GWO_SCULPTURE, GWO_MUSIC, GWO_RELIC, GWO_ARTIFACT]) expect(free(state, city, obj)).toBe(slots[0]);
+    expect(placeGreatWork(state, city, { obj: GWO_WRITING, maker: 0, era: -1, seat: 0 })).toBe(slots[0]);
+    expect(placeGreatWork(state, city, { obj: GWO_WRITING, maker: 0, era: -1, seat: 0 })).toBe(slots[1]);
+    expect(free(state, city, GWO_SCULPTURE)).toBe(slots[2]);
+    // a RELIC takes from the same four
+    expect(placeGreatWork(state, city, { obj: GWO_RELIC, maker: -1, era: -1, seat: 0 })).toBe(slots[2]);
+    expect(placeGreatWork(state, city, { obj: GWO_MUSIC, maker: 0, era: -1, seat: 0 })).toBe(slots[3]);
+    expect(gwHasRoom(state, city, GWO_WRITING)).toBe(false);
   });
 
-  it('a DEDICATED slot is spent before the pool is', () => {
-    const { state, city } = cityWith('NATIONAL_HISTORY_MUSEUM', 'AMPHITHEATER');
+  it("a holder's DEDICATED slot is filled before the museum's", () => {
+    const { state, city } = scene('NATIONAL_HISTORY_MUSEUM', 'AMPHITHEATER');
     city.districts.push({ type: 'THEATER_SQUARE', tileIndex: city.centerIndex });
-    // the Amphitheater's own two, then the pool's four
-    expect(gwCapacity(city, GW_WRITING, gwExtraSlots(state, GW_WRITING)(city))).toBe(6);
-    gwGive(city, GW_WRITING, [-1, -1]);
-    gwGive(city, GW_WRITING, [-1, -1]);
-    expect(gwCount(city, GW_WRITING)).toBe(2);
-    expect(anyWorkFree(state, city)).toBe(4); // still nothing standing in the pool
-    gwGive(city, GW_WRITING, [-1, -1]);
-    expect(anyWorkFree(state, city)).toBe(3);
+    // the Amphitheater's own two, then the museum's four
+    const got: number[] = [];
+    for (let i = 0; i < 6; i++) got.push(placeGreatWork(state, city, { obj: GWO_WRITING, maker: 0, era: -1, seat: 0 }));
+    expect(got).toEqual([...holderSlots(AMPH), ...holderSlots(NHM)]);
+    expect(gwHasRoom(state, city, GWO_WRITING)).toBe(false);
   });
 
   it('without the museum there is no pool at all', () => {
-    const { state, city } = cityWith('AMPHITHEATER');
+    const { state, city } = scene('AMPHITHEATER');
     city.districts.push({ type: 'THEATER_SQUARE', tileIndex: city.centerIndex });
-    expect(anyWorkFree(state, city)).toBe(0);
-    expect(gwCapacity(city, GW_WRITING, gwExtraSlots(state, GW_WRITING)(city))).toBe(2);
+    expect(gwHasRoom(state, city, GWO_RELIC)).toBe(false);
+    expect(free(state, city, GWO_WRITING)).toBe(holderSlots(AMPH)[0]);
   });
 });
 

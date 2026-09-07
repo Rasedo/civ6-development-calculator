@@ -10,7 +10,12 @@ import { purchaseNaturalist, naturalistCost } from '../../../cpu/core/game';
 import { FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { seatTourism, parkAmenities } from '../../../cpu/core/city';
 import { tileAppeal } from '../../../cpu/core/appeal';
-import { museumThemed, THEMING_MULT, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_TOURISM, artifactTourism } from '../../../cpu/data/greatPeople';
+import { GW_HOLDERS, GWO_ARTIFACT, GWO_TOURISM, THEMING_MULT } from '../../../cpu/data/greatWorks';
+import { greatWorkTourism, gwWorks, holderThemed, placeGreatWork, workContext } from '../../../cpu/core/greatWorks';
+const ARTIFACT_BUILDING = 'ARCHAEOLOGICAL_MUSEUM';
+const ARTIFACT_SLOTS = 3;
+const ARTIFACT_TOURISM = GWO_TOURISM[GWO_ARTIFACT]!;
+const MUSEUM = GW_HOLDERS.findIndex((h) => h.id === ARTIFACT_BUILDING);
 import { PARK_MIN_APPEAL, PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../../../cpu/data/improvements';
 import { UNITS, NATURALIST_COST_STEP } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
@@ -184,7 +189,7 @@ describe('shipwrecks', () => {
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', water.index, 0)!;
     arch.tileIndex = water.index;
     expect(archaeologistExcavate(state, arch.id, 0).ok).toBe(true);
-    expect(city.artifacts).toBe(1);
+    expect(gwWorks(city).filter((w) => w.obj === GWO_ARTIFACT)).toHaveLength(1);
     expect(water.shipwreck).toBe(false); // removed from the map
   });
 });
@@ -194,24 +199,22 @@ describe('theming', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = found(state, 5, 5);
+    city.buildings = city.buildings.filter((b) => b !== 'PALACE'); // the museum alone holds finds here
     city.buildings.push(ARTIFACT_BUILDING);
-    city.artifacts = ARTIFACT_SLOTS;
-    city.artifactEras = [1, 1, 1];
-    city.artifactSeats = [0, 1, 2];
-    expect(museumThemed(city)).toBe(true);
-    expect(artifactTourism(city)).toBe(ARTIFACT_SLOTS * ARTIFACT_TOURISM * THEMING_MULT);
+    const dig = (eras: number[], seats: number[]) => {
+      delete city.greatWorks;
+      for (let i = 0; i < eras.length; i++) placeGreatWork(state, city, { obj: GWO_ARTIFACT, maker: -1, era: eras[i]!, seat: seats[i]! });
+      return holderThemed(state, workContext(state, city), city, MUSEUM);
+    };
+    expect(dig([1, 1, 1], [0, 1, 2])).toBe(true);
+    expect(greatWorkTourism(state, city, false)).toBe(ARTIFACT_SLOTS * ARTIFACT_TOURISM * THEMING_MULT);
     // a repeated civilization breaks it
-    city.artifactSeats = [0, 1, 1];
-    expect(museumThemed(city)).toBe(false);
-    expect(artifactTourism(city)).toBe(ARTIFACT_SLOTS * ARTIFACT_TOURISM);
+    expect(dig([1, 1, 1], [0, 1, 1])).toBe(false);
+    expect(greatWorkTourism(state, city, false)).toBe(ARTIFACT_SLOTS * ARTIFACT_TOURISM);
     // ...so does a mixed era
-    city.artifactSeats = [0, 1, 2];
-    city.artifactEras = [1, 2, 1];
-    expect(museumThemed(city)).toBe(false);
+    expect(dig([1, 2, 1], [0, 1, 2])).toBe(false);
     // ...and so does an empty slot
-    city.artifactEras = [1, 1, 1];
-    city.artifacts = ARTIFACT_SLOTS - 1;
-    expect(museumThemed(city)).toBe(false);
+    expect(dig([1, 1], [0, 1])).toBe(false);
   });
 
   it('a dug artifact carries the era and the seat that buried it', () => {
@@ -228,8 +231,8 @@ describe('theming', () => {
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index, 0)!;
     arch.tileIndex = dig.index;
     expect(archaeologistExcavate(state, arch.id, 0).ok).toBe(true);
-    expect(city.artifactEras).toEqual([0]);
-    expect(city.artifactSeats).toEqual([1]);
+    const finds = gwWorks(city).filter((w) => w.obj === GWO_ARTIFACT);
+    expect(finds.map((w) => [w.era, w.seat])).toEqual([[0, 1]]);
     // the dig's provenance is cleared with the dig
     expect(dig.antiquityEra).toBeUndefined();
   });

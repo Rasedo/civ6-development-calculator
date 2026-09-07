@@ -2,9 +2,11 @@
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import { bankItemProgress } from './prodLayout';
-import { greatPeopleEarned, relicSlotsIn } from './greatPeople';
+import { greatPeopleEarned } from './greatPeople';
 import { airTrainTile } from './air';
-import { placeRelic, GP_CLASSES } from '../data/greatPeople';
+import { GP_CLASSES } from '../data/greatPeople';
+import { placeGreatWorkIn } from './greatWorks';
+import { GWO_RELIC } from '../data/greatWorks';
 import { VALLETTA_FAITH_DISTRICTS } from '../data/cityStates';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
@@ -1869,20 +1871,18 @@ function theologicalCombatPhase(state: GameState): void {
     // Granted in the SAME order as the two disbands below (defender first,
     // then attacker) so the relic's slot is order-exact across engines.
     const martyrs = (u: Unit): boolean => promoFlag(u, 'MARTYR');
-    // Capacity is the TEMPLE's slot plus any wonder's and the any-work pool's,
-    // so the closure resolves completeness off the tile the way the
-    // Great-Works path does.
-    const relicSlots = relicSlotsIn(state);
-    // CIV6: a Relic that finds no open slot waits in reserve for one to open;
-    // `drainRelicReserve` hands it out at the owner's next turn.
+    // The Relic lands in the owner's first city with an open slot that takes
+    // one. CIV6: a Relic that finds no open slot waits in reserve for one to
+    // open; `drainRelicReserve` hands it out at the owner's next turn.
     const reserve = (sx: number) => {
       const owner = seatOf(state, sx);
       if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
     };
+    const relic = (sx: number) => ({ obj: GWO_RELIC, maker: -1, era: -1, seat: sx });
     if (def.hp <= 0 && martyrs(def)
-        && !placeRelic(citiesOf(state, unitSeat(def)), relicSlots)) reserve(unitSeat(def));
+        && !placeGreatWorkIn(state, citiesOf(state, unitSeat(def)), relic(unitSeat(def)))) reserve(unitSeat(def));
     if (att.hp <= 0 && martyrs(att)
-        && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g);
+        && !placeGreatWorkIn(state, citiesOf(state, g), relic(g))) reserve(g);
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
     // CIV6: "If the defender is killed, the attacker enters its tile, just like

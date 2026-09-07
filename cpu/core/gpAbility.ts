@@ -13,11 +13,12 @@ import { naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import {
-  GP_CITY_PERM, GP_CLASSES, GP_PERM, GREAT_PEOPLE, GW_CLASS_KIND, GW_WORK_CLASSES,
-  gpChargesOf, gpEffectOf, gpSiteOf, gwCapacity, gwCount, placeGreatWorks,
+  GP_CITY_PERM, GP_CLASSES, GP_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
+  gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GreatPersonDef,
 } from '../data/greatPeople';
-import { gwExtraSlots } from './greatPeople';
+import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
+import { GWO_ARTIFACT, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
@@ -54,9 +55,9 @@ export function gpCityAt(state: GameState, seat: number, tile: Tile): City | und
   return citiesOf(state, seat).find((c) => c.isCapital);
 }
 
-/** an open Great Work slot of `kind` in this city, wonders included. */
-function gwOpen(state: GameState, city: City, kind: number): boolean {
-  return gwCount(city, kind) < gwCapacity(city, kind, gwExtraSlots(state, kind)(city));
+/** an open slot in this city that takes at least one of the person's works */
+function gwOpen(state: GameState, city: City, person: GreatPersonDef, at: number): boolean {
+  return personWorkObjects(person.class, at).some((obj) => gwHasRoom(state, city, obj));
 }
 
 /** MAY this person's charge be spent on the tile the unit is standing on? */
@@ -74,10 +75,9 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
       return tile.district === district && tile.districtComplete && !tile.districtPillaged;
     }
     case 'gwSlot': {
-      const kind = GW_CLASS_KIND[person.class];
-      if (kind === undefined || !tileOwnedByCiv(tile, unit.seat)) return false;
+      if (!tileOwnedByCiv(tile, unit.seat)) return false;
       const city = cityAtTile(state, tile);
-      return !!city && city.seat === unit.seat && gwOpen(state, city, kind);
+      return !!city && city.seat === unit.seat && gwOpen(state, city, person, unit.gpAt ?? 0);
     }
     case 'cityState':
       return isCityStateSeat(tileSeat(tile));
@@ -167,13 +167,16 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if (fx.science) owner.research.techProgress += fx.science;
   // CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this city."
   if (fx.artifactScience && city) {
-    owner.research.techProgress += fx.artifactScience * (city.artifactEras?.length ?? 0);
+    owner.research.techProgress += fx.artifactScience * gwCountsByObj(city)[GWO_ARTIFACT]!;
   }
   // CIV6 (Marina Raskova): "District in this tile gains +1 air unit slots."
   if (fx.airSlotBonus) tile.airSlotBonus = (tile.airSlotBonus ?? 0) + fx.airSlotBonus;
   if (GW_WORK_CLASSES.has(person.class) && city) {
-    const kind = GW_CLASS_KIND[person.class]!;
-    const overflow = placeGreatWorks([city], kind, gwExtraSlots(state, kind), unit.gpAt ?? 0);
+    // each work seeks its own slot in THIS city; one with none is the lump
+    let overflow = 0;
+    for (const obj of personWorkObjects(person.class, unit.gpAt ?? 0)) {
+      if (placeGreatWork(state, city, { obj, maker: unit.gpAt ?? 0, era: -1, seat: unit.seat }) < 0) overflow += 1;
+    }
     if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;
@@ -282,8 +285,9 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     const inv = (owner.gpLuxuries ??= []);
     for (let i = 0; i < fx.luxuryCopies; i++) inv.push(fx.luxuryAmenities ?? 1);
   }
+  // CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
   if (fx.greatWorkKind !== undefined && city) {
-    placeGreatWorks([city], fx.greatWorkKind, gwExtraSlots(state, fx.greatWorkKind), 0);
+    placeGreatWork(state, city, { obj: gwKindObjects(fx.greatWorkKind)[0]!, maker: unit.gpAt ?? 0, era: -1, seat: unit.seat });
   }
   // THE SEAT'S OWN LEDGERS.
   if (fx.envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.envoys;

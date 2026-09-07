@@ -72,10 +72,7 @@ class SimDeals:
                 sel = va == k
                 if not bool(sel.any()):
                     continue
-                gw = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[k]
-                src = (self.city_alive[:, giver] & (gw[:, giver] > 0)).any(dim=1)
-                dst = (self.city_alive[:, taker] & (gw[:, taker] < self._gw_capacity(taker, k))).any(dim=1)
-                out |= sel & src & dst
+                out |= sel & self._gw_gift_ok(giver, taker, k)
             return out
         if kind == self._deal_k_city:
             cell = self._deal_city_cell(giver, va)

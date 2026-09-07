@@ -12,6 +12,7 @@ import { spawnUnit } from '../../cpu/core/units';
 import { hexDistance } from '../../world/hex';
 import { tilesWithin } from '../../world/hex';
 import { defaultModifiers, type YieldCtx } from '../../cpu/core/effects';
+import { GW_HOLDERS, GW_LAYOUT, slotAccepts, type GreatWork } from '../../cpu/data/greatWorks';
 
 export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND'): GameMap {
   const tiles: Tile[] = [];
@@ -150,4 +151,33 @@ export function expandBorders(state: GameState, city: City, radius: number): voi
   for (const t of tilesWithin(state.map, center.col, center.row, radius)) {
     if (tileSeat(t) !== 0) setTileOwner(t, city.seat, city.id);
   }
+}
+
+/** the test's shorthand for a city that already HOLDS works: `n` works of
+ *  object `obj` in the first free layout slots whose type takes it, holders
+ *  standing or not. Returns the slots taken. */
+export function holdWorks(
+  city: { greatWorks?: GreatWork[]; buildings?: string[]; wonders?: { id: string; tileIndex: number }[] },
+  obj: number,
+  n = 1,
+  extra: Partial<Omit<GreatWork, 'slot' | 'obj'>> = {},
+): number[] {
+  const taken = new Set((city.greatWorks ?? []).map((w) => w.slot));
+  const has = (h: number) => {
+    const def = GW_HOLDERS[h]!;
+    return def.wonder ? (city.wonders ?? []).some((w) => w.id === def.id) : (city.buildings ?? []).includes(def.id);
+  };
+  const out: number[] = [];
+  // a slot of a holder the city HAS first, any accepting slot after
+  for (const present of [true, false]) {
+    for (let i = 0; i < GW_LAYOUT.length && out.length < n; i++) {
+      const s = GW_LAYOUT[i]!;
+      if (taken.has(i) || !slotAccepts(s.type, obj) || has(s.holder) !== present) continue;
+      (city.greatWorks ??= []).push({ slot: i, obj, maker: -1, era: -1, seat: -1, ...extra });
+      taken.add(i);
+      out.push(i);
+    }
+  }
+  city.greatWorks?.sort((a, b) => a.slot - b.slot);
+  return out;
 }

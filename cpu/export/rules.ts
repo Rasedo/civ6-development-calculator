@@ -25,10 +25,11 @@ import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KE
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
-import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_PROV_W, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
 import { ROUTE_CHAIN_MAX, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { CIV_IDS, MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, ALLIANCE_QP_TURN, ALLIANCE_QP_ROUTE, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, ALLIANCE_M1_CS, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C2_GPP, ALLIANCE_C3_CUL_PCT, ALLIANCE_C3_TOUR_PCT, ALLIANCE_E2_INFLUENCE, ALLIANCE_REL2_THEO_CS, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_REL3_PRESSURE_PCT, GRIEVANCE_WAR_BASE, GRIEVANCE_WAR_ON_FRIEND, GRIEVANCE_WAR_ON_SUZERAIN, GRIEVANCE_WAR_ON_CS_FRIEND, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_CS_CONQUERED, GRIEVANCE_CS_RAZED, GRIEVANCE_DENOUNCE, GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_ALLY_SHARE, GRIEVANCE_FRIEND_SHARE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DECAY_FLOOR, GRIEVANCE_OCCUPIED_DECAY, GRIEVANCE_OCCUPIED_CAPITAL_DECAY, GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX, GRIEVANCE_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CONGRESS_ENERGY_DISCOUNT, CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS, CONGRESS_PACT_LEVELS, DEAL_ITEMS, DEAL_TURNS, DEAL_OFFER_TURNS, DEAL_ITEM_KINDS, DEAL_PERMANENT, COMPETITIONS, COMPETITION_TURNS, COMPETITION_SILVER_PCT, COMPETITION_BRONZE_PCT, VISIBILITY_MAX, VISIBILITY_TECH, VISIBILITY_CS_PER_LEVEL, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, EMERGENCY_NUCLEAR, EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT, WW_WMD_LAUNCHED, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, TOURISM_GOV_MULT, TOURISM_RELIGIOUS_PENALTY_PCT, GOV_INTOLERANCE, CULTURE_PER_DOMESTIC_TOURIST, HOLY_CITY_TOURISM, ENLIGHTENMENT_CIVIC, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_SKY, DED_BODYGUARD, DED_AUTOMATON, SKY_EUREKAS, SKY_ALUMINUM_PER_TURN, SKY_AIR_XP_PCT, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE, PRODUCTION_QUEUE_MAX , CIV_LEADERS } from '../data/seats';
@@ -447,6 +448,41 @@ const civicOrThrow = (id: string): number => {
 const rowCiv = (r: { civ?: string }): number => (r.civ !== undefined ? CIV_IDS.indexOf(r.civ as never) : -1);
 const rowLeader = (r: { leader?: string }): number => (r.leader !== undefined ? CIV_LEADERS.findIndex((l) => l.leader === r.leader) : -1);
 
+/** GREAT WORKS PER HOLDER (`GW_HOLDERS` / `GW_LAYOUT`): each holder's building
+ *  or wonder column and theming rule, every layout position's holder, slot
+ *  type and extra rank, the slot-type acceptance table and the per-object
+ *  yields — plus the roster rows that widen a holder or theme it. */
+function greatWorksWire() {
+  const wonderIdx = new Map(BUILT_WONDER_LIST.map((w, i) => [w.id, i] as const));
+  const holders = GW_HOLDERS.map((h) => {
+    // the Palace stands outside the building catalog: its column is -2, the
+    // capital flag the GPU pays every other Palace effect from
+    const bidx = h.wonder ? -1 : h.id === 'PALACE' ? -2 : buildingIdx.get(h.id);
+    const widx = h.wonder ? wonderIdx.get(h.id) : -1;
+    if (bidx === undefined || widx === undefined) {
+      throw new Error(`great-work holder ${h.id} is not in the ${h.wonder ? 'wonder' : 'building'} catalog`);
+    }
+    return { id: h.id, bidx, widx, wonder: h.wonder ? 1 : 0, theme: h.theme, slots: h.slots.reduce((n, s) => n + s.count, 0) };
+  });
+  return {
+    w: GW_LAYOUT_W,
+    slotHolder: GW_LAYOUT.map((s) => s.holder),
+    slotType: GW_LAYOUT.map((s) => s.type),
+    slotExtraRank: GW_LAYOUT.map((s) => s.extraRank),
+    holders,
+    accepts: GWS_ACCEPTS.map((a) => Array.from({ length: GWO_COUNT }, (_, o) => (a.includes(o) ? 1 : 0))),
+    objCulture: [...GWO_CULTURE],
+    objFaith: [...GWO_FAITH],
+    objTourism: [...GWO_TOURISM],
+    objKind: Array.from({ length: GWO_COUNT }, (_, o) => gwKindOf(o)),
+    themingMult: THEMING_MULT,
+    // [civ, leaderRow, holder, amount]
+    extraSlots: EXTRA_SLOT_ROWS.map((r) => [rowCiv(r), rowLeader(r), GW_HOLDERS.findIndex((h) => h.id === r.holder), r.amount]),
+    // [civ, leaderRow, slots, wonder]
+    autoTheme: AUTO_THEME_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.slots, r.wonder ? 1 : 0]),
+  };
+}
+
 export function buildRules() {
   const rules = {
     focusBase: [2, 2, 1, 1, 1, 1], // food, production, gold, science, culture, faith
@@ -730,46 +766,21 @@ export function buildRules() {
       // 10 hexes".
       killSpreadRange: KILL_SPREAD_RANGE,
       rainforestFid: FEAT_IDS.indexOf('RAINFOREST'),
-      // Great Works. WRITER/MUSICIAN class indices, the building
-      // columns (b_cost catalog order) that hold writing/music works, the slots
-      // per building, the works per person and the per-work culture yield BY KIND
-      // (writing 2, music 4 — the real GS values; NO Great Work pays
-      // gold). The GPU slots works into these building columns and adds the
-      // matching culture at the buildings-bucket position; `gwTourismByKind`
-      // carries the tourism the same way.
-      // the three slotted Great Work kinds, in kind order
-      // (0 WRITING / 1 ART / 2 MUSIC) — the REAL Civ 6 mapping:
-      // Amphitheater 2 slots, Art Museum 3, Broadcast Center 1.
+      // Great Works. The WRITER / ARTIST / MUSICIAN class indices by created
+      // kind (0 WRITING / 1 ART / 2 MUSIC), the works each makes, PRINTING's
+      // doubling of a Work of Writing's tourism, and each artist's works.
       gwClsByKind: [GP_CLASSES.indexOf('WRITER'), GP_CLASSES.indexOf('ARTIST'), GP_CLASSES.indexOf('MUSICIAN')],
-      gwBidxByKind: GW_BUILDINGS.map((b) => buildingIdx.get(b) ?? -1),
-      gwSlotsByKind: [...GW_SLOTS],
       gwWorksByKind: [...GW_WORKS_PER_PERSON],
-      gwCultureByKind: [...GW_CULTURE],
-      gwTourismByKind: [...GW_TOURISM], // tourism per Great Work
-      // PRINTING doubles Great Work of WRITING tourism (real Civ 6 —
-      // the tourism, not the slot count). Index into the exported tech list.
       gwPrintingTech: techIdx.get(GW_PRINTING_TECH) ?? -1,
       gwPrintingWritingMult: GW_PRINTING_WRITING_MULT,
-      artifactBidx: buildingIdx.get(ARTIFACT_BUILDING) ?? -1,
       workshopBidx: buildingIdx.get('WORKSHOP') ?? -1,
-      artifactSlots: ARTIFACT_SLOTS,
-      // every slot an Artifact can STAND in per city — the museum's own
-      // plus the whole any-work pool; the provenance arrays' width.
-      artifactProvW: ARTIFACT_PROV_W,
       // the deepest post chain a route stores (a shared capacity choice)
       routeChainMax: ROUTE_CHAIN_MAX,
-      artifactCulture: ARTIFACT_CULTURE,
-      artifactTourism: ARTIFACT_TOURISM,
-      // a THEMED Archaeological Museum doubles what it holds; the theming
-      // test itself is one era, three civilizations, every slot full.
-      themingMult: THEMING_MULT,
-      // the three works each Great Artist makes, in creation order
+      // the three works each Great Artist makes, in creation order, as object types
       artistWorks: ARTIST_WORKS.map((w) => [...w]),
       modernEraIndex: MODERN_ERA_INDEX,
-      relicBidx: buildingIdx.get(RELIC_BUILDING) ?? -1,
-      relicSlots: RELIC_SLOTS_PER_BUILDING,
-      relicFaith: RELIC_FAITH,
-      relicTourism: RELIC_TOURISM,
+      // the holders, the layout and the object tables (`GW_HOLDERS` / `GW_LAYOUT`)
+      greatWorks: greatWorksWire(),
       wonderTourismBase: WONDER_TOURISM_BASE,
       tourismPerVisitorPerCiv: TOURISM_PER_VISITOR_PER_CIV,
       culturePerDomesticTourist: CULTURE_PER_DOMESTIC_TOURIST,
@@ -979,8 +990,6 @@ export function buildRules() {
         uc: w.requiresCivic ? civicIdx.get(w.requiresCivic) ?? -3 : -1,
         cy: YIELD_KEYS.map((k) => w.cityYields?.[k] ?? 0),
         growAll: w.effects?.growthAllMult ?? 1,
-        gwslots: GW_WONDER_SLOTS[w.id] ?? [0, 0, 0],
-        relicslots: RELIC_WONDER_SLOTS[w.id] ?? 0,
         // Great Person points per turn, parallel to GP_CLASSES.
         gpp: GP_CLASSES.map((c) => w.effects?.gpPoints?.[c] ?? 0),
         // Terrain/feature-keyed tile yields. terr/feat/xfeat are catalog
@@ -1604,8 +1613,8 @@ export function buildRules() {
       formations: FORMATION_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.tier, r.naval ? 1 : 0,
         r.civic !== undefined ? (civicIdx.get(r.civic) ?? -1) : -1, r.cs ?? 0]),
       centerAdj: CENTER_ADJ_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), YIELD_KEYS.indexOf(r.yield), r.amount]),
-      // [civ, leaderRow, kind (0 relic / 1 artifact), yield, amount]
-      greatWorkYields: GREAT_WORK_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.kind === 'relic' ? 0 : 1, YIELD_KEYS.indexOf(r.yield), r.amount]),
+      // [civ, leaderRow, object type, yield, amount]
+      greatWorkYields: GREAT_WORK_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.obj, YIELD_KEYS.indexOf(r.yield), r.amount]),
       gppClass: GPP_CLASS_ROWS.map((r) => [rowCiv(r), rowLeader(r), GP_CLASSES.indexOf(r.cls as never), r.pct]),
       poweredYields: POWERED_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount]),
       // [civ, leaderRow, resource (RESOURCE_IDS), terrain, amount, pct]
@@ -1911,7 +1920,6 @@ export function buildRules() {
       settlerProdPct: b.settlerProdPct ?? 0,
       conquestProdPct: b.conquestProdPct ?? 0,
       conquestProdTurns: b.conquestProdTurns ?? 0,
-      anyWorkSlots: b.anyWorkSlots ?? 0,
       healOnKill: b.healOnKill ?? 0,
       projectChargePct: b.projectChargePct ?? 0,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,

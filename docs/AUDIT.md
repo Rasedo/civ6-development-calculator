@@ -45,9 +45,9 @@ only ever be a delta chain, and delta chains drift. What replaces it is
 the OPEN weight, hand-weighted 1–8 by implementation size, recomputable
 from the list below. ONE ROW PER OPEN ENTRY, and no row without an entry.
 
-Seven entries that had no table row (C-64, C-65, C-67, C-68, C-69, C-71,
-C-72) carry one at weight 1 each since 2026-09-05; every one is cited by an
-open docs/roster_ledger.json row.
+Five entries that had no table row (C-64, C-67, C-68, C-69, C-72) carry
+one at weight 1 each since 2026-09-05; every one is cited by an open
+docs/roster_ledger.json row.
 
 | Open item | Weight | What is open |
 |---|---|---|
@@ -59,7 +59,6 @@ open docs/roster_ledger.json row.
 | B-24r Ages/governors | 1 | Affluence copies the GROUND, Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on named absent systems |
 | B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six; the summed-yield key and one-candidate head are P8-surface |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
-| B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the inert promotions | 1 | three of 107 rows name a mechanic neither engine has — sight-blocking, a PATROL order (C-34), and one magnitude the source never published |
@@ -69,7 +68,7 @@ open docs/roster_ledger.json row.
 | B-66 formations | 1 | the direct-trained formation's strategic-resource charge; an escort formation is a PAIR here; a dragged rider lifts no fog |
 | B-67 the district price MODEL | 1 | one progression curve for all where the install splits two, both DLL-side |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
-| **B. Fidelity vs real Civ 6** | **18** | |
+| **B. Fidelity vs real Civ 6** | **17** | |
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark, demand and discuss and the Retribution casus belli wait on C-76; the queue-front purchase; ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
@@ -85,21 +84,18 @@ open docs/roster_ledger.json row.
 | C-41 nothing places Volcanic Soil | 1 | WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
 | C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
-| C-59 a generic themed carrier | 1 | only a MUSEUM themes; great works are not held PER HOLDER |
 | C-60 the Free City's own defence, amenities and religion | 1 | the Free Cities seat is in on both engines (revolt, race, join, Eleanor's skip, open to attack); what it spawns, its amenity tier and its religion walks are not |
 | C-61 the Cothon's project has no Cothon to stand in | 1 | the civ-unique gate and `moveCapital` / `_move_capital` are in; the row waits on the Cothon district (C-69) and its game-progress price curve |
 | C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
-| C-65 a Great Work of Art carries no object kind | 1 | four SCULPTURE rows have no field to read; decide with C-59 |
 | C-67 a diplomatic action has no preference weight | 1 | waits on the self-play decider, not on a carrier |
 | C-68 two unique chassis are not in the unit roster | 1 | the Janissary and the Saka Horse Archer |
 | C-69 three unique districts, buildings and improvements are absent | 1 | M'banza, Royal Navy Dockyard, Tsikhe, Mission — and the Cothon, which C-61's project stands in |
-| C-71 a building's great-work slots are one table for every seat | 1 | `TRAIT_EXTRA_PALACE_SLOTS` cannot add one; widening is a layout change |
 | C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
 | C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
 | C-76 no opinion scale between majors | 1 | the mission's mark, DEMAND, DISCUSS and its promises, the Retribution casus belli, the AI's agendas — every clause that reads how a leader FEELS |
 | C-77 the worked-tile assignment lives only inside the yield walk | 1 | which citizen works which plot is derived on both engines and exposed nowhere, so a rule that names a WORKED tile (a nuke's citizens) has nothing to read |
-| **C. Absent systems** | **37** | |
-| **OPEN, TOTAL** | **56** | |
+| **C. Absent systems** | **34** | |
+| **OPEN, TOTAL** | **52** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -424,12 +420,6 @@ that with both allowlists empty.
   OPEN: climate change ending fertilization at Phase IV, the Egyptian
   ability, the Soothsayer and COASTAL floods all wait on systems that do not
   exist here.
-- **B-39r. WONDER EFFECTS STILL DROPPED.** Weight 1.
-  SHIPPED: the sourced sweep landed fourteen channels, the Mausoleum's
-  engineer charge and Cristo Redentor's shield.
-  OPEN, both blocked on the per-work TYPE names B-20r would need: Apadana's
-  "+2 Great Work slots (any type)" and the Hermitage's LANDSCAPE-only art
-  slots.
 - **B-51r. ENCAMPMENT RESIDUALS.** Weight 1.
   SHIPPED: the district holds its OWN outer-defense pool
   (`Tile.encampOuterHp` / `encamp_outer_hp`). SOURCED: one set of Walls
@@ -1007,9 +997,9 @@ under their blocker so the dependency is readable, and both halves count.
   OPEN, each against a named blocker:
   - **THE AGENDAS** — DLL-scored, and neither engine holds an opinion scale.
     (C-67 is the same shape for diplomatic preference weights.)
-  - Kristina's auto-theming — C-59. Nkisi's four SCULPTURE rows — C-65; its
-    Palace slots — C-71. Philip II's and Mvemba's majority-religion clauses —
-    C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
+  - Kristina's auto-theming, Nkisi's four SCULPTURE rows and its Palace
+    slots SHIPPED (C-59 / C-65 / C-71). Philip II's and Mvemba's
+    majority-religion clauses — C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
     Apostle arm, England's Royal Navy Dockyard, Georgia's Tsikhe, Spain's
     Mission — C-69. The Cree Trader's tile claim — C-72. Divine Wind's
     hurricanes and Mother Russia's blizzards SHIPPED (C-49). Chandragupta's and
@@ -1265,33 +1255,6 @@ under their blocker so the dependency is readable, and both halves count.
     stays open is the column's READING: one roll per tile pillaging every
     building of the district there, or one per building? The storm rides the
     district's darkness until that is read.
-- **C-59. A GENERIC THEMED CARRIER.** Weight 1.
-  SOURCED (Kristina): "Buildings with at least three Great Work slots and
-  wonders with at least two Great Work slots are automatically themed when
-  they have all their slots filled", and a themed set then pays +100% yields
-  and +100% Tourism. The install's two auto-theme rows are exact:
-  `AUTO_THEME_AT_LEAST_2_SLOTS` is Amount 2 with `IsWonder: true`,
-  `AUTO_THEME_AT_LEAST_3_SLOTS` is Amount 3 with `IsWonder: false`.
-  THE TRAP, recorded so nobody ships it twice: her other two modifiers,
-  `THEMED_YIELD_MODIFIER` and `THEMED_TOURISM_MODIFIER`, are Amount 100 each
-  — and her description promises NO extra yields, only the auto-theming. They
-  are the STANDARD theming bonus expressed as player modifiers so her
-  auto-themed sets pay it, not a bonus of her own. This engine already
-  doubles a themed museum's yields (`THEMING_MULT = 2`), so shipping them as
-  a further +100% would pay twice. What the engine genuinely lacks is the
-  TOURISM half.
-  ENGINES: theming is the MUSEUM's alone — `museumThemed` / `artMuseumThemed`
-  and `_museum_themed` / `_art_museum_themed`; the GPU comment says outright
-  that "a wonder's art slots sit outside the bonus".
-  OPEN — the blocker is a DATA MODEL, not a number. Great works are counted
-  per CITY and per KIND (`GW_SLOTS = [2, 3, 1]` is writing/art/music, and
-  `gwArtType[]` / `artifactSeats[]` are city-wide parallel arrays); no
-  building or wonder declares a slot count, and nothing records WHICH holder a
-  work sits in. A rule reading "a wonder with at least two slots, all filled"
-  cannot be written until great works are held PER HOLDER — the same gap
-  Nkisi's Palace slots wait on (C-71) and the same shape as C-65's object
-  kind; decide the three together. Kristina's four modifiers are marked open
-  against this item in docs/roster_ledger.json.
 - **C-60. THE FREE CITY'S OWN DEFENCE, ITS AMENITIES AND ITS RELIGION.**
   Weight 1.
   SHIPPED (2026-09-06): CIV6's Free Cities player as one seat on both engines
@@ -1472,16 +1435,6 @@ under their blocker so the dependency is readable, and both halves count.
   majority read over its own cities' followed religions, on both engines; the
   TIE RULE is the thing to source before it ships, since a seat can hold two
   religions in equal numbers of cities. Ask.
-- **C-65. A GREAT WORK OF ART CARRIES NO OBJECT KIND.** Weight 1.
-  SOURCED: CIV6 splits Art into SCULPTURE, PAINTING and RELIGIOUS.
-  ENGINES: both model a work's SLOT kind (writing / art / music) and nothing
-  finer, so no site can tell one Art work from another.
-  OPEN: four roster rows pay only the sculpture half —
-  `TRAIT_GREAT_WORK_FAITH_SCULPTURE`, `..._FOOD_SCULPTURE`,
-  `..._GOLD_SCULPTURE`, `..._PRODUCTION_SCULPTURE`, all marked open against
-  this item. The carrier is an object-kind field on the work itself, written
-  where a work is created and read by the four rows — the same shape as C-59's
-  theming and C-71's per-seat slots, and it should be decided with them.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
   SOURCED: CIV6's agenda-style clauses that make an AI PREFER or REFUSE an
   action are DLL-side weightings.
@@ -1516,15 +1469,6 @@ under their blocker so the dependency is readable, and both halves count.
   OPEN, a second gap of the Dockyard row's own: a district's granted unit is
   NAMED by its row on both engines, and nothing picks the strongest naval unit
   of a class the way `bestTrainableOfClass` picks a land one.
-- **C-71. A BUILDING'S GREAT-WORK SLOTS ARE ONE TABLE FOR EVERY SEAT.**
-  Weight 1.
-  ENGINES: `GW_SLOTS` gives each building its slot count globally, and no site
-  asks the SEAT how many slots its own copy has.
-  OPEN: `TRAIT_EXTRA_PALACE_SLOTS` (marked open against this item) cannot add
-  one to a Palace. The carrier is a per-seat override read wherever the slot
-  count is read; the trap is that the count is baked into the wire and into
-  the GPU's slot geometry, so widening it is a LAYOUT change, not a lookup
-  change (`append-shifts-derived-layouts`). Decide with C-59 and C-65.
 - **C-72. A TRADER CLAIMS NO TILE IT WALKS OVER.** Weight 1.
   ENGINES: trade routes move gold and yields between two cities and never
   touch tile ownership, so `TRAIT_TRADE_GAIN_TILES_EN_ROUTE` (marked open
@@ -1577,6 +1521,78 @@ index; the full narrative is in the git log, and the durable lessons are in
 the memory files this appendix names. Delete a bullet once its class is
 mirrored in memory.
 
+- **C-59. Only a MUSEUM themed; great works were counted per city and per
+  kind. CLOSED 2026-09-07.** Great works are now held PER HOLDER on both
+  engines: CIV6 `Building_GreatWorks` / `GreatWork_ValidSubTypes` /
+  `GreatWorkObjectTypes` as one leaf table (`GW_HOLDERS` / `GW_LAYOUT`,
+  cpu/data/greatWorks.ts, fifteen holders, seven slot types, eight object
+  types, a fixed 37-slot layout), `City.greatWorks` / `city_gw_obj/_maker/
+  _era/_seat [B, ROWS, RC, W]` compared as one manifest row, ONE placement
+  composer per side (`placeGreatWork` / `_gw_place`) behind the Great
+  Person, the archaeologist, the Relic, the deal, the gift and the heist, and
+  one theming composer per side (`holderThemed` / `_gw_themed`): the Art
+  Museum's rule (one object type, distinct makers), the Archaeological
+  Museum's (one era, distinct civilizations), and Kristina's
+  `AUTO_THEME_AT_LEAST_3_SLOTS` / `_2_SLOTS` (a building of three slots, a
+  wonder of two, all full, themed whatever the rule). A themed holder pays
+  its works' own culture, faith AND tourism x2 — the tourism half was the
+  missing one. Her `THEMED_YIELD_MODIFIER` / `THEMED_TOURISM_MODIFIER` are
+  the standard x2 written as player modifiers so her auto-themed sets pay it
+  (READING: the install's `Building_GreatWorks` carries the museums'
+  ThemingYieldMultiplier / ThemingTourismMultiplier 100 already, so the two
+  rows ship as that bonus, never as a further +100%). SOURCED alongside: a
+  Work of Art pays 3 Culture (Base GreatWork_YieldChanges, no GS update —
+  this engine paid 2), Kandinsky's, Behzad's and Tohaku's works are
+  LANDSCAPE/PORTRAIT (the Babylon pack; the engine had RELIGIOUS), Sun Tzu's
+  Art of War is ONE work (GREATWORK_SUN_TZU; both engines placed two).
+  READINGS, identical on both engines: a work lands in the first open slot
+  that takes it, holders in the install's row order (buildings before
+  wonders, so a capital's Palace slot fills first); a PILLAGED or vanished
+  holder (the Palace of a captured capital) keeps and pays its works and
+  accepts nothing new; a holder themes only while PRESENT, pillaged or not;
+  theming doubles the work's own face, never the roster's per-work adders;
+  a gift, a deal or a heist takes the giver's LAST-placed work of the kind
+  from its first holding city, and the heist needs the thief to hold a slot
+  that takes it (the mission is refused otherwise). BAR:
+  `great-works-holders` (TS) / `great_works_holders` (GPU), the rewritten
+  `great-works` / `great_works` and `relics` lanes on both sides; the smoke
+  serve (seed 9209, 250 turns) green. REACH (measured: the driver over 250
+  turns on seeds 9001 and 9014): Works of Writing in the Palace's and the
+  Amphitheater's slots and a Relic in a Palace slot; no Museum, wonder holder
+  or themed holder is reached in 250 driven turns, so the theming rules and
+  the auto-theme rows rest on the two lanes. Class: two-composers-of-one-fact — every creator of a work now
+  calls the one composer, and the storage swap shipped as a second commit
+  after the byte-identical wire commit.
+- **C-65. A Great Work of Art carried no object kind. CLOSED 2026-09-07.**
+  Every work carries `obj` (the install's `GreatWorkObjectTypes` numbering:
+  sculpture 0, portrait 1, landscape 2, religious 3, artifact 4, writing 5,
+  music 6, relic 7), written from `ARTIST_WORKS` at creation and carried by
+  a gift, a deal, a heist and a capture. `GREAT_WORK_YIELD_ROWS` are keyed
+  by object, so Nkisi's four SCULPTURE rows pay per sculpture held (+2 Food,
+  +2 Production, +1 Faith, +4 Gold). BAR: `great-works-holders` /
+  `great_works_holders` (three sculptors theme the Art Museum; Kongo's four
+  rows against a plain seat). With C-59.
+- **C-71. A building's great-work slots were one table for every seat.
+  CLOSED 2026-09-07.** `EXTRA_SLOT_ROWS` widens a holder's slot row per
+  seat: the layout carries every row at its widest and ranks the extra
+  positions, and the capacity composer opens rank r only to a seat whose
+  rows sum past r. Nkisi's `TRAIT_EXTRA_PALACE_SLOTS` (BuildingType PALACE,
+  GreatWorkSlotType PALACE, Amount 4 — the AUDIT had guessed one) gives
+  Kongo a five-slot Palace of any object type, everyone else one. BAR:
+  `great-works-holders` / `great_works_holders` ("holds five works of any
+  kind for Kongo, one for anyone else"). With C-59.
+- **B-39r. Two wonder residuals waited on per-work TYPE names. CLOSED
+  2026-09-07.** SOURCED against the install rather than the wiki: the
+  Apadana's row is two GREATWORKSLOT_PALACE slots (Macedonia_Persia
+  GameplayData — any object), and the Hermitage's is four GREATWORKSLOT_ART
+  slots with NO landscape restriction (Base Buildings.xml; the "landscape-
+  only" reading was the civilopedia's, and the XML outranks it). Both are
+  rows of `GW_HOLDERS`, beside the Great Library's, Oxford's, the Bolshoi's,
+  Mont St. Michel's and St. Basil's. BAR: `great-works` (a Hermitage holds
+  an Artist's three with no Museum; the Great Library's two after the
+  Amphitheater's) and `relics` (St. Basil's three, additive with the
+  Temple's) on both engines. Lesson: declared-gaps-are-not-the-gap-list —
+  the "blocked" bullet named a restriction the install does not have.
 - **A-14r. A Free City could not work its own tiles on the GPU. CLOSED
   2026-09-07.** The work window and the yield walk matched a tile's holder by
   city-plane ROW INDEX (`tile_seat == row`), which equals the seat id for a

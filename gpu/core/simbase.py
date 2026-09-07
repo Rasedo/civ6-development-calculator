@@ -179,7 +179,6 @@ class Rules:
     b_settler_prod: torch.Tensor  # f64 [NB] — percent added to SETTLER production in the building's own city
     b_conquest_pct: torch.Tensor  # f64 [NB] — percent added to every city's production inside the window
     b_conquest_turns: torch.Tensor  # long [NB] — how many turns a capture opens that window for
-    b_any_work: torch.Tensor  # long [NB] — Great Work slots of ANY kind, one shared pool
     b_heal_kill: torch.Tensor  # long [NB] — hit points a unit of this seat heals when it eliminates one
     b_project_charge: torch.Tensor  # f64 [NB] — percent of a District Project's cost each Builder charge pays
     b_power_supply: torch.Tensor  # f64 [NB] — renewable Power it supplies its own city, no stockpile behind it
@@ -381,7 +380,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_settler_prod=torch.tensor([float(b.get("settlerProdPct", 0)) for b in B], dtype=torch.float64),
         b_conquest_pct=torch.tensor([float(b.get("conquestProdPct", 0)) for b in B], dtype=torch.float64),
         b_conquest_turns=torch.tensor([int(b.get("conquestProdTurns", 0)) for b in B], dtype=torch.long),
-        b_any_work=torch.tensor([int(b.get("anyWorkSlots", 0)) for b in B], dtype=torch.long),
         b_heal_kill=torch.tensor([int(b.get("healOnKill", 0)) for b in B], dtype=torch.long),
         b_project_charge=torch.tensor([float(b.get("projectChargePct", 0)) for b in B], dtype=torch.float64),
         b_power_supply=torch.tensor([float(b.get("powerSupply", 0)) for b in B], dtype=torch.float64),
@@ -791,7 +789,7 @@ _MUTABLE = [
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_rock_bands",  # how many Rock Bands each seat has bought (the progressive price)
     "civ_naturalists",  # how many Naturalists — the same progression shape
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus",
 ]

@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
-import { makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
+import { makeState, settleAt, tileAtCoords, grantTechs, holdWorks } from '../helpers';
 import { spawnUnit, archaeologistExcavate, trainableUnits } from '../../../cpu/core/units';
 import { markAntiquitySite } from '../../../cpu/core/combat';
-import { ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, ARCHAEOLOGIST_CHARGES, artifactCulture, artifactTourism } from '../../../cpu/data/greatPeople';
+import { ARCHAEOLOGIST_CHARGES } from '../../../cpu/data/greatPeople';
+import { GW_HOLDERS, GWO_ARTIFACT, GWO_CULTURE, GWO_TOURISM, GWS_ARTIFACT } from '../../../cpu/data/greatWorks';
+import { greatWorkTourism, greatWorkYields, gwCountObjs } from '../../../cpu/core/greatWorks';
+const ARTIFACT_BUILDING = 'ARCHAEOLOGICAL_MUSEUM';
+const ARTIFACT_SLOTS = 3;
+const artifacts = (c: City) => gwCountObjs(c, [GWO_ARTIFACT]);
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import type { City, GameState } from '../../../cpu/core/types';
 
@@ -19,9 +24,9 @@ function found(state: GameState, col: number, row: number): City {
 
 describe('artifacts and archaeology', () => {
   it('the sourced constants and the museum choice', () => {
-    expect(ARTIFACT_CULTURE).toBe(3);
-    expect(ARTIFACT_TOURISM).toBe(3);
-    expect(ARTIFACT_SLOTS).toBe(3);
+    expect(GWO_CULTURE[GWO_ARTIFACT]).toBe(3);
+    expect(GWO_TOURISM[GWO_ARTIFACT]).toBe(3);
+    expect(GW_HOLDERS.find((h) => h.id === ARTIFACT_BUILDING)!.slots).toEqual([{ type: GWS_ARTIFACT, count: ARTIFACT_SLOTS }]);
     expect(ARCHAEOLOGIST_CHARGES).toBe(3);
     // real Civ 6: a Theater Square holds the ART museum OR the ARCHAEOLOGICAL
     // one, never both
@@ -55,13 +60,13 @@ describe('artifacts and archaeology', () => {
     expect(arch.charges).toBe(ARCHAEOLOGIST_CHARGES);
 
     expect(archaeologistExcavate(state, arch.id, 0).ok).toBe(true);
-    expect(city.artifacts).toBe(1);
+    expect(artifacts(city)).toBe(1);
     expect(dig.antiquity).toBe(false); // the dig is spent
     expect(arch.charges).toBe(ARCHAEOLOGIST_CHARGES - 1);
 
     // ... and the artifact pays the sourced yields
-    expect(artifactCulture(city)).toBe(ARTIFACT_CULTURE);
-    expect(artifactTourism(city)).toBe(ARTIFACT_TOURISM);
+    expect(greatWorkYields(state, city).culture).toBe(GWO_CULTURE[GWO_ARTIFACT]);
+    expect(greatWorkTourism(state, city, false)).toBe(GWO_TOURISM[GWO_ARTIFACT]);
 
     // a second excavation with no site underfoot is refused
     expect(archaeologistExcavate(state, arch.id, 0).ok).toBe(false);
@@ -71,8 +76,9 @@ describe('artifacts and archaeology', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = found(state, 5, 5);
+    city.buildings = city.buildings.filter((b) => b !== 'PALACE'); // no Palace slot to fall back on
     city.buildings.push(ARTIFACT_BUILDING);
-    city.artifacts = ARTIFACT_SLOTS; // full
+    holdWorks(city, GWO_ARTIFACT, ARTIFACT_SLOTS); // full
     const dig = tileAtCoords(state.map, 6, 5);
     setTileOwner(dig, city.seat, city.id);
     markAntiquitySite(state, dig.index, 0);
@@ -80,7 +86,7 @@ describe('artifacts and archaeology', () => {
     arch.tileIndex = dig.index;
 
     expect(archaeologistExcavate(state, arch.id, 0).ok).toBe(false);
-    expect(city.artifacts).toBe(ARTIFACT_SLOTS);
+    expect(artifacts(city)).toBe(ARTIFACT_SLOTS);
     expect(dig.antiquity).toBe(true); // the dig survives a refused excavation
   });
 
@@ -88,6 +94,9 @@ describe('artifacts and archaeology', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = found(state, 5, 5);
+    // the capital's Palace slot takes an Artifact too; take it away so the
+    // museum alone decides
+    city.buildings = city.buildings.filter((b) => b !== 'PALACE');
     const has = () => trainableUnits(state, 0, city).some((d) => d.id === 'ARCHAEOLOGIST');
     expect(has()).toBe(false); // no civic, no museum
     grantTechs(state); // (techs only — the civic gate is separate)
@@ -95,7 +104,7 @@ describe('artifacts and archaeology', () => {
     expect(has()).toBe(false); // civic in, but still no museum
     city.buildings.push(ARTIFACT_BUILDING);
     expect(has()).toBe(true);
-    city.artifacts = ARTIFACT_SLOTS; // museum full -> nothing left to dig for
+    holdWorks(city, GWO_ARTIFACT, ARTIFACT_SLOTS); // museum full -> nothing left to dig for
     expect(has()).toBe(false);
   });
 });

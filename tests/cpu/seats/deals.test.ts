@@ -21,7 +21,7 @@
  * The GPU twin is `tests/gpu/geopolitics_test.py`'s poke m.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { civsAtWar, emptySeat, setTileOwner, setWar, setWarTurnsWith, borderTurnsFrom } from '../../../cpu/core/seats';
 import {
@@ -34,7 +34,8 @@ import {
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import { grantStockpile, stockOf } from '../../../cpu/core/stockpile';
 import { spiesOf } from '../../../cpu/core/espionage';
-import { gwCount } from '../../../cpu/data/greatPeople';
+import { gwCountKind } from '../../../cpu/core/greatWorks';
+import { GWO_WRITING } from '../../../cpu/data/greatWorks';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat, SeatActionRecord } from '../../../cpu/core/types';
 
@@ -184,13 +185,13 @@ describe('the things a deal can name', () => {
     const home = state.seats[2].cities[0];
     from.buildings.push('AMPHITHEATER');
     home.buildings.push('AMPHITHEATER');
-    from.greatWorksWriting = 1;
+    holdWorks(from, GWO_WRITING, 1);
     play(state, {
       1: { offer: [2, [[DEAL_GREAT_WORK, 0, 0]], []] },
       2: { accept: [1] },
     });
-    expect(gwCount(from, 0)).toBe(0);
-    expect(gwCount(home, 0)).toBe(1);
+    expect(gwCountKind(from, 0)).toBe(0);
+    expect(gwCountKind(home, 0)).toBe(1);
   });
 
   it('a city changes hands only at full HP, walls and all', () => {

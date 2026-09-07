@@ -12,7 +12,7 @@ import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf } from './seats';
 import { hexDistance } from '../../world/hex';
-import { gwCount, GW_WRITING, GW_ART, GW_MUSIC } from '../data/greatPeople';
+import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
@@ -750,7 +750,7 @@ export function greatWorkLoyalty(state: GameState, city: City): number {
     for (const c of s.cities) {
       const t = state.map.tiles[c.centerIndex];
       const d = hexDistance(here.col, here.row, t.col, t.row);
-      const works = gwCount(c, GW_WRITING) + gwCount(c, GW_ART) + gwCount(c, GW_MUSIC);
+      const works = cityGreatWorks(c);
       if (!works) continue;
       for (const r of rows) if (d <= r.range) n += r.amount * works;
     }

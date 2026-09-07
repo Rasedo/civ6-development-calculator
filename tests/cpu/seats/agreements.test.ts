@@ -21,7 +21,7 @@
  * The GPU twin is `tests/gpu/geopolitics_test.py`'s pokes i, i2 and i3.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import {
   allyTurnsWith, borderTurnsFrom, delegationWith, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
@@ -37,7 +37,8 @@ import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL, SPY_UNIT } from '../../..
 import { defenderCS } from '../../../cpu/core/combat';
 import { borderClosedTo, spawnUnit, tileFreeForUnit } from '../../../cpu/core/units';
 import { diplomaticFavorPerTurn, allianceLevels } from '../../../cpu/core/seatTurn';
-import { gwCount } from '../../../cpu/data/greatPeople';
+import { gwAt, gwCountKind } from '../../../cpu/core/greatWorks';
+import { GW_HOLDERS, GWO_LANDSCAPE, holderSlots } from '../../../cpu/data/greatWorks';
 import {
   AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_L2_QP, ALLIANCE_MILITARY, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_RESEARCH,
   FAVOR_PER_ALLIANCE, FORMAL_WAR_MIN_TURNS, OPEN_BORDERS_CIVIC,
@@ -415,16 +416,15 @@ describe('a Great Work changes hands', () => {
     const home = state.seats[2].cities[0];
     from.buildings.push('MUSEUM');
     home.buildings.push('MUSEUM');
-    from.greatWorksArt = 1;
-    from.gwArtType = [4, -1, -1];
-    from.gwArtArtist = [2, -1, -1];
+    const museum = holderSlots(GW_HOLDERS.findIndex((h) => h.id === 'MUSEUM'));
+    from.greatWorks = [{ slot: museum[0]!, obj: GWO_LANDSCAPE, maker: 2, era: -1, seat: 1 }];
 
     play(state, { 1: { gift: [[1, 2]] } });
-    expect(gwCount(from, 1)).toBe(0);
-    expect(gwCount(home, 1)).toBe(1);
-    expect(from.gwArtType![0]).toBe(-1);
-    expect(home.gwArtType![0]).toBe(4);
-    expect(home.gwArtArtist![0]).toBe(2);
+    expect(gwCountKind(from, 1)).toBe(0);
+    expect(gwCountKind(home, 1)).toBe(1);
+    expect(from.greatWorks).toBeUndefined();
+    // the work lands in the taker's museum, WHAT it is and WHO made it intact
+    expect(gwAt(home, museum[0]!)).toEqual({ slot: museum[0], obj: GWO_LANDSCAPE, maker: 2, era: -1, seat: 1 });
   });
 
   it('gives nothing away at war, and nothing it does not hold', () => {
@@ -433,15 +433,15 @@ describe('a Great Work changes hands', () => {
     const home = state.seats[2].cities[0];
     from.buildings.push('MUSEUM');
     home.buildings.push('MUSEUM');
-    from.greatWorksArt = 1;
+    holdWorks(from, GWO_LANDSCAPE, 1);
     setWar(state, 1, 2, true);
     play(state, { 1: { gift: [[1, 2]] } });
-    expect(gwCount(from, 1)).toBe(1);
+    expect(gwCountKind(from, 1)).toBe(1);
 
     setWar(state, 1, 2, false);
-    from.greatWorksArt = 0;
+    delete from.greatWorks;
     play(state, { 1: { gift: [[1, 2]] } });
-    expect(gwCount(home, 1)).toBe(0);
+    expect(gwCountKind(home, 1)).toBe(0);
   });
 });
 

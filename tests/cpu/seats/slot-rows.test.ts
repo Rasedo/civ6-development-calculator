@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { getModifiers, wonderExtraSlots, slotFavorOf, greatWorkLoyalty } from '../../../cpu/core/effects';
 import { cityHasPark } from '../../../cpu/core/city';
@@ -12,9 +12,10 @@ import { CIVICS } from '../../../cpu/data/civics';
 import {
   SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS,
   GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, PARK_APPEAL_ROWS,
-  SKIP_FREE_CITY_ROWS, UNIT_POP_COST_ROWS, AUTO_THEME_ROWS,
+  SKIP_FREE_CITY_ROWS, UNIT_POP_COST_ROWS,
 } from '../../../cpu/data/civilizations';
 import type { GameState } from '../../../cpu/core/types';
+import { AUTO_THEME_ROWS, GWO_PORTRAIT, GWO_WRITING } from '../../../cpu/data/greatWorks';
 
 /**
  * THE SLOT, THE GREAT WORK AND THE CONQUERED FORMATION (CIV6, the install's
@@ -108,7 +109,7 @@ describe('Eleanor', () => {
       state.seats[1].civ = row;
       const mine = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
       const theirs = settleAt(state, tileAtCoords(state.map, far ? 18 : 8, far ? 18 : 5).index, 1);
-      theirs.greatWorksWriting = works;
+      holdWorks(theirs, GWO_WRITING, works);
       return greatWorkLoyalty(state, mine);
     };
     expect(scene(leaderRow('ELEANOR_ENGLAND'), 0, false)).toBe(0);
@@ -123,7 +124,7 @@ describe('Eleanor', () => {
     const state = sceneAs(leaderRow('ELEANOR_ENGLAND'));
     const mine = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
     const other = settleAt(state, tileAtCoords(state.map, 9, 9).index, 0);
-    other.greatWorksArt = 5;
+    holdWorks(other, GWO_PORTRAIT, 5);
     expect(greatWorkLoyalty(state, mine)).toBe(0);
   });
 });

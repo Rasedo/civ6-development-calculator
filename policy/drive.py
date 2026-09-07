@@ -196,14 +196,13 @@ def _gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
         return own & (sim.district == arg) & sim.district_complete & ~sim.pillaged
     if site == 1:  # anywhere — nothing to walk to
         return torch.ones_like(own)
-    if site == 2:  # a city with a free Great Work slot of this class's kind
+    if site == 2:  # a city with an open slot taking a work of this class's kind
         out = torch.zeros_like(own)
         col = sim.city_slot_at(seat)
         for kind in range(3):
             if sim._gw_cls[kind] < 0:
                 continue
-            used = (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)[kind][:, seat]
-            free = ((sim._gw_capacity(seat, kind) - used) > 0) & sim.city_alive[:, seat]
+            free = sim._gw_room_kind(seat, kind) & sim.city_alive[:, seat]
             out = out | (own & (col >= 0) & free.gather(1, col.clamp(min=0)))
         return out
     if site == 3:  # inside any city-state's territory
@@ -875,7 +874,6 @@ def _geo_turn(sim, seeds=None):
                 if sim._open_borders_civic >= 0 else torch.zeros_like(alive_row))
     al_civic = (sim.civ_civics[:, :nrow, sim._alliance_civic]
                 if sim._alliance_civic >= 0 else torch.zeros_like(alive_row))
-    gw_planes = (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)
     for a in range(nrow):
         for b in range(nrow):
             if a == b:
@@ -921,9 +919,8 @@ def _geo_turn(sim, seeds=None):
                               & (sim.civ_treasury[:, a] >= _cost))
             trusted = (sim.seat_friend_turns[:, a, b] > 0) | (sim.seat_ally_turns[:, a, b] > 0)
             for kind in range(ladder.GW_KINDS):
-                held = gw_planes[kind]
-                mine = (held[:, a] * sim.city_alive[:, a].long()).sum(dim=1)
-                theirs = (held[:, b] * sim.city_alive[:, b].long()).sum(dim=1)
+                mine = (sim._gw_kind_count(a, kind) * sim.city_alive[:, a].long()).sum(dim=1)
+                theirs = (sim._gw_kind_count(b, kind) * sim.city_alive[:, b].long()).sum(dim=1)
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (mine > theirs)
     _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max)
     return den, frd, ally, bord, gift, deleg, off, acc, ally_ty

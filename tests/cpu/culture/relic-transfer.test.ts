@@ -4,6 +4,9 @@ import { makeState, tileAtCoords } from '../helpers';
 import { transferCity } from '../../../cpu/core/phase';
 import { tilesWithin } from '../../../world/hex';
 import type { GameState, City, Seat } from '../../../cpu/core/types';
+import { holdWorks } from '../helpers';
+import { GWO_MUSIC, GWO_RELIC, GWO_SCULPTURE, GWO_WRITING } from '../../../cpu/data/greatWorks';
+import { gwCountObjs } from '../../../cpu/core/greatWorks';
 
 // A city that changes hands must carry its GREAT WORKS and RELICS
 // to the new owner: in real Civ 6 the victor gains control of the Great Works
@@ -85,20 +88,24 @@ describe('great works and relics ride a city transfer', () => {
     const from = addCiv(state, 4, 4, 'Rome');
     const to = addCiv(state, 9, 9, 'Greece');
     const civCity = from.cities[0];
-    civCity.relics = 1;
-    civCity.greatWorksWriting = 2;
-    civCity.greatWorksArt = 3;
-    civCity.greatWorksMusic = 1;
+    holdWorks(civCity, GWO_RELIC, 1, { seat: from.seat });
+    holdWorks(civCity, GWO_WRITING, 2, { maker: 4, seat: from.seat });
+    holdWorks(civCity, GWO_SCULPTURE, 3, { maker: 2, seat: from.seat });
+    holdWorks(civCity, GWO_MUSIC, 1, { maker: 1, seat: from.seat });
+    const before = civCity.greatWorks!.map((w) => ({ ...w }));
 
     transferCity(state, from.seat, to, civCity, 'conquered');
 
     expect(from.cities).toHaveLength(0);
     expect(to.cities).toHaveLength(2);
     const flipped = to.cities[to.cities.length - 1];
-    expect(flipped.relics).toBe(1);
-    expect(flipped.greatWorksWriting).toBe(2);
-    expect(flipped.greatWorksArt).toBe(3);
-    expect(flipped.greatWorksMusic).toBe(1);
+    expect(gwCountObjs(flipped, [GWO_RELIC])).toBe(1);
+    expect(gwCountObjs(flipped, [GWO_WRITING])).toBe(2);
+    expect(gwCountObjs(flipped, [GWO_SCULPTURE])).toBe(3);
+    expect(gwCountObjs(flipped, [GWO_MUSIC])).toBe(1);
+    // slot for slot, maker and provenance intact, and not the same array
+    expect(flipped.greatWorks).toEqual(before);
+    expect(flipped.greatWorks).not.toBe(civCity.greatWorks);
     // the Temple that houses the relic must come with it, or the carried count
     // would be unhousable — keeps buildings minus PALACE
     expect(flipped.buildings).toContain('TEMPLE');
@@ -113,7 +120,6 @@ describe('great works and relics ride a city transfer', () => {
     transferCity(state, from.seat, to, civCity, 'conquered');
 
     const flipped = to.cities[to.cities.length - 1];
-    expect(flipped.relics ?? 0).toBe(0);
-    expect(flipped.greatWorksArt ?? 0).toBe(0);
+    expect(flipped.greatWorks).toBeUndefined();
   });
 });

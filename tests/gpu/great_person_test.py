@@ -37,7 +37,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, clear_works
 
 ROW = 1  # a civ row: the pokes below are seat-generic, so any row proves them
 
@@ -227,18 +227,21 @@ def poke_gw_site(rules, path):
     assert ctr >= 0, "row has no city"
     v = make_person(sim, ROW, cls, at, ctr)
     sim._gp_site[cls, at] = 2
-    used = (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)[kind]
-    bcol = sim._gw_bidx[kind]
-    assert bcol >= 0, f"kind {kind} has no slot building in this roster"
+    bcol = holder_bidx(sim, ("AMPHITHEATER", "MUSEUM", "BROADCAST_CENTER")[kind])
     sim.city_bldg[0, ROW, 0, bcol] = True
-    sim._eff_version += 1
-    cap = int(sim._gw_capacity(ROW, kind)[0, 0])
-    assert cap > 0, f"the slot building left kind {kind} at capacity {cap}"
-    used[0, ROW, 0] = 0
-    sim._eff_version += 1
+    sim.city_is_cap[0, ROW, 0] = False  # the Palace slot aside
+    clear_works(sim)
     assert site_ok(sim, ROW, v), "a city with a free slot refused the Great Work site"
-    used[0, ROW, 0] = cap
-    sim._eff_version += 1
+    # fill every slot that takes one of the person's works
+    objs = sorted(set(int(o) for o in sim._gw_person_objs(torch.tensor([cls]), torch.tensor([at]))[0].tolist() if o >= 0))
+    cap = 0
+    for o in objs:
+        while bool(sim._gw_room(ROW, o)[0, 0]):
+            B = sim.B
+            full = lambda x: torch.full((B,), x, dtype=torch.long)  # noqa: E731
+            assert bool(sim._gw_place(ROW, torch.ones(B, dtype=torch.bool), full(0), full(o), full(0), full(-1), full(0))[0])
+            cap += 1
+    assert cap > 0, f"the slot building left kind {kind} with no slot"
     assert not site_ok(sim, ROW, v), "a FULL city satisfied the Great Work site"
     print(f"  2b great-work site OK — class {cls}, kind {kind}, capacity {cap}")
 
@@ -407,6 +410,17 @@ def poke_grant_drops_queue(rules, path):
     assert float(sim.city_prod_bank[bidx, ROW, col]) == 42.0,         f"the hammers burned instead of banking ({float(sim.city_prod_bank[bidx, ROW, col])})"
     assert float(sim.city_progress[bidx, ROW, col, 0]) == 0.0, "the slot kept its progress"
     print("  8 grant drops the queue OK — slot cleared, 37 hammers banked onto the 5 already there")
+
+
+def holder_bidx(sim, hid: str) -> int:
+    """the building column of one great-work holder (`GW_HOLDERS`)"""
+    return sim._gw_holder_bidx[[h["id"] for h in sim.rules.seats["greatWorks"]["holders"]].index(hid)]
+
+
+def holder_slots(sim, hid: str) -> list[int]:
+    """the layout slots of one great-work holder"""
+    h = [x["id"] for x in sim.rules.seats["greatWorks"]["holders"]].index(hid)
+    return (sim._gw_slot_holder == h).nonzero(as_tuple=True)[0].tolist()
 
 
 def main() -> None:

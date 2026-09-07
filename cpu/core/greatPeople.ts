@@ -1,8 +1,7 @@
 
-import type { City, GameState, GreatPersonClass, Seat } from './types';
+import type { GameState, GreatPersonClass, Seat } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_KINDS, GW_WONDER_SLOTS, ARTIFACT_BUILDING, ARTIFACT_SLOTS, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_WONDER_SLOTS, gpChargesOf, gpCost, gwCapacity, gwCount } from '../data/greatPeople';
-import { cityBuildingSum } from './city';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpChargesOf, gpCost } from '../data/greatPeople';
 import { nextRandom } from './rand';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
@@ -218,97 +217,6 @@ export function greatPersonPointsPerTurn(
     }
   }
   return out;
-}
-
-/** Great-work slots a city's WONDERS add, for one kind. It resolves here
- *  because completeness lives on the tile and data/greatPeople.ts is map-free. */
-export function wonderGwSlots(state: GameState, kind: number) {
-  return (c: { wonders?: { id: string; tileIndex: number }[] }): number =>
-    (c.wonders ?? []).reduce(
-      (n, w) =>
-        n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[kind] ?? 0) : 0),
-      0,
-    );
-}
-
-/** What every slot rule here reads: a city's buildings, its districts (a
- *  pillaged one takes its buildings with it) and what it already holds. */
-type WorkCity = {
-  buildings: string[];
-  artifacts?: number;
-  districts?: City['districts'];
-  relics?: number;
-  wonders?: { id: string; tileIndex: number }[];
-  greatWorksWriting?: number;
-  greatWorksArt?: number;
-  greatWorksMusic?: number;
-};
-
-/** CIV6: a city's RELIC capacity beyond its Temple slot — every complete
- *  wonder's, the pool slots its relics already stand in, and whatever is left
- *  of the pool. */
-export function relicSlotsIn(state: GameState) {
-  return (c: WorkCity): number => {
-    const w = wonderRelicSlots(state, c);
-    const dedicated = (c.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0) + w;
-    return w + inPool(state, c, dedicated, c.relics ?? 0) + anyWorkFree(state, c);
-  };
-}
-
-/** relic slots this city's COMPLETE wonders add. */
-function wonderRelicSlots(state: GameState, c: WorkCity): number {
-  return (c.wonders ?? []).reduce(
-    (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
-    0,
-  );
-}
-
-/**
- * CIV6 (National History Museum): "Provides 4 slots for any Great Work" — ONE
- * shared pool, which a work of any kind falls into once the slots of its own
- * kind are full. What is left of that pool here: the works this city holds
- * beyond their DEDICATED slots are already standing in it.
- */
-export function anyWorkFree(state: GameState, city: WorkCity): number {
-  const pool = cityBuildingSum(state, city, 'anyWorkSlots');
-  if (pool <= 0) return 0;
-  let used = 0;
-  for (let k = 0; k < GW_KINDS; k++) {
-    used += Math.max(0, gwCount(city, k) - gwCapacity(city, k, wonderGwSlots(state, k)(city)));
-  }
-  const relicDedicated = (city.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0)
-    + wonderRelicSlots(state, city);
-  used += Math.max(0, (city.relics ?? 0) - relicDedicated);
-  used += Math.max(0, (city.artifacts ?? 0)
-    - (city.buildings.includes(ARTIFACT_BUILDING) ? ARTIFACT_SLOTS : 0));
-  return Math.max(0, pool - used);
-}
-
-/** CIV6 (National History Museum): its any-kind slots take an Artifact like
- *  any other Great Work, so a find's room is per-CITY — the Archaeological
- *  Museum's own slots plus what is left of the pool — never the bare museum
- *  constant. */
-export function artifactFree(state: GameState, c: WorkCity): number {
-  const ded = c.buildings.includes(ARTIFACT_BUILDING) ? ARTIFACT_SLOTS : 0;
-  return Math.max(0, ded - (c.artifacts ?? 0)) + anyWorkFree(state, c);
-}
-
-/** The extra Great-Work slots of one kind a city carries beyond its slot
- *  building: its wonders', the pool slots that kind's works already stand in,
- *  and whatever is left of the pool. */
-export function gwExtraSlots(state: GameState, kind: number) {
-  const wonders = wonderGwSlots(state, kind);
-  return (c: WorkCity): number => {
-    const w = wonders(c);
-    return w + inPool(state, c, gwCapacity(c, kind, w), gwCount(c, kind)) + anyWorkFree(state, c);
-  };
-}
-
-/** How many of the any-work POOL's slots one kind already stands in. Never
- *  more than the pool: a city that loses a dedicated slot under an occupied
- *  work keeps the work, not a slot conjured to hold it. */
-function inPool(state: GameState, c: WorkCity, dedicated: number, held: number): number {
-  return Math.min(Math.max(0, held - dedicated), cityBuildingSum(state, c, 'anyWorkSlots'));
 }
 
 /**

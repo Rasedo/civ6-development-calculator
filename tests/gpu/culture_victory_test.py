@@ -32,7 +32,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import _MUTABLE
-from warmup import settle_all
+from warmup import settle_all, hold_works
 
 
 def _sim(n: int = 1) -> BatchSim:
@@ -137,14 +137,14 @@ def main() -> None:
     assert s9._holy_city_tour == 8, s9._holy_city_tour
     assert s9._enl_cidx >= 0, "the Enlightenment civic must export its index"
     col = int(s9.city_alive[0, 0].nonzero()[0])
-    s9.city_relics[0, 0, col] = 2
+    hold_works(s9, 0, 0, col, 7, 2)
     s9.holy_tile[0, 0] = int(s9.city_center[0, 0, col])
     got = int(s9._tourism_religious_of(0)[0])
-    assert got == 2 * s9._relic_tour + s9._holy_city_tour, got
+    assert got == 2 * 8 + s9._holy_city_tour, got
     # a religion's Holy City pays its CURRENT owner
     col1 = int(s9.city_alive[0, 1].nonzero()[0])
     s9.holy_tile[0, 0] = int(s9.city_center[0, 1, col1])
-    assert int(s9._tourism_religious_of(0)[0]) == 2 * s9._relic_tour
+    assert int(s9._tourism_religious_of(0)[0]) == 2 * 8
     assert int(s9._tourism_religious_of(1)[0]) == s9._holy_city_tour
 
     def banked_rel(enl_o: bool, shield_c: bool, dom_diff: bool) -> int:

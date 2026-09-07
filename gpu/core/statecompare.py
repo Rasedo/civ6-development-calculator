@@ -785,25 +785,14 @@ CITY = {
     "freePressure": lambda sim, b, rows: [
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],
-    "greatWorksWriting": _cty("city_gw_writing"),
-    "greatWorksArt": _cty("city_gw_art"),
-    "greatWorksMusic": _cty("city_gw_music"),
+    # every layout slot's work — object, maker, era, civilization; -1s for an
+    # empty slot — exactly like the TS extractor.
+    "greatWorks": lambda sim, b, rows: [
+        [int(x) for i in range(sim.GW_W)
+         for x in (sim.city_gw_obj[b, c, s, i], sim.city_gw_maker[b, c, s, i], sim.city_gw_era[b, c, s, i], sim.city_gw_seat[b, c, s, i])]
+        for c, s in rows
+    ],
     "powered": lambda sim, b, rows: [1 if sim.city_powered[b, c, s] else 0 for c, s in rows],
-    "relics": _cty("city_relics"),
-    "artifacts": _cty("city_artifacts"),
-    # the museum's provenance, slot by slot: era then civilization, so one
-    # row reads [e0, s0, e1, s1, ...] exactly like the TS extractor.
-    "artifactProv": lambda sim, b, rows: [
-        [int(x) for i in range(sim._artifact_prov_w)
-         for x in (sim.city_artifact_era[b, c, s, i], sim.city_artifact_seat[b, c, s, i])]
-        for c, s in rows
-    ],
-    # the ART MUSEUM's provenance, slot by slot: type then artist.
-    "gwArtProv": lambda sim, b, rows: [
-        [int(x) for i in range(sim._gw_slots_k[1])
-         for x in (sim.city_gwart_type[b, c, s, i], sim.city_gwart_artist[b, c, s, i])]
-        for c, s in rows
-    ],
 }
 
 
