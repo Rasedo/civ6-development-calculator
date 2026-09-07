@@ -2295,6 +2295,7 @@ class SimInit:
         self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
         self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
         self._flood_bldg_p = torch.tensor([float(x) for x in _ds["floodBldgP"]], dtype=torch.float64, device=device)
+        self._decommission_score = int(_ds["decommissionScore"])
         self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
         self._flood_dmg_lo = torch.tensor([int(x) for x in _ds["floodDmgLo"]], dtype=torch.long, device=device)
         self._flood_dmg_hi = torch.tensor([int(x) for x in _ds["floodDmgHi"]], dtype=torch.long, device=device)

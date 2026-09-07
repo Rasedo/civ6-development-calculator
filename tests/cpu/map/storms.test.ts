@@ -186,6 +186,15 @@ describe('the eight storms are the install\'s table', () => {
     stormTile(state, dt, ev, false);
     expect(city.pillagedBuildings ?? []).toContain('LIBRARY');
     expect(city.pillagedBuildings ?? []).not.toContain('MONUMENT');
+
+    // ...and a storm ON THE CENTRE darkens nothing: a city CENTRE is never
+    // pillaged, which is `pillageDistrict`'s own rule and the GPU's by
+    // construction — its district plane never encodes a centre.
+    const centre = state.map.tiles[city.centerIndex];
+    expect(centre.district).toBe('CITY_CENTER');
+    const before = [...(city.pillagedBuildings ?? [])];
+    stormTile(state, centre, ev, false);
+    expect(city.pillagedBuildings ?? []).toEqual(before);
   });
 
   it('the climate ramp is the flood\'s: mass moves to the worse severity, then every draw scales', () => {

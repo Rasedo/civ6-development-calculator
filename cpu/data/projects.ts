@@ -60,6 +60,12 @@ export interface ProjectDef {
   /** CIV6 (Recommission Nuclear Reactor): resets the city's reactor age to 0.
    *  Repeatable, and its cost "does not scale with further research". */
   recommission?: boolean;
+  /** CIV6 (Expansion2_Projects.xml, Project_BuildingCosts): the project
+   *  CONSUMES this building — the three DECOMMISSION rows remove the plant
+   *  they name and all its effects. Offered only while the effect that
+   *  unlocks them stands (`UnlocksFromEffect`), which is the Climate Accords
+   *  competition. */
+  consumesBuilding?: string;
   /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
    *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
   laser?: boolean;
@@ -72,6 +78,10 @@ export interface ProjectDef {
   cost?: number;
   /** Gating CIVIC — the research half a tech cannot express. */
   requiresCivic?: string;
+  /** CIV6 (Expansion2_Projects.xml, `UnlocksFromEffect`): offered only while
+   *  a CLIMATE ACCORDS competition is running — the effect that unlocks the
+   *  three decommission rows. */
+  accordsOnly?: boolean;
   /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor and reduces the
    *  civilization's lifetime carbon emissions by 50 CO2 points", and "allows
    *  the lifetime carbon emissions of a civilization to go below 0". */
@@ -199,6 +209,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // "resets the age of the reactor to 0". 400 Production, and the cost
     // "does not scale with further research".
     P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.' }),
+    // CIV6 (Expansion2_Projects.xml): the three DECOMMISSION projects —
+    // Cost 400 apiece, PrereqDistrict DISTRICT_INDUSTRIAL_ZONE,
+    // `UnlocksFromEffect` (the Climate Accords competition opens them), and
+    // each one's `Project_BuildingCosts` row names the plant it consumes.
+    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', accordsOnly: true, description: 'Removes the Coal Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', accordsOnly: true, description: 'Removes the Oil Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', accordsOnly: true, description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
     P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
     P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
     P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),

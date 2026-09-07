@@ -358,6 +358,8 @@ class SimSeats:
                     okp_m = okp_m & self._wmd_project_ok(row, pi_m)
                 elif int(prow_m.get("rec", 0)):
                     okp_m = okp_m & self._recommission_ok(row, j, pi_m)
+                elif int(prow_m.get("ao", 0)):
+                    okp_m = okp_m & self._decommission_ok(row, j, pi_m)
                 _rv = int(prow_m.get("rv", -1))
                 if _rv >= 0:
                     okp_m = okp_m & self.civ_civics[:, row, _rv]
@@ -2643,6 +2645,17 @@ class SimSeats:
         if rt >= 0:
             ok = ok & self.civ_techs[:, row, rt]
         return ok
+
+    def _decommission_ok(self, row: int, j: int, pi: int) -> torch.Tensor:
+        """[B] — may city slot `j` start a DECOMMISSION project? CIV6
+        (`UnlocksFromEffect`): the three rows are opened by the CLIMATE
+        ACCORDS competition and close with it, and each asks for the plant
+        it consumes to be standing here (`availableProjects` twin)."""
+        cb = int(self._proj_rows[pi].get("cb", -1))
+        if cb < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        live = (self.comp_kind >= 0) & (self.comp_kind == self._comp_climate)
+        return live & self.city_bldg[:, row, j, cb]
 
     def _project_resource_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — can this seat pay the project's one-time resource charge?"""

@@ -227,7 +227,9 @@ def poke_river_reach() -> None:
     while int(sim.rng_state[0]) != int(probe[0]) and spent < 4096:
         sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
         spent += 1
-    assert spent == 1 + 7 * n, f"a {n}-tile flood spent {spent} draws, not 1 + 7 x {n}"
+    # destroy, district, BUILDING, damage, civilian, population, and the two
+    # fertility yields — eight columns a tile, after the one severity draw
+    assert spent == 1 + 8 * n, f"a {n}-tile flood spent {spent} draws, not 1 + 8 x {n}"
     for t in reach:
         assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
             f"tile {t} is on the flooded river and kept its improvement whole"

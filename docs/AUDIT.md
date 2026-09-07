@@ -30,7 +30,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-21r suzerain rows on flat channels | 3 | nine `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; eight are buildable now, Zanzibar needs two new luxuries |
-| B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities, the Accords' decommission half (C-1) |
+| B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities |
 | B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
@@ -44,7 +44,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
 | **B. Fidelity vs real Civ 6** | **21** | |
-| C-1 power | 2 | accident roll and damage tables (sourced), three decommission projects (sourced), a minor's grid when C-38 gives one a load |
+| C-1 power | 1 | accident roll and damage tables (sourced, on ask 7), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
@@ -70,8 +70,8 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
 | C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
 | C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
-| **C. Absent systems** | **42** | |
-| **OPEN, TOTAL** | **63** | |
+| **C. Absent systems** | **41** | |
+| **OPEN, TOTAL** | **62** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -140,8 +140,6 @@ Nothing open.
     gold-to-a-rival scorer. BORDER DISPUTE, CATASTROPHE and MILITARY
     COMPETITION each want their own scored quantity.
   - THE NOBEL PRIZE competitions are Sweden-only (C-26).
-  - CLIMATE ACCORDS scores the three decommission projects beside the
-    emission gap — blocked on C-1.
 - **B-24r. GOVERNOR TAILS.** Weight 3.
   - A district PURCHASE verb (gold and faith) — Contractor and Divine
     Architect wait on it; no engine has the verb.
@@ -241,12 +239,6 @@ Nothing open.
     population -80%, radiation 20 turns, units 100% @ 20-50, garrison 100%
     @ 20-50, civilians 100%. The age SCALING is DLL. The clock ships
     (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 7.
-  - THE DECOMMISSION PROJECTS. SOURCED `Expansion2_Emergencies.xml`
-    `CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}` ScoreAmount 100
-    each, `FromProject` the decommission row; "Removes the Nuclear Power
-    Plant and all its effects from this city", offered while a Climate
-    Accords competition runs. Buildable; B-22r's Accords count the gap
-    alone until then.
   - A CITY-STATE'S CITIES ARE NEVER POWERED: `resolveSeatPower` /
     `_resolve_seat_power` run for majors only. Vacuous today (nothing in
     `minorLadder` draws or supplies Power, pinned by

@@ -774,6 +774,12 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // Silver "100 Diplomatic Favor", Bronze "50 Diplomatic Favor".
   { id: 'CLIMATE_ACCORDS', name: 'Climate Accords', goldPoints: 2, silverFavor: 100, bronzeFavor: 50 },
 ];
+/** CIV6 (Expansion2_Emergencies.xml,
+ *  CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}): `ScoreAmount`
+ *  100 apiece, `FromProject` the decommission row — the Accords score the
+ *  three projects alongside the emission gap. */
+export const COMPETITION_DECOMMISSION_SCORE = 100;
+
 export const COMPETITION_CLIMATE = 0;
 
 

@@ -1193,6 +1193,24 @@ class SimPhase:
                             hit, torch.full_like(hit, -self._recapture_units, dtype=torch.float64),
                             torch.zeros(self.B, dtype=torch.float64, device=self.device)))
                         self.civ_diplo_favor[:, row] += hit.long() * self._recapture_favor
+                    _cb = int(prow.get("cb", -1))
+                    if _cb >= 0:
+                        # CIV6 (Project_BuildingCosts): the project CONSUMES the
+                        # plant it names — "removes the Power Plant and all its
+                        # effects from this city". Its pillage mark and the
+                        # reactor's own age go with it, and the CLIMATE ACCORDS
+                        # score the completion (ScoreAmount 100).
+                        _dr = hit.nonzero(as_tuple=True)[0]
+                        if len(_dr) > 0:
+                            self.city_bldg[_dr, row, col[_dr], _cb] = False
+                            self.city_bldg_pillaged[_dr, row, col[_dr], _cb] = False
+                            if _cb == self._nuclear_bidx:
+                                self.city_reactor_age[_dr, row, col[_dr]] = 0
+                            _sc = ((self.comp_kind[_dr] == self._comp_climate)
+                                   & self.comp_member[_dr, row])
+                            if bool(_sc.any()):
+                                self.comp_score[_dr[_sc], row] += self._decommission_score
+                            self._eff_version += 1
                     if int(prow.get("rec", 0)):
                         # CIV6 (Recommission Nuclear Reactor): the age counts
                         # the turns since the plant was built, converted to, or

@@ -1,5 +1,6 @@
 import type { City, GameState, Seat, Unit } from './types';
 import { repairBuilding } from './yields';
+import { scoreDecommission } from './competition';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital } from './seats';
 import { NO_SEAT } from '../../world/types';
@@ -91,6 +92,19 @@ export function completeProject(state: GameState, city: City, projectId: string,
     // below zero — `emitCarbon` never clamps.
     emitCarbon(state, city.seat, -CARBON_RECAPTURE_UNITS);
     owner.diplomaticFavor += CARBON_RECAPTURE_FAVOR;
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
+  if (def.consumesBuilding) {
+    // CIV6 (Project_BuildingCosts): the project CONSUMES the plant it names
+    // — "removes the Power Plant and all its effects from this city". The
+    // reactor's own age goes with it, and a pillage mark on a building that
+    // no longer stands would outlive it.
+    const b = def.consumesBuilding;
+    city.buildings = city.buildings.filter((x) => x !== b);
+    repairBuilding(city, b);
+    if (b === 'NUCLEAR_POWER_PLANT') delete city.reactorAge;
+    scoreDecommission(state, city.seat);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }

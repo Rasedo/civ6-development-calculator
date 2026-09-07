@@ -18,7 +18,8 @@
  */
 import type { Competition, GameState } from './types';
 import {
-  COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_CLIMATE, COMPETITION_SILVER_PCT,
+  COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_CLIMATE,
+  COMPETITION_DECOMMISSION_SCORE, COMPETITION_SILVER_PCT,
   COMPETITION_TURNS,
 } from '../data/seats';
 import { isCiv, seatOf } from './seats';
@@ -61,6 +62,15 @@ function scoreTurn(state: GameState, c: Competition): void {
     if (!sx) continue;
     c.score[i] += Math.max(0, top - (sx.co2Turn ?? 0));
   }
+}
+
+/** CIV6 (CLIMATE_ACCORDS_SCORE_DECOMMISSION_*): a decommission project
+ *  completed during the window scores its seat `ScoreAmount` 100, beside the
+ *  per-turn emission gap. A seat outside the field scores nothing. */
+export function scoreDecommission(state: GameState, seat: number): void {
+  const c = state.competition;
+  if (!c || c.kind !== COMPETITION_CLIMATE || !c.member[seat]) return;
+  c.score[seat] += COMPETITION_DECOMMISSION_SCORE;
 }
 
 /** The podium, by RANK: gold is the single best, and the two lower tiers are

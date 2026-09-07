@@ -67,7 +67,10 @@ function pillageDistrict(state: GameState, tile: Tile): void {
  * every building of the district standing there.
  */
 function pillageTileBuildings(state: GameState, tile: Tile): void {
-  if (!tile.district || !tile.districtComplete || envImmune(state, tile)) return;
+  // A city CENTRE is never pillaged (`pillageDistrict`'s own rule, and no
+  // storm row names CITY_GARRISON or CITY_WALLS), so its buildings stand.
+  if (!tile.district || tile.district === 'CITY_CENTER'
+      || !tile.districtComplete || envImmune(state, tile)) return;
   const held = cityAtIndex(state, tile.index);
   const city = held?.city ?? cityHoldingDistrict(state, tile);
   if (!city) return;
