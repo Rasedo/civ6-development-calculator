@@ -92,7 +92,7 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
 
 /** one eureka/inspiration draw over the eras `lo`..`hi`, in the catalog order
  *  both engines walk. The stream advances only when something was open. */
-function boostRandom(
+export function boostRandom(
   state: GameState, seat: number, kind: 'tech' | 'civic', n: number, lo: number, hi: number,
 ): void {
   const owner = seatOf(state, seat);

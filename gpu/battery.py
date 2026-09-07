@@ -430,6 +430,7 @@ def main() -> int:
                 ("feature_add", [py, "tests/gpu/feature_add_test.py"], 2),  # the carrier for a feature that ARRIVES after t0 — no rollout caller yet  # a flood pillages the district on the floodplain
                 ("cree_claim", [py, "tests/gpu/cree_claim_test.py"], 2),  # the Cree Trader claims unclaimed ground within 3 of its own city
                 ("decommission", [py, "tests/gpu/decommission_test.py"], 2),  # C-1 the three plant-removal projects, opened by a Climate Accords window
+                ("worlds_fair", [py, "tests/gpu/worlds_fair_test.py"], 2),  # B-22r the second scored competition, on the Great Person points earned
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
                 ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target

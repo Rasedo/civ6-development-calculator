@@ -5478,13 +5478,42 @@ class SimSeats:
         than the highest polluter" — the WORLD's highest, so the top polluter
         scores nothing. `scoreTurn`'s twin."""
         run = (self.comp_kind >= 0) & (self.comp_kind == self._comp_climate)
-        if not bool(run.any()):
+        if bool(run.any()):
+            emit = self.civ_co2_turn[:, : self.n_majors]
+            top = emit.max(dim=1, keepdim=True).values
+            gain = (top - emit).clamp(min=0)
+            add = run.unsqueeze(1) & self.comp_member
+            self.comp_score += torch.where(add, gain, torch.zeros_like(gain)).to(self.comp_score.dtype)
+        # CIV6 (World's Fair): "1 point per Great Person POINT of every class"
+        # earned during the window — the eight `WORLDS_FAIR_SCORE_GPP_*` rows,
+        # ScoreAmount 1 apiece. The Prophet is not among them.
+        fair = (self.comp_kind >= 0) & (self.comp_kind == self._comp_fair)
+        if bool(fair.any()) and self._fair_gp_classes:
+            gp = self.civ_gpp_turn[:, : self.n_majors][:, :, self._fair_gp_classes].sum(dim=2)
+            addf = fair.unsqueeze(1) & self.comp_member
+            self.comp_score += torch.where(addf, gp, torch.zeros_like(gp)).to(self.comp_score.dtype)
+
+    def _boost_random_civics(self, row: int, hit: torch.Tensor, n: int,
+                             lo: int, hi: int) -> None:
+        """`boostRandom(kind='civic')` — N inspirations drawn over the eras
+        `lo`..`hi` inclusive, in the catalog order the TS filter walks. A row
+        with nothing open spends NONE of the stream, as TS returns first."""
+        if n <= 0 or lo < 0 or hi < lo or not bool(hit.any()):
             return
-        emit = self.civ_co2_turn[:, : self.n_majors]
-        top = emit.max(dim=1, keepdim=True).values
-        gain = (top - emit).clamp(min=0)
-        add = run.unsqueeze(1) & self.comp_member
-        self.comp_score += torch.where(add, gain, torch.zeros_like(gain)).to(self.comp_score.dtype)
+        done_c = self.civ_civics[:, row]
+        boosted = self.civ_civic_boosted[:, row]
+        nk = min(done_c.shape[1], boosted.shape[1], self._civic_era.numel())
+        band = ((self._civic_era[:nk] >= lo) & (self._civic_era[:nk] <= hi)).reshape(1, -1)
+        for _ in range(n):
+            openm = band & ~done_c[:, :nk] & ~boosted[:, :nk]
+            want = hit & openm.any(dim=1)
+            if not bool(want.any()):
+                return
+            rnd = self._next_random(want)
+            pick = self._nth_open(openm, rnd)
+            r = want.nonzero(as_tuple=True)[0]
+            boosted[r, pick[r]] = True
+            self._dedication_event(row, self._ded_pen_brush, want.long())
 
     def _competition_podium(self, done: torch.Tensor) -> None:
         """CIV6 (Competition): "the civilization with the highest score wins the
@@ -5506,6 +5535,13 @@ class SimSeats:
             for rank, r in enumerate(field):
                 if rank == 0:
                     self.civ_diplo_points[b, r] += int(row["gold"])
+                    # CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the
+                    # winner also takes Great Person points, spread over the
+                    # classes it scored.
+                    _gg = int(row.get("goldGpp", 0))
+                    if _gg:
+                        for _c in self._fair_gp_classes:
+                            self.civ_gpp[b, r, _c] += _gg
                 # CIV6 (Faces of Peace): "+100% Diplomatic Favor from
                 # successfully completing a ... Scored Competition"
                 _pct = 0
@@ -5516,6 +5552,16 @@ class SimSeats:
                     self.civ_diplo_favor[b, r] += (int(row["silver"]) * (100 + _pct)) // 100
                 elif rank < bronze:
                     self.civ_diplo_favor[b, r] += (int(row["bronze"]) * (100 + _pct)) // 100
+                # CIV6 (WORLD_FAIR_{TOP,BOTTOM}_TIER_CULTURE): random civic
+                # boosts of the Industrial..Information eras, two to the top
+                # tier and one below it.
+                _nb = (int(row.get("silverBoosts", 0)) if rank < silver
+                       else int(row.get("bronzeBoosts", 0)) if rank < bronze else 0)
+                if _nb > 0:
+                    _one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    _one[b] = True
+                    self._boost_random_civics(r, _one, _nb, int(row.get("boostLo", -1)),
+                                              int(row.get("boostHi", -1)))
 
     def _resolve_competition(self) -> None:
         """The turn's competition: score the field, run the clock down, pay the
@@ -5533,6 +5579,7 @@ class SimSeats:
                 self.comp_member[done] = False
                 self.comp_score[done] = 0
         self.civ_co2_turn[:] = 0
+        self.civ_gpp_turn[:] = 0
 
     def _congress_leader(self, m: torch.Tensor) -> torch.Tensor:
         """[B] the DVP leader among alive majors, ties to the LOWER row; -1

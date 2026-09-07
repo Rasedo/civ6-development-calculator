@@ -23,7 +23,7 @@ import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { resolveCompetition, startCompetition, competitionOf } from '../../../cpu/core/competition';
 import { emitCarbon } from '../../../cpu/core/climate';
 import {
-  COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS,
+  COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS, COMPETITION_WORLDS_FAIR,
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
@@ -60,6 +60,62 @@ function burn(state: GameState, per: readonly number[]): void {
 }
 
 const CLIMATE = COMPETITIONS[COMPETITION_CLIMATE];
+
+const FAIR = COMPETITIONS[COMPETITION_WORLDS_FAIR];
+
+/** One turn of Great Person points, then the turn's bookkeeping. */
+function earn(state: GameState, per: readonly number[]): void {
+  per.forEach((n, seat) => {
+    const sx = state.seats[seat];
+    if (sx) (sx.gppTurn ??= {}).SCIENTIST = ((sx.gppTurn ?? {}).SCIENTIST ?? 0) + n;
+  });
+  resolveCompetition(state);
+}
+
+describe("the World's Fair", () => {
+  it('carries the install rewards', () => {
+    // CIV6 (Expansion2_Emergencies.xml, EMERGENCY_WORLDS_FAIR): FIRST PLACE
+    // +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
+    // Favor and 2 random Industrial..Information civic boosts; BOTTOM 1.
+    expect(FAIR.scored).toBe('gpp');
+    expect(FAIR.goldPoints).toBe(1);
+    expect(FAIR.goldGpp).toBe(100);
+    expect(FAIR.silverFavor).toBe(50);
+    expect(FAIR.bronzeFavor).toBe(0);
+    expect(FAIR.silverBoosts).toBe(2);
+    expect(FAIR.bronzeBoosts).toBe(1);
+    expect(FAIR.boostEras).toEqual(['Industrial', 'Information']);
+  });
+
+  it('scores the Great Person points EARNED, and clears the stash each turn', () => {
+    const state = table();
+    startCompetition(state, COMPETITION_WORLDS_FAIR, [0, 1, 2]);
+    earn(state, [7, 3, 0]);
+    const c = competitionOf(state)!;
+    expect(c.score[0]).toBe(7);
+    expect(c.score[1]).toBe(3);
+    expect(c.score[2]).toBe(0);
+    // the stash is read ONCE and cleared, so a quiet turn adds nothing
+    expect(state.seats[0].gppTurn).toBeUndefined();
+    resolveCompetition(state);
+    expect(competitionOf(state)!.score[0]).toBe(7);
+  });
+
+  it('pays the winner its victory point and its Great Person points', () => {
+    const state = table();
+    startCompetition(state, COMPETITION_WORLDS_FAIR, [0, 1, 2]);
+    earn(state, [9, 1, 0]);
+    const c = competitionOf(state)!;
+    c.left = 1;
+    const dv = state.seats[0].diplomaticPoints ?? 0;
+    resolveCompetition(state);
+    expect(competitionOf(state)).toBeUndefined();
+    expect(state.seats[0].diplomaticPoints).toBe(dv + FAIR.goldPoints);
+    expect(state.seats[0].gpp.SCIENTIST).toBe(FAIR.goldGpp);
+    // ...and the Prophet is not one of the classes it scores
+    expect(state.seats[0].gpp.PROPHET ?? 0).toBe(0);
+  });
+});
 
 describe('a scored competition', () => {
   it('scores the gap to the highest polluter, and the polluter scores nothing', () => {

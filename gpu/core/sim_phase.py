@@ -1783,6 +1783,10 @@ class SimPhase:
                 pts = torch.where(_ban, torch.zeros_like(pts), pts)
                 self.civ_gpp[:, row, cls] = torch.where(
                     _ban, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
+            # what this turn EARNED, stashed for a scored competition to read
+            # once and clear — the `civ_co2_turn` shape.
+            self.civ_gpp_turn[:, row, cls] = torch.where(
+                active, self.civ_gpp_turn[:, row, cls] + pts, self.civ_gpp_turn[:, row, cls])
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )

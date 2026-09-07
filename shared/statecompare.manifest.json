@@ -1282,6 +1282,17 @@
           "note": "THIS TURN's raw carbon, the Climate Accords score's input; cleared by resolveCompetition once every seat has emitted."
         },
         {
+          "name": "gppTurn",
+          "compare": "milli",
+          "covers": [
+            "Seat.gppTurn"
+          ],
+          "planes": [
+            "civ_gpp_turn"
+          ],
+          "note": "the Great Person points this seat EARNED this turn, per class. Stashed at the Great Person phase and read once by a scored competition (the World's Fair scores eight of the nine classes), then cleared with co2Turn — the same shape, for the same reason: the value must be comparable at one point in the turn."
+        },
+        {
           "name": "gpUsed",
           "compare": "exact",
           "covers": [

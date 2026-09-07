@@ -590,6 +590,10 @@ export interface Seat {
   government: GovernmentState;
   religion: ReligionState;
   gpp: Partial<Record<GreatPersonClass, number>>;
+  /** the Great Person points this seat EARNED this turn, per class — the
+   *  `co2Turn` shape, read once by a scored competition and cleared with it.
+   *  CIV6 (World's Fair): "1 point per Great Person POINT of every class". */
+  gppTurn?: Partial<Record<GreatPersonClass, number>>;
   buildersTrained: number;
   /** CIV6: a Relic with no open slot is held until one opens, not lost. */
   relicReserve: number;

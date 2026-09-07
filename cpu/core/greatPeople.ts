@@ -343,6 +343,9 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
       owner.gpp[cls] = 0;
       continue;
     }
+    // what this turn EARNED, stashed for a scored competition to read
+    // once and clear — the `co2Turn` shape.
+    (owner.gppTurn ??= {})[cls] = ((owner.gppTurn ?? {})[cls] ?? 0) + perTurn[cls];
     let pts = (owner.gpp[cls] ?? 0) + perTurn[cls];
     if (pts !== 0) {
       for (;;) {

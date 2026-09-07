@@ -50,7 +50,7 @@ import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { ROUTE_CHAIN_MAX } from './trade';
-import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
+import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile } from '../data/constants';
 
@@ -70,7 +70,6 @@ import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
@@ -411,6 +410,9 @@ const SEAT: Record<string, Extractor> = {
   // the copies of each chassis this seat has ever acquired, flattened as
   // [unit index, count] pairs in ascending index — only a chassis with a
   // `costStep` is ever counted, so the list stays short.
+  // the Great Person points EARNED this turn, per class — a scored
+  // competition reads it once and clears it, the `co2Turn` shape.
+  gppTurn: overSeats((s) => GP_CLASSES.map((c) => s.gppTurn?.[c] ?? 0)),
   unitsAcquired: overSeats((s) => {
     const out: number[] = [];
     for (const [id, n] of Object.entries(s.unitsAcquired ?? {})

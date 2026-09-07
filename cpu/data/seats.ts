@@ -756,12 +756,25 @@ export const COMPETITION_BRONZE_PCT = 50;
 export interface CompetitionDef {
   id: string;
   name: string;
+  /** WHAT the competition counts each turn: the Climate Accords' emission
+   *  gap, or the World's Fair's Great Person points. */
+  scored: 'co2' | 'gpp';
   /** Diplomatic Victory Points to the single highest score. */
   goldPoints: number;
   /** Diplomatic Favor to the top quarter, the gold winner included. */
   silverFavor: number;
   /** ...and to the quarter below it. */
   bronzeFavor: number;
+  /** CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): Great Person points
+   *  to the single highest score, on top of its victory point. */
+  goldGpp?: number;
+  /** CIV6 (WORLD_FAIR_{TOP,BOTTOM}_TIER_CULTURE,
+   *  MODIFIER_EMERGENCY_PLAYERS_GRANT_RANDOM_CIVIC_BOOST_BY_ERA): random
+   *  civic boosts to each tier, drawn over `boostEras`. */
+  silverBoosts?: number;
+  bronzeBoosts?: number;
+  /** the inclusive ERA window the boosts are drawn from. */
+  boostEras?: readonly [string, string];
 }
 /**
  * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
@@ -772,7 +785,21 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // CIV6 (Climate Accords): scored "1 point per turn for each CO2 emission
   // less than the highest polluter"; Gold "2 Diplomatic Victory points",
   // Silver "100 Diplomatic Favor", Bronze "50 Diplomatic Favor".
-  { id: 'CLIMATE_ACCORDS', name: 'Climate Accords', goldPoints: 2, silverFavor: 100, bronzeFavor: 50 },
+  { id: 'CLIMATE_ACCORDS', name: 'Climate Accords', scored: 'co2', goldPoints: 2, silverFavor: 100, bronzeFavor: 50 },
+  // CIV6 (Expansion2_Emergencies.xml, EMERGENCY_WORLDS_FAIR): Duration 29,
+  // LockoutTime 60; scored 1 point per Great Person POINT of every class
+  // earned during the window (eight `WORLDS_FAIR_SCORE_GPP_*` rows,
+  // ScoreAmount 1, over GENERAL/ADMIRAL/ENGINEER/MERCHANT/SCIENTIST/
+  // WRITER/ARTIST/MUSICIAN — the Prophet is not among them). FIRST PLACE
+  // +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
+  // Favor and 2 random civic boosts of the Industrial..Information eras;
+  // BOTTOM TIER 1 such boost.
+  {
+    id: 'WORLDS_FAIR', name: "World's Fair", scored: 'gpp',
+    goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
+    goldGpp: 100, silverBoosts: 2, bronzeBoosts: 1,
+    boostEras: ['Industrial', 'Information'],
+  },
 ];
 /** CIV6 (Expansion2_Emergencies.xml,
  *  CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}): `ScoreAmount`
@@ -781,6 +808,7 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
 export const COMPETITION_DECOMMISSION_SCORE = 100;
 
 export const COMPETITION_CLIMATE = 0;
+export const COMPETITION_WORLDS_FAIR = 1;
 
 
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic

@@ -30,7 +30,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-21r suzerain rows on flat channels | 3 | nine `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; eight are buildable now, Zanzibar needs two new luxuries |
-| B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities |
+| B-22r World Congress competitions | 1 | Aid Request's gold-to-rival scorer, three more scored quantities |
 | B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
@@ -43,7 +43,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **21** | |
+| **B. Fidelity vs real Civ 6** | **20** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 7), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
@@ -71,7 +71,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
 | C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
 | **C. Absent systems** | **41** | |
-| **OPEN, TOTAL** | **62** | |
+| **OPEN, TOTAL** | **61** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -130,12 +130,6 @@ Nothing open.
     else (C-5 reads them).
 - **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 2.
   The machinery takes one data row per scored competition.
-  - THE WORLD'S FAIR — SOURCED `Expansion2_Emergencies.xml`: 1 point per
-    Great Person POINT of every class earned during the window (eight
-    `WORLDS_FAIR_SCORE_GPP_*` rows), Duration 29, lockout 60; FIRST PLACE
-    +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
-    Favor and 2 random Industrial..Information civic boosts; BOTTOM TIER 1
-    boost. Buildable.
   - AID REQUEST scores gold SENT to the target player — needs a
     gold-to-a-rival scorer. BORDER DISPUTE, CATASTROPHE and MILITARY
     COMPETITION each want their own scored quantity.

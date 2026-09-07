@@ -612,6 +612,8 @@ class SimInit:
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])
         self._comps = list(_er2["competitions"])
         self._comp_climate = [c["id"] for c in self._comps].index("CLIMATE_ACCORDS")
+        _cids = [c["id"] for c in self._comps]
+        self._comp_fair = _cids.index("WORLDS_FAIR") if "WORLDS_FAIR" in _cids else -1
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
@@ -989,6 +991,10 @@ class SimInit:
         # passenger, and the passenger needs a plane of its own.
         self.embarked_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
+        # the Great Person points each seat EARNED this turn, per class — the
+        # `civ_co2_turn` shape, read once by a scored competition and cleared
+        # with it (`Seat.gppTurn`).
+        self.civ_gpp_turn = torch.zeros(B, self.n_majors, n_gp, dtype=torch.float64, device=device)
         # the FROZEN offer per class (`GameState.gpOffer`): a roster index,
         # -1 = a draw is pending, -2 = exhausted for good; and the price
         # frozen with it.
@@ -1373,6 +1379,11 @@ class SimInit:
         self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
         self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
+        # CIV6 (Expansion2_Emergencies.xml): the World's Fair scores eight
+        # `WORLDS_FAIR_SCORE_GPP_*` rows — every Great Person class but the
+        # Prophet.
+        _ngp = int(rr.get("gpClasses", len(rr.get("gpClassDistrict", [])) or 9))
+        self._fair_gp_classes = [i for i in range(_ngp) if i != self._prophet_cls]
         self._writer_cls = int(rr["writerCls"])  # WRITER's class index
         self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
         self._promo_max_level = int(rr.get("promoMaxLevel", 8))

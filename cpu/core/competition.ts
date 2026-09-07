@@ -16,7 +16,10 @@
  *
  * `gpu/core/sim_seats.py`'s `_competition_*` are the twins.
  */
-import type { Competition, GameState } from './types';
+import type { Competition, GameState, GreatPersonClass } from './types';
+import { boostRandom } from './gpAbility';
+import { ERAS } from '../data/techs';
+import type { Era } from '../data/techs';
 import {
   COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_CLIMATE,
   COMPETITION_DECOMMISSION_SCORE, COMPETITION_SILVER_PCT,
@@ -53,14 +56,28 @@ export function startCompetition(state: GameState, kind: number, field: readonly
  *  the highest polluter" — the world's highest, not the field's, and a seat
  *  that IS the highest polluter scores nothing. */
 function scoreTurn(state: GameState, c: Competition): void {
-  if (c.kind !== COMPETITION_CLIMATE) return;
-  let top = 0;
-  for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2Turn ?? 0);
+  const def = COMPETITIONS[c.kind];
+  if (!def) return;
+  if (def.scored === 'co2') {
+    let top = 0;
+    for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2Turn ?? 0);
+    for (let i = 0; i < c.member.length; i++) {
+      if (!c.member[i]) continue;
+      const sx = seatOf(state, i);
+      if (!sx) continue;
+      c.score[i] += Math.max(0, top - (sx.co2Turn ?? 0));
+    }
+    return;
+  }
+  // CIV6 (World's Fair): "1 point per Great Person POINT of every class"
+  // earned during the window — the eight `WORLDS_FAIR_SCORE_GPP_*` rows,
+  // ScoreAmount 1 apiece. The Prophet is not among them.
   for (let i = 0; i < c.member.length; i++) {
-    if (!c.member[i]) continue;
-    const sx = seatOf(state, i);
+    const sx = c.member[i] ? seatOf(state, i) : undefined;
     if (!sx) continue;
-    c.score[i] += Math.max(0, top - (sx.co2Turn ?? 0));
+    let sum = 0;
+    for (const cls of FAIR_CLASSES) sum += sx.gppTurn?.[cls] ?? 0;
+    c.score[i] += sum;
   }
 }
 
@@ -72,6 +89,12 @@ export function scoreDecommission(state: GameState, seat: number): void {
   if (!c || c.kind !== COMPETITION_CLIMATE || !c.member[seat]) return;
   c.score[seat] += COMPETITION_DECOMMISSION_SCORE;
 }
+
+/** CIV6 (Expansion2_Emergencies.xml): the eight classes the World's Fair
+ *  scores — every Great Person class but the Prophet. */
+const FAIR_CLASSES: readonly GreatPersonClass[] = [
+  'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
+];
 
 /** The podium, by RANK: gold is the single best, and the two lower tiers are
  *  the published quarters of the field. Ties break on the lower seat id, one
@@ -89,12 +112,25 @@ function payPodium(state: GameState, c: Competition): void {
     const sx = seatOf(state, field[r]);
     if (!sx) continue;
     if (r === 0) sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + def.goldPoints;
+    // CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the winner also
+    // takes Great Person points, spread over the classes it scored.
+    if (r === 0 && def.goldGpp) {
+      for (const cls of FAIR_CLASSES) sx.gpp[cls] = (sx.gpp[cls] ?? 0) + def.goldGpp;
+    }
     // CIV6 (Faces of Peace): "+100% Diplomatic Favor from successfully
     // completing an ... Scored Competition" (`EMERGENCY_FAVOR_ROWS`)
     const pct = getModifiers(state, field[r]).emergencyFavorPct;
     const paid = (n: number) => Math.floor((n * (100 + pct)) / 100);
     if (r < silver) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + paid(def.silverFavor);
     else if (r < bronze) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + paid(def.bronzeFavor);
+    // CIV6 (WORLD_FAIR_{TOP,BOTTOM}_TIER_CULTURE): random civic boosts of the
+    // Industrial..Information eras, two to the top tier and one below it.
+    const boosts = r < silver ? (def.silverBoosts ?? 0)
+      : r < bronze ? (def.bronzeBoosts ?? 0) : 0;
+    if (boosts > 0 && def.boostEras) {
+      boostRandom(state, field[r], 'civic', boosts,
+        ERAS.indexOf(def.boostEras[0] as Era), ERAS.indexOf(def.boostEras[1] as Era));
+    }
   }
   state.eventLog.push(`${def.name}: ${seatOf(state, field[0])?.name ?? 'nobody'} takes the gold.`);
 }
@@ -116,5 +152,8 @@ export function resolveCompetition(state: GameState): void {
   }
   // The per-turn emission is read HERE and nowhere else, so it is cleared here
   // too: every seat has emitted by now, and the next turn starts from zero.
-  for (const s of state.seats) if (s.co2Turn) s.co2Turn = 0;
+  for (const s of state.seats) {
+    if (s.co2Turn) s.co2Turn = 0;
+    if (s.gppTurn) delete s.gppTurn;
+  }
 }
