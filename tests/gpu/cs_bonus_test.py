@@ -300,12 +300,26 @@ def test_faith_class(rules, path) -> None:
     assert rq == -1 or rq == sim._encamp_didx,         f"the candidate named {BUILDING_IDS[bi]}, which is neither a City Center nor an Encampment row"
 
     # the FAITH price, and the write
-    price = float(sim._class_faith_cost(b)[0])
+    price = float(sim._class_faith_cost(row, b)[0])
     assert abs(price - float(sim.rules_dev.b_cost[bi]) * sim.rules.faith_purchase_mult) < 1e-9,         "the class purchase is not priced at the faith rate"
     f0, jc = float(sim.civ_faith[0, row]), int(j[0])
-    sim._seat_buy_building_faith(row, ok, j, b, sim._class_faith_cost(b))
+    sim._seat_buy_building_faith(row, ok, j, b, sim._class_faith_cost(row, b))
     assert bool(sim.city_bldg[0, row, jc, bi]), "the faith-bought building did not land in the city"
     assert abs(float(sim.civ_faith[0, row]) - (f0 - price)) < 1e-9, "the faith was not spent"
+
+    # CIV6 (Leaders.xml, MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,
+    # STAR}_BONUS): ADJUST_BUILDING_PURCHASE_COST Amount 50 — the three walls
+    # come at half, and no other row of the class moves.
+    _walls = [i for i in sim._walls_rows]
+    assert _walls, "the catalog carries no walls row"
+    _wi = torch.full((sim.B,), _walls[0], dtype=torch.long, device=sim.device)
+    _full = float(sim.rules_dev.b_cost[_walls[0]]) * sim.rules.faith_purchase_mult
+    _got = float(sim._class_faith_cost(row, _wi)[0])
+    assert abs(_got - round(_full * (100 - sim._valletta_walls_pct) / 100)) < 1e-9, (
+        f"a Valletta suzerain pays {_got} for the walls, not the discounted "
+        f"{round(_full * (100 - sim._valletta_walls_pct) / 100)}")
+    assert abs(float(sim._class_faith_cost(row, b)[0]) - price) < 1e-9, (
+        "a non-walls row of the class must not take the discount")
 
     # a seat with no such suzerain is offered nothing
     sim.seat_citystate_envoys[0, row, 0] = 0

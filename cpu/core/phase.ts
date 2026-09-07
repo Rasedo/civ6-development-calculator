@@ -46,7 +46,7 @@ import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TE
 import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
-import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
@@ -1290,7 +1290,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       if (def && def.combat > 0 && unitDomain(id) === 'military' && !formationBanned(id)
           && civCity.buildings.includes(def.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land)
           && (!civic || isCivicComplete(state, civic, actor.seat))
-          && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)) {
+          && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)
+          // the TIER's own strategic charge, which `trainableUnits` asked at the
+          // chassis' single rate
+          && (state.sandbox || canTrainWithStockpile(state, actor.seat, id, tier))) {
         commitProduction(state, civCity.seat, civCity, {
           kind: 'unit', unit: id, formation: tier, progress: 0,
           cost: Math.round(def.cost * FORMATION_COST_MULT[tier] * FORMATION_TRAIN_DISCOUNT),

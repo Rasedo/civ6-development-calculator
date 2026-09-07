@@ -17,7 +17,7 @@ const ARTIFACT_SLOTS = 3;
 const ARTIFACT_TOURISM = GWO_TOURISM[GWO_ARTIFACT]!;
 const MUSEUM = GW_HOLDERS.findIndex((h) => h.id === ARTIFACT_BUILDING);
 import { PARK_MIN_APPEAL, PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../../../cpu/data/improvements';
-import { UNITS, NATURALIST_COST_STEP } from '../../../cpu/data/units';
+import { UNITS } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
 
 // NATIONAL PARKS, SHIPWRECKS and THEMING. Sourced from the Civ 6 wiki:
@@ -78,9 +78,10 @@ describe('the Naturalist and the National Park', () => {
     const price = naturalistCost(state, 0);
     expect(purchaseNaturalist(state, city.id, 0).ok).toBe(true);
     expect(seat.faith).toBe(before - price);
-    // CIV6 (Naturalist): the faith cost is progressive — each one bought
-    // raises the next price by the game table's 50.
-    expect(naturalistCost(state, 0)).toBe(price + NATURALIST_COST_STEP * FAITH_PURCHASE_MULT);
+    // CIV6 (Expansion2_Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the faith
+    // cost is progressive — each copy already held raises the next by
+    // CostProgressionParam1 50.
+    expect(naturalistCost(state, 0)).toBe(price + UNITS.NATURALIST.costStep! * FAITH_PURCHASE_MULT);
     expect(state.units.some((u) => u.type === 'NATURALIST' && u.seat === 0)).toBe(true);
   });
 

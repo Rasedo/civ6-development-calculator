@@ -362,28 +362,6 @@
           ]
         },
         {
-          "name": "rockBandsBought",
-          "compare": "exact",
-          "covers": [
-            "Seat.rockBandsBought"
-          ],
-          "planes": [
-            "civ_rock_bands"
-          ],
-          "note": "how many Rock Bands this seat has bought — the progressive faith price reads it."
-        },
-        {
-          "name": "naturalistsBought",
-          "compare": "exact",
-          "covers": [
-            "Seat.naturalistsBought"
-          ],
-          "planes": [
-            "civ_naturalists"
-          ],
-          "note": "how many Naturalists this seat has bought - the progressive faith price reads it."
-        },
-        {
           "name": "governorAppointed",
           "compare": "exact",
           "covers": [
@@ -796,6 +774,14 @@
             "civ_gov_turns"
           ],
           "note": "turns spent in each government, in the roster's own order — what MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS accrues on. Kept beside governmentsHeld deliberately: the mask's `|=` is idempotent and hides a gating difference between the engines, where this counter shows one on the turn it happens (C-63)."
+        },
+        {
+          "name": "policySlotsExtra",
+          "compare": "exact",
+          "covers": [],
+          "planes": [],
+          "derived": true,
+          "note": "the policy slots a seat holds BEYOND its government's own, in SLOT_KINDS order — a wonder's, Adam Smith's, a roster row's, and the kind a conversion (Founding Fathers, the Holy Roman Emperor) moves. Derived on both engines (`wonderExtraSlots` / `_wonder_extra_slots`); compared beside policiesSlotted, since two engines can agree on every slotted card and still disagree about how many slots exist."
         },
         {
           "name": "policiesSlotted",
@@ -1339,6 +1325,17 @@
             "civ_gp_lux_n"
           ],
           "note": "the INVENTED luxuries, each entry the number of cities that copy reaches."
+        },
+        {
+          "name": "unitsAcquired",
+          "compare": "exact",
+          "covers": [
+            "Seat.unitsAcquired"
+          ],
+          "planes": [
+            "civ_unit_acq"
+          ],
+          "note": "copies of each chassis this seat has ever acquired, flattened as [unit index, count] pairs in ascending index. Only a chassis carrying a `costStep` is ever counted (COST_PROGRESSION_PREVIOUS_COPIES), so the list stays short; the progressive faith price reads it."
         }
       ]
     },

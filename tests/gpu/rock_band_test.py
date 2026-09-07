@@ -462,20 +462,23 @@ def test_band_promotions(rules) -> None:
 
 
 def test_progressive_price(rules) -> None:
-    """`rockBandCost`'s twin: (base + a step per band already bought) at the
+    """`unitFaithCost`'s twin: (base + a step per copy already acquired) at the
     faith purchase multiplier, and the candidate needs the civic and the purse."""
     sim = build(rules)
     fm = sim.rules.faith_purchase_mult
-    base = float(sim._type_cost[sim._band_idx]) * fm
-    civ_i = int(sim._type_civic[sim._band_idx])
+    bi = sim._band_idx
+    base = float(sim._type_cost[bi]) * fm
+    step = float(sim._type_cost_step[bi])
+    civ_i = int(sim._type_civic[bi])
     assert civ_i >= 0, "the chassis names no enabling civic"
-    sim.civ_rock_bands.zero_()
-    assert float(sim._rock_band_cost(0)[0]) == base
-    sim.civ_rock_bands[0, 0] = 2
-    assert float(sim._rock_band_cost(0)[0]) == base + 2 * sim._band_cost_step * fm, (
+    assert step > 0, "the Rock Band row carries no CostProgressionParam1"
+    sim.civ_unit_acq.zero_()
+    assert float(sim._unit_faith_cost(0, bi)[0]) == base
+    sim.civ_unit_acq[0, 0, bi] = 2
+    assert float(sim._unit_faith_cost(0, bi)[0]) == base + 2 * step * fm, (
         "the price is not progressive")
 
-    sim.civ_rock_bands.zero_()
+    sim.civ_unit_acq.zero_()
     one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
     sim.civ_civics[0, 0, civ_i] = False
     sim.civ_faith[0, 0] = base * 10
@@ -487,7 +490,7 @@ def test_progressive_price(rules) -> None:
     sim.civ_faith[0, 0] = base - 1
     ok, _ = sim._seat_rock_band_candidate(0, one)
     assert not bool(ok[0]), "a purse short of the live price still bought"
-    print(f"  progressive price OK: base {base:.0f}, +{sim._band_cost_step * fm:.0f} faith per band bought")
+    print(f"  progressive price OK: base {base:.0f}, +{step * fm:.0f} faith per copy acquired")
 
 
 def main() -> None:

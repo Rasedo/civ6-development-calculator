@@ -137,19 +137,23 @@ def main() -> None:
     ctr = int(sim.city_center[0, row, j])
     aero = aerodrome(sim, row, j)
     slots = sim._air_slots_at(row)[0]
-    assert int(slots[ctr]) == sim._city_centre_air_slots, (
-        f"a City Center bases {sim._city_centre_air_slots}, read {int(slots[ctr])}")
-    assert int(slots[aero]) == sim._aerodrome_air_slots, (
-        f"an Aerodrome bases {sim._aerodrome_air_slots}, read {int(slots[aero])}")
+    # CIV6 (Districts.xml): DISTRICT_CITY_CENTER AirSlots 1,
+    # DISTRICT_AERODROME AirSlots 4 — the install's own literals, so the
+    # numbers are pinned here and not just read back off the sim.
+    assert sim._city_centre_air_slots == 1 and sim._aerodrome_air_slots == 4, (
+        f"the install bases 1 and 4, this sim {sim._city_centre_air_slots} and "
+        f"{sim._aerodrome_air_slots}")
+    assert int(slots[ctr]) == 1, f"a City Center bases 1, read {int(slots[ctr])}"
+    assert int(slots[aero]) == 4, f"an Aerodrome bases 4, read {int(slots[aero])}"
     hangars = (sim._b_air_slots > 0).nonzero().flatten()
     assert hangars.numel() >= 2, "the catalog carries no Aerodrome buildings"
     for b in hangars.tolist():
         sim.city_bldg[0, row, j, b] = True
     sim._eff_version += 1
     grown = int(sim._air_slots_at(row)[0, aero])
-    assert grown == sim._aerodrome_air_slots + int(sim._b_air_slots[hangars].sum()), (
-        f"CIV6: an Aerodrome 'can reach 4 slots after constructing the Hangar and "
-        f"the Airport' — read {grown}")
+    assert grown == 8 == sim._aerodrome_air_slots + int(sim._b_air_slots[hangars].sum()), (
+        f"CIV6 (Buildings.xml): the Hangar and the Airport grant 2 apiece over the "
+        f"Aerodrome's own 4, so a built one bases 8 — read {grown}")
     sim.district_pillaged[0, aero] = True
     sim._eff_version += 1
     assert int(sim._air_slots_at(row)[0, aero]) == 0, "a wrecked base bases nothing"

@@ -14,7 +14,7 @@ import { LOYALTY_MAX } from '../../../cpu/data/seats';
 import { hexDistance } from '../../../world/hex';
 import {
   UNITS, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS,
-  ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, ROCK_BAND_COST_STEP,
+  ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL,
 } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import type { City, GameState, Unit } from '../../../cpu/core/types';
@@ -414,6 +414,8 @@ describe('the progressive faith price', () => {
     const { state, mine } = twoSeatGame();
     const own = seatOf(state, 0)!;
     const base = UNITS.ROCK_BAND.cost * FAITH_PURCHASE_MULT; // Cost 300 -> 600 faith at Standard
+    // CIV6 (Expansion2_Units.xml): CostProgressionParam1 50 per copy already held
+    const step = UNITS.ROCK_BAND.costStep! * FAITH_PURCHASE_MULT;
     own.faith = base * 10;
 
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(false); // no civic yet
@@ -422,13 +424,13 @@ describe('the progressive faith price', () => {
     expect(rockBandCost(state, 0)).toBe(base);
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
     expect(own.faith).toBe(base * 10 - base);
-    expect(own.rockBandsBought).toBe(1);
-    expect(rockBandCost(state, 0)).toBe(base + ROCK_BAND_COST_STEP * FAITH_PURCHASE_MULT);
+    expect(own.unitsAcquired?.ROCK_BAND).toBe(1);
+    expect(rockBandCost(state, 0)).toBe(base + step);
 
     const before = own.faith;
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
-    expect(own.faith).toBe(before - (base + ROCK_BAND_COST_STEP * FAITH_PURCHASE_MULT));
-    expect(own.rockBandsBought).toBe(2);
+    expect(own.faith).toBe(before - (base + step));
+    expect(own.unitsAcquired?.ROCK_BAND).toBe(2);
 
     const bought = state.units.filter((u) => u.type === 'ROCK_BAND' && u.seat === 0);
     expect(bought.length).toBe(2);
@@ -444,7 +446,7 @@ describe('the progressive faith price', () => {
     grantCivics(state, 'COLD_WAR');
     own.faith = UNITS.ROCK_BAND.cost - 1;
     expect(purchaseRockBand(state, mine.id, 0).ok).toBe(false);
-    expect(own.rockBandsBought ?? 0).toBe(0);
+    expect(own.unitsAcquired?.ROCK_BAND ?? 0).toBe(0);
     expect(state.units.some((u) => u.type === 'ROCK_BAND')).toBe(false);
   });
 });

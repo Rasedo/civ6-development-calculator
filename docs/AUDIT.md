@@ -27,10 +27,9 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| A-11r extra policy slots uncompared | 1 | a `policySlotsExtra` manifest row on both engines |
-| **A. Engine vs engine** | **1** | |
+| **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
-| B-21r suzerain rows on flat channels | 3 | ten `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; seven are buildable now, Zanzibar needs two new luxuries |
+| B-21r suzerain rows on flat channels | 3 | nine `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; eight are buildable now, Zanzibar needs two new luxuries |
 | B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities, the Accords' decommission half (C-1) |
 | B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
@@ -41,12 +40,12 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
 | B-63r gang-up bar | 1 | ask; Enkidu's allied-war discount waits on it |
-| B-66 formations | 2 | resource charge x2/x3 (sourced), a THREE-member escort, the rider's own reveal |
+| B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
-| B-D unsourced data values | 2 | Democracy's alliance tail, faith progression (sourced), Valletta 50% (sourced), per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| B-D unsourced data values | 1 | Democracy's alliance tail; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
+| **B. Fidelity vs real Civ 6** | **21** | |
 | C-1 power | 2 | accident roll and damage tables (sourced), three decommission projects (sourced), a minor's grid when C-38 gives one a load |
-| C-2 diplomatic agreements | 2 | +2 alliance points per deal (sourced), queue-front purchase (sourced), joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76 |
+| C-2 diplomatic agreements | 2 | queue-front purchase (sourced), joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76 |
 | C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
@@ -54,7 +53,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
 | C-31 the nuclear strike's last clauses | 1 | 50%-HP interception (sourced, with C-34), citizens killed (C-77), wonder in the blast (ask) |
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
-| C-34 air combat's second half | 2 | Aerodrome 4/6/8 slots (sourced), fighter interception and Patrol (unsourced roll), Priority Target |
+| C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
 | C-38 a city-state's city | 2 | growth and border from its own food and culture, what it spends gold and faith on |
 | C-41 Volcanic Soil | 1 | improvement clauses accept the soil (sourced); where an eruption lays it is an ask |
@@ -73,7 +72,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
 | C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
 | **C. Absent systems** | **43** | |
-| **OPEN, TOTAL** | **67** | |
+| **OPEN, TOTAL** | **64** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -107,10 +106,8 @@ the entry and the line leaves.
 The digest is the only instrument for this class; a round that widens what
 the gate reaches is worth more here than one that re-reads the exporter.
 
-- **A-11r. THE EXTRA POLICY SLOTS ARE NOT COMPARED.** Weight 1.
-  - `wonderExtraSlots` / `_wonder_extra_slots` (a wonder's or a slot-type
-    conversion's extra slots) are in neither digest. Add a `policySlotsExtra`
-    manifest row on both engines.
+Nothing open.
+
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
@@ -126,7 +123,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
     PASSING-THROUGH half (the course is stored now); Hunza +1 Gold per 5
     tiles of the course; Hong Kong +20% Production on projects; Ngazargamu
     20% gold-purchase discount per Encampment building.
-  - Valletta's 50%: see B-D.
   - Zanzibar's Cinnamon and Cloves need two luxury ids that exist nowhere
     else (C-5 reads them).
 - **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 2.
@@ -191,10 +187,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - `GRIEVANCE_GANG` is a knob — ask 1. Enkidu's allied-war discount
     (`EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT` 150) waits on it.
 - **B-66. FORMATIONS.** Weight 2.
-  - A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE is the unit's own. SOURCED
-    (secondary, two agreeing: gamepressure's GS strategic-resources guide,
-    the Unit wiki page): a Corps costs DOUBLE the strategic resource up
-    front, an Army TRIPLE, maintenance unchanged. Buildable.
   - AN ESCORT FORMATION IS A PAIR; real Civ 6 links military, civilian and
     support. Needs a support stacking class and a two-rider drag on both
     engines (`escortUnit` / `_escort_rider`).
@@ -207,17 +199,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
 - **B-D. UNSOURCED DATA VALUES.** Weight 2.
   - DEMOCRACY'S TAIL: the Trade Route to an ally's or suzerain's city and
     its alliance points — alliances exist now (C-2); buildable.
-  - THE RELIGIOUS FAITH PRICES ARE FLAT. SOURCED `Units.xml`
-    `COST_PROGRESSION_PREVIOUS_COPIES`, `CostProgressionParam1` per copy:
-    Missionary 75 +6, Apostle 200 +15, Inquisitor 75 +6, Guru 120 +12,
-    Naturalist 800 +100, Rock Band 300 +50; Warrior Monk 100 flat. READING
-    for the DLL half: a previous copy is one the seat has ever acquired.
-    Buildable.
-  - VALLETTA'S WALLS DISCOUNT. SOURCED `Leaders.xml`
-    `MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,STAR}_BONUS`:
-    `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PURCHASE_COST` Amount 50 on
-    BUILDING_WALLS / CASTLE / STAR_FORT. The faith-only half ships
-    (`wallsGoldBlocked`); the 50% does not. Buildable.
   - THE PER-CITY WAR-WEARINESS SPLIT: the install's numbers are
     `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0,
     NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`,
@@ -263,10 +244,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `minor_yields_test::test_power_vacuous`); due when C-38's ladder
     reaches a building with a load.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 2.
-  - ALLIANCE_POINTS_FOR_DEAL. SOURCED GlobalParameter `Value="2"` (Exp1 and
-    Exp2) and the Alliances page ("increase the rate ... by trading with
-    your Ally"; Cleopatra: "twice as many"). READING: +2 to the pair when a
-    deal between allies is accepted, Cleopatra x2. Buildable.
   - THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM is refused on both engines
     (`goldPurchasableBuildings`). SOURCED (one tested report,
     steamcommunity.com/app/289070/discussions/0/1848072002747657088):
@@ -342,12 +319,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - The five-hex Range is a verb the action space lacks; no direction
     encoding reaches five hexes.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
-  - THE AERODROME'S SLOTS. SOURCED `Districts.xml` DISTRICT_AERODROME
-    `AirSlots="4"`; `Buildings.xml` HANGAR_BONUS_AIR_SLOTS and
-    AIRPORT_BONUS_AIR_SLOTS `MODIFIER_PLAYER_DISTRICT_GRANT_AIR_SLOTS`
-    Amount 2 each; CITY_CENTER 1, AIRSTRIP 3, AIRCRAFT_CARRIER 2. Both
-    engines carry 1 apiece (`airSlots`, `_aerodrome_air_slots` +
-    `_b_air_slots`) and must move to 4/6/8. Buildable.
   - INTERCEPTION BY A FIGHTER has no published strength, formula or cap on
     attempts; PATROL waits on it; C-31's delivery shares the half.
   - PRIORITY TARGET (the Jet Bomber's reach to the support unit under a

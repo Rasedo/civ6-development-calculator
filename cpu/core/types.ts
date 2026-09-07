@@ -578,9 +578,9 @@ export interface Seat {
    *  civilization, and the international modifiers are per pair. */
   tourismTo?: number[];
   tourismReligiousTo?: number[];
-  /** how many Rock Bands this seat has bought — the progressive price. */
-  rockBandsBought?: number;
-  naturalistsBought?: number;
+  /** how many copies of each chassis this seat has ever acquired, keyed by
+   *  unit id — what a `costStep` price progression counts. */
+  unitsAcquired?: Record<string, number>;
   /** the RELIGIOUS half (relics + holy cities), banked apart because a
    *  rival's Enlightenment or a different religion halves it at the read
    *  (`cultureVictor`) — the general bank above is never diminished. */

@@ -881,6 +881,13 @@ export const ALLIANCE_RELIGIOUS = 4;
  *  Stored in QUARTER-points so both engines bank integers. */
 export const ALLIANCE_QP_TURN = 4;
 export const ALLIANCE_QP_ROUTE = 1;
+/** CIV6 (GlobalParameters, ALLIANCE_POINTS_FOR_DEAL 2, Expansion1 and
+ *  Expansion2 alike): a deal closed between two allies pays the pair, on the
+ *  same quarter-point store the turn tick banks into —
+ *  ALLIANCE_POINTS_MULTIPLIER is the install's own 4, which is why a turn
+ *  pays 4 and a trade route 1 (ALLIANCE_POINTS_FOR_TRADE). Cleopatra's clause
+ *  adjusts the TRADE parameter, not this one. */
+export const ALLIANCE_QP_DEAL = 2;
 export const ALLIANCE_L2_QP = 320;
 export const ALLIANCE_L3_QP = 960;
 /** CIV6 (Alliance, level 1): Trade Routes between allies pay extra - "+2

@@ -37,7 +37,8 @@
  * the browser build
 imports this.
  */
-import { POLICY_LIST } from '../data/policies';
+import { POLICY_LIST, SLOT_KINDS } from '../data/policies';
+import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -64,7 +65,7 @@ import { effectiveSpecialists } from './city';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { UNITS } from '../data/units';
+import { UNITS, UNIT_INDEX } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
@@ -407,8 +408,16 @@ const SEAT: Record<string, Extractor> = {
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
-  rockBandsBought: overSeats((s) => s.rockBandsBought ?? 0),
-  naturalistsBought: overSeats((s) => s.naturalistsBought ?? 0),
+  // the copies of each chassis this seat has ever acquired, flattened as
+  // [unit index, count] pairs in ascending index — only a chassis with a
+  // `costStep` is ever counted, so the list stays short.
+  unitsAcquired: overSeats((s) => {
+    const out: number[] = [];
+    for (const [id, n] of Object.entries(s.unitsAcquired ?? {})
+      .map(([k, v]) => [UNIT_INDEX[k] ?? -1, v] as [number, number])
+      .sort((a, b) => a[0] - b[0])) if (n > 0) out.push(id, n);
+    return out;
+  }),
   governorAppointed: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? 1 : 0))),
   governorCity: overSeats((s) => governorsOf(s).map((g) => (g.appointed ? g.cityId : -1))),
   governorEstablish: overSeats((s) => governorsOf(s).map((g) => g.establishTurns)),
@@ -476,6 +485,14 @@ const SEAT: Record<string, Extractor> = {
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
   // the SLOTTED cards as a sorted index set — the stored decision
+  // the policy slots a seat holds BEYOND its government's own — a wonder's, a
+  // Great Person's, and the kind a conversion moves. Compared beside the cards
+  // themselves, since two engines can agree on every card and still disagree
+  // about how many slots there are to put them in.
+  policySlotsExtra: overSeats((s, state) => {
+    const x = wonderExtraSlots(state, s.seat);
+    return SLOT_KINDS.map((k) => x[k]);
+  }),
   policiesSlotted: overSeats((s) => s.government.policies
     .map((p) => (p ? POLICY_IDX.get(p) ?? -1 : -1)).filter((i) => i >= 0).sort((a, b) => a - b)),
   governmentTurns: overSeats((s) => [...(s.government.govTurns ?? [])]),

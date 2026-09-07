@@ -15,6 +15,7 @@ import type { City, DealItem, DealOffer, DealTerm, GameState } from './types';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN,
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
+  ALLIANCE_QP_DEAL,
   DEAL_PERMANENT, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
 } from '../data/seats';
 import { STRATEGIC_IDS } from '../data/constants';
@@ -24,7 +25,8 @@ import { SPY_UNIT } from '../data/espionage';
 import { gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { outerPool, wallsMax } from './rules';
 import {
-  civsAtWar, grantKey, isCiv, seatOf, setBorderTurnsFrom, warTurnsWith,
+  alliancePtsWith, civsAtWar, grantKey, isCiv, seatOf, seatsAllied,
+  setAlliancePtsWith, setBorderTurnsFrom, warTurnsWith,
 } from './seats';
 import { grantStockpile, spendStockpile, stockOf, stockpileCap } from './stockpile';
 import { spawnUnit } from './units';
@@ -243,6 +245,11 @@ export function acceptDeal(state: GameState, from: number, to: number): boolean 
   const ask = temporaryOf(o.ask);
   if (give.length > 0) (state.dealTerms ??= {})[grantKey(from, to)] = { left: DEAL_TURNS, items: give };
   if (ask.length > 0) (state.dealTerms ??= {})[grantKey(to, from)] = { left: DEAL_TURNS, items: ask };
+  // CIV6 (ALLIANCE_POINTS_FOR_DEAL 2): a table that clears between two ALLIES
+  // pays the pair, over and above the turn's own tick.
+  if (seatsAllied(state, from, to)) {
+    setAlliancePtsWith(state, from, to, alliancePtsWith(state, from, to) + ALLIANCE_QP_DEAL);
+  }
   clearDealOffer(state, from, to);
   return true;
 }

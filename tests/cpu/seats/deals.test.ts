@@ -23,7 +23,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { civsAtWar, emptySeat, setTileOwner, setWar, setWarTurnsWith, borderTurnsFrom } from '../../../cpu/core/seats';
+import { alliancePtsWith, civsAtWar, emptySeat, setAllyTurnsWith, setTileOwner, setWar, setWarTurnsWith, borderTurnsFrom } from '../../../cpu/core/seats';
+import { ALLIANCE_QP_DEAL } from '../../../cpu/data/seats';
 import {
   dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable,
 } from '../../../cpu/core/deals';
@@ -128,6 +129,33 @@ describe('the table, and what crosses it', () => {
     expect(dealOfferOf(state, 1, 2)).toBeUndefined();
     play(state, { 2: { accept: [1] } });
     expect(state.seats[1].treasury).toBe(1000);
+  });
+});
+
+describe('what a closed table pays the pair', () => {
+  it('pays ALLIANCE_QP_DEAL to two ALLIES, and nothing to anyone else', () => {
+    // CIV6 (GlobalParameters, ALLIANCE_POINTS_FOR_DEAL 2): the deal pays the
+    // pair on the same quarter-point store the turn tick banks into.
+    const plain = table();
+    plain.seats[2].diplomaticFavor = 9;
+    play(plain, { 1: { offer: [2, [[DEAL_GOLD, 100, 0]], [[DEAL_FAVOR, 5, 0]]] } });
+    play(plain, { 2: { accept: [1] } });
+    expect(alliancePtsWith(plain, 1, 2)).toBe(0);
+
+    const allied = table();
+    allied.seats[2].diplomaticFavor = 9;
+    setAllyTurnsWith(allied, 1, 2, 30);
+    const before = alliancePtsWith(allied, 1, 2);
+    play(allied, { 1: { offer: [2, [[DEAL_GOLD, 100, 0]], [[DEAL_FAVOR, 5, 0]]] } });
+    play(allied, { 2: { accept: [1] } });
+    // the turn's own tick runs beside it, so the DELTA is what this pins
+    const withDeal = alliancePtsWith(allied, 1, 2) - before;
+    const noDeal = table();
+    setAllyTurnsWith(noDeal, 1, 2, 30);
+    const b2 = alliancePtsWith(noDeal, 1, 2);
+    play(noDeal, {});
+    play(noDeal, {});
+    expect(withDeal - (alliancePtsWith(noDeal, 1, 2) - b2)).toBe(ALLIANCE_QP_DEAL);
   });
 });
 

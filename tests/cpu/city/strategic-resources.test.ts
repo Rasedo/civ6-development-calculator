@@ -4,7 +4,9 @@ import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpe
 import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit, refreshUnits, spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
-import { accrueStockpiles, chargeUnitUpkeep, fuelShortCS, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
+import { accrueStockpiles, canTrainWithStockpile, chargeUnitUpkeep, fuelShortCS, grantStockpile, stockOf, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
+import { commitProduction } from '../../../cpu/core/seatTurn';
+import { FORMATION_RESOURCE_MULT } from '../../../cpu/data/units';
 import { stackDefenceCS } from '../../../cpu/core/combat';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, FUEL_SHORT_CS } from '../../../cpu/data/constants';
 
@@ -129,6 +131,42 @@ describe('build/purchase gating', () => {
     const { state, city } = resState('HORSES', null, 'HORSEBACK_RIDING');
     state.sandbox = true;
     expect(ids(trainableUnits(state, 0, city))).toContain('HORSEMAN');
+  });
+});
+
+describe('a formation pays a multiple of the chassis charge', () => {
+  it('doubles for a Corps and triples for an Army, up front', () => {
+    // CIV6 (Formations, two agreeing secondary sources): a Corps costs DOUBLE
+    // the unit's strategic resource and an Army TRIPLE, maintenance unchanged.
+    const gated = Object.values(UNITS).find((u) => u.requiresResource)!;
+    const one = unitResourceCost(gated.id)!;
+    expect(one.n).toBeGreaterThan(0);
+    expect(unitResourceCost(gated.id, 1)!.n).toBe(one.n * FORMATION_RESOURCE_MULT[1]);
+    expect(unitResourceCost(gated.id, 2)!.n).toBe(one.n * FORMATION_RESOURCE_MULT[2]);
+    expect(FORMATION_RESOURCE_MULT[1]).toBe(2);
+    expect(FORMATION_RESOURCE_MULT[2]).toBe(3);
+    // the resource is the same one either way — only the amount moves
+    expect(unitResourceCost(gated.id, 2)!.id).toBe(one.id);
+  });
+
+  it('charges the queued tier, and gates the column on what it will charge', () => {
+    const state = makeState(makeMap(12, 12));
+    const city = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
+    const gated = Object.values(UNITS).find((u) => u.requiresResource)!;
+    const res = gated.requiresResource!;
+    const one = unitResourceCost(gated.id)!.n;
+    const seat = seatOf(state, 0)!;
+
+    grantStockpile(state, 0, res, one * 2);
+    expect(canTrainWithStockpile(state, 0, gated.id, 0)).toBe(true);
+    expect(canTrainWithStockpile(state, 0, gated.id, 1)).toBe(true);
+    // an ARMY asks three times the charge, which this bank cannot meet
+    expect(canTrainWithStockpile(state, 0, gated.id, 2)).toBe(false);
+
+    const before = stockOf(state, 0, res);
+    commitProduction(state, 0, city, { kind: 'unit', unit: gated.id, formation: 1, progress: 0 });
+    expect(before - stockOf(state, 0, res)).toBe(one * 2);
+    expect(seat).toBeTruthy();
   });
 });
 

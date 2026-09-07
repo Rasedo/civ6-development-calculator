@@ -200,8 +200,6 @@ class SimInit:
         self.citystate_suz_peace = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # tourism SENT per (from, to) major pair — real Civ 6 accrues toward
         # each foreign civ separately, through its own summed modifier
-        self.civ_rock_bands = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        self.civ_naturalists = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_tourism_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         self.civ_tourism_rel_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         # the RESOLVED suzerain contest (-1 none) and the minor's own research
@@ -513,8 +511,10 @@ class SimInit:
         self._alliance_civic = int(rules.seats["allianceCivic"])
         self._open_borders_civic = int(rules.seats["openBordersCivic"])
         self._favor_per_alliance = int(rules.seats["favorPerAlliance"])
+        self._valletta_walls_pct = int(rules.seats["vallettaWallsDiscountPct"])
         self._al_qp_turn = int(rules.seats["allianceQpTurn"])
         self._al_qp_route = int(rules.seats["allianceQpRoute"])
+        self._al_qp_deal = int(rules.seats["allianceQpDeal"])
         self._al_l2_qp = int(rules.seats["allianceL2Qp"])
         self._al_l3_qp = int(rules.seats["allianceL3Qp"])
         self._al_route_to = torch.tensor([int(x) for x in rules.seats["allianceRouteTo"]], dtype=torch.long, device=device)
@@ -1116,22 +1116,19 @@ class SimInit:
                     "neither a feature nor a terrain — _adj_src_count cannot count it")
         _erows = _bl.get("enhancers", [])
         # The missionary chassis anchors + per-enhancer channels. The exporter
-        # pre-rounds mcost/mlump to INTEGERS (Math.round on the TS side), so
-        # both engines read the identical value; the pad row (index 0 = no
-        # enhancer) carries the BASE cost/lump, unlike the additive zero pads of
-        # the other channels.
-        _mcost0 = float(_bl["missionaryCost"])
+        # pre-rounds mlump to an INTEGER (Math.round on the TS side), so both
+        # engines read the identical value; the pad row (index 0 = no enhancer)
+        # carries the BASE lump and a discount of 1, unlike the additive zero
+        # pads of the other channels. The PRICE itself is `_unit_faith_cost`,
+        # which charges the progression before this discount.
         _mlump0 = int(_bl.get("spreadPressure", 10))
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
-        self._apostle_cost = float(_bl["apostleCost"])
         self._apostle_cap = int(_bl.get("apostleCap", 1))
         self._inquisitor_idx = int(_bl.get("inquisitorIdx", -1))
-        self._inquisitor_cost = float(_bl["inquisitorCost"])
         self._inquisitor_cap = int(_bl.get("inquisitorCap", 2))
         self._monk_idx = int(_bl.get("warriorMonkIdx", -1))
-        self._monk_cost = float(_bl["warriorMonkCost"])
         self._monk_follower = int(_bl.get("warriorMonkFollower", -1))
         self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
         self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
@@ -1154,7 +1151,7 @@ class SimInit:
             "cvs": torch.tensor([0.0] + [float(x.get("cvs", 0)) for x in _erows], dtype=torch.float64, device=device),
             "mchg": torch.tensor([0] + [int(x.get("mchg", 0)) for x in _erows], dtype=torch.long, device=device),
             "mlump": torch.tensor([_mlump0] + [int(x.get("mlump", _mlump0)) for x in _erows], dtype=torch.long, device=device),
-            "mcost": torch.tensor([_mcost0] + [float(x.get("mcost", _mcost0)) for x in _erows], dtype=torch.float64, device=device),
+            "mcostMult": torch.tensor([1.0] + [float(x.get("mcostMult", 1.0)) for x in _erows], dtype=torch.float64, device=device),
         }
         self._just_war_range = int(_bl.get("justWarRange", 3))
         self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
@@ -1462,8 +1459,6 @@ class SimInit:
         self._band_venue_bits = {str(_k): int(_v) for _k, _v in rr["bandVenueBits"].items()}
         self._band_venue_districts = [(int(_b), int(_d)) for _b, _d in rr["bandVenueDistricts"] if int(_d) >= 0]
         self._concert_share_range = int(rr["concertShareRange"])
-        self._band_cost_step = int(rr["rockBandCostStep"])
-        self._naturalist_cost_step = int(rr["naturalistCostStep"])
         self._holy_city_tour = int(rr.get("holyCityTourism", 8))
         self._enl_cidx = int(rr.get("enlightenmentCidx", -3))
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
@@ -2223,10 +2218,10 @@ class SimInit:
         self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AERODROME"), -1)
         self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "SPACEPORT"), -1)
 
-        # CIV6 (Air combat): a City Center bases 1, an Aerodrome 2 before its
-        # buildings.
+        # CIV6 (Districts.xml): DISTRICT_CITY_CENTER AirSlots 1,
+        # DISTRICT_AERODROME AirSlots 4 before its buildings.
         self._city_centre_air_slots = 1
-        self._aerodrome_air_slots = 2
+        self._aerodrome_air_slots = 4
         self._mp_scale = int(rules.mp_scale)
         # CIV6 (Mountain Tunnel): the published exit price, "2 Movement" (C-20)
         self._portal_mp = 2
@@ -2330,6 +2325,9 @@ class SimInit:
         self._form_cost_mult = torch.tensor(
             [float(x) for x in rules.combat.get("formationCostMult", [1.0])],
             dtype=torch.float64, device=device)
+        # CIV6 (Formations): a DIRECT-trained Corps pays DOUBLE the chassis'
+        # strategic resource and an Army TRIPLE, by tier.
+        self._form_res_mult = [int(x) for x in rules.combat["formationResourceMult"]]
         self._form_train_disc = float(rules.combat.get("formationTrainDiscount", 1.0))
         self._form_max = self._formation_cs.numel() - 1
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
@@ -2760,6 +2758,9 @@ class SimInit:
         self._celestial_tech = int(cb.get("celestialTech", -1))
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
+        # how many copies of each chassis a seat has ever acquired — what a
+        # `costStep` price progression counts (`unitsAcquired`'s twin).
+        self.civ_unit_acq = torch.zeros(B, self.n_majors, self.NU, dtype=torch.long, device=device)
         # THE PRODUCTION LAYOUT (cpu/core/prodLayout.ts), named once. It is the
         # space the wire's action codes ride in, the space `city_current`
         # stores its queue head in for EVERY seat row, and the space the state
@@ -2776,6 +2777,9 @@ class SimInit:
         self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
         self.PROMOTE_BASE = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
+        # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the flat
+        # CostProgressionParam1 each copy already acquired adds to the next.
+        self._type_cost_step = torch.tensor([u.get("costStep", 0) for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         self._type_civilian = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)

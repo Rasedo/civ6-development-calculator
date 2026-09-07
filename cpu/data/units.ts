@@ -37,6 +37,13 @@ export const FORMATION_MAX = 2;
  *  civilopedia's "225%" is contradicted by the table), and the enabling
  *  building takes 25% off that price. */
 export const FORMATION_COST_MULT: readonly number[] = [1, 1.5, 2.0];
+/** CIV6 (Formations, two agreeing secondary sources — the Gathering Storm
+ *  strategic-resources guide and the Unit page): a Corps costs DOUBLE the
+ *  chassis' strategic resource up front and an Army TRIPLE, maintenance
+ *  unchanged. No install row carries it. Indexed by formation tier.
+ *  A merge (`formUp`) pays nothing — only a DIRECT train charges. */
+export const FORMATION_RESOURCE_MULT: readonly number[] = [1, 2, 3];
+
 export const FORMATION_TRAIN_DISCOUNT = 0.75;
 export const FORMATION_TRAIN_BUILDING = { land: 'MILITARY_ACADEMY', naval: 'SEAPORT' } as const;
 
@@ -89,6 +96,11 @@ export interface UnitDef {
   air?: 'FIGHTER' | 'BOMBER';
   /** air-unit slots this chassis provides as a base (the Aircraft Carrier). */
   airSlots?: number;
+  /** CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): each copy the seat
+   *  has already acquired raises the next one's Cost by this flat
+   *  `CostProgressionParam1`. Scaled by `GAME_SPEED` exactly as `cost` is.
+   *  Absent = a flat price forever. */
+  costStep?: number;
   /** a building the TRAINING city must already hold (the Military Engineer's
    *  Armory). Per-CITY, so it is enforced in `trainableUnits`. */
   requiresBuilding?: string;
@@ -217,7 +229,11 @@ export interface UnitDef {
   description: string;
 }
 
-const U = (def: UnitDef): UnitDef => ({ ...def, cost: Math.round(def.cost * GAME_SPEED) });
+const U = (def: UnitDef): UnitDef => ({
+  ...def,
+  cost: Math.round(def.cost * GAME_SPEED),
+  ...(def.costStep === undefined ? {} : { costStep: Math.round(def.costStep * GAME_SPEED) }),
+});
 
 export const UNITS: Record<string, UnitDef> = Object.fromEntries(
   [
@@ -401,6 +417,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'MISSIONARY',
       name: 'Missionary',
       cost: 75, // Units.xml Cost; faith-only, priced by `unitFaithCost`
+      costStep: 6,  // Units.xml CostProgressionParam1
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -451,6 +468,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'APOSTLE',
       name: 'Apostle',
       cost: 200, // Units.xml Cost; faith-only, priced by `unitFaithCost`
+      costStep: 15,  // Units.xml CostProgressionParam1
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian: never garrisons, flanks, supports or fights normal combat
@@ -545,6 +563,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'NATURALIST',
       name: 'Naturalist',
       cost: 300,
+      costStep: 50,  // Units.xml CostProgressionParam1
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian
@@ -627,6 +646,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'INQUISITOR',
       name: 'Inquisitor',
       cost: 75, // Units.xml Cost; faith-only, priced by `unitFaithCost`
+      costStep: 6,  // Units.xml CostProgressionParam1
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -1326,6 +1346,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'ROCK_BAND',
       name: 'Rock Band',
       cost: 300,
+      costStep: 50,  // Units.xml CostProgressionParam1
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -1491,6 +1512,13 @@ export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {
 /** the ERA a unit first becomes available — the era index of the tech or civic
  *  that unlocks it (0 = trainable from the start). The production cards'
  *  "Ancient and Classical era ... units" clause reads this. */
+/** the catalog POSITION of each chassis — the index every per-type plane is
+ *  keyed by on both engines, since the exporter writes the unit rows in this
+ *  same order. */
+export const UNIT_INDEX: Record<string, number> = Object.fromEntries(
+  Object.keys(UNITS).map((id, i) => [id, i]),
+);
+
 export const UNIT_ERA_INDEX: Record<string, number> = Object.fromEntries(
   Object.values(UNITS).map((u) => {
     const t = u.requiresTech ? TECHS[u.requiresTech] : undefined;
@@ -1605,13 +1633,6 @@ export const ROCK_BAND_TIER_ODDS: readonly (readonly number[])[] = [
   [163, 214, 251, 214, 116, 42],
 ];
 export const ROCK_BAND_MAX_LEVEL = 4;
-/** CIV6 (Expansion2_Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): each copy
- *  already bought raises the next one's Cost by a flat 50 — the Rock Band's
- *  and the Naturalist's, both at Cost 300. The FAITH price is that Cost at
- *  `FAITH_PURCHASE_MULT`, so a seat pays 600, then 700, then 800 at Standard
- *  speed; the step rides `GAME_SPEED` exactly as the base does. */
-export const ROCK_BAND_COST_STEP = Math.round(50 * GAME_SPEED);
-export const NATURALIST_COST_STEP = Math.round(50 * GAME_SPEED);
 
 /**
  * THE GIANT DEATH ROBOT'S FUTURE-ERA UPGRADES. CIV6: the chassis "gains

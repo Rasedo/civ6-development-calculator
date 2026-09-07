@@ -16,7 +16,7 @@ Covered (all gate-unreachable):
      wire's missionary price buys exactly one missionary at the city center,
      faith down by exactly that price; the base
      row has 3 charges.
-  2. Missionary BUY pricing — HOLY_ORDER prices it 30% off (mcost row); SCRIPTURE
+  2. Missionary BUY pricing — HOLY_ORDER prices it 30% off (mcostMult row); SCRIPTURE
      grants 4 charges (mchg row).
   3. Missionary BUY gating — cap 2 (no third), no Shrine (no buy), incomplete /
      pillaged Holy Site (no buy).
@@ -75,7 +75,7 @@ def enh_rows(sim) -> dict:
         "JUST_WAR": row(e["cnear"] != 0),
         "DEFENDER": row(e["cdef"] != 0),
         "CRUSADE": row(e["cvs"] != 0),
-        "HOLY_ORDER": row(e["mcost"] != float(e["mcost"][0])),
+        "HOLY_ORDER": row(e["mcostMult"] != float(e["mcostMult"][0])),
         "MESSENGER": row(e["tradeRel"].abs().sum(dim=1) > 0),
     }
 
@@ -200,7 +200,7 @@ def poke_missionary_buy(rules, rj, path):
     assert sim._missionary_idx >= 0 and sim._shrine_bidx >= 0 and sim._hs_idx >= 0, "missionary anchors missing"
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
 
-    cost = float(rj["beliefs"]["missionaryCost"])  # the sim's own price key
+    cost = float(sim._unit_faith_cost(r + 1, sim._missionary_idx)[0])  # the sim's own price key
     isolate_faith(sim, r)
     sim.civ_faith[:, r + 1] = cost
     clear_missionaries(sim, r)
@@ -243,16 +243,19 @@ def poke_missionary_buy(rules, rj, path):
 
 
 def poke_missionary_pricing(rules, rj, path):
-    """2. HOLY_ORDER prices the missionary 30% under the wire's base (mcost row,
+    """2. HOLY_ORDER prices the missionary 30% under the catalog base (mcostMult,
     CIV6 "Missionaries and Apostles are 30% cheaper to purchase"); SCRIPTURE
     grants 4 charges (mchg row)."""
     sim = build(rules, path)
     r, j = 0, 0
     E = enh_rows(sim)
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
-    cost = float(rj["beliefs"]["missionaryCost"])
-    ho = round(cost * 0.7)
-    assert int(sim._enh["mcost"][E["HOLY_ORDER"] + 1]) == ho, f"HOLY_ORDER mcost row must be {ho}"
+    cost = float(sim._unit_faith_cost(r + 1, sim._missionary_idx)[0])
+    # CIV6 (Holy Order): the discount rides the whole Cost, progression included
+    mm = sim._enh["mcostMult"][E["HOLY_ORDER"] + 1]
+    ho = round(cost * float(mm))
+    got = int(sim._unit_faith_cost(r + 1, sim._missionary_idx, mm)[0])
+    assert got == ho, f"HOLY_ORDER missionary price must be {ho}, read {got}"
     assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 1, "SCRIPTURE mchg row must be +1"
     assert int(sim._type_charges[sim._missionary_idx]) == 3, "base missionary charges must be 3"
 
@@ -804,6 +807,46 @@ def poke_religious_heal(rules, rj, path):
           f"{faith * sim._relig_heal_per_faith} HP on and beside it, 0 elsewhere)")
 
 
+def poke_copies_acquired(rules, rj, path):
+    """CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the price climbs
+    with every copy the seat has ACQUIRED, and the tally is taken at the one
+    place a unit is born — a purchase, a grant or a free one alike."""
+    sim = build(rules, path)
+    r = 0
+    mi = sim._missionary_idx
+    assert mi >= 0, "no missionary chassis"
+    step = float(sim._type_cost_step[mi])
+    assert step > 0, "the Missionary row carries no CostProgressionParam1"
+    fm = sim.rules.faith_purchase_mult
+    base = float(sim._type_cost[mi]) * fm
+
+    sim.civ_unit_acq.zero_()
+    assert float(sim._unit_faith_cost(r + 1, mi)[0]) == base
+
+    # a SPAWN that is no purchase still counts the copy
+    j = int(sim.city_alive[0, r + 1].long().argmax())
+    ctr = int(sim.city_center[0, r + 1, j])
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    landed = sim._spawn_unit(r + 1, one, torch.full((sim.B,), ctr, dtype=torch.long, device=sim.device), mi)
+    assert bool(landed[0]), "the missionary did not land — the tally is unmeasured"
+    assert int(sim.civ_unit_acq[0, r + 1, mi]) == 1, (
+        f"the spawn tallied {int(sim.civ_unit_acq[0, r + 1, mi])}, wanted 1")
+    assert float(sim._unit_faith_cost(r + 1, mi)[0]) == base + step * fm, (
+        "the price did not climb with the copy acquired")
+
+    # a chassis with no progression row never moves the tally it is priced by
+    flat = next((i for i in range(sim.NU)
+                 if float(sim._type_cost_step[i]) == 0 and bool(sim._type_civilian[i])
+                 and int(sim._type_air[i]) == 0 and i != sim._spy_idx), -1)
+    assert flat >= 0, "every civilian chassis carries a progression row"
+    t2 = free_neighbor(sim, ctr)
+    sim._spawn_unit(r + 1, one, torch.full((sim.B,), t2, dtype=torch.long, device=sim.device), flat)
+    assert int(sim.civ_unit_acq[0, r + 1, flat]) == 0, (
+        "a chassis with no CostProgressionParam1 was tallied")
+    assert int(sim.civ_unit_acq[0, r + 1, mi]) == 1, "the flat spawn moved another row"
+    print("  copies acquired OK: the spawn tallies, the price climbs, a flat row never ticks")
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
@@ -814,6 +857,7 @@ def main() -> None:
 
     poke_missionary_buy(rules, rj, path)
     poke_missionary_pricing(rules, rj, path)
+    poke_copies_acquired(rules, rj, path)
     poke_missionary_gating(rules, rj, path)
     poke_missionary_spread(rules, rj, path)
     poke_presr(rules, rj, path)

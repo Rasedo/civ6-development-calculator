@@ -219,6 +219,11 @@ class SimDeals:
         self._deal_move_bundle(b, a, ask, go)
         self._deal_set_term(a, b, give, go)
         self._deal_set_term(b, a, ask, go)
+        # CIV6 (ALLIANCE_POINTS_FOR_DEAL 2): a table that clears between two
+        # ALLIES pays the pair, over and above the turn's own tick.
+        _al = (go & (self.seat_ally_turns[:, a, b] > 0)).long() * self._al_qp_deal
+        self.seat_alliance_pts[:, a, b] += _al
+        self.seat_alliance_pts[:, b, a] += _al
         self.deal_offer_left[:, a, b] = torch.where(
             go, torch.zeros_like(self.deal_offer_left[:, a, b]), self.deal_offer_left[:, a, b])
         return go

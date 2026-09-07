@@ -513,8 +513,9 @@ SEAT = {
         [int(sim.civ_tourism_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
     "tourismReligiousTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_rel_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
-    "rockBandsBought": _civ_scalar("civ_rock_bands"),
-    "naturalistsBought": _civ_scalar("civ_naturalists"),
+    "unitsAcquired": lambda sim, b, rows: [
+        [x for i, n in enumerate(sim.civ_unit_acq[b, c].tolist()) if n > 0 for x in (i, n)]
+        for c in rows],
     "governorAppointed": _gov_row("civ_gov_appointed"),
     "governorCity": lambda sim, b, rows: [
         [int(sim.civ_gov_city[b, c, g]) if bool(sim.civ_gov_appointed[b, c, g]) else -1
@@ -557,6 +558,8 @@ SEAT = {
     "eraScore": _civ_scalar("era_score"),
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
+    "policySlotsExtra": lambda sim, b, rows: [
+        [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
     "governmentTurns": _civ_vec("civ_gov_turns"),
     "prevAge": _civ_scalar("prev_age"),

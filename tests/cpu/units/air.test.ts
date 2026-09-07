@@ -4,7 +4,7 @@ import { UNITS } from '../../../cpu/data/units';
 import { spawnUnit, unitsAt } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import {
-  CITY_CENTER_AIR_SLOTS, AERODROME_AIR_SLOTS,
+  AERODROME_AIR_SLOTS,
   airSlotsAt, airBaseFree, airBasesOf, airTrainTile, canTrainAir,
   rebaseRange, canRebaseTo, rebaseAir, displaceAirFrom, carryAirWith,
   airStrikeTargets, rebaseTargets, airStrikeOffers, airDefenseOf, antiAirOf,
@@ -43,14 +43,17 @@ function airState() {
 
 describe('air bases and their slots', () => {
   it('each base type carries the count the source names', () => {
-    // CIV6 (Air combat): a City Center has 1, an Aerodrome "has 2 slots
-    // initially", an Aircraft Carrier "starts with 2".
+    // CIV6 (Districts.xml): a City Center bases 1 and an Aerodrome 4;
+    // (Buildings.xml) the Hangar and the Airport grant 2 apiece, so a fully
+    // built Aerodrome bases 8. An Aircraft Carrier carries its own 2.
     const { state, city, pad, sea } = airState();
-    expect(airSlotsAt(state, 0, city.centerIndex)).toBe(CITY_CENTER_AIR_SLOTS);
+    expect(airSlotsAt(state, 0, city.centerIndex)).toBe(1);
+    expect(airSlotsAt(state, 0, pad.index)).toBe(4);
     expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS);
 
     city.buildings.push('HANGAR', 'AIRPORT');
-    expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS + 2);
+    expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS + 4);
+    expect(airSlotsAt(state, 0, pad.index)).toBe(8);
 
     pad.districtPillaged = true;
     expect(airSlotsAt(state, 0, pad.index)).toBe(0);

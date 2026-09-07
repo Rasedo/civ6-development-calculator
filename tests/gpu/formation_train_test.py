@@ -153,6 +153,59 @@ def test_the_order_costs_the_formation_price(rules, path) -> None:
     print(f"  2 price OK — corps {expected_cost(sim, ui, 1):.0f}, army {expected_cost(sim, ui, 2):.0f}")
 
 
+def test_the_order_charges_the_tier_s_resource(rules, path) -> None:
+    """CIV6 (Formations): a DIRECT-trained Corps pays DOUBLE the chassis'
+    strategic resource and an Army TRIPLE — charged at the QUEUE, like the
+    plain unit's own, and asked for by the column before it is offered."""
+    sim = build(rules, path)
+    j = a_city(sim)
+    grant(sim, j, ma=True, civ1=True, civ2=True)
+    # a strategic-gated LAND chassis, with its tech, an owned improved source
+    # and a bank — the fixture's opening fields none, so the scene grants them
+    gated = [(u, sl, c) for u, sl, c in sim._res_slot_units
+             if int(sim._type_combat[u]) > 0 and int(sim._type_air[u]) == 0
+             and not bool(sim.unit_naval[u]) and u != sim._gdr_idx]
+    assert gated, "the roster carries no strategic-gated land chassis"
+    ui, slot, cost = gated[0]
+    ti = int(sim._type_tech[ui])
+    if ti >= 0:
+        sim.civ_techs[B0, ROW, ti] = True
+    res = next(r for u, r in sim._res_unit_pairs if u == ui)
+    t = next(t for t in reversed(range(sim.T)) if int(sim.tile_seat[B0, t]) == ROW)
+    sim.res_id[B0, t] = res
+    sim.res_imp[B0, t] = 3
+    sim.improvement[B0, t] = 3
+    sim.pillaged[B0, t] = False
+    sim.civ_stockpile[B0, ROW, slot] = cost * 10
+    sim._eff_version += 1
+    assert bool(sim._trainable_units(ROW)[B0, j, ui]), (
+        "the granted chassis is still untrainable — the check below would be vacuous")
+    assert sim._form_res_mult[1] == 2 and sim._form_res_mult[2] == 3, (
+        f"the tier table must be 1/2/3, read {sim._form_res_mult}")
+
+    for tier, code in ((1, sim.FORM_BASE + ui), (2, sim.FORM_BASE + sim.NU + ui)):
+        clear_queue(sim, j)
+        sim.civ_stockpile[B0, ROW, slot] = cost * 10
+        sim._eff_version += 1
+        before = float(sim.civ_stockpile[B0, ROW, slot])
+        apply_code(sim, j, code)
+        paid = before - float(sim.civ_stockpile[B0, ROW, slot])
+        want = cost * sim._form_res_mult[tier]
+        assert paid == want, f"tier {tier} paid {paid}, wanted {want}"
+
+    # the COLUMN asks for what the applier will charge: a bank that covers the
+    # chassis but not the tier must not offer the tier
+    clear_queue(sim, j)
+    sim.civ_stockpile[B0, ROW, slot] = cost
+    sim._eff_version += 1
+    mask = sim._seat_production_mask(ROW)
+    assert not bool(mask[B0, j, sim.FORM_BASE + ui]), (
+        "a corps was offered on a bank that covers only the single charge")
+    assert not bool(mask[B0, j, sim.FORM_BASE + sim.NU + ui]), (
+        "an army was offered on a bank that covers only the single charge")
+    print(f"  2b tier charge OK — {cost} single, {cost * 2} corps, {cost * 3} army")
+
+
 def test_the_apply_re_validates(rules, path) -> None:
     sim = build(rules, path)
     j = a_city(sim)
@@ -247,6 +300,7 @@ def main() -> int:
     path = fixture_paths()[0]
     test_the_building_and_the_civic_gate_the_columns(rules, path)
     test_the_order_costs_the_formation_price(rules, path)
+    test_the_order_charges_the_tier_s_resource(rules, path)
     test_the_apply_re_validates(rules, path)
     test_the_completion_spawns_the_tier(rules, path)
     test_the_fold_touches_only_the_form_block(rules, path)

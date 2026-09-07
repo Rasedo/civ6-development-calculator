@@ -5,7 +5,8 @@ import {
   foundCity, purchaseBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith,
   faithBuyableClass, faithBuysLandUnits, wallsGoldBlocked, buildingFaithCost, unitFaithCost,
 } from '../../../cpu/core/game';
-import { CITY_STATE_SUZERAIN_BONUS, SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, SUZERAIN_ENVOYS, VALLETTA_WALLS_DISCOUNT_PCT } from '../../../cpu/data/cityStates';
+import { FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { UNITS } from '../../../cpu/data/units';
 import type { CityState, GameState } from '../../../cpu/core/types';
@@ -90,6 +91,21 @@ describe("Valletta's class purchase", () => {
     expect(purchaseBuilding(b.state, b.city.id, 'ANCIENT_WALLS', 0).ok).toBe(false);
     expect(purchaseBuildingWithFaith(b.state, b.city.id, 'ANCIENT_WALLS', 0).ok).toBe(true);
     expect(b.city.buildings).toContain('ANCIENT_WALLS');
+  });
+
+  it('prices the three walls at half, and nothing else', () => {
+    // CIV6 (Leaders.xml, MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,
+    // STAR}_BONUS): ADJUST_BUILDING_PURCHASE_COST Amount 50 on the three walls
+    const plain = makeState(makeMap(12, 12));
+    const suz = makeState(makeMap(12, 12));
+    suzerainOfValletta(suz);
+    const full = BUILDINGS.ANCIENT_WALLS.cost * FAITH_PURCHASE_MULT;
+    expect(buildingFaithCost(plain, 0, 'ANCIENT_WALLS')).toBe(full);
+    expect(buildingFaithCost(suz, 0, 'ANCIENT_WALLS')).toBe(
+      Math.round(full * (100 - VALLETTA_WALLS_DISCOUNT_PCT) / 100));
+    // a City Center row the suzerain may also buy pays the ordinary rate
+    expect(buildingFaithCost(suz, 0, 'MONUMENT'))
+      .toBe(BUILDINGS.MONUMENT.cost * FAITH_PURCHASE_MULT);
   });
 });
 

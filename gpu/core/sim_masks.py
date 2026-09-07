@@ -2232,6 +2232,13 @@ class SimMasks:
             torch.zeros_like(self.civ_best_melee[:, row]),
         )
         self.civ_best_melee[:, row] = torch.maximum(self.civ_best_melee[:, row], melee_cs)
+        # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose
+        # price climbs is priced off every copy the seat has ever acquired, so
+        # the tally is taken here — a purchase, a grant or a Great Person's free
+        # one alike. Gated on `can` like TS: a no-spot spawn lands nothing.
+        self.civ_unit_acq[:, row].scatter_add_(
+            1, ti_n.unsqueeze(1),
+            (can & (self._type_cost_step[ti_n] > 0)).long().unsqueeze(1))
         return can
 
 

@@ -1687,6 +1687,17 @@ export function spawnUnit(
     const owner = seatOf(state, seat);
     if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat);
   }
+  // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price
+  // climbs is priced off every copy the seat has ever acquired, so the tally is
+  // taken at the one place a unit is born — a purchase, a grant or a Great
+  // Person's free one alike.
+  if (def.costStep !== undefined) {
+    const owner = seatOf(state, seat);
+    if (owner) {
+      owner.unitsAcquired ??= {};
+      owner.unitsAcquired[unitType] = (owner.unitsAcquired[unitType] ?? 0) + 1;
+    }
+  }
   return unit;
 }
 

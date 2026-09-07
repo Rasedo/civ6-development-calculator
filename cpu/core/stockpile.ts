@@ -7,7 +7,7 @@
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile } from '../data/constants';
-import { UNITS, civUpgradeTarget } from '../data/units';
+import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
@@ -134,10 +134,13 @@ export function canPayStockpile(state: GameState, seat: number, resourceId: stri
  * new order while its queue is empty, so entering production happens once and
  * this is charged once.
  */
-export function unitResourceCost(unitType: string): { id: string; n: number } | undefined {
+export function unitResourceCost(unitType: string, formation = 0): { id: string; n: number } | undefined {
   const def = UNITS[unitType];
   return def?.requiresResource
-    ? { id: def.requiresResource, n: def.resourceCost ?? UNIT_RESOURCE_COST }
+    ? {
+      id: def.requiresResource,
+      n: (def.resourceCost ?? UNIT_RESOURCE_COST) * (FORMATION_RESOURCE_MULT[formation] ?? 1),
+    }
     : undefined;
 }
 
@@ -230,13 +233,13 @@ export function upgradeResourceCost(state: GameState, seat: number, unitType: st
   return c && c.id !== UNITS[unitType]?.requiresResource ? c : undefined;
 }
 
-export function canTrainWithStockpile(state: GameState, seat: number, unitType: string): boolean {
-  const c = unitResourceCost(unitType);
+export function canTrainWithStockpile(state: GameState, seat: number, unitType: string, formation = 0): boolean {
+  const c = unitResourceCost(unitType, formation);
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
 
-export function chargeUnitResource(state: GameState, seat: number, unitType: string, city?: City): void {
-  const c = unitResourceCost(unitType);
+export function chargeUnitResource(state: GameState, seat: number, unitType: string, city?: City, formation = 0): void {
+  const c = unitResourceCost(unitType, formation);
   if (!c) return;
   // CIV6 (Black Marketeer): "Strategic resources for units are discounted 80%."
   const off = city ? governorSum(state, city, (e) => e.resourceDiscountPct) : 0;

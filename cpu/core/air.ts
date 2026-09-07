@@ -4,9 +4,11 @@
  * A plane is not a tile occupant the way a land unit is — it sits INSIDE its
  * base, strikes from it, and re-bases rather than walking.
  *
- * Bases and their slots, from the same page: a City Center has 1, an Aerodrome
- * "has 2 slots initially, and can reach 4 slots after constructing the Hangar
- * and the Airport", and an Aircraft Carrier "starts with 2".
+ * Bases and their slots come from the install, not the page: Districts.xml
+ * gives DISTRICT_CITY_CENTER AirSlots 1, DISTRICT_AERODROME 4 and
+ * IMPROVEMENT_AIRSTRIP 3; Buildings.xml grants the Hangar and the Airport 2
+ * apiece (MODIFIER_PLAYER_DISTRICT_GRANT_AIR_SLOTS), so an Aerodrome reaches
+ * 8; the Aircraft Carrier carries its own 2.
  */
 import { UNITS, UNIT_HP, GDR_DRONE_AA } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -18,7 +20,7 @@ import { promoFlag, promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
-export const AERODROME_AIR_SLOTS = 2;
+export const AERODROME_AIR_SLOTS = 4;
 
 export function isAirUnit(type: string): boolean {
   return UNITS[type]?.air !== undefined;

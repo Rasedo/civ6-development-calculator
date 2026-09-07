@@ -115,6 +115,13 @@ export const ANSHAN_RELIC_SCIENCE = 1;
 /** Valletta: "City Center buildings and Encampment district buildings can be
  *  bought with Faith." The class is the building's own district. */
 export const VALLETTA_FAITH_DISTRICTS: DistrictId[] = ['CITY_CENTER', 'ENCAMPMENT'];
+
+/** CIV6 (Leaders.xml, MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,STAR}
+ *  _BONUS): `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PURCHASE_COST` Amount 50
+ *  on BUILDING_WALLS, BUILDING_CASTLE and BUILDING_STAR_FORT — the three walls
+ *  are half price for a Valletta suzerain, who is also the only seat that may
+ *  buy them at all (`wallsGoldBlocked`). */
+export const VALLETTA_WALLS_DISCOUNT_PCT = 50;
 /** Kumasi: routes to any city-state pay "+2 Culture and +1 Gold for every
  *  specialty district in the origin city". */
 export const KUMASI_ROUTE_CULTURE = 2;
@@ -149,7 +156,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', channel: 'production', note: 'a per-building GOLD PURCHASE discount; the flat production channel stands in' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
-  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings', note: 'the walls DISCOUNT has no published magnitude, so the three walls are faith-only at the ordinary faith price' },
+  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },

@@ -131,7 +131,9 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
 }
 
 export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
-  if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit, city);
+  // CIV6 (Formations): a DIRECT-trained Corps pays double the chassis'
+  // strategic resource and an Army triple; a merge pays nothing.
+  if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit, city, item.formation ?? 0);
   else if (item.kind === 'project') chargeProjectResource(state, seat, item.project);
   item.progress += takeItemBank(city, item);
   city.queue.push(item);

@@ -1523,11 +1523,11 @@ class SimEconomy:
         return out
 
     def _air_slots_at(self, row: int) -> torch.Tensor:
-        """[B, T] — what each tile can BASE for seat row `row`. CIV6 (Air
-        combat): a City Center has 1, an Aerodrome "has 2 slots initially, and
-        can reach 4 slots after constructing the Hangar and the Airport", and
-        an Aircraft Carrier "starts with 2"; an Airstrip carries its own
-        `airSlots`. A pillaged or unfinished district bases nothing."""
+        """[B, T] — what each tile can BASE for seat row `row`. CIV6
+        (Districts.xml): a City Center bases 1 and an Aerodrome 4, the Hangar
+        and the Airport granting 2 apiece; an Airstrip and an Aircraft Carrier
+        carry their own `airSlots` (3 and 2). A pillaged or unfinished district
+        bases nothing."""
         B, T, dev = self.B, self.T, self.device
         out = torch.zeros(B, T, dtype=torch.long, device=dev)
         if not self._any_air:
