@@ -1,13 +1,14 @@
 /**
- * THE ESPIONAGE SYSTEM. A Spy is a civilian that never walks: it JUMPS between
- * revealed cities, establishes, and runs one mission at a time out of a
- * district of the city it stands in.
+ * THE ESPIONAGE SYSTEM. A Spy is a civilian that never walks: it JUMPS to the
+ * district tile of a revealed city it will work out of, establishes, and runs
+ * one mission at a time from that district.
  *
  * CIV6 (Espionage): "Spies act in cities. Spy missions may be performed in
  * enemy cities and your own, and what exactly they will do depends on the city
  * you send them to."
  */
 import { hexDistance } from '../../world/hex';
+import { darkBuildings, pillageBuilding } from './yields';
 import { UNITS, UNIT_ERA_INDEX } from '../data/units';
 import { holdSpy, spiesHeldOf } from './deals';
 import { TECHS } from '../data/techs';
@@ -24,7 +25,7 @@ import {
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
   SPY_M_COUNTERSPY, SPY_M_LISTENING_POST, SPY_M_FABRICATE_SCANDAL,
-  SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL,
+  SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL, SPY_SURVEILLANCE_REACH,
   type SpyMissionDef,
 } from '../data/espionage';
 import { envoysOf, resolveSuzerain, suzerainOf } from './cityStates';
@@ -74,56 +75,59 @@ export function canTrainSpy(state: GameState, seat: number): boolean {
   return spiesOf(state, seat).length + spiesHeldOf(state, seat) < spyCapacity(state, seat);
 }
 
-/** the city whose CENTRE this spy stands on, whoever holds it. */
+/** does this city's registry hold the tile — its centre or one of its districts? */
+function cityHoldsTile(city: City, tileIndex: number): boolean {
+  return city.centerIndex === tileIndex || city.districts.some((d) => d.tileIndex === tileIndex);
+}
+
+/** the MAJOR city on whose centre or district tile this spy stands, whoever
+ *  holds it. A spy occupies the district it works out of — CIV6 (Espionage):
+ *  every operation names its Location, "the district in which the mission
+ *  takes place". */
 export function spyCity(state: GameState, unit: Unit): { seat: Seat; city: City } | undefined {
+  return spyCityAt(state, unit.tileIndex);
+}
+
+function spyCityAt(state: GameState, tileIndex: number): { seat: Seat; city: City } | undefined {
   for (const actor of state.seats) {
-    const city = actor.cities.find((c) => c.centerIndex === unit.tileIndex);
+    const city = actor.cities.find((c) => cityHoldsTile(c, tileIndex));
     if (city) return { seat: actor, city };
   }
   return undefined;
 }
 
-function cityHasDistrict(state: GameState, city: City, district: string): boolean {
-  if (district === 'CITY_CENTER') return true;
-  return city.districts.some((d) => {
-    if (d.type !== district) return false;
-    const t = state.map.tiles[d.tileIndex];
-    return !!t?.districtComplete && !t.districtPillaged;
-  });
-}
-
 /**
  * CIV6: "You may send a Spy to any city you have revealed (provided you don't
- * have an alliance with that civilization)". Ordered by CENTRE TILE INDEX
- * ascending and cut to the head's width, so both engines agree on column k
- * without shipping a list.
+ * have an alliance with that civilization)" — to the DISTRICT it will work
+ * out of: every centre and district tile of every such major city, and a
+ * city-state's centre (the scandal's ground). NEAREST first, ties to the
+ * lowest tile index, cut to the head's width — so both engines agree on
+ * column k without shipping a list, and the head reaches the cities a spy
+ * could actually get to soonest.
  */
 export function spyDestinations(state: GameState, unit: Unit, width = SPY_TRAVEL_COLS): number[] {
   const s = seatOf(state, unit.seat);
   if (!s || !isSpy(unit.type)) return [];
-  const out: number[] = [];
-  for (const tile of state.map.tiles) {
-    if (tile.index === unit.tileIndex) continue;
-    if (s.explored.length > 0 && s.explored[tile.index] !== 1) continue;
-    const here = spyCityAt(state, tile.index);
-    if (here) {
-      if (seatsAllied(state, unit.seat, here.holder)) continue;
-    } else if (!spyMinorAt(state, tile.index)) {
-      // a CITY-STATE centre is a destination too — the scandal's ground
-      continue;
-    }
-    out.push(tile.index);
-    if (out.length >= width) break;
-  }
-  return out;
-}
-
-function spyCityAt(state: GameState, tileIndex: number): { holder: number; city: City } | undefined {
+  const here = state.map.tiles[unit.tileIndex];
+  const seen = new Set<number>();
+  const out: { t: number; d: number }[] = [];
+  const offer = (t: number): void => {
+    if (t === unit.tileIndex || seen.has(t)) return;
+    if (s.explored.length > 0 && s.explored[t] !== 1) return;
+    seen.add(t);
+    const tile = state.map.tiles[t];
+    out.push({ t, d: hexDistance(here.col, here.row, tile.col, tile.row) });
+  };
   for (const actor of state.seats) {
-    const city = actor.cities.find((c) => c.centerIndex === tileIndex);
-    if (city) return { holder: actor.seat, city };
+    if (seatsAllied(state, unit.seat, actor.seat)) continue;
+    for (const city of actor.cities) {
+      offer(city.centerIndex);
+      for (const d of city.districts) offer(d.tileIndex);
+    }
   }
-  return undefined;
+  for (const minor of state.cityStates ?? []) offer(minor.centerIndex);
+  out.sort((a, b) => a.d - b.d || a.t - b.t);
+  return out.slice(0, width).map((x) => x.t);
 }
 
 /** the CITY-STATE whose centre this tile is — the minor's record IS its city
@@ -189,7 +193,18 @@ export function missionOffered(state: GameState, unit: Unit, m: number): boolean
   if (!here) return false;
   const mine = here.seat.seat === unit.seat;
   if (!!def.athome !== mine) return false;
-  if (!cityHasDistrict(state, here.city, def.district)) return false;
+  // THE GEOMETRY: a mission is offered where its district stands — on the
+  // tile the spy occupies. A centre mission wants the centre, a district
+  // mission a LIVE district of its type underfoot, and the counterspy post
+  // any district of the city it guards.
+  const tile = state.map.tiles[unit.tileIndex];
+  if (def.anyDistrict) {
+    // any tile of the city — `spyCity` already answered that
+  } else if (def.district === 'CITY_CENTER') {
+    if (tile.index !== here.city.centerIndex) return false;
+  } else if (tile.district !== def.district || !tile.districtComplete || tile.districtPillaged) {
+    return false;
+  }
   if (m === SPY_M_GREAT_WORK_HEIST && heistTarget(here.city) === null) return false;
   if (m === SPY_M_STEAL_TECH_BOOST && stealableTech(state, unit.seat, here.seat.seat) === null) return false;
   if (m === SPY_M_NEUTRALIZE_GOVERNOR && !hasGovernor(state, here.seat, here.city)) return false;
@@ -274,7 +289,7 @@ export function effectiveLevel(
     + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
     + quartermasterLevels(state, unit.seat)
     + congressPactLevels(state, m);
-  return Math.max(0, lvl - (city ? cityCounterLevels(state, city) : 0));
+  return Math.max(0, lvl - (city ? cityCounterLevels(state, city, unit.tileIndex) : 0));
 }
 
 /** the district types of a city that are built and unpillaged — what a
@@ -288,8 +303,9 @@ function liveDistrictTypes(state: GameState, city: City): Set<string> {
   return live;
 }
 
-/** the levels a city's own defences take off a spy working there. */
-export function cityCounterLevels(state: GameState, city: City): number {
+/** the levels a city's own defences take off a spy working there — at
+ *  `atTile`, the district it stands on, where the geometry matters. */
+export function cityCounterLevels(state: GameState, city: City, atTile?: number): number {
   let n = 0;
   const live = liveDistrictTypes(state, city);
   // per INSTANCE — a repeatable district may stand more than once
@@ -297,9 +313,10 @@ export function cityCounterLevels(state: GameState, city: City): number {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].spyLevelPenalty ?? 0;
   }
+  const dark = darkBuildings(state.map, city);
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (!def || !live.has(def.district)) continue;
+    if (!def || !live.has(def.district) || dark.has(id)) continue;
     n += def.spyLevelPenalty ?? 0;
   }
   // CIV6 (Consulate): the penalty reaches "this city OR CITIES WITH
@@ -317,9 +334,21 @@ export function cityCounterLevels(state: GameState, city: City): number {
     }
   }
   // CIV6 (Polygraph): "If this Spy is in home territory, enemy Spies in your
-  // lands operate at 1 level below usual" — the posts standing in this city.
+  // lands operate at 1 level below usual" — the posts standing in this city,
+  // on whichever of its districts.
   for (const u of spiesOf(state, city.seat)) {
-    if (u.tileIndex === city.centerIndex) n += promoValue(u, 'SPY_HOME_ENEMY_LEVEL');
+    if (!cityHoldsTile(city, u.tileIndex)) continue;
+    n += promoValue(u, 'SPY_HOME_ENEMY_LEVEL');
+    // CIV6 (Surveillance): "When Counterspying all city districts are defended
+    // (and +1 level at districts within 1 hex)" — READING: the post operates a
+    // level higher against a spy working within that reach of it, which is
+    // one level off the intruder.
+    const surv = promoValue(u, 'SPY_SURVEIL');
+    if (surv > 0 && u.spyMission === SPY_M_COUNTERSPY && atTile !== undefined) {
+      const a = state.map.tiles[u.tileIndex];
+      const b = state.map.tiles[atTile];
+      if (hexDistance(a.col, a.row, b.col, b.row) <= SPY_SURVEILLANCE_REACH) n += surv;
+    }
   }
   // CIV6 (Local Informants): "Enemy Spies operate at 3 levels below normal in
   // this city."
@@ -332,10 +361,14 @@ function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
 
-function counterspiesAt(state: GameState, holder: number, tileIndex: number): Unit[] {
+/** the holder's counterspy posts that DEFEND the district at `tileIndex`: a
+ *  post guards the district it stands on, and CIV6 (Surveillance) "When
+ *  Counterspying all city districts are defended". */
+function counterspiesGuarding(state: GameState, holder: number, city: City, tileIndex: number): Unit[] {
   return state.units.filter(
-    (u) => u.seat === holder && isSpy(u.type)
-      && u.tileIndex === tileIndex && u.spyMission === SPY_M_COUNTERSPY,
+    (u) => u.seat === holder && isSpy(u.type) && u.spyMission === SPY_M_COUNTERSPY
+      && cityHoldsTile(city, u.tileIndex)
+      && (u.tileIndex === tileIndex || promoValue(u, 'SPY_SURVEIL') > 0),
   );
 }
 
@@ -428,7 +461,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     }
   }
   if (def.certain) return;
-  if (!ok) spyEscape(state, unit, here.city.districts, here.seat.seat);
+  if (!ok) spyEscape(state, unit, here.city.districts, here.seat.seat, here.city);
 }
 
 /**
@@ -472,7 +505,8 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * the prison — a minor keeps no cell, so its catch ends the career.
  */
 function spyEscape(state: GameState, unit: Unit,
-                   districts: { type: string; tileIndex: number }[], jailer: number): void {
+                   districts: { type: string; tileIndex: number }[], jailer: number,
+                   city?: City): void {
   const live = new Set<string>();
   for (const d of districts) {
     const dt = state.map.tiles[d.tileIndex];
@@ -482,8 +516,8 @@ function spyEscape(state: GameState, unit: Unit,
     ?? SPY_ESCAPE_ROUTES[SPY_ESCAPE_ROUTES.length - 1];
   // CIV6: "when enemy Spies are performing missions in those districts, there
   // is a much higher chance than normal that they will be caught" — the post
-  // now leans on the ESCAPE.
-  const posted = jailer >= 0 ? counterspiesAt(state, jailer, unit.tileIndex) : [];
+  // guarding the district the spy worked from leans on the ESCAPE.
+  const posted = jailer >= 0 && city ? counterspiesGuarding(state, jailer, city, unit.tileIndex) : [];
   const lvl = spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL');
   const pct = route.basePct + SPY_SUCCESS_PER_LEVEL_PCT * lvl
     - (posted.length > 0 ? SPY_COUNTERSPY_CATCH_PCT : 0);
@@ -567,7 +601,12 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       return;
     }
     case SPY_M_SABOTAGE_PRODUCTION:
-      pillageDistrict(state, city, 'INDUSTRIAL_ZONE');
+      // CIV6 (Sabotage Production): "Pillage all buildings in the industrial
+      // zone." — the BUILDINGS, not the district: its adjacency keeps paying
+      // while the Workshop and its successors stand dark until repaired.
+      for (const id of city.buildings) {
+        if (BUILDINGS[id]?.district === 'INDUSTRIAL_ZONE') pillageBuilding(city, id);
+      }
       return;
     case SPY_M_DISRUPT_ROCKETRY:
       pillageDistrict(state, city, 'SPACEPORT');

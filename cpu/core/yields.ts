@@ -259,6 +259,52 @@ export function pillagedDistrictTypes(
   return out;
 }
 
+/** the shape every building-holding city answers with — a City, the minor's
+ *  city, or a capture's stub */
+export type BuildingHolder = {
+  buildings: string[];
+  districts?: { type: DistrictId; tileIndex: number }[];
+  pillagedBuildings?: string[];
+};
+
+/** THE one reader of the per-building pillage flag. */
+export function buildingPillaged(city: { pillagedBuildings?: string[] }, id: string): boolean {
+  return city.pillagedBuildings?.includes(id) ?? false;
+}
+
+/** CIV6 (Sabotage Production): "Pillage all buildings in the industrial
+ *  zone" — mark a standing building pillaged; nothing happens to one the city
+ *  does not hold. */
+export function pillageBuilding(city: { buildings?: string[]; pillagedBuildings?: string[] }, id: string): void {
+  if (!city.buildings?.includes(id) || buildingPillaged(city, id)) return;
+  (city.pillagedBuildings ??= []).push(id);
+}
+
+/** the repair — the building's own queue column completing at
+ *  PILLAGE_BUILDING_REPAIR_PERCENT of its price clears the mark. */
+export function repairBuilding(city: { pillagedBuildings?: string[] }, id: string): void {
+  if (!city.pillagedBuildings) return;
+  city.pillagedBuildings = city.pillagedBuildings.filter((b) => b !== id);
+  if (city.pillagedBuildings.length === 0) delete city.pillagedBuildings;
+}
+
+/**
+ * The buildings of a city that pay NOTHING: those standing in a COMPLETE-but-
+ * PILLAGED district, and those pillaged themselves — the finer read the
+ * district flag implies. ONE composer: every "does this building pay"
+ * question (yields, housing, amenities, power, loyalty, spy levels,
+ * training experience, specialist slots) asks here.
+ */
+export function darkBuildings(map: GameState['map'], city: BuildingHolder): Set<string> {
+  const pillaged = pillagedDistrictTypes(map, city.districts ?? []);
+  const out = new Set<string>();
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if ((def && pillaged.has(def.district)) || buildingPillaged(city, id)) out.add(id);
+  }
+  return out;
+}
+
 /** CIV6 (Stave Church): the adjacency rule a civilization's unique building
  *  adds to one district type of its city (EFFECT_FEATURE_ADJACENCY). */
 export function buildingVariantAdjacency(civ: string | null, city: City, type: DistrictId): AdjacencyRule[] {
@@ -302,11 +348,12 @@ export function poweredExtra(mods: Modifiers, poweredYields: Partial<Yields>): P
 export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): Yields {
   const out = emptyYields();
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
+  const dark = darkBuildings(ctx.map, city);
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def) continue;
     if (def.regional) continue; // handled by regional scan (affects own city too)
-    if (pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
+    if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
     if (def.yields) addYields(out, def.yields);
     if (powered && def.poweredYields) {
       addYields(out, def.poweredYields);
@@ -340,7 +387,7 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     let base = 0;
     for (const id of city.buildings) {
       const def = BUILDINGS[id];
-      if (!def || def.regional || def.district !== b.district) continue;
+      if (!def || def.regional || def.district !== b.district || dark.has(id)) continue;
       base += def.yields?.[b.yield] ?? 0;
     }
     out[b.yield] += base * pct;
@@ -375,10 +422,11 @@ export interface CityPower {
  */
 export function cityPower(state: GameState, city: City): CityPower {
   const pillaged = pillagedDistrictTypes(state.map, city.districts);
+  const dark = darkBuildings(state.map, city);
   let demand = LASER_POWER_LOAD * (city.laserStations ?? 0);
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (!def?.power || pillaged.has(def.district)) continue;
+    if (!def?.power || dark.has(id)) continue;
     demand += def.power;
   }
   let supply = 0;
@@ -387,7 +435,7 @@ export function cityPower(state: GameState, city: City): CityPower {
   // `resolveSeatPower` asks a plant only for the shortfall.
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (def?.powerSupply && !pillaged.has(def.district)) supply += def.powerSupply;
+    if (def?.powerSupply && !dark.has(id)) supply += def.powerSupply;
   }
   // CIV6 (Solar Farm, Wind Farm): a renewable generator "provides Power to
   // its city" — the one that owns its plot — from a source no stockpile
@@ -520,7 +568,7 @@ export function cityDistrictSum(
 }
 
 export function localAmenities(state: GameState, city: City): number {
-  const pillaged = pillagedDistrictTypes(state.map, city.districts);
+  const dark = darkBuildings(state.map, city);
   let n = cityDistrictSum(state, city, 'amenities');
   // CIV6 (Bath): the unique district's own flat Amenity, in the base the
   // luxury ranking sorts on — where the Aqueduct's own would sit.
@@ -532,7 +580,7 @@ export function localAmenities(state: GameState, city: City): number {
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def || def.regional) continue;
-    if (pillaged.has(def.district)) continue; // pillaged district's amenities go dark
+    if (dark.has(id)) continue; // a pillaged district's amenities go dark, and a pillaged building's
     n += def.amenities ?? 0;
     // CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
     if (def.autoCapital) for (const r of getModifiers(state, city.seat).capital) n += r.palaceAmenities ?? 0;

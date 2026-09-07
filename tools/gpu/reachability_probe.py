@@ -95,7 +95,8 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
         "darkAge", "darkCard",
-        "freeCity", "freeLeft") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "freeCity", "freeLeft",
+        "spy", "spyDistrict", "spyMission", "bldgPillaged") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -216,6 +217,20 @@ def main() -> None:
             for _row in seats:
                 _dk |= (sim._seat_slotted(_row) & (sim._pol_dark_lo >= 0).unsqueeze(0)).any(dim=1)
             mark("darkCard", _dk, t)
+
+        # the SPY: fielded at all; standing on a DISTRICT tile rather than a
+        # centre (the ground its missions are offered on); running an
+        # offensive mission; and any building standing PILLAGED anywhere
+        _sidx = getattr(sim, "_spy_idx", -1)
+        if _sidx >= 0:
+            _spies = sim.unit_alive & (sim.unit_type == _sidx)
+            mark("spy", _spies.any(dim=1), t)
+            _stile = sim.unit_tile.clamp(min=0)
+            _on_d = (sim.district.gather(1, _stile) >= 0) & (sim.centre_slot_at.gather(1, _stile) < 0)
+            mark("spyDistrict", (_spies & _on_d).any(dim=1), t)
+            _off = torch.tensor(sim._spy_offensive or [-1], dtype=torch.long, device=sim.device)
+            mark("spyMission", (_spies & torch.isin(sim.unit_spy_mission, _off)).any(dim=1), t)
+        mark("bldgPillaged", sim.city_bldg_pillaged.reshape(sim.B, -1).any(dim=1), t)
 
         _eidx = getattr(sim, "_eng_idx", -1)
         if _eidx >= 0:

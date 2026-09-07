@@ -42,7 +42,7 @@ class SimGp:
     def _gp_perm(self, row: int, name: str) -> torch.Tensor:
         """[B] — one permanent per-seat channel a spent Great Person left."""
         k = self._gp_perm_names.index(name) if name in self._gp_perm_names else -1
-        if k < 0:
+        if k < 0 or row >= self.n_majors:  # a minor or the Free row recruits nobody
             return torch.zeros(self.B, dtype=self.civ_gp_perm.dtype, device=self.device)
         return self.civ_gp_perm[:, row, k]
 

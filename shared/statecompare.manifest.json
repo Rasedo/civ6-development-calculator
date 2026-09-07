@@ -1495,17 +1495,18 @@
         },
         {
           "name": "techProgress",
-          "compare": "exact",
+          "compare": "milli",
           "covers": [
             "ResearchState.techProgress"
           ],
           "planes": [
             "citystate_tech_prog"
-          ]
+          ],
+          "note": "the minor city's own Science, banked — a fraction like a major's"
         },
         {
           "name": "civicProgress",
-          "compare": "exact",
+          "compare": "milli",
           "covers": [
             "ResearchState.civicProgress"
           ],
@@ -1515,12 +1516,43 @@
         },
         {
           "name": "prodProgress",
-          "compare": "exact",
+          "compare": "milli",
           "covers": [
             "CityState.prodProgress"
           ],
           "planes": [
             "citystate_prod"
+          ]
+        },
+        {
+          "name": "minorTreasury",
+          "compare": "milli",
+          "covers": [
+            "CityState.treasury"
+          ],
+          "planes": [
+            "citystate_treasury"
+          ],
+          "note": "the minor city's Gold, banked; nothing spends it yet"
+        },
+        {
+          "name": "minorFaith",
+          "compare": "milli",
+          "covers": [
+            "CityState.faith"
+          ],
+          "planes": [
+            "citystate_faith"
+          ]
+        },
+        {
+          "name": "minorBuildingsPillaged",
+          "compare": "exact",
+          "covers": [
+            "CityState.pillagedBuildings"
+          ],
+          "planes": [
+            "city_bldg_pillaged"
           ]
         },
         {
@@ -1743,6 +1775,17 @@
             "city_bldg"
           ],
           "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's city_bldg column order."
+        },
+        {
+          "name": "buildingsPillaged",
+          "compare": "exact",
+          "covers": [
+            "City.pillagedBuildings"
+          ],
+          "planes": [
+            "city_bldg_pillaged"
+          ],
+          "note": "the SET of building indices standing pillaged, in the same order — dark until the city's queue repairs them."
         },
         {
           "name": "productionBank",

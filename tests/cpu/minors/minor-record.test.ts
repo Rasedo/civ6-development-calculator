@@ -5,7 +5,9 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import { borderClosedTo } from '../../../cpu/core/units';
 import { spreadFromUnit } from '../../../cpu/core/unitOrders';
-import { addEnvoys, cityStatePhase, isSuzerain, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
+import { addEnvoys, isSuzerain, minorCity, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
+import { minorPhase } from '../../../cpu/core/minorBuild';
+import { computeCityStats } from '../../../cpu/core/city';
 import { containmentBonus } from '../../../cpu/core/effects';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { OPEN_BORDERS_CIVIC } from '../../../cpu/data/seats';
@@ -110,17 +112,22 @@ describe('Containment', () => {
 
 // ---------------------------------------------------------------------------
 describe("the minor's research record", () => {
-  it('banks POPULATION a turn and completes the cheapest available row', () => {
+  it("banks its city's own Science a turn and completes the cheapest available row", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { population: 5 });
     const cheapestTech = Object.entries(TECHS)
       .filter(([, d]) => d.prereqs.length === 0)
       .sort((a, b) => a[1].cost - b[1].cost)[0];
     state.turn = 1;
-    cityStatePhase(state);
-    expect(cs.research.techProgress).toBe(5);   // pop into the pot, nothing done
+    // the pot takes the yield walk's Science over `minorCity` — its five
+    // citizens alone pay some (`tests/cpu/citystates/minor-yields.test.ts`
+    // pins the walk itself)
+    const sci = computeCityStats(state, minorCity(cs)).total.science;
+    expect(sci).toBeGreaterThan(0);
+    minorPhase(state);
+    expect(cs.research.techProgress).toBe(sci);   // the city's Science into the pot, nothing done
     expect(cs.research.techs).toEqual([]);
-    for (let i = 0; i < Math.ceil(cheapestTech[1].cost / 5); i++) cityStatePhase(state);
+    for (let i = 0; i < Math.ceil(cheapestTech[1].cost / sci); i++) minorPhase(state);
     expect(cs.research.techs).toContain(cheapestTech[0]);
     expect(cs.research.techProgress).toBeGreaterThanOrEqual(0);
   });

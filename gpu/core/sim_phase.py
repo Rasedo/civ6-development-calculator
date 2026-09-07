@@ -849,7 +849,7 @@ class SimPhase:
         # bonus Production in all Cities for 5 turns". Percentages both, so
         # they join the SAME additive sum rather than compounding on it.
         if bool((self._b_settler_prod != 0).any()):
-            _stand_b = self.city_bldg[bidx, row, col] & ~self._bldg_dark(self.city_dist_tile[bidx, row, col])
+            _stand_b = self.city_bldg[bidx, row, col] & ~self._bldg_dark(self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
             _sp = (_stand_b.double() * self._b_settler_prod.unsqueeze(0)).sum(dim=1) / 100
             _add = _add + torch.where(cur == self.SETTLER, _sp, torch.zeros_like(_sp)).to(_add.dtype)
         if bool((self._b_conquest_pct != 0).any()):
@@ -935,7 +935,10 @@ class SimPhase:
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-            xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui, row, col)
+            xp = self._train_xp_pct(
+                self.city_bldg[bidx, row, col, :] & ~self._bldg_dark(
+                    self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col]),
+                ui, row, col)
             fp = (self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)
                   if self.n_governors else torch.zeros_like(made_u))
             # CIV6 (Military alliance 3): "Units start with a free Promotion."
@@ -1036,6 +1039,8 @@ class SimPhase:
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
             self.city_bldg[br, row, col[br], bi[br]] = True
+            # a building already held and standing pillaged was REPAIRED
+            self.city_bldg_pillaged[br, row, col[br], bi[br]] = False
             self._bldg_version += 1
             self._building_dedications(row, bi, made_b2)
             # A completed REGIONAL building reaches OTHER cities' yields, so

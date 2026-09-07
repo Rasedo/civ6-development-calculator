@@ -17,7 +17,7 @@ import { citiesOf, civOf, seatOf, tileOwnedByCiv } from './seats';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
-import { cityPower, pillagedDistrictTypes } from './yields';
+import { cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 
@@ -45,9 +45,9 @@ export function stockOf(state: GameState, seat: number, resourceId: string): num
 export function stockpileCap(state: GameState, seat: number): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {
-    if (pillagedDistrictTypes(state.map, city.districts).has('ENCAMPMENT')) continue;
+    const dark = darkBuildings(state.map, city);
     for (const id of city.buildings) {
-      if (BUILDINGS[id]?.district === 'ENCAMPMENT') n += 1;
+      if (BUILDINGS[id]?.district === 'ENCAMPMENT' && !dark.has(id)) n += 1;
     }
   }
   // CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's per-building rows

@@ -1,7 +1,7 @@
 """ESPIONAGE: capacity, the jump, the mission heads and what each one does.
 
-A Spy holds NEITHER occupancy plane — it jumps between city centres and works
-out of a district of whatever city it stands on. Every check below drives
+A Spy holds NEITHER occupancy plane — it jumps to the district tile it will
+work out of, in whatever city holds it. Every check below drives
 `_seat_unit_mask` / `_apply_seat_unit_actions`, the entry points
 `policy/drive.py` uses, so a rule only the applier knows cannot hide.
 """
@@ -155,13 +155,21 @@ def main() -> None:
 
     iz = give_district(sim, foe, theirs, sim._iz_idx)
     mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
+    assert not bool(mm[sim._spy_m_sabotage]), "the Zone stands, but the spy stands on the centre"
+    # THE GEOMETRY: a mission is offered on the district it names, under the spy
+    sim.unit_tile[0, v] = iz
+    sim._gen_ver += 1
+    mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert bool(mm[sim._spy_m_sabotage])
+    assert not bool(mm[sim._spy_m_sources]), "a centre mission lit on the Zone"
     sim.district_pillaged[0, iz] = True
     sim._eff_version += 1
     mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert not bool(mm[sim._spy_m_sabotage]), "a DARK district offers nothing"
     sim.district_pillaged[0, iz] = False
     sim._eff_version += 1
+    sim.unit_tile[0, v] = ctr_t
+    sim._gen_ver += 1
 
     # ...and the at-home column comes back at home
     sim.unit_tile[0, v] = ctr_m
@@ -251,7 +259,14 @@ def main() -> None:
     assert int(sim.civ_gov_out[0, foe, gi]) == sim._spy_gov_turns - 1
     sim.civ_gov_out[0, foe, gi] = 0
 
-    # -- 11: Sabotage darkens the district it names -------------------------
+    # -- 11: Sabotage pillages the Zone's BUILDINGS, from the Zone -----------
+    # CIV6 (Sabotage Production): "Pillage all buildings in the industrial
+    # zone." — the district itself keeps standing.
+    wk = int((sim._b_req_district == sim._iz_idx).nonzero(as_tuple=True)[0][0])
+    sim.city_bldg[0, foe, theirs, wk] = True
+    sim._bldg_version += 1
+    sim._eff_version += 1
+    sim.unit_tile[0, v] = iz
     sim.unit_spy_mission[0, v] = sim._spy_idle
     sim._gen_ver += 1
     order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_sabotage)
@@ -259,8 +274,11 @@ def main() -> None:
     sim.rng_state[0] = 7  # a draw that clears the success bar
     for _ in range(int(sim.unit_spy_turns[0, v])):
         sim._tick_spies(row)
-    assert bool(sim.district_pillaged[0, iz]), "a successful Sabotage darkens the Zone"
+    assert bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a successful Sabotage did not pillage the Workshop"
+    assert not bool(sim.district_pillaged[0, iz]), "Sabotage darkened the district itself"
     assert int(sim.unit_spy_level[0, v]) == 1, "an offensive success levels the Spy"
+    sim.city_bldg_pillaged[0, foe, theirs, wk] = False
+    sim._eff_version += 1
 
     # -- 12: the rebels are ANTI-CAVALRY of the world era --------------------
     ch = sim._partisan_chassis()
@@ -280,19 +298,20 @@ def main() -> None:
     sim._spy_capture_pct = 100
     for _r in sim._spy_escape_routes:
         _r["basePct"] = -1000        # ...and no route can save the spy
-    w = spawn_spy(sim, row, ctr_t)
-    guard = spawn_spy(sim, foe, ctr_t)
+    # the post guards the district it stands on — the Zone the saboteur works from
+    w = spawn_spy(sim, row, iz)
+    guard = spawn_spy(sim, foe, iz)
     sim.unit_spy_mission[0, guard] = sim._spy_m_counterspy
     sim.unit_spy_level[0, guard] = 0
-    sim.district_pillaged[0, iz] = False
     sim._gen_ver += 1
     order(sim, row, w, sim._A_SPY_MISSION + sim._spy_m_sabotage)
     assert int(sim.unit_spy_mission[0, w]) == sim._spy_m_sabotage
     for _ in range(int(sim.unit_spy_turns[0, w])):
         sim._tick_spies(row)
     assert not bool(sim.unit_alive[0, w]), "the pinned catch did not fire"
-    assert not bool(sim.district_pillaged[0, iz]), "a pinned FAILURE wrecked the Zone"
+    assert not bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a pinned FAILURE wrecked the Workshop"
     assert int(sim.unit_spy_level[0, guard]) == 1, "the captor earned nothing"
+    sim.unit_alive[0, guard] = False
     sim._spy_missions[sim._spy_m_sabotage]["successPct"] = _pct0
     sim._spy_success_per_level = _per0
     sim._spy_capture_pct = _cap0
@@ -392,7 +411,9 @@ def main() -> None:
     sim.unit_spy_mission[0, x] = sim._spy_idle
     sim.unit_promos[0, x] = 0
     sim._gen_ver += 1
-    give_district(sim, foe, theirs, sim._spy_missions[sim._spy_m_siphon]["district"])
+    hub = give_district(sim, foe, theirs, sim._spy_missions[sim._spy_m_siphon]["district"])
+    sim.unit_tile[0, x] = hub
+    sim._gen_ver += 1
     mm = mask_row(sim, row, x)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert not bool(mm[sim._spy_m_siphon]), "the banned operation is still offered"
     sim.congress_active[0, 0, 2] = other

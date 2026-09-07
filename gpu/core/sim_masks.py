@@ -925,7 +925,7 @@ class SimMasks:
         cls = rd.u_promo_class[utype.clamp(min=0)]
         reach = rd.b_train_xp_cls[:, cls.clamp(min=0)].transpose(0, 1)  # [B, NB]
         pct = (rd.b_train_xp_pct.view(1, -1) * (bldg & reach).long()).sum(dim=1)
-        if self._governor_xp_rows and self.n_governors:
+        if self._governor_xp_rows and self.n_governors and row < self.n_majors:
             _est = self._governor_established(row).gather(1, col.unsqueeze(1)).squeeze(1)
             _own = self.city_founder[:, row].gather(1, col.unsqueeze(1)).squeeze(1) == row
             for _xc, _xl, _xp, _xf in self._governor_xp_rows:
@@ -2545,6 +2545,8 @@ class SimMasks:
         tab = self._golden_ded_table(kind)
         if torch.is_tensor(civ):
             return tab.gather(1, civ.clamp(min=0).unsqueeze(1)).squeeze(1)
+        if civ >= self.n_majors:  # a minor's or the Free row's city keeps no age
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return tab[:, civ]
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None,

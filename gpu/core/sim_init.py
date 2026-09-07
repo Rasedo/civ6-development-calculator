@@ -91,6 +91,9 @@ class SimInit:
             ("gwart_type", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("gwart_artist", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
+            # the members of `city_bldg` standing PILLAGED — dark until the
+            # city's own queue repairs them; read through `_bldg_dark` alone
+            ("bldg_pillaged", torch.bool, False, None, max(len(rules.b_cost), 1)),
             ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
             _shape = (B, self.CITY_ROWS, _rcp) + ((_ex,) if _ex else ())
@@ -216,6 +219,11 @@ class SimInit:
         # coastal Harbor. The built results live on the shared city planes
         # (`city_bldg`, `city_dist_tile`, `city_outer_hp`) at the minor's row.
         self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the minor city's GOLD and FAITH: what its yield walk pays, banked —
+        # nothing in this engine spends either yet (the TS `CityState.treasury`
+        # / `.faith` twins)
+        self.citystate_treasury = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        self.citystate_faith = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index
         self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -753,6 +761,7 @@ class SimInit:
         self._spy_idle = int(_sp["idle"])
         self._spy_travelling = int(_sp["travelling"])
         self._spy_travel_cols = int(_sp["travelCols"])
+        self._spy_surveil_reach = int(_sp["surveilReach"])
         self._spy_missions = [
             {k: int(v) for k, v in m.items() if k != "id"} for m in _sp["missions"]
         ]
@@ -828,6 +837,10 @@ class SimInit:
         # consumers that speak column space resolve through the `owner` cache's
         # id→slot match.
         self.city_id = torch.zeros(B, self.CITY_ROWS, civ_city_pad, dtype=torch.long, device=device)
+        # a minor's tiles carry NO city id (the wire's ownerCity is -1 for a
+        # city-state's ground), so its one city answers to -1 — what
+        # `city_slot_at` and the yield walk's `valid` compare
+        self.city_id[:, self._CITY_MINOR0:self._CITY_MINOR0 + max(self.S, 1), 0] = -1
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
         # (city_is_cap), not a slot — _reclaim_cities compaction permutes slots

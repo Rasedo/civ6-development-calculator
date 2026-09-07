@@ -73,7 +73,7 @@ open docs/roster_ledger.json row.
 | C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
 | C-2 diplomatic agreements | 2 | the mission's mark, demand and discuss and the Retribution casus belli wait on C-76; the queue-front purchase; ALLIANCE_POINTS_FOR_DEAL |
 | C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
-| C-16 the spy's second half | 1 | the district a spy should stand on, the buildings Sabotage should pillage, and the model values a published number would replace |
+| C-16 the spy's second half | 1 | the model values a published number would replace (how UnitOperations' four probability columns compose), and whether a Free City is a spy's ground |
 | C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's trade-route gold multiplier has no published magnitude (DLL-side) |
 | C-22 the district roster | 1 | the Preserve housing table is a stylization |
 | C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 32 of the ledger's 343 modifiers are open against a named blocker |
@@ -81,7 +81,7 @@ open docs/roster_ledger.json row.
 | C-33 the Giant Death Robot's remaining abilities | 1 | the five-hex Range is a verb the action space lacks (the Jump's cost is STYLIZED, ruled) |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; two sources disagree on the Aerodrome's slot count |
 | C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
-| C-38 a city-state's city develops HALFWAY | 1 | the yields of any of it, and power |
+| C-38 a city-state's city develops HALFWAY | 1 | the minor's Food, Gold and Faith are computed and unspent; its border never grows; power is vacuous by its ladder |
 | C-41 nothing places Volcanic Soil | 1 | WHERE the soil lands (and what it does to an improvement) is an open owner question |
 | C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
 | C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
@@ -659,9 +659,13 @@ under their blocker so the dependency is readable, and both halves count.
     first-party page reached states any figure, so B-22r's window counts the
     emission gap alone. Ask.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
-    `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous while
-    it stands (a minor holds no building that asks for Power and no plant
-    that supplies one) — blocked on C-38.
+    `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous BY THE
+    LADDER (2026-09-07): nothing a minor builds — the three walls, the six
+    tier-1 rows, the Stable — draws or supplies Power
+    (`tests/gpu/minor_yields_test.py::test_power_vacuous` pins all ten), so
+    a minor arm would compute zero on every turn. It is due the day C-38's
+    ladder reaches a building with a load; the exact question is C-38's —
+    what else a city-state builds.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 2.
   SHIPPED: the 30-turn agreement clock, friendship, the alliance with its
   defensive pact, the denouncement, open and CLOSED borders, the Great Work
@@ -836,19 +840,57 @@ under their blocker so the dependency is readable, and both halves count.
   `SPY_SCANDAL_ENVOYS_BASE` + 1 per effective level are MODEL values. A minor
   keeps no cell, so a spy whose escape fails there is killed, never
   imprisoned — a recorded model choice.
-  BAR: `spy_test.py`, `spy.test.ts`, `spy_release_level` (both engines).
-  REACH: the gate REACHES the spy — Catherine's free Spy at Castles puts one
-  on the map.
+  THE SPY STANDS ON THE DISTRICT IT WORKS FROM (2026-09-07). SOURCED
+  (UnitOperations, Base + Expansion1 + Expansion2): each operation's
+  `TargetDistrict` — DISTRICT_CAMPUS Steal Tech Boost, DISTRICT_COMMERCIAL_HUB
+  Siphon Funds, DISTRICT_INDUSTRIAL_ZONE Sabotage Production, DISTRICT_THEATER
+  Great Work Heist, DISTRICT_NEIGHBORHOOD Recruit Partisans, DISTRICT_SPACEPORT
+  Disrupt Rocketry, DISTRICT_DAM Breach Dam; Gain Sources, Listening Post,
+  Counterspy, Foment Unrest, Neutralize Governor and Fabricate Scandal name
+  none, the City Center. The travel head (`spyDestinations` /
+  `_spy_destinations`) names the centre and district tiles of every revealed,
+  unallied major city plus a minor's centre, NEAREST first with ties to the
+  lowest tile index, `SPY_TRAVEL_COLS` 24 wide (a MODEL width — a city is
+  several tiles now); `spyCity` / `_spy_here` read the city off the tile's
+  registry; the mask offers a mission only where its district stands under
+  the spy (`missionOffered` / `_spy_mission_mask`), the counterspy post on
+  any district of an own city (`anyDistrict`). The post DEFENDS the district
+  it stands on (`counterspiesGuarding` / `_counterspies_guarding`), and
+  SURVEILLANCE is live — "When Counterspying all city districts are defended
+  (and +1 level at districts within 1 hex)": every district guarded, and
+  READING: the post operates a level higher against a spy working within
+  `SPY_SURVEILLANCE_REACH` 1 of it, taken as one level off the intruder
+  (`cityCounterLevels` / `_counter_levels`); Polygraph reads a post anywhere
+  in its city. SABOTAGE PRODUCTION PILLAGES THE BUILDINGS — SOURCED
+  (LOC_SPYMISSIONDETAILS): "Pillage all buildings in the industrial zone" —
+  through the PER-BUILDING PILLAGE FLAG, `City.pillagedBuildings` /
+  `city_bldg_pillaged`, ONE reader per engine (`buildingPillaged` under the
+  `darkBuildings` composer / `_bldg_dark`'s second argument), compared as
+  `buildingsPillaged` and `minorBuildingsPillaged`: a dark building pays no
+  yield, housing, amenity, power, loyalty, spy level, specialist slot or
+  training experience, and it carries on capture (READING: no source repairs
+  a building by conquest). THE REPAIR is the building's own queue column,
+  offered again while it stands pillaged, priced at
+  PILLAGE_BUILDING_REPAIR_PERCENT 25 (SOURCED, GlobalParameters), production
+  only (READING: the gold arm never sells a repair), clearing the flag on
+  completion. Disrupt Rocketry keeps pillaging the DISTRICT — its own text is
+  "Disable the Spaceport in the city" / "pillaging of the enemy Spaceport
+  district".
+  BAR: `spy_test.py`, `spy.test.ts`, `spy_release_level` (both engines, the
+  spies re-seated on the district tiles their missions name);
+  `tests/gpu/spy_district_test.py` (lane `spy_district`),
+  `tests/cpu/espionage/spy-district.test.ts`.
+  REACH: the gate REACHES the spy only through Catherine's free Spy at
+  Castles. MEASURED 2026-09-07 (`tools/gpu/reachability_probe.py`, all 24
+  fixtures driven 250 turns): `spy` 0/24 seeds, `spyDistrict` 0/24,
+  `spyMission` 0/24, `bldgPillaged` 0/24 — no fixture's drawn trio fields a
+  spy, so the district geometry, Surveillance, Sabotage's flag and the
+  repair are POKE-PROVEN by the two lanes above and nothing else.
   OPEN:
-  - **A SPY STANDS ON THE CITY CENTRE AND NOWHERE ELSE.** The jump targets
-    `city_center` and the mission reads the district registry rather than the
-    plot the spy holds, so a counterspy already defends every district of its
-    city. SURVEILLANCE ("when Counterspying all city districts are defended,
-    and +1 level at districts within 1 hex") ships INERT on that: its first
-    half is already true here and its second has no geometry to measure. The
-    missing mechanic is a spy that occupies the district it works out of.
-  - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not the
-    district; a per-building pillage flag is the difference.
+  - **A FREE CITY IS NOBODY'S TO SPY ON.** Both engines walk the MAJOR rows
+    for a spy's ground (`state.seats` / `n_majors`), so a Free City's
+    districts are neither a destination nor a mission's city. The exact
+    question: does the install let a spy operate in a Free City (C-60)?
   - **WHAT A LEVEL IS WORTH IS THIS MODEL'S OWN.** The chassis' own mission
     table publishes each operation's DURATION (8 turns, 16 for the Counterspy
     post) and base success RATE (10% Recruit Partisans; 20% Great Work Heist,
@@ -859,7 +901,16 @@ under their blocker so the dependency is readable, and both halves count.
     if 2 levels more experienced" — nor what a failure costs.
     `SPY_SUCCESS_PER_LEVEL_PCT` and `SPY_CAPTURE_PCT` are those two, beside
     the escape routes' base rates. The Intelligence Agency's success bonus has
-    no published figure either.
+    no published figure either. FOUND 2026-09-07 for the sourcing pass: the
+    install's UnitOperations rows DO publish four columns per operation —
+    `BaseProbability` (13 Siphon Funds, Foment Unrest, Fabricate Scandal; 14
+    Sabotage Production, Steal Tech Boost, Neutralize Governor; 15 Great Work
+    Heist, Disrupt Rocketry, Breach Dam; 16 Recruit Partisans),
+    `LevelProbChange` 1, `EnemyProbChange` 3, `EnemyLevelProbChange` 1 — the
+    shape of the per-level term this model invents. The exact question: how
+    do those four compose into the success rate the chassis page prints
+    (56/35/20/10 are not the BaseProbability column), and which of them is
+    the counterspy's catch?
 - **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1.
   SHIPPED: the Fort, the Airstrip, both routes, the 20% charge, the MISSILE
   SILO (Rocketry, flat land, no plunder) and **"Can clean Nuclear Fallout"**
@@ -1036,8 +1087,8 @@ under their blocker so the dependency is readable, and both halves count.
   OPEN: whether real Civ 6 keeps a submerged tile's feature working for its
   neighbours or strips the ground bare. Unsourced either way; ask.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1.
-  SHIPPED: the minor BUILDS (`minorBuildPhase` / `_minor_build`) — a
-  production pot takes POPULATION points a turn and a fixed ladder spends it:
+  SHIPPED: the minor BUILDS (`minorPhase` / `_minor_build`) — a production
+  pot takes the city's own Production a turn and a fixed ladder spends it:
   Ancient Walls, the district its type names, a Harbor when it sits on the
   coast, then the higher walls. SOURCED: a city-state "will build a district
   within their territory that corresponds to their type". Each item pays the
@@ -1053,18 +1104,57 @@ under their blocker so the dependency is readable, and both halves count.
   BUILDING-keyed (`cityStateEnvoyBonuses` / the `_citystate_t1idx` scatter):
   the pair Barracks OR Stable at 3 envoys and the ARMORY at 6; cultural tier
   2 is either museum (`CITY_STATE_TYPE_TIER1` / `CITY_STATE_TYPE_TIER2`).
-  STYLIZED (owner ruling 2026-09-04): the `minorResearch` pacing — no source
-  publishes a rate and no alternative reading exists to prefer. MODEL
-  CHOICES, recorded: the LADDER's order, the one-item-a-turn pace, and the
-  first pair member of a building pair.
-  BAR: `tests/gpu/minor_builds_test.py`.
+  MODEL CHOICES, recorded: the LADDER's order, the one-item-a-turn pace, and
+  the first pair member of a building pair.
+  THE MINOR'S CITY PAYS ITS YIELDS (2026-09-07). SOURCED: the install seats
+  a city-state as a civilization of `CIV_LEVEL_CITY_STATE` (Civilizations.xml)
+  and no row of Districts.xml or Buildings.xml keys a yield on the owner's
+  level — its city is an ordinary city, and "it will apparently research
+  certain techs" on what that city makes. The minor's row rides the SAME walk
+  a major's city rides — `computeCityStats` over `minorCity` (the CityState
+  as a City: id -1, the id its ground carries) / `_seat_city_walk` at row
+  `n_majors + s` — over the minor's OWN record: `_seat_civics` /
+  `_seat_techs` / `_seat_policies` answer for any city row (a minor adopts
+  the government its civics reach and slots no card — READING), ownership
+  goes by seat id (`_ROW_SEAT`), every civ-only channel (beliefs, ages,
+  Great People, suzerainties, routes, envoys, governors) answers nothing for
+  a minor row. Science fills the tech pot, Culture the civic pot, Production
+  the build pot (`minorPhase` / `_minor_accrue` → `_minor_research` →
+  `_minor_build`, one minor at a time because a district one lands may lend
+  the next one's adjacency), Gold and Faith BANK in `CityState.treasury` /
+  `.faith` (`citystate_treasury` / `citystate_faith`, compared as
+  `minorTreasury` / `minorFaith`; the three pots compare `milli` now). The
+  STYLIZED population clock (owner ruling 2026-09-04) is RETIRED — the
+  install's own mechanism replaced it. A unit LEVIED from a minor carries the
+  training experience of the minor's standing Barracks or Stable
+  (`trainXpPct` over `minorCity` / `_train_xp_pct` over the minor's row,
+  dark buildings excluded on both). KEPT: a minor builds no wonder, runs no
+  project, sends no route, founds no religion, appoints no governor
+  (`governorAt` refuses a city-state seat outright).
+  BAR: `tests/gpu/minor_builds_test.py`, `tests/gpu/minor_record_test.py`,
+  `tests/cpu/minors/minor-record.test.ts` (the pot pins re-keyed from
+  population to the walk); `tests/gpu/minor_yields_test.py` (lane
+  `minor_yields`), `tests/cpu/citystates/minor-yields.test.ts`.
+  REACH: GATE-REACHED every turn of every seed — every fixture seats three
+  minors, the walk runs for each at the city-state phase, and the compared
+  pots now carry its output on both engines (a serve red keys on
+  `techProgress` / `prodProgress` / `minorTreasury`).
   OPEN:
-  - **THE YIELDS OF ANY OF IT** — a minor's districts produce nothing for the
-    minor (its research runs on population, not on the Campus), and a levied
-    garrison earns no barracks experience from the building now standing.
-  - **POWER** — a minor's cities still draw and supply nothing (C-1).
+  - **FOOD.** The walk's Food is computed and not consumed: the population
+    keeps its 12-turn clock and the border never grows. The exact question
+    for the same replacement, one step on: does a city-state's city grow on
+    the food box and claim tiles on Culture exactly as a major's does (the
+    install has one city rule), and what does its citizen work when it does?
+  - **GOLD AND FAITH ARE BANKED, UNSPENT.** The exact question: what does
+    the install let a city-state spend Gold on (unit purchase? its
+    maintenance is already net of the walk) and Faith on (a city-state founds
+    no pantheon)?
+  - **POWER** — vacuous by the ladder: nothing a minor builds draws or
+    supplies Power (`minor_yields_test::test_power_vacuous` pins the ten
+    rows), so the grid has no minor arm (C-1).
   - Foreign Investor's accumulating minor (B-24r) and Affluence's improved
-    tile (B-24r) both wait on this item.
+    tile (B-24r): the minor now banks Gold and works tiles; the improved tile
+    still waits on a minor that improves anything.
 - **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 1.
   SHIPPED: the row with the name its page gives ("This land adjacent to a
   volcano has suffered from a previous eruption ... Can receive additional
@@ -1170,9 +1260,11 @@ under their blocker so the dependency is readable, and both halves count.
     path is DLL logic nobody can read. A storm stays on its centre for its
     three turns. The exact question: how does a storm choose its heading
     and how many tiles does it move per turn?
-  - **PER-BUILDING PILLAGE.** BUILDING_PILLAGED (40/60/100%) pays per
-    building once a per-building pillage flag exists; today the district's
-    darkness stands in for it.
+  - **PER-BUILDING PILLAGE.** BUILDING_PILLAGED (40/60/100%) — the flag it
+    waited on exists now (`buildingPillaged` / `_bldg_dark`, C-16); what
+    stays open is the column's READING: one roll per tile pillaging every
+    building of the district there, or one per building? The storm rides the
+    district's darkness until that is read.
 - **C-59. A GENERIC THEMED CARRIER.** Weight 1.
   SOURCED (Kristina): "Buildings with at least three Great Work slots and
   wonders with at least two Great Work slots are automatically themed when

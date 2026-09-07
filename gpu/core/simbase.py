@@ -81,6 +81,7 @@ class Rules:
     housing_aq_no_fresh: float  # Aqueduct: raise a non-fresh city's water housing to this
     amenity_tiers: list  # [(min, growth, yield)]
     center_min_food: float
+    pillage_building_repair_pct: float
     center_min_production: float
     settler_base: float
     settler_per_city: float
@@ -282,6 +283,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_aq_no_fresh=r["housing"].get("aqNoFreshTotal", 6),
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
         center_min_food=r.get("centerMinFood", 2),
+        pillage_building_repair_pct=r["pillageBuildingRepairPct"],
         center_min_production=r.get("centerMinProduction", 1),
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
@@ -783,12 +785,13 @@ _MUTABLE = [
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
+    "citystate_treasury", "citystate_faith",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_rock_bands",  # how many Rock Bands each seat has bought (the progressive price)
     "civ_naturalists",  # how many Naturalists — the same progression shape
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus",
 ]

@@ -84,19 +84,24 @@ def test_walls_first_and_only_once(rules, path) -> None:
     anc = walls_rows(sim)[0]
     cost = float(sim.rules_dev.b_cost[anc])
     sim.citystate_prod[B0, s] = 0.0
-    pop = int(sim.citystate_pop[B0, s])
+    # the pot takes the city's OWN Production — the yield walk's, not a
+    # population clock (`tests/gpu/minor_yields_test.py` pins the walk itself)
+    yf = sim._seat_amenity(row)[2][:, 0:1]
+    prod = float(sim._seat_city_walk(row, 0, amen_yf=yf)[B0, 0, 1])
+    assert prod > 0, "a live minor's city produces something"
 
     # no tech: the pot accrues, nothing lands
-    sim._minor_build()
-    assert float(sim.citystate_prod[B0, s]) == pop, "the pot did not take its population points"
+    sim._minor_accrue(s)
+    sim._minor_build(s)
+    assert float(sim.citystate_prod[B0, s]) == prod, "the pot did not take the city's Production"
     assert not bool(sim.city_bldg[B0, row, 0, anc]), "walls landed without their tech"
 
     # the tech in, the pot covering: the walls land and the perimeter fills
     grant_walls_tech(sim, s, anc)
     sim.citystate_prod[B0, s] = cost + 3.0
-    sim._minor_build()
+    sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, anc]), "Ancient Walls did not land"
-    assert float(sim.citystate_prod[B0, s]) == 3.0 + pop, \
+    assert float(sim.citystate_prod[B0, s]) == 3.0, \
         f"the pot did not pay the walls price ({float(sim.citystate_prod[B0, s])})"
     tier1 = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     assert int(sim.city_outer_hp[B0, row, 0]) == tier1, "the perimeter pool did not fill"

@@ -2,9 +2,10 @@
 
 CIV6 (Espionage): "Spies aren't moved like regular units; they jump from city
 to city using air, sea, road, or foot travel, each with their own travel time."
-So a Spy holds no plot and walks no path: its whole state is four pool planes
-(`unit_spy_mission`, `unit_spy_turns`, `unit_spy_target`, `unit_spy_level`)
-plus the two city clocks a finished mission leaves behind.
+So a Spy holds no plot and walks no path: it stands on the DISTRICT tile it
+works out of, and its whole state is four pool planes (`unit_spy_mission`,
+`unit_spy_turns`, `unit_spy_target`, `unit_spy_level`) plus the two city
+clocks a finished mission leaves behind.
 """
 
 from __future__ import annotations
@@ -58,33 +59,43 @@ class SimSpy:
     # ---- where a spy may go ------------------------------------------------
     def _spy_destinations(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                           utype: torch.Tensor) -> torch.Tensor:
-        """[B, N, W] CENTRE TILE indices this spy may jump to, in tile-index
-        order and cut to the head's width — `spyDestinations`.
+        """[B, N, W] the DISTRICT tiles this spy may jump to — NEAREST first,
+        ties to the lowest tile index, cut to the head's width
+        (`spyDestinations`).
 
         CIV6: "You may send a Spy to any city you have revealed (provided you
-        don't have an Alliance with that civilization)" — a MAJOR centre off
-        `centre_slot_at`, or a living minor's centre, the scandal's ground."""
+        don't have an Alliance with that civilization)" — every centre and
+        district tile of a MAJOR's city, the tile the spy will work out of; or
+        a living minor's centre, the scandal's ground. A Free City is nobody's
+        to spy on here, as TS's roster walk has it."""
         B, N = tc.shape
         W, dev = self._spy_travel_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         cols = self._spy_cols(utype)
         if W == 0 or cols.numel() == 0:
             return out
-        holder = torch.where(self.centre_slot_at >= 0, self.tile_seat,
-                             torch.full_like(self.tile_seat, -1))
+        holder = self.tile_seat
+        major = (holder >= 0) & (holder < self.n_majors)
+        on_city = major & ((self.district >= 0) | (self.centre_slot_at >= 0))
         allied = self.seat_ally_turns[:, row, : self.n_majors].gather(
-            1, holder.clamp(min=0)) > 0
-        ok = (holder >= 0) & ~allied
+            1, holder.clamp(min=0, max=self.n_majors - 1)) > 0
+        ok = on_city & ~allied
         # a CITY-STATE centre is a destination too — the scandal's ground
         ok = ok | (self._spy_minor_centres() >= 0)
         if self.fog_of_war:
             ok = ok & self.seat_explored[:, row]
+        tcc = tc[:, cols]
         cand = ok.unsqueeze(1) & (
-            torch.arange(self.T, device=dev).view(1, 1, self.T)
-            != tc[:, cols].unsqueeze(2))
+            torch.arange(self.T, device=dev).view(1, 1, self.T) != tcc.unsqueeze(2))
         cand = cand & (self._spy_idle_at(sc[:, cols])
                        & (utype[:, cols] == self._spy_idx)).unsqueeze(2)
-        out[:, cols] = self._air_first_k(cand, W)
+        # the first W by (distance from the spy, tile index)
+        T = self.T
+        key = self.pair_dist[tcc.clamp(min=0)].long() * T + torch.arange(T, device=dev).view(1, 1, T)
+        big = T * T + 1
+        keyed = torch.where(cand, key, torch.full_like(key, big))
+        vals, idx = keyed.topk(min(W, T), dim=2, largest=False)
+        out[:, cols, :vals.shape[2]] = torch.where(vals < big, idx, torch.full_like(idx, -1))
         return out
 
     def _spy_travel_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
@@ -119,14 +130,29 @@ class SimSpy:
         return -1
 
     def _spy_here(self, tc: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """(holder row, city column) for the major centre each spy stands on,
-        -1/-1 where it stands on none — `spyCity`."""
+        """(holder row, city column) for the MAJOR city on whose centre or
+        district tile each spy stands, -1/-1 where it stands on none —
+        `spyCity`. A spy occupies the district it works out of."""
         flat = tc.clamp(min=0).reshape(self.B, -1)
-        col = self.centre_slot_at.gather(1, flat).reshape(tc.shape)
-        seat = self.tile_seat.gather(1, flat).reshape(tc.shape)
-        live = col >= 0
-        return (torch.where(live, seat, torch.full_like(seat, -1)),
-                torch.where(live, col, torch.full_like(col, -1)))
+        on_city = (self.district.gather(1, flat) >= 0) | (self.centre_slot_at.gather(1, flat) >= 0)
+        seat = self.tile_seat.gather(1, flat)
+        row = torch.full_like(seat, -1)
+        col = torch.full_like(seat, -1)
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r).gather(1, flat)
+            hit = on_city & (seat == r) & (sl >= 0)
+            row = torch.where(hit, torch.full_like(row, r), row)
+            col = torch.where(hit, sl, col)
+        return row.reshape(tc.shape), col.reshape(tc.shape)
+
+    def _city_holds_tile(self, b: int, hr: int, hc: int, t: int) -> bool:
+        """does city (hr, hc) hold tile `t` as its centre or one of its
+        districts — `cityHoldsTile`."""
+        if t < 0:
+            return False
+        if int(self.city_center[b, hr, hc]) == t:
+            return True
+        return int(self.district[b, t]) >= 0 and int(self.city_slot_at(hr)[b, t]) == hc
 
     def _city_cell(self, plane: torch.Tensor, hrow: torch.Tensor,
                    hcol: torch.Tensor) -> torch.Tensor:
@@ -182,6 +208,12 @@ class SimSpy:
         maj = base & (hrow >= 0)
         mine = hrow == row
         ban = self._congress_pact_ban().unsqueeze(1)
+        # THE GEOMETRY: what stands UNDER the spy — a centre, or a district
+        # of some type — decides which missions its tile offers
+        tcf = tcc.clamp(min=0)
+        under_d = self.district.gather(1, tcf)
+        on_ctr = self.centre_slot_at.gather(1, tcf) >= 0
+        under_live = self._district_live(tcc)
         for m, mdef in enumerate(self._spy_missions):
             if mdef["citystate"]:
                 # CIV6 (Fabricate Scandal): performed "in a City-State that
@@ -190,8 +222,12 @@ class SimSpy:
             else:
                 ok = maj & (mine if mdef["athome"] else ~mine)
                 di = mdef["district"]
-                if di >= 0:
-                    ok = ok & self._district_live(self._city_district_tile(hrow, hcol, di))
+                if mdef.get("anyDistrict", 0):
+                    pass  # the counterspy post guards whichever district it stands on
+                elif di >= 0:
+                    ok = ok & (under_d == di) & under_live
+                else:
+                    ok = ok & on_ctr
                 ok = ok & self._spy_mission_extra(row, m, hrow, hcol)
             ok = ok & ~(pair & (smn.unsqueeze(1) == m)).any(dim=2)
             # CIV6 (Espionage Pact, outcome B): "Target Operation is
@@ -360,7 +396,7 @@ class SimSpy:
             if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
         lvl += (self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
                 + self._congress_pact_levels(b, m))
-        lvl = max(0, lvl - self._counter_levels(b, hr, hc))
+        lvl = max(0, lvl - self._counter_levels(b, hr, hc, int(self.unit_tile[b, v])))
         ok = bool(mdef["certain"]) or self._spy_roll(
             b, mdef["successPct"] + self._spy_success_per_level * lvl)
         if ok:
@@ -435,12 +471,9 @@ class SimSpy:
         if hr >= 0:
             # CIV6: "when enemy Spies are performing missions in those
             # districts, there is a much higher chance than normal that they
-            # will be caught" — the post now leans on the ESCAPE.
-            t0 = int(self.unit_tile[b, v])
-            posted = (self._spies_of(hr)[b]
-                      & (self.unit_tile[b] == t0)
-                      & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(
-                          as_tuple=True)[0]
+            # will be caught" — the post guarding the district the spy worked
+            # from leans on the ESCAPE (`counterspiesGuarding`).
+            posted = self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v]))
         lvl = int(self.unit_spy_level[b, v]) + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL")
         pct = (route["basePct"] + self._spy_success_per_level * lvl
                - (self._spy_counterspy_pct if posted.numel() else 0))
@@ -495,7 +528,11 @@ class SimSpy:
                     plane[b, row, home] += 1
                 self._eff_version += 1
         elif m == self._spy_m_sabotage:
-            self._pillage_city_district(b, hr, hc, self._iz_idx)
+            # CIV6 (Sabotage Production): "Pillage all buildings in the
+            # industrial zone." — the BUILDINGS, not the district: its
+            # adjacency keeps paying while the Workshop and its successors
+            # stand dark until repaired.
+            self._pillage_city_buildings(b, hr, hc, self._iz_idx)
         elif m == self._spy_m_rocketry:
             self._pillage_city_district(b, hr, hc, self._spaceport_didx)
         elif m == self._spy_m_partisans:
@@ -619,27 +656,53 @@ class SimSpy:
         one[b] = True
         self._promo_offer_draw(one, torch.full((self.B,), v, dtype=torch.long, device=self.device))
 
-    def _counter_levels(self, b: int, hr: int, hc: int) -> int:
+    def _counterspies_guarding(self, b: int, hr: int, hc: int, t: int) -> torch.Tensor:
+        """the holder's counterspy posts that DEFEND the district at `t`: a
+        post guards the district it stands on, and CIV6 (Surveillance) "When
+        Counterspying all city districts are defended" (`counterspiesGuarding`)."""
+        posts = (self._spies_of(hr)[b]
+                 & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(as_tuple=True)[0]
+        keep = []
+        for u in posts.tolist():
+            ut = int(self.unit_tile[b, u])
+            if not self._city_holds_tile(b, hr, hc, ut):
+                continue
+            if ut == t or self._spy_promo_sum(b, u, "SPY_SURVEIL") > 0:
+                keep.append(u)
+        return torch.tensor(keep, dtype=torch.long, device=self.device)
+
+    def _counter_levels(self, b: int, hr: int, hc: int, t: int = -1) -> int:
         """CIV6 (Diplomatic Quarter): "Enemy Spies operate at 2 levels below
         normal when targeting this district or adjacent districts", and
         (Consulate) "Spies operate at one level lower when targeting this
-        city" — both read as whole-city terms here, which is what a mission
-        that names a district but not a tile can address. `cityCounterLevels`'
-        twin."""
+        city" — both read as whole-city terms here. `t` is the district tile
+        the intruder works from, where the geometry matters.
+        `cityCounterLevels`' twin."""
         reg = self.city_dist_tile[b, hr, hc]              # [nD]
         # per INSTANCE off the tile plane — the registry keeps one per type
         dcount = self._dist_counts(hr)[b]                 # [RC, nD]
         live = dcount[hc]
         n = int((live * self._d_spy_pen).sum())
         if bool((self._b_spy_pen > 0).any()):
-            stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
+            stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(
+                reg.reshape(1, 1, -1), self.city_bldg_pillaged[b, hr, hc].reshape(1, 1, -1))[0, 0]
             n += int((stand.long() * self._b_spy_pen).sum())
         # CIV6 (Polygraph): "If this Spy is in home territory, enemy Spies in
-        # your lands operate at 1 level below usual" — the posts standing here.
-        ctr = int(self.city_center[b, hr, hc])
+        # your lands operate at 1 level below usual" — the posts standing in
+        # this city, on whichever of its districts.
         for u in self._spies_of(hr)[b].nonzero(as_tuple=True)[0].tolist():
-            if int(self.unit_tile[b, u]) == ctr:
-                n += self._spy_promo_sum(b, u, "SPY_HOME_ENEMY_LEVEL")
+            ut = int(self.unit_tile[b, u])
+            if not self._city_holds_tile(b, hr, hc, ut):
+                continue
+            n += self._spy_promo_sum(b, u, "SPY_HOME_ENEMY_LEVEL")
+            # CIV6 (Surveillance): "When Counterspying all city districts are
+            # defended (and +1 level at districts within 1 hex)" — READING: the
+            # post operates a level higher against a spy working within that
+            # reach of it, which is one level off the intruder.
+            surv = self._spy_promo_sum(b, u, "SPY_SURVEIL")
+            if (surv > 0 and t >= 0 and int(self.unit_spy_mission[b, u]) == self._spy_m_counterspy
+                    and int(self.pair_dist[ut, t]) <= self._spy_surveil_reach):
+                n += surv
         # CIV6 (Consulate): the penalty reaches "this city OR CITIES WITH
         # ENCAMPMENTS" — the second half is empire-wide, so a Consulate
         # standing anywhere covers every city of the seat holding a live
@@ -677,4 +740,14 @@ class SimSpy:
         dt = int(self.city_dist_tile[b, hr, hc, di])
         if dt >= 0 and bool(self.district_complete[b, dt]):
             self.district_pillaged[b, dt] = True
+            self._eff_version += 1
+
+    def _pillage_city_buildings(self, b: int, hr: int, hc: int, di: int) -> None:
+        """every building the city holds in district `di` stands pillaged
+        (`pillageBuilding` over the district's line)."""
+        if di < 0:
+            return
+        mine = self.city_bldg[b, hr, hc] & (self._b_req_district == di)
+        if bool(mine.any()):
+            self.city_bldg_pillaged[b, hr, hc] |= mine
             self._eff_version += 1

@@ -2030,7 +2030,10 @@ class SimSeats:
                     key_u = torch.where(cand_u, key_u.expand(B, -1), torch.full((B, self.NU), -1e18, dtype=torch.float64, device=dev))
                     pick_ty = key_u.argmax(dim=1)
                     ctr_u = self.city_center[bidx, row, spawn_slot].clamp(min=0)
-                    xp_u = self._train_xp_pct(self.city_bldg[bidx, row, spawn_slot], pick_ty, row, spawn_slot)
+                    xp_u = self._train_xp_pct(
+                        self.city_bldg[bidx, row, spawn_slot] & ~self._bldg_dark(
+                            self.city_dist_tile[bidx, row, spawn_slot], self.city_bldg_pillaged[bidx, row, spawn_slot]),
+                        pick_ty, row, spawn_slot)
                     landed_u = self._spawn_unit(
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
                         pick_ty, init_xp=xp_u)
@@ -2210,7 +2213,10 @@ class SimSeats:
                      & self._afford(self.civ_faith[:, row], price_u))
             if bool(buy_u.any()):
                 at_u = self.city_center[bidx, row, ju].clamp(min=0)
-                xp_u = self._train_xp_pct(self.city_bldg[bidx, row, ju], bu, row, ju)
+                xp_u = self._train_xp_pct(
+                    self.city_bldg[bidx, row, ju] & ~self._bldg_dark(
+                        self.city_dist_tile[bidx, row, ju], self.city_bldg_pillaged[bidx, row, ju]),
+                    bu, row, ju)
                 landed_u = self._spawn_unit(row, buy_u, at_u, bu, init_xp=xp_u)
                 self.civ_faith[:, row] = torch.where(landed_u, self.civ_faith[:, row] - price_u, self.civ_faith[:, row])
                 for _ui, _sl, _c in self._res_slot_units:
@@ -2274,14 +2280,24 @@ class SimSeats:
                     at_l = self.citystate_center[bidx, sl].clamp(min=0)
                     ltype = self._spearman_idx if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
                     ltype_t = torch.full((B,), ltype, dtype=torch.long, device=dev)
+                    # CIV6 (Barracks, Stable): "+25% combat experience for all
+                    # <classes> units trained in this city" — the MINOR's city
+                    # trained the levy, so its standing Encampment line pays
+                    # the same percentage a major's would (`trainXpPct`)
+                    _mrow = self._CITY_MINOR0 + sl
+                    _bl_l = self.city_bldg[bidx, _mrow, 0] & ~self._bldg_dark(
+                        self.city_dist_tile[bidx, _mrow, 0], self.city_bldg_pillaged[bidx, _mrow, 0])
+                    xp_l = self._train_xp_pct(_bl_l, ltype_t, self._CITY_MINOR0,
+                                              torch.zeros(B, dtype=torch.long, device=dev))
                     for _ in range(levy_units_n):
                         _lslot = self._spawn_unit(row, do_l, at_l, ltype_t)
                         # the MARK all three levy clauses read, and a re-pool:
-                        # the spawn priced the pool before the mark existed (C-66).
+                        # the spawn priced the pool before the mark existed.
                         if bool(_lslot.any()):
                             _lr = _lslot.nonzero(as_tuple=True)[0]
                             _lsl = getattr(self, self.POOL_NEXT["major"])[_lr] - 1
                             self.major_unit_levied[_lr, _lsl] = True
+                            self.major_unit_xp_pct[_lr, _lsl] = xp_l[_lr]
                             self._repool_unit(_lr, _lsl)
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
@@ -4062,6 +4078,8 @@ class SimSeats:
         Treaty Organization weighting in `_suzerain_count` is what a
         suzerainty pays in FAVOR; a yield clause counts heads, which is what
         TS's `isSuzerain` filter does (`culturePerSuzerain`, Pericles)."""
+        if row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
 
     def _suz_live_mask(self, row: int) -> torch.Tensor:
@@ -4096,7 +4114,10 @@ class SimSeats:
         return codes[code]
 
     def _suz_effect(self, row: int, code: int) -> torch.Tensor:
-        """[B] — does seat row `row` hold a suzerain whose perk is `code`?"""
+        """[B] — does seat row `row` hold a suzerain whose perk is `code`?
+        Only a major holds one; a minor's or the Free row's city reads none."""
+        if row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self._suz_effect_rows(code)[:, row]
 
     def _cav_hill_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
@@ -4681,7 +4702,7 @@ class SimSeats:
         term (spy capacity, influence, diplomatic favor), which pays from the
         one city that built it to the whole seat. `seatBuildingSum`'s twin."""
         reg = self.city_dist_tile[:, row]  # [B, RC, nD]
-        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg) & self.city_alive[:, row].unsqueeze(2)
+        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg, self.city_bldg_pillaged[:, row]) & self.city_alive[:, row].unsqueeze(2)
         return torch.einsum("bjn,n->b", stand.to(w.dtype), w)
 
     def _city_terrain_count(self, row: int, plane: torch.Tensor) -> torch.Tensor:
@@ -4707,7 +4728,7 @@ class SimSeats:
             out = out + (live.double() * self._d_loyalty.double().unsqueeze(0)).sum(dim=1)
         w = self.rules.b_loyalty
         if w.numel() and bool((w != 0).any()):
-            stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg)
+            stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg, self.city_bldg_pillaged[bidx, row, col])
             out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
         return out
 
@@ -5226,7 +5247,7 @@ class SimSeats:
         if name == "DEFORESTATION_TREATY":
             # A pays gold for clearing the named feature, so a seat names
             # whichever clearable feature it owns the most of.
-            mine = (self.tile_seat == row) & ~self.feat_stripped
+            mine = (self.tile_seat == int(self._ROW_SEAT[row])) & ~self.feat_stripped
             counts = torch.zeros(B, max(1, len(self._congress_feat)), dtype=torch.float64, device=dev)
             for t, fid in enumerate(self._congress_feat):
                 counts[:, t] = (mine & (self.feat_id == fid)).sum(dim=1).double()
@@ -5274,7 +5295,7 @@ class SimSeats:
             nL = max(1, self._n_lux)
             counts = torch.zeros(B, nL, dtype=torch.float64, device=dev)
             if self._n_lux > 0 and self.improvements_on:
-                mine = ((self.lux_id >= 0) & (self.tile_seat == row)
+                mine = ((self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row]))
                         & (self.improvement == self.lux_req)).double()
                 counts.scatter_add_(1, self.lux_id.clamp(min=0), mine)
             return a, self._argmax_low(counts)
@@ -5999,10 +6020,31 @@ class SimSeats:
         return f_plane
 
     def _seat_civics(self, row: int) -> torch.Tensor:
-        return self.civ_civics[:, row]
+        """[B, nC] the civics a city ROW's holder has researched — a major's
+        own record, a minor's own (`citystate_civics`), none for the Free row.
+        The yield walk reads research through this and `_seat_techs` alone,
+        which is what lets a city-state's city ride the same walk."""
+        if row < self.n_majors:
+            return self.civ_civics[:, row]
+        s = row - self._CITY_MINOR0
+        if 0 <= s < self.S:
+            return self.citystate_civics[:, s]
+        return torch.zeros(self.B, self.civ_civics.shape[2], dtype=torch.bool, device=self.device)
 
     def _seat_techs(self, row: int) -> torch.Tensor:
-        return self.civ_techs[:, row]
+        if row < self.n_majors:
+            return self.civ_techs[:, row]
+        s = row - self._CITY_MINOR0
+        if 0 <= s < self.S:
+            return self.citystate_techs[:, s]
+        return torch.zeros(self.B, self.civ_techs.shape[2], dtype=torch.bool, device=self.device)
+
+    def _seat_policies(self, row: int) -> torch.Tensor:
+        """[B, nPol] the cards a city ROW's holder has slotted — only a major
+        keeps a store; a minor and the Free row slot nothing."""
+        if row < self.n_majors:
+            return self.civ_policies[:, row]
+        return torch.zeros(self.B, self.civ_policies.shape[2], dtype=torch.bool, device=self.device)
 
     def _seat_envoys(self, row: int) -> torch.Tensor:
         """[B, S] long — what the 1/3/6 bonus tiers weigh, which is the
@@ -6010,7 +6052,10 @@ class SimSeats:
         return self._envoys_here(row)
 
     def _seat_has_beliefs(self, row: int) -> bool:
-        return self._bel_any and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)).any())
+        # only a major founds a pantheon or a religion; a minor's and the Free
+        # row's cities follow one but claim none
+        return self._bel_any and row < self.n_majors \
+            and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)).any())
 
     def _bel_add(self, key: str, row: int) -> torch.Tensor:
         if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
@@ -6153,7 +6198,8 @@ class SimSeats:
             return None
         live = (self.improvement >= 0) & ~self.pillaged
         out = None
-        cv = self.civ_civics[:, row]
+        cv = self._seat_civics(row)
+        tv = self._seat_techs(row)
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on = (nb >= 0).unsqueeze(0)
@@ -6172,7 +6218,7 @@ class SimSeats:
                 up = (cv[:, uc] if uc >= 0 else
                       torch.zeros(self.B, dtype=torch.bool, device=self.device))
                 if ut >= 0:
-                    up = up | self.civ_techs[:, row, ut]
+                    up = up | tv[:, ut]
                 hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
                 if int(r.get("bres", 0)):
                     hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
@@ -6317,7 +6363,7 @@ class SimSeats:
             who = (civ == c) if c >= 0 else (lead == ld)
             cv, er = int(self._py_civic[k]), int(self._py_era[k])
             if cv >= 0:
-                who = who & self.civ_civics[:, row, cv]
+                who = who & self._seat_civics(row)[:, cv]
             if er >= 0:
                 who = who & (era >= er)
             if not bool(who.any()):
@@ -6358,7 +6404,7 @@ class SimSeats:
             who = (civ == c) if c >= 0 else (lead == ld)
             cv, er = int(self._py_civic[k]), int(self._py_era[k])
             if cv >= 0:
-                who = who & self.civ_civics[:, row, cv]
+                who = who & self._seat_civics(row)[:, cv]
             if er >= 0:
                 who = who & (era >= er)
             if not bool(who.any()):
@@ -6500,6 +6546,8 @@ class SimSeats:
         Callers iterate rows strictly sequentially, so the slot is always
         overwritten by a different row before the same row is re-requested.
         Consumers read one column, read-only."""
+        if row >= self.n_majors:
+            return None  # a minor or the Free row sends no route and carries no roster row
         key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_version)
         if self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
@@ -6878,22 +6926,32 @@ class SimSeats:
         z = torch.zeros_like(dom)
         return torch.where(alive, allc, z), torch.where(alive, dom, z)
 
-    def _bldg_dark(self, dt_reg: torch.Tensor) -> torch.Tensor:
+    def _bldg_dark(self, dt_reg: torch.Tensor, bldg_pil: torch.Tensor | None = None) -> torch.Tensor:
         """Given a city district-tile registry [..., nD] (tile per district type,
-        -1 = none), return [..., NB] bool = building b is dark because its
-        district is COMPLETE-but-PILLAGED. CITY_CENTER buildings (_b_req_district
-        == -1) never gate. The pillagedDistrictTypes twin, for any seat row —
-        TS reads `city.districts`, a per-city LIST, so the registry (not a tile
-        window) is the faithful input on every row."""
+        -1 = none) and the city's own per-building pillage flags [..., NB]
+        (`city_bldg_pillaged` at the same index), return [..., NB] bool =
+        building b is DARK: its district is COMPLETE-but-PILLAGED, or the
+        building itself stands pillaged. CITY_CENTER buildings (_b_req_district
+        == -1) never gate on a district. The `darkBuildings` twin, for any seat
+        row — TS reads `city.districts`, a per-city LIST, so the registry (not
+        a tile window) is the faithful input on every row. THE one reader of
+        the building flag: every "does this building pay" question asks here."""
         if not self.districts_on or dt_reg.shape[-1] == 0:
-            return torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
-        B0 = dt_reg.shape[0]
-        flat = dt_reg.clamp(min=0).reshape(B0, -1)
-        comp = self.district_complete.gather(1, flat).reshape_as(dt_reg)
-        pilf = self.district_pillaged.gather(1, flat).reshape_as(dt_reg)
-        pil = (dt_reg >= 0) & comp & pilf  # [..., nD]
-        breq = self._b_req_district  # [NB]
-        return pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
+            out = torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
+        else:
+            B0 = dt_reg.shape[0]
+            flat = dt_reg.clamp(min=0).reshape(B0, -1)
+            comp = self.district_complete.gather(1, flat).reshape_as(dt_reg)
+            pilf = self.district_pillaged.gather(1, flat).reshape_as(dt_reg)
+            pil = (dt_reg >= 0) & comp & pilf  # [..., nD]
+            breq = self._b_req_district  # [NB]
+            out = pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
+        return out if bldg_pil is None else out | bldg_pil
+
+    def _building_pillaged(self, row: int, sl: slice | None = None) -> torch.Tensor:
+        """[B, n, NB] bool — which of a row's buildings stand PILLAGED
+        (`buildingPillaged`'s twin over a column slice)."""
+        return self.city_bldg_pillaged[:, row, slice(0, self.RC) if sl is None else sl]
 
     def _seat_city_yields(self, row: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, ...]:
         yf = amen_yf.unsqueeze(1) if amen_yf is not None else self._seat_amenity(row)[2][:, j:j + 1]
@@ -7109,7 +7167,7 @@ class SimSeats:
         B, cols, dev = self.B, self.RC, self.device
         alive = self.city_alive[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
-        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg)  # [B, cols, NB]
+        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])  # [B, cols, NB]
         demand = stand.double() @ self._b_power
         demand = demand + self._laser_power_load * self.city_lasers[:, row, :cols].double()
         demand = torch.where(alive, demand, torch.zeros_like(demand))
@@ -7128,7 +7186,7 @@ class SimSeats:
         # the Dam and never with the plants.
         if self._imp_power_any:
             per = self._imp_power[self.improvement.clamp(min=0)] \
-                * ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == row)).double()
+                * ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == int(self._ROW_SEAT[row]))).double()
             for j in range(cols):
                 mine = ((self.tile_city == self.city_id[:, row, j].unsqueeze(1))
                         & alive[:, j].unsqueeze(1))
@@ -7223,7 +7281,7 @@ class SimSeats:
         clamped to `_stockpile_cap`."""
         if self._n_strategic == 0:
             return
-        owned = (self.tile_seat == row) & ~self.pillaged & (self.improvement == self.res_imp)
+        owned = (self.tile_seat == int(self._ROW_SEAT[row])) & ~self.pillaged & (self.improvement == self.res_imp)
         bank = self.civ_stockpile[:, row]
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
             here = owned & (self.res_id == rid)
@@ -7270,7 +7328,7 @@ class SimSeats:
         if self._encampment_didx < 0:
             return torch.full((self.B,), self._stock_cap_base, dtype=torch.long, device=self.device)
         enc = (self._b_req_district == self._encampment_didx).reshape(1, 1, -1)
-        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols])
+        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
         n = (stand & enc & self.city_alive[:, row, :cols].unsqueeze(2)).sum(dim=(1, 2))
         cap = self._stock_cap_base + self._stock_cap_per_enc * n
         # CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's
@@ -7455,7 +7513,7 @@ class SimSeats:
                     water = water + has_aq.to(water.dtype) * float(_v["housing"]) * _pm.reshape(-1, *([1] * (water.dim() - 1)))
         else:
             water = wh
-        selb_h = bldg & ~self._bldg_dark(dreg)
+        selb_h = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
         housing = water + torch.einsum("bjn,n->bj", selb_h.double(), rd.b_housing.double())
         housing = housing + self._palace_housing * is_cap_a
         # CIV6 (Kupe's Voyage): "The Palace receives +3 Housing" (`CAPITAL_ROWS`)
@@ -7476,7 +7534,7 @@ class SimSeats:
                 + [(i, None) for i in self._rep_house_idx]:
             if _di < 0:
                 continue
-            ok_d = (self.district == _di) & self.district_complete & ~self.district_pillaged & (self.tile_seat == row)
+            ok_d = (self.district == _di) & self.district_complete & ~self.district_pillaged & (self.tile_seat == int(self._ROW_SEAT[row]))
             if not bool(ok_d.any()):
                 continue
             ids = self.city_id[:, row, :cols]  # [B, cols] persistent ids
@@ -7515,7 +7573,7 @@ class SimSeats:
             hc = self._imp_house_civic[imp_w.clamp(min=0)]
             if bool((hc >= 0).any()):
                 got = torch.where(hc >= 0,
-                                  self.civ_civics[:, row].gather(
+                                  self._seat_civics(row).gather(
                                       1, hc.clamp(min=0).reshape(self.B, -1)).reshape_as(hc),
                                   torch.zeros_like(hc, dtype=torch.bool))
                 housing = housing + (got & own).double().sum(dim=2)
@@ -7561,7 +7619,7 @@ class SimSeats:
         alive = self.city_alive[:, row, :cols]
         is_cap = self.city_is_cap[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
-        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
+        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols]) & ~self._b_regional.reshape(1, 1, -1)
         have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
         # CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
         for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
@@ -7699,6 +7757,7 @@ class SimSeats:
         self.city_spec_pin[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
+        self.city_bldg_pillaged[b, row, col, :] = False
         self.city_reactor_age[b, row, col] = -1
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
@@ -7786,6 +7845,9 @@ class SimSeats:
         old_prov = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in
                     ("city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist")]
         old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
+        # a pillaged building stays pillaged in the new owner's hands — the
+        # repair is the queue's, whoever holds the queue
+        old_bpil = self.city_bldg_pillaged[b, src_row, src_col, :].clone()
         # RELIGION TRAVELS WITH THE CITY (TS copies religionPressure and
         # followedReligion into the flipped literal). Both planes are slot
         # indexed, so the fact has to be carried across by hand.
@@ -7897,6 +7959,7 @@ class SimSeats:
                            "city_gwart_type", "city_gwart_artist"), old_prov):
             getattr(self, _p)[b, dst_row, col, :] = _v
         self.city_bldg[b, dst_row, col, :] = old_bldg
+        self.city_bldg_pillaged[b, dst_row, col, :] = old_bpil
         self._bldg_version += 1
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
@@ -8260,6 +8323,7 @@ class SimSeats:
         self.city_dist_tile[rows, row, slot, :] = -1
         self.city_wonder[rows, row, slot, :] = -1
         self.city_bldg[rows, row, slot, :] = False
+        self.city_bldg_pillaged[rows, row, slot, :] = False
         self._bldg_version += 1
         # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
         # (TS ownerCity), the slot stays a storage address only.
@@ -8860,7 +8924,7 @@ class SimSeats:
         B, cols, dev = self.B, self.RC, self.device
         out = torch.zeros(B, cols, dtype=torch.float64, device=dev)
         tix = torch.arange(self.T, device=dev).reshape(1, -1)
-        anchor = (self.park == tix) & (self.tile_seat == row)   # [B, T]
+        anchor = (self.park == tix) & (self.tile_seat == int(self._ROW_SEAT[row]))   # [B, T]
         if not bool(anchor.any()):
             return out
         alive = self.city_alive[:, row, :cols]
@@ -10308,7 +10372,7 @@ class SimSeats:
         if not have:
             return out
         reg = self.city_dist_tile[:, row]
-        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg) & self.city_alive[:, row].unsqueeze(2)
+        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg, self.city_bldg_pillaged[:, row]) & self.city_alive[:, row].unsqueeze(2)
         for bi in have:
             hit = stand[:, :, bi].any(dim=1)
             out = torch.where((out < 0) & hit,

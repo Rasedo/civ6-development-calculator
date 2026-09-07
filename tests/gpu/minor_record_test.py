@@ -70,21 +70,23 @@ def test_minor_research(rules) -> None:
     sim.citystate_civics[0, 0].zero_()
     sim.citystate_tech_prog[0, 0] = 0
     sim.citystate_civic_prog[0, 0] = 0
-    pop = int(sim.citystate_pop[0, 0])
-    assert pop > 0, "a live minor has population"
+    row = sim._CITY_MINOR0
+    yf = sim._seat_amenity(row)[2][:, 0:1]
+    sci = float(sim._seat_city_walk(row, 0, amen_yf=yf)[0, 0, 3])
+    assert sci > 0, "a live minor's city yields Science (its citizens alone pay some)"
     cost = sim.rules_dev.t_cost
     avail = sim._available_mask(sim.citystate_techs[0:1, 0], sim._prereq_t)[0]
     cheapest = int(torch.where(avail, cost.to(sim.device),
                                torch.full_like(cost.to(sim.device), float("inf"))).argmin())
     sim._city_state_phase()
-    assert float(sim.citystate_tech_prog[0, 0]) == float(pop), "the pot takes POPULATION"
+    assert float(sim.citystate_tech_prog[0, 0]) == sci, "the pot takes the city's own Science"
     assert int(sim.citystate_techs[0, 0].sum()) == 0, "and nothing completes below the price"
-    turns = int(float(cost[cheapest]) // pop) + 2
+    turns = int(float(cost[cheapest]) // sci) + 2
     for _ in range(turns):
         sim._city_state_phase()
     assert bool(sim.citystate_techs[0, 0, cheapest]), "the cheapest available row lands first"
     assert int(sim.citystate_civics[0, 0].sum()) > 0, "the civic pot walks its own row"
-    print(f"  minor research OK: {pop}/turn, cheapest row {cheapest} at cost {float(cost[cheapest]):.0f}")
+    print(f"  minor research OK: {sci}/turn, cheapest row {cheapest} at cost {float(cost[cheapest]):.0f}")
 
 
 def test_minor_border(rules) -> None:

@@ -1,4 +1,5 @@
 import type { City, GameState, Seat, Unit } from './types';
+import { repairBuilding } from './yields';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital } from './seats';
 import { NO_SEAT } from '../../world/types';
@@ -370,6 +371,7 @@ export function completeQueueItem(
       // `city.buildings` is a SET — every reader tests it with `includes`,
       // and the GPU carries it as one bit per building.
       if (!city.buildings.includes(item.building)) city.buildings.push(item.building);
+      repairBuilding(city, item.building); // a held building's column completing is its REPAIR
       buildingDedications(state, city.seat, item.building);
       // CIV6 (Intelligence Agency): "+1 Spy" — the free unit, here.
       if (BUILDINGS[item.building]?.grantUnit) spawnUnit(state, BUILDINGS[item.building].grantUnit!, city.centerIndex, city.seat);

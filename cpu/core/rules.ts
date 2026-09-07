@@ -23,7 +23,8 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, type TerrainId } from '../../world/types';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { PROJECTS } from '../data/projects';
-import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
+import { CITY_WORK_RADIUS, PILLAGE_BUILDING_REPAIR_PERCENT, maxSpecialtyDistricts } from '../data/constants';
+import { buildingPillaged } from './yields';
 import { gpCityPermOf } from '../data/greatPeople';
 import { campTiles, cityHolders, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 import { getModifiers } from './effects';
@@ -660,7 +661,10 @@ export function fitEncampOuter(state: GameState, city: City): void {
 export function buildingCostIn(state: GameState, city: City, id: string): number {
   const def = BUILDINGS[id];
   if (!def) return 0;
-  const base = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
+  const full = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
+  // CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing pillaged
+  // is REPAIRED for that share of its price
+  const base = buildingPillaged(city, id) ? Math.round((full * PILLAGE_BUILDING_REPAIR_PERCENT) / 100) : full;
   return Math.round(base * congressEnergyDiscount(state, id));
 }
 
@@ -709,7 +713,10 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
   for (const type of placed) {
     if (type === blockedD) continue;
     for (const def of buildingsForDistrict(type)) {
-      if (have.has(def.id) || queued.has(def.id)) continue;
+      // a HELD building standing PILLAGED is buildable again — that is its
+      // REPAIR, on its own column at `buildingCostIn`'s repair price; the gold
+      // arm never sells one (CIV6 repairs from the queue alone)
+      if ((have.has(def.id) && (gold || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
       if (def.worship) {
         if (gold) continue;
         if (seatOf(state, city.seat)?.religion.worship !== def.id) continue;

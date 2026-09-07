@@ -19,7 +19,7 @@ class SimEconomy:
         if self._n_lux == 0 or not self.improvements_on:
             return out
         alive = self.city_alive[:, row, :cols]
-        improved = (self.lux_id >= 0) & (self.tile_seat == row) & (self.improvement == self.lux_req)
+        improved = (self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row])) & (self.improvement == self.lux_req)
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         own_copies = counts.clone()  # the seat's OWN improved copies, pre-Affluence
@@ -27,7 +27,7 @@ class SimEconomy:
         # of its Luxury resources to you." A minor improves nothing here, so the
         # copy is the ground's own resource; a copy of one already worked is no
         # second amenity, which the distinct count answers by itself.
-        if self.S > 0 and self.n_governors:
+        if self.S > 0 and self.n_governors and row < self.n_majors:  # only a major posts Amani
             aff = self._minor_gov_row(row, "minorLuxuries") > 0
             for s in range(self.S):
                 if not bool(aff[:, s].any()):
@@ -52,8 +52,12 @@ class SimEconomy:
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how
         # many it reaches. They rank AFTER the worked ones, in creation order.
-        gp_n = self.civ_gp_lux_n[:, row]
-        gp_reach = self.civ_gp_lux[:, row]
+        if row < self.n_majors:
+            gp_n = self.civ_gp_lux_n[:, row]
+            gp_reach = self.civ_gp_lux[:, row]
+        else:  # a minor or the Free row recruits no Great Merchant
+            gp_n = torch.zeros_like(rounds)
+            gp_reach = torch.zeros(B, self.civ_gp_lux.shape[2], dtype=self.civ_gp_lux.dtype, device=self.device)
         total = rounds + gp_n
         mx = int(total.max().item())
         if mx == 0:
@@ -1346,6 +1350,10 @@ class SimEconomy:
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
                                self._flood_barrier_cost(row)[:, j].double(), base)
+        # CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing
+        # pillaged is REPAIRED for that share of its price
+        pil = self.city_bldg_pillaged[:, row, j].gather(1, bi.unsqueeze(1)).squeeze(1)
+        base = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
         disc = self._congress_energy_discount()
         return torch.where((disc >= 0) & (bi == disc),
                            js_round(base * self._c_energy_discount), base)
@@ -1364,6 +1372,9 @@ class SimEconomy:
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
                                self._flood_barrier_cost(row).unsqueeze(2).double(), base)
+        # a queued REPAIR keeps its repair price while the building stands pillaged
+        pil = self.city_bldg_pillaged[:, row].gather(2, bi)
+        base = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
         disc = self._congress_energy_discount().reshape(-1, 1, 1)
         live = torch.where((disc >= 0) & (bi == disc),
                            js_round(base * self._c_energy_discount), base)
@@ -1423,8 +1434,12 @@ class SimEconomy:
         # hasRiver at each centre, read off the static tile plane (a dead
         # slot's centre is -1; its column is masked by `alive` downstream).
         river_c = self.tile_river.gather(1, self.city_center[:, row].clamp(min=0))  # [B, C]
+        # a HELD building standing PILLAGED is buildable again — that is its
+        # REPAIR, on its own column at `_building_cost_in`'s repair price;
+        # the gold arm never sells one (CIV6 repairs from the queue alone)
+        held = have if gold else (have & ~self.city_bldg_pillaged[:, row])
         base = (
-            unlocked.unsqueeze(1) & ~have & ~queued
+            unlocked.unsqueeze(1) & ~held & ~queued
             & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
             & ~self._b_worship.reshape(1, 1, -1)
         )
@@ -2027,7 +2042,7 @@ class SimEconomy:
                 # THE STORE is the truth: what the seat CHOSE, minus any card whose
                 # unlock has lapsed since (a Dark Age ending, the Treaty's ban)
                 _ad, _hg = self._adopted_gov(civics2)
-                slotted = (self.civ_policies[:, row]
+                slotted = (self._seat_policies(row)
                            & self._policy_unlocked(civics2, dark, era, held, _ad)
                            & _hg.unsqueeze(1))
             # a LEGACY card pays its ACCRUAL (the loop below) and never its table row,
@@ -2204,17 +2219,24 @@ class SimEconomy:
         # a copy compares equal to itself forever and freezes the answer.
         civ = self._seat_civics(row).clone()
         slots = self._wonder_extra_slots(row)
-        dark = self.civ_age[:, row] == 0
-        era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
-        held = self.civ_gov_held[:, row].clone()
+        # a MINOR's city adopts the government its own civics reach and slots
+        # no card, keeps no age, holds no legacy — the same channels a major's
+        # civics open, over the minor's record
+        major = row < self.n_majors
+        dark = (self.civ_age[:, row] == 0) if major \
+            else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        era = self._civ_era(self._seat_techs(row), civ)
+        held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
+            (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
         # ...and the CLOCK. A legacy card's payout is what this seat has
         # ACCUMULATED, so the answer moves on a turn when none of the five
         # inputs above do. Left out, the memo would freeze the accrual at
-        # whatever it was when the answer was first computed (C-73).
-        turns = self.civ_gov_turns[:, row].clone()
+        # whatever it was when the answer was first computed.
+        turns = self.civ_gov_turns[:, row].clone() if major else torch.zeros(
+            (self.B,) + tuple(self.civ_gov_turns.shape[2:]), dtype=self.civ_gov_turns.dtype, device=self.device)
         # ...and the STORE: the cards the seat chose are an input now, and a
         # key that is a view of the live plane would freeze the first answer
-        pols = self.civ_policies[:, row].clone()
+        pols = self._seat_policies(row).clone()
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
@@ -2947,7 +2969,7 @@ class SimEconomy:
         if not self._any_work_live:
             return pool
         for r in range(self.n_majors):
-            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r])
+            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r], self.city_bldg_pillaged[:, r])
             pool[:, r] = torch.einsum("bjn,n->bj", stand.long(), self._b_any_work)
         return pool
 
@@ -4112,7 +4134,7 @@ class SimEconomy:
             sl = slice(0, self.RC)
         B = self.B
         alive = self.city_alive[:, row, sl]
-        bldg = self.city_bldg[:, row, sl]
+        bldg = self.city_bldg[:, row, sl] & ~self._building_pillaged(row, sl)  # a pillaged building seats nobody
         dreg = self.city_dist_tile[:, row, sl]
         dflat = dreg.clamp(min=0).reshape(B, -1)
         dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
@@ -4428,7 +4450,7 @@ class SimEconomy:
                 dist_y = dist_y + cnt.double().unsqueeze(2) * y6
 
         bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
-        selb = bldg & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
+        selb = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl]) & ~self._b_regional.reshape(1, 1, -1)
         if bool(selb.any()):
             selbf = selb.double()
             bld_y = bld_y + selbf @ rd.b_yields.double()
@@ -4443,7 +4465,7 @@ class SimEconomy:
                     bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, self._bel_add_pf("bldgY", row))
                 if fol_live:
                     bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
-            if self.S > 0:
+            if self.S > 0 and row < self.n_majors:  # only a major sends envoys
                 env, acs, nB = self._seat_envoys(row), self.citystate_alive.double(), selb.shape[2]
                 csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
                 for _bar, _tidx in ((3, self._citystate_t1idx), (6, self._citystate_t2idx)):
@@ -4586,7 +4608,7 @@ class SimEconomy:
             _gcity, _gcap, _gh, gym, *_ = self._gov_mods(row)
             b_city = b_city + _gcity.double()
             b_cap = b_cap + _gcap.double()
-        if self.S > 0:
+        if self.S > 0 and row < self.n_majors:  # only a major sends envoys or holds a suzerain
             _env, _acs = self._seat_envoys(row), self.citystate_alive
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
@@ -4614,7 +4636,7 @@ class SimEconomy:
         if self._gov_has_effects:
             _gby = self._gov_mods(row)[12]["govbldy"]
             if bool((_gby != 0).any()):
-                _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols])
+                _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
                 _n = (_stand & self._b_gov_yield.reshape(1, 1, -1)).sum(dim=2).double()
                 # the PALACE is a capital TERM on this engine, never a
                 # `city_bldg` bit, so the count adds it by hand
