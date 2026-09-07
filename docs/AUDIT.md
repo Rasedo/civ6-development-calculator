@@ -1,2044 +1,499 @@
-# Engine audit — open items
+# Engine audit — open work
 
-THIS FILE IS A LIST OF OPEN ITEMS. Nothing else belongs in it. A resolved
-entry is DELETED, not annotated — what was fixed, when and why is the git
-log's job. Everything below is open work, stated against the current
-engine by symbol.
+THIS FILE IS A LIST OF OPEN WORK. A resolved entry is DELETED, not
+annotated; what was fixed, when and why is the git log's job. No history,
+no shipped-prose, no test rosters — one weight and one OPEN list per entry,
+each bullet naming its build, its blocker or its ask.
 
 **RULES (owner):**
-- Every note anchors code BY SYMBOL — function/method/class/exported
-  constant — never by line number. Line numbers rot; symbols grep.
-- VERIFY-BEFORE-IMPLEMENT: every fidelity claim is checked against a real
-  Civ 6 source before implementation — never off residual text, briefs or
-  comments. Unverifiable magnitudes are recorded, not invented.
-- SOURCE OF TRUTH is real Civ 6. Reachability is never a licence to
-  deviate; gates prove the two engines agree, never that they agree with
-  Civ 6.
-- Every landed mechanic records WHICH lane can reach it. A green gate over
-  an unreached mechanic proves nothing.
-- NOTHING IS CLOSED BY RECORDING ALONE (owner, 2026-08-19). A fidelity gap
-  deferred because a mechanic is unimplemented becomes TWO open items: one
-  for the missing mechanic, one for the deferred gap (naming the mechanic
-  item as its blocker). "Recorded, not fixed" / "descoped" / "unmodeled"
-  are deferrals, never permanent closures.
+- Anchor code BY SYMBOL, never by line number.
+- VERIFY-BEFORE-IMPLEMENT against a real Civ 6 source: the owner's install
+  (XML over civilopedia; Base <- Exp1 <- Exp2, take the last) first, forums
+  second. An unsourced magnitude is an ASK, never an invention.
+- A gap deferred on an unbuilt mechanic is TWO open items: the mechanic and
+  the gap naming it. "Recorded" and "descoped" are deferrals, never closures.
+- Every new mechanic records which lane REACHES it; a green gate over an
+  unreached mechanic proves nothing.
+- When an entry closes, delete its row and its entry in the SAME commit.
 
-**Every entry uses one template.** Weight; SHIPPED (what the engines do
-today, by symbol); SOURCE (the civilopedia line or the install's XML row
-and parameter); BAR (the test lanes that hold it); REACH (what the parity
-gate actually enters); OPEN (one bullet per residual, each naming its
-blocker or its ask). A field is omitted when the item has nothing under
-it.
+**State:** P8 training PARKED until this file is empty. Restore `N_SEEDS`
+to 24 before the final hunt.
 
-**State:** P8 training PARKED until this file is clean. The battery is
-GREEN end to end (serve: 12 seeds x 250 turns, digest per turn per group).
-Restore the seed set to 24 before the final hunt — 12 is a temporary
-dev-speed cut. All surviving `_LIVE` master switches are ON
-(GOVERNMENTS_ADOPTION, B18_FOLLOWER_COUPLING, CITY_RELIGION_ADDER,
-ADMIRAL_MARCH, DEDICATION_PAYOUTS, ENGINEER, BARB_SCOUT_OPENER); no
-mechanic is inert behind a flag.
+## Open weight
 
-## What is left (owner-requested; guesstimates)
+Hand-weighted 1–8 by the size of what is LEFT to build, not by what the
+mechanic was worth when the entry opened. One row per entry, no row
+without an entry. No percentage: closed weight is deleted by design.
 
-No "% complete" — it needs the weight of everything already CLOSED as a
-denominator, and closed entries are deleted here by design, so it could
-only ever be a delta chain, and delta chains drift. What replaces it is
-the OPEN weight, hand-weighted 1–8 by implementation size, recomputable
-from the list below. ONE ROW PER OPEN ENTRY, and no row without an entry.
-
-Five entries that had no table row (C-64, C-67, C-68, C-69, C-72) carry
-one at weight 1 each since 2026-09-05; every one is cited by an open
-docs/roster_ledger.json row.
-
-| Open item | Weight | What is open |
+| Open item | Weight | What is left |
 |---|---|---|
-| A-11r the extra policy slots are not compared | 1 | `wonderExtraSlots` / `_wonder_extra_slots` are in neither engine's digest, so a seat holding slots beyond its government's own is uncompared |
+| A-11r extra policy slots uncompared | 1 | a `policySlotsExtra` manifest row on both engines |
 | **A. Engine vs engine** | **1** | |
-| B-20r tourism tails | 1 | the park rhombus has no canonical vertical |
-| B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
-| B-22r World Congress | 1 | the scored-competition catalog holds one row |
-| B-24r Ages/governors | 1 | Affluence copies the GROUND, Foreign Investor waits on a minor that accumulates anything, nine promotion clauses on named absent systems |
-| B-31r trade-route tails | 1 | plunder gold is a stylization; the course depth is a capacity six; the summed-yield key and one-candidate head are P8-surface |
-| B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
-| B-51r Encampment residuals | 1 | a capture leaves the district's own pool standing (unsourced either way) |
-| B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-56r the inert promotions | 1 | three of 107 rows name a mechanic neither engine has — sight-blocking, a PATROL order (C-34), and one magnitude the source never published |
-| B-61r the Great Person clauses with no carrier | 2 | 10 rows name a mechanic nothing here has |
-| B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the adjacency half is unsourced either way |
-| B-63r the grievance ledger's magnitudes | 1 | the gang-up bar is a heuristic — no source publishes the AI threshold |
-| B-66 formations | 1 | the direct-trained formation's strategic-resource charge; an escort formation is a PAIR here; a dragged rider lifts no fog |
-| B-67 the district price MODEL | 1 | one progression curve for all where the install splits two, both DLL-side |
-| B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
-| **B. Fidelity vs real Civ 6** | **17** | |
-| C-1 POWER | 1 | the accident roll and the decommission projects' score are unpublished |
-| C-2 diplomatic agreements | 2 | the mission's mark, demand and discuss and the Retribution casus belli wait on C-76; the queue-front purchase; ALLIANCE_POINTS_FOR_DEAL |
-| C-5 strategic-resource stockpiles | 1 | Zanzibar's two exists-nowhere-else luxuries (B-21r) |
-| C-16 the spy's second half | 1 | the model values a published number would replace (how UnitOperations' four probability columns compose), and whether a Free City is a spy's ground |
-| C-20 the Military Engineer's build list | 1 | the Mountain Tunnel's trade-route gold multiplier has no published magnitude (DLL-side) |
-| C-22 the district roster | 1 | the Preserve housing table is a stylization |
-| C-26 civilization uniques | 8 | 30 of 34 civilizations seat as plain civilizations; 32 of the ledger's 343 modifiers are open against a named blocker |
-| C-31 the nuclear strike's last clauses | 1 | interception has no published roll; the citizens a blast kills; whether a wonder in the blast is pillaged |
-| C-33 the Giant Death Robot's remaining abilities | 1 | the five-hex Range is a verb the action space lacks (the Jump's cost is STYLIZED, ruled) |
-| C-34 air combat's second half | 2 | Interception, Patrol and Priority Target have no published roll or magnitude; two sources disagree on the Aerodrome's slot count |
-| C-35 the drowned ground keeps its record | 1 | what a submerged tile's terrain and feature still lend their neighbours is unsourced either way |
-| C-38 a city-state's city develops HALFWAY | 1 | the minor's Food, Gold and Faith are computed and unspent; its border never grows; power is vacuous by its ladder |
-| C-41 nothing places Volcanic Soil | 1 | WHERE the soil lands (and what it does to an improvement) is an open owner question |
-| C-45 the queue's depth is a fixed five | 1 | real Civ 6 publishes no queue ceiling; the GPU's is a tensor dimension |
-| C-49 named random events | 1 | the storm's WALK (`Movement 8`) is DLL logic nobody can read — a storm stays on its centre; the rest shipped |
-| C-60 the Free City's own defence, amenities and religion | 1 | the Free Cities seat is in on both engines (revolt, race, join, Eleanor's skip, open to attack); what it spawns, its amenity tier and its religion walks are not |
-| C-61 the Cothon's project has no Cothon to stand in | 1 | the civ-unique gate and `moveCapital` / `_move_capital` are in; the row waits on the Cothon district (C-69) and its game-progress price curve |
-| C-64 a seat has no majority religion | 1 | three roster rows wait on the fact; the tie rule needs sourcing |
-| C-67 a diplomatic action has no preference weight | 1 | waits on the self-play decider, not on a carrier |
-| C-68 two unique chassis are not in the unit roster | 1 | the Janissary and the Saka Horse Archer |
-| C-69 three unique districts, buildings and improvements are absent | 1 | M'banza, Royal Navy Dockyard, Tsikhe, Mission — and the Cothon, which C-61's project stands in |
-| C-72 a Trader claims no tile it walks over | 1 | the radius is sourced, the geometry it is measured from is not — an ASK |
-| C-74 the eruption rate is still stylized | 1 | the install counts eruptions per GAME where this engine rolls per VOLCANO |
-| C-76 no opinion scale between majors | 1 | the mission's mark, DEMAND, DISCUSS and its promises, the Retribution casus belli, the AI's agendas — every clause that reads how a leader FEELS |
-| C-77 the worked-tile assignment lives only inside the yield walk | 1 | which citizen works which plot is derived on both engines and exposed nowhere, so a rule that names a WORKED tile (a nuke's citizens) has nothing to read |
-| **C. Absent systems** | **34** | |
-| **OPEN, TOTAL** | **52** | |
+| B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
+| B-21r suzerain rows on flat channels | 3 | ten `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; seven are buildable now, Zanzibar needs two new luxuries |
+| B-22r World Congress competitions | 2 | the World's Fair row (sourced), Aid Request's gold-to-rival scorer, three more scored quantities, the Accords' decommission half (C-1) |
+| B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
+| B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
+| B-34r flood tails | 1 | coastal floods and the Phase IV fertilization end |
+| B-51r Encampment pool on capture | 1 | ask |
+| B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
+| B-56r inert promotions | 1 | Sentry needs sight-blocking; Ground Crews needs PATROL (C-34); Boarding has no magnitude |
+| B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
+| B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
+| B-63r gang-up bar | 1 | ask; Enkidu's allied-war discount waits on it |
+| B-66 formations | 2 | resource charge x2/x3 (sourced), a THREE-member escort, the rider's own reveal |
+| B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
+| B-D unsourced data values | 2 | Democracy's alliance tail, faith progression (sourced), Valletta 50% (sourced), per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
+| **B. Fidelity vs real Civ 6** | **23** | |
+| C-1 power | 2 | accident roll and damage tables (sourced), three decommission projects (sourced), a minor's grid when C-38 gives one a load |
+| C-2 diplomatic agreements | 2 | +2 alliance points per deal (sourced), queue-front purchase (sourced), joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76 |
+| C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
+| C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
+| C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
+| C-22 Preserve housing table | 1 | middle bands stylized |
+| C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
+| C-31 the nuclear strike's last clauses | 1 | 50%-HP interception (sourced, with C-34), citizens killed (C-77), wonder in the blast (ask) |
+| C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
+| C-34 air combat's second half | 2 | Aerodrome 4/6/8 slots (sourced), fighter interception and Patrol (unsourced roll), Priority Target |
+| C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
+| C-38 a city-state's city | 2 | growth and border from its own food and culture, what it spends gold and faith on |
+| C-41 Volcanic Soil | 1 | improvement clauses accept the soil (sourced); where an eruption lays it is an ask |
+| C-45 queue depth five | 1 | ask |
+| C-49 named storms | 1 | the storm's walk (DLL); one roll per tile or per building for BUILDING_PILLAGED |
+| C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
+| C-61 the Cothon's project | 1 | the row and its GAME_PROGRESS price, after C-79's Cothon |
+| C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
+| C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
+| C-68 Janissary and Saka Horse Archer | 1 | two chassis rows with their clauses |
+| C-69 five unique rows with trait clauses | 2 | M'banza, Royal Navy Dockyard, Tsikhe, Mission, Cothon, and a strongest-naval-unit picker |
+| C-72 the Cree Trader's claim | 1 | tiles within 3 of a Cree city on the Trader's first entry (sourced) |
+| C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
+| C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
+| C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
+| C-78 unique UNITS absent | 5 | 29 of the roster's 34 unique units have no `UnitDef` row on either engine |
+| C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them) |
+| **C. Absent systems** | **43** | |
+| **OPEN, TOTAL** | **67** | |
 
-RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
-SAME commit. When one opens, add a row with its weight and its reason. Do
-not add a "done" column back.
+## The question ledger — owner asks, one line each
 
-Recounted 2026-09-05 against 068ecf39: the seven rowless entries, C-74 and
-the new A-11r each took a row; C-47, C-50, C-57 and C-63 lost theirs as
-closed; five rows that had no entry (B-61r, B-67, C-31, C-33, C-34) have
-one now. 2026-09-06: C-62 closed and C-76 opened (weight 1).
+A question the SOURCE under-determines; neither engine ships a branch until
+the owner rules or a primary source is reached. The ruling is written into
+the entry and the line leaves.
 
-## THE QUESTION LEDGER — genuine open asks, one line each
+1. **B-63r — the gang-up bar.** No source publishes the AI threshold;
+   `GRIEVANCE_GANG` is a knob (forum lore: "100 is not enough, 150 is
+   getting that way").
+2. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
+   and whether an already-improved tile takes it — DLL.
+3. **C-45 — the queue's depth.** Five is a tensor dimension. Acceptable, or
+   name a depth?
+4. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6, the same shape.
+5. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
+   zeroes; the district's own pool rides through. No rule reached.
+6. **C-64 — the majority-religion tie.** Two religions in equal cities; no
+   source names the winner.
+7. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
+   counts eruptions and reactor accidents per game; this engine rolls per
+   volcano and would roll per reactor. PROPOSAL: divide the per-turn rate
+   by the map's count of objects at risk.
+8. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
+9. **C-76 — the opinion deltas.** The install names every
+   `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
+   nothing.
 
-An entry here is a question the SOURCE under-determines: no civilopedia
-line and no install row settles it, and neither engine may ship a branch
-until the owner rules. The detail lives in the item's own row — this list
-carries none. An entry LEAVES when the owner rules or a primary source is
-reached; a ruling is written into the row, not kept here as a question.
+## A. Engine vs engine
 
-1. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
-   threshold; `GRIEVANCE_GANG` is a tuning knob wearing a sourced unit (the
-   forums offer only "100 grievances is not enough, 150 is getting that way").
-2. **C-41 — where Volcanic Soil lands.** The install lets a Farm, a Mine, a
-   Fort, an Airstrip, a Seaside Resort and the unique tile improvements stand
-   ON the soil (`Improvement_ValidFeatures`, 2026-09-07), so the engine's
-   "a featured tile is occupied" objection is gone; WHICH tiles an eruption
-   paints, and whether an already-improved one takes it, stay DLL.
-3. **C-45 — the queue's depth.** Five is a capacity choice (the GPU's
-   tensor dimension). Is five acceptable, or name a depth?
-4. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6 is the same shape of
-   capacity choice. Is six acceptable, or name a depth?
-5. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes on a
-   city capture; the Encampment's own pool rides through. The CivFanatics
-   City Combat guide gives the CITY's side ("half HP walls and garrison" once
-   Urban Defenses is known); the Encampment's own pool after capture is
-   reported only as a bug (2016-2017). No rule reached.
-6. **C-64 — the majority-religion tie rule.** A seat can hold two religions
-   in equal numbers of cities and no source names the winner.
-7. **C-74 / C-1 — a per-GAME count over per-OBJECT rolls.** The install
-   counts eruptions AND reactor accidents per game (MODERATE: volcanoes
-   4 / 2.5 / 1.5, each accident severity 1) where this engine rolls per
-   volcano and would roll per reactor. PROPOSAL, no new number: divide the
-   per-turn rate by the map's count of objects at risk, which keeps the
-   install's per-game expectation. Not covered by the 2026-09-04 ruling.
-8. **C-31 — whether a wonder in the blast is pillaged.** Unsourced.
-9. **C-76 — the opinion deltas.** The install names every modifier
-   (`LOC_DIPLO_MODIFIER_*` in the text files) and publishes no amount; the
-   community threads found carry Civ V's numbers or none. What feeds the
-   scale stays an ask.
-
-RULED AND REMOVED FROM THIS LEDGER (each ruling now lives in its row): C-33
-the Jump's cost, C-16 the released spy's level, C-38 the minor's build
-pace, C-58 the capture curve and B-66 the merged unit's hit points and
-spent turn — the five magnitudes ruled STYLIZED on 2026-09-04; C-74's
-three disaster rates (MODERATE / 500 turns, 2026-09-04); C-75's slotting
-(a DRIVER decision, 2026-09-04); C-46's pressure scale (the table read
-literally, 2026-09-05); and B-20r's park vertical, which is not an ask —
-the entry states the implementation that is closer to Civ 6 and ships the
-other, so it is a recorded model choice awaiting nothing.
-
-SOURCED AND REMOVED 2026-09-07 (the last sourcing pass, #231 — each finding
-now lives in its row): the reactor's base rate and its three damage tables
-(C-1, the install's RandomEvents); the decommission score of 100 (C-1,
-Expansion2_Emergencies); the nuke's interception, a 50%-HP threshold and
-never a roll (C-31, community tests); what drowned ground lends — nothing,
-it is coastal water (C-35, the install's pedia); the formation's resource
-charge, double and triple (B-66, two secondary sources); the queue-front
-purchase, allowed, a building's progress lost and a unit's kept (C-2, one
-tested report); ALLIANCE_POINTS_FOR_DEAL, +2 per deal between allies (C-2,
-the GlobalParameter and the pedia's own sentence); the Cree radius, three
-tiles from a Cree CITY (C-72, the trait's own text); the Aerodrome's 4/6/8
-slots (C-34, Districts.xml + two GRANT_AIR_SLOTS modifiers); the World's
-Fair's scoring and every tier (B-22r, Expansion2_Emergencies); Valletta's
-50% (B-D, Leaders.xml); and the religious units' Faith progression (B-D,
-Units.xml COST_PROGRESSION_PREVIOUS_COPIES).
-
-## A. Engine vs engine — where the two implementations can answer differently
-
-THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS — both engines can be
-equally faithful to Civ 6 and still disagree with each other. Its green
-bounds nothing the gate does not reach, and a round that widens coverage is
-worth more here than a round that re-reads the exporter.
+The digest is the only instrument for this class; a round that widens what
+the gate reaches is worth more here than one that re-reads the exporter.
 
 - **A-11r. THE EXTRA POLICY SLOTS ARE NOT COMPARED.** Weight 1.
-  SHIPPED: since C-75's cutover the digest carries the slotted CARD SET
-  (`policiesSlotted`), and `governmentsHeld` and the civics that derive the
-  adopted government were already in it.
-  OPEN: the extra policy SLOTS a seat holds BEYOND its government's own —
-  `wonderExtraSlots` / `_wonder_extra_slots`, the delta a wonder or a
-  slot-type conversion (Founding Fathers, Plato's Republic, the Holy Roman
-  Emperor) adds — are in neither engine's digest. Two engines can therefore
-  disagree about how many slots a seat has while agreeing about every card in
-  them, which is the half of A-6r its closure did not cover. The carrier is a
-  `policySlotsExtra` manifest row on both engines.
-  WHY IT MATTERS: A-5r's divergence lived in exactly this neighbourhood — a
-  military slot and the Survey card in it — and surfaced only as one unit's
-  banked XP 28 turns later.
-
-WHAT IS NOT A SOURCE OF NEW MEMBERS: a seat asymmetry. Seat 0 rides the same
-machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
-that with both allowlists empty.
+  - `wonderExtraSlots` / `_wonder_extra_slots` (a wonder's or a slot-type
+    conversion's extra slots) are in neither digest. Add a `policySlotsExtra`
+    manifest row on both engines.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
-- **B-20r. TOURISM TAILS.** Weight 1.
-  SHIPPED: works, relics, artifacts, parks, shipwrecks, both museums'
-  theming, provenance across capture.
-  BAR: `tests/gpu/parks_test.py`, `tests/cpu/culture/parks-theming.test.ts`
-  — the gate is thin here.
-  OPEN — **a park's ORIENTATION.** Civ 6 fixes the park rhombus's vertical;
-  this hex frame has no canonical vertical, so every rhombus is offered.
-  A recorded model choice, not an ask.
-- **B-21r. CITY-STATE SUZERAIN ROWS.** Weight 1.
-  SHIPPED: eleven perks are RULES (`SUZ_EFFECTS`, both engines). Geneva's
-  CONDITION ships (`cityStateSuzerainCapitalBonus` / `_suz_capital_mask`,
-  peace with every MAJOR).
-  OPEN: the remaining catalog rows carry their reason in their
-  `CITY_STATE_SUZERAIN_BONUS` entry's `note` — each needs a whole absent
-  system (unique improvements/luxuries, a gold-purchase discount, a
-  per-district Great Person channel) or is a flat channel standing in for a
-  %-scaling. What survives of Geneva's row is the MAGNITUDE alone: +15% of
-  the city's Science against a flat +3.
-- **B-22r. WORLD CONGRESS RESIDUALS.** Weight 1.
-  SHIPPED: nineteen regular resolutions, the DV resolution, emergencies as
-  special sessions, the favor tie-break, refund tiers and the ballot wire
-  (`congressSession` / `_world_congress`; emergencies in
-  `cpu/core/emergency.ts` / `_raise_emergency` and siblings). The
-  observation renders the ANNOUNCED slate beside the standing one, the turns
-  until it, and whether the DV resolution runs in it.
-  - THE CULTURE BOMB WIPES UNFINISHED CONSTRUCTION. SOURCED: "if a Wonder or
-    a District is still under construction and it suffers the effect of a
-    Culture Bomb, construction will immediately stop and it'll disappear",
-    while "a Culture Bomb will not steal completed wonders or districts". The
-    claim skips only a COMPLETE build; `wipeConstruction` /
-    `_wipe_construction` undo an unfinished one — tile mark, registry entry
-    and production item, whose hammers BANK rather than burn.
-  - SCORED COMPETITIONS ship as one resolution row whose TARGET names the
-    competition, so a second competition is a data row. SOURCED: "players who
-    vote in favor of the Scored Competition will compete to contribute to the
-    cause" (outcome A opens the window, its own A voters are the field); a
-    competition runs 30 turns; "the civilization with the highest score wins
-    the Gold Tier rewards ... all civs whose scores fall within the top 25%
-    ... win the Silver Tier rewards, and all civs ... within the next highest
-    quarter ... Bronze" (`resolveCompetition` / `_resolve_competition`). Era
-    floor Modern. CLIMATE ACCORDS is the first row, scored "1 point per turn
-    for each CO2 emission less than the highest polluter" (the WORLD's
-    highest), paying Gold 2 DV points, Silver 100 and Bronze 50 Favor.
-    FOUR DECISIONS, not transcriptions: one competition runs at a time (real
-    Civ 6 bounds nothing, and one slot makes the score a comparable plane);
-    "CO2 emission" is read as the per-turn RATE, not the lifetime total; the
-    podium's tie breaks on the LOWER seat; and the free vote's line (the
-    highest polluter refuses what it cannot score) is this model's
-    self-interest heuristic, like every AI line in the catalog.
-  - LUXURY POLICY, the nineteenth regular row, appended LAST with its own
-    'luxury' target kind (the target space is `LUXURY_IDS`' order, the tile
-    plane's own). SOURCED: "A: +1 Amenity on duplicates of a Resource. / B:
-    This Luxury resource grants no Amenities." B silences the named luxury
-    outright, Affluence copies included; A pays one extra full-reach amenity
-    round per OWN improved copy beyond the first (`luxuryAmenities` /
-    `_luxury_amenities`). TWO DECISIONS: A's REACH rides the machinery's own
-    LUXURY_AMENITY_CITIES spread (the published line names no cities), and the
-    DUPLICATE count reads the seat's own improved tiles. The game's own
-    congress table gives the row NO era window and both engines carry that.
-    Free vote: A on the luxury the voter holds the most improved copies of.
-  - ARMS CONTROL acts. SOURCED: "A: All players have their weapons of Mass
-    Destruction set equal to the target player. / B: The target player loses
-    all of their Weapons of Mass Destruction." An inventory is state rather
-    than a standing modifier, so `armsControl` / `_arms_control` enforce the
-    winning outcome at the session, per device row. Its free vote is a
-    self-interest line of this model's own.
-  - THE ESPIONAGE PACT ships — "A: All Spies function +2 levels higher for
-    the Target Operation. / B: Target Operation is unavailable"
-    (`congressPactLevels` / `congressPactBanned` and their `_congress_pact_*`
-    twins, on the `SPY_OP_LEVEL` channel nine Espionage promotions use). ONE
-    DECISION: the target space is `SPY_OFFENSIVE_MISSIONS`, since no source
-    lists what the game offers. Era window Industrial through Atomic, the
-    game's own congress table.
-  - PEACE DEALS carry terms: "the peaceful resolution of a war involves
-    diplomatic negotiations ... You or your opponent may initiate a Peace
-    Deal", so a table between two seats at war IS the peace deal and
-    confirming it ends the war (`acceptDeal` / `_accept_deal`, both calling
-    the one `makePeace` body). The unilateral sue at the war head stays as
-    the no-terms case.
-  REACH: a ballot on 12/12 seeds, ~5 sessions per seed; rows past rotation
-  rank 9 are poke-only (`world-congress.test.ts`, `congress_vote_test`); the
-  CITY_STATE emergency trigger is poke-only
-  (`tests/cpu/minors/emergencies.test.ts`, `tests/gpu/emergency_test.py`).
-  Climate Accords' own reach is unmeasured; `congress_vote_test` and
-  `tests/cpu/seats/competition.test.ts` exercise it.
-  OPEN:
-  - **THE COMPETITION CATALOG HOLDS ONE ROW.** The machinery takes a data row
-    per competition; what is missing is the rows. WORLD'S FAIR — SOURCED
-    2026-09-07 from `Expansion2_Emergencies.xml`, buildable: the score is 1
-    point per Great Person POINT of every class earned during the window
-    (eight `WORLDS_FAIR_SCORE_GPP_*` rows, ScoreAmount 1), Duration 29 with a
-    60-turn lockout; FIRST PLACE +1 Diplomatic Victory point
-    (`NON_EMERGENCY_FIRST_PLACE_VICTORY_POINT`) and +100 Great Person points;
-    TOP TIER +50 Favor and 2 random Industrial..Information civic boosts;
-    BOTTOM TIER 1 such boost. AID REQUEST scores
-    members who "send Gold to the target player", which needs a
-    gold-to-a-rival scorer no competition reads yet; BORDER DISPUTE,
-    CATASTROPHE and MILITARY COMPETITION each want a scored quantity of their
-    own. THE NOBEL PRIZE competitions are Sweden-only — blocked on C-26.
-  - **CLIMATE ACCORDS SCORES ONLY HALF ITS INPUTS.** The source scores the
-    Decommission Coal/Oil/Nuclear Power Plant projects alongside the emission
-    gap; those projects have no carrier — blocked on C-1.
-- **B-24r. AGES / GOVERNORS TAILS.** Weight 1.
-  SHIPPED: twelve dedications, both faces, over the published era windows
-  (`DEDICATION_ERAS` / `_ded_eras`). Thirteen DARK AGE cards with their era
-  windows, wildcard-only, adoptable only by a seat actually in a Dark Age
-  (`computeAdoption(.., dark)` / `_slotted_policies(.., dark, era)`).
-  THE GOVERNOR IS A PERSON: seven named agents per seat (`Seat.governors` /
-  the `civ_gov_*` planes), each appointed with a Governor Title, seated in
-  one city, promoted with further titles. Titles are earned one per each of
-  thirteen NAMED civics plus the Government Plaza and every building in it,
-  and spent one per appointment and one per promotion
-  (`governorTitlesEarned` / `_governor_titles_earned`). Forty-two promotion
-  rows carry their governor, tier and prerequisite mask; the DEFAULT ability
-  rides the appointment and costs nothing. SOURCED: an establishment clock
-  (3 turns for Victor, 5 for the rest) gates every ABILITY while the +8
-  Loyalty transfers on ASSIGNMENT; a neutralize clock follows the PERSON, so
-  a neutralized governor leaves his city and can be seated nowhere for six
-  turns.
-  AMANI IS POSTED TO A CITY-STATE. SOURCED (Amani): "Can be assigned to a
-  City-state, where she acts as 2 Envoys", and the catalog's `cityStates`
-  flag says she is the only one. Posted at the governor phase BEFORE the
-  cities are handed out, taking none while abroad; the establishment clock
-  runs there as in a city; a neutralize or a conquest sends her home.
-  `Governor.minorId` / `civ_gov_minor` are the posting, compared as
-  `governorAtMinor` — addressed by the CITY-STATE, so neither engine has to
-  name a minor the way the other does. WHICH minor is this model's own line:
-  the met, live one where the seat already holds the most envoys, ties to
-  the first in the roster. `envoysHere` / `_envoys_here` is the store plus
-  Messenger's two, doubled by Puppeteer (she is part of the number she
-  doubles). The EFFECTIVE count is what asks who LEADS and what a seat has
-  EARNED — both halves of the suzerain contest (`resolveSuzerain`,
-  `isSuzerain`, and the levy gate with them), the 1/3/6 bonus tiers, and the
-  driver's next-envoy preview; the STORE is what asks about the act of
-  SENDING one — the emergency's "must have met and sent an Envoy", the
-  first-envoy double, and the Congress's envoy context. The stored answer
-  (`CityState.suzerain` / `citystate_suzerain`) is refreshed for the WHOLE
-  roster at every position on both engines, because a posting moves the
-  contest without touching any one minor's ledger.
-  SIX PROMOTION CLAUSES landed off their own sourced sentences — Surplus
-  Logistics (`routeStartFood`), Vertical Integration (`industryAllSources`,
-  INDUSTRIAL_ZONE rows only), Reinforced Materials (`envDamageImmune`,
-  gating `scorch`, the flood's improvement destruction and `floodDistrict`;
-  the GPU's `_env_immune` is the OR over the majors and no draw moves),
-  Forestry Management (`goldPerFeature` in BONUSES over the tiles the city
-  OWNS, and `appealNearFeature` through `cityAppealResolver`), Patron Saint
-  (`firstPromoBonus` banked at the FAITH BUY and spent by `takePromotion` /
-  the PROMOTE applier, carried per unit as `Unit.promoBonus` /
-  `unit_promo_bonus`), and Land Acquisition (`passRouteGold` over the stored
-  course, the seat's own routes never counted, plus `borderExpansionPct` 20
-  from the game's own governor-promotion table). Grants' "+100% Great People
-  points" rides `gppMult` over everything its city GENERATES
-  (`governorMult` / `_governor_mult`), the seat-level government and
-  Congress factors staying outside it.
-  BAR: `tests/gpu/gov_clauses_test.py`,
-  `tests/cpu/city/governor-clauses.test.ts`, `tests/gpu/amani_test.py`,
-  `tests/cpu/minors/amani.test.ts`, `governor_roster_test.py` poke f, the TS
-  `dark-policies` lane, `legacy-cards.test.ts` / `legacy_cards_test.py`.
-  REACH: Amani IS reached — seed 9131 posts her and she decides a
-  suzerainty inside 250 turns. No seed reaches a governed city holding any of
-  the six clauses above, and Grants is a tier-2 Pingala row no scripted lane
-  promotes to — poke-only.
-  OPEN:
-  - **AFFLUENCE COPIES THE GROUND, NOT THE WORKED TILE.** A minor improves
-    nothing on this engine (C-38), so requiring the improvement the seat's
-    own luxuries require would make the promotion a permanent no-op. Both
-    engines copy every distinct luxury RESOURCE in the minor's territory —
-    a reading, not a transcription.
-  - **FOREIGN INVESTOR HAS NO CARRIER.** "While established in a city-state,
-    accumulate its Strategic resources. When suzerain, receive double the
-    amount" needs a minor that ACCUMULATES strategic resources, and a minor
-    here has no production, no improvement and no stockpile — blocked on
-    C-38. No source publishes a rate to stand in for one.
-  - **NINE PROMOTION CLAUSES WAIT ON A NAMED ABSENT SYSTEM**: Contractor and
-    Divine Architect (no district PURCHASE verb, gold or faith); Renewable
-    Subsidizer and Industrialist (C-1's plants and renewables); Air Defense
-    Initiative (anti-air units, C-34, and the ICBM, C-31); Arms Race
-    Proponent (nuclear armament projects, C-31); Aquaculture and Parks and
-    Recreation (the Fishery and City Park improvements, which the
-    improvement catalog does not carry); Foreign Investor (above).
-  - **NO CARD STYLE ASKS FOR A DARK AGE CARD.** The dark rows are wildcard-
-    only and appended last by the wire-index discipline, and the driver's
-    three styles are GREEDY (table order), LEGACY-FIRST (the wildcard bench
-    goes to the legacy cards) and MILITARY-FIRST (to the military overflow) —
-    none of them reaches one. A FOURTH STYLE IS THE CARRIER. MEASURED on a
-    forced Dark Age with every civic researched: 8 cards slotted, 0 dark;
-    widening the wildcard bench to 40 slots, the same seat takes all 13. Both
-    engines agree exactly, so this is REACHABILITY, not a divergence, and the
-    pool is proven only by `governor_roster_test.py` poke f and the TS
-    `dark-policies` lane.
-  - **WHO TO HIRE AND WHERE TO SEAT HIM IS A HEURISTIC, NOT A RULE.** Appoint
-    in catalog order, promote the first legal row, seat every idle governor in
-    the lowest-loyalty ungoverned city (quantized-milli key, ties by array
-    position). Real Civ 6 leaves all three to the player; both engines mirror
-    the heuristic exactly, and making them decisions is P8-surface work.
-  - Ibrahim is Ottoman-exclusive and therefore C-26's, not an omission here.
+- **B-20r. A PARK'S ORIENTATION.** Weight 1.
+  - Civ 6 fixes the park rhombus's vertical; this hex frame has none, so
+    every rhombus is offered. A model choice; nothing to build until a
+    vertical is chosen.
+- **B-21r. SUZERAIN ROWS ON FLAT CHANNELS.** Weight 3.
+  Each row's `note` in `cpu/data/cityStates.ts` names its gap.
+  - Buildable now: Geneva +15% Science (flat +3 stands in); Bologna +1 GPP
+    per district with a building; Nan Madol +2 Culture per district on or
+    beside water; Venice +1 Gold per destination luxury; Bandar Brunei's
+    PASSING-THROUGH half (the course is stored now); Hunza +1 Gold per 5
+    tiles of the course; Hong Kong +20% Production on projects; Ngazargamu
+    20% gold-purchase discount per Encampment building.
+  - Valletta's 50%: see B-D.
+  - Zanzibar's Cinnamon and Cloves need two luxury ids that exist nowhere
+    else (C-5 reads them).
+- **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 2.
+  The machinery takes one data row per scored competition.
+  - THE WORLD'S FAIR — SOURCED `Expansion2_Emergencies.xml`: 1 point per
+    Great Person POINT of every class earned during the window (eight
+    `WORLDS_FAIR_SCORE_GPP_*` rows), Duration 29, lockout 60; FIRST PLACE
+    +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
+    Favor and 2 random Industrial..Information civic boosts; BOTTOM TIER 1
+    boost. Buildable.
+  - AID REQUEST scores gold SENT to the target player — needs a
+    gold-to-a-rival scorer. BORDER DISPUTE, CATASTROPHE and MILITARY
+    COMPETITION each want their own scored quantity.
+  - THE NOBEL PRIZE competitions are Sweden-only (C-26).
+  - CLIMATE ACCORDS scores the three decommission projects beside the
+    emission gap — blocked on C-1.
+- **B-24r. GOVERNOR TAILS.** Weight 3.
+  - A district PURCHASE verb (gold and faith) — Contractor and Divine
+    Architect wait on it; no engine has the verb.
+  - The FISHERY and CITY PARK improvements — Aquaculture and Parks and
+    Recreation wait on the catalog rows.
+  - Renewable Subsidizer and Industrialist wait on C-1's plants; Air
+    Defense Initiative on C-34's anti-air and C-31's ICBM; Arms Race
+    Proponent on C-31's armament projects.
+  - FOREIGN INVESTOR needs a minor that accumulates strategic resources
+    (C-38); AFFLUENCE copies the ground's luxuries because a minor improves
+    nothing (C-38).
+  - NO CARD STYLE ASKS FOR A DARK AGE CARD: the driver's three styles never
+    reach one (measured: a forced Dark Age slots 0 of 13). A fourth style
+    is the carrier; poke-only until then.
+  - Who to hire and where to seat him is a heuristic (catalog order,
+    lowest-loyalty city) — a decision for P8's surface.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
-  SHIPPED: the Trader unit, sea legs, trading posts, chained reach and the
-  whole-destination-set candidate; a city-state's complete Harbor is a
-  second water anchor (`centreMaritime`'s minor arm / the maritime plane's
-  minor scatter). A route stores its COURSE at commit (`TradeRoute.chain` /
-  `seat_route_chain`, statecompare-compared, `routeChain`'s FIFO walk over
-  the seat's own posts, first discovery wins). SOURCED (Trading Post):
-  "Every Trading Post for your civilization through which a route passes
-  along its course adds +1 Gold", and "Each foreign Trading Post also adds
-  +1 Gold to the yields of every Trade Route which passes through this city"
-  — `routeChainGold` / the `_seat_route_income` chain term pays each live
-  course city 1 plus the other civs' posts standing there, and the reach walk
-  carries the same depth cap.
-  OPEN:
-  - `ROUTE_CHAIN_MAX` (6) is a CAPACITY choice, the GPU plane's width — real
-    Civ 6 chains posts "and so on" with no published limit. C-45's pattern;
-    ask.
-  - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names the
-    real base magnitude.
-  - **The destination is ONE candidate row plus a take/skip.** The single
-    summed-yield ranking key is this engine's heuristic and the policy sees
-    one candidate — the free-choice head is P8-surface work, alongside the
-    route verb joining `env.step`.
+  - `ROUTE_CHAIN_MAX` 6 is a capacity choice — ask 4.
+  - `PLUNDER_ROUTE_GOLD` 50 is unsourced.
+  - The destination is one candidate row plus take/skip; the free-choice
+    head is P8 work.
 - **B-34r. FLOOD TAILS.** Weight 1.
-  SHIPPED: the GS flood whole — severity ladder, river reach, river-scoped
-  shield, the Dam, the Great Bath's per-flood faith over `Tile.floodCount` /
-  `tile_flood_ct`.
-  BAR: `flood_severity_test` poke f pins the reach.
-  OPEN: climate change ending fertilization at Phase IV, the Egyptian
-  ability, the Soothsayer and COASTAL floods all wait on systems that do not
-  exist here.
-- **B-51r. ENCAMPMENT RESIDUALS.** Weight 1.
-  SHIPPED: the district holds its OWN outer-defense pool
-  (`Tile.encampOuterHp` / `encamp_outer_hp`). SOURCED: one set of Walls
-  "supplies both", yet "destroying the one does not destroy the other" — the
-  assault and the -17 shot split against it, its own pool gates the `estk`
-  strike, the repair project prices and refills BOTH pools (centre first), a
-  melee walker ENTERING a shot-emptied district conquers it "as you would a
-  City Center" (`stepUnit` / `_step_verb`'s entry hook; a ranged walker only
-  OCCUPIES it, and the 20 HP/turn heal re-blocks), and the `estk` target scan
-  measures distance 1..2 from the DISTRICT's own tile.
-  OPEN — **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
-  city capture; the district's own pool rides through unchanged on both
-  engines. Searched 2026-09-07: the CivFanatics City Combat guide
-  (forums.civfanatics.com/resources/city-combat.27737) gives the CITY's side
-  — "when you capture a city after discovering Urban Defences the captured
-  city starts with half HP walls and garrison", "when an encampment is
-  occupied all its buildings are automatically pillaged", "Encampment
-  Garrisons only have 100 HP but their wall HP match their city center" —
-  and the Encampment's own pool after capture appears only in bug reports
-  (health stuck at 29/200, 2016-2017). No rule reached; ask.
-- **B-54r. FLANKING AND SUPPORT AGAINST THEIR OWN PAGE.** Weight 1.
-  SHIPPED: every rule on the page, plus the four higher stacks a promotion or
-  Great Person raises.
-  OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and Macedon's
-  Hypaspist raise flanking or support for themselves alone. Blocked on C-26.
+  - COASTAL floods, and climate change ending fertilization at Phase IV,
+    are not modelled.
+- **B-51r. THE ENCAMPMENT'S POOL ON CAPTURE.** Weight 1.
+  - `city_outer_hp` zeroes on a city capture; `Tile.encampOuterHp` /
+    `encamp_outer_hp` rides through. Ask 5.
+- **B-54r. UNIQUE-UNIT FLANK AND SUPPORT STACKS.** Weight 1.
+  - Zulu's Impi and Macedon's Hypaspist raise flanking or support for
+    themselves alone — after C-78 seats the chassis.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
-  SHIPPED: 104 of the 107 catalog rows in `cpu/data/promotions.ts` reach a
-  rule.
-  BAR: `tests/gpu/promotions_test.py`, `tests/gpu/promo_effects_test.py`,
-  `tests/gpu/air_promo_test.py`.
-  OPEN — three rows carry `none`, each with its blocker:
-  - **SENTRY** ("can see through Woods and Rainforest") — `revealAround` /
+  Three of 107 rows in `cpu/data/promotions.ts` carry `none`:
+  - SENTRY ("see through Woods and Rainforest") — `revealAround` /
     `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **GROUND_CREWS** ("heal while patrolling or deployed") — PATROL is
-    C-34's gap, and without it there is no state to heal in.
-  - **BOARDING** ("obtain Gold from naval victories") — the Civilopedia
-    publishes no magnitude and no other row prices a kill in gold. Waits on a
-    source, not on a mechanic.
-- **B-61r. THE GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
-  SHIPPED: Goddard's visibility grant and Shah Jahan's gold-buyout.
-  OPEN: ten rows name a mechanic nothing here has — tourism x4, regional
-  range x2, city-state absorption, barbarian conversion, ocean passage, and
-  Tupac Amaru's per-district undefended grant walk. Mary Leakey's tourism
-  clause has a per-rival bank to read now and still no carrier.
-  The ten rows and each one's blocker are the `open: B-61r` rows of
-  docs/roster_ledger.json.
-- **B-62r. A SUZERAIN IMPROVEMENT'S ADJACENCY STOPS AT THE WONDER TILE.**
-  Weight 1.
-  SHIPPED: the PRESERVE's bands pay a natural-wonder tile (`tileYields`'
-  wonder arm / `_preserve_live`). SOURCED (Grove): the band pays "adjacent
-  unimproved tiles" by APPEAL, and a natural wonder is unimproved and
-  Breathtaking by construction — `tileAppeal` answers 5. A pantheon's
-  `featureYields` clause is VACUOUS there: the wonder stands where the
-  feature would, so no feature row exists to pay.
-  OPEN — **THE ADJACENCY HALF IS UNSOURCED EITHER WAY.** `tileYields` leaves
-  on `tile.wonder` before a suzerain improvement's adjacency add and
-  `_tile_add_live` masks the same tiles; no source says whether real Civ 6
-  pays it there, so both engines refuse.
-- **B-63r. THE GRIEVANCE LEDGER'S UNPUBLISHED MAGNITUDES.** Weight 1.
-  SHIPPED: the mechanic is whole — every published row pays, the spread, the
-  decay, the favor ladder, PUBLIC RELATIONS. Since 2026-09-06 a declaration,
-  a capture and a raze are priced by the declared war's OWN casus belli
-  columns for all eleven kinds (`WAR_KINDS[].pct`, the install's
-  WarmongerPercent / CaptureWarmongerPercent / RazeWarmongerPercent), read
-  off the pair's kind (`warKindWith` / `_war_kind_code`).
-  OPEN — **THE GANG-UP BAR IS A HEURISTIC.** `GRIEVANCE_GANG` is a tuning
-  knob wearing a sourced unit; no source publishes an AI threshold (searched
-  again 2026-09-07 — forum lore only: "100 grievances is not enough to make
-  everyone denounce you, but 150 is getting that way"). Ask.
-  Enkidu's allied-war discount (EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT
-  150) waits here.
-- **B-66. FORMATIONS.** Weight 1.
-  SHIPPED: Corps, Armies, Fleets and Armadas on both engines — one
-  `formation` tier per unit (`formationCS` / `_form_cs`, `_form_cs_pool`),
-  the FORM_UP head merging a unit into a same-type neighbour (`formUp` /
-  `_form_up`), and the strength term on every duel read (melee, ranged,
-  bombard, the city and city-state assaults, the stack-defender choice, the
-  embarked defence).
-  SOURCED (Formations): two of a type make a Corps after Nationalism and
-  three an Army after Mobilization (`FORMATION_CIVIC`); the magnitudes are
-  the game's own COMBAT_CORPS_STRENGTH_MODIFIER 10 and
-  COMBAT_ARMY_STRENGTH_MODIFIER 17; "the experience and promotions of the
-  highest experience unit is preserved"; "once a Corps or Army has been
-  formed, the units may not be broken apart into individual units again", so
-  there is no inverse verb. A direct-trained formation costs
-  UNIT_CORPS_COST_MODIFIER 1.5 / UNIT_ARMY_COST_MODIFIER 2.0 of the unit
-  (GlobalParameters.xml) — the install's table, which outranks the Military
-  Academy's civilopedia prose that `FORMATION_COST_MULT` had taken 2.25
-  from. The four Great People who make a formation out of ONE unit ship
-  (`GP_ABILITY`'s `formation` clause, `_gp_form_up`): El Cid a Corps,
-  Napoleon an Army "out of a military land unit", Gaius Duilius a Fleet and
-  Santa Cruz an Armada out of a naval one, asking no civic; the target "must
-  be a military unit that is not a Corps or an Army".
-  THE QUEUE TIER SHIPS: a city holding the Military Academy (Seaport at sea)
-  trains a Corps or Army (Fleet or Armada) outright once the formation's own
-  civic is in, at 150% / 225% of the unit's cost and 25% off for the enabling
-  building (`FORMATION_COST_MULT`, the `formLo` block, `_q_unit_of`).
-  THE ESCORT FORMATION SHIPS (`escortUnit` / `breakEscort` / `inEscort`,
-  `_escort_rider` / `_escort_carry_with`, the ESCORT and BREAK_ESCORT
-  columns). SOURCED (Formations): "A military unit can create a formation
-  with a support or civilian unit at any time"; the formation's Movement "is
-  equal to that of the slowest unit that belongs to it"; "all attacks against
-  this tile will be absorbed by the military unit of the formation" — already
-  the engine's stacking rule (`stackDefender` takes a military unit whenever
-  the tile holds one), formation or not. Only the CIVILIAN carries the flag
-  and the tile names its escort, so a flag with no military unit beside it is
-  not a formation and the rider is free the moment its escort dies. A naval
-  hull forms with its PASSENGER, the other half of "Naval military units may
-  also create a formation with embarked land units". Two promotions ride it:
-  ESCORT_MOBILITY ("Formation units all inherit escort's Movement speed") and
-  CONVOY ("+10 Combat Strength when in a formation", Naval Melee behind
-  Reinforced Hull and Rutter). Which formation CONVOY's "a formation" names
-  is settled by no source — a Fleet is one and so is an escort — and it ships
-  as the ESCORT reading BY OWNER DECISION, on the hull carrying a rider
-  (`convoyCS` / `_convoy_cs`).
-  STYLIZED (owner ruling 2026-09-04): the merged unit keeps the VETERAN's own
-  hit points — the same unit whose promotions and experience the sourced rule
-  already keeps — and ends its turn. No source publishes either.
-  BAR: `tests/gpu/formation_test.py`, `tests/cpu/units/formation.test.ts`
-  (the Great Person clause also in `tests/cpu/units/greatPerson.test.ts`),
-  `tests/gpu/formation_train_test.py`, `tests/gpu/escort_test.py`,
-  `tests/cpu/units/escort.test.ts`.
-  REACH, measured: the Corps IS reached — the driver takes FORM_UP, the
-  column is offered on 4 of 12 seeds from t211 and a Corps stands on 3 of 12
-  from t212, so the gate compares the tier-1 strength term over the last ~40
-  turns of those games. The ARMY is not (its civic is Modern). The ESCORT
-  column is offered on 12 of 12 seeds from t14 and NO driver ever takes it,
-  so the pair, the drag and Escort Mobility are poke-only.
-  OPEN:
-  - **A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE IS THE UNIT'S OWN.**
-    SOURCED 2026-09-07 (secondary, two agreeing: gamepressure's Gathering
-    Storm strategic-resources guide and the Unit wiki page): a Corps costs
-    DOUBLE the unit's strategic resource up front and an Army TRIPLE, with
-    maintenance unchanged; no XML row carries it. Buildable on that reading.
-  - **AN ESCORT FORMATION IS A PAIR.** Real Civ 6 links up to THREE units of
-    different classes — military, civilian and support. Support units are
-    modelled here as civilians and the drag takes ONE rider, so `escortUnit`
-    refuses a second flag on a tile rather than leave a member behind.
-    Widening it needs a support stacking class of its own and a two-rider drag
-    on both engines.
-  - **A DRAGGED RIDER LIFTS NO FOG.** `_step_verb` / `stepUnit` reveal around
-    the MOVER; the escorted unit arrives without a reveal of its own, which
-    matters only where the rider's sight is the wider of the two. It follows
-    the carried-aircraft precedent (`_air_carry_with` / `carryAirWith`) rather
-    than a source.
-- **B-67. THE DISTRICT PRICE MODEL IS ONE CURVE FOR ALL.** Weight 1.
-  SHIPPED: the per-row BASE and the per-row under-represented DISCOUNT come
-  from the install (`Districts.Cost` and `CostProgressionParam1`), so an
-  Aqueduct no longer costs a Campus and the two plaza rows take 25% where
-  every other row takes 40.
-  OPEN: the PROGRESSION MODEL. The install splits
-  COST_PROGRESSION_NUM_UNDER_AVG_PLUS_TECH (the specialty rows, the
-  Government Plaza, the Diplomatic Quarter, the Aerodrome) from
-  COST_PROGRESSION_GAME_PROGRESS (the Aqueduct, Canal, Dam, Neighborhood and
-  the Mbanza); both formulas are DLL-side, and this engine runs the
-  tech-driven one for both.
-- **B-D. UNSOURCED DATA VALUES.** Weight 2. Swept once; the named
-  stylizations are OPEN, not closed. The cpu/data walk fetched every
-  magnitude from the GS Civilopedia row by row (wonders, units, both trees,
-  buildings, all 49 policy cards, the city-state roster). What remains:
-  - **THE GOVERNMENTS' CHANNEL-BLOCKED TAILS.** Every row ships its INHERENT
-    bonus and nothing else, re-sourced page by page. One term stays open:
-    Democracy's, whose Trade Route to an Ally or Suzerain's city and whose
-    alliance points both want ALLIANCES (C-2). The LEGACY bonuses are a
-    second catalog and ship as their own Wildcard cards, on the accrual C-63
-    records.
-    ADOPTION REACHABILITY: `computeAdoption` / `_adopted_gov` take the newest
-    unlocked tier on table order, so Oligarchy and Classical Republic are
-    adopted in NO game — the two government test lanes' borrowed-row drills
-    hold their rows.
-  - **THE PER-CITY WAR-WEARINESS SPLIT IS NOT PUBLISHED, and the empire-wide
-    rule we implement IS** (sourced: -1 Amenity per 400 WWP,
-    `warWearinessPenalty`'s shape). The install's numbers, read 2026-09-07:
+  - GROUND_CREWS ("heal while patrolling or deployed") — PATROL is C-34's.
+  - BOARDING ("Gold from naval victories") — no published magnitude.
+- **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
+  - Ten `open: B-61r` rows in `docs/roster_ledger.json`: tourism x4,
+    regional range x2, city-state absorption, barbarian conversion, ocean
+    passage, Tupac Amaru's per-district grant walk.
+- **B-62r. A SUZERAIN IMPROVEMENT'S ADJACENCY AT A WONDER TILE.** Weight 1.
+  - `tileYields` leaves on `tile.wonder` before the adjacency add and
+    `_tile_add_live` masks the same tiles; whether real Civ 6 pays it there
+    is unsourced either way.
+- **B-63r. THE GANG-UP BAR.** Weight 1.
+  - `GRIEVANCE_GANG` is a knob — ask 1. Enkidu's allied-war discount
+    (`EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT` 150) waits on it.
+- **B-66. FORMATIONS.** Weight 2.
+  - A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE is the unit's own. SOURCED
+    (secondary, two agreeing: gamepressure's GS strategic-resources guide,
+    the Unit wiki page): a Corps costs DOUBLE the strategic resource up
+    front, an Army TRIPLE, maintenance unchanged. Buildable.
+  - AN ESCORT FORMATION IS A PAIR; real Civ 6 links military, civilian and
+    support. Needs a support stacking class and a two-rider drag on both
+    engines (`escortUnit` / `_escort_rider`).
+  - A DRAGGED RIDER LIFTS NO FOG: `stepUnit` / `_step_verb` reveal around
+    the mover only.
+- **B-67. THE DISTRICT PRICE PROGRESSION.** Weight 1.
+  - The install runs COST_PROGRESSION_GAME_PROGRESS for the Aqueduct, Canal,
+    Dam, Neighborhood and Mbanza and NUM_UNDER_AVG_PLUS_TECH for the rest;
+    this engine runs the tech-driven one for all. Both formulas are DLL.
+- **B-D. UNSOURCED DATA VALUES.** Weight 2.
+  - DEMOCRACY'S TAIL: the Trade Route to an ally's or suzerain's city and
+    its alliance points — alliances exist now (C-2); buildable.
+  - THE RELIGIOUS FAITH PRICES ARE FLAT. SOURCED `Units.xml`
+    `COST_PROGRESSION_PREVIOUS_COPIES`, `CostProgressionParam1` per copy:
+    Missionary 75 +6, Apostle 200 +15, Inquisitor 75 +6, Guru 120 +12,
+    Naturalist 800 +100, Rock Band 300 +50; Warrior Monk 100 flat. READING
+    for the DLL half: a previous copy is one the seat has ever acquired.
+    Buildable.
+  - VALLETTA'S WALLS DISCOUNT. SOURCED `Leaders.xml`
+    `MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,STAR}_BONUS`:
+    `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PURCHASE_COST` Amount 50 on
+    BUILDING_WALLS / CASTLE / STAR_FORT. The faith-only half ships
+    (`wallsGoldBlocked`); the 50% does not. Buildable.
+  - THE PER-CITY WAR-WEARINESS SPLIT: the install's numbers are
     `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0,
     NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`,
     `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`,
     `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200,
-    TURN_AT_WAR 50}`, `_WARMONGER_BASE 16`. How the three per-city rows
-    compose is DLL; closing this still needs the C++ behaviour.
-  - `GAME_SPEED` 0.6 (`constants`) — a SHAPE difference: real Civ 6 scales
-    cost, yield and turn tables independently per speed.
-  - **THE RELIGIOUS FAITH PRICES ARE FLAT — the progression is SOURCED
-    2026-09-07, buildable.** `Units.xml`: `CostProgressionModel=
-    "COST_PROGRESSION_PREVIOUS_COPIES"` with `CostProgressionParam1` per
-    copy — Missionary 75 +6, Apostle 200 +15, Inquisitor 75 +6, Guru 120
-    +12, Naturalist 800 +100, Rock Band 300 +50; the Warrior Monk is 100
-    flat. READING for the DLL half: a "previous copy" is one the seat has
-    ever acquired, dead or alive.
-  - the BELIEF magnitudes (`religion` header) and the deliberate tuning
-    constants in `seats` (its header names them) — stylizations that will
-    never close by sourcing; recorded once.
-  - the FLOOD SEVERITY split now comes from the install (C-74); what stays
-    the model's own in `disasters` is ERUPTION_CHANCE_PER_VOLCANO, held under
-    C-74's open half.
-  - **VALLETTA'S WALLS DISCOUNT — SOURCED 2026-09-07, buildable.**
-    `Leaders.xml` MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,STAR}_BONUS
-    are `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PURCHASE_COST` Amount 50 on
-    BUILDING_WALLS / BUILDING_CASTLE / BUILDING_STAR_FORT: half price. The
-    faith-ONLY half ships (`wallsGoldBlocked`); the 50% does not yet.
-  - **THE FAITH RATE FOR A LAND COMBAT UNIT IS INFERRED** — Valletta's page
-    publishes the BUILDING rate ("2 Faith for 1 Production",
-    `FAITH_PURCHASE_MULT`) and `unitFaithCost` /
-    `_seat_faith_unit_candidate` reuse it because no page states the unit
-    one.
+    TURN_AT_WAR 50}`, `_WARMONGER_BASE 16`; how the per-city rows compose is
+    DLL. The empire-wide rule ships (`warWearinessPenalty`).
+  - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield
+    and turn tables independently.
+  - THE FAITH RATE FOR A LAND COMBAT UNIT is inferred from the building
+    rate (`FAITH_PURCHASE_MULT`, reused by `unitFaithCost` /
+    `_seat_faith_unit_candidate`); no page states the unit one.
+  - The BELIEF magnitudes (`religion` header) and the tuning constants in
+    `seats` (its header names them) are stylizations no source closes.
+  - Oligarchy and Classical Republic are adopted in NO game
+    (`computeAdoption` / `_adopted_gov` take the newest tier); their rows
+    are held by the two government lanes' borrowed-row drills only.
 
-## C. ABSENT SYSTEMS — the blockers, and the gaps waiting on them
+## C. Absent systems — the blockers, and the gaps waiting on them
 
-Every entry here was once written down as a decision; each is a DEFERRAL
-waiting on a system this engine does not have. The missing system is one
-open item, and each gap that names it is another — the gaps are listed
-under their blocker so the dependency is readable, and both halves count.
-
-- **C-1. POWER — the emissions and the renewable roster.** Weight 1.
-  SHIPPED: the grid, the three plants, the fuel burn, the powered-yield
-  splits and Cardiff (`cityPower` / `_city_power_need`). The RENEWABLE half
-  and the reactor: the SOLAR FARM and WIND FARM are improvements paying the
-  Civilopedia's +2 Power each to the city owning their plot, the
-  HYDROELECTRIC DAM's `powerSupply` 6 rides the same channel, and the
-  BIOSPHERE multiplies every one by `BIOSPHERE_POWER_MULT` /
-  `biosphere_power_mult` (Cardiff's Harbor power is not on the wonder's list
-  and is added after). The NUCLEAR reactor carries an AGE (`City.reactorAge`
-  / `city_reactor_age`) — SOURCED: "the number of turns that have passed
-  since the Power Plant was first constructed, converted to, or last
-  recommissioned" — ticking in `resolveSeatPower` / `_resolve_seat_power`,
-  cleared with the building, and reset by RECOMMISSION_REACTOR (400
-  Production, Nuclear Fission, repeatable, gated on the plant standing).
-  THE OFFSHORE WIND FARM SHIPS — "+2 Production", "Provides 2 Power per
-  turn", "Must be constructed on Coast and Lake", by Builders, the catalog's
-  one `waterOnly` row (`validImprovementsIn`'s water arm / `_imp_water`).
-  PREDICTIVE SYSTEMS joins the tree with it: Future era, 2200 Science, "+1
-  Production to Quarry, Oil Well, and Oil Rig" (the Oil Rig's share waits on
-  an improvement the catalog does not hold), under the Future block's
-  recorded convention — the game randomizes Future prerequisites per match,
-  so the deepest Information-era nodes stand in.
-  BAR: `tests/gpu/power_test.py`, `tests/cpu/city/power.test.ts`.
-  REACH: ZERO — no gate lane builds a plant, no scripted lane reaches an
-  Atomic-era plant, and the driver's job ladder never walks a Builder onto
-  water. Poke-proven throughout.
-  OPEN:
-  - **THE ACCIDENT ROLL — SOURCED 2026-09-07, buildable.**
-    `Expansion2_RandomEvents.xml` carries the three accidents as RandomEvents:
-    `RANDOM_EVENT_NUCLEAR_ACCIDENT_{MINOR,MAJOR,CATASTROPHIC}` (Severity
-    0/1/2, `MinTurnAtRisk` 10/20/30 — the reactor age each opens at),
-    `OccurrencesPerGame` 1 apiece at MODERATE (2/2 at MINIMAL for the first
-    two), and a `RandomEvent_Damages` table per severity: MINOR improvement
-    pillaged 10%, building pillaged 20%, radiation 100% for 2 turns; MAJOR
-    civilians killed 50%, improvement pillaged 40%, district pillaged 50%,
-    buildings pillaged 100%, radiation 100% for 10 turns, land/naval units
-    50% @ 20-50 HP, garrison 50% @ 20-50; CATASTROPHIC improvement pillaged
-    100%, buildings DESTROYED 100%, district pillaged 100%, population -80%,
-    radiation 100% for 20 turns, units 100% @ 20-50, garrison 100% @ 20-50,
-    civilians 100%. The pedia adds only "as it ages, the chances that a
-    Nuclear Accident will occur increase" — the AGE SCALING is DLL and the
-    base rate is the C-74 shape (1 per game per severity, / 500). Whether
-    that count is per GAME or per REACTOR is the ledger's per-object question
-    (with the volcanoes). The clock ships; the roll waits on that one ask.
-  - **THE DECOMMISSION PROJECTS — SOURCED 2026-09-07, buildable.** "Removes
-    the Nuclear Power Plant and all its effects from this city", offered while
-    a Climate Accords competition runs, and the Coal and Oil rows beside it.
-    `Expansion2_Emergencies.xml` `CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,
-    OIL,NUCLEAR}`: `ScoreAmount="100"` each, `FromProject` the decommission
-    row. B-22r's window still counts the emission gap alone until the three
-    projects and their score source ship.
-  - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
-    `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous BY THE
-    LADDER (2026-09-07): nothing a minor builds — the three walls, the six
-    tier-1 rows, the Stable — draws or supplies Power
-    (`tests/gpu/minor_yields_test.py::test_power_vacuous` pins all ten), so
-    a minor arm would compute zero on every turn. It is due the day C-38's
-    ladder reaches a building with a load; the exact question is C-38's —
-    what else a city-state builds.
+- **C-1. POWER.** Weight 2.
+  - THE ACCIDENT ROLL. SOURCED `Expansion2_RandomEvents.xml`:
+    `RANDOM_EVENT_NUCLEAR_ACCIDENT_{MINOR,MAJOR,CATASTROPHIC}`, Severity
+    0/1/2, `MinTurnAtRisk` 10/20/30 (the reactor age each opens at),
+    `OccurrencesPerGame` 1 apiece at MODERATE; `RandomEvent_Damages`: MINOR
+    improvement pillaged 10%, building pillaged 20%, radiation 100% for 2
+    turns; MAJOR civilians killed 50%, improvement pillaged 40%, district
+    pillaged 50%, buildings pillaged 100%, radiation 10 turns, land/naval
+    units 50% @ 20-50 HP, garrison 50% @ 20-50; CATASTROPHIC improvement
+    pillaged 100%, buildings DESTROYED 100%, district pillaged 100%,
+    population -80%, radiation 20 turns, units 100% @ 20-50, garrison 100%
+    @ 20-50, civilians 100%. The age SCALING is DLL. The clock ships
+    (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 7.
+  - THE DECOMMISSION PROJECTS. SOURCED `Expansion2_Emergencies.xml`
+    `CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}` ScoreAmount 100
+    each, `FromProject` the decommission row; "Removes the Nuclear Power
+    Plant and all its effects from this city", offered while a Climate
+    Accords competition runs. Buildable; B-22r's Accords count the gap
+    alone until then.
+  - A CITY-STATE'S CITIES ARE NEVER POWERED: `resolveSeatPower` /
+    `_resolve_seat_power` run for majors only. Vacuous today (nothing in
+    `minorLadder` draws or supplies Power, pinned by
+    `minor_yields_test::test_power_vacuous`); due when C-38's ladder
+    reaches a building with a load.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 2.
-  SHIPPED: the 30-turn agreement clock, friendship, the alliance with its
-  defensive pact, the denouncement, open and CLOSED borders, the Great Work
-  gift, the DELEGATION and Resident Embassy, and DIPLOMATIC VISIBILITY, all
-  on the wire; the opponent block renders visibility BOTH ways, because the
-  GAP is what the combat term reads. SOURCED: visibility is five levels —
-  "None, Limited, Open, Secret, and Top Secret" — one per source, DERIVED
-  rather than stored (`diploVisibility` / `_diplo_vis`) because every input
-  is state both engines already compare: a trade route to that civ, a
-  mission, the Printing tech's level with everyone, and the Listening Post or
-  the alliance, which "do not add separate Diplomatic Visibility levels".
-  What it buys is "Intel on enemy movements", +3 Combat Strength per level of
-  the gap to the side that is ahead (`visibilityCS` / `_vis_cs`), at every
-  site the barbarian pair-term rides plus theological combat.
-  THE NEGOTIATED DEAL: "an 'Accept Deal' button will appear, which will
-  confirm the trade that is on the table" — an `offer` parks two bundles and
-  the other seat's `accept` moves them both, whole or not at all, every item
-  re-validated at that moment (`acceptDeal` / `_accept_deal`). Eight item
-  kinds — gold as a lump or per turn, Diplomatic Favor, a lump of a
-  consumable resource, a Great Work, a city, a captured spy, Open Borders —
-  split as the page splits them: "Sums of Gold, Great Works, Relics,
-  Artifacts, and captured Spies are all permanent trades ... Resources and
-  gold per turn, however, are temporary, and once the deal has run its course
-  you will get them back", on the same 30 turns.
-  ALLIANCE TYPES AND LEVELS SHIP, off Expansion1_Alliances.xml's effect
-  table. Five types ride the wire (`allyType` beside `ally`), one alliance per
-  pair, its TYPE chosen at formation and cleared when the clock runs out.
-  POINTS accrue on the pair tick — 1 per turn, "+0.25 for sending at least
-  one Trade Route to the ally" and +0.25 for receiving one, QUARTER-points so
-  both engines bank integers — and LEVELS land at "80 to reach Level 2 and
-  160 more to reach Level 3" on Standard; each alliance pays Favor "per turn
-  per level". FOURTEEN of the fifteen effects ship with sourced text: the
-  four route halves (+2/+1 Science, Culture, Faith; +4/+2 Gold, sender and
-  receiver sides), Cultural 1/2/3, Research 2 ("Every 30 turns", a Eureka for
-  a tech the ally "has researched or boosted, but you have not" —
-  ALLIANCE_RESEARCH_AGREEMENT 30) and 3, Military 1 (+5 vs common enemies,
-  unit-vs-unit) / 2 (shared visibility, and "+15% Production toward military
-  units when you or your ally are at war",
-  ALLIANCE_INCREASE_PRODUCTION_WHEN_WAR 15) / 3 (a free promotion on trained
-  units), Religious 1/2, Economic 2/3.
-  THE MODEL'S OWN CHOICES, recorded: points are ONE per-pair pool that
-  persists when an alliance lapses; each side's Research 2 Eureka is the
-  FIRST qualifying tech in catalog order; the level-3 percentage terms read
-  the ally's most recently STORED per-turn output (`sciRate` / `culRate` /
-  `tourRate`, compared state) so the two reads never compound.
-  RELIGIOUS 3'S SECOND CLAUSE SHIPS (2026-09-06): ALLIANCE_RELIGIOUS_PRESSURE
-  -> EFFECT_ALLIANCE_PRESSURE_FROM_NO_ALLY_RELIGION, Amount 20, on
-  COLLECTION_OWNER — LOC_ALLIANCE_LV3_RELIGIOUS_EFFECT_2 "Bonus Religious
-  Pressure in cities with no followers of your ally's Religion". The holder's
-  religion presses `ALLIANCE_REL3_PRESSURE_PCT` harder into any city where the
-  ally's religion has NO accumulated pressure (`spreadReligiousPressure` /
-  `_spread_religious_pressure`: the turn's summed add for that religion is
-  scaled and floored once). READING: "no followers" is read as no pressure of
-  the ally's religion in that city — neither engine holds per-religion
-  follower counts, only the majority; an ally with no founded religion grants
-  nothing; two such allies stack their percents.
-  BAR: `alliance_levels_test.py`, the dividends block of `agreements.test.ts`,
-  `geopolitics_test.py` poke m (every deal item kind), the pressure clause in
-  `war-kinds.test.ts` / `war_kinds_test.py` poke d.
-  REACH, over the driven 12x250 probe: a mission in 12/12 seeds from t4, and
-  every visibility level entered — Limited 12/12 from t4, Open 12/12 from
-  t105, Secret 9/12 from t115, Top Secret 2/12 from t187. The deal
-  protocol's own reach is unmeasured; the round's smoke serve is what proves
-  the two engines walk it together.
-  OPEN:
-  - **ALLIANCE_POINTS_FOR_DEAL (2) — SOURCED 2026-09-07, buildable.** A
-    GlobalParameter (Expansion1 and Expansion2 both `Value="2"`); the pedia's
-    Alliances page: "You can increase the rate at which you gain Alliance
-    Points by trading with your Ally", and Cleopatra's text "Trading with
-    Allies earns twice as many bonus Alliance Points". READING: +2 points to
-    the pair when a deal between allies is accepted (Cleopatra doubles it).
-  - **THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM** is refused on both engines
-    (`goldPurchasableBuildings` holds the shared reading). SOURCED 2026-09-07
-    (one tested report, steamcommunity.com/app/289070/discussions/0/
-    1848072002747657088, 19 Mar 2019): the purchase is ALLOWED; a UNIT keeps
-    its progress ("you'll keep on working on the one you were building"), a
-    BUILDING's progress is "wasted". Secondary; buildable on that reading,
-    with the unit's kept progress moving to the next item of its kind.
-  - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP** — waits on C-76, the
-    opinion scale. The delegation ships —
-    "Delegations cost 10 Gold and Embassies cost 25 Gold, which is paid to
-    the other leader", one directed mission per pair, indefinite, the Embassy's
-    price once Diplomatic Service is in, war kicking both halves out — but the
-    page also gives it "a small positive bonus in your relationship with that
-    leader", and no source puts a number on it. Two clauses around it are the
-    model's own and say so in the code: the refusal reads "a rival worse than
-    Neutral will not accept" as the two states the engines can name (a war, or
-    a denouncement either way), because there is no opinion scale; and the
-    AI's own send is the driver's scan, not a published rule.
-  - **DEMAND AND DISCUSS ARE THE OTHER TWO BUTTONS** — both wait on C-76, and
-    so does the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row
-    `retribution`, RequiresBrokenPromise: "a player who has broken a promise
-    to you within the past 30 turns"), which ships in the table and reads a
-    promise nothing holds. A demand is the table
-    run one-way under hostility — "select items from their side of the table
-    to demand as tribute" — and Discuss asks a leader to "promise to stop
-    doing" something: settling nearby, spreading religion, spying, attacking
-    your allied city-states. Both run on the same 30 turns. Neither ships: a
-    demand needs the relationship scale above, and a promise needs a
-    per-subject breach test.
-  - **JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT and ASK-FOR-PROMISE** —
-    four agreements the deal protocol can carry, each still needing its own
-    effect: a war declared by two seats at once, a seat joining one already
-    running, the Research Agreement's unpublished science, and the promise
-    above.
-  - **A LUXURY HAS NO LUMP TO TRADE.** The screen lists "Strategic and Luxury
-    Resources"; C-5's stockpile gives a consumable a quantity, but a luxury
-    here is a pure boolean access gate with no amount to hand over. The
-    RESOURCE item therefore names a strategic only.
-  - THREE READINGS RECORDED, all agreeing by construction and none sourced:
-    whether the intel bonus applies to a CITY attack (both engines apply it
-    unit-against-unit only); what a table may HOLD (one running deal per
-    ORDERED pair, `DEAL_ITEMS` items a side, an offer standing for the turn it
-    was made and the one after — real Civ 6 bounds none of the three, and the
-    AI's VALUATION is unpublished so it lives in the driver where the engine
-    never reads it); and whether a WAR ends a standing deal (both engines let
-    a gold-per-turn or resource term run).
+  - ALLIANCE_POINTS_FOR_DEAL. SOURCED GlobalParameter `Value="2"` (Exp1 and
+    Exp2) and the Alliances page ("increase the rate ... by trading with
+    your Ally"; Cleopatra: "twice as many"). READING: +2 to the pair when a
+    deal between allies is accepted, Cleopatra x2. Buildable.
+  - THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM is refused on both engines
+    (`goldPurchasableBuildings`). SOURCED (one tested report,
+    steamcommunity.com/app/289070/discussions/0/1848072002747657088):
+    allowed; a UNIT keeps its progress, a BUILDING's is wasted. Buildable:
+    the unit's progress moves to the next item of its kind.
+  - JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT (unpublished science)
+    and ASK-FOR-PROMISE (C-76) — four agreements the table can carry and
+    nothing acts on.
+  - A LUXURY HAS NO LUMP TO TRADE: a luxury is a boolean access gate; the
+    RESOURCE item names a strategic only.
+  - A MISSION LEAVES NO MARK ("a small positive bonus in your
+    relationship"), DEMAND and DISCUSS (the four promises of
+    `Expansion2_DiplomaticActions.xml`, FavorCost 30, GrievancesForRefusal
+    25, GrievancesPerIncursion 25) and the WAR OF RETRIBUTION's
+    RequiresBrokenPromise all wait on C-76.
+  - Readings with no source, identical on both engines: the intel bonus is
+    unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS`
+    a side, an offer standing two turns; a war does not end a standing
+    deal.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES.** Weight 1.
-  SHIPPED: the bank, the ceiling, the charges, the plant fuel, the heal
-  denial and the shortage penalty. SOURCED: the penalty is the game's own
-  FLAT 20 — Expansion2_GlobalParameters
-  COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL, shown in the combat preview as
-  "-20 Insufficient <resource>" (the wiki's "proportional to the amount
-  you're short" was a paraphrase). The upkeep pass marks a slot SHORT when
-  the seat's whole bill exceeds the bank (`chargeUnitUpkeep` /
-  `_seat_charge_upkeep`), and every strength read of a unit drawing that slot
-  takes the 20 (`fuelShortCS` / `_fuel_short_cs`) until the next pass meets
-  the bill.
-  BAR: `fuel_short_test.py`, `strategic-resources.test.ts`.
-  REACH: the driven gate reaches Oil units only in the late hundreds of
-  turns — poke-proven, gate reach unmeasured.
-  OPEN: **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — blocked on B-21r.
+  - Zanzibar's two exists-nowhere-else luxuries — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 1.
-  SHIPPED: the Spy, its capacity, the jump, the twelve-mission catalog, the
-  counterspy post, the capture roll, the ESPIONAGE promotion class, the
-  Espionage Pact's two outcomes (B-22r) and the Listening Post's payload
-  (C-2's visibility). The chassis is a CIVILIAN — its own page types it
-  "Civilian/Espionage" — so `unitIsMilitary` / `_type_military` is what To
-  Arms! pays, and the Spy is outside it. The promotion class is a flat pool
-  of seventeen rows with no prerequisites, three drawn without replacement at
-  each level (`levelUpSpy` / `_level_up_spy` over the `promoOffer` channel the
-  Apostle already had). Nine are one shape — "<mission> as if 2 levels more
-  experienced", read by `promoValueFor` / `_spy_op_levels` off the mission's
-  own bit — and the other four live rows are Linguist's 25% clock cut,
-  Disguise's instant arrival, Quartermaster's +1 level to every own spy from
-  home and Polygraph's 1 level off every intruder. Bodyguard of Lies rides
-  Disguise's channel.
-  THE ESCAPE SEQUENCE SHIPS. SOURCED: a discovered spy "will need to escape
-  from the target city" — by Airplane (an Aerodrome, 1 turn home), Boat (a
-  Harbor, 2), Vehicle (a Commercial Hub, 3) or on Foot (always, 4), a
-  survivor reappearing in the CAPITAL on the existing travel machinery, a lost
-  escape splitting captured-vs-killed on the catch odds; ACE_DRIVER carries
-  its own sourced figure, "If caught on a mission, have a much higher chance
-  of escape (+4 levels)". MODEL VALUES under that sourced ordering: each
-  route's base rate (`SPY_ESCAPE_ROUTES`), and the ROUTE CHOICE — the real
-  game asks the player, this model takes the fastest route whose district
-  stands.
-  A RELEASED SPY IS THE SPY THAT WAS CAUGHT — STYLIZED, owner ruling
-  2026-09-04. SOURCED: a caught spy is "imprisoned, but not killed", held by
-  the seat whose city made the catch, still counted against its owner's
-  capacity ("if you've trained the maximum number of Spies possible, you
-  cannot train a new Spy to replace one that gets captured"), and traded back
-  through C-2's table to arrive "immediately returned to the original owner's
-  Capital". No source publishes the level it returns at, so the cell holds
-  LEVELS rather than a count (`spyHeld` per owner -> captor; `seat_spy_held
-  [B, pw, pw, level]`) and the released spy is spawned at the level it was
-  caught at; when one captor holds several the HIGHEST goes home first
-  (`releaseSpy` / `_spy_cell_release`). The promotions themselves are not
-  carried: a level-3 spy comes back level 3 with no picks made.
-  THE SAME-MISSION GATE SHIPS, sourced — "a single city may contain more than
-  one Spy, but no two Spies may perform the same Mission in the same city",
-  read per OWNER (the one scope a player's own mission list can see), a
-  recorded model choice.
-  FABRICATE SCANDAL SHIPS — mission thirteen, appended LAST (the mission head
-  is the wire and every later verb column derives its base from the list's
-  length on both engines): "16 (Standard Speed)" turns at 56% per the
-  chassis' own table, performed "in a City-State that you are not Suzerain
-  over". On success "all other players lose a number of Envoys determined by
-  the Spy's level" — the SHAPE is sourced, the map is not:
-  `SPY_SCANDAL_ENVOYS_BASE` + 1 per effective level are MODEL values. A minor
-  keeps no cell, so a spy whose escape fails there is killed, never
-  imprisoned — a recorded model choice.
-  THE SPY STANDS ON THE DISTRICT IT WORKS FROM (2026-09-07). SOURCED
-  (UnitOperations, Base + Expansion1 + Expansion2): each operation's
-  `TargetDistrict` — DISTRICT_CAMPUS Steal Tech Boost, DISTRICT_COMMERCIAL_HUB
-  Siphon Funds, DISTRICT_INDUSTRIAL_ZONE Sabotage Production, DISTRICT_THEATER
-  Great Work Heist, DISTRICT_NEIGHBORHOOD Recruit Partisans, DISTRICT_SPACEPORT
-  Disrupt Rocketry, DISTRICT_DAM Breach Dam; Gain Sources, Listening Post,
-  Counterspy, Foment Unrest, Neutralize Governor and Fabricate Scandal name
-  none, the City Center. The travel head (`spyDestinations` /
-  `_spy_destinations`) names the centre and district tiles of every revealed,
-  unallied major city plus a minor's centre, NEAREST first with ties to the
-  lowest tile index, `SPY_TRAVEL_COLS` 24 wide (a MODEL width — a city is
-  several tiles now); `spyCity` / `_spy_here` read the city off the tile's
-  registry; the mask offers a mission only where its district stands under
-  the spy (`missionOffered` / `_spy_mission_mask`), the counterspy post on
-  any district of an own city (`anyDistrict`). The post DEFENDS the district
-  it stands on (`counterspiesGuarding` / `_counterspies_guarding`), and
-  SURVEILLANCE is live — "When Counterspying all city districts are defended
-  (and +1 level at districts within 1 hex)": every district guarded, and
-  READING: the post operates a level higher against a spy working within
-  `SPY_SURVEILLANCE_REACH` 1 of it, taken as one level off the intruder
-  (`cityCounterLevels` / `_counter_levels`); Polygraph reads a post anywhere
-  in its city. SABOTAGE PRODUCTION PILLAGES THE BUILDINGS — SOURCED
-  (LOC_SPYMISSIONDETAILS): "Pillage all buildings in the industrial zone" —
-  through the PER-BUILDING PILLAGE FLAG, `City.pillagedBuildings` /
-  `city_bldg_pillaged`, ONE reader per engine (`buildingPillaged` under the
-  `darkBuildings` composer / `_bldg_dark`'s second argument), compared as
-  `buildingsPillaged` and `minorBuildingsPillaged`: a dark building pays no
-  yield, housing, amenity, power, loyalty, spy level, specialist slot or
-  training experience, and it carries on capture (READING: no source repairs
-  a building by conquest). THE REPAIR is the building's own queue column,
-  offered again while it stands pillaged, priced at
-  PILLAGE_BUILDING_REPAIR_PERCENT 25 (SOURCED, GlobalParameters), production
-  only (READING: the gold arm never sells a repair), clearing the flag on
-  completion. Disrupt Rocketry keeps pillaging the DISTRICT — its own text is
-  "Disable the Spaceport in the city" / "pillaging of the enemy Spaceport
-  district".
-  BAR: `spy_test.py`, `spy.test.ts`, `spy_release_level` (both engines, the
-  spies re-seated on the district tiles their missions name);
-  `tests/gpu/spy_district_test.py` (lane `spy_district`),
-  `tests/cpu/espionage/spy-district.test.ts`.
-  REACH: the gate REACHES the spy only through Catherine's free Spy at
-  Castles. MEASURED 2026-09-07 (`tools/gpu/reachability_probe.py`, all 24
-  fixtures driven 250 turns): `spy` 0/24 seeds, `spyDistrict` 0/24,
-  `spyMission` 0/24, `bldgPillaged` 0/24 — no fixture's drawn trio fields a
-  spy, so the district geometry, Surveillance, Sabotage's flag and the
-  repair are POKE-PROVEN by the two lanes above and nothing else.
-  OPEN:
-  - **A FREE CITY IS NOBODY'S TO SPY ON.** Both engines walk the MAJOR rows
-    for a spy's ground (`state.seats` / `n_majors`), so a Free City's
-    districts are neither a destination nor a mission's city. The exact
-    question: does the install let a spy operate in a Free City (C-60)?
-  - **WHAT A LEVEL IS WORTH IS THIS MODEL'S OWN.** The chassis' own mission
-    table publishes each operation's DURATION (8 turns, 16 for the Counterspy
-    post) and base success RATE (10% Recruit Partisans; 20% Great Work Heist,
-    Disrupt Rocketry, Breach Dam; 35% Sabotage Production, Steal Tech Boost,
-    Neutralize Governor; 56% Siphon Funds, Foment Unrest, Fabricate Scandal),
-    and both engines carry that table per mission. It does NOT publish how a
-    LEVEL moves that rate — only that it does, since nine promotions read "as
-    if 2 levels more experienced" — nor what a failure costs.
-    `SPY_SUCCESS_PER_LEVEL_PCT` and `SPY_CAPTURE_PCT` are those two, beside
-    the escape routes' base rates. The Intelligence Agency's success bonus has
-    no published figure either. FOUND 2026-09-07 for the sourcing pass: the
-    install's UnitOperations rows DO publish four columns per operation —
-    `BaseProbability` (13 Siphon Funds, Foment Unrest, Fabricate Scandal; 14
-    Sabotage Production, Steal Tech Boost, Neutralize Governor; 15 Great Work
-    Heist, Disrupt Rocketry, Breach Dam; 16 Recruit Partisans),
-    `LevelProbChange` 1, `EnemyProbChange` 3, `EnemyLevelProbChange` 1 — the
-    shape of the per-level term this model invents. The exact question: how
-    do those four compose into the success rate the chassis page prints
-    (56/35/20/10 are not the BaseProbability column), and which of them is
-    the counterspy's catch?
-- **C-20. THE MILITARY ENGINEER'S LAST VERBS.** Weight 1.
-  SHIPPED: the Fort, the Airstrip, both routes, the 20% charge, the MISSILE
-  SILO (Rocketry, flat land, no plunder) and **"Can clean Nuclear Fallout"**
-  (`CLEAN_FALLOUT` / `_rk_clean`, offered to any chassis holding a build
-  charge, because the charge is the whole gate the page states). What the
-  silo is FOR is C-31's.
-  THE MOUNTAIN TUNNEL SHIPS. SOURCED: `IMPROVEMENT_MOUNTAIN_TUNNEL`,
-  PrereqTech TECH_CHEMISTRY, built by UNIT_MILITARY_ENGINEER alone, on the
-  five mountain terrains, `CanBuildOutsideTerritory`, PlunderType
-  PLUNDER_NONE; the behaviour comes from the description — "Acts as a
-  movement portal on a mountain range, allowing units to move into it and
-  exit from another portal at the cost of 2 Movement. ... Can only be built on
-  an adjacent Mountain tile. Cannot be pillaged or removed." ENTERABLE, and
-  only that: it rides `gdrJump`'s two sites per engine (`tileFreeForUnit` +
-  the pathing arm on TS, the two `_jmp` terms on the GPU) rather than
-  `isImpassable`, because FOURTEEN exported flags derive from that predicate
-  and a tunnelled mountain must not become workable, campable or farmable.
-  THREE MODEL CHOICES, all forced by an action space carrying six DIRECTIONS
-  and no target (`EFFECT_MOUNTAIN_PORTAL` carries no ModifierArguments at
-  all, so the install settles none of them): the BUILD target is the
-  LOWEST-index bare adjacent mountain (`tunnelTarget` / its GPU block) — the
-  only improvement whose target is not the builder's own tile; the PORTAL
-  exit is the NEXT tunnel on the same range by ascending tile index, WRAPPING
-  (`portalExit` / `_portal_exit`), which reaches every portal under repeated
-  use where a fixed "lowest" would make one tunnel a hub; and a RANGE is a
-  connected component of MOUNTAIN tiles (`deriveMountainRanges`, the flood
-  fill `deriveContinents` already runs), baked at export because mountains
-  never move.
-  BAR: `mountain_tunnel` (7 lanes), `mountain-tunnel.test.ts` (8),
-  `engineer_test.py` (every other rule, including lane 9's engineer job mask).
-  REACH: ZERO — no seed trains the chassis.
-  OPEN: **THE TUNNEL'S TRADE-ROUTE GOLD MULTIPLIER.** "Trade Routes traveling
-  through it can multiply the Gold they get from districts at their
-  destination" has no published magnitude and is DLL-side.
-- **C-22. THE DISTRICT ROSTER.** Weight 1.
-  SHIPPED: all eighteen districts with catalog-column effects and sourced
-  placement clauses. The Government Plaza's five effect rows all ship, the
-  Royal Society's BOOST_PROJECT verb last (`projectBoostCity` /
-  `_project_boost_slot`). THE ANY-WORK POOL REACHES ARTIFACTS: artifact room
-  is a per-city capacity like the other four kinds (`artifactFree` /
-  `_artifact_free` — the museum's own slots plus what is left of the pool),
-  the Archaeologist's training gate and the excavation's landing city both
-  read it, and the pool's free count debits artifact overflow. The theming
-  rule stays the museum's own — it asks that the building STAND, and the
-  DOUBLE reaches only the three it holds (`_artifact_theming_counts`), never
-  a pool-standing find; the provenance arrays widened to every slot a find can
-  stand in (`ARTIFACT_PROV_W`) and statecompare compares the full width.
-  BAR: `tests/cpu/city/plaza-buildings.test.ts`, `tests/gpu/plaza_test.py`.
-  REACH: the Preserve and Government Plaza ride the gate on 12/12 seeds; the
-  CANAL on none (its placement and its naval passage, `canalPassage` /
-  `_canal_pass`, are poke-proven only); the Royal Society's building is built
-  by no seed of the twelve, so no Builder is ever offered the column.
-  OPEN: **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
-  `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published ceiling
-  at Breathtaking; no source can close the middle.
-- **C-26. CIVILIZATION UNIQUES.** Weight 8.
-  THE ROSTER IS THE INSTALL'S: 34 civilizations and 38 leaders
-  (`CIV_LEADERS`, one row per civilization-leader pair; `Seat.civ` indexes
-  the row), the seeder drawing each world's trio so a battery reaches the
-  whole list. A seat plays one of the roster's civilizations (`CIV_IDS`,
-  `row_civ`) and its leader (`CIV_LEADERS[].leader`, `leaderOf` /
-  `_row_leads`); its unique unit, unique infrastructure, civilization ability
-  and leader ability ship from the install's own XML (Units, Districts,
-  Buildings, Improvements, Traits and their Modifiers).
-  THE CENSUS IS docs/ROSTER.md — every trait's modifiers by effect type off
-  the XML, 149 effect types over 344 modifiers — and docs/roster_ledger.json
-  is the machine-checked ledger behind it, one row per modifier reading
-  `shipped` or `open: <blocker>`; `tests/cpu/data/ledger-audit.test.ts` holds
-  every open row to a live AUDIT item. 311 of the ledger's 343 modifiers
-  ship; the other 32 are each open against a named blocker and the triage is
-  complete, with no modifier left untriaged. THIS ENTRY DOES NOT RE-LIST WHAT
-  SHIPS — the ledger and ROSTER.md are the record, and a second hand-kept
-  copy here rots.
-  FOUR CIVILIZATIONS SHIP IN FULL (Rome, Egypt, Norway, Sumeria) with their
-  unique units (Legion, Maryannu Chariot Archer, Berserker, Longship,
-  War-Cart), unique infrastructure (the Bath, the Stave Church, the Sphinx,
-  the Ziggurat), civilization abilities (All Roads Lead to Rome, Iteru, the
-  Knarr, Epic Quest) and leader abilities (Trajan's Column, Mediterranean's
-  Bride, Thunderbolt of the North, Adventures of Enkidu). The other thirty
-  seat as plain civilizations until their batch lands, drawing on the
-  cross-roster machinery already built (continents, ban rows, formation
-  tiers, per-seat appeal, the Terrace Farm's adjacent-improvement channel,
-  `SEAT_BAN_ROWS`, `notFoundedSum` / `_not_founded_sum`, `_district_cap`,
-  `_faith_buyable_class`, `progressAhead`, `civ_gp_earned`).
-  BAR / REACH: the fixtures seat the drawn trio, so a civilization outside a
-  world's draw is unreached by construction; the site census in
-  `tests/cpu/seats/combat-rows.test.ts` and `tests/gpu/combat_rows_test.py`
-  allowlists the one known unpaid site (a CITY's own ranged strike composes
-  its defender without the roster's rows on both engines, in
-  `cityStrikeStrength`'s block in `seatPhase`) and fails on any other. The
-  driver never orders a Legion's Fort; the engine has no resource
-  VISIBILITY, so the Stave Church counts every coastal resource where the
-  install counts the visible ones.
-  OPEN, each against a named blocker:
-  - **THE AGENDAS** — DLL-scored, and neither engine holds an opinion scale.
-    (C-67 is the same shape for diplomatic preference weights.)
-  - Kristina's auto-theming, Nkisi's four SCULPTURE rows and its Palace
-    slots SHIPPED (C-59 / C-65 / C-71). Philip II's and Mvemba's
-    majority-religion clauses — C-64. The Janissary and the Saka Horse Archer — C-68. Mvemba's M'banza
-    Apostle arm, England's Royal Navy Dockyard, Georgia's Tsikhe, Spain's
-    Mission — C-69. The Cree Trader's tile claim — C-72. Divine Wind's
-    hurricanes and Mother Russia's blizzards SHIPPED (C-49). Chandragupta's and
-    Robert the Bruce's war-kind terms SHIPPED (C-62). Enkidu's allied-war
-    discount — B-63r. The Impi and Hypaspist stacks — B-54r. Zanzibar's luxuries and the
-    suzerain rows — B-21r. Poundmaker's shared visibility SHIPPED (C-70).
-  - **UNREAD DLL LOGIC, recorded rather than guessed:** whether Trajan's
-    grant also fires on a CONQUERED city (the modifier's collection is
-    PLAYER_CITIES; founding only ships); whether Iteru's flood AVOID also
-    skips the fertility half (the fertility ships); whether the Knarr's Ocean
-    clause reaches a TRADER's course (`tradeWaterLevel` stays
-    Cartography-gated); the Great Turkish Bombard's ranged strike on a city.
-  - **THE ROCK BAND's four unique-district venue clauses**
-    (Expansion2_UnitPromotions.xml: Arena Rock reads the Street Carnival,
-    Reggae Rock the Copacabana, Glam Rock the Acropolis, Surf Band the Royal
-    Navy Dockyard) — each a `BAND_VENUE_BIT` the district does not exist to
-    raise; the Dockyard half is C-69's, and a district's granted unit is NAMED
-    by its row on both engines where nothing picks the strongest naval unit of
-    a class the way `bestTrainableOfClass` picks a land one.
-  - **THE GAULS' OPPIDUM, Ambiorix's and Saladin's leader terms, the Nihang's
-    embarked CS, America's Film Studio** — rows whose civilization has not had
-    its batch.
+  - WHAT A LEVEL IS WORTH. The install's UnitOperations rows publish
+    `BaseProbability` (13 Siphon Funds, Foment Unrest, Fabricate Scandal;
+    14 Sabotage Production, Steal Tech Boost, Neutralize Governor; 15 Great
+    Work Heist, Disrupt Rocketry, Breach Dam; 16 Recruit Partisans),
+    `LevelProbChange` 1, `EnemyProbChange` 3, `EnemyLevelProbChange` 1.
+    The exact question: how do the four compose into the chassis page's
+    56/35/20/10, and which is the counterspy's catch?
+    `SPY_SUCCESS_PER_LEVEL_PCT`, `SPY_CAPTURE_PCT` and `SPY_ESCAPE_ROUTES`'
+    base rates are the model values a published composition replaces.
+  - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
+    a spy's ground. Does the install let a spy operate in a Free City
+    (C-60)?
+- **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1.
+  - "Trade Routes traveling through it can multiply the Gold they get from
+    districts at their destination" — no published magnitude, DLL-side.
+- **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.
+  - `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
+    ceiling at Breathtaking; the middle bands are this model's own.
+- **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
+  The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
+  `shipped` on 329 of 343 modifiers and `open: <item>` on 14, each under
+  C-61, C-64, C-67, C-68, C-69, C-72 or B-63r. Unique units are C-78,
+  unique infrastructure C-79 and C-69.
+  - THE AGENDAS — DLL-scored against an opinion scale neither engine has
+    (C-76).
+  - UNREAD DLL LOGIC, recorded: whether Trajan's grant fires on a CONQUERED
+    city (founding ships); whether Iteru's flood avoid also skips the
+    fertility half; whether the Knarr's Ocean clause reaches a Trader's
+    course (`tradeWaterLevel` stays Cartography-gated); the Great Turkish
+    Bombard's strike on a city.
+  - THE ROCK BAND's four venue clauses (`Expansion2_UnitPromotions.xml`:
+    Arena Rock / Street Carnival, Reggae Rock / Copacabana, Glam Rock /
+    Acropolis, Surf Band / Royal Navy Dockyard) — each a `BAND_VENUE_BIT`
+    whose district C-79 or C-69 does not yet hold.
+  - The engine has no resource VISIBILITY, so the Stave Church counts every
+    coastal resource where the install counts the visible ones.
+  - The site census (`tests/cpu/seats/combat-rows.test.ts`,
+    `tests/gpu/combat_rows_test.py`) allowlists one unpaid site: a CITY's
+    own ranged strike composes its defender without the roster's rows
+    (`cityStrikeStrength`'s block in `seatPhase`).
 - **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1.
-  SHIPPED: the strike itself, and C-20's MISSILE SILO under it.
-  OPEN, three cells, none closable from a reached source (ask):
-  - INTERCEPTION — SOURCED 2026-09-07 (community tests, not a roll): the
-    Gathering Storm interception tests (forums.civfanatics.com/threads/
-    civilization-6-gathering-storm-results-of-some-nuke-interception-tests-
-    for-multiplayer.665241, Dec 2020, and the linked test document) find NO
-    percent chance — an anti-air unit whose interception takes the delivering
-    bomber under 50% HP stops the drop and the device is lost from the
-    inventory; silo launches are stopped by Gun AA, Battleships and Mobile
-    SAM, submarine launches by Mobile SAM only; fighters presumed, untested.
-    Buildable as a deterministic threshold (shared with C-34's fighter side).
-  - THE CITIZENS A BLAST KILLS wait on a worked-tile selection neither engine
-    exposes — C-77.
-  - WHETHER A WONDER IN THE BLAST IS PILLAGED is unsourced.
-- **C-33. THE GIANT DEATH ROBOT'S REMAINING ABILITIES.** Weight 1.
-  SHIPPED: every published clause. STYLIZED (owner ruling 2026-09-04): the
-  Jump enters the mountain at the HEX'S OWN movement cost — the shipped
-  reading stands, and no source publishes the action's cost.
-  OPEN: the five-hex RANGE is a verb the action space lacks — the same shape
-  as C-20's tunnel target, but no direction encoding reaches five hexes.
+  - INTERCEPTION. SOURCED (community tests,
+    forums.civfanatics.com/threads/...665241, Dec 2020): no percent roll —
+    an anti-air unit whose interception takes the delivering bomber under
+    50% HP stops the drop and the device is lost; silo launches are stopped
+    by Gun AA, Battleships and Mobile SAM, submarine launches by Mobile SAM
+    only. Buildable as a threshold, shared with C-34's fighter side.
+  - THE CITIZENS A BLAST KILLS wait on C-77.
+  - A WONDER IN THE BLAST — ask 8.
+- **C-33. THE GIANT DEATH ROBOT'S RANGE.** Weight 1.
+  - The five-hex Range is a verb the action space lacks; no direction
+    encoding reaches five hexes.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
-  SHIPPED: the promotion term in the sortie and the parked weapon's cover.
-  BAR: `tests/gpu/air_promo_test.py` (the promotion rows).
-  OPEN:
-  - **INTERCEPTION BY A FIGHTER** has no published roll. The wiki says only
-    that "every Interception does damage to the unit being intercepted", that
-    a shot-down plane never lands its attack and a surviving one still does,
-    and that a fighter "takes damage for each attempt" — no strength, no
-    formula, no cap on attempts. Three invented numbers is what building it
-    would cost, so it waits on a source, not on a mechanic. C-31's nuclear
-    delivery has the same half.
-  - **PATROL** waits on interception in turn: a deployed fighter's whole point
-    is the interception it then makes. B-56r's GROUND_CREWS waits on the
-    PATROL state.
-  - **PRIORITY TARGET** — the Jet Bomber's reach past a stack's military
-    occupant to the SUPPORT unit under it. The Civilopedia's Jet Bomber page
-    does not carry the ability at all, and the flat "sustains 65 damage" is
-    wiki text no session could fetch to quote. Unsourced magnitude, unbuilt.
-  - **THE AERODROME'S SLOT COUNT — SOURCED 2026-09-07, and BOTH pages were
-    wrong.** `Districts.xml` DISTRICT_AERODROME `AirSlots="4"`; `Buildings.xml`
-    HANGAR_BONUS_AIR_SLOTS and AIRPORT_BONUS_AIR_SLOTS are
-    `MODIFIER_PLAYER_DISTRICT_GRANT_AIR_SLOTS` Amount 2 each; no expansion
-    overrides any of the three. So 4, 6, 8 — not the Air Combat page's
-    2-then-4 nor the +2-apiece-to-6. Beside them: CITY_CENTER 1, AIRSTRIP 3,
-    AIRCRAFT_CARRIER 2. Both engines carry the page's reading (`airSlots` 1
-    apiece, `_aerodrome_air_slots` + `_b_air_slots`) and must move to the
-    XML's — buildable, no longer an ask.
-  (Moved out of C-20, whose title never covered these; C-20 keeps the tunnel.)
-- **C-35. THE DROWNED GROUND KEEPS ITS RECORD.** Weight 1.
-  SHIPPED: sea-ness MOVES — `Tile.submerged` / `tile_submerged` turn a tile
-  to open water, and every GPU plane the exporter derives from `isWater` is
-  state (`_submerge`). What the sea takes with the ground is the improvement,
-  the district, the resource and the ground's own use; what it leaves is the
-  MAP's record — terrain, feature and river edges stay underneath. That
-  reading is what keeps both engines identical: every ring fact the exporter
-  derives reads TERRAIN (`isCoastalLand`, the Seaside Resort's coast, fresh
-  water, the Aqueduct's source, district adjacency's WOODS/RAINFOREST/REEF
-  sources), so a drowned Woods still lends its neighbours what it always did.
-  The ONE neighbour answer that asks `isLand` is `isCoastalWater`, and
-  `_submerge` moves it with the wonders that need it.
-  SOURCED 2026-09-07, the install's own pedia (Sea Level Rise): "1 meter
-  and 2 meter tiles will become submerged and become coastal water tiles.
-  This may result in the destruction of improvements and districts on
-  flooded tiles". A submerged tile IS coastal water for its neighbours: no
-  land feature survives to lend adjacency, and a coast tile lends what coast
-  lends.
-  OPEN: the reading above — terrain, feature and river edges kept underneath
-  — is the WRONG one by that text; the ring facts must read a drowned tile
-  as COAST on both engines. A build, no longer an ask.
-- **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1.
-  SHIPPED: the minor BUILDS (`minorPhase` / `_minor_build`) — a production
-  pot takes the city's own Production a turn and a fixed ladder spends it:
-  Ancient Walls, the district its type names, a Harbor when it sits on the
-  coast, then the higher walls. SOURCED: a city-state "will build a district
-  within their territory that corresponds to their type". Each item pays the
-  rules a major pays — the minor's OWN researched unlock, `canPlaceDistrictIn`
-  on its own ground (the lowest legal plot), the district price scaled by its
-  own research, and no higher wall over a damaged perimeter. The walls FIGHT:
-  both engines' city-state damage sites route through the shared
-  `cityDamageSplit`, the tier joins the defense strength, and the conquest
-  CARRIES buildings, registry and perimeter into the captured city. The minor
-  raises its type district's tier-1 building too, the rung after the district
-  in `minorLadder` / `_minor_build`, gated on the COMPLETE district and the
-  minor's own unlock. SOURCED (R&F) for the majors' envoy bonuses, which are
-  BUILDING-keyed (`cityStateEnvoyBonuses` / the `_citystate_t1idx` scatter):
-  the pair Barracks OR Stable at 3 envoys and the ARMORY at 6; cultural tier
-  2 is either museum (`CITY_STATE_TYPE_TIER1` / `CITY_STATE_TYPE_TIER2`).
-  MODEL CHOICES, recorded: the LADDER's order, the one-item-a-turn pace, and
-  the first pair member of a building pair.
-  THE MINOR'S CITY PAYS ITS YIELDS (2026-09-07). SOURCED: the install seats
-  a city-state as a civilization of `CIV_LEVEL_CITY_STATE` (Civilizations.xml)
-  and no row of Districts.xml or Buildings.xml keys a yield on the owner's
-  level — its city is an ordinary city, and "it will apparently research
-  certain techs" on what that city makes. The minor's row rides the SAME walk
-  a major's city rides — `computeCityStats` over `minorCity` (the CityState
-  as a City: id -1, the id its ground carries) / `_seat_city_walk` at row
-  `n_majors + s` — over the minor's OWN record: `_seat_civics` /
-  `_seat_techs` / `_seat_policies` answer for any city row (a minor adopts
-  the government its civics reach and slots no card — READING), ownership
-  goes by seat id (`_ROW_SEAT`), every civ-only channel (beliefs, ages,
-  Great People, suzerainties, routes, envoys, governors) answers nothing for
-  a minor row. Science fills the tech pot, Culture the civic pot, Production
-  the build pot (`minorPhase` / `_minor_accrue` → `_minor_research` →
-  `_minor_build`, one minor at a time because a district one lands may lend
-  the next one's adjacency), Gold and Faith BANK in `CityState.treasury` /
-  `.faith` (`citystate_treasury` / `citystate_faith`, compared as
-  `minorTreasury` / `minorFaith`; the three pots compare `milli` now). The
-  STYLIZED population clock (owner ruling 2026-09-04) is RETIRED — the
-  install's own mechanism replaced it. A unit LEVIED from a minor carries the
-  training experience of the minor's standing Barracks or Stable
-  (`trainXpPct` over `minorCity` / `_train_xp_pct` over the minor's row,
-  dark buildings excluded on both). KEPT: a minor builds no wonder, runs no
-  project, sends no route, founds no religion, appoints no governor
-  (`governorAt` refuses a city-state seat outright).
-  BAR: `tests/gpu/minor_builds_test.py`, `tests/gpu/minor_record_test.py`,
-  `tests/cpu/minors/minor-record.test.ts` (the pot pins re-keyed from
-  population to the walk); `tests/gpu/minor_yields_test.py` (lane
-  `minor_yields`), `tests/cpu/citystates/minor-yields.test.ts`.
-  REACH: GATE-REACHED every turn of every seed — every fixture seats three
-  minors, the walk runs for each at the city-state phase, and the compared
-  pots now carry its output on both engines (a serve red keys on
-  `techProgress` / `prodProgress` / `minorTreasury`).
-  OPEN:
-  - **FOOD.** The walk's Food is computed and not consumed: the population
-    keeps its 12-turn clock and the border never grows. The exact question
-    for the same replacement, one step on: does a city-state's city grow on
-    the food box and claim tiles on Culture exactly as a major's does (the
-    install has one city rule), and what does its citizen work when it does?
-  - **GOLD AND FAITH ARE BANKED, UNSPENT.** The exact question: what does
-    the install let a city-state spend Gold on (unit purchase? its
-    maintenance is already net of the walk) and Faith on (a city-state founds
-    no pantheon)?
-  - **POWER** — vacuous by the ladder: nothing a minor builds draws or
-    supplies Power (`minor_yields_test::test_power_vacuous` pins the ten
-    rows), so the grid has no minor arm (C-1).
-  - Foreign Investor's accumulating minor (B-24r) and Affluence's improved
-    tile (B-24r): the minor now banks Gold and works tiles; the improved tile
-    still waits on a minor that improves anything.
-- **C-41. NOTHING PLACES VOLCANIC SOIL.** Weight 1.
-  SHIPPED: the row with the name its page gives ("This land adjacent to a
-  volcano has suffered from a previous eruption ... Can receive additional
-  yields from environmental effects" — the `fertility` channel the eruption
-  already lays down) and no yields of its own. THE CARRIER SHIPS: `addFeature`
-  / `_add_feature` plant a feature after t0 on both engines (`feat_id` live
-  beside a static `feat_id0`, the yield walk pricing the arrival from
-  `featCatalogY`, `statecompare` comparing feature IDENTITY), and
-  FIRE_GODDESS's "+2 Faith from ... Volcanic Soil" half pays the turn the soil
-  exists.
-  BAR: `feature_add_test` / `feature-add.test.ts` — the carrier's whole
-  reach, since no rollout path calls it.
-  OPEN — **WHERE THE SOIL LANDS.** The eruption laying it on volcano-adjacent
-  land is the obvious runtime writer, but every improvement clause in this
-  engine reads a featured tile as occupied — a Farm, a Mine and a Seaside
-  Resort each ask for `tile.feature === null`. SOURCED 2026-09-07: the
-  install says the soil refuses none of them — `Improvement_ValidFeatures`
-  lists FEATURE_VOLCANIC_SOIL for FARM, MINE, FORT, AIRSTRIP, BEACH_RESORT,
-  MISSILE_SILO, the Roman Fort, the Great Wall, the Moai, the Colossal Head
-  and the barbarian camp; `Feature_ValidTerrains` puts it on grass, plains,
-  desert, tundra and snow, flat or hills; and the feature row is
-  `ValidDistrictPlacement`, `ValidWonderPlacement` and `ValidForReplacement`
-  all true. So the three improvement clauses must ACCEPT the soil (a build).
-  Still unsourced: WHICH tiles an eruption paints and whether an
-  already-improved tile takes it (the carrier's envelope refuses one). ASK.
-- **C-45. THE QUEUE'S DEPTH IS A FIXED FIVE.** Weight 1.
-  SHIPPED: a city holds `PRODUCTION_QUEUE_MAX` items and refuses the sixth.
-  The per-item hammer ledger a CANCELLED entry banks into (`city_item_bank`,
-  eight columns per city) is the same class of capacity choice.
-  REACH: the driven gate fills queues to the cap by the early hundreds of
-  turns, so the refusal itself is exercised.
-  OPEN: real Civ 6 publishes no ceiling on its queue, and the number here is
-  a CAPACITY choice — the GPU's queue is a tensor dimension (`sim.QD`, the
-  last axis of `city_current` / `city_progress` / `city_cost` / `city_qtile`)
-  and must be finite, so TS carries the same cap to keep the two engines
-  answering alike. Raising it costs one constant and one re-export; removing
-  the ceiling would cost the GPU its dense storage. Ask.
-- **C-49. NAMED RANDOM EVENTS.** Weight 1.
-  SHIPPED 2026-09-06, both engines (`STORM_EVENTS` / `_st_*`, `stormTile` /
-  `_storm_tile`, `Tile.stormEvent`+`stormTurns` / `storm_event`+`storm_left`
-  in `_MUTABLE` and the manifest): the one land-only storm is replaced by the
-  install's EIGHT, one row each from `RandomEvents`, `RandomEvent_Terrains`,
-  `RandomEvent_Frequencies` (MODERATE, per the C-74 ruling: OccurrencesPerGame
-  / 500 — 8, 2, 8, 2, 15, 3, 15, 3 per game), `RandomEvent_Damages` and
-  `RandomEvent_Yields`. One draw per event per turn in table order; the start
-  tile is uniform over the family's terrains (blizzard: snow/tundra, dust
-  storm: desert, tornado: grassland/plains, flat and hills each, no mountain;
-  hurricane: the OCEAN terrain alone — this engine's LAKE is the install's
-  COAST); the footprint is `Hexes` (1/3/7/19) slots of the canonical
-  radius-2 disc; the storm PERSISTS `Duration` 3 turns, applying its effects
-  on its spawn turn and each turn after. Per footprint tile per turn, TEN
-  draws always: IMPROVEMENT_PILLAGED (`CoastalLowlandPercentage` on a
-  `Tile.lowland` tile for the hurricane rows), IMPROVEMENT_DESTROYED,
-  DISTRICT_PILLAGED, POPULATION_LOSS (-1 in the owning city), UNIT_KILLED_
-  CIVILIAN, the land and naval shares, one HP band roll, food and production
-  fertility. The eight roster rows ship: NO_UNIT_DAMAGE (COLLECTION_OWNER,
-  `RandomEventType` + `NoDamage`) — the owner's units take no UNIT_* column
-  of that event; MODIFIED_DAMAGE_OPPOSING_PLAYER (`Amount 100`) — a unit AT
-  WAR with the carrier, on a tile the carrier OWNS, takes +100% HP damage.
-  Divine Wind is Hojo's LEADER trait (Expansion2_Leaders.xml) over the two
-  hurricane rows, Mother Russia the CIVILIZATION's over the two blizzards; no
-  requirement set on either — the "in X's territory" clause is the trait
-  text's, read as tile ownership. The old "desert deposits silt / strips past
-  Phase IV" arm: the desert-only fertility is DELETED (the yields table keys
-  no terrain); the past-Phase-IV strip is KEPT for every family (the climate
-  page's "all Storms"). Egypt's Iteru stays flood-only. As a drive-by the GPU
-  flood's IMPROVEMENT_DESTROYED arm now honours Reinforced Materials'
-  `envDamageImmune` the way TS always did.
-  READINGS (identical on both engines):
-  - CLIMATE: each family's two rows share the flood's ramp — `severitySplit`
-    moves the phase's melt fraction from the severity-1 row onto the
-    severity-2 row, then `disasterRateMult` scales every draw
-    (`stormChances`). `ChanceIncreasePerDegree` 0/50 is not read as a number;
-    the engine has one climate ramp and this is it.
-  - FOOTPRINT ORDER: centre, ring 1, ring 2, each ring in ascending tile
-    index (`STORM_DISC` / `_storm_offs`); the 3-hex shape is the first three
-    slots; an off-map slot is absent, not re-drawn.
-  - ONE STORM PER CENTRE: a roll that picks a centre already under a storm is
-    dropped (no second draw). No cap on live storms otherwise.
-  - UNIT SHARE: a domain's `Percentage` is ONE roll per tile — all of that
-    domain's units on the tile are hit or none; one HP roll per tile feeds
-    both domains' bands. An embarked land unit is its chassis' domain; an
-    air unit or a spy holds no tile and is neither. A city centre on the
-    footprint takes nothing (no storm row names CITY_GARRISON/CITY_WALLS).
-  - PREVENTION covers every UNIT_* DamageType of the event, the civilian
-    kill included (it is a row of the same `RandomEvent_Damages` table); the
-    DOUBLE multiplies HP amounts only — a kill chance has no amount.
-  - FERTILITY: the storm rows' FeatureType FEATURE_ICE is, per the file's own
-    comment, "the equivalent of no feature" — the rows are not feature-keyed,
-    so each is the flood's reading: the chance of +1 of its yield on every
-    land tile of the footprint; `ReplaceFeature` places nothing. The BLIZZARD
-    rows ship as the table has them (food 10/20%) although the row's
-    EffectString reads NO_FERTILITY — OWNER RULING 2026-09-06: "blizzards do
-    give boost to fertility", the table stands over the label; tornadoes have
-    no row and fertilize nothing.
-  - BUILDING_PILLAGED rides the district's darkness, as the flood does.
-  BAR 2026-09-06: tsc, pyright, ruff, oxlint, seat_symmetry, statecompare
-  census, inplace discipline, `tests/cpu/map/storms.test.ts`,
-  `tests/gpu/storms_test.py` (lane `storms`), full vitest, serve 9209 x 250
-  green. REACH (seed 9209 driven 250 turns through the ladder): 38 storms
-  formed — TORNADO_FAMILY 12, HURRICANE_CAT_4 14, DUST_STORM_GRADIENT 5,
-  BLIZZARD_SIGNIFICANT 4, HURRICANE_CAT_5 2, BLIZZARD_CRIPPLING 1 — and 9
-  storm-turns had a unit inside the footprint, so the unit columns and the
-  severity-2 rows are gate-reached; the roster rows fire only when a fixture
-  seats Japan or Russia, which the two test lanes pin.
-  OPEN:
-  - **THE WALK.** `Movement 8` on every storm row is the storm's movement
-    across the map while it lasts, and the rule joining that number to a
-    path is DLL logic nobody can read. A storm stays on its centre for its
-    three turns. The exact question: how does a storm choose its heading
-    and how many tiles does it move per turn?
-  - **PER-BUILDING PILLAGE.** BUILDING_PILLAGED (40/60/100%) — the flag it
-    waited on exists now (`buildingPillaged` / `_bldg_dark`, C-16); what
-    stays open is the column's READING: one roll per tile pillaging every
-    building of the district there, or one per building? The storm rides the
-    district's darkness until that is read.
-- **C-60. THE FREE CITY'S OWN DEFENCE, ITS AMENITIES AND ITS RELIGION.**
-  Weight 1.
-  SHIPPED (2026-09-06): CIV6's Free Cities player as one seat on both engines
-  — `FREE_SEAT` 300 (`state.freeSeat`, `freeSeatOf`, `cityHolders`) and the
-  `FREE_ROW` of every city plane (`CITY_ROWS`, the barbarian row after it;
-  `_seat_row`/`_ROW_SEAT` carry it; `city_slot_at`, `_city_col_at`,
-  `_owner_city_col`, `_reclaim_cities` and the registry invariant match a
-  row's tiles by SEAT id). A city at 0 loyalty REVOLTS into it (`flipCity` /
-  `_seat_loyalty_flips` -> `transferCity(..., 'revolted')` /
-  `_transfer_city(b, row, j, FREE_ROW)`) unless the seat pressing hardest on
-  it plays Eleanor (`SKIP_FREE_CITY_ROWS` on the wire as `skipFreeCity`,
-  `skipsFreeCityStep` / `_skips_free_city` — the RECEIVER's row). The Free
-  Cities player takes its turn after every major's (`freeCitiesPhase` /
-  `_free_cities_phase`, `_city_heal` shared with the majors' walk): each
-  Free City heals, runs `freeCityLoyaltyDelta` and accrues the RACE
-  (`City.freePressure` / `city_free_press`, compared as `freePressure`); at
-  0 it joins the race's leader (`joinFromFreeCity`, ties to the lowest seat
-  id; a seat that pulled nothing or holds no city takes nothing). A Free
-  City's citizens press on every major's loyalty walk as a foreign term at
-  factor 1, and count as "another holder" for the loyalty gate. Hostility is
-  `SEAT_CAPS.free.alwaysHostile` / the `_seats_hostile` free clause — anyone
-  may attack it with no declaration and no war opens; `warKindAllowed` /
-  `_war_kinds_allowed` refuse it as a target by construction (`isCiv` both
-  sides). Every city-target gate routes through one predicate per side
-  (`unitsHostile(state, attacker, { seat: holder })`; `_centre_target_seat`
-  + `_holder_row` + `_city_defense_cs`), and the founding spacing counts a
-  Free City's centre on both engines.
-  SOURCED: LOYALTY page — "When Loyalty reaches 0, the city revolts against
-  its owner and becomes a Free City ... If a Free City's Loyalty drops to 0
-  ... it will join the Civilization that has exerted the most Loyalty
-  pressure on it since the Free City became independent";
-  IDENTITY_PER_TURN_FROM_FREE_CITIES 10; LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY
-  100; IDENTITY_PER_TURN_FROM_ORIGINAL_OWNER_ON_FREE_CITY 0 and
-  ..._OWNER_BEFORE_OCCUPATION_ON_FREE_CITY 0 (no extra owner term);
-  CIVILIZATION_LEVEL_FREE_CITIES (founds nothing, annexes nothing, earns no
-  Great People, builds no wonders); DIPLO_STATE_FREE_CITIES_NEUTRAL with
-  every level; TRAIT_LEADER_ELEANOR_LOYALTY -> SKIP_FREE_CITY
-  (MODIFIER_PLAYER_ADJUST_SKIP_FREE_CITY_STEP, Skip true, both leaders);
-  the pedia's "belong to no civilization and will seek to defend themselves
-  from military intrusion".
-  READING (identical on both engines): (1) a transfer by loyalty — the
-  revolt and the joining — is not a conquest: the city keeps its population,
-  its HP and its walls' pool, and starts at loyalty 100 (the install prices
-  population after a CONQUEST only, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST;
-  before this round both engines took the conquest's quarter and half HP on
-  a loyalty flip too). (2) A Free City's loyalty per turn = 10 + the
-  citizen-pressure term (its own side every Free City's citizens at factor
-  1, the Free Cities player having no age; the foreign side every major's at
-  that major's age factor) + the flat loyalty of what STANDS in it
-  (`builtLoyalty` / `_built_loyalty`: Monument, Government Plaza) — no
-  amenity, governor, policy, emergency or roster term, which are an OWNER's.
-  (3) The race is the sum of each major's age-factored citizen pressure
-  since the revolt, from zero; OWNER_IDENTITY_PERCENT_LOST_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY
-  50 acts on an identity stock this engine does not hold, so it moves
-  nothing here. (4) The pull that decides Eleanor's skip is the RAW citizen
-  pressure at the revolt (the same scan the old flip used); with no puller
-  at all the city still becomes Free. (5) A Free City fields no unit and
-  fires no strike of its own; taking one aggrieves nobody, opens no
-  emergency and scores no era.
-  BAR: tests/cpu/city/free-city.test.ts (7), tests/gpu/free_city_test.py
-  (6 scenes, `free_city` lane); the merged war-kind gate and the casus belli
-  conditions read only majors' cities and founders, so the sentinel never
-  reaches them.
-  REACH, measured 2026-09-07 over 24 seeds x 250 driven turns: ONE city
-  revolts into the Free class (`freeCity` 1/24, first at t202) and none
-  leaves it again inside the horizon (`freeLeft` 0/24) — the join race is
-  held by `free_city_test` / `free-city.test.ts` alone. The moving capital
-  has no reach at all until C-69's Cothon lands the project row.
-  OPEN — each an exact question, none a magnitude this round may invent:
-  - the Free City's OWN DEFENCE: the pedia says it "will repair pillaged
-    improvements and spawn units to defend itself, and may build walls", and
-    "if attacked by a civilization, the Free City will try to retaliate".
-    No XML row names the unit, the cadence or the walls; its centre's
-    ranged strike would need a target rule (whom does a Free City shoot —
-    every foreign military unit in range, or its attackers?). Until sourced
-    a Free City stands at the floor-15 defence plus the walls it revolted
-    with and heals 20 a turn.
-  - a Free City's AMENITIES: real Civ 6 gives it an amenity tier that feeds
-    its loyalty; this model's tier is computed per OWNER (`computeCityStats`
-    with the seat's luxuries and policies) and the Free Cities player has
-    none, so the term is left out — what does the install give a Free City
-    for amenities (its own luxuries only, no policies)?
-  - the RELIGION walks skip a Free City on both engines (`allCities` and the
-    GPU's `[:, :n_majors]` pressure rows): a Free City neither receives nor
-    exerts religious pressure while Free, and a Missionary cannot spread
-    into it. Widening those walks to the free row is the same class of edit
-    as this round's loyalty walk and belongs to the religion items.
-  (EMERGENCY_PREVENT_FREE_CITY_BUFF — EFFECT_ADJUST_CITY_IDENTITY_PER_TURN 20
-  on the emergency's target city — was already in: `emergencyLoyalty` /
-  `_emergency_loyalty` pay `EMERGENCY_TARGET_LOYALTY` 20 while the emergency
-  runs, and a city held at loyalty never reaches the revolt.)
-- **C-61. THE COTHON'S PROJECT HAS NO COTHON TO STAND IN.** Weight 1.
-  SHIPPED (2026-09-06): a civilization-UNIQUE project is a data-model fact on
-  both engines — `ProjectDef.civ` / `.leader` (the `rowIsFor` reading every
-  roster row takes), `projectSeatOk` in `availableProjects` and
-  `_proj_seat_ok` in the GPU's production mask AND its applier (the wire's
-  `cv` / `ld` columns); and the capital MOVES through one composer per side,
-  `moveCapital` / `_move_capital` (`ProjectDef.movesCapital`, the wire's
-  `mc`, fired at `completeProject` and the GPU completion): `isCapital` and
-  the PALACE leave every other city of the seat, `capitalTile` /
-  `civ_cap_tile` move (the domination anchor and the home continent), and
-  the ORIGINAL-capital mark (`origCapitalSeat` / `city_orig_cap`) clears in
-  the city that carried it — wherever it stands now — and lands in the new
-  one, which is what `occupiedCapitals` and the grievance decay read.
-  SOURCED: Expansion2_Projects.xml PROJECT_COTHON_CAPITAL_MOVE — Cost 100,
-  COST_PROGRESSION_GAME_PROGRESS 1500, PrereqDistrict DISTRICT_COTHON,
-  MaxSimultaneousInstances 1; Expansion2_Leaders_Major.xml
-  TRAIT_LEADER_FOUNDER_CARTHAGE -> DISTRICT_COMPLETE_MOVE_CAPITAL
-  (MODIFIER_PLAYER_ADJUST_CAPITAL / EFFECT_ADJUST_PLAYER_CAPITAL, ProjectType
-  PROJECT_COTHON_CAPITAL_MOVE); the trait text "Can move their original
-  Capital to any city with a Cothon they founded by completing a unique
-  project in that city"; the project text "available to any city with a
-  Cothon. When complete, the Phoenician Capital moves to this city".
-  READING: the moved capital IS the original capital for every reader — the
-  old one is no longer anyone's first city (its mark clears rather than
-  standing beside the new one); the home continent follows `capitalTile`
-  as it always did (`homeContinent`), so Mediterranean Colonies re-reads it.
-  BAR: tests/cpu/city/move-capital.test.ts (3), tests/gpu/move_capital_test.py
-  (4 scenes, `move_capital` lane) — the gate and the composer, driven
-  directly; no shipped row is gated yet, and the tests pin that.
-  REACH: nothing reaches it — the row is not in the catalog (below).
-  OPEN: the project row itself. Its PrereqDistrict is the COTHON, Phoenicia's
-  unique Harbor, which neither engine's district catalog holds (C-69's
-  list, now with the Cothon in it); a `ProjectDef` names a `DistrictId`, so
-  the row cannot be added ahead of the district. When C-69 lands the Cothon
-  the row is `{ id: 'COTHON_CAPITAL_MOVE', district: 'COTHON', civ:
-  'PHOENICIA', movesCapital: true, cost: 100 }` plus the game-progress
-  price curve (COST_PROGRESSION_GAME_PROGRESS 1500 — the one number here no
-  existing project takes; source its formula against the other progression
-  rows before shipping). "They founded" is a second gate the clause names:
-  the Cothon must stand in a city Phoenicia FOUNDED (`founderSeat` /
-  `city_founder`), not one it took.
-- **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 1.
-  ENGINES: a major's stance toward another is the sum of the STATES both
-  engines carry — a war and its kind, a denouncement, a friendship, an
-  alliance and its type, the grievance balance, the treaty clock — and
-  nothing in between: no number that says how a leader FEELS about another,
-  so no clause that reads "a small positive bonus in your relationship", "a
-  rival worse than Neutral", or an agenda's like or dislike has anything to
-  read. The install's DiplomaticStates table (Allied 100 ... Denounced 16,
-  War 0, `RelationshipLevel`) names the scale; what MOVES it is DLL-side.
-  OPEN — what waits on the scale, each in its own entry:
-  - the Delegation's and Embassy's "small positive bonus in your relationship"
-    (C-2), the acceptance rule the engines read as "at war or denounced";
-  - DEMAND (tribute under hostility) and DISCUSS, whose four promises
-    (PROMISE_DONT_SPY_ON_ME, ..._DONT_CONVERT_MY_CITIES,
-    ..._DONT_DIG_UP_MY_ARTIFACTS, ..._DONT_SETTLE_NEAR_ME —
-    Expansion2_DiplomaticActions.xml, FavorCost 30, GrievancesForRefusal 25,
-    GrievancesPerIncursion 25) need a per-subject breach test and an opinion
-    to bend (C-2);
-  - the WAR OF RETRIBUTION's casus belli (`WAR_KINDS` row `retribution`,
-    RequiresBrokenPromise), which ships in the table and can never be met
-    until a promise can be broken (C-2's Discuss half);
-  - the AI's AGENDAS (C-26) and the diplomatic-action preference weights
-    (C-67), both DLL-scored against the scale.
-  The carrier is a per-directed-pair opinion on both engines, compared,
-  with the install's `RelationshipLevel` anchors; what feeds it is an ASK —
-  no source publishes the per-event deltas. Searched 2026-09-07: the install
-  names every modifier (`LOC_DIPLO_MODIFIER_*` in the Expansion text files)
-  and carries no amount for any; the CivFanatics "opinion mechanics" threads
-  hold Civ V's Vox Populi numbers or none; the guide-site figures (delegation
-  +3, a refused promise -6 decaying, a caught spy -5) cite nothing.
-- **C-77. THE WORKED-TILE ASSIGNMENT LIVES ONLY INSIDE THE YIELD WALK.** Weight 1.
-  ENGINES: `assignWorkedTiles` and the GPU walk's `topk` derive which plot each
-  citizen works every time a city's yields are computed; nothing stores it,
-  nothing compares it, and no rule outside the walk can ask it. The seed 9014
-  hunts of 2026-09-06 (A-12r, A-13r) both surfaced as a yield split because the
-  pick itself is invisible to the gate.
-  OPEN: CIV6 (Nuclear weapons): "Citizens 'working' the affected tiles are
-  eliminated" — C-20's nuke bullet waits here. The carrier is ONE exposed
-  reader per engine (the walk's own pick, returned rather than consumed) and a
-  compared per-city worked-tile list, which would also have caught both A-12r
-  and A-13r a turn earlier and at the tile.
-
+  - THE AERODROME'S SLOTS. SOURCED `Districts.xml` DISTRICT_AERODROME
+    `AirSlots="4"`; `Buildings.xml` HANGAR_BONUS_AIR_SLOTS and
+    AIRPORT_BONUS_AIR_SLOTS `MODIFIER_PLAYER_DISTRICT_GRANT_AIR_SLOTS`
+    Amount 2 each; CITY_CENTER 1, AIRSTRIP 3, AIRCRAFT_CARRIER 2. Both
+    engines carry 1 apiece (`airSlots`, `_aerodrome_air_slots` +
+    `_b_air_slots`) and must move to 4/6/8. Buildable.
+  - INTERCEPTION BY A FIGHTER has no published strength, formula or cap on
+    attempts; PATROL waits on it; C-31's delivery shares the half.
+  - PRIORITY TARGET (the Jet Bomber's reach to the support unit under a
+    stack) — unsourced magnitude.
+- **C-35. THE DROWNED GROUND IS COAST.** Weight 2.
+  - SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
+    coastal water tiles". Both engines keep terrain, feature and river edges
+    underneath (`Tile.submerged` / `_submerge`) so a drowned Woods still
+    lends adjacency. Every ring fact the exporter derives (`isCoastalLand`,
+    the Seaside Resort's coast, fresh water, the Aqueduct's source, district
+    adjacency's WOODS/RAINFOREST/REEF sources) must read a submerged tile
+    as coast on both engines.
+- **C-38. A CITY-STATE'S CITY.** Weight 2.
+  Its yields ride the shared walk; Production, Science and Culture are
+  spent, Food, Gold and Faith are not.
+  - FOOD: the population keeps its 12-turn clock and the border never grows.
+    Does a city-state's city grow on the food box and claim tiles on
+    Culture as a major's does (the install has one city rule), and what
+    does its citizen work?
+  - GOLD AND FAITH bank in `CityState.treasury` / `.faith`. What does the
+    install let a city-state spend them on?
+  - POWER: C-1's minor arm, due when the ladder reaches a load.
+  - Foreign Investor and Affluence (B-24r) wait on a minor that improves
+    and accumulates.
+- **C-41. VOLCANIC SOIL.** Weight 1.
+  - SOURCED `Improvement_ValidFeatures`: FEATURE_VOLCANIC_SOIL is valid
+    under FARM, MINE, FORT, AIRSTRIP, BEACH_RESORT, MISSILE_SILO, the Roman
+    Fort, the Great Wall, the Moai, the Colossal Head and the barbarian
+    camp; `Feature_ValidTerrains` grass, plains, desert, tundra, snow, flat
+    or hills; ValidDistrictPlacement, ValidWonderPlacement and
+    ValidForReplacement all true. The three improvement clauses that read
+    `tile.feature === null` must ACCEPT the soil. Buildable.
+  - WHERE an eruption lays it — ask 2. The carrier (`addFeature` /
+    `_add_feature`) is in.
+- **C-45. THE QUEUE'S DEPTH.** Weight 1.
+  - `PRODUCTION_QUEUE_MAX` 5 is `sim.QD`, a tensor dimension — ask 3.
+- **C-49. NAMED STORMS.** Weight 1.
+  - THE WALK: `Movement 8` on every storm row is DLL logic; a storm stays on
+    its centre for its three turns. How does it choose a heading and how far
+    does it move per turn?
+  - BUILDING_PILLAGED (40/60/100%) rides the district's darkness; the
+    per-building flag exists now (`buildingPillaged` / `_bldg_dark`). One
+    roll per tile pillaging every building, or one per building?
+- **C-60. THE FREE CITY'S OWN PLAY.** Weight 2.
+  The seat is in on both engines (revolt, race, join, Eleanor's skip, open
+  to attack). Each bullet is an exact question, no magnitude to invent:
+  - ITS DEFENCE: the pedia says it "will repair pillaged improvements and
+    spawn units to defend itself, and may build walls" and "will try to
+    retaliate". No XML row names the unit, the cadence or the walls; its
+    strike needs a target rule. Today: floor-15 defence plus the walls it
+    revolted with, healing 20 a turn.
+  - ITS AMENITIES: the tier is computed per OWNER (`computeCityStats` with
+    the seat's luxuries and policies) and the Free Cities player has none.
+    What does the install give a Free City?
+  - THE RELIGION WALKS skip the free row (`allCities`, the GPU's
+    `[:, :n_majors]` pressure rows): no pressure in or out, no Missionary
+    spread. The same class of widening as the loyalty walk took.
+- **C-61. THE COTHON'S PROJECT.** Weight 1.
+  - The gate and `moveCapital` / `_move_capital` are in. When C-79 lands the
+    Cothon the row is `{ id: 'COTHON_CAPITAL_MOVE', district: 'COTHON', civ:
+    'PHOENICIA', movesCapital: true, cost: 100 }` plus
+    COST_PROGRESSION_GAME_PROGRESS 1500 (no existing project takes that
+    curve — source its formula first) and the "they founded" gate
+    (`founderSeat` / `city_founder`).
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
-  ENGINES: both hold religious PRESSURE per city and a followed religion per
-  city, and neither ever asks which religion a SEAT is majority-held by.
-  OPEN: three roster rows wait on that one fact and are marked open against
-  this item — `TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
-  `TRAIT_COMBAT_BONUS_OTHER_RELIGION` and
-  `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`. The carrier is a per-seat
-  majority read over its own cities' followed religions, on both engines; the
-  TIE RULE is the thing to source before it ships, since a seat can hold two
-  religions in equal numbers of cities. Searched again 2026-09-07 (the
-  install's text, CivFanatics, Steam): nothing names the winner. Ask.
+  - Three ledger rows wait (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
+    `TRAIT_COMBAT_BONUS_OTHER_RELIGION`,
+    `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`). The carrier is a
+    per-seat majority over its cities' followed religions on both engines;
+    the tie rule is ask 6.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
-  SOURCED: CIV6's agenda-style clauses that make an AI PREFER or REFUSE an
-  action are DLL-side weightings.
-  ENGINES: neither has an AI that weighs diplomatic actions at all — the
-  driver decides them.
-  OPEN: `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
-  `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are marked open against this item.
-  A MODEL question rather than a missing field: a preference is only
-  meaningful against a decider that has alternatives to weigh, so it waits on
-  the self-play direction rather than on a carrier.
-- **C-68. TWO UNIQUE CHASSIS ARE NOT IN THE UNIT ROSTER.** Weight 1.
-  ENGINES: the Janissary (Ottoman) and the Saka Horse Archer (Scythia) have no
-  row in the unit table, so the clauses naming them have nothing to charge:
-  `JANISSARY_LOSE_POPULATION_IN_FOUNDED_CITIES` and
-  `TRAIT_EXTRASAKAHORSEARCHER`, both marked open against this item.
-  SOURCING CORRECTION worth keeping: the Saka Horse Archer is
-  PROMOTION_CLASS_RANGED, NOT light cavalry, so a roster row keyed on the
-  engine's coarser cavalry class would pay the wrong chassis
-  (`engine-class-coarser-than-install`).
-- **C-69. THREE UNIQUE DISTRICTS, BUILDINGS AND IMPROVEMENTS ARE ABSENT.**
-  Weight 1.
-  ENGINES: Kongo's M'banza (district), England's Royal Navy Dockyard
-  (district), Georgia's Tsikhe (building) and Spain's Mission (improvement)
-  have no row on either engine, so four clauses have nothing to attach to:
-  `TRAIT_FREE_APOSTLE_FINISH_MBANZA`, `TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT`,
-  `TRAIT_TSIKHE_PRODUCTION` and `TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER`,
-  all marked open against this item. Phoenicia's COTHON (district, the
-  unique Harbor: Expansion2_Districts_Major.xml DISTRICT_COTHON, TraitType
-  TRAIT_CIVILIZATION_DISTRICT_COTHON) is a fifth: it is the PrereqDistrict of
-  PROJECT_COTHON_CAPITAL_MOVE, whose gate and capital move are in (C-61) and
-  whose row waits on this district.
-  OPEN, a second gap of the Dockyard row's own: a district's granted unit is
-  NAMED by its row on both engines, and nothing picks the strongest naval unit
-  of a class the way `bestTrainableOfClass` picks a land one.
-- **C-72. A TRADER CLAIMS NO TILE IT WALKS OVER.** Weight 1.
-  ENGINES: trade routes move gold and yields between two cities and never
-  touch tile ownership, so `TRAIT_TRADE_GAIN_TILES_EN_ROUTE` (marked open
-  against this item) has no hook. The route's WALK exists on both engines
-  already — the road-laying leg computes it — so the path is there and only
-  the claim is not.
-  SOURCED, except one field: `EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE`
-  carries `GainTileRadius: 3`, on `TRAIT_CIVILIZATION_CREE_TRADE_GAIN_TILES`
-  (the CREE, so it is the civilization's clause and not Poundmaker's). The
-  page text — "Trade Routes claim unclaimed tiles they pass through" — says
-  WHAT is claimed and the install says the radius is 3, but nothing says what
-  that radius is measured FROM: the path tiles, the origin, or the
-  destination. On a walk of any length those three differ enormously (3 from
-  every path tile is most of a continent).
-  GEOMETRY SOURCED 2026-09-07 from the trait's own text
-  (`LOC_TRAIT_CIVILIZATION_NIHITHAW_DESCRIPTION`): "Unclaimed tiles within 3
-  tiles of a Cree CITY come under Cree control when a Trader first moves
-  into them" — measured from the city, not the path or the route's ends.
-  OPEN: the claim itself, now a build and no longer an ask.
-- **C-74. THE ERUPTION RATE IS STILL STYLIZED.** Weight 1.
-  SOURCED: `RandomEvent_Frequencies` publishes an `OccurrencesPerGame` for
-  every event at each of five `RealismSettingType` levels (MINIMAL, LIGHT,
-  MODERATE, HEAVY, HYPERREAL).
-  OWNER RULED 2026-09-04: model REALISM_SETTING_MODERATE and divide
-  OccurrencesPerGame by the STANDARD game length — 500 turns, the span the
-  install's count is written over (this engine plays 250 of them and sees half
-  a game's worth). SHIPPED on that ruling 2026-09-05, the wire carrying all
-  four so both engines moved together: FLOOD_CHANCE 0.05 -> 0.009 (4.5 per
-  game), FLOOD_SEVERITY_P [0.6, 0.3, 0.1] -> [0.44, 0.33, 0.22],
-  DROUGHT_CHANCE 0.02 -> 0.056 (MAJOR 23 + EXTREME 5, summed because this
-  engine has one drought kind), and the storm's summed rate, since replaced
-  by C-49's eight per-event rows off the same table.
-  OPEN — **ERUPTION_CHANCE_PER_VOLCANO IS NOT COVERED BY THE RULING.** The
-  install counts eruptions per GAME where this engine rolls per VOLCANO, and
-  the conversion needs the map's volcano count. The reactor accidents (C-1)
-  are the same shape. PROPOSAL (2026-09-07, no new number): divide the
-  per-turn rate by the map's count of objects at risk, keeping the install's
-  per-game expectation. Ask.
-## Harness — not weighted (this file prices fidelity)
+  - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
+    `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
+    preference needs a decider with alternatives — P8's, not a carrier's.
+- **C-68. THE JANISSARY AND THE SAKA HORSE ARCHER.** Weight 1.
+  - No `UnitDef` row, so `JANISSARY_LOSE_POPULATION_IN_FOUNDED_CITIES` and
+    `TRAIT_EXTRASAKAHORSEARCHER` charge nothing. The Saka Horse Archer is
+    PROMOTION_CLASS_RANGED, not light cavalry.
+- **C-69. FIVE UNIQUE ROWS WITH TRAIT CLAUSES.** Weight 2.
+  - Kongo's M'banza (district), England's Royal Navy Dockyard (district),
+    Georgia's Tsikhe (building), Spain's Mission (improvement) and
+    Phoenicia's Cothon (district, C-61's PrereqDistrict) have no catalog
+    row; `TRAIT_FREE_APOSTLE_FINISH_MBANZA`,
+    `TRAIT_ROYAL_NAVY_DOCKYARD_NAVAL_UNIT`, `TRAIT_TSIKHE_PRODUCTION` and
+    `TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER` wait on them.
+  - The Dockyard's granted unit is NAMED by its row on both engines;
+    nothing picks the strongest naval unit of a class the way
+    `bestTrainableOfClass` picks a land one.
+- **C-72. THE CREE TRADER'S CLAIM.** Weight 1.
+  - SOURCED `EFFECT_ADJUST_PLAYER_TRADE_GAIN_TILES_EN_ROUTE`
+    `GainTileRadius: 3` and `LOC_TRAIT_CIVILIZATION_NIHITHAW_DESCRIPTION`:
+    "Unclaimed tiles within 3 tiles of a Cree CITY come under Cree control
+    when a Trader first moves into them" — measured from the city. The
+    route's walk exists; the claim does not. Buildable.
+- **C-74. PER-GAME COUNTS OVER PER-OBJECT ROLLS.** Weight 1.
+  - `ERUPTION_CHANCE_PER_VOLCANO` is not covered by the MODERATE / 500
+    ruling: the install counts eruptions per GAME, this engine rolls per
+    VOLCANO; C-1's reactor is the same shape. Ask 7.
+- **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 2.
+  - The install's DiplomaticStates table names the scale (Allied 100 ...
+    Denounced 16, War 0, `RelationshipLevel`); what moves it is DLL. The
+    carrier is a compared per-directed-pair opinion on both engines with
+    those anchors; the deltas are ask 9.
+  - Waiting on it: the mission's mark, DEMAND, DISCUSS and its promises,
+    the Retribution casus belli (C-2); the agendas (C-26); the preference
+    weights (C-67).
+- **C-77. THE WORKED-TILE PICK IS UNEXPOSED.** Weight 1.
+  - `assignWorkedTiles` and the GPU walk's `topk` derive the pick inside the
+    yield walk; nothing stores or compares it. The carrier is one exposed
+    reader per engine and a compared per-city worked-tile list. C-31's
+    "Citizens 'working' the affected tiles are eliminated" waits on it.
+- **C-78. UNIQUE UNITS ABSENT.** Weight 5.
+  - Four of the roster's 34 unique units have a `UnitDef` row (`uniqueTo`
+    / `replaces`: Legion, Maryannu Chariot Archer, Berserker, War-Cart;
+    Harald's Longship beside them). The other 29 do not — one row each off `Units.xml` with its
+    abilities off `UnitAbilities` / `UnitPromotions`, on both engines:
+    P-51, Mamluk, Minas Geraes, Mountie, Crouching Tiger, Okihtcitaw, Sea
+    Dog, Garde Impériale, Khevsureti, U-Boat, Hoplite, Huszár, Warak'aq,
+    Varu, Samurai, Ngao Mbeba, Hwacha, Mandekalu Cavalry, Toa, Malón
+    Raider, Keshig, De Zeven Provinciën, Barbary Corsair, Bireme, Cossack,
+    Highlander, Conquistador, Carolean, Impi (the Saka Horse Archer and
+    Janissary are C-68). The leader units (Rough Rider, Black Army, ...)
+    are the nine blank rows of `docs/ROSTER.md`.
+  - A seat whose civilization has no row trains the base chassis; B-54r's
+    stacks wait here.
+- **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 5.
+  - Five of 36 have a catalog row (the Bath as a `civVariants` entry, the
+    Stave Church's `civ`, the Sphinx, Terrace Farm and Ziggurat's
+    `uniqueTo`). Beside C-69's five, 26 do not — each a district, building
+    or improvement row with its placement, adjacency and yields off the
+    install, on both engines and the exporter: Film Studio, Madrasa, Street
+    Carnival and Copacabana, Ice Hockey Rink, Great Wall, Mekewap, Château,
+    Hansa, Acropolis, Thermal Bath, Stepwell, Electronics Factory, Seowon,
+    Suguba, Marae, Pā, Chemamull, Ordu, Polder, Grand Bazaar, Lavra, Golf
+    Course, Kurgan, Open-Air Museum, Ikanda.
+  - The Rock Band's venue bits (C-26) and the Cothon's project (C-61) read
+    rows from this list.
 
-- **THE DRIVER NEEDS A REAL STYLE MECHANISM.** Today a style is one boolean
-  read at a single `if` inside `pick_research`; adding one style meant a rank
-  refactor of `pick_production` that was reverted with the style it served.
-  What it should be: NAMED KNOBS with defaults that reproduce today's picks
-  exactly (research depth, production tier order, war appetite, expansion
-  appetite, faith/culture lean, naval lean); PRESETS built from the knobs,
-  assignable per actor as data; an ASSIGNMENT POLICY off the existing
-  per-(seed, seat) stream or an explicit table; CLI selection on the probe and
-  the gate. The bar is the probe diff: a preset earns its place by ADDING rows
-  without losing any.
+## Harness — not weighted
 
-## Appendix — closed this round (the lesson only)
-
-These entries are CLOSED. They are kept for one round as a divergence-class
-index; the full narrative is in the git log, and the durable lessons are in
-the memory files this appendix names. Delete a bullet once its class is
-mirrored in memory.
-
-- **C-59. Only a MUSEUM themed; great works were counted per city and per
-  kind. CLOSED 2026-09-07.** Great works are now held PER HOLDER on both
-  engines: CIV6 `Building_GreatWorks` / `GreatWork_ValidSubTypes` /
-  `GreatWorkObjectTypes` as one leaf table (`GW_HOLDERS` / `GW_LAYOUT`,
-  cpu/data/greatWorks.ts, fifteen holders, seven slot types, eight object
-  types, a fixed 37-slot layout), `City.greatWorks` / `city_gw_obj/_maker/
-  _era/_seat [B, ROWS, RC, W]` compared as one manifest row, ONE placement
-  composer per side (`placeGreatWork` / `_gw_place`) behind the Great
-  Person, the archaeologist, the Relic, the deal, the gift and the heist, and
-  one theming composer per side (`holderThemed` / `_gw_themed`): the Art
-  Museum's rule (one object type, distinct makers), the Archaeological
-  Museum's (one era, distinct civilizations), and Kristina's
-  `AUTO_THEME_AT_LEAST_3_SLOTS` / `_2_SLOTS` (a building of three slots, a
-  wonder of two, all full, themed whatever the rule). A themed holder pays
-  its works' own culture, faith AND tourism x2 — the tourism half was the
-  missing one. Her `THEMED_YIELD_MODIFIER` / `THEMED_TOURISM_MODIFIER` are
-  the standard x2 written as player modifiers so her auto-themed sets pay it
-  (READING: the install's `Building_GreatWorks` carries the museums'
-  ThemingYieldMultiplier / ThemingTourismMultiplier 100 already, so the two
-  rows ship as that bonus, never as a further +100%). SOURCED alongside: a
-  Work of Art pays 3 Culture (Base GreatWork_YieldChanges, no GS update —
-  this engine paid 2), Kandinsky's, Behzad's and Tohaku's works are
-  LANDSCAPE/PORTRAIT (the Babylon pack; the engine had RELIGIOUS), Sun Tzu's
-  Art of War is ONE work (GREATWORK_SUN_TZU; both engines placed two).
-  READINGS, identical on both engines: a work lands in the first open slot
-  that takes it, holders in the install's row order (buildings before
-  wonders, so a capital's Palace slot fills first); a PILLAGED or vanished
-  holder (the Palace of a captured capital) keeps and pays its works and
-  accepts nothing new; a holder themes only while PRESENT, pillaged or not;
-  theming doubles the work's own face, never the roster's per-work adders;
-  a gift, a deal or a heist takes the giver's LAST-placed work of the kind
-  from its first holding city, and the heist needs the thief to hold a slot
-  that takes it (the mission is refused otherwise). BAR:
-  `great-works-holders` (TS) / `great_works_holders` (GPU), the rewritten
-  `great-works` / `great_works` and `relics` lanes on both sides; the smoke
-  serve (seed 9209, 250 turns) green. REACH (measured: the driver over 250
-  turns on seeds 9001 and 9014): Works of Writing in the Palace's and the
-  Amphitheater's slots and a Relic in a Palace slot; no Museum, wonder holder
-  or themed holder is reached in 250 driven turns, so the theming rules and
-  the auto-theme rows rest on the two lanes. Class: two-composers-of-one-fact — every creator of a work now
-  calls the one composer, and the storage swap shipped as a second commit
-  after the byte-identical wire commit.
-- **C-65. A Great Work of Art carried no object kind. CLOSED 2026-09-07.**
-  Every work carries `obj` (the install's `GreatWorkObjectTypes` numbering:
-  sculpture 0, portrait 1, landscape 2, religious 3, artifact 4, writing 5,
-  music 6, relic 7), written from `ARTIST_WORKS` at creation and carried by
-  a gift, a deal, a heist and a capture. `GREAT_WORK_YIELD_ROWS` are keyed
-  by object, so Nkisi's four SCULPTURE rows pay per sculpture held (+2 Food,
-  +2 Production, +1 Faith, +4 Gold). BAR: `great-works-holders` /
-  `great_works_holders` (three sculptors theme the Art Museum; Kongo's four
-  rows against a plain seat). With C-59.
-- **C-71. A building's great-work slots were one table for every seat.
-  CLOSED 2026-09-07.** `EXTRA_SLOT_ROWS` widens a holder's slot row per
-  seat: the layout carries every row at its widest and ranks the extra
-  positions, and the capacity composer opens rank r only to a seat whose
-  rows sum past r. Nkisi's `TRAIT_EXTRA_PALACE_SLOTS` (BuildingType PALACE,
-  GreatWorkSlotType PALACE, Amount 4 — the AUDIT had guessed one) gives
-  Kongo a five-slot Palace of any object type, everyone else one. BAR:
-  `great-works-holders` / `great_works_holders` ("holds five works of any
-  kind for Kongo, one for anyone else"). With C-59.
-- **B-39r. Two wonder residuals waited on per-work TYPE names. CLOSED
-  2026-09-07.** SOURCED against the install rather than the wiki: the
-  Apadana's row is two GREATWORKSLOT_PALACE slots (Macedonia_Persia
-  GameplayData — any object), and the Hermitage's is four GREATWORKSLOT_ART
-  slots with NO landscape restriction (Base Buildings.xml; the "landscape-
-  only" reading was the civilopedia's, and the XML outranks it). Both are
-  rows of `GW_HOLDERS`, beside the Great Library's, Oxford's, the Bolshoi's,
-  Mont St. Michel's and St. Basil's. BAR: `great-works` (a Hermitage holds
-  an Artist's three with no Museum; the Great Library's two after the
-  Amphitheater's) and `relics` (St. Basil's three, additive with the
-  Temple's) on both engines. Lesson: declared-gaps-are-not-the-gap-list —
-  the "blocked" bullet named a restriction the install does not have.
-- **A-15r. TS paid Support to a unit standing in a city-state's centre. CLOSED
-  2026-09-07.** CIV6 (Support): "Units will not gain Support when inside
-  defensible Districts (City Center, Encampment)". TS tested `district ===
-  'CITY_CENTER'`, and TS never paves a minor's centre with a district, so a
-  Scythian Slinger inside Hunza took +2 Support against a Roman Warrior where
-  the GPU's `_centre_seat_plane` (majors and minors in one plane) paid none
-  (seed 9170 t114, the combat log's `mel` q 80 vs 100). The GPU was right;
-  `defensibleDistrict` now answers for both `supportCount` and
-  `theoSupportCount`. Latent since the minors' centres existed; reached once
-  the minor's city became an ordinary city a foreign unit may stand in.
-  Lesson: a TS predicate spelled on `tile.district` misses every city the TS
-  model keeps OFF the tile (a minor's centre) — the "is there a city here"
-  question has one composer per engine, ask it. Lanes: `combat_mod` H2 and
-  the TS support scene.
-- **A-14r. A Free City could not work its own tiles on the GPU. CLOSED
-  2026-09-07.** The work window and the yield walk matched a tile's holder by
-  city-plane ROW INDEX (`tile_seat == row`), which equals the seat id for a
-  major and never for the Free row (its tiles carry seat 300): zero workable
-  plots, every citizen a specialist, and the compare rendered the holder as
-  the row index and counted the city among the majors' (seed 9027 t202, the
-  one revolt the probe had measured). A row's seat id is `_ROW_SEAT[row]`;
-  the other `tile_seat == row` sites are reached with major rows only. Lesson:
-  a new ROW CLASS in a plane whose index used to equal a seat id turns every
-  `== row` read into a fork — census the READS of the plane, not the writes.
-  Lane: `free_city` step 2.
-- **A-13r. Silt on a natural wonder paid production on the GPU. CLOSED
-  2026-09-06.** A storm's production fertility landed on the Eye of the Sahara
-  (both engines write it: the wonder is land and no mountain) and `_neutral_prod`
-  added it where TS's wonder arm early-returns above the fertility lines; the
-  food read already carried the guard. Found the turn the storms merged (seed
-  9014 t148). Lesson: a new WRITER of an old plane reaches tiles the old writers
-  never did, so every reader of that plane is re-tested by the new reach — grep
-  the plane's readers, not the writer's. Lane: `storms` step 7 and its TS twin.
-- **A-12r. The Amazon counted a CHOPPED rainforest. CLOSED 2026-09-06.** The
-  GPU's feature-appeal term read `feat_id == fi` bare, and `feat_id` keeps a
-  chopped tile's old id; the strip flag is the live `n.feature` read TS does.
-  Latent from C-50 until a Preserve stood on a stripped rainforest beside a
-  Brazilian tile and its Grove band paid the wrong tile (seed 9014 t198, the
-  worked-tile pick). Lesson: every bare `feat_id ==` read needs the strip flag
-  or `_feature_live`; the census of the others was clean. Lane: `feature_appeal`
-  step 6.
-- **A-10r. A gold-bought strategic unit paid its resource on the GPU and not
-  on TS. CLOSED 2026-09-05.** TS's seat-phase `buy` kind-2 arm spawned the
-  unit and never called `chargeUnitResource`, though `purchaseUnit` beside it
-  does — CIV6 (GS): a strategic unit pays "the moment you purchase it". Bar:
-  `gold-buy-resource` (TS) and the GPU side under the serve gate. Class:
-  two-composers-of-one-fact.
-- **A-9r. A ranged hit on a stacked hex went to the first-listed fighter on TS
-  and to the hull on the GPU. CLOSED 2026-09-05.** SOURCED (Flanking and
-  Support): the higher-Combat-Strength unit of a hull-plus-passenger stack
-  defends a ranged attack. The engines parted on the TIE — TS scanned from
-  `fighters[0]` (tile-array order, a TS-only fact) where `_stack_fold` takes
-  the passenger only on a strict `>`. `stackDefender` now starts from the hull.
-  Bar: `stack-defender-tie` (TS), `stack_defender_tie` (GPU). Class: no rule
-  may break a tie on an order only one engine owns.
-- **A-8r. A cityless seat's governor phase ran on the GPU — but only in a
-  batch. CLOSED 2026-09-05.** `_governor_phase` gated on `civ_alive`, which a
-  cityless seat still satisfies, where TS's `seatPhase` `continue`s such a seat
-  before `governorPhase`. At B=1 the batch-wide early return hid it. Bar:
-  `governor_cityless` (two games). Class:
-  start-state-invalidates-liveness — `civ_alive` is not "has a city", and only
-  a batch can tell them apart.
-- **A-7r. A bankruptcy tie went to the lowest unit id on one engine and the
-  lowest slot on the other. CLOSED 2026-09-05.** A converted barbarian keeps
-  its old id on TS and takes a fresh slot on the GPU, so "lowest id" and
-  "lowest slot" part for a RE-SEATED unit. TS now ties on the earliest in
-  `state.units` — spawn order, the one order both engines own. Bar:
-  `bankruptcy-tie` (TS, 2), `bankruptcy_tie` (GPU, 3). Class: any TS rule that
-  orders units by `id` is suspect the moment a re-seat path exists.
-- **C-63. A legacy bonus accrues time. CLOSED 2026-09-05 — C-73 spends the
-  accrual on every one of the nine channels.**
-  SOURCED — the install spells "legacy" as ACCUMULATING. Nine
-  `MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS` modifiers in
-  `Governments.xml` each take three arguments — `BonusType`, `Increment` and
-  `Interval` (`ScaleByGameSpeed`):
-
-  | government | bonus | increment | interval |
-  |---|---|---|---|
-  | OLIGARCHY          | COMBAT_EXPERIENCE   | 1 |  5 |
-  | MONARCHY           | ENVOYS              | 1 | 10 |
-  | DEMOCRACY          | DISTRICT_PROJECTS   | 1 | 10 |
-  | FASCISM            | UNIT_PRODUCTION     | 1 | 10 |
-  | CLASSICAL_REPUBLIC | GREAT_PEOPLE        | 1 | 15 |
-  | MERCHANT_REPUBLIC  | GOLD_PURCHASES      | 1 | 15 |
-  | THEOCRACY          | FAITH_PURCHASES     | 1 | 15 |
-  | AUTOCRACY          | WONDER_CONSTRUCTION | 1 | 20 |
-  | COMMUNISM          | OVERALL_PRODUCTION  | 1 | 20 |
-
-  The accrual is +1% per Interval turns held, permanent once earned, with no
-  cap in the XML — those three argument names are the whole modifier. The
-  community's independently-reported "+1% every 20 turns on Standard" for
-  Autocracy matches the row exactly. SOURCED (Founding Fathers): "Earn all
-  government legacy bonuses in half the usual time" — the interval halved.
-  SHIPPED: `GovernmentState.govTurns` / `civ_gov_turns` count turns held per
-  government per seat, written on the SAME line as `governmentsHeld` under the
-  same condition (deliberately: `|=` is idempotent and hides a gating
-  difference where a counter shows one at once), gated on `active` so a
-  cityless seat banks nothing. `legacyBonusPct` / `_legacy_pct` is the one
-  composer on each side, and the rate divides the interval rather than
-  multiplying the result so the two readings agree at every increment.
-  BAR: `legacy-accrual` (5 lanes), `legacy_accrual` (6, including the
-  per-game batch guard), plus a 250-turn-shaped single-seed serve.
-  REACH: 64 government-turns banked over 30 driven turns across three seats.
-
-- **C-73. A legacy card pays the whole government. CLOSED 2026-09-05 — nine of
-  nine channels ship, and the driver's legacy-first style reaches them.**
-  `cpu/data/policies.ts` synthesised one wildcard card per government with
-  `effects: g.effects`, the government's WHOLE inherent bonus. SOURCED: each
-  government names exactly ONE `BonusType` in its
-  `MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS` (C-63's table), and the
-  legacy a seat keeps after switching is the accumulated percentage against
-  that one thing — Fascism's card paid +5 Combat Strength and -15% war
-  weariness where the install pays +N% unit production for N = turns held /
-  10. `legacyEffects` / the GPU's payout switch map each BonusType to its
-  channel: wonderConstruction and unitProduction to a synthesized `prodBoost`,
-  overallProduction to the production `yieldMult`, districtProjects to
-  `projectProdMult`, greatPeople to `gppMult`, combatExperience to `xpPct`,
-  envoys to an `influenceMult` over the ONE envoy accrual sum, and — last —
-  goldPurchases and faithPurchases through `goldPrice` / `faithPrice` and
-  `_gold_price` / `_faith_price`, ONE composer per purse per engine, applied
-  where every purchase is priced AND paid (a building, a unit, a settler, a
-  worship building, a religious unit, the Monumentality civilians, a
-  Naturalist, a Rock Band, a class building, and the driver's affordability
-  twins on both sides). READING recorded: an upgrade, a tile and a patronage
-  are not "purchases" in the card's sense and pay full price. Every mapping is
-  corroborated twice — the install's own Increment/Interval, and the
-  community's reported percentages. The nine `TRAIT_*_BONUS_RATE` ledger rows
-  ship with it. Bar: `legacy-discount` (TS) and `legacy_accrual`'s discount
-  case (GPU) — a stored Merchant Republic legacy at 30 turns prices a
-  100-gold purchase at 98, Theocracy's the faith one.
-  REACH: REAL — the driver's legacy-first style slots a legacy card in play,
-  so the channels are paid on a driven seat rather than in a poke alone.
-  TWO LESSONS. The GPU memo had to take the CLOCK into its key: `_gov_mods`
-  compared five inputs and a legacy payout is an ACCRUAL, so the answer moves
-  on a turn when none of the five do and the bonus would have frozen at its
-  first value — the memo-key class, caught before it shipped. And the
-  reachability flip (C-75) exposed the GPU paying a legacy card's TABLE ROW,
-  this item's own error, beside its accrual: the ordinary channels read the
-  cards minus the legacy ones now, as `legacyEffects` always did on TS.
-- **C-62. A war TYPE. CLOSED 2026-09-06 — eleven kinds, the civic gate and
-  its roster override, the declarer's ten-turn clock, six roster rows.**
-  SOURCED: every `DIPLOACTION_DECLARE_*_WAR` row of the install (Base
-  DiplomaticActions.xml, Expansion1's Defensive-Tactics updates for
-  Reconquest and Protectorate, Expansion1's Golden Age / Retribution /
-  Ideological rows) is ONE table both engines address by position
-  (`WAR_KINDS`, data/warKinds.ts, on the wire as `seats.warKinds`): the
-  civic, `DenouncementTurnsRequired`, the requirement column and the three
-  warmonger percents. ONE predicate (`warKindAllowed` / `_war_kinds_allowed`)
-  serves the record's validator (`declareWar` / `_declare_war_major`, the one
-  body every declaration runs — the nuclear strike's included), the default
-  (`defaultWarKind`) and the driver's pick (`_war_kind_pick`); the record
-  carries `warKind` (schema v3, optional) and a kind the seat may not declare
-  REFUSES the war. The kind is stored SIGNED (`Seat.warKinds` /
-  `seat_warkind` int8: +(code+1) on the declarer's cell), so "who declared"
-  rides the same compared field (`warKinds`); the pair's war clock is the
-  declaration clock. The six rows ship (`WAR_BUFF_ROWS`): Arthashastra's +5
-  Combat Strength (`rosterCS` / `_roster_cs`) and +2 Movement
-  (`unitFullMoves` / `_full_mp`), Bannockburn's +100% Production (the
-  additive percent stack in `seatPhase` / `_seat_city_produce`) and +2
-  Movement, each for `WAR_BUFF_TURNS` 10 while a war the seat DECLARED of the
-  row's kind is that young, and the two PREREQ_OVERRIDEs (Military Training,
-  Defensive Tactics) inside the civic gate.
-  READINGS, identical on both engines: the denouncement may stand in EITHER
-  direction (the LOC text: "Denounced you or that you have Denounced"); a
-  `DenouncementTurnsRequired` of 0 (Golden Age, Protectorate) still wants a
-  standing denouncement — "Can be used right after Denouncing" — where the
-  Surprise row has no such column at all, which retires the old reading that
-  the To Arms! dedicant needed none; Territorial's "2 of your cities within
-  10 tiles of 2 opponents' cities" is two declarer cities each within reach
-  of some target city AND two target cities each within reach of some
-  declarer city; Colonial's "two technology eras" is the per-civ era of techs
-  and civics; Ideological's "different Tier 3 government" is two LATE
-  governments (tier >= 3) that differ; Liberation's "captured a city from one
-  of your friends or allies" reads the city's FOUNDER; the default kind is
-  the cheapest casus belli held by the declaration percent (ties to table
-  order), and the `warlord` style prefers the leader's own buffed kind; the
-  buff's age is the compared pair clock, so a war the LOWER seat declares
-  reads 1 at its own tail and the higher seat's 0 until the next turn.
-  BAR: `war-kinds.test.ts`, `war_kinds_test.py` (the civic gate refuses a
-  kind before its civic, the override lets the leader declare early, the
-  buff pays on turn 1 and not on turn 11, the alliance pressure clause), the
-  golden-war blocks of `grievances.test.ts` and `war_test.py` rewritten to
-  the install's row, `geopolitics_test.py` on the signed plane.
-  REACH: seed 9209 x 250 driven (Chandragupta seated at row 1): 1 Surprise
-  (t77) and 3 Formal (t92) declarations, no other kind and no buff turn —
-  the conditioned kinds and the six rows are held by the new lanes alone.
-  THE LESSON: a boolean pair plane that meant "formal" was two facts short
-  (WHICH kind, WHO declared); widening it to a signed code kept one compared
-  field and let every reader stay a one-line predicate.
-- **C-75. No legacy card is ever slotted. CLOSED 2026-09-05 — the slotting is
-  the driver's decision, and its legacy-first style slots them.** The greedy
-  fill walked the catalog in order with the legacy and Dark Age cards appended
-  last, so an earlier card took every slot: zero legacy cards with every civic
-  researched and every government held, on both engines. SOURCE: real Civ 6
-  does not fill slots greedily — the PLAYER chooses. OWNER RULED 2026-09-04:
-  the slotting becomes a DRIVER DECISION on the wire. Shipped in three steps —
-  the stored set (`Seat.government.policies` / `civ_policies`), the cutover
-  (the store is what both engines pay from; every reader goes through
-  `slottedPolicyIndices` / `_seat_slotted`; the record key is validated whole
-  by `fitPolicies` / `_policy_set_ok`), and the STYLES: `ladder.pick_policies`
-  takes a per-seat card style — GREEDY, LEGACY-FIRST (the wildcard slots go to
-  the unlocked legacy cards first) and MILITARY-FIRST — from the seat's preset
-  (`warlord` = military) or one persistent per-game draw (salt 10, 34/33/33).
-  These are DRIVER styles, harness rather than fidelity: real Civ 6 leaves the
-  choice to the player, and these are three players. Bar: `policy-store` /
-  `policy_store`, and the reachability lanes flipped — `legacy_accrual` shows
-  the legacy-first style slotting a card the store accepts and the effects
-  read, the greedy style none; `legacy-accrual` stores AUTOCRACY's legacy under
-  another government and reads the accrued 2% back.
-  THE LESSON, and the reason a reachability flip is worth a serve: the FIRST
-  serve down the newly reached path paid for two GPU forks the gap had hidden.
-  `_seat_city_produce` broadcast a legacy card's per-game percent against its
-  flat city rows — a shape error invisible at B=1 and wrong at B=2 — and
-  `_gov_policy_mods` paid a legacy card's TABLE ROW, the government's whole
-  package (C-73's own fault), beside its accrual: seed 9209 t131, +1.05 on
-  every yield of a legacy-first seat. The ordinary channels read the cards
-  minus the legacy ones now, as `legacyEffects` always did on TS. An
-  unreachable mechanic is an untested one, and the two classes are the
-  familiar pair — a per-game scalar broadcast into a per-row shape, and two
-  composers of one fact where only one engine excluded the special row.
-- **A-6r. The slotted policy cards are not compared. CLOSED 2026-09-05.**
-  `governmentsHeld` and the civics under it were in the digest and the CARDS
-  a seat slots were not, which is where A-5r's divergence lived unseen for 28
-  turns. Closed by C-75's cutover: the stored SET is what both engines pay
-  from and `policiesSlotted` compares it — the SET, not the slot POSITION,
-  which is a fact neither engine owns. The closure covered the CARD set only;
-  the extra policy SLOTS half went to **A-11r**. Class: a divergence with no
-  manifest field surfaces many turns later as something else entirely.
-- **A-5r. A narrowed XP award read another game's roster. CLOSED 2026-09-04.**
-  `_battle_gain` multiplied by `_recon_xp_mult` / `_suz_xp_mult`, both ending
-  in `tab.gather(1, seat.unsqueeze(1))` — a gather along dim 1 with a NARROWED
-  index reads batch rows 0..n-1. Fixed by threading `rows`; the four per-seat
-  gathers now assert a batch-wide index when no `rows` is given. Bar:
-  `narrow_batch_xp` (5). Class: narrow-batch-gather. It also opened A-6r.
-- **A-4r. A route coming IN was paid only while a route was going OUT. CLOSED
-  2026-09-05.** `_seat_route_income` returned None for a seat with no outgoing
-  route and held that exit open for one destination-side row; Radio Oranje's
-  incoming-route Culture sat behind it. Fixed by deriving the exemption from
-  the rows. Bar: `incoming-route` (4), `incoming_route` (6). Class:
-  rows-behind-an-early-return.
-- **A-3r. An engineer walked to a rail site. CLOSED 2026-09-04.**
-  `_seat_engineer_job_mask` read `~road | ~railroad` where TS's twin carries no
-  rail arm; the GPU now reads `~road`, which is exactly `canBuildRoad`. Bar:
-  `engineer_test` lane 9. Class: driver-twin-mirrors-mask.
-- **A-2r. A naval unit was born a Movement short. CLOSED 2026-09-04.**
-  `spawnUnit` rebuilt a fresh unit's pool by hand and missed three terms
-  `unitFullMoves` carries; it calls the composer now. Bar:
-  `spawn-pool.test.ts` (3). Class: two-composers-of-one-fact.
-- **C-46. Religious pressure is on the install's scale. CLOSED 2026-09-05.**
-  Every term off GlobalParameters.xml — the adjacent-city distance 10 and per
-  turn 1, HOLY_CITY_PRESSURE_MULTIPLIER 4, HOLY_SITE_PRESSURE_MULTIPLIER 2,
-  ATHEISM_PRESSURE_PER_POP 50, HOLY_CITY_PRESSURE_PER_POP 200 at founding,
-  STRENGTH_MULTIPLIER 200 on a full-health Spread (x1.5 Scripture),
-  COMBAT_VICTORY 250, UNIT_CAPTURE 125 — and a city FOLLOWS the religion
-  holding MORE THAN HALF of its total pressure with the baseline
-  (`followedReligionOf` / `_followed_religion`, ONE composer per engine). TWO
-  READINGS recorded, not sourced: the x4 and x2 do not stack (the larger
-  applies), and a city presses ITSELF. Bar: `religion-trade`,
-  `suzerain-rules`, `religion2`, `religion_gp`, `rock-band` / `rock_band`,
-  `missionary`.
-- **C-47. Tribal villages. CLOSED 2026-09-04.** The install's own reward table
-  runs on both engines, sourced entire from `GoodyHuts` + `GoodyHutSubTypes`;
-  the draw is a kind uniformly among those with an eligible subtype, then a
-  subtype by weight (`drawGoodyReward` / `_draw_goody_reward`). Villages are
-  ON in the seeder (240 over the 24 fixtures) and REACHED — 18 claims spanning
-  11 of 24 subtypes over four seeds x 250 turns. Epic Quest's clause ships
-  with it (`TRAIT_BARBARIAN_CAMP_GOODY`: the install says the camp IS a
-  village for Sumeria), both call sites sharing one payout body
-  (`drawAndPayGoody` / `_draw_and_pay_goody`). Class: rows-behind-an-early-
-  return, three times over — the exporter refused a hut-carrying world, `camp`
-  baked `!t.goodyHut` at export, and `Tile.goodyHut` was excluded from
-  statecompare.
-- **C-50. Appeal is map-global. CLOSED 2026-09-04.** SOURCED (Amazon,
-  TRAIT_AMAZON_RAINFOREST_EXTRA_APPEAL): "Rainforest tiles provide +1 Appeal
-  to adjacent tiles, instead of the usual -1" — EFFECT_ADJUST_FEATURE_APPEAL_
-  MODIFIER on FEATURE_JUNGLE with Amount 2 (the engine spells the install's
-  JUNGLE as RAINFOREST). It needed no per-seat plane: `cityAppealResolver` /
-  `_gp_appeal_plane` is keyed by the tile's OWNER and already reads
-  neighbours. An UNOWNED tile takes none of it, which is right for all four
-  consumers. Bar: `feature_appeal` (5), `feature-appeal.test.ts` (4).
-- **C-56. A trade route's religious pressure. CLOSED 2026-09-05.** SOURCED
-  (GlobalParameters): RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0
-  and _FOR_ORIGIN 0.5; Dharma doubles both ends (Amount 100). Keyed by the
-  RECEIVER so the Citadel of God and Religious-alliance masks apply as to city
-  pressure; the accumulator is an integer, so the half-point lands on EVEN
-  turns (`routePressureShare` / `_route_pressure_share`). Bar: `route_pressure`
-  (GPU), the route case in `religion-trade` (TS).
-- **C-57. One follower belief per city. CLOSED 2026-09-03.** SOURCED (Dharma):
-  "Receives Follower Belief bonuses in a city from each Religion that has at
-  least 1 Follower." `followerReligionsForCity` feeds `withFollowerBelief` a
-  LIST and `_fol_tab_for` sums the belief table over each present religion.
-  Both engines model PRESSURE rather than followers, so "at least 1 Follower"
-  stays "a religion with pressure here". Bar: `all_follower_beliefs` (6 each).
-  Class: rows-behind-an-early-return — the whole carrier had shipped and the
-  missing half was the QUANTIFIER.
-- **C-58. A defeated cavalry unit may be captured. CLOSED 2026-09-05, the
-  curve STYLIZED by owner ruling 2026-09-04.** SOURCED: the permission
-  (`TRAIT_CAVALRY_CAPTURE_CAVALRY_MODIFIER`, CanCapture true), the strength,
-  and COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20. The DLL's curve through that
-  number is unreadable, so it is this model's, anchored on the sourced base:
-  `pct = round(50 + 5q / 20)`, certain at +20 and nothing at -20. STYLIZED
-  beside it: `CAPTURED_UNIT_HP` 25, promotions/experience/formation kept, a
-  passenger at sea never captured. Bar: `capture_cavalry` (both engines).
-  REACH: no fixture seats Genghis Khan, so the lanes are the whole bar.
-- **C-66. No unit carries a levied mark. CLOSED 2026-09-04.** `Unit.levied` /
-  `unit_levied`, set at the levy, PERMANENT, in the statecompare digest. Both
-  modifiers pay: `LEVY_UNITUPGRADEDISCOUNT` (75% off upgrading a levied unit —
-  the row had shipped and nothing read it) and `LEVY_UNITS_GRANT_ABILITY`
-  (ABILITY_THE_RAVEN_KING: EFFECT_ADJUST_UNIT_MOVEMENT 2 and
-  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER 5). The levy RE-POOLS the unit after
-  marking it, or it is born two Movement short (A-2r exactly). Bar:
-  `levied_upgrade` (6), `levied-upgrade.test.ts` (8).
-- **C-70. An alliance carries no shared visibility. CLOSED 2026-09-04.**
-  SOURCED (Poundmaker): EFFECT_ADJUST_PLAYER_ALL_ALLIANCES_PROVIDE_SHARED_VIS
-  with `ShareVis: true` — a boolean, read as MUTUAL. It lands inside
-  `revealAround` / `_reveal_around` rather than a new phase step, which makes
-  it turn-exact and seat-order independent; the discovery EVENT is
-  deliberately left behind (an ally merely SHOWN a natural wonder earns no era
-  score). Bar: `shared_vision` (6), `shared-vision.test.ts` (6); `explored` is
-  in the digest. Class: verify the carrier before building — this is
-  `Seat.explored`, NOT the Listening Post's diplomatic-visibility levels.
-
-## Appendix — working notes
-
-Process, not gaps — kept out of the weighted chapters.
-
-**Hunt discipline.** Scripted-reachability first (the digest gate names the
-turn), checkpoint-bracket from the nearest earlier checkpoint (validate a
-resume against a fresh run the first time it is trusted for a diagnosis),
-full fresh gate for any behaviour-changing fix. One battery at the round's
-end, never per fix.
-
-**How to read a battery red — A POKE RED.** The recurring shapes, each of
-which reads exactly like an engine red until checked:
-- **The auto-decision premise.** The engines are decision-free: a buy, a
-  strike, a queue pick or a spread is an ORDER the applier re-validates, never
-  something `_seat_phase` chooses. A lane that steps and waits is waiting for
-  nothing — stash the intent (`apply_seat_actions`, the order helpers in
-  `tests/gpu/warmup.py`) and assert the validation.
-- **The registry confound.** Districts are read off the city REGISTRY
-  (`city_dist_tile`), never the tile plane; a scene must write both, as a real
-  completion does.
-- **The stale index space.** Appliers take the ROW and RANKED orders over
-  `_seat_slot_map`; a test speaking the dead civ-index or raw pool-slot
-  convention lands its orders on the wrong seat or unit and no-ops.
-- **The wrong resolver.** `_hostile_ranged_strike` scopes out major-vs-major
-  by design; that pairing is `_ranged_attack`'s.
-- **A stale cache under a poke.** Writes that the engine always pairs with
-  `_eff_version += 1` must be paired in a poke too, or the mask serves the
-  pre-poke world.
-
-**A TS-SUITE RED, same triage.** The battery tail only ever shows the last
-failing file; run vitest directly for the full list. The TS-specific shapes:
-- **Founding under `unitsMode` needs a settler on the tile** — `settleAt`
-  (tests/cpu/helpers.ts) is the scene helper.
-- **The actor loop skips a CITYLESS seat** (`seatPhase`) — influence, favor,
-  upkeep/bankruptcy and quest issuance all live inside it.
-- **Rules that live IN the seat phase**: city strikes (`cstk`/`estk`), city
-  healing, influence-to-envoy conversion.
-- **The scripted adoption** (`computeAdoption`): modifiers read the adoption,
-  a pure function of civics — `setPolicy`/`setGovernment` write a store
-  nothing reads in a driven game.
-- **One seat model**: `isCiv(0)` is true; a fake seat `{ id, atWar }` builds a
-  scene the war axis cannot see; a CityState without
-  `emptySeat(seatOfCityState(id))` has no seat id.
-- **Meeting is by EXPLORATION** — in a fogless world every seat meets every
-  city-state at the phase top; "unmet" scenes need fog live.
+- **THE DRIVER NEEDS A REAL STYLE MECHANISM.** A style is one boolean read
+  at a single `if` inside `pick_research`. Wanted: NAMED KNOBS whose
+  defaults reproduce today's picks exactly (research depth, production tier
+  order, war appetite, expansion appetite, faith/culture lean, naval lean);
+  PRESETS built from the knobs, assignable per actor as data; an assignment
+  policy off the per-(seed, seat) stream or a table; CLI selection on the
+  probe and the gate. The bar is the probe diff: a preset earns its place by
+  ADDING reached rows without losing any. B-24r's fourth card style is the
+  first customer.

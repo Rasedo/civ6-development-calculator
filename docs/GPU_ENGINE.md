@@ -138,6 +138,47 @@ edit sources while one is in flight.
   `c` (absolute stream position), so one mismatched `diff` names the
   divergent strength term directly and an inserted or missing roll shows
   as a counter slip — no bisect.
+- **Hunt discipline.** Scripted-reachability first (the digest gate names the
+  turn), checkpoint-bracket from the nearest earlier checkpoint (validate a
+  resume against a fresh run the first time it is trusted for a diagnosis),
+  full fresh gate for any behaviour-changing fix. One battery at the round's
+  end, never per fix.
+
+- **Reading a battery red — a POKE red.** The recurring shapes, each of
+  which reads exactly like an engine red until checked:
+  - **The auto-decision premise.** The engines are decision-free: a buy, a
+    strike, a queue pick or a spread is an ORDER the applier re-validates, never
+    something `_seat_phase` chooses. A lane that steps and waits is waiting for
+    nothing — stash the intent (`apply_seat_actions`, the order helpers in
+    `tests/gpu/warmup.py`) and assert the validation.
+  - **The registry confound.** Districts are read off the city REGISTRY
+    (`city_dist_tile`), never the tile plane; a scene must write both, as a real
+    completion does.
+  - **The stale index space.** Appliers take the ROW and RANKED orders over
+    `_seat_slot_map`; a test speaking the dead civ-index or raw pool-slot
+    convention lands its orders on the wrong seat or unit and no-ops.
+  - **The wrong resolver.** `_hostile_ranged_strike` scopes out major-vs-major
+    by design; that pairing is `_ranged_attack`'s.
+  - **A stale cache under a poke.** Writes that the engine always pairs with
+    `_eff_version += 1` must be paired in a poke too, or the mask serves the
+    pre-poke world.
+
+- **A TS-suite red, same triage.** The battery tail only ever shows the last
+  failing file; run vitest directly for the full list. The TS-specific shapes:
+  - **Founding under `unitsMode` needs a settler on the tile** — `settleAt`
+    (tests/cpu/helpers.ts) is the scene helper.
+  - **The actor loop skips a CITYLESS seat** (`seatPhase`) — influence, favor,
+    upkeep/bankruptcy and quest issuance all live inside it.
+  - **Rules that live IN the seat phase**: city strikes (`cstk`/`estk`), city
+    healing, influence-to-envoy conversion.
+  - **The scripted adoption** (`computeAdoption`): modifiers read the adoption,
+    a pure function of civics — `setPolicy`/`setGovernment` write a store
+    nothing reads in a driven game.
+  - **One seat model**: `isCiv(0)` is true; a fake seat `{ id, atWar }` builds a
+    scene the war axis cannot see; a CityState without
+    `emptySeat(seatOfCityState(id))` has no seat id.
+  - **Meeting is by EXPLORATION** — in a fogless world every seat meets every
+    city-state at the phase top; "unmet" scenes need fog live.
 
 ## World presets and driver styles
 
