@@ -2088,6 +2088,17 @@
           "note": "the training city's experience lines, carried for life."
         },
         {
+          "name": "mpBonus",
+          "compare": "exact",
+          "covers": [
+            "Unit.mpBonus"
+          ],
+          "planes": [
+            "unit_mp_bonus"
+          ],
+          "note": "the training city's flat Movement grant (the Ordu's), carried for life beside xpPct."
+        },
+        {
           "name": "embarked",
           "compare": "exact",
           "covers": [

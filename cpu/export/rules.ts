@@ -249,7 +249,7 @@ import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
-import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
+import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { AMENITY_TIERS, amenityTierIndex } from '../data/constants';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
@@ -1635,6 +1635,13 @@ export function buildRules() {
         rowCiv(r), rowLeader(r), PLACEABLE_DISTRICTS.indexOf(r.district),
         r.tech === undefined ? -1 : techIdx.get(r.tech) ?? -1,
         r.civic === undefined ? -1 : civicIdx.get(r.civic) ?? -1]),
+      // the same override for a unique BUILDING (the Madrasa's Theology civic)
+      buildingPrereq: BUILDING_PREREQ_ROWS.map((r) => [
+        // the WIRE order is , which is what a building index
+        // means everywhere else in this file — never the raw catalog order
+        rowCiv(r), rowLeader(r), buildingIdx.get(r.building) ?? -1,
+        r.tech === undefined ? -1 : techIdx.get(r.tech) ?? -1,
+        r.civic === undefined ? -1 : civicIdx.get(r.civic) ?? -1]),
       warWeariness: WAR_WEARINESS_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.enemyPct]),
       peacefulFounders: PEACEFUL_FOUNDER_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
       yieldPerSuzerain: YIELD_PER_SUZERAIN_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.pct]),
@@ -1861,6 +1868,9 @@ export function buildRules() {
       // FEAT_IDS order — what lets the GPU derive its wonder plane and price
       // a feature that ARRIVES after t0 from the same table TS reads.
       featNatural: FEAT_IDS.map((f) => (FEATURES[f]?.naturalWonder ? 1 : 0)),
+      // CIV6 (PLOT_HAS_ANY_PASSABLE_FEATURE): the Marae's rule names
+      // exactly this — a feature that is not impassable.
+      featPassable: FEAT_IDS.map((f) => (FEATURES[f]?.impassable ? 0 : 1)),
       featCatalogY: FEAT_IDS.map((f) => YIELD_KEYS.map((k) => FEATURES[f]?.yields?.[k] ?? 0)),
       nLuxuries: LUXURY_IDS.length,
       farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
@@ -1993,13 +2003,39 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
-      // a civilization's UNIQUE BUILDING standing in for this row (the Stave Church)
+      // a civilization's UNIQUE BUILDING standing in for this row. The
+      // OVERRIDE half mirrors `effectiveBuilding`: -1 (or an empty yield
+      // vector, or -1 amenities/housing) means "take the base row's".
       variants: (b.civVariants ?? []).map((v) => ({
         civ: CIV_IDS.indexOf(v.civ),
         adjDist: v.districtAdjacency ? PLACEABLE_DISTRICTS.indexOf(v.districtAdjacency.district) : -1,
         adjSrc: v.districtAdjacency?.source ?? '',
         adjAmt: v.districtAdjacency?.amount ?? 0,
         coastResY: YIELD_KEYS.map((k) => v.coastResourceYields?.[k] ?? 0),
+        // the columns `BUILDING_VARIANT_COLUMNS` names, -1 = "the base row's"
+        cost: v.cost ?? -1,
+        hasYields: v.yields ? 1 : 0,
+        yields: YIELD_KEYS.map((k) => v.yields?.[k] ?? 0),
+        housing: v.housing ?? -1,
+        amenities: v.amenities ?? -1,
+        maintenance: v.maintenance ?? -1,
+        power: v.power ?? -1,
+        hasPoweredYields: v.poweredYields ? 1 : 0,
+        poweredYields: YIELD_KEYS.map((k) => v.poweredYields?.[k] ?? 0),
+        regional: v.regional === undefined ? -1 : v.regional ? 1 : 0,
+        regionalRange: v.regionalRange ?? -1,
+        // the CLAUSES, which are the variant's own and never a column
+        noGreatWorks: v.noGreatWorks ? 1 : 0,
+        featureTileY: YIELD_KEYS.map((k) => v.featureTileYields?.[k] ?? 0),
+        goldenAgeY: YIELD_KEYS.map((k) => v.goldenAgeYields?.[k] ?? 0),
+        wallsHpBonus: v.wallsHpBonus ?? 0,
+        amenityPerLuxuryType: v.amenityPerLuxuryType ?? 0,
+        strategicPerType: v.strategicPerType ?? 0,
+        trainMovement: v.trainMovement ?? 0,
+        trainMovementClasses: (v.trainMovementClasses ?? []).map((c) => PROMO_CLASSES.indexOf(c)),
+        amenitiesWithFeature: v.amenitiesWithFeature
+          ? [featIdx.get(v.amenitiesWithFeature.feature) ?? -1, v.amenitiesWithFeature.amount] : [-1, 0],
+        districtAdjacencyAsFaith: v.districtAdjacencyAsFaith ? 1 : 0,
       })),
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror
       river: b.special === 'WATER_MILL',

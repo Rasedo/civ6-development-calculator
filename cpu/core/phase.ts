@@ -15,7 +15,7 @@ import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tra
 import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
+import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice } from './effects';
@@ -389,8 +389,8 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   // CIV6 (Barracks, Stable): "+25% combat experience for all <classes> units
   // trained in this city" — the MINOR's city trained the levy, so its
-  // standing Encampment line pays the same percentage a major's would.
-  const xpPct = trainXpPct(state, minorCity(cityState), promoClassOf(type));
+  // standing Encampment line pays the same percentage a major's would, and
+  // whatever else that city grants a unit it trains rides the same composer.
   for (let i = 0; i < LEVY_UNITS; i++) {
     // CIV6 (The Raven King): the mark the three levy clauses read — the
     // ability's +2 Movement and +5 Combat, and the 75% upgrade discount. It
@@ -398,7 +398,7 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     const lv = spawnUnit(state, type, cityState.centerIndex, seat);
     if (lv) {
       lv.levied = true;
-      lv.xpPct = xpPct;
+      applyTrainingGrants(state, minorCity(cityState), lv);
       // ...and RE-POOL: `spawnUnit` priced the pool before the mark existed,
       // so without this a levied unit is born 2 Movement short and only comes
       // right at the next refresh — A-2r exactly (C-66).
@@ -2090,7 +2090,7 @@ export function seatPhase(state: GameState): void {
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;
             bought = true;
-            u.xpPct = trainXpPct(state, spawnCity, promoClassOf(pickId));
+            applyTrainingGrants(state, spawnCity, u);
             // CIV6 (GS): a strategic unit pays its resource "the moment you
             // purchase it" — the same charge `purchaseUnit` and the GPU's
             // gold arm make; a purchase outside a queue pays full price

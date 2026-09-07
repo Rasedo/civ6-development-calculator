@@ -1,7 +1,8 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { CivId, LeaderId } from '../data/seats';
-import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type LegacyRateRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
+import { AGE_GOLDEN } from '../data/seats';
+import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type LegacyRateRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, DOMESTIC_ROUTE_YIELD_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, CAPTURE_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -64,6 +65,8 @@ export function computeUnlocksIn(
   // unlock. Required, not defaulted: `computeUnlocksIn` takes no seat, so a
   // forgotten one would quietly hand the row the base tree.
   districtPrereq: readonly DistrictPrereqRow[],
+  // the same override for a unique BUILDING (the Madrasa's Theology civic)
+  buildingPrereq: readonly BuildingPrereqRow[] = [],
 ): Unlocks {
   const u: Unlocks = {
     improvements: new Set(BASELINE.improvements),
@@ -113,6 +116,12 @@ export function computeUnlocksIn(
     if (has) u.districts.add(r.district);
     else u.districts.delete(r.district);
   }
+  for (const r of buildingPrereq) {
+    const has = r.tech !== undefined ? research.techs.includes(r.tech)
+      : r.civic !== undefined ? research.civics.includes(r.civic) : false;
+    if (has) u.buildings.add(r.building);
+    else u.buildings.delete(r.building);
+  }
   return u;
 }
 
@@ -120,7 +129,8 @@ export function computeUnlocks(state: GameState, seat: number): Unlocks {
   const s = seatOf(state, seat);
   return computeUnlocksIn(
     s ? s.research : { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
-    s ? getModifiers(state, seat).districtPrereq : []);
+    s ? getModifiers(state, seat).districtPrereq : [],
+    s ? getModifiers(state, seat).buildingPrereq : []);
 }
 
 export function isTechComplete(state: GameState, id: string, seat: number): boolean {
@@ -159,6 +169,9 @@ export interface Modifiers {
   impUpgrades: Set<string>;
   /** the civilization the seat plays (`civOf`), for the unique rows' overlays */
   civ: string | null;
+  /** CIV6 (REQUIREMENT_PLAYER_HAS_GOLDEN_AGE): the seat stands in a Golden
+   *  Age. Read by the yield rows that pay only then (the Tsikhe's Faith). */
+  goldenAge: boolean;
   /** the leader the seat plays (`leaderOf`) */
   leader: string | null;
   /** the roster's plot rows this seat holds NOW — its civilization's or
@@ -203,6 +216,7 @@ export interface Modifiers {
   cityTiles: number;
   boostPct: readonly BoostPctRow[];
   districtPrereq: readonly DistrictPrereqRow[];
+  buildingPrereq: readonly BuildingPrereqRow[];
   enemyWarWearinessPct: number;
   peacefulFounderFaith: number;
   yieldPerSuzerain: readonly YieldPerSuzerainRow[];
@@ -432,6 +446,7 @@ export function defaultModifiers(): Modifiers {
   return {
     improvementYields: {},
     civ: null,
+    goldenAge: false,
     leader: null,
     plotYields: [],
     prodMults: [],
@@ -480,6 +495,7 @@ export function defaultModifiers(): Modifiers {
     cityTiles: 0,
     boostPct: [],
     districtPrereq: [],
+    buildingPrereq: [],
     enemyWarWearinessPct: 0,
     peacefulFounderFaith: 0,
     yieldPerSuzerain: [],
@@ -830,6 +846,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
 
   const mods = modifiersFromResearch(s.research);
   mods.civ = civOf(state, seat);
+  mods.goldenAge = (seatOf(state, seat)?.age ?? 1) === AGE_GOLDEN;
   mods.leader = leaderOf(state, seat);
   mods.plotYields = plotYieldRowsFor(state, seat, mods.civ, mods.leader);
   mods.prodMults = PROD_MULT_ROWS.filter((r) => rowIsFor(r, mods.civ, mods.leader));
@@ -880,6 +897,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   mods.cityTiles = mine(CITY_TILES_ROWS).reduce((n, r) => n + r.amount, 0);
   mods.boostPct = mine(BOOST_PCT_ROWS);
   mods.districtPrereq = mine(DISTRICT_PREREQ_ROWS);
+  mods.buildingPrereq = mine(BUILDING_PREREQ_ROWS);
   mods.enemyWarWearinessPct = mine(WAR_WEARINESS_ROWS).reduce((n, r) => n + r.enemyPct, 0);
   mods.peacefulFounderFaith = mine(PEACEFUL_FOUNDER_ROWS).reduce((n, r) => n + r.amount, 0);
   mods.yieldPerSuzerain = mine(YIELD_PER_SUZERAIN_ROWS);

@@ -1046,6 +1046,23 @@ export interface DistrictPrereqRow {
   tech?: string;
   civic?: string;
 }
+/** CIV6 (Buildings.xml): a UNIQUE BUILDING may arrive on a different edge of
+ *  the tree from the row it replaces — the Madrasa on the Theology CIVIC where
+ *  the University waits for the Education tech. The row REPLACES that
+ *  building's own unlock for the seat it names, the same way
+ *  `DISTRICT_PREREQ_ROWS` replaces a district's. */
+export interface BuildingPrereqRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  building: string;
+  /** exactly ONE of the two. */
+  tech?: string;
+  civic?: string;
+}
+export const BUILDING_PREREQ_ROWS: readonly BuildingPrereqRow[] = [
+  { civ: 'ARABIA', building: 'UNIVERSITY', civic: 'THEOLOGY' },
+];
+
 export const DISTRICT_PREREQ_ROWS: readonly DistrictPrereqRow[] = [
   { leader: 'QIN', district: 'CANAL', tech: 'MASONRY' },
   // CIV6 (M'banza, Districts.xml `PrereqCivic="CIVIC_GUILDS"`): Kongo's

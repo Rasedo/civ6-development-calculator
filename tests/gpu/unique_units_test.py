@@ -193,7 +193,7 @@ def main() -> int:
         "the Janissary costs ONE citizen, in a founded city")
     print("  7 roster rows OK — the Saka's second copy and the Janissary's citizen")
 
-    # 8 — the ten unique DISTRICTS reached the wire as variants
+    # 8 — the TWELVE unique DISTRICTS reached the wire as variants
     _dvar = {}
     for _i, _d in enumerate(rules.districts):
         for _v in _d.get("variants", []):
@@ -204,10 +204,14 @@ def main() -> int:
         ("ENCAMPMENT", "ZULU"), ("NEIGHBORHOOD", "KONGO"),
         ("HARBOR", "ENGLAND"), ("HARBOR", "PHOENICIA"),
         ("ENTERTAINMENT_COMPLEX", "BRAZIL"),
+        ("AQUEDUCT", "ROME"), ("WATER_PARK", "BRAZIL"),
     ]
+    assert set(_dvar) == set(WANT), f"the unique-district wire is {set(_dvar) ^ set(WANT)} off"
     for _k in WANT:
         assert _k in _dvar, f"{_k[1]}'s variant of {_k[0]} never reached the wire"
-        assert abs(float(_dvar[_k]["costMult"]) - 1.0) < 1e-9, f"{_k} is not priced like its base row"
+        # CIV6 (Districts.xml): a unique district's Cost is HALF the row it
+        # replaces, without exception — 27 against 54, 18 against 36.
+        assert abs(float(_dvar[_k]["costMult"]) - 0.5) < 1e-9, f"{_k} is not priced at half its base row"
     assert int(_dvar[("ENCAMPMENT", "ZULU")]["housing"]) == 1, "the Ikanda's Housing"
     assert int(_dvar[("NEIGHBORHOOD", "KONGO")]["housing"]) == 5, "the M'banza's Housing"
     assert int(_dvar[("ENTERTAINMENT_COMPLEX", "BRAZIL")]["amenities"]) == 2, "the Carnival's Amenity"
@@ -223,6 +227,10 @@ def main() -> int:
     assert ids[int(_mb["grantUnit"])] == "APOSTLE", "the M'banza grants no Apostle"
     assert int(_dvar[("HARBOR", "ENGLAND")]["grantNaval"]) == 1, "the Dockyard grants no hull"
     assert int(_dvar[("HARBOR", "PHOENICIA")]["grantNaval"]) == 0, "the Cothon grants a hull"
+    # the Bath's own Housing and Amenity, and the Copacabana's Amenity
+    assert int(_dvar[("AQUEDUCT", "ROME")]["housing"]) == 2, "the Bath's Housing"
+    assert int(_dvar[("AQUEDUCT", "ROME")]["amenities"]) == 1, "the Bath's Amenity"
+    assert int(_dvar[("WATER_PARK", "BRAZIL")]["amenities"]) == 2, "the Copacabana's Amenity"
     print(f"  8 unique districts OK — {len(WANT)} variants, the Seowon's own set, "
           "the M'banza's yields and the Dockyard's hull")
 
@@ -242,6 +250,79 @@ def main() -> int:
     assert sum(1 for r in _prows if int(r["cv"]) >= 0 or int(r["ld"]) >= 0) == 1, (
         "more than one project is gated to a civilization")
     print("  9 cothon project OK — last in the catalog, Phoenicia's, priced off game progress")
+
+    # 10 — the EIGHT unique BUILDINGS: every column the exporter carries and
+    # every clause that is not a column. `_b_cols` merges the overrides; a -1
+    # scalar (or an all-zero `hasYields`) means "take the base row's".
+    _bids = [b["id"] for b in rules.buildings]
+    _bvar = {}
+    for _bi, _b in enumerate(rules.buildings):
+        for _v in _b.get("variants", []):
+            _bvar[(_bids[_bi], civs[int(_v["civ"])])] = _v
+    _want = {
+        ("BROADCAST_CENTER", "AMERICA"), ("UNIVERSITY", "ARABIA"),
+        ("FACTORY", "JAPAN"), ("STABLE", "MONGOLIA"),
+        ("RENAISSANCE_WALLS", "GEORGIA"), ("BANK", "OTTOMAN"),
+        ("AMPHITHEATER", "MAORI"), ("ZOO", "HUNGARY"), ("TEMPLE", "NORWAY"),
+    }
+    assert set(_bvar) == _want, f"the unique-building wire is {set(_bvar) ^ _want} off"
+    _bank = rules.buildings[_bids.index("BANK")]
+    _gb = _bvar[("BANK", "OTTOMAN")]
+    assert 0 < int(_gb["cost"]) < int(_bank["cost"]), "the Grand Bazaar is not cheaper than the Bank"
+    assert int(_gb["amenityPerLuxuryType"]) == 1 and int(_gb["strategicPerType"]) == 1
+    _ef = _bvar[("FACTORY", "JAPAN")]
+    assert int(_ef["hasYields"]) == 1 and _ef["yields"][1] == 4, "the Electronics Factory pays no 4 Production"
+    assert int(_ef["cost"]) == -1, "the Electronics Factory names a price of its own"
+    _tb = _bvar[("ZOO", "HUNGARY")]
+    assert int(_tb["amenities"]) == 2 and int(_tb["amenitiesWithFeature"][1]) == 2
+    _ts = _bvar[("RENAISSANCE_WALLS", "GEORGIA")]
+    assert int(_ts["wallsHpBonus"]) == 100 and _ts["goldenAgeY"][5] == 4
+    _mr = _bvar[("AMPHITHEATER", "MAORI")]
+    assert int(_mr["noGreatWorks"]) == 1 and _mr["featureTileY"][4] == 1 and _mr["featureTileY"][5] == 1
+    assert int(_mr["maintenance"]) == 0, "the Marae keeps the Amphitheater's upkeep"
+    _or = _bvar[("STABLE", "MONGOLIA")]
+    assert int(_or["trainMovement"]) == 1 and len(_or["trainMovementClasses"]) == 2
+    _md = _bvar[("UNIVERSITY", "ARABIA")]
+    assert int(_md["districtAdjacencyAsFaith"]) == 1
+    print("  10 unique buildings OK — nine wire rows, every override and clause")
+
+    # 11 — the Madrasa's own unlock REPLACES the University's
+    _bp = list(rules.uniques["buildingPrereq"])
+    assert len(_bp) == 1, "the building-unlock override table is not one row"
+    _pc, _pl, _pb, _pt, _pv = (int(x) for x in _bp[0])
+    assert _pc == civs.index("ARABIA") and _pb == _bids.index("UNIVERSITY")
+    assert _pt < 0 and _pv >= 0, "the Madrasa waits on a TECH, not a civic"
+    print("  11 madrasa unlock OK — Arabia's University opens on a civic")
+
+    # 12 — the merged per-row column table: a seat that plays no variant
+    # reads the base catalog, and the one that does reads its own.
+    _ott = civs.index("OTTOMAN")
+    _bi_bank = _bids.index("BANK")
+    _cols0 = sim._b_cols(0)
+    assert _cols0["cost"].shape == (sim.B, len(_bids)), "the merged cost table is the wrong shape"
+    for r in range(sim.n_majors):
+        _c = sim._b_cols(r)["cost"][:, _bi_bank]
+        _plays = sim.row_civ[:, r] == _ott
+        assert bool((_c[~_plays] == float(_bank["cost"])).all()), (
+            f"row {r} pays the Bazaar price where it plays no Ottoman")
+        if bool(_plays.any()):
+            assert bool((_c[_plays] == float(_gb["cost"])).all()), (
+                f"row {r} pays the Bank price where it PLAYS the Ottomans")
+    # REACH the merge: the seeder need not have dealt the Ottomans to anybody,
+    # so seat them by hand on game 0 of a spare row and read the table again.
+    # (`_b_cols` caches by row, so this uses a row nothing above has asked for.)
+    _spare = sim.n_majors - 1
+    sim._bvar_col_cache.pop(_spare, None)  # the loop above cached the base table
+    sim.row_civ[0, _spare] = _ott
+    _cm = sim._b_cols(_spare)
+    assert float(_cm["cost"][0, _bi_bank]) == float(_gb["cost"]), (
+        "a seated Ottoman row still pays the Bank's price")
+    assert float(_cm["amenities"][0, _bids.index("ZOO")]) == float(rules.buildings[_bids.index("ZOO")]["amenities"]), (
+        "the Ottoman row took Hungary's Thermal Bath Amenity")
+    if sim.B > 1:
+        assert float(_cm["cost"][1, _bi_bank]) == float(_bank["cost"]), (
+            "the merge leaked into a game that plays no Ottoman")
+    print("  12 merged columns OK — the base row everywhere, the variant on the seated game alone")
 
     print("UNIQUE UNITS OK")
     return 0

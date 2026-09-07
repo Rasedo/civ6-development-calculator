@@ -10,14 +10,14 @@ import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PE
 import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
 import { citiesOf, civOf, seatOf, tileOwnedByCiv } from './seats';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
-import { cityPower, darkBuildings } from './yields';
+import { cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 
@@ -100,6 +100,26 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     const per = STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource)
       + governorTileSum(state, t, (e) => e.stockpilePerTurn) + add;
     bk[k] += Math.floor((per * (100 + pct)) / 100);
+  }
+  // CIV6 (Grand Bazaar, GRANDBAZAAR_ACCUMULATION_STRATEGICS Amount 1):
+  // "Accumulate 1 extra Strategic resource for every different type of
+  // Strategic resource this city has improved." The modifier is named for
+  // DIVERSITY, so the extra is paid once per DISTINCT kind the city has
+  // improved, on that kind — which totals exactly the "1 extra for every
+  // different type" the description promises.
+  const bzCiv = civOf(state, seat);
+  for (const city of citiesOf(state, seat)) {
+    const dark = darkBuildings(state.map, city);
+    let per = 0;
+    for (const id of city.buildings) {
+      if (dark.has(id)) continue;
+      per += buildingVariantFor(bzCiv, id)?.strategicPerType ?? 0;
+    }
+    if (!per) continue;
+    for (const r of cityImprovedResourceKinds(state, city, 'strategic')) {
+      const k = strategicSlot(r);
+      if (k >= 0) bk[k] += per;
+    }
   }
   // CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" — a
   // standing grant, owed whether or not the seat mines any.

@@ -732,6 +732,7 @@ const UNIT_G: Record<string, Extractor> = {
   promoUsed: overUnits((u) => u.promoUsed ?? 0),
   promoBonus: overUnits((u) => u.promoBonus ?? 0),
   xpPct: overUnits((u) => u.xpPct ?? 0),
+  mpBonus: overUnits((u) => u.mpBonus ?? 0),
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
   movesFull: ((state, rows) => (rows as Unit[]).map((u) => grantedMoves(state, u))) as Extractor,

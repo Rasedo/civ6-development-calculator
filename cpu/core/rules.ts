@@ -16,7 +16,7 @@ import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
 import { seatGovernmentId } from './seatTurn';
 import { cityLowlands, floodBarrierCost } from './climate';
-import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
+import { BUILDINGS, type BuildingDef, buildingVariantFor, buildingsForDistrict, effectiveBuilding } from '../data/buildings';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -587,7 +587,12 @@ export function repairDrip(state: GameState, city: City, before: number): void {
 /** The size of that tier's perimeter pool — what a fresh set of walls is
  *  worth and what a repair restores. */
 export function wallsMax(state: GameState, city: { buildings: string[]; seat: number }): number {
-  return WALLS_TIER_HP[wallsTier(state, city)] ?? 0;
+  let hp = WALLS_TIER_HP[wallsTier(state, city)] ?? 0;
+  // CIV6 (Tsikhe, OuterDefenseHitPoints 200 against the Star Fort's 100): a
+  // unique walls row carries a bigger perimeter than the tier it supplies.
+  const civ = civOf(state, city.seat);
+  for (const b of city.buildings) hp += buildingVariantFor(civ, b)?.wallsHpBonus ?? 0;
+  return hp;
 }
 
 /** The outer-defense pool a city has right now. Absent = FULL where the walls
@@ -669,7 +674,7 @@ export function fitEncampOuter(state: GameState, city: City): void {
  * live price never reshuffles the wire.
  */
 export function buildingCostIn(state: GameState, city: City, id: string): number {
-  const def = BUILDINGS[id];
+  const def = effectiveBuilding(civOf(state, city.seat), id);
   if (!def) return 0;
   const full = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
   // CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing pillaged

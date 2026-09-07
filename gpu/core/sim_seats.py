@@ -1133,15 +1133,18 @@ class SimSeats:
         if self._walls_rows:
             elig6 = elig6 & (self._walls_build_ok(row).unsqueeze(2)
                              | (self._b_walls.reshape(1, 1, -1) == 0))
-        key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
-            + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
-        key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
+        # the SEAT's own prices: a unique building may be cheaper than the row
+        # it replaces, and the cheapest-first key has to see that
+        _bc6 = self._b_cols(row)["cost"]                              # [B, NB]
+        key6 = (_bc6.reshape(B, 1, NB6) * 1024 + torch.arange(NB6, device=dev, dtype=_bc6.dtype).reshape(1, 1, -1)) * 32 \
+            + torch.arange(self.RC, device=dev, dtype=_bc6.dtype).reshape(1, -1, 1)
+        key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=_bc6.dtype, device=dev))
         flat6 = key6.reshape(B, -1)
         best6 = flat6.argmin(dim=1)
         has6 = active & torch.isfinite(flat6.gather(1, best6.unsqueeze(1)).squeeze(1))
         jj6 = torch.div(best6, NB6, rounding_mode="floor")
         bb6 = best6 % NB6
-        price6 = self._gold_price(row, rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult)
+        price6 = self._gold_price(row, _bc6.gather(1, bb6.unsqueeze(1)).squeeze(1) * self.rules.gold_purchase_mult)
         reserve6 = float(self.rules.seats.get("peaceGold0", 150))
         can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
@@ -1223,6 +1226,69 @@ class SimSeats:
         if i < 0 or row >= self.n_majors:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self.row_civ[:, row] == i
+
+    def _b_cols(self, row: int) -> dict[str, torch.Tensor]:
+        """The BUILDING COLUMNS one seat row actually builds, per game: the
+        base catalog with this row's civilization's unique variants merged over
+        it. `effectiveBuilding`'s twin, and the one door every column reader
+        goes through, so a unique building's price, yields, Housing, Amenities,
+        upkeep, Power and regional reach all arrive together.
+
+        Shapes are [B, NB] ([B, NB, 6] for the two yield tables). A row whose
+        civilization carries no variant gets the base row broadcast, which is
+        what makes this cheap for every seat but the handful that matter.
+
+        Cached by ROW: `row_civ` is read off the fixture in `__init__` and
+        never written again, so a merged table cannot go stale.
+        """
+        hit = self._bvar_col_cache.get(row)
+        if hit is not None:
+            return hit
+        rd, dev = self.rules_dev, self.device
+        B, NB = self.B, rd.b_cost.shape[0]
+
+        def _s(t: torch.Tensor) -> torch.Tensor:
+            return t.double().reshape(1, NB).expand(B, NB)
+
+        out = {
+            "cost": _s(rd.b_cost),
+            "yields": rd.b_yields.double().reshape(1, NB, 6).expand(B, NB, 6),
+            "housing": _s(rd.b_housing),
+            "amenities": _s(rd.b_amenities),
+            "maintenance": _s(rd.b_maintenance),
+            "power": _s(self._b_power),
+            "powY": self._b_pow_y.double().reshape(1, NB, 6).expand(B, NB, 6),
+            "regional": self._b_regional.reshape(1, NB).expand(B, NB),
+            "regionalRange": _s(self._b_regional_range),
+        }
+        if not self._bvar_any or row >= self.n_majors:
+            self._bvar_col_cache[row] = out
+            return out
+        live = [(bi, civ, v) for bi, civ, v in self._bvar_cols
+                if bool(self._row_plays_idx(row, civ).any())]
+        if not live:
+            self._bvar_col_cache[row] = out
+            return out
+        out = {k: t.clone() for k, t in out.items()}
+        for bi, civ, v in live:
+            who = self._row_plays_idx(row, civ)                      # [B]
+            for key, col in (("cost", "cost"), ("housing", "housing"),
+                             ("amenities", "amenities"), ("maintenance", "maintenance"),
+                             ("power", "power"), ("regionalRange", "regionalRange")):
+                x = float(v[col])
+                if x >= 0:  # -1 means "take the base row's"
+                    out[key][:, bi] = torch.where(who, torch.full_like(out[key][:, bi], x), out[key][:, bi])
+            _rg = int(v["regional"])
+            if _rg >= 0:
+                out["regional"][:, bi] = torch.where(who, torch.full_like(out["regional"][:, bi], bool(_rg)), out["regional"][:, bi])
+            for key, has, col in (("yields", "hasYields", "yields"),
+                                  ("powY", "hasPoweredYields", "poweredYields")):
+                if not int(v[has]):
+                    continue
+                y = torch.tensor([float(x) for x in v[col]], dtype=torch.float64, device=dev)
+                out[key][:, bi, :] = torch.where(who.unsqueeze(1), y.reshape(1, 6).expand(B, 6), out[key][:, bi, :])
+        self._bvar_col_cache[row] = out
+        return out
 
     def _row_plays_idx(self, row: int, civ: int) -> torch.Tensor:
         """[B] bool — `_row_plays` by civilization index."""
@@ -1745,8 +1811,9 @@ class SimSeats:
         elig = self._seat_buildable(row, True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.unsqueeze(1)
         if self._walls_rows:
             elig = elig & (self._walls_build_ok(row).unsqueeze(2) | (self._b_walls.reshape(1, 1, -1) == 0))
-        key = (rdv.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB, device=dev, dtype=rdv.b_cost.dtype).reshape(1, 1, -1)) * 32             + torch.arange(self.RC, device=dev, dtype=rdv.b_cost.dtype).reshape(1, -1, 1)
-        key = torch.where(elig, key.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv.b_cost.dtype, device=dev))
+        _bcf = self._b_cols(row)["cost"]                               # [B, NB]
+        key = (_bcf.reshape(B, 1, NB) * 1024 + torch.arange(NB, device=dev, dtype=_bcf.dtype).reshape(1, 1, -1)) * 32             + torch.arange(self.RC, device=dev, dtype=_bcf.dtype).reshape(1, -1, 1)
+        key = torch.where(elig, key.expand(B, -1, -1), torch.tensor(float("inf"), dtype=_bcf.dtype, device=dev))
         flat = key.reshape(B, -1)
         best = flat.argmin(dim=1)
         has = held & torch.isfinite(flat.gather(1, best.unsqueeze(1)).squeeze(1))
@@ -1802,7 +1869,7 @@ class SimSeats:
             cut = torch.where(
                 self._suz_effect(row, self._suz_c_faith_bldg) & (self._b_walls[bi] > 0),
                 torch.full_like(cut, self._valletta_walls_pct), cut)
-        return js_round(self.rules_dev.b_cost.gather(0, bi).double()
+        return js_round(self._b_cols(row)["cost"].gather(1, bi.unsqueeze(1)).squeeze(1)
                         * self.rules.faith_purchase_mult * (100 - cut).double() / 100.0)
 
     def _seat_naturalist_candidate(self, row: int, active: torch.Tensor):
@@ -2030,7 +2097,7 @@ class SimSeats:
                 _, _, _, _, elig = self._seat_buy_candidates(row, active)
                 jc = jjw.clamp(min=0, max=self.RC - 1)
                 bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
-                price = self._gold_price(row, self.rules_dev.b_cost.gather(0, bc).double() * mult)
+                price = self._gold_price(row, self._b_cols(row)["cost"].gather(1, bc.unsqueeze(1)).squeeze(1) * mult)
                 reserve = float(self.rules.seats.get("peaceGold0", 150))
                 ok = want & elig[torch.arange(B, device=dev), jc, bc] \
                     & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
@@ -2088,9 +2155,11 @@ class SimSeats:
                         self.city_bldg[bidx, row, spawn_slot] & ~self._bldg_dark(
                             self.city_dist_tile[bidx, row, spawn_slot], self.city_bldg_pillaged[bidx, row, spawn_slot]),
                         pick_ty, row, spawn_slot)
+                    _bl_g = self.city_bldg[bidx, row, spawn_slot] & ~self._bldg_dark(
+                        self.city_dist_tile[bidx, row, spawn_slot], self.city_bldg_pillaged[bidx, row, spawn_slot])
                     landed_u = self._spawn_unit(
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
-                        pick_ty, init_xp=xp_u)
+                        pick_ty, init_xp=xp_u, init_mp=self._train_mp_bonus(_bl_g, pick_ty, row))
                     price_u = self._gold_price(row, self._type_cost.gather(0, pick_ty).double() * mult
                                                * self._congress_unit_buy_mult(0)
                                                * self._suz_land_buy_mult(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1)
@@ -2271,7 +2340,10 @@ class SimSeats:
                     self.city_bldg[bidx, row, ju] & ~self._bldg_dark(
                         self.city_dist_tile[bidx, row, ju], self.city_bldg_pillaged[bidx, row, ju]),
                     bu, row, ju)
-                landed_u = self._spawn_unit(row, buy_u, at_u, bu, init_xp=xp_u)
+                _bl_f = self.city_bldg[bidx, row, ju] & ~self._bldg_dark(
+                    self.city_dist_tile[bidx, row, ju], self.city_bldg_pillaged[bidx, row, ju])
+                landed_u = self._spawn_unit(row, buy_u, at_u, bu, init_xp=xp_u,
+                                            init_mp=self._train_mp_bonus(_bl_f, bu, row))
                 self.civ_faith[:, row] = torch.where(landed_u, self.civ_faith[:, row] - price_u, self.civ_faith[:, row])
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, landed_u & (bu == _ui), _ui)
@@ -7555,7 +7627,7 @@ class SimSeats:
         alive = self.city_alive[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
         stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])  # [B, cols, NB]
-        demand = stand.double() @ self._b_power
+        demand = torch.einsum("bjn,bn->bj", stand.double(), self._b_cols(row)["power"])
         demand = demand + self._laser_power_load * self.city_lasers[:, row, :cols].double()
         demand = torch.where(alive, demand, torch.zeros_like(demand))
         nP = max(len(self._plant_bidx), 1)
@@ -7700,6 +7772,31 @@ class SimSeats:
                     if _st >= 0 and _sp:
                         pct = pct + (self._row_is(row, _sc, _sl).unsqueeze(1) & (self.terrain == _st)).long() * _sp
                 bank[:, k] += ((pt * (100 + pct)) // 100).sum(dim=1)
+        # CIV6 (Grand Bazaar, GRANDBAZAAR_ACCUMULATION_STRATEGICS Amount 1):
+        # "Accumulate 1 extra Strategic resource for every different type of
+        # Strategic resource this city has improved." The modifier is named for
+        # DIVERSITY, so the extra is paid once per DISTINCT kind the city has
+        # improved, on that kind.
+        if self._bvar_strat_type and row < self.n_majors:
+            cols = self.RC
+            _dark = self._bldg_dark(self.city_dist_tile[:, row, :cols],
+                                    self.city_bldg_pillaged[:, row, :cols])
+            _alive = self.city_alive[:, row, :cols]
+            _slot = self.city_slot_at(row)
+            for (_zbi, _zciv), _zamt in self._bvar_strat_type.items():
+                _zw = self._row_plays_idx(row, _zciv)
+                if not bool(_zw.any()):
+                    continue
+                _held = (self.city_bldg[:, row, :cols, _zbi] & ~_dark[:, :, _zbi]
+                         & _alive & _zw.unsqueeze(1))
+                if not bool(_held.any()):
+                    continue
+                for k, rid in enumerate(self._strat_rid):
+                    _hs = torch.where(owned & (self.res_id == rid), _slot,
+                                      torch.full_like(_slot, -1))
+                    _cnt = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
+                    _cnt.scatter_add_(1, _hs.clamp(min=0, max=cols - 1), (_hs >= 0).long())
+                    bank[:, k] += (_held & (_cnt > 0)).sum(dim=1) * int(_zamt)
         # CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" —
         # a standing grant, owed whether or not the seat mines any.
         if self._auto_ura_slot >= 0:
@@ -7707,6 +7804,39 @@ class SimSeats:
                 self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
+
+    def _city_has_feature(self, row: int, feat: int) -> torch.Tensor:
+        """[B, RC] bool — CIV6 (REQUIREMENT_CITY_HAS_X_FEATURE_TYPE): does this
+        city's BORDER hold at least one tile carrying the feature?"""
+        cols = self.RC
+        if feat < 0:
+            return torch.zeros(self.B, cols, dtype=torch.bool, device=self.device)
+        hit = (self.feat_id == feat) & ~self.feat_stripped
+        sl = torch.where(hit, self.city_slot_at(row), torch.full_like(self.feat_id, -1))
+        cnt = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
+        cnt.scatter_add_(1, sl.clamp(min=0, max=cols - 1), (sl >= 0).long())
+        return cnt > 0
+
+    def _city_improved_res_kinds(self, row: int, cat: int) -> torch.Tensor:
+        """[B, RC] long — the DISTINCT resources of one category each city of
+        this row has IMPROVED inside its own borders: the tile is unpillaged
+        and carries the resource's own improvement
+        (`cityImprovedResourceKinds`)."""
+        cols = self.RC
+        out = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
+        ok = ((self.res_cat == cat) & ~self.pillaged
+              & (self.improvement >= 0) & (self.improvement == self.res_imp))
+        if not bool(ok.any()):
+            return out
+        sl = torch.where(ok, self.city_slot_at(row), torch.full_like(self.res_id, -1))
+        nr = int(self.res_id.max().item()) + 1
+        for rid in range(nr):
+            here = sl.clone()
+            here = torch.where(self.res_id == rid, here, torch.full_like(here, -1))
+            cnt = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
+            cnt.scatter_add_(1, here.clamp(min=0, max=cols - 1), (here >= 0).long())
+            out = out + (cnt > 0).long()
+        return out
 
     def _stockpile_cap(self, row: int) -> torch.Tensor:
         """[B] — CIV6 (GS): 50 for each resource, "+10 per building" for every
@@ -7769,6 +7899,7 @@ class SimSeats:
         reach = self._regional_range + self._suz_reach_bonus * self._suz_effect(row, self._suz_c_reach).long().reshape(B, 1, 1)
         lit = None
         y6 = am = None
+        bcol = self._b_cols(row)
         for n in self._reg_bidx:
             own_n = self.city_bldg[:, row, :cols, n] & alive
             if not bool(own_n.any()):
@@ -7782,8 +7913,8 @@ class SimSeats:
             # CIV6 (Aquarium, Aquatics Center): "This bonus extends to each City
             # Center within 9 tiles" — a row with its own reach ignores the
             # shared one, the suzerain bonus included.
-            _rr = int(self._b_regional_range[n])
-            reach_n = torch.full_like(reach, _rr) if _rr > 0 else reach
+            _rr = bcol["regionalRange"][:, n].long().reshape(B, 1, 1)
+            reach_n = torch.where(_rr > 0, _rr, reach)
             _in = ok.unsqueeze(2) & (dd <= reach_n)
             has = _in.any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
@@ -7792,9 +7923,10 @@ class SimSeats:
             if y6 is None:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
-            y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().reshape(1, 1, 6)
-            am = am + hf * float(self.rules.b_amenities[n])
-            if float(self._b_pow_y[n].abs().sum()) == 0 and float(self._b_pow_am[n]) == 0:
+            y6 = y6 + hf.unsqueeze(2) * bcol["yields"][:, n, :].reshape(B, 1, 6)
+            am = am + hf * bcol["amenities"][:, n].reshape(B, 1)
+            _pw = bcol["powY"][:, n, :]                              # [B, 6]
+            if not bool((_pw != 0).any()) and float(self._b_pow_am[n]) == 0:
                 continue
             if lit is None:
                 lit = self.city_powered[:, row, :cols]
@@ -7803,10 +7935,10 @@ class SimSeats:
             hpf = hp.double()
             if every is not None and int(self._b_req_district[n]) == self._iz_idx:
                 hpf = torch.where(every, (_lin.sum(dim=1) * alive).double(), hpf)
-            y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
+            y6 = y6 + hpf.unsqueeze(2) * _pw.reshape(B, 1, 6)
             _pa = self._powered_add(row)
             if _pa is not None:
-                y6 = y6 + hpf.unsqueeze(2) * (self._b_pow_y_mask[n].reshape(1, 1, 6) * _pa.unsqueeze(1))
+                y6 = y6 + hpf.unsqueeze(2) * ((_pw != 0).double().reshape(B, 1, 6) * _pa.unsqueeze(1))
             am = am + hpf * float(self._b_pow_am[n])
         return None if y6 is None else (y6, am)
 
@@ -7868,7 +8000,6 @@ class SimSeats:
         dreg = self.city_dist_tile[:, row, :cols]
         dflat = dreg.clamp(min=0).reshape(B, -1)
         dcomp = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
-        rd = self.rules_dev
         # cityMaintenance — per-type district upkeep over COMPLETED districts
         # (no pillage gate) + buildingMaintenance over EVERY building (no
         # pillage and no regional skip; cityMaintenance has neither), + the
@@ -7877,7 +8008,7 @@ class SimSeats:
         # per INSTANCE off the tile plane — the registry keeps one per type
         maint = (self._d_maint.double().reshape(1, 1, -1)
                  * self._dist_counts(row, pillage_gate=False)[:, :cols].double()).sum(dim=2)
-        maint = maint + torch.einsum("bjn,n->bj", bldg.double(), rd.b_maintenance.double())
+        maint = maint + torch.einsum("bjn,bn->bj", bldg.double(), self._b_cols(row)["maintenance"])
         maint = maint + float(self.rules.palace_maintenance) * is_cap_a
         # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
         # aqFreshBonus, a dry one is raised to aqNoFreshTotal. A pillaged
@@ -7901,7 +8032,7 @@ class SimSeats:
         else:
             water = wh
         selb_h = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
-        housing = water + torch.einsum("bjn,n->bj", selb_h.double(), rd.b_housing.double())
+        housing = water + torch.einsum("bjn,bn->bj", selb_h.double(), self._b_cols(row)["housing"])
         housing = housing + self._palace_housing * is_cap_a
         # CIV6 (Kupe's Voyage): "The Palace receives +3 Housing" (`CAPITAL_ROWS`)
         for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
@@ -8002,12 +8133,29 @@ class SimSeats:
         block calls this ONCE per row, at its loop top (_seat_city_stats), so
         the luxury ranking freezes there for the whole walk."""
         cols = self.RC
-        rd = self.rules_dev
         alive = self.city_alive[:, row, :cols]
         is_cap = self.city_is_cap[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
-        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols]) & ~self._b_regional.reshape(1, 1, -1)
-        have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
+        _bc = self._b_cols(row)
+        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols]) & ~_bc["regional"].unsqueeze(1)
+        have = torch.einsum("bjn,bn->bj", selb.to(torch.float64), _bc["amenities"])
+        # CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): a unique building may
+        # pay MORE while its city's border holds a tile of one feature.
+        for (_abi, _aciv), (_afeat, _aamt) in self._bvar_amen_feat.items():
+            _aw = self._row_plays_idx(row, _aciv)
+            if not bool(_aw.any()):
+                continue
+            have = have + (selb[:, :, _abi] & _aw.unsqueeze(1)
+                           & self._city_has_feature(row, _afeat)).double() * _aamt
+        # CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES): "Receive 1
+        # Amenity for every Luxury resource this city has improved" — the
+        # DISTINCT kinds inside its own borders.
+        for (_lbi, _lciv), _lamt in self._bvar_amen_lux.items():
+            _lw = self._row_plays_idx(row, _lciv)
+            if not bool(_lw.any()):
+                continue
+            have = have + ((selb[:, :, _lbi] & _lw.unsqueeze(1)).double()
+                           * self._city_improved_res_kinds(row, 3).double() * _lamt)
         # CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
         for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
             if _ca:
@@ -8806,10 +8954,10 @@ class SimSeats:
             return
         self._eff_version += 1  # the city founded above must be in the walk
         B, dev = self.B, self.device
-        cost = self.rules_dev.b_cost
-        NB = cost.shape[0]
+        cost = self._b_cols(row)["cost"][rows]                         # [n, NB]
+        NB = cost.shape[1]
         elig = self._seat_buildable(row, True)[rows, slot] & (self._b_req_district < 0).unsqueeze(0)
-        key = torch.where(elig, (cost * 1024 + torch.arange(NB, device=dev, dtype=cost.dtype)).unsqueeze(0).expand(len(rows), -1),
+        key = torch.where(elig, cost * 1024 + torch.arange(NB, device=dev, dtype=cost.dtype).unsqueeze(0),
                           torch.tensor(float("inf"), dtype=cost.dtype, device=dev))
         best = key.argmin(dim=1)
         has = torch.isfinite(key.gather(1, best.unsqueeze(1)).squeeze(1))

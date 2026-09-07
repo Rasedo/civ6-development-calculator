@@ -960,7 +960,11 @@ class SimPhase:
                   if self.n_governors else torch.zeros_like(made_u))
             # CIV6 (Military alliance 3): "Units start with a free Promotion."
             fp = fp | self._allied_type(row, 3, 3).any(dim=1)
-            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp, free_promo=fp, formation=form_t)
+            _bl_u = self.city_bldg[bidx, row, col, :] & ~self._bldg_dark(
+                self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
+            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
+                             free_promo=fp, formation=form_t,
+                             init_mp=self._train_mp_bonus(_bl_u, ui, row))
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
             # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)

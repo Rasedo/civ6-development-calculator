@@ -19,6 +19,7 @@
  */
 import type { City, GameState } from './types';
 import { darkBuildings } from './yields';
+import { buildingVariantFor } from '../data/buildings';
 import { rowIsFor } from '../data/civilizations';
 import { civOf, leaderOf } from './seats';
 import {
@@ -102,7 +103,9 @@ export function workContext(state: GameState, city: WorkCity): WorkContext {
       p = (city.wonders ?? []).some((w) => w.id === h.id && state.map.tiles[w.tileIndex]?.builtWonderComplete);
       o = p;
     } else {
-      p = city.buildings.includes(h.id);
+      // CIV6 (Marae, "Has no Great Work slots"): a seat's unique copy of a
+      // holder may declare none of the slots the base row does.
+      p = city.buildings.includes(h.id) && !buildingVariantFor(civ, h.id)?.noGreatWorks;
       o = p && !dark.has(h.id);
     }
     present.push(p);

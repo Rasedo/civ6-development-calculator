@@ -9,6 +9,7 @@
  */
 
 import type { DistrictId, Yields } from '../core/types';
+import type { FeatureId } from '../../world/types';
 import type { AdjacencySource } from './districts';
 import type { CivId } from './seats';
 import type { PromoClass } from './promotions';
@@ -20,11 +21,69 @@ import { GAME_SPEED } from './constants';
 export interface BuildingVariant {
   civ: CivId;
   name: string;
+  /**
+   * Every column below OVERRIDES the row it replaces; absent takes the base
+   * row's own. The install prices a unique building by its own `Cost`, but
+   * this catalog's costs come from the published ladder rather than the XML
+   * (see the file header), so a variant's cost is the install's RATIO applied
+   * to the base row's cost, and each row writes the arithmetic down.
+   */
+  cost?: number;
+  yields?: Partial<Yields>;
+  housing?: number;
+  amenities?: number;
+  maintenance?: number;
+  power?: number;
+  poweredYields?: Partial<Yields>;
+  regional?: boolean;
+  regionalRange?: number;
+  /** the unique row's OWN unlock, where it differs from the base row's — the
+   *  Madrasa arrives on a CIVIC where the University waits for a tech. */
+  unlockTech?: string;
+  unlockCivic?: string;
+  trainXpPct?: number;
+  trainXpClasses?: readonly PromoClass[];
   /** EFFECT_FEATURE_ADJACENCY: one more adjacency rule for a district of the city */
   districtAdjacency?: { district: DistrictId; source: AdjacencySource; amount: number };
   /** extra yields on every Coast tile of the city that carries a resource */
   coastResourceYields?: Partial<Yields>;
+  /** CIV6 (Marae, "Has no Great Work slots"): this seat's copy of the row
+   *  holds none of the slots the base row declares. */
+  noGreatWorks?: boolean;
+  /** CIV6 (Marae, MARAE_CULTURE_FEATURES / MARAE_FAITH_FEATURES): yields on
+   *  every tile of the city carrying a PASSABLE feature. */
+  featureTileYields?: Partial<Yields>;
+  /** CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): what the row pays ON TOP while
+   *  its seat holds a Golden Age. */
+  goldenAgeYields?: Partial<Yields>;
+  /** CIV6 (Tsikhe, OuterDefenseHitPoints 200 against the Star Fort's 100):
+   *  what the row adds to its city's outer-defense pool on top of its tier. */
+  wallsHpBonus?: number;
+  /** CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES Amount 1): one
+   *  Amenity per DISTINCT luxury this city has improved. */
+  amenityPerLuxuryType?: number;
+  /** CIV6 (Grand Bazaar, GRANDBAZAAR_ACCUMULATION_STRATEGICS Amount 1): one
+   *  extra unit accumulated per DISTINCT strategic this city has improved. */
+  strategicPerType?: number;
+  /** CIV6 (Ordu, ABILITY_ORDU_INCREASED_MOVEMENT): Movement granted for life
+   *  to the classes in `trainMovementClasses`, trained in this row's city. */
+  trainMovement?: number;
+  trainMovementClasses?: readonly PromoClass[];
+  /** CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES Amount 2): Amenities this
+   *  row pays ON TOP while its city holds at least one tile of this feature. */
+  amenitiesWithFeature?: { feature: FeatureId; amount: number };
+  /** CIV6 (Madrasa, OldYieldType SCIENCE -> NewYieldType FAITH): the row pays
+   *  FAITH equal to its district's own adjacency bonus, beside the Science
+   *  that bonus already pays. */
+  districtAdjacencyAsFaith?: boolean;
 }
+
+/** the BuildingDef columns a `BuildingVariant` may override, one list so a
+ *  new column is added in exactly one place. */
+export const BUILDING_VARIANT_COLUMNS = [
+  'cost', 'yields', 'housing', 'amenities', 'maintenance', 'power',
+  'poweredYields', 'regional', 'regionalRange', 'trainXpPct', 'trainXpClasses',
+] as const;
 
 export interface BuildingDef {
   id: string;
@@ -187,7 +246,18 @@ const rawList: BuildingDef[] = [
   { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1 },
 
   { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 90, yields: { science: 2 }, maintenance: 1 },
-  { id: 'UNIVERSITY', name: 'University', district: 'CAMPUS', cost: 250, requiresAny: ['LIBRARY'], yields: { science: 4 }, housing: 1, maintenance: 2 },
+  {
+    id: 'UNIVERSITY', name: 'University', district: 'CAMPUS', cost: 250, requiresAny: ['LIBRARY'], yields: { science: 4 }, housing: 1, maintenance: 2,
+    // CIV6 (BUILDING_MADRASA): Cost 250 against the University's 250 (no
+    // discount), Maintenance 2, Housing 1, Science 5 — and PrereqCivic
+    // THEOLOGY where the University waits for the Education TECH. Its
+    // OldYieldType SCIENCE / NewYieldType FAITH row pays the Campus's own
+    // adjacency a second time, in Faith.
+    civVariants: [{
+      civ: 'ARABIA', name: 'Madrasa', yields: { science: 5 },
+      unlockCivic: 'THEOLOGY', districtAdjacencyAsFaith: true,
+    }],
+  },
   { id: 'RESEARCH_LAB', name: 'Research Lab', district: 'CAMPUS', cost: 440, requiresAny: ['UNIVERSITY'], yields: { science: 3 }, power: 3, poweredYields: { science: 5 }, maintenance: 3 },
 
   { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 70, yields: { faith: 2 }, maintenance: 1 },
@@ -208,11 +278,41 @@ const rawList: BuildingDef[] = [
   { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 1, worship: true },
   { id: 'STUPA', name: 'Stupa', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, amenities: 1, worship: true },
 
-  { id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 150, yields: { culture: 2 }, maintenance: 1 },
+  {
+    id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 150, yields: { culture: 2 }, maintenance: 1,
+    // CIV6 (BUILDING_MARAE): Cost 150 against the Amphitheater's 150, NO
+    // Maintenance column and no `Building_GreatWorks` row at all. Its
+    // modifiers pay +1 Culture and +1 Faith on every passable-feature tile of
+    // the city; the Tourism third is a per-tile tourism channel this engine
+    // has no carrier for (recorded on C-79).
+    civVariants: [{
+      civ: 'MAORI', name: 'Marae', maintenance: 0, noGreatWorks: true,
+      featureTileYields: { culture: 1, faith: 1 },
+    }],
+  },
   { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 290, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['ARCHAEOLOGICAL_MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
-  { id: 'BROADCAST_CENTER', name: 'Broadcast Center', district: 'THEATER_SQUARE', cost: 440, requiresAny: ['MUSEUM'], yields: { culture: 2 }, power: 3, poweredYields: { culture: 4 }, maintenance: 3 },
+  {
+    id: 'BROADCAST_CENTER', name: 'Broadcast Center', district: 'THEATER_SQUARE', cost: 440, requiresAny: ['MUSEUM'], yields: { culture: 2 }, power: 3, poweredYields: { culture: 4 }, maintenance: 3,
+    // CIV6 (BUILDING_FILM_STUDIO): every column matches the Broadcast
+    // Center's — Cost 580 against 580, Maintenance 3, RequiredPower 3, the
+    // same two Culture rows and the same single MUSIC great-work slot. Its
+    // one clause is "+100% Tourism pressure from this city towards other
+    // civilizations in the Modern era", a per-PAIR tourism pressure this
+    // engine does not carry (recorded on C-79).
+    civVariants: [{ civ: 'AMERICA', name: 'Film Studio' }],
+  },
   { id: 'MARKET', name: 'Market', district: 'COMMERCIAL_HUB', cost: 120, yields: { gold: 2 }, maintenance: 0 },
-  { id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 290, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0 },
+  {
+    id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 290, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0,
+    // CIV6 (BUILDING_GRAND_BAZAAR): Cost 220 against the Bank's 290, so
+    // 290 x 220/290 = 220 here. Gold 5, no maintenance, and its two
+    // modifiers: one Amenity per distinct improved LUXURY and one extra unit
+    // accumulated per distinct improved STRATEGIC.
+    civVariants: [{
+      civ: 'OTTOMAN', name: 'Grand Bazaar', cost: 220,
+      amenityPerLuxuryType: 1, strategicPerType: 1,
+    }],
+  },
   { id: 'STOCK_EXCHANGE', name: 'Stock Exchange', district: 'COMMERCIAL_HUB', cost: 330, requiresAny: ['BANK'], yields: { gold: 4 }, power: 3, poweredYields: { gold: 7 }, maintenance: 0 },
 
   // CIV6: "+1 Food. +1 Food in Coast and Lake tiles controlled by the city.
@@ -222,7 +322,18 @@ const rawList: BuildingDef[] = [
   { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'] },
 
   { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 3 }, maintenance: 1 },
-  { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, power: 2, poweredYields: { production: 3 }, regional: true, maintenance: 2 },
+  {
+    id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, power: 2, poweredYields: { production: 3 }, regional: true, maintenance: 2,
+    // CIV6 (BUILDING_ELECTRONICS_FACTORY): Cost 390 against the Factory's
+    // 390 (no discount), Maintenance 2, RequiredPower 2, RegionalRange 6, and
+    // Production 4 where the Factory pays 3 — the regional row every city
+    // centre within six tiles is paid. Its "+4 Culture after Electricity"
+    // half is a TECH-gated building yield this catalog has no column for
+    // (recorded on C-79).
+    civVariants: [{
+      civ: 'JAPAN', name: 'Electronics Factory', yields: { production: 4 },
+    }],
+  },
   // THE THREE POWER PLANTS. CIV6 (GS): one per Industrial Zone, each
   // "convert[ing] stockpiles of the relevant resource into Power" at its own
   // published rate — Coal 1:4, Oil 1:4, Uranium 1:16.
@@ -231,7 +342,21 @@ const rawList: BuildingDef[] = [
   { id: 'NUCLEAR_POWER_PLANT', name: 'Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', cost: 480, requiresAny: ['FACTORY'], exclusiveWith: ['COAL_POWER_PLANT', 'OIL_POWER_PLANT'], yields: { production: 4, science: 3 }, regional: true, powerPlant: true, fuel: 'URANIUM', fuelRate: 16, maintenance: 3 },
 
   { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 90, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['MELEE', 'RANGED', 'ANTICAV'] },
-  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
+  {
+    id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'],
+    // CIV6 (BUILDING_ORDU): every Stable column, Cost 120 against 120, plus
+    // ABILITY_ORDU_INCREASED_MOVEMENT (+1 Movement for life to Heavy and
+    // Light Cavalry trained here). Its XP ability names the same three classes
+    // the Stable already carries. Its ORDU_ADJUST_RESOURCE_STOCKPILE_CAP
+    // Amount 10 is NOT a second bonus: the Stable carries no such modifier in
+    // the install and the Ordu's description names no resource, so the row is
+    // the unique standing in for the DLL's own "+10 per Encampment building",
+    // which `stockpileCap` already pays every Encampment building here.
+    civVariants: [{
+      civ: 'MONGOLIA', name: 'Ordu',
+      trainMovement: 1, trainMovementClasses: ['LIGHT_CAV', 'HEAVY_CAV'],
+    }],
+  },
   { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
   { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
 
@@ -239,7 +364,20 @@ const rawList: BuildingDef[] = [
   { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 3 }, maintenance: 2, airSlots: 2, trainXpPct: 50, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'] },
 
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
-  { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },
+  {
+    id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2,
+    // CIV6 (BUILDING_THERMAL_BATH): Cost 360 against the Zoo's 445, so
+    // 360 x 360/445 = 291 here. Entertainment 2 against the Zoo's 1,
+    // Production 2 of its own, RegionalRange 6 — both reach every city centre
+    // within six tiles, as the Zoo's Amenity does. THERMALBATH_ADDAMENITIES
+    // pays +2 MORE Amenities while the city holds a Geothermal Fissure (its
+    // Tourism third is the channel C-79 records).
+    civVariants: [{
+      civ: 'HUNGARY', name: 'Thermal Bath', cost: 291,
+      amenities: 2, yields: { production: 2 },
+      amenitiesWithFeature: { feature: 'GEOTHERMAL_FISSURE', amount: 2 },
+    }],
+  },
   { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 480, requiresAny: ['ZOO'], amenities: 1, power: 2, poweredAmenities: 2, regional: true, maintenance: 3 },
 
   // ARCHAEOLOGICAL MUSEUM — in real Civ 6 the Theater Square offers
@@ -254,7 +392,23 @@ const rawList: BuildingDef[] = [
   // the Archaeological Museum above. Both carry the Gathering Storm cost and
   // require the tier below; both refuse a gold purchase.
   { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, noPurchase: true },
-  { id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true },
+  {
+    id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true,
+    // CIV6 (BUILDING_TSIKHE): Cost 260 against the Star Fort's 305, so
+    // 300 x 260/305 = 256 here. OuterDefenseHitPoints 200 against the Star
+    // Fort's 100 — one tier's worth MORE perimeter, which puts a Georgian
+    // city on the Urban Defenses pool while it keeps the Renaissance tier's
+    // Combat Strength. Faith 4, paid again while the seat holds a Golden Age.
+    // TRAIT_TSIKHE_PRODUCTION (+50% Production toward the Tsikhe) needs no
+    // row of its own: it exists in the install only because the Tsikhe is a
+    // different BuildingType from the Star Fort, and Strength in Unity's
+    // RENAISSANCE_WALLS row in `PROD_MULT_ROWS` already pays it here.
+    civVariants: [{
+      civ: 'GEORGIA', name: 'Tsikhe', cost: 256,
+      yields: { faith: 4 }, goldenAgeYields: { faith: 4 },
+      wallsHpBonus: 100,
+    }],
+  },
 
   // THE DAM. CIV6: "Provides 6 Power to the city from renewable water
   // sources" — the earliest alternative to a fossil plant, and the densest.
@@ -294,7 +448,15 @@ const rawList: BuildingDef[] = [
   { id: 'WAR_DEPARTMENT', name: 'War Department', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'ROYAL_SOCIETY'], healOnKill: 20 },
 ];
 
-const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));
+const list: BuildingDef[] = rawList.map((b) => ({
+  ...b,
+  cost: Math.round(b.cost * GAME_SPEED),
+  // A VARIANT's own price is a catalog cost like any other and rides the same
+  // game-speed scale as the row it replaces. Missing this made the Grand
+  // Bazaar dearer than the Bank instead of cheaper.
+  civVariants: b.civVariants?.map(
+    (v) => (v.cost === undefined ? v : { ...v, cost: Math.round(v.cost * GAME_SPEED) })),
+}));
 
 /**
  * CIV6 (Autocracy): "+1 to all yields for each Government Plaza building,
@@ -336,3 +498,43 @@ export const BUILDING_ERA_INDEX: Record<string, number> = (() => {
   }
   return out;
 })();
+
+
+const EFFECTIVE_BUILDING_CACHE = new Map<string, BuildingDef>();
+
+/**
+ * THE ROW A SEAT ACTUALLY BUILDS: the base row with its civilization's unique
+ * variant merged over it. Every column reader asks here rather than indexing
+ * `BUILDINGS` directly, so a unique building's price, yields, Housing,
+ * Amenities, upkeep, Power and regional reach all arrive through one door.
+ *
+ * The clauses a variant carries that are NOT BuildingDef columns (the Marae's
+ * feature yields, the Tsikhe's Golden Age Faith, the Ordu's Movement grant)
+ * stay on the variant and are read by name — a column here would be a second
+ * home for one fact.
+ *
+ * Memoized on (civilization, id): both are catalog facts that never change
+ * inside a game, so the cache can never go stale.
+ */
+export function effectiveBuilding(civ: string | null | undefined, id: string): BuildingDef | undefined {
+  const def = BUILDINGS[id];
+  if (!def || !civ || !def.civVariants) return def;
+  const v = def.civVariants.find((x) => x.civ === civ);
+  if (!v) return def;
+  const key = `${civ}|${id}`;
+  const hit = EFFECTIVE_BUILDING_CACHE.get(key);
+  if (hit) return hit;
+  const out: BuildingDef = { ...def, name: v.name };
+  for (const k of BUILDING_VARIANT_COLUMNS) {
+    const x = v[k];
+    if (x !== undefined) (out as unknown as Record<string, unknown>)[k] = x;
+  }
+  EFFECTIVE_BUILDING_CACHE.set(key, out);
+  return out;
+}
+
+/** the unique variant of `id` this civilization builds, or undefined. */
+export function buildingVariantFor(civ: string | null | undefined, id: string): BuildingVariant | undefined {
+  if (!civ) return undefined;
+  return BUILDINGS[id]?.civVariants?.find((x) => x.civ === civ);
+}

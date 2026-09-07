@@ -214,6 +214,11 @@ export const ERA_SCORE_MOMENT_MIN = 2;
 export const ERA_DARK_T = 12;
 export const ERA_GOLDEN_T = 24;
 export const AGE_PREV_STEP = 5;
+/** `Seat.age`: 0 a Dark Age, 1 Normal, 2 Golden. A HEROIC age is a Golden one
+ *  reached out of a Dark one, so it carries this same code and only
+ *  `prevAge` tells the two apart — which is why every "is this seat in a
+ *  Golden Age" test is an equality against this. */
+export const AGE_GOLDEN = 2;
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
 /**
  * The CULTURE VICTORY constants, verified against the Gathering

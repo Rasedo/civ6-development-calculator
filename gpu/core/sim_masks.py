@@ -347,9 +347,47 @@ class SimMasks:
             out = torch.where((seat_row == int(self._ROW_SEAT[r])) & (sl >= 0), sl, out)
         return torch.where(tile >= 0, out, torch.full_like(out, -1))
 
+    def _walls_hp_bonus_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """[B] — CIV6 (Tsikhe, OuterDefenseHitPoints 200 against the Star
+        Fort's 100): what a UNIQUE walls row adds to its city's perimeter on
+        top of the tier it supplies. `row`/`col` are per-game, so this answers
+        for whichever seat's city the caller is pointed at."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if not self._bvar_walls_hp:
+            return out
+        b = torch.arange(self.B, device=self.device)
+        r0, c0 = row.clamp(min=0), col.clamp(min=0)
+        bl = self.city_bldg[b, r0, c0]  # [B, NB]
+        for (bi, civ), amt in self._bvar_walls_hp.items():
+            who = self._seat_row_plays(r0, civ) & bl[:, bi]
+            out = out + who.long() * int(amt)
+        return torch.where((row >= 0) & (col >= 0), out, torch.zeros_like(out))
+
+    def _walls_hp_bonus_all(self, row: int) -> torch.Tensor:
+        """[B, RC] — `_walls_hp_bonus_at` over every column of one row."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        if not self._bvar_walls_hp or row >= self.n_majors:
+            return out
+        bl = self.city_bldg[:, row]  # [B, RC, NB]
+        for (bi, civ), amt in self._bvar_walls_hp.items():
+            who = self._row_plays_idx(row, civ)
+            if not bool(who.any()):
+                continue
+            out = out + (bl[:, :, bi] & who.unsqueeze(1)).long() * int(amt)
+        return out
+
+    def _seat_row_plays(self, row: torch.Tensor, civ: int) -> torch.Tensor:
+        """[B] bool — does the per-game seat ROW play civilization `civ`?"""
+        if civ < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        r = row.clamp(min=0, max=self.n_majors - 1)
+        return (row < self.n_majors) & (row >= 0) & (
+            self.row_civ.gather(1, r.unsqueeze(1)).squeeze(1) == civ)
+
     def _walls_max_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
-        """`wallsMax` — the size of that tier's perimeter pool."""
-        return self._walls_tier_hp[self._walls_tier_at(row, col)]
+        """`wallsMax` — the size of that tier's perimeter pool, plus whatever a
+        unique walls row adds on top of it."""
+        return self._walls_tier_hp[self._walls_tier_at(row, col)] + self._walls_hp_bonus_at(row, col)
 
     def _urban_defenses_fit(self, row: int, hit: torch.Tensor) -> None:
         """`urbanDefensesFit` — CIV6: unlocking Urban Defenses "builds modern
@@ -401,7 +439,7 @@ class SimMasks:
 
     def _walls_max_all(self, row: int) -> torch.Tensor:
         """[B, RC] the perimeter pool every one of this row's columns carries."""
-        return self._walls_tier_hp[self._walls_tier_all(row)]
+        return self._walls_tier_hp[self._walls_tier_all(row)] + self._walls_hp_bonus_all(row)
 
     def _walls_build_ok(self, row: int) -> torch.Tensor:
         """[B, RC] — CIV6: "While city defenses are damaged, you cannot build
@@ -955,6 +993,25 @@ class SimMasks:
                 _xw = self._row_is(row, _xc, _xl) & _est & (_own == bool(_xf))
                 pct = pct + _xw.long() * _xp
         return torch.where(cls >= 0, pct, torch.zeros_like(pct))
+
+    def _train_mp_bonus(self, bldg: torch.Tensor, utype: torch.Tensor, row: int) -> torch.Tensor:
+        """[B] — CIV6 (Ordu, ABILITY_ORDU_INCREASED_MOVEMENT): the flat
+        MOVEMENT a city's UNIQUE buildings grant the classes they name, to
+        every unit trained there, carried for life. `_train_xp_pct`'s twin,
+        and written by the same spawn (`applyTrainingGrants`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if not self._bvar_train_mp or row >= self.n_majors:
+            return out
+        cls = self.rules_dev.u_promo_class[utype.clamp(min=0)]
+        for (bi, civ), (amt, classes) in self._bvar_train_mp.items():
+            who = self._row_plays_idx(row, civ)
+            if not bool(who.any()):
+                continue
+            in_cls = torch.zeros_like(cls, dtype=torch.bool)
+            for c in classes:
+                in_cls = in_cls | (cls == c)
+            out = out + (bldg[:, bi] & who & in_cls & (cls >= 0)).long() * int(amt)
+        return out
 
     def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
         arange6 = torch.arange(6, device=self.device)
@@ -2146,7 +2203,7 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None) -> torch.Tensor:
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -2199,6 +2256,11 @@ class SimMasks:
         # PERCENTAGE the unit carries for life, not a lump of starting XP.
         getattr(self, f"{pre}_unit_xp_pct")[rows, slot] = (
             torch.zeros_like(slot) if init_xp is None else init_xp[rows]
+        )
+        # ...and the training city's flat MOVEMENT grant (the Ordu's), which
+        # `_full_mp` reads BEFORE the pool below is written.
+        getattr(self, f"{pre}_unit_mp_bonus")[rows, slot] = (
+            torch.zeros_like(slot) if init_mp is None else init_mp[rows]
         )
         # a unit spawned MID-turn has no frozen grant yet — TS leaves movesFull
         # undefined until its first refreshUnits and the `?? full` fallback

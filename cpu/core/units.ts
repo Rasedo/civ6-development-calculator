@@ -935,7 +935,7 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   return m;
 }
 
-export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; levied?: boolean }): number {
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; levied?: boolean; mpBonus?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
@@ -959,6 +959,10 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
     // kind — a unit's own stat, so the embarked pool above overrides it
     // exactly as it overrides the golden dedication's (`WAR_BUFF_ROWS`)
     + warBuffMoves(state, unit.seat)
+    // CIV6 (Ordu, EFFECT_ADJUST_UNIT_MOVEMENT through an ability granted to
+    // units TRAINED in its city): a unit's own stat, carried for life, so the
+    // embarked pool above overrides it as it does the levy's
+    + (unit.mpBonus ?? 0)
     // CIV6 (Enhanced Mobility): "+3 Moves."
     + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)
     // an emergency member marches faster on its target's ground

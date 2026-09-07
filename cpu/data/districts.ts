@@ -65,6 +65,9 @@ export interface AdjacencyRule {
 export interface DistrictVariant {
   civ: CivId;
   name: string;
+  /** CIV6 (Districts.xml): a unique district's own `Cost` is HALF the row it
+   *  replaces, without exception — 27 against a specialty district's 54, 18
+   *  against the Aqueduct's 36. */
   cost: number;
   housing: number;
   amenities: number;
@@ -200,7 +203,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // CIV6 (Seowon): "+4 Science, and -1 for each adjacent district" — it
     // reads NOTHING the Campus reads, mountains and rainforest included.
     civVariants: [{
-      civ: 'KOREA', name: 'Seowon', cost: 54, housing: 0, amenities: 0,
+      civ: 'KOREA', name: 'Seowon', cost: 27, housing: 0, amenities: 0,
       adjacency: [
         { source: 'SELF', amount: 4 },
         { source: 'DISTRICT', amount: -1 },
@@ -235,7 +238,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     id: 'HOLY_SITE',
     // CIV6 (Lavra): the Holy Site's own rows, unchanged in kind.
     civVariants: [{
-      civ: 'RUSSIA', name: 'Lavra', cost: 54, housing: 0, amenities: 0,
+      civ: 'RUSSIA', name: 'Lavra', cost: 27, housing: 0, amenities: 0,
       adjacency: [
         { source: 'NATURAL_WONDER', amount: 2 },
         { source: 'MOUNTAIN', amount: 1 },
@@ -270,7 +273,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // Entertainment Complex and a Water Park, and its district rows pay per
     // ONE neighbour instead of per two.
     civVariants: [{
-      civ: 'GREECE', name: 'Acropolis', cost: 54, housing: 0, amenities: 0,
+      civ: 'GREECE', name: 'Acropolis', cost: 27, housing: 0, amenities: 0,
       adjacency: [
         { source: 'BUILT_WONDER', amount: 1 },
         { source: 'DISTRICT', amount: 1 },
@@ -303,7 +306,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     id: 'COMMERCIAL_HUB',
     // CIV6 (Suguba): a Holy Site beside it pays like a river does.
     civVariants: [{
-      civ: 'MALI', name: 'Suguba', cost: 54, housing: 0, amenities: 0,
+      civ: 'MALI', name: 'Suguba', cost: 27, housing: 0, amenities: 0,
       adjacency: [
         { source: 'RIVER', amount: 2 },
         { source: 'HOLY_SITE_DISTRICT', amount: 2 },
@@ -337,7 +340,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // Dockyard grants a naval unit when it finishes.
     civVariants: [
       {
-        civ: 'ENGLAND', name: 'Royal Navy Dockyard', cost: 54, housing: 0, amenities: 0,
+        civ: 'ENGLAND', name: 'Royal Navy Dockyard', cost: 27, housing: 0, amenities: 0,
         adjacency: [
           { source: 'SEA_RESOURCE', amount: 1 },
           { source: 'DISTRICT', amount: 0.5 },
@@ -347,7 +350,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
         grantsNavalUnit: true,
       },
       {
-        civ: 'PHOENICIA', name: 'Cothon', cost: 54, housing: 0, amenities: 0,
+        civ: 'PHOENICIA', name: 'Cothon', cost: 27, housing: 0, amenities: 0,
         adjacency: [
           { source: 'SEA_RESOURCE', amount: 1 },
           { source: 'DISTRICT', amount: 0.5 },
@@ -382,7 +385,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // CIV6 (Hansa): a Commercial Hub and any adjacent Resource pay it, and it
     // keeps the three engineering districts the base row already reads.
     civVariants: [{
-      civ: 'GERMANY', name: 'Hansa', cost: 54, housing: 0, amenities: 0,
+      civ: 'GERMANY', name: 'Hansa', cost: 27, housing: 0, amenities: 0,
       adjacency: [
         { source: 'COMMERCIAL_HUB', amount: 2 },
         { source: 'DISTRICT', amount: 0.5 },
@@ -419,7 +422,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     id: 'ENCAMPMENT',
     // CIV6 (Ikanda): the Encampment with a Housing of its own.
     civVariants: [{
-      civ: 'ZULU', name: 'Ikanda', cost: 54, housing: 1, amenities: 0,
+      civ: 'ZULU', name: 'Ikanda', cost: 27, housing: 1, amenities: 0,
     }],
     name: 'Encampment',
     code: 'EN',
@@ -458,7 +461,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // CIV6 (Street Carnival): `Entertainment="2"` — twice the Complex's own
     // Amenity, on the same ground.
     civVariants: [{
-      civ: 'BRAZIL', name: 'Street Carnival', cost: 54, housing: 0, amenities: 2,
+      civ: 'BRAZIL', name: 'Street Carnival', cost: 27, housing: 0, amenities: 2,
     }],
     plunder: { kind: 'heal', amount: 50 },
     name: 'Entertainment Complex',
@@ -481,7 +484,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // +4 Gold of its own, unlocked at Guilds rather than Urbanization, and a
     // free Apostle when it finishes.
     civVariants: [{
-      civ: 'KONGO', name: "M'banza", cost: 54, housing: 5, amenities: 0,
+      civ: 'KONGO', name: "M'banza", cost: 27, housing: 5, amenities: 0,
       flatYield: { food: 2, gold: 4 },
       // its EARLIER unlock is a `DISTRICT_PREREQ_ROWS` override, the same
       // door The First Emperor's Canal comes through
@@ -594,6 +597,15 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     appealAdjacent: 1,
     exclusiveDistricts: ['ENTERTAINMENT_COMPLEX'],
     placement: { onCoastalWater: true },
+    // CIV6 (DISTRICT_WATER_STREET_CARNIVAL, "Copacabana"): Cost 27,
+    // `Entertainment="2"` against the Water Park's 1, on the same Coast +
+    // AdjacentToLand ground and the same Natural History unlock. A Theater
+    // Square beside one is paid the +2 Culture `Copacabana_Culture` names,
+    // which is exactly what `WaterPark_Culture` already pays the base row —
+    // the variant IS the Water Park in storage, so no source is added.
+    civVariants: [{
+      civ: 'BRAZIL', name: 'Copacabana', cost: 27, housing: 0, amenities: 2,
+    }],
     description: 'The Entertainment Complex on the water. One or the other, never both.',
   }),
   // CIV6 (Preserve): "Grants up to 3 Housing based on tile's Appeal",

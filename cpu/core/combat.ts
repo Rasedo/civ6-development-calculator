@@ -9,7 +9,7 @@ import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE } from '../data/nuclear';
-import { EMERGENCY_NUCLEAR } from '../data/seats';
+import { AGE_GOLDEN, EMERGENCY_NUCLEAR } from '../data/seats';
 import { addWmd, nukeBlast, nukeCarrier, nukeInterceptor, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
 import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
@@ -19,7 +19,7 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
@@ -40,13 +40,14 @@ import {
   attacksLeftOf, attacksPerTurn,
   bankXp, battleXp, cityXp, holdTheLineCS, promoCS, promoFlag,
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
+  promoClassOf,
 } from './promotions';
 import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { seatsAllied } from './seats';
+import { civOf, seatsAllied } from './seats';
 import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
@@ -238,6 +239,36 @@ export const SUPPORT_CS = 2;
 /** CIV6: "+25% combat experience for all <classes> units trained in this
  *  city", summed over the training city's Encampment and Harbor lines and
  *  carried by the unit for life. */
+/**
+ * CIV6 (Ordu, ABILITY_ORDU_INCREASED_MOVEMENT): the flat MOVEMENT a city's
+ * unique buildings grant the classes they name, to every unit trained there,
+ * for life. The twin of `trainXpPct` — same walk, same dark-building rule.
+ */
+export function trainMovement(
+  state: GameState,
+  city: City,
+  cls: string | undefined,
+): number {
+  if (!cls) return 0;
+  let mp = 0;
+  const civ = civOf(state, city.seat);
+  const dark = darkBuildings(state.map, city);
+  for (const b of city.buildings) {
+    if (dark.has(b)) continue; // a pillaged line trains nobody
+    const v = buildingVariantFor(civ, b);
+    if (v?.trainMovement && v.trainMovementClasses?.includes(cls as never)) mp += v.trainMovement;
+  }
+  return mp;
+}
+
+/** Everything the CITY that trained a unit hands it for life, in one place. */
+export function applyTrainingGrants(state: GameState, city: City, unit: Unit): void {
+  const cls = promoClassOf(unit.type);
+  unit.xpPct = trainXpPct(state, city, cls);
+  const mp = trainMovement(state, city, cls);
+  if (mp) unit.mpBonus = mp;
+}
+
 export function trainXpPct(
   state: GameState,
   city: City,
@@ -1060,7 +1091,7 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeWounded' ? foeHp !== null && foeHp < UNIT_HP
       : r.when === 'foeCity' ? foeIsCity
       // CIV6 (Swift Hawk): a HEROIC age is a golden one, so the age is the test
-      : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === 2
+      : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === AGE_GOLDEN
       // CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
       : r.when === 'onHomeContinent' ? onHomeContinent(state, own.seat, own.tileIndex)
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —

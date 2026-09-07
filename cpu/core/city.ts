@@ -14,7 +14,7 @@ import { hasRiver } from '../../world/query';
 import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
+import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
 import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
@@ -30,8 +30,9 @@ import { suzerainEffect, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
+import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
-import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
+import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -65,8 +66,10 @@ export interface CityStats {
   maintenance: number;
 }
 
-export function buildingMaintenance(id: string): number {
-  const def = BUILDINGS[id];
+export function buildingMaintenance(id: string, civ?: string | null): number {
+  // a unique building may carry no upkeep where the row it replaces does
+  // (the Marae), so the SEAT decides which row is being priced
+  const def = effectiveBuilding(civ, id);
   if (!def || def.cost === 0) return 0;
   // Verified real values override the tier heuristic; worship
   // buildings are maintenance-free in real Civ 6.
@@ -144,7 +147,8 @@ export function cityMaintenance(state: GameState, city: City): number {
   for (const d of city.districts) {
     if (state.map.tiles[d.tileIndex].districtComplete) total += districtMaintenance(d.type);
   }
-  for (const b of city.buildings) total += buildingMaintenance(b);
+  const civ = civOf(state, city.seat);
+  for (const b of city.buildings) total += buildingMaintenance(b, civ);
   return total;
 }
 
@@ -287,6 +291,21 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
 }
 
 
+/** CIV6 (Marae): the yields a civilization's unique building pays on every
+ *  tile of the city carrying a PASSABLE feature, summed over the buildings the
+ *  city holds. A natural wonder is a feature, so a passable one is paid. */
+export function buildingVariantFeatureYields(state: GameState, city: City): Partial<Yields> | null {
+  let out: Partial<Yields> | null = null;
+  const civ = civOf(state, city.seat);
+  for (const id of city.buildings) {
+    const y = buildingVariantFor(civ, id)?.featureTileYields;
+    if (!y) continue;
+    out = out ?? {};
+    for (const k of Object.keys(y) as (keyof Yields)[]) out[k] = (out[k] ?? 0) + (y[k] ?? 0);
+  }
+  return out;
+}
+
 /** CIV6 (Stave Church): the yields a civilization's unique building pays on
  *  every Coast tile of the city that carries a resource, summed over the
  *  buildings the city holds. */
@@ -341,7 +360,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     }
   }
   for (const id of city.buildings) {
-    const def = BUILDINGS[id];
+    const def = effectiveBuilding(civOf(state, city.seat), id);
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
     if (def?.housing) total += def.housing;
     // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
@@ -870,14 +889,24 @@ export function computeCityStats(
     if (coastResY && t.terrain === 'COAST' && t.resource !== null) addYields(tiles, coastResY);
   };
   const coastResY = buildingVariantCoastYields(state, city);
+  // CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with a
+  // passable feature or natural wonder" — a plot yield, so only a WORKED tile
+  // materializes it, exactly as the Lighthouse's Food does.
+  const featTileY = buildingVariantFeatureYields(state, city);
+  const featureTileBonus = (t: Tile) => {
+    if (!featTileY || t.feature === null || FEATURES[t.feature]?.impassable) return;
+    addYields(tiles, featTileY);
+  };
   wonderTileBonus(center, true);
   waterMillBonus(center);
   lighthouseBonus(center);
+  featureTileBonus(center);
   for (const i of worked) {
     addYields(tiles, tileYields(ctx, map.tiles[i]));
     wonderTileBonus(map.tiles[i], false);
     waterMillBonus(map.tiles[i]);
     lighthouseBonus(map.tiles[i]);
+    featureTileBonus(map.tiles[i]);
   }
 
   const districts = cityDistrictYields(ctx, city);

@@ -16,6 +16,8 @@ import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 /** replaces -> [civ, name, housing, amenities] straight off Districts.xml. */
 const ROWS: readonly (readonly [DistrictId, string, string, number, number])[] = [
+  ['AQUEDUCT', 'ROME', 'Bath', 2, 1],
+  ['WATER_PARK', 'BRAZIL', 'Copacabana', 0, 2],
   ['THEATER_SQUARE', 'GREECE', 'Acropolis', 0, 0],
   ['INDUSTRIAL_ZONE', 'GERMANY', 'Hansa', 0, 0],
   ['CAMPUS', 'KOREA', 'Seowon', 0, 0],
@@ -44,6 +46,15 @@ function place(state: GameState, city: City, type: DistrictId, col: number, row:
 }
 
 describe('the unique district catalog', () => {
+  it('names every unique district the install gives a seated civilization', () => {
+    // twelve rows: `CivUniqueDistrictType` holds sixteen, and four name
+    // civilizations this roster does not seat (Hippodrome/Byzantium,
+    // Observatory/Maya, Oppidum/Gaul, Thanh/Vietnam).
+    const all = Object.values(DISTRICTS).flatMap((d) => (d.civVariants ?? []).map((v) => v.name));
+    expect(all.length).toBe(ROWS.length);
+    expect(new Set(all).size).toBe(ROWS.length);
+  });
+
   it('carries every row as a variant of the district it replaces', () => {
     for (const [base, civ, name, housing, amenities] of ROWS) {
       const v = DISTRICTS[base].civVariants?.find((x) => x.civ === civ);
@@ -51,8 +62,8 @@ describe('the unique district catalog', () => {
       expect(v!.name).toBe(name);
       expect(v!.housing, `${name} housing`).toBe(housing);
       expect(v!.amenities, `${name} amenities`).toBe(amenities);
-      // the install prices every unique district at its base row's own Cost
-      expect(v!.cost, `${name} cost`).toBe(DISTRICTS[base].cost);
+      // the install prices every unique district at HALF the row it replaces
+      expect(v!.cost, `${name} cost`).toBe(DISTRICTS[base].cost / 2);
     }
   });
 

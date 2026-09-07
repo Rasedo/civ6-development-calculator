@@ -953,6 +953,8 @@ class SimInit:
             # Saint), each spent by re-arming it as it takes one
             ("promo_bonus", torch.long),
             ("xp_pct", torch.long),     # the training city's percentage XP modifier, for life
+            # the training city's flat MOVEMENT grant (the Ordu's), for life
+            ("mp_bonus", torch.long),
             ("charges", torch.long),    # builder/missionary charges
             # The general/admiral aura's +MP, FROZEN at the refreshUnits site
             # (_refresh_aura_mp) — walkers read it instead of recomputing, so a
@@ -1327,6 +1329,9 @@ class SimInit:
         # its own. `wonder_near` is its neighbourhood closure (the ASTROLOGY
         # eureka's "near a wonder").
         self._feat_natural = torch.tensor([bool(x) for x in rules.improvements["featNatural"]], dtype=torch.bool, device=device)
+        # CIV6 (PLOT_HAS_ANY_PASSABLE_FEATURE): the Marae counts a feature
+        # that is not impassable — a natural wonder included.
+        self._feat_passable = torch.tensor([bool(x) for x in rules.improvements["featPassable"]], dtype=torch.bool, device=device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
         # `feat_id` is LIVE (`_add_feature` writes it); `feat_id0` keeps the
         # t0 bake the per-tile `feat_yields`/chop planes were computed from.
@@ -2719,6 +2724,30 @@ class SimInit:
         self._bvar_coast: list[tuple[int, int, torch.Tensor]] = [
             (bi, int(v["civ"]), torch.tensor([float(x) for x in v["coastResY"]], dtype=dtype, device=device))
             for bi, vs in enumerate(rules.b_variants) for v in vs if any(float(x) for x in v["coastResY"])]
+        # The COLUMN overrides a unique building carries (`effectiveBuilding`'s
+        # `BUILDING_VARIANT_COLUMNS`): (building idx, civ idx, the variant row).
+        # -1 in a scalar column, an all-zero `hasYields`, means "take the base
+        # row's" — the same convention the exporter writes.
+        self._bvar_cols: list[tuple[int, int, dict]] = [
+            (bi, int(v["civ"]), v) for bi, vs in enumerate(rules.b_variants) for v in vs]
+        self._bvar_any = bool(self._bvar_cols)
+        # per-row merged column tables, built lazily. `row_civ` comes off the
+        # fixture and is never written again, so a row's table cannot go stale.
+        self._bvar_col_cache: dict[int, dict[str, torch.Tensor]] = {}
+        # the CLAUSES, each keyed (building idx, civ idx)
+        self._bvar_feature_y = {(bi, c): torch.tensor([float(x) for x in v["featureTileY"]], dtype=dtype, device=device)
+                                for bi, c, v in self._bvar_cols if any(float(x) for x in v["featureTileY"])}
+        self._bvar_golden_y = {(bi, c): torch.tensor([float(x) for x in v["goldenAgeY"]], dtype=dtype, device=device)
+                               for bi, c, v in self._bvar_cols if any(float(x) for x in v["goldenAgeY"])}
+        self._bvar_walls_hp = {(bi, c): float(v["wallsHpBonus"]) for bi, c, v in self._bvar_cols if float(v["wallsHpBonus"])}
+        self._bvar_amen_lux = {(bi, c): float(v["amenityPerLuxuryType"]) for bi, c, v in self._bvar_cols if float(v["amenityPerLuxuryType"])}
+        self._bvar_strat_type = {(bi, c): float(v["strategicPerType"]) for bi, c, v in self._bvar_cols if float(v["strategicPerType"])}
+        self._bvar_train_mp = {(bi, c): (float(v["trainMovement"]), [int(x) for x in v["trainMovementClasses"]])
+                               for bi, c, v in self._bvar_cols if float(v["trainMovement"])}
+        self._bvar_amen_feat = {(bi, c): (int(v["amenitiesWithFeature"][0]), float(v["amenitiesWithFeature"][1]))
+                                for bi, c, v in self._bvar_cols if int(v["amenitiesWithFeature"][0]) >= 0}
+        self._bvar_adj_faith = {(bi, c) for bi, c, v in self._bvar_cols if int(v["districtAdjacencyAsFaith"])}
+        self._bvar_no_gw = {(bi, c) for bi, c, v in self._bvar_cols if int(v["noGreatWorks"])}
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
         self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm
@@ -3188,6 +3217,9 @@ class SimInit:
         # [civ, leaderRow, district, tech] — REPLACES the district's own unlock
         self._district_prereq_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["districtPrereq"]]  # type: ignore[misc]
+        # the same override for a unique BUILDING (the Madrasa's Theology civic)
+        self._building_prereq_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["buildingPrereq"]]  # type: ignore[misc]
         self._war_weariness_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["warWeariness"]]  # type: ignore[misc]
         self._peaceful_founder_rows: list[tuple[int, int, int]] = [

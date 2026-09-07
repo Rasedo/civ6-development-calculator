@@ -476,6 +476,11 @@ export interface Unit {
   /** the summed PERCENTAGE experience modifier of the city that trained it —
    *  CIV6's Encampment and Harbor buildings — carried for life. */
   xpPct?: number;
+  /** CIV6 (Ordu, ABILITY_ORDU_INCREASED_MOVEMENT): the flat MOVEMENT the city
+   *  that trained it granted, carried for life the same way `xpPct` is. Both
+   *  are written by one composer (`applyTrainingGrants`), so a third grant
+   *  cannot miss a training site. */
+  mpBonus?: number;
   /** a bitmask over the rows of this unit's OWN class list (`promoRows`), so
    *  bit k is column k of the PROMOTE head on both engines. */
   promos?: number;

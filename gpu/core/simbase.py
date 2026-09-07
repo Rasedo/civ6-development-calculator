@@ -143,7 +143,8 @@ class Rules:
     b_river: torch.Tensor  # bool
     b_farmbonus: torch.Tensor  # bool — Water Mill: farm-improved BONUS resources gain +1 food
     b_coastfood: torch.Tensor  # bool — Lighthouse: +1 food on every Coast/Lake tile the city works
-    b_variants: list  # per building: [{civ, adjDist, adjSrc, adjAmt, coastResY}] — the unique building standing in for the row
+    buildings: list  # the raw building catalog rows, in wire order (a building's INDEX is its action code)
+    b_variants: list  # per building: the unique building standing in for the row — its column overrides and its own clauses
     b_maxloy_culture: torch.Tensor  # bool — Monument: +1 culture while the city sits at max loyalty
     b_loyalty: torch.Tensor  # f64 — flat loyalty per turn while the building stands
     b_unlock: torch.Tensor  # tech index or -1
@@ -344,6 +345,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
         b_farmbonus=torch.tensor([b.get("farmBonusFood", 0) for b in B], dtype=torch.bool),
         b_coastfood=torch.tensor([b.get("coastFood", 0) for b in B], dtype=torch.bool),
+        buildings=list(B),
         b_variants=[list(b["variants"]) for b in B],
         b_maxloy_culture=torch.tensor([b.get("cultureAtMaxLoyalty", 0) for b in B], dtype=torch.bool),
         b_loyalty=torch.tensor([float(b.get("loyalty", 0)) for b in B], dtype=torch.float64),
@@ -593,6 +595,10 @@ def seat_class(seat: int) -> str:
         return "minor"
     return "major"
 NO_SEAT = -1  # "nobody" — the cpu/core/seats.ts NO_SEAT twin
+# `civ_age`: 0 a Dark Age, 1 Normal, 2 Golden. A HEROIC age is a Golden one
+# reached out of a Dark one and carries this same code, which is why every
+# "is this seat in a Golden Age" test is an equality against it (AGE_GOLDEN).
+AGE_GOLDEN = 2
 
 # Flanking & support (mirrors combat.ts). A melee attacker gains +2 CS per
 # OTHER unit adjacent to the defender that is hostile to the defender
@@ -776,7 +782,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied",
     "unit_escorted", "military_at", "civilian_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",

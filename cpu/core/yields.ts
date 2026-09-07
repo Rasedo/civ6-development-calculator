@@ -1,8 +1,8 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
+import { citiesOf, civOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
-import type { GameMap } from '../../world/types';
+import type { FeatureId, GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
 import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
@@ -12,7 +12,7 @@ import { BIOSPHERE_POWER_MULT, IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
-import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
+import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
@@ -386,7 +386,9 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
   const dark = darkBuildings(ctx.map, city);
   for (const id of city.buildings) {
-    const def = BUILDINGS[id];
+    // the row this SEAT builds — a unique building's own yields, Power and
+    // regional reach all arrive through `effectiveBuilding`
+    const def = effectiveBuilding(ctx.mods.civ, id);
     if (!def) continue;
     if (def.regional) continue; // handled by regional scan (affects own city too)
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
@@ -403,6 +405,19 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     }
     const beliefAdd = ctx.mods.buildingYieldAdd[id];
     if (beliefAdd) addYields(out, beliefAdd);
+    const bv = buildingVariantFor(ctx.mods.civ, id);
+    // CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): a unique row may pay again
+    // while its seat stands in a Golden (or Heroic) Age.
+    if (bv?.goldenAgeYields && ctx.mods.goldenAge) addYields(out, bv.goldenAgeYields);
+    // CIV6 (Madrasa, OldYieldType SCIENCE -> NewYieldType FAITH): the row
+    // pays FAITH equal to its own district's adjacency, the same shape the
+    // Coal Plant and the Shipyard read Production off theirs.
+    if (bv?.districtAdjacencyAsFaith) {
+      const d = city.districts.find((x) => x.type === def.district);
+      if (d && ctx.map.tiles[d.tileIndex].districtComplete) {
+        out.faith += effectiveAdjacency(ctx, ctx.map.tiles[d.tileIndex], def.district);
+      }
+    }
     if (def.special === 'SHIPYARD') {
       const harbor = city.districts.find((d) => d.type === 'HARBOR');
       if (harbor && ctx.map.tiles[harbor.tileIndex].districtComplete) {
@@ -422,13 +437,34 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     if (effectiveAdjacency(ctx, ctx.map.tiles[d.tileIndex], b.district) >= b.adjMin) pct += b.adjPct;
     let base = 0;
     for (const id of city.buildings) {
-      const def = BUILDINGS[id];
+      const def = effectiveBuilding(ctx.mods.civ, id);
       if (!def || def.regional || def.district !== b.district || dark.has(id)) continue;
       base += def.yields?.[b.yield] ?? 0;
     }
     out[b.yield] += base * pct;
   }
   return out;
+}
+
+/** The DISTINCT resources of one category this city has IMPROVED — the tile
+ *  is inside its borders, unpillaged, and carries the resource's own
+ *  improvement. What the Grand Bazaar's two clauses count. */
+export function cityImprovedResourceKinds(
+  state: GameState, city: City, category: 'luxury' | 'strategic',
+): Set<string> {
+  const out = new Set<string>();
+  for (const t of state.map.tiles) {
+    if (!t.resource || t.pillaged || !tileBelongsTo(t, city)) continue;
+    const def = RESOURCES[t.resource];
+    if (def?.category === category && t.improvement === def.improvement) out.add(t.resource);
+  }
+  return out;
+}
+
+/** CIV6 (REQUIREMENT_CITY_HAS_X_FEATURE_TYPE): does this city's BORDER hold
+ *  at least one tile carrying the feature? */
+export function cityHasFeature(state: GameState, city: City, feature: FeatureId): boolean {
+  return state.map.tiles.some((t) => tileBelongsTo(t, city) && t.feature === feature);
 }
 
 export interface CityPower {
@@ -460,8 +496,9 @@ export function cityPower(state: GameState, city: City): CityPower {
   const pillaged = pillagedDistrictTypes(state.map, city.districts);
   const dark = darkBuildings(state.map, city);
   let demand = LASER_POWER_LOAD * (city.laserStations ?? 0);
+  const _civ = civOf(state, city.seat);
   for (const id of city.buildings) {
-    const def = BUILDINGS[id];
+    const def = effectiveBuilding(_civ, id);
     if (!def?.power || dark.has(id)) continue;
     demand += def.power;
   }
@@ -553,7 +590,7 @@ export function regionalEffects(
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged source is dark
       for (const id of other.buildings) {
-        const def = BUILDINGS[id];
+        const def = effectiveBuilding(civOf(state, city.seat), id);
         if (!def || !def.regional || def.district !== inst.type) continue;
         if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach)) continue;
         // CIV6 (Vertical Integration): "This city receives Production from any
@@ -613,11 +650,24 @@ export function localAmenities(state: GameState, city: City): number {
     if (!t.districtComplete || t.districtPillaged) continue;
     n += civVariantOf(state, city.seat, DISTRICTS[d.type].civVariants)?.amenities ?? 0;
   }
+  const civA = civOf(state, city.seat);
   for (const id of city.buildings) {
-    const def = BUILDINGS[id];
+    const def = effectiveBuilding(civA, id);
     if (!def || def.regional) continue;
     if (dark.has(id)) continue; // a pillaged district's amenities go dark, and a pillaged building's
     n += def.amenities ?? 0;
+    // CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): a unique building may
+    // pay MORE while its city holds a tile of one feature.
+    const bvA = buildingVariantFor(civA, id);
+    const awf = bvA?.amenitiesWithFeature;
+    if (awf && cityHasFeature(state, city, awf.feature)) n += awf.amount;
+    // CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES Amount 1): "Receive
+    // 1 Amenity for every Luxury resource this city has improved" — the
+    // DISTINCT kinds inside this city's own borders, so a second copy of one
+    // pays nothing.
+    if (bvA?.amenityPerLuxuryType) {
+      n += bvA.amenityPerLuxuryType * cityImprovedResourceKinds(state, city, 'luxury').size;
+    }
     // CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
     if (def.autoCapital) for (const r of getModifiers(state, city.seat).capital) n += r.palaceAmenities ?? 0;
     if (def.poweredAmenities && city.powered) n += def.poweredAmenities;

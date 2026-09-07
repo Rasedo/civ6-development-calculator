@@ -26,8 +26,8 @@ import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
 import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
-import { trainXpPct } from './combat';
-import { promoClassOf, unitPromoRows, xpToNextLevel } from './promotions';
+import { applyTrainingGrants } from './combat';
+import { unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -354,7 +354,7 @@ export function completeQueueItem(
         || allianceFreePromo(state, city.seat);
       const trained = spawnUnit(state, item.unit, where, city.seat);
       if (trained) {
-        trained.xpPct = trainXpPct(state, city, promoClassOf(item.unit));
+        applyTrainingGrants(state, city, trained);
         grantFreePromotion(trained, freePromo);
         // a FORMATION entry arrives at its tier — the whole point of the order
         if (item.formation) trained.formation = item.formation;
@@ -383,7 +383,7 @@ export function completeQueueItem(
       for (let k = 0; k < copies; k++) {
         const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);
         if (extra) {
-          extra.xpPct = trainXpPct(state, city, promoClassOf(item.unit));
+          applyTrainingGrants(state, city, extra);
           grantFreePromotion(extra, freePromo);
           if (item.formation) extra.formation = item.formation;
         }
@@ -391,7 +391,7 @@ export function completeQueueItem(
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
         const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
         if (twin) {
-          twin.xpPct = trainXpPct(state, city, promoClassOf(item.unit));
+          applyTrainingGrants(state, city, twin);
           grantFreePromotion(twin, freePromo);
           // what was trained arrives twice, tier and all
           if (item.formation) twin.formation = item.formation;

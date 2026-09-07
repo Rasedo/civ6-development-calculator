@@ -304,7 +304,7 @@ class SimEconomy:
                 if not bool(who.any()):
                     continue
                 _lr = loser.clamp(min=0, max=self.n_majors - 1)
-                _golden = self.civ_age.gather(1, _lr.unsqueeze(1)).squeeze(1) == 2
+                _golden = self.civ_age.gather(1, _lr.unsqueeze(1)).squeeze(1) == AGE_GOLDEN
                 drop = torch.where(_golden, torch.full_like(_lr, _pa + _pg),
                                    torch.full_like(_lr, _pa))
                 for b in who.nonzero(as_tuple=True)[0].tolist():
@@ -1430,7 +1430,7 @@ class SimEconomy:
         FLOOD BARRIER, whose own is its city's lowland tiles and the sea
         level, then the Global Energy Treaty's discount on the plant it
         names."""
-        base = self.rules_dev.b_cost.gather(0, bi).double()
+        base = self._b_cols(row)["cost"].gather(1, bi.unsqueeze(1)).squeeze(1)
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
                                self._flood_barrier_cost(row)[:, j].double(), base)
@@ -1452,7 +1452,8 @@ class SimEconomy:
         at queue, and it has to be followed for a deeper entry too."""
         cur = self.city_current[:, row]                       # [B, RC, QD]
         bi = cur.clamp(min=0, max=self.NB - 1)
-        base = self.rules_dev.b_cost.gather(0, bi.reshape(-1)).reshape(bi.shape).double()
+        base = self._b_cols(row)["cost"].unsqueeze(1).expand(
+            self.B, self.RC, self.NB).gather(2, bi)
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
                                self._flood_barrier_cost(row).unsqueeze(2).double(), base)
@@ -1511,6 +1512,15 @@ class SimEconomy:
             self.civ_civics[:, row].gather(1, rd.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
             ones_nb,
         )  # Temple/Amphitheater/... gate on a CIVIC (availableBuildings' unlocks.buildings)
+        # CIV6 (Madrasa): a UNIQUE building may arrive on a different edge of
+        # the tree from the row it replaces. The override REPLACES that row's
+        # own unlock for the seat it names (`BUILDING_PREREQ_ROWS`).
+        for _qc, _ql, _qb, _qt, _qv in self._building_prereq_rows:
+            if _qb < 0 or (_qt < 0 and _qv < 0):
+                continue
+            _qw = self._row_is(row, _qc, _ql)
+            _qopen = (self.civ_techs[:, row, _qt] if _qt >= 0 else self.civ_civics[:, row, _qv])
+            unlocked[:, _qb] = torch.where(_qw, _qopen, unlocked[:, _qb])
         cur = self.city_current[:, row]  # [B, C, QD]; layout: [0, NB) IS the building range
         _qsrc = cur[:, :, :0] if gold else cur
         queued = (torch.nn.functional.one_hot(_qsrc.clamp(min=0, max=NB - 1), NB).bool()
@@ -4047,6 +4057,11 @@ class SimEconomy:
                     _add = torch.where(_lv & self._seat_is(_ls, _lc, _ll),
                                        torch.full_like(_add, _lm), _add)
                 base = base + _add
+        # CIV6 (Ordu, EFFECT_ADJUST_UNIT_MOVEMENT through an ability granted
+        # to units TRAINED in its city): a unit's own stat, carried for life,
+        # so the embark pool below overrides it as it does the levy's.
+        if self._bvar_train_mp:
+            base = base + getattr(self, f"{pre}_unit_mp_bonus")
         # CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2
         # Movement."
         if self._gov_has_effects:
@@ -4688,6 +4703,25 @@ class SimEconomy:
             _hw = ((_tw == self._coast_terr) & _rw & take & sv.unsqueeze(2)).sum(dim=2).double()
             _hc = ((_tc == self._coast_terr) & _rc & sv).double()
             tiles_y = tiles_y + (_hw + _hc).unsqueeze(2) * _y6.double().view(1, 1, 6)
+        # CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with
+        # a passable feature or natural wonder" — a PLOT yield, so only a
+        # worked tile (or the centre) materializes it, the Lighthouse's way.
+        for (_mbi, _mciv), _my6 in self._bvar_feature_y.items():
+            _mpm = self._row_plays_idx(row, _mciv)
+            if not bool(_mpm.any()):
+                continue
+            _msv = bldg[:, :, _mbi] & _mpm.reshape(-1, *([1] * (bldg.dim() - 2)))
+            if not (_msv.numel() and bool(_msv.any())):
+                continue
+            _fw = self.feat_id.gather(1, stf).reshape(B, n, M)
+            _fc = self.feat_id.gather(1, ctr)
+            _sw = self.feat_stripped.gather(1, stf).reshape(B, n, M)
+            _sc = self.feat_stripped.gather(1, ctr)
+            _okw = (_fw >= 0) & ~_sw & self._feat_passable[_fw.clamp(min=0)]
+            _okc = (_fc >= 0) & ~_sc & self._feat_passable[_fc.clamp(min=0)]
+            _nw = (_okw & take & _msv.unsqueeze(2)).sum(dim=2).double()
+            _nc = (_okc & _msv).double()
+            tiles_y = tiles_y + (_nw + _nc).unsqueeze(2) * _my6.double().view(1, 1, 6)
 
         # ================= bucket 2: DISTRICTS ==============================
         # THE DISTRICT REGISTRY IS THE ONE READ, on every seat row: TS walks
@@ -4774,16 +4808,41 @@ class SimEconomy:
                 dist_y = dist_y + cnt.double().unsqueeze(2) * y6
 
         bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
-        selb = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl]) & ~self._b_regional.reshape(1, 1, -1)
+        # the row this SEAT builds — a unique building's own yields, Power and
+        # regional reach all arrive through `_b_cols` (`effectiveBuilding`)
+        bcol = self._b_cols(row)
+        selb = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl]) & ~bcol["regional"].unsqueeze(1)
         if bool(selb.any()):
             selbf = selb.double()
-            bld_y = bld_y + selbf @ rd.b_yields.double()
+            bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, bcol["yields"])
             # CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — the
             # seat-wide permanent, per standing Workshop.
             if self._workshop_bidx >= 0:
                 _wc = self._gp_perm(row, "workshopCulture").double()
                 if bool((_wc != 0).any()):
                     bld_y[:, :, 4] = bld_y[:, :, 4] + _wc.unsqueeze(1) * selbf[:, :, self._workshop_bidx]
+            # CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): a unique row may pay
+            # again while its seat stands in a Golden (or Heroic) Age.
+            for (_gbi, _gciv), _gy in (self._bvar_golden_y.items()
+                                       if row < self.n_majors else ()):
+                # `civ_age` is a MAJOR's plane, so the guard is on the loop
+                _gw = self._row_plays_idx(row, _gciv) & (self.civ_age[:, row] == AGE_GOLDEN)
+                if not bool(_gw.any()):
+                    continue
+                bld_y = bld_y + (selbf[:, :, _gbi] * _gw.double().unsqueeze(1)).unsqueeze(2) * _gy.reshape(1, 1, 6)
+            # CIV6 (Madrasa, OldYieldType SCIENCE -> NewYieldType FAITH): the
+            # row pays FAITH equal to its own district's adjacency, the shape
+            # the Coal Plant and the Shipyard read Production off theirs.
+            for (_fbi, _fciv) in self._bvar_adj_faith:
+                _fw = self._row_plays_idx(row, _fciv)
+                _fdi = int(self._b_req_district[_fbi])
+                if _fdi < 0 or not bool(_fw.any()):
+                    continue
+                _ft = dreg[:, :, _fdi]
+                _fadj = self._district_adj_seat(row, _fdi).gather(1, _ft.clamp(min=0)).double()
+                _fon = (_ft >= 0) & self.district_complete.gather(1, _ft.clamp(min=0))
+                bld_y[:, :, 5] = bld_y[:, :, 5] + (
+                    selbf[:, :, _fbi] * _fw.double().unsqueeze(1) * _fon.double() * _fadj)
             if has_bel or fol_live:
                 if has_bel:
                     bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, self._bel_add_pf("bldgY", row))
@@ -4802,7 +4861,7 @@ class SimEconomy:
                 # GS POWER: the second half of a late building's yields, paid
                 # while its city meets its whole load.
                 _lit = self.city_powered[:, row, sl].double().unsqueeze(2)
-                bld_y = bld_y + (selbf * _lit) @ self._b_pow_y
+                bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf * _lit, bcol["powY"])
                 # CIV6 (EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING): the
                 # roster's add on each yield a powered half pays
                 _pa = self._powered_add(row)
@@ -4841,7 +4900,7 @@ class SimEconomy:
                     1, dreg[:, :, _di].clamp(min=0)).double()
                 _pct = _pct + (_adjv >= float(_r7[5])).double() * float(_r7[6])
                 _mine = (selb & (self._b_req_district.reshape(1, 1, -1) == _di)).double()
-                _base = _mine @ rd.b_yields[:, _yi].double()
+                _base = torch.einsum("bjn,bn->bj", _mine, bcol["yields"][:, :, _yi])
                 bld_y[:, :, _yi] = bld_y[:, :, _yi] + torch.where(
                     _live, _base * _pct, torch.zeros_like(_base))
         _reg = self._seat_regional(row)
