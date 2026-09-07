@@ -114,50 +114,36 @@ until the owner rules. The detail lives in the item's own row — this list
 carries none. An entry LEAVES when the owner rules or a primary source is
 reached; a ruling is written into the row, not kept here as a question.
 
-1. **C-1 — the reactor's accident roll.** Severities open at ages 10/20/30;
-   no source publishes the per-turn probability.
-2. **C-1 — the decommission projects' competition score.** A secondary
-   source says 100 points; no first-party page states any figure.
-3. **C-31 — the nuke's last three cells.** The interception roll, the
-   citizens a blast kills, and whether a wonder in the blast is pillaged.
-4. **C-35 — what drowned ground still lends.** Does a submerged tile's
-   FEATURE keep working for its neighbours, or is the ground stripped?
-5. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
-   threshold; `GRIEVANCE_GANG` is a tuning knob wearing a sourced unit.
-6. **B-66 — a direct-trained formation's strategic-resource charge.** The
-   cost multipliers are sourced; the resource charge of the direct order is
-   not.
-7. **C-41 — where Volcanic Soil lands.** WHERE an eruption's soil lands,
-   and whether it may land on an improved tile.
-8. **C-45 — the queue's depth.** Five is a capacity choice (the GPU's
+1. **B-63r — the gang-up bar.** No source publishes the AI's gang-up
+   threshold; `GRIEVANCE_GANG` is a tuning knob wearing a sourced unit (the
+   forums offer only "100 grievances is not enough, 150 is getting that way").
+2. **C-41 — where Volcanic Soil lands.** The install lets a Farm, a Mine, a
+   Fort, an Airstrip, a Seaside Resort and the unique tile improvements stand
+   ON the soil (`Improvement_ValidFeatures`, 2026-09-07), so the engine's
+   "a featured tile is occupied" objection is gone; WHICH tiles an eruption
+   paints, and whether an already-improved one takes it, stay DLL.
+3. **C-45 — the queue's depth.** Five is a capacity choice (the GPU's
    tensor dimension). Is five acceptable, or name a depth?
-9. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6 is the same shape of
+4. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6 is the same shape of
    capacity choice. Is six acceptable, or name a depth?
-10. **C-2 — the queue-front gold purchase.** Refused on both engines; real
-    Civ 6 likely allows it with the progress banked, and no source settles
-    it.
-11. **C-2 — ALLIANCE_POINTS_FOR_DEAL (2).** A row of the install's alliance
-    table with no published text behind it.
-12. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes on a
-    city capture; the Encampment's own pool rides through. No source says
-    which is right.
-13. **C-72 — what the Cree trade claim's radius is measured FROM.** The
-    install gives `GainTileRadius: 3` and nothing says whether it is measured
-    from the path tiles, the origin or the destination; on a long walk the
-    three differ by most of a continent.
-14. **C-64 — the majority-religion tie rule.** A seat can hold two religions
-    in equal numbers of cities and no source names the winner.
-15. **C-74 — the per-volcano eruption rate.** The install counts eruptions
-    per GAME; this engine rolls per VOLCANO, and the conversion needs the
-    map's volcano count. Not covered by the 2026-09-04 disaster ruling.
-16. **C-20 / C-34 — the Aerodrome's slot count.** Two first-party pages
-    disagree (2-then-4 on the Air Combat page, +2 apiece on each building's
-    own entry, which reaches 6). Nothing here decides between them.
-17. **B-22r — the WORLD'S FAIR competition's Gold tier and scored
-    quantity.** Silver and Bronze came back from the source; those two did
-    not, and will not be invented.
-18. **B-D — Valletta's Walls discount.** The faith-only half ships; the
-    reduction has no published magnitude.
+5. **B-51r — a capture and the district pool.** `city_outer_hp` zeroes on a
+   city capture; the Encampment's own pool rides through. The CivFanatics
+   City Combat guide gives the CITY's side ("half HP walls and garrison" once
+   Urban Defenses is known); the Encampment's own pool after capture is
+   reported only as a bug (2016-2017). No rule reached.
+6. **C-64 — the majority-religion tie rule.** A seat can hold two religions
+   in equal numbers of cities and no source names the winner.
+7. **C-74 / C-1 — a per-GAME count over per-OBJECT rolls.** The install
+   counts eruptions AND reactor accidents per game (MODERATE: volcanoes
+   4 / 2.5 / 1.5, each accident severity 1) where this engine rolls per
+   volcano and would roll per reactor. PROPOSAL, no new number: divide the
+   per-turn rate by the map's count of objects at risk, which keeps the
+   install's per-game expectation. Not covered by the 2026-09-04 ruling.
+8. **C-31 — whether a wonder in the blast is pillaged.** Unsourced.
+9. **C-76 — the opinion deltas.** The install names every modifier
+   (`LOC_DIPLO_MODIFIER_*` in the text files) and publishes no amount; the
+   community threads found carry Civ V's numbers or none. What feeds the
+   scale stays an ask.
 
 RULED AND REMOVED FROM THIS LEDGER (each ruling now lives in its row): C-33
 the Jump's cost, C-16 the released spy's level, C-38 the minor's build
@@ -168,6 +154,22 @@ three disaster rates (MODERATE / 500 turns, 2026-09-04); C-75's slotting
 literally, 2026-09-05); and B-20r's park vertical, which is not an ask —
 the entry states the implementation that is closer to Civ 6 and ships the
 other, so it is a recorded model choice awaiting nothing.
+
+SOURCED AND REMOVED 2026-09-07 (the last sourcing pass, #231 — each finding
+now lives in its row): the reactor's base rate and its three damage tables
+(C-1, the install's RandomEvents); the decommission score of 100 (C-1,
+Expansion2_Emergencies); the nuke's interception, a 50%-HP threshold and
+never a roll (C-31, community tests); what drowned ground lends — nothing,
+it is coastal water (C-35, the install's pedia); the formation's resource
+charge, double and triple (B-66, two secondary sources); the queue-front
+purchase, allowed, a building's progress lost and a unit's kept (C-2, one
+tested report); ALLIANCE_POINTS_FOR_DEAL, +2 per deal between allies (C-2,
+the GlobalParameter and the pedia's own sentence); the Cree radius, three
+tiles from a Cree CITY (C-72, the trait's own text); the Aerodrome's 4/6/8
+slots (C-34, Districts.xml + two GRANT_AIR_SLOTS modifiers); the World's
+Fair's scoring and every tier (B-22r, Expansion2_Emergencies); Valletta's
+50% (B-D, Leaders.xml); and the religious units' Faith progression (B-D,
+Units.xml COST_PROGRESSION_PREVIOUS_COPIES).
 
 ## A. Engine vs engine — where the two implementations can answer differently
 
@@ -284,10 +286,14 @@ that with both allowlists empty.
   `tests/cpu/seats/competition.test.ts` exercise it.
   OPEN:
   - **THE COMPETITION CATALOG HOLDS ONE ROW.** The machinery takes a data row
-    per competition; what is missing is the rows. WORLD'S FAIR is blocked on
-    its own SOURCE — Silver is 50 Diplomatic Favor and Bronze a free Civic,
-    but the GOLD tier and the SCORED QUANTITY did not come back from any
-    reachable source and will not be invented (ask). AID REQUEST scores
+    per competition; what is missing is the rows. WORLD'S FAIR — SOURCED
+    2026-09-07 from `Expansion2_Emergencies.xml`, buildable: the score is 1
+    point per Great Person POINT of every class earned during the window
+    (eight `WORLDS_FAIR_SCORE_GPP_*` rows, ScoreAmount 1), Duration 29 with a
+    60-turn lockout; FIRST PLACE +1 Diplomatic Victory point
+    (`NON_EMERGENCY_FIRST_PLACE_VICTORY_POINT`) and +100 Great Person points;
+    TOP TIER +50 Favor and 2 random Industrial..Information civic boosts;
+    BOTTOM TIER 1 such boost. AID REQUEST scores
     members who "send Gold to the target player", which needs a
     gold-to-a-rival scorer no competition reads yet; BORDER DISPUTE,
     CATASTROPHE and MILITARY COMPETITION each want a scored quantity of their
@@ -432,7 +438,14 @@ that with both allowlists empty.
   measures distance 1..2 from the DISTRICT's own tile.
   OPEN — **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
   city capture; the district's own pool rides through unchanged on both
-  engines. No source says which is right; ask.
+  engines. Searched 2026-09-07: the CivFanatics City Combat guide
+  (forums.civfanatics.com/resources/city-combat.27737) gives the CITY's side
+  — "when you capture a city after discovering Urban Defences the captured
+  city starts with half HP walls and garrison", "when an encampment is
+  occupied all its buildings are automatically pillaged", "Encampment
+  Garrisons only have 100 HP but their wall HP match their city center" —
+  and the Encampment's own pool after capture appears only in bug reports
+  (health stuck at 29/200, 2016-2017). No rule reached; ask.
 - **B-54r. FLANKING AND SUPPORT AGAINST THEIR OWN PAGE.** Weight 1.
   SHIPPED: every rule on the page, plus the four higher stacks a promotion or
   Great Person raises.
@@ -479,7 +492,9 @@ that with both allowlists empty.
   WarmongerPercent / CaptureWarmongerPercent / RazeWarmongerPercent), read
   off the pair's kind (`warKindWith` / `_war_kind_code`).
   OPEN — **THE GANG-UP BAR IS A HEURISTIC.** `GRIEVANCE_GANG` is a tuning
-  knob wearing a sourced unit; no source publishes an AI threshold. Ask.
+  knob wearing a sourced unit; no source publishes an AI threshold (searched
+  again 2026-09-07 — forum lore only: "100 grievances is not enough to make
+  everyone denounce you, but 150 is getting that way"). Ask.
   Enkidu's allied-war discount (EFFECT_ADJUST_PLAYER_ALLIED_WAR_DISCOUNT
   150) waits here.
 - **B-66. FORMATIONS.** Weight 1.
@@ -540,9 +555,11 @@ that with both allowlists empty.
   column is offered on 12 of 12 seeds from t14 and NO driver ever takes it,
   so the pair, the drag and Escort Mobility are poke-only.
   OPEN:
-  - **A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE IS THE UNIT'S OWN.** No
-    reached source publishes the STRATEGIC-RESOURCE charge of the direct
-    order; it ships at the single unit's charge, the modelled minimum. Ask.
+  - **A DIRECT-TRAINED FORMATION'S RESOURCE CHARGE IS THE UNIT'S OWN.**
+    SOURCED 2026-09-07 (secondary, two agreeing: gamepressure's Gathering
+    Storm strategic-resources guide and the Unit wiki page): a Corps costs
+    DOUBLE the unit's strategic resource up front and an Army TRIPLE, with
+    maintenance unchanged; no XML row carries it. Buildable on that reading.
   - **AN ESCORT FORMATION IS A PAIR.** Real Civ 6 links up to THREE units of
     different classes — military, civilian and support. Support units are
     modelled here as civilians and the drag takes ONE rider, so `escortUnit`
@@ -581,23 +598,33 @@ that with both allowlists empty.
     hold their rows.
   - **THE PER-CITY WAR-WEARINESS SPLIT IS NOT PUBLISHED, and the empire-wide
     rule we implement IS** (sourced: -1 Amenity per 400 WWP,
-    `warWearinessPenalty`'s shape). The three
-    `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_*` GlobalParameters are real data
-    no source explains; closing this needs the C++ behaviour.
+    `warWearinessPenalty`'s shape). The install's numbers, read 2026-09-07:
+    `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0,
+    NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`,
+    `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`,
+    `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200,
+    TURN_AT_WAR 50}`, `_WARMONGER_BASE 16`. How the three per-city rows
+    compose is DLL; closing this still needs the C++ behaviour.
   - `GAME_SPEED` 0.6 (`constants`) — a SHAPE difference: real Civ 6 scales
     cost, yield and turn tables independently per speed.
-  - **THE RELIGIOUS FAITH PRICES ARE FLAT.** Every religious infobox ends
-    "Faith cost is progressive"; no source publishes the progression (the
-    same channel `naturalistCost` names).
+  - **THE RELIGIOUS FAITH PRICES ARE FLAT — the progression is SOURCED
+    2026-09-07, buildable.** `Units.xml`: `CostProgressionModel=
+    "COST_PROGRESSION_PREVIOUS_COPIES"` with `CostProgressionParam1` per
+    copy — Missionary 75 +6, Apostle 200 +15, Inquisitor 75 +6, Guru 120
+    +12, Naturalist 800 +100, Rock Band 300 +50; the Warrior Monk is 100
+    flat. READING for the DLL half: a "previous copy" is one the seat has
+    ever acquired, dead or alive.
   - the BELIEF magnitudes (`religion` header) and the deliberate tuning
     constants in `seats` (its header names them) — stylizations that will
     never close by sourcing; recorded once.
   - the FLOOD SEVERITY split now comes from the install (C-74); what stays
     the model's own in `disasters` is ERUPTION_CHANCE_PER_VOLCANO, held under
     C-74's open half.
-  - **VALLETTA'S WALLS DISCOUNT HAS NO PUBLISHED MAGNITUDE** — the
-    faith-ONLY half ships (`wallsGoldBlocked`); the reduction has no figure.
-    Ask.
+  - **VALLETTA'S WALLS DISCOUNT — SOURCED 2026-09-07, buildable.**
+    `Leaders.xml` MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,STAR}_BONUS
+    are `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PURCHASE_COST` Amount 50 on
+    BUILDING_WALLS / BUILDING_CASTLE / BUILDING_STAR_FORT: half price. The
+    faith-ONLY half ships (`wallsGoldBlocked`); the 50% does not yet.
   - **THE FAITH RATE FOR A LAND COMBAT UNIT IS INFERRED** — Valletta's page
     publishes the BUILDING rate ("2 Faith for 1 Production",
     `FAITH_PURCHASE_MULT`) and `unitFaithCost` /
@@ -638,16 +665,30 @@ under their blocker so the dependency is readable, and both halves count.
   Atomic-era plant, and the driver's job ladder never walks a Builder onto
   water. Poke-proven throughout.
   OPEN:
-  - **THE ACCIDENT ROLL.** The ages that open each severity are published —
-    Radioactive Steam Venting, Major Radiation Leaks and Nuclear Meltdown
-    become possible at 10, 20 and 30 — but NO SOURCE REACHED PUBLISHES THE
-    PER-TURN PROBABILITY. The clock ships; the roll does not. Ask.
-  - **THE DECOMMISSION PROJECTS.** "Removes the Nuclear Power Plant and all
-    its effects from this city", offered while a Climate Accords competition
-    runs, and the Coal and Oil rows beside it. The removal is sourced; the
-    COMPETITION SCORE each grants is not — a secondary source says 100 and no
-    first-party page reached states any figure, so B-22r's window counts the
-    emission gap alone. Ask.
+  - **THE ACCIDENT ROLL — SOURCED 2026-09-07, buildable.**
+    `Expansion2_RandomEvents.xml` carries the three accidents as RandomEvents:
+    `RANDOM_EVENT_NUCLEAR_ACCIDENT_{MINOR,MAJOR,CATASTROPHIC}` (Severity
+    0/1/2, `MinTurnAtRisk` 10/20/30 — the reactor age each opens at),
+    `OccurrencesPerGame` 1 apiece at MODERATE (2/2 at MINIMAL for the first
+    two), and a `RandomEvent_Damages` table per severity: MINOR improvement
+    pillaged 10%, building pillaged 20%, radiation 100% for 2 turns; MAJOR
+    civilians killed 50%, improvement pillaged 40%, district pillaged 50%,
+    buildings pillaged 100%, radiation 100% for 10 turns, land/naval units
+    50% @ 20-50 HP, garrison 50% @ 20-50; CATASTROPHIC improvement pillaged
+    100%, buildings DESTROYED 100%, district pillaged 100%, population -80%,
+    radiation 100% for 20 turns, units 100% @ 20-50, garrison 100% @ 20-50,
+    civilians 100%. The pedia adds only "as it ages, the chances that a
+    Nuclear Accident will occur increase" — the AGE SCALING is DLL and the
+    base rate is the C-74 shape (1 per game per severity, / 500). Whether
+    that count is per GAME or per REACTOR is the ledger's per-object question
+    (with the volcanoes). The clock ships; the roll waits on that one ask.
+  - **THE DECOMMISSION PROJECTS — SOURCED 2026-09-07, buildable.** "Removes
+    the Nuclear Power Plant and all its effects from this city", offered while
+    a Climate Accords competition runs, and the Coal and Oil rows beside it.
+    `Expansion2_Emergencies.xml` `CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,
+    OIL,NUCLEAR}`: `ScoreAmount="100"` each, `FromProject` the decommission
+    row. B-22r's window still counts the emission gap alone until the three
+    projects and their score source ship.
   - **A CITY-STATE'S CITIES ARE NEVER POWERED** — `resolveSeatPower` /
     `_resolve_seat_power` run inside the MAJOR seat loop only. Vacuous BY THE
     LADDER (2026-09-07): nothing a minor builds — the three walls, the six
@@ -721,11 +762,19 @@ under their blocker so the dependency is readable, and both halves count.
   protocol's own reach is unmeasured; the round's smoke serve is what proves
   the two engines walk it together.
   OPEN:
-  - **ALLIANCE_POINTS_FOR_DEAL (2)** is a row of the same table with no
-    published text behind it. Ask.
+  - **ALLIANCE_POINTS_FOR_DEAL (2) — SOURCED 2026-09-07, buildable.** A
+    GlobalParameter (Expansion1 and Expansion2 both `Value="2"`); the pedia's
+    Alliances page: "You can increase the rate at which you gain Alliance
+    Points by trading with your Ally", and Cleopatra's text "Trading with
+    Allies earns twice as many bonus Alliance Points". READING: +2 points to
+    the pair when a deal between allies is accepted (Cleopatra doubles it).
   - **THE GOLD PURCHASE OF THE QUEUE-FRONT ITEM** is refused on both engines
-    (`goldPurchasableBuildings` holds the shared reading). Real Civ 6 likely
-    allows it with the progress banked; no source in reach settles it. Ask.
+    (`goldPurchasableBuildings` holds the shared reading). SOURCED 2026-09-07
+    (one tested report, steamcommunity.com/app/289070/discussions/0/
+    1848072002747657088, 19 Mar 2019): the purchase is ALLOWED; a UNIT keeps
+    its progress ("you'll keep on working on the one you were building"), a
+    BUILDING's progress is "wasted". Secondary; buildable on that reading,
+    with the unit's kept progress moving to the next item of its kind.
   - **A MISSION LEAVES NO MARK ON THE RELATIONSHIP** — waits on C-76, the
     opinion scale. The delegation ships —
     "Delegations cost 10 Gold and Embassies cost 25 Gold, which is paid to
@@ -1025,8 +1074,15 @@ under their blocker so the dependency is readable, and both halves count.
 - **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1.
   SHIPPED: the strike itself, and C-20's MISSILE SILO under it.
   OPEN, three cells, none closable from a reached source (ask):
-  - INTERCEPTION has no published roll (shared with C-34, which owns the
-    fighter's side of it).
+  - INTERCEPTION — SOURCED 2026-09-07 (community tests, not a roll): the
+    Gathering Storm interception tests (forums.civfanatics.com/threads/
+    civilization-6-gathering-storm-results-of-some-nuke-interception-tests-
+    for-multiplayer.665241, Dec 2020, and the linked test document) find NO
+    percent chance — an anti-air unit whose interception takes the delivering
+    bomber under 50% HP stops the drop and the device is lost from the
+    inventory; silo launches are stopped by Gun AA, Battleships and Mobile
+    SAM, submarine launches by Mobile SAM only; fighters presumed, untested.
+    Buildable as a deterministic threshold (shared with C-34's fighter side).
   - THE CITIZENS A BLAST KILLS wait on a worked-tile selection neither engine
     exposes — C-77.
   - WHETHER A WONDER IN THE BLAST IS PILLAGED is unsourced.
@@ -1054,13 +1110,15 @@ under their blocker so the dependency is readable, and both halves count.
     occupant to the SUPPORT unit under it. The Civilopedia's Jet Bomber page
     does not carry the ability at all, and the flat "sustains 65 damage" is
     wiki text no session could fetch to quote. Unsourced magnitude, unbuilt.
-  - **THE AERODROME'S SLOT COUNT HAS TWO SOURCES THAT DISAGREE.** The Air
-    Combat page says an Aerodrome "has 2 slots initially, and can reach 4
-    slots after constructing the Hangar and the Airport"; each building's own
-    Civilopedia entry says "+2 air unit slots in Aerodrome district", which
-    would reach 6. Both engines carry the page's reading (`airSlots` 1
-    apiece, `_aerodrome_air_slots` + `_b_air_slots`). Neither number is
-    invented, and nothing here decides between them. Ask.
+  - **THE AERODROME'S SLOT COUNT — SOURCED 2026-09-07, and BOTH pages were
+    wrong.** `Districts.xml` DISTRICT_AERODROME `AirSlots="4"`; `Buildings.xml`
+    HANGAR_BONUS_AIR_SLOTS and AIRPORT_BONUS_AIR_SLOTS are
+    `MODIFIER_PLAYER_DISTRICT_GRANT_AIR_SLOTS` Amount 2 each; no expansion
+    overrides any of the three. So 4, 6, 8 — not the Air Combat page's
+    2-then-4 nor the +2-apiece-to-6. Beside them: CITY_CENTER 1, AIRSTRIP 3,
+    AIRCRAFT_CARRIER 2. Both engines carry the page's reading (`airSlots` 1
+    apiece, `_aerodrome_air_slots` + `_b_air_slots`) and must move to the
+    XML's — buildable, no longer an ask.
   (Moved out of C-20, whose title never covered these; C-20 keeps the tunnel.)
 - **C-35. THE DROWNED GROUND KEEPS ITS RECORD.** Weight 1.
   SHIPPED: sea-ness MOVES — `Tile.submerged` / `tile_submerged` turn a tile
@@ -1074,8 +1132,15 @@ under their blocker so the dependency is readable, and both halves count.
   sources), so a drowned Woods still lends its neighbours what it always did.
   The ONE neighbour answer that asks `isLand` is `isCoastalWater`, and
   `_submerge` moves it with the wonders that need it.
-  OPEN: whether real Civ 6 keeps a submerged tile's feature working for its
-  neighbours or strips the ground bare. Unsourced either way; ask.
+  SOURCED 2026-09-07, the install's own pedia (Sea Level Rise): "1 meter
+  and 2 meter tiles will become submerged and become coastal water tiles.
+  This may result in the destruction of improvements and districts on
+  flooded tiles". A submerged tile IS coastal water for its neighbours: no
+  land feature survives to lend adjacency, and a coast tile lends what coast
+  lends.
+  OPEN: the reading above — terrain, feature and river edges kept underneath
+  — is the WRONG one by that text; the ring facts must read a drowned tile
+  as COAST on both engines. A build, no longer an ask.
 - **C-38. A CITY-STATE'S CITY DEVELOPS HALFWAY.** Weight 1.
   SHIPPED: the minor BUILDS (`minorPhase` / `_minor_build`) — a production
   pot takes the city's own Production a turn and a fixed ladder spends it:
@@ -1160,10 +1225,16 @@ under their blocker so the dependency is readable, and both halves count.
   OPEN — **WHERE THE SOIL LANDS.** The eruption laying it on volcano-adjacent
   land is the obvious runtime writer, but every improvement clause in this
   engine reads a featured tile as occupied — a Farm, a Mine and a Seaside
-  Resort each ask for `tile.feature === null` — so the paint would refuse
-  those three on every tile beside a volcano, and the carrier's own envelope
-  refuses a tile already improved. No source reached says Volcanic Soil
-  refuses an improvement. ASK THE OWNER.
+  Resort each ask for `tile.feature === null`. SOURCED 2026-09-07: the
+  install says the soil refuses none of them — `Improvement_ValidFeatures`
+  lists FEATURE_VOLCANIC_SOIL for FARM, MINE, FORT, AIRSTRIP, BEACH_RESORT,
+  MISSILE_SILO, the Roman Fort, the Great Wall, the Moai, the Colossal Head
+  and the barbarian camp; `Feature_ValidTerrains` puts it on grass, plains,
+  desert, tundra and snow, flat or hills; and the feature row is
+  `ValidDistrictPlacement`, `ValidWonderPlacement` and `ValidForReplacement`
+  all true. So the three improvement clauses must ACCEPT the soil (a build).
+  Still unsourced: WHICH tiles an eruption paints and whether an
+  already-improved tile takes it (the carrier's envelope refuses one). ASK.
 - **C-45. THE QUEUE'S DEPTH IS A FIXED FIVE.** Weight 1.
   SHIPPED: a city holds `PRODUCTION_QUEUE_MAX` items and refuses the sixth.
   The per-item hammer ledger a CANCELLED entry banks into (`city_item_bank`,
@@ -1412,7 +1483,11 @@ under their blocker so the dependency is readable, and both halves count.
     (C-67), both DLL-scored against the scale.
   The carrier is a per-directed-pair opinion on both engines, compared,
   with the install's `RelationshipLevel` anchors; what feeds it is an ASK —
-  no source publishes the per-event deltas.
+  no source publishes the per-event deltas. Searched 2026-09-07: the install
+  names every modifier (`LOC_DIPLO_MODIFIER_*` in the Expansion text files)
+  and carries no amount for any; the CivFanatics "opinion mechanics" threads
+  hold Civ V's Vox Populi numbers or none; the guide-site figures (delegation
+  +3, a refused promise -6 decaying, a caught spy -5) cite nothing.
 - **C-77. THE WORKED-TILE ASSIGNMENT LIVES ONLY INSIDE THE YIELD WALK.** Weight 1.
   ENGINES: `assignWorkedTiles` and the GPU walk's `topk` derive which plot each
   citizen works every time a city's yields are computed; nothing stores it,
@@ -1434,7 +1509,8 @@ under their blocker so the dependency is readable, and both halves count.
   `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`. The carrier is a per-seat
   majority read over its own cities' followed religions, on both engines; the
   TIE RULE is the thing to source before it ships, since a seat can hold two
-  religions in equal numbers of cities. Ask.
+  religions in equal numbers of cities. Searched again 2026-09-07 (the
+  install's text, CivFanatics, Steam): nothing names the winner. Ask.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
   SOURCED: CIV6's agenda-style clauses that make an AI PREFER or REFUSE an
   action are DLL-side weightings.
@@ -1483,8 +1559,11 @@ under their blocker so the dependency is readable, and both halves count.
   that radius is measured FROM: the path tiles, the origin, or the
   destination. On a walk of any length those three differ enormously (3 from
   every path tile is most of a continent).
-  OPEN: the amount is sourced and the GEOMETRY is not, which makes this an
-  ASK rather than a build. It must not ship on a guess.
+  GEOMETRY SOURCED 2026-09-07 from the trait's own text
+  (`LOC_TRAIT_CIVILIZATION_NIHITHAW_DESCRIPTION`): "Unclaimed tiles within 3
+  tiles of a Cree CITY come under Cree control when a Trader first moves
+  into them" — measured from the city, not the path or the route's ends.
+  OPEN: the claim itself, now a build and no longer an ask.
 - **C-74. THE ERUPTION RATE IS STILL STYLIZED.** Weight 1.
   SOURCED: `RandomEvent_Frequencies` publishes an `OccurrencesPerGame` for
   every event at each of five `RealismSettingType` levels (MINIMAL, LIGHT,
@@ -1500,7 +1579,10 @@ under their blocker so the dependency is readable, and both halves count.
   by C-49's eight per-event rows off the same table.
   OPEN — **ERUPTION_CHANCE_PER_VOLCANO IS NOT COVERED BY THE RULING.** The
   install counts eruptions per GAME where this engine rolls per VOLCANO, and
-  the conversion needs the map's volcano count. Ask.
+  the conversion needs the map's volcano count. The reactor accidents (C-1)
+  are the same shape. PROPOSAL (2026-09-07, no new number): divide the
+  per-turn rate by the map's count of objects at risk, keeping the install's
+  per-game expectation. Ask.
 ## Harness — not weighted (this file prices fidelity)
 
 - **THE DRIVER NEEDS A REAL STYLE MECHANISM.** Today a style is one boolean
