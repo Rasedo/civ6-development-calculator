@@ -1543,7 +1543,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // CIV6 (Loot): "+50 Gold from coastal raids", flat and on top of
         // whatever the wrecked target's own plunder row pays.
         const raidGold = (): void => { actor.treasury += promoValue(unit, 'RAID_GOLD'); };
-        const spendPillage = (): void => {
+        const spendPillage = (raid = false): void => {
+          if (raid && UNITS[unit.type]?.raidFreeMoves) return;
           unit.movesLeft = Math.max(
             0, unit.movesLeft - MP_SCALE * (pillageCost > 0 ? pillageCost : 3));
         };
@@ -1571,7 +1572,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         } else if (hereOwned && districtWreckable(here)) {
           wreckDistrict(here);
         } else if ((UNITS[unit.type]?.raider || (leaderOf(state, unit.seat) === 'HARDRADA' && navalMelee(UNITS[unit.type])))
-          && isWater(here) && unit.movesLeft >= 3 * MP_SCALE) {
+          // CIV6 (Barbary Corsair): "It costs no Movement to coastal raid" —
+          // the three-point reserve goes with the spend.
+          && isWater(here)
+          && (UNITS[unit.type]?.raidFreeMoves || unit.movesLeft >= 3 * MP_SCALE)) {
           // CIV6 (Thunderbolt of the North): "coastal raiding for all naval
           // melee units"
           // CIV6 (Coastal Raid): the raider "must be next to the land
@@ -1587,7 +1591,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           if (impT) {
             impT.pillaged = true;
             pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, impT.improvement ?? undefined, tileSeat(impT));
-            spendPillage();
+            spendPillage(true);
             raidGold();
           } else {
             const disT = cand.find(districtWreckable);

@@ -45,7 +45,7 @@ function sceneAs(row: number): GameState {
 
 describe('the wire', () => {
   it('carries every batch-ten family, and every code is addressable', () => {
-    expect(EXTRA_UNIT_COPY_ROWS.length).toBe(1);
+    expect(EXTRA_UNIT_COPY_ROWS.length).toBe(2);
     expect(CONQUEST_POP_ROWS.length).toBe(1);
     expect(NOT_FOUNDED_ROWS.length).toBe(2);
     expect(EXTRA_DISTRICT_ROWS.length).toBe(1);
@@ -58,7 +58,11 @@ describe('the wire', () => {
     expect(GOVERNOR_TITLE_GRANT_ROWS.length).toBe(1);
     expect(GP_REFUND_ROWS.length).toBe(1);
     expect(EVICT_PCT_ROWS.length).toBe(1);
-    for (const r of EXTRA_UNIT_COPY_ROWS) expect(COPY_CLASSES.indexOf(r.cls as never)).toBeGreaterThanOrEqual(0);
+    // a row names EITHER a class or ONE chassis, never both and never neither
+    for (const r of EXTRA_UNIT_COPY_ROWS) {
+      if (r.unit !== undefined) expect(r.cls).toBe('');
+      else expect(COPY_CLASSES.indexOf(r.cls as never)).toBeGreaterThanOrEqual(0);
+    }
     for (const r of NOT_FOUNDED_ROWS) expect(NOT_FOUNDED_CHANNELS.indexOf(r.channel)).toBeGreaterThanOrEqual(0);
   });
 
@@ -265,8 +269,12 @@ describe('People of the Steppe', () => {
   it('names the light cavalry class and nothing else', () => {
     expect(EXTRA_UNIT_COPY_ROWS[0].cls).toBe('LIGHT_CAVALRY');
     expect(EXTRA_UNIT_COPY_ROWS[0].amount).toBe(1);
+    // CIV6 (TRAIT_EXTRASAKAHORSEARCHER): the Saka Horse Archer is
+    // PROMOTION_CLASS_RANGED, so it takes a row of its own
+    expect(EXTRA_UNIT_COPY_ROWS[1].unit).toBe('SAKA_HORSE_ARCHER');
+    expect(isLightCavalry(UNITS.SAKA_HORSE_ARCHER)).toBe(false);
     const state = sceneAs(seatRow('SCYTHIA'));
-    expect(getModifiers(state, 0).extraUnitCopies.length).toBe(1);
+    expect(getModifiers(state, 0).extraUnitCopies.length).toBe(2);
     expect(getModifiers(sceneAs(PLAIN), 0).extraUnitCopies.length).toBe(0);
     // the spawn itself is the production path's; here we pin that a HORSEMAN
     // is the class the row reaches and a KNIGHT is not

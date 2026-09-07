@@ -2988,7 +2988,13 @@ class SimInit:
         self._type_park_builder = _uc("parkBuilder", bool, torch.bool)
         self._type_escort_speed = _uc("escortSpeed", bool, torch.bool)
         self._type_pillage_cost = _uc("pillageCost")
-        self._type_guards_traders = _uc("guardsTraders", bool, torch.bool)
+        # 0 none, 1 LAND (Mandekalu), 2 WATER (Bireme)
+        self._type_guards_traders = _uc("guardsTraders")
+        self._type_vs_fighter_cs = _uc("vsFighterCs")
+        self._type_ocean_cs = _uc("oceanCs")
+        self._type_district_atk_cs = _uc("districtAtkCs")
+        self._type_raid_free = _uc("raidFreeMoves", bool, torch.bool)
+        self._type_capture_ships = _uc("captureShips", bool, torch.bool)
         self._type_capture_converts = _uc("captureConverts", bool, torch.bool)
         _uq = rules.uniques
         self._civ_ids: list[str] = list(_uq["civs"])
@@ -3138,8 +3144,12 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["worship"]]  # type: ignore[misc]
         # THE CONQUERED CITY, THE SECOND HORSE AND THE BOOST
         # [civ, leaderRow, COPY_CLASSES index, amount] on a TRAINED unit
-        self._extra_unit_copy_rows: list[tuple[int, int, int, int]] = [
+        self._extra_unit_copy_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["extraUnitCopies"]]  # type: ignore[misc]
+        # the chassis whose TRAINING costs the city citizens (the Janissary):
+        # [civ, leader, unitIdx, amount (the install's SIGNED value), foundedOnly]
+        self._unit_pop_cost_rows: list[tuple[int, int, int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["unitPopCost"]]  # type: ignore[misc]
         self._conquest_pop_rows: list[tuple[int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["conquestPop"]]  # type: ignore[misc]
         # [civ, leaderRow, channel (0 amenity / 1 loyalty), amount]

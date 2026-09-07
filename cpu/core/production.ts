@@ -354,10 +354,19 @@ export function completeQueueItem(
       // ... each time you train a light cavalry unit" — a TRAINED one, the
       // same door the Arsenal's hull comes through (`EXTRA_UNIT_COPY_ROWS`)
       let copies = 0;
-      if (UNITS[item.unit] && isLightCavalry(UNITS[item.unit])) {
-        for (const r of getModifiers(state, city.seat).extraUnitCopies) {
-          if (r.cls === 'LIGHT_CAVALRY') copies += r.amount;
+      for (const r of getModifiers(state, city.seat).extraUnitCopies) {
+        if (r.unit !== undefined) {
+          if (r.unit === item.unit) copies += r.amount;
+        } else if (r.cls === 'LIGHT_CAVALRY' && UNITS[item.unit] && isLightCavalry(UNITS[item.unit])) {
+          copies += r.amount;
         }
+      }
+      // CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city a
+      // citizen, in a city this seat founded.
+      for (const r of getModifiers(state, city.seat).unitPopCost) {
+        if (r.unit !== item.unit) continue;
+        if (r.foundedOnly && city.founderSeat !== city.seat) continue;
+        city.population = Math.max(1, city.population + r.amount);
       }
       for (let k = 0; k < copies; k++) {
         const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);

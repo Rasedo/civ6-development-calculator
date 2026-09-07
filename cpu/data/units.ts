@@ -296,9 +296,24 @@ export interface UnitDef {
   escortSpeed?: boolean;
   /** CIV6 (Malón Raider): "Pillaging costs 1 Movement." */
   pillageCost?: number;
-  /** CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from
-   *  Plunder." */
-  guardsTraders?: boolean;
+  /** CIV6 (Mandekalu Cavalry): "Protects nearby LAND Trade units from
+   *  Plunder"; (Bireme): "Protects nearby Trade units from being Plundered on
+   *  WATER Tiles." One clause, two grounds. */
+  guardsTraders?: 'land' | 'water';
+  /** CIV6 (P-51 Mustang): "+5 Combat Strength bonus vs. Fighters." */
+  vsFighterCS?: number;
+  /** CIV6 (U-Boat): "+10 Combat Strength in Ocean combat" — the deep water
+   *  alone; a Coast or Lake tile is not Ocean. */
+  oceanCS?: number;
+  /** CIV6 (De Zeven Provincien): "+7 Combat Strength when attacking
+   *  defensible districts." */
+  districtAttackCS?: number;
+  /** CIV6 (Barbary Corsair): "It costs no Movement to coastal raid" — the
+   *  three-point reserve the raid asks for, and the spend, both waived. */
+  raidFreeMoves?: boolean;
+  /** CIV6 (Sea Dog): "Can capture defeated enemy naval vessels" — the
+   *  capture permission `captureMask` otherwise carries per SEAT. */
+  captureShips?: boolean;
   /** CIV6 (Conquistador): "If this unit captures a city or is adjacent to a
    *  city when it's captured, the city will automatically convert to the
    *  Conquistador player's majority Religion." */
@@ -1782,7 +1797,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       // CIV6 (ABILITY_MANDEKALU): "Protects nearby land Trade units from
       // Plunder" and "Gain Gold equal to 100% that unit's base Combat
       // Strength" on a kill.
-      guardsTraders: true,
+      guardsTraders: 'land',
       killGoldPct: 100,
       upgradesTo: 'CUIRASSIER',
       uniqueTo: 'MALI',
@@ -1935,6 +1950,186 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       uniqueTo: 'ZULU',
       replaces: 'PIKEMAN',
       description: 'Zulu anti-cavalry unit that flanks twice as hard.',
+    }),
+
+    // ========== THE UNIQUE NAVAL AND AIR UNITS, AND THE TWO LATE LAND ROWS ==========
+    U({
+      id: 'P51_MUSTANG',
+      name: 'P-51 Mustang',
+      cost: 520,
+      maintenance: 7,
+      moves: 10,
+      combat: 105,
+      ranged: { strength: 105, range: 5 },
+      air: 'FIGHTER',
+      sight: 4,
+      requiresTech: 'ADVANCED_FLIGHT',
+      requiresResource: 'ALUMINUM',
+      resourceCost: 1,
+      resourceUpkeep: 1,
+      // CIV6 (ABILITY_MUSTANG): "+5 Combat Strength bonus vs. Fighters" and
+      // "+50% experience from combat."
+      vsFighterCS: 5,
+      xpRate: 1.5,
+      upgradesTo: 'JET_FIGHTER',
+      uniqueTo: 'AMERICA',
+      replaces: 'FIGHTER',
+      description: 'American fighter, deadlier against its own kind.',
+    }),
+    U({
+      id: 'MINAS_GERAES',
+      name: 'Minas Geraes',
+      cost: 430,
+      maintenance: 6,
+      moves: 5,
+      combat: 70,
+      ranged: { strength: 80, range: 3 },
+      antiAir: 90,
+      naval: true,
+      // the install gives it no ability row: it is the Battleship arriving a
+      // whole era early, off a CIVIC, and stronger.
+      requiresCivic: 'NATIONALISM',
+      requiresResource: 'COAL',
+      resourceCost: 1,
+      resourceUpkeep: 1,
+      upgradesTo: 'MISSILE_CRUISER',
+      uniqueTo: 'BRAZIL',
+      replaces: 'BATTLESHIP',
+      description: 'Brazilian battleship, early and strong.',
+    }),
+    U({
+      id: 'SEA_DOG',
+      name: 'Sea Dog',
+      cost: 280,
+      maintenance: 4,
+      moves: 4,
+      combat: 40,
+      ranged: { strength: 55, range: 2 },
+      naval: true,
+      raider: true,
+      stealth: true,
+      revealStealth: true,
+      requiresCivic: 'MERCANTILISM',
+      // CIV6 (ABILITY_PRIZE_SHIPS, CLASS_CAPTURE_SHIPS): "Can capture defeated
+      // enemy naval vessels."
+      captureShips: true,
+      upgradesTo: 'SUBMARINE',
+      uniqueTo: 'ENGLAND',
+      replaces: 'PRIVATEER',
+      description: 'English raider that takes its prizes home.',
+    }),
+    U({
+      id: 'U_BOAT',
+      name: 'U-Boat',
+      cost: 430,
+      maintenance: 6,
+      moves: 3,
+      combat: 65,
+      ranged: { strength: 75, range: 2 },
+      naval: true,
+      raider: true,
+      stealth: true,
+      revealStealth: true,
+      sight: 3,
+      requiresTech: 'ELECTRICITY',
+      requiresResource: 'OIL',
+      resourceCost: 1,
+      resourceUpkeep: 1,
+      // CIV6 (ABILITY_UBOAT): "+10 Combat Strength in Ocean combat."
+      oceanCS: 10,
+      upgradesTo: 'NUCLEAR_SUBMARINE',
+      uniqueTo: 'GERMANY',
+      replaces: 'SUBMARINE',
+      description: 'German submarine, cheaper and deadly in deep water.',
+    }),
+    U({
+      id: 'DE_ZEVEN_PROVINCIEN',
+      name: 'De Zeven Provinciën',
+      cost: 280,
+      maintenance: 5,
+      moves: 4,
+      combat: 50,
+      ranged: { strength: 60, range: 2 },
+      naval: true,
+      requiresTech: 'SQUARE_RIGGING',
+      requiresResource: 'NITER',
+      // CIV6 (ABILITY_DUTCH_ZEVEN_PROVINCIEN): "+7 Combat Strength when
+      // attacking defensible districts."
+      districtAttackCS: 7,
+      upgradesTo: 'BATTLESHIP',
+      uniqueTo: 'NETHERLANDS',
+      replaces: 'FRIGATE',
+      description: 'Dutch frigate that batters a defended shore.',
+    }),
+    U({
+      id: 'BARBARY_CORSAIR',
+      name: 'Barbary Corsair',
+      cost: 240,
+      maintenance: 3,
+      moves: 4,
+      combat: 40,
+      ranged: { strength: 50, range: 2 },
+      naval: true,
+      raider: true,
+      stealth: true,
+      revealStealth: true,
+      requiresCivic: 'MEDIEVAL_FAIRES',
+      // CIV6 (ABILITY_CORSAIR): "It costs no Movement to coastal raid."
+      raidFreeMoves: true,
+      upgradesTo: 'SUBMARINE',
+      uniqueTo: 'OTTOMAN',
+      replaces: 'PRIVATEER',
+      description: 'Ottoman raider that raids for free.',
+    }),
+    U({
+      id: 'BIREME',
+      name: 'Bireme',
+      cost: 65,
+      maintenance: 1,
+      moves: 4,
+      combat: 35,
+      naval: true,
+      requiresTech: 'SAILING',
+      // CIV6 (ABILITY_BIREME_PROTECT_TRADER): "Protects nearby Trade units
+      // from being Plundered on Water Tiles."
+      guardsTraders: 'water',
+      upgradesTo: 'CARAVEL',
+      uniqueTo: 'PHOENICIA',
+      replaces: 'GALLEY',
+      description: 'Phoenician galley that escorts its own shipping.',
+    }),
+    U({
+      id: 'JANISSARY',
+      name: 'Janissary',
+      cost: 120,
+      maintenance: 4,
+      moves: 2,
+      combat: 60,
+      melee: true,
+      requiresTech: 'GUNPOWDER',
+      requiresResource: 'NITER',
+      // CIV6 (ABILITY_CORBACI): "Starts with a free promotion."
+      freePromotions: 1,
+      upgradesTo: 'LINE_INFANTRY',
+      uniqueTo: 'OTTOMAN',
+      replaces: 'MUSKETMAN',
+      description: 'Ottoman musketman, cheap, strong and born promoted.',
+    }),
+    U({
+      id: 'SAKA_HORSE_ARCHER',
+      name: 'Saka Horse Archer',
+      cost: 100,
+      maintenance: 2,
+      moves: 4,
+      combat: 20,
+      ranged: { strength: 25, range: 1 },
+      cavalry: true, // CLASS_RANGED_CAVALRY — no light/heavy tag
+      requiresTech: 'HORSEBACK_RIDING',
+      // the install gives it no ability row: it is a ranged cavalry chassis a
+      // whole era before anybody else's.
+      upgradesTo: 'CROSSBOWMAN',
+      uniqueTo: 'SCYTHIA',
+      description: 'Scythian ranged cavalry, available at Horseback Riding.',
     }),
   ].map((u) => [u.id, u]),
 );

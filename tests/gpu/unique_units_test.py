@@ -1,14 +1,14 @@
-"""THE TWENTY-TWO UNIQUE LAND UNITS, GPU side.
+"""THE THIRTY-ONE UNIQUE UNITS, GPU side.
 
 Every stat below is the install's own Units.xml row and every clause is one
-UnitAbilities.xml ability; the TS pins in tests/cpu/units/unique-land-units.ts
+UnitAbilities.xml ability; the TS pins in tests/cpu/units/unique-{land,sea-air}-units.ts
 hold the same numbers, and the serve gate compares the two engines running.
 
 This lane drives `_chassis_ability_cs` and the chassis planes directly: the
 driver trains a unique unit only where the seeder happened to seat its
 civilization, so a catalog row could ship unreached for a whole round.
 
-Run: PYTHONIOENCODING=utf-8 python tests/gpu/unique_land_units_test.py
+Run: PYTHONIOENCODING=utf-8 python tests/gpu/unique_units_test.py
 """
 from __future__ import annotations
 
@@ -48,6 +48,16 @@ ROWS = {
     "CONQUISTADOR": ("SPAIN", "MUSKETMAN", 250, 2, 58),
     "CAROLEAN": ("SWEDEN", "PIKE_AND_SHOT", 250, 3, 55),
     "IMPI": ("ZULU", "PIKEMAN", 125, 2, 45),
+    # the naval and air half, and the two late land rows
+    "P51_MUSTANG": ("AMERICA", "FIGHTER", 520, 10, 105),
+    "MINAS_GERAES": ("BRAZIL", "BATTLESHIP", 430, 5, 70),
+    "SEA_DOG": ("ENGLAND", "PRIVATEER", 280, 4, 40),
+    "U_BOAT": ("GERMANY", "SUBMARINE", 430, 3, 65),
+    "DE_ZEVEN_PROVINCIEN": ("NETHERLANDS", "FRIGATE", 280, 4, 50),
+    "BARBARY_CORSAIR": ("OTTOMAN", "PRIVATEER", 240, 4, 40),
+    "BIREME": ("PHOENICIA", "GALLEY", 65, 4, 35),
+    "JANISSARY": ("OTTOMAN", "MUSKETMAN", 120, 2, 60),
+    "SAKA_HORSE_ARCHER": ("SCYTHIA", None, 100, 4, 20),
 }
 
 
@@ -60,7 +70,7 @@ def main() -> int:
     paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim = build(rules, paths[0])
-    print(f"unique_land_units_test on {paths[0].name}")
+    print(f"unique_units_test on {paths[0].name}")
 
     ids = [u["id"] for u in rules.units]
     idx = {u: i for i, u in enumerate(ids)}
@@ -116,7 +126,22 @@ def main() -> int:
     assert int(col("_type_pillage_cost", "MALON_RAIDER")) == 1
     assert bool(col("_type_guards_traders", "MANDEKALU_CAVALRY"))
     assert bool(col("_type_capture_converts", "CONQUISTADOR"))
-    print("  2 ability columns OK — every clause on its own chassis and nobody else's")
+    # the sea and air clauses
+    assert int(col("_type_vs_fighter_cs", "P51_MUSTANG")) == 5
+    assert float(col("_type_xp_rate", "P51_MUSTANG")) == 1.5
+    assert int(col("_type_ocean_cs", "U_BOAT")) == 10
+    assert int(col("_type_district_atk_cs", "DE_ZEVEN_PROVINCIEN")) == 7
+    assert bool(col("_type_raid_free", "BARBARY_CORSAIR"))
+    assert bool(col("_type_capture_ships", "SEA_DOG"))
+    assert int(col("_type_guards_traders", "BIREME")) == 2, "the Bireme guards WATER"
+    assert int(col("_type_guards_traders", "MANDEKALU_CAVALRY")) == 1, "the Mandekalu guards LAND"
+    assert int(col("_type_free_promos", "JANISSARY")) == 1
+    # EVERY civilization in the roster now names a unique chassis
+    _seen = {int(u["uniq"]) for u in rules.units if int(u["uniq"]) >= 0}
+    assert len(_seen) == len(civs), (
+        f"{len(civs) - len(_seen)} civilizations have no unique unit")
+    print("  2 ability columns OK — every clause on its own chassis, all "
+          f"{len(civs)} civilizations covered")
 
     # 3 — the composer reads the GROUND under the unit
     hill = int(sim.hills[B0].long().argmax()) if bool(sim.hills[B0].any()) else -1
@@ -155,7 +180,20 @@ def main() -> int:
         "the Hwacha carries a Bombard, so the clause proves nothing")
     print("  6 setup OK — the siege gate reaches a chassis with no Bombard")
 
-    print("UNIQUE LAND UNITS OK")
+    # 7 — the two rows the roster ledger called open
+    _saka = [r for r in rules.uniques["extraUnitCopies"] if int(r[4]) >= 0]
+    assert _saka, "no extra-copy row names a chassis"
+    assert ids[int(_saka[0][4])] == "SAKA_HORSE_ARCHER", (
+        f"the chassis-keyed copy row names {ids[int(_saka[0][4])]}")
+    assert int(_saka[0][3]) == 1, "the Saka copy is one unit"
+    _jan = rules.uniques["unitPopCost"]
+    assert _jan, "the Janissary's population row never reached the wire"
+    assert ids[int(_jan[0][2])] == "JANISSARY", "the population row names the wrong chassis"
+    assert int(_jan[0][3]) == -1 and int(_jan[0][4]) == 1, (
+        "the Janissary costs ONE citizen, in a founded city")
+    print("  7 roster rows OK — the Saka's second copy and the Janissary's citizen")
+
+    print("UNIQUE UNITS OK")
     return 0
 
 

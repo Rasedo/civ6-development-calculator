@@ -253,11 +253,16 @@ class SimMasks:
         sea (a re-seated unit stands where it fell, and a hull's passenger has
         no hull of its captor's to stand on)."""
         out = torch.zeros_like(atk_seat, dtype=torch.bool)
-        if not self._capture_rows:
-            return out
         ds = d_slot.clamp(min=0).unsqueeze(1)
         d_type = self.unit_type.gather(1, ds).squeeze(1).clamp(min=0, max=self.NU - 1)
         a_t = a_type.clamp(min=0, max=self.NU - 1)
+        # CIV6 (Sea Dog, CLASS_CAPTURE_SHIPS): "Can capture defeated enemy naval
+        # vessels" — a CHASSIS permission, not the seat's policy row.
+        if bool(self._type_capture_ships.any()):
+            out = out | (self._type_capture_ships[a_t] & self.unit_naval[d_type])
+        if not self._capture_rows:
+            d_emb0 = self.unit_emb.gather(1, ds).squeeze(1)
+            return out & (d_slot >= 0) & ~d_emb0
         bits = self.rules_dev.promo_class_bit
         a_bit = bits[self.rules_dev.u_promo_class[a_t].clamp(min=0)]
         d_bit = bits[self.rules_dev.u_promo_class[d_type].clamp(min=0)]

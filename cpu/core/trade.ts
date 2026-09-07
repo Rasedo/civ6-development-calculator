@@ -329,9 +329,11 @@ export function routePlunderer(state: GameState, tileIndex: number, seat: number
   // — a guard of this seat's own on the Trader's tile or beside it.
   const here = state.map.tiles[tileIndex];
   if (here) {
+    const ground = isWater(here) ? 'water' : 'land';
     const near = [here, ...neighbors(state.map, here)];
     if (state.units.some((g) => g.seat === seat && g.hp > 0
-      && UNITS[g.type]?.guardsTraders && near.some((t) => t.index === g.tileIndex))) return null;
+      && UNITS[g.type]?.guardsTraders === ground
+      && near.some((t) => t.index === g.tileIndex))) return null;
   }
   let raider: number | null = null;
   for (const u of state.units) {

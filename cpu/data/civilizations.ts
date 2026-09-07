@@ -947,7 +947,14 @@ export interface ExtraUnitCopyRow {
   civ?: CivId;
   leader?: LeaderId;
   /** the unit CLASS the copy follows */
+  /** the CLASS a row copies, or '' when it names one chassis instead. */
   cls: string;
+  /** CIV6 (TRAIT_EXTRASAKAHORSEARCHER,
+   *  `MODIFIER_PLAYER_UNITS_ADJUST_EXTRA_UNIT_COPY` UnitType
+   *  UNIT_SCYTHIAN_HORSE_ARCHER): a row may name ONE chassis rather than a
+   *  class — the Saka Horse Archer is PROMOTION_CLASS_RANGED, so the light
+   *  cavalry row above never reaches it. */
+  unit?: string;
   amount: number;
 }
 /** the WIRE's index space for a copy row's class — both engines address one
@@ -955,7 +962,9 @@ export interface ExtraUnitCopyRow {
 export const COPY_CLASSES = ['LIGHT_CAVALRY'] as const;
 export const EXTRA_UNIT_COPY_ROWS: readonly ExtraUnitCopyRow[] = [
   { civ: 'SCYTHIA', cls: 'LIGHT_CAVALRY', amount: 1 },
+  { civ: 'SCYTHIA', cls: '', unit: 'SAKA_HORSE_ARCHER', amount: 1 },
 ];
+
 
 /** CIV6 (Great Turkish Bombard, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST):
  *  "Conquered cities do not lose Population" — the PERCENTAGE of the
@@ -1504,8 +1513,10 @@ export interface UnitPopCostRow {
   amount: number;
   foundedOnly: boolean;
 }
-/** OPEN: the Janissary is not in the engine's unit roster, so this row has
- *  no chassis to charge — it is not on the wire (docs/roster_ledger.json). */
+/** CIV6 (JANISSARY_LOSE_POPULATION_IN_FOUNDED_CITIES):
+ *  `MODIFIER_PLAYER_CITIES_CHANGE_POPULATION_CREATE_UNIT` Amount -1 on the
+ *  chassis, under the requirement set JANISSARY_CITY_FOUNDED — the amount is the install's own
+ *  SIGNED value, so the reader ADDS it. */
 export const UNIT_POP_COST_ROWS: readonly UnitPopCostRow[] = [
   { leader: 'SULEIMAN', unit: 'JANISSARY', amount: -1, foundedOnly: true },
 ];

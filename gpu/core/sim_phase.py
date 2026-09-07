@@ -964,14 +964,34 @@ class SimPhase:
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
             # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)
-            for _ec, _el, _ecls, _en in self._extra_unit_copy_rows:
-                if _ecls != 0:  # COPY_CLASSES[0] = LIGHT_CAVALRY
+            # CIV6 (TRAIT_EXTRASAKAHORSEARCHER): a row may name ONE chassis
+            # instead of a class — the Saka Horse Archer is ranged, so the
+            # light-cavalry row above never reaches it.
+            for _ec, _el, _ecls, _en, _eu in self._extra_unit_copy_rows:
+                if _eu >= 0:
+                    _hit = ui == _eu
+                elif _ecls == 0:  # COPY_CLASSES[0] = LIGHT_CAVALRY
+                    _hit = self._type_lightcav[ui]
+                else:
                     continue
-                _ew = made_u & self._type_lightcav[ui] & self._row_is(row, _ec, _el)
+                _ew = made_u & _hit & self._row_is(row, _ec, _el)
                 if not bool(_ew.any()):
                     continue
                 for _ in range(_en):
                     self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
+            # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
+            # a citizen, in a city this seat founded.
+            for _pc, _pl, _pu, _pa, _pf in self._unit_pop_cost_rows:
+                if _pu < 0:
+                    continue
+                _pw = made_u & (ui == _pu) & self._row_is(row, _pc, _pl)
+                if _pf:
+                    _pw = _pw & (self.city_founder[bidx, row, col] == row)
+                if not bool(_pw.any()):
+                    continue
+                _pop = self.city_pop[bidx, row, col]
+                self.city_pop[bidx, row, col] = torch.where(
+                    _pw, (_pop + _pa).clamp(min=1), _pop)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
             if self._wond_n and bool(self._wond_dupnaval.any()):

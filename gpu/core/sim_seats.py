@@ -4227,7 +4227,9 @@ class SimSeats:
         return hit.any(dim=1)
 
     def _chassis_ability_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor,
-                            *, def_ranged: bool = False) -> torch.Tensor:
+                            *, def_ranged: bool = False,
+                            foe_type: torch.Tensor | None = None,
+                            vs_district: bool = False) -> torch.Tensor:
         """`chassisAbilityCS`'s twin, [B] long — every position-dependent
         unique-unit clause, read at the tile the unit FIGHTS FROM, exactly
         where `_cav_hill_cs` is read. Each `if` below is one UnitAbilities.xml
@@ -4310,6 +4312,22 @@ class SimSeats:
                 rel = self._rel_strength[: self.NU] > 0
                 out = out + torch.where(on & self._unit_near(tiles, 1, seat=seat, mask=rel),
                                         a, torch.zeros_like(a))
+        # CIV6 (U-Boat): "+10 Combat Strength in Ocean combat" — the deep water
+        # alone; a Coast or a Lake is not Ocean.
+        if bool((self._type_ocean_cs != 0).any()):
+            o = self._type_ocean_cs[ti]
+            deep = self.ocean_tile.gather(1, tl.unsqueeze(1)).squeeze(1)
+            out = out + torch.where(live & deep, o, torch.zeros_like(o))
+        # CIV6 (P-51 Mustang): "+5 Combat Strength bonus vs. Fighters."
+        if foe_type is not None and bool((self._type_vs_fighter_cs != 0).any()):
+            f = self._type_vs_fighter_cs[ti]
+            fi = self._type_air[foe_type.clamp(min=0, max=self.NU - 1)] == 1  # 1 = FIGHTER
+            out = out + torch.where(live & (foe_type >= 0) & fi, f, torch.zeros_like(f))
+        # CIV6 (De Zeven Provincien): "+7 Combat Strength when attacking
+        # defensible districts."
+        if vs_district and bool((self._type_district_atk_cs != 0).any()):
+            d = self._type_district_atk_cs[ti]
+            out = out + torch.where(live, d, torch.zeros_like(d))
         # CIV6 (Mountie): "within 2 tiles of a National Park owned by you."
         if bool((self._type_near_park_cs != 0).any()):
             a = self._type_near_park_cs[ti]
@@ -8931,10 +8949,10 @@ class SimSeats:
             if major:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
             atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], here).to(atk_e.dtype)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], here).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], here, foe_type=d_type).to(atk_e.dtype)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_barb, neg, d_seat_m), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat_m, d_type, ttc).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat_m, d_type, ttc).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat_m, d_type, ttc, foe_type=a_type[:, u]).to(def_e.dtype))
             # Great General / Admiral aura. Attacker keyed on its own tile `here`
             # (a CIV attacker gets its civ's aura; a BARB has none); defender
             # keyed on `tgt` — seat 0, a civ seat, or barb (-1). Embarked/naval →
@@ -10024,7 +10042,7 @@ class SimSeats:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
             atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
@@ -10464,7 +10482,7 @@ class SimSeats:
         if self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
         atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(hrow, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
@@ -10666,7 +10684,7 @@ class SimSeats:
         if self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
         atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], at0, a_tile[:, u]).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u]).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
@@ -11043,7 +11061,7 @@ class SimSeats:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
             if not barb:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
@@ -11273,7 +11291,7 @@ class SimSeats:
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at0).to(def_e.dtype))
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
@@ -11923,13 +11941,16 @@ class SimSeats:
         # CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from
         # Plunder" — a guard of this seat's own on the Trader's tile or beside
         # it takes the raider off it.
-        if bool(self._type_guards_traders.any()) and row < self.n_majors:
+        if bool((self._type_guards_traders > 0).any()) and row < self.n_majors:
             _gt = self._type_guards_traders
             _d = self.pair_dist[tiles]                                  # [n, T]
             _near = _d.gather(1, self.major_unit_tile[bb].clamp(min=0)) <= 1
+            # 1 guards LAND ground, 2 guards WATER — the Trader's own tile decides
+            _want = torch.where(self.water[bb, tiles], 2, 1).unsqueeze(1)
             _guard = (self.major_unit_alive[bb] & _near & (self.major_unit_hp[bb] > 0)
                       & (self.major_unit_seat[bb] == row)
-                      & _gt[self.major_unit_type[bb].clamp(min=0, max=self.NU - 1)]).any(dim=1)
+                      & (_gt[self.major_unit_type[bb].clamp(min=0, max=self.NU - 1)] == _want)
+                      ).any(dim=1)
             raider = torch.where(_guard, big, raider)
         hit = raider < (1 << 30)
         if not bool(hit.any()):

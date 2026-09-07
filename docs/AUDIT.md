@@ -61,15 +61,14 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-61 the Cothon's project | 1 | the row and its GAME_PROGRESS price, after C-79's Cothon |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
-| C-68 Janissary and Saka Horse Archer | 1 | two chassis rows with their clauses |
 | C-69 five unique rows with trait clauses | 2 | M'banza, Royal Navy Dockyard, Tsikhe, Mission, Cothon, and a strongest-naval-unit picker |
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
-| C-78 unique UNITS absent | 2 | the 22 LAND rows are built; seven naval and air rows are left, and two clauses wait on B-56r and C-79 |
+| C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 5 | 26 unique districts, buildings and improvements have no catalog row (C-69's five beside them); the Toa's Pā waits here |
-| **C. Absent systems** | **37** | |
-| **OPEN, TOTAL** | **54** | |
+| **C. Absent systems** | **35** | |
+| **OPEN, TOTAL** | **52** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -276,8 +275,8 @@ Nothing open.
     ceiling at Breathtaking; the middle bands are this model's own.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 330 of 343 modifiers and `open: <item>` on 13, each under
-  C-61, C-64, C-67, C-68, C-69 or B-63r. Unique units are C-78,
+  `shipped` on 332 of 343 modifiers and `open: <item>` on 11, each under
+  C-61, C-64, C-67, C-69 or B-63r. Unique units are C-78,
   unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
@@ -377,10 +376,6 @@ Nothing open.
   - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
     `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
     preference needs a decider with alternatives — P8's, not a carrier's.
-- **C-68. THE JANISSARY AND THE SAKA HORSE ARCHER.** Weight 1.
-  - No `UnitDef` row, so `JANISSARY_LOSE_POPULATION_IN_FOUNDED_CITIES` and
-    `TRAIT_EXTRASAKAHORSEARCHER` charge nothing. The Saka Horse Archer is
-    PROMOTION_CLASS_RANGED, not light cavalry.
 - **C-69. FIVE UNIQUE ROWS WITH TRAIT CLAUSES.** Weight 2.
   - Kongo's M'banza (district), England's Royal Navy Dockyard (district),
     Georgia's Tsikhe (building), Spain's Mission (improvement) and
@@ -408,18 +403,14 @@ Nothing open.
     yield walk; nothing stores or compares it. The carrier is one exposed
     reader per engine and a compared per-city worked-tile list. C-31's
     "Citizens 'working' the affected tiles are eliminated" waits on it.
-- **C-78. UNIQUE UNITS ABSENT.** Weight 2.
-  - The twenty-two unique LAND units are BUILT — row, abilities and pins on
-    both engines. Seven are left, all at sea or in the air: P-51 Mustang,
-    Minas Geraes, Sea Dog, U-Boat, De Zeven Provinciën, Barbary Corsair,
-    Bireme (the Saka Horse Archer and Janissary are C-68). The leader units
-    (Rough Rider, Black Army, ...) are the nine blank rows of
+- **C-78. UNIQUE UNITS ABSENT.** Weight 1.
+  - Every one of the 34 civilizations names a unique chassis now — 31 rows
+    with their abilities and pins on both engines. What is left is the nine
+    LEADER units (Rough Rider, Black Army, ...), the blank rows of
     `docs/ROSTER.md`.
   - Two halves of a built row wait on another entry: the Ngao Mbeba's "can
     see through features" needs the sight-BLOCKING this engine does not
     model (B-56r), and the Toa's Pā improvement needs C-79's row.
-  - A seat whose civilization has no row trains the base chassis; B-54r's
-    stacks wait here.
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 5.
   - Five of 36 have a catalog row (the Bath as a `civVariants` entry, the
     Stave Church's `civ`, the Sphinx, Terrace Farm and Ziggurat's

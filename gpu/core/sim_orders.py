@@ -1049,7 +1049,10 @@ class SimOrders:
                        & (self._type_raider[utp.clamp(min=0)]
                           | (self._type_naval_melee[utp.clamp(min=0)] & self._row_leads(row, "HARDRADA")))
                        & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
-                       & (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3 * self._mp_scale)
+                       # CIV6 (Barbary Corsair): "It costs no Movement to
+                       # coastal raid" — the reserve goes with the spend.
+                       & (self._type_raid_free[utp.clamp(min=0)]
+                          | (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3 * self._mp_scale))
                        & ~(_en & (_hi | _hd)))
                 if bool((_pl | _rd).any()):
                     _r = (_pl | _rd).nonzero(as_tuple=True)[0]
@@ -1189,6 +1192,11 @@ class SimOrders:
                         self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP"),
                         self._type_pillage_cost[utp[_r].clamp(min=0, max=self.NU - 1)])
                     _cost = self._mp_scale * torch.where(_pc > 0, _pc, torch.full_like(_pc, 3))
+                    # a chassis that raids for free spends nothing on the RAID
+                    # arm; the tile underfoot still costs it the usual three.
+                    _cost = torch.where(
+                        _rd[_r] & self._type_raid_free[utp[_r].clamp(min=0, max=self.NU - 1)],
+                        torch.zeros_like(_cost), _cost)
                     _left = self.unit_mp[_r, sc[_r]]
                     self.unit_mp[_r, sc[_r]] = (_left - _cost).clamp(min=0)
                     self._eff_version += 1
