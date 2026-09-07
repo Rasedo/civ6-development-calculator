@@ -58,20 +58,52 @@ class SimEconomy:
         else:  # a minor or the Free row recruits no Great Merchant
             gp_n = torch.zeros_like(rounds)
             gp_reach = torch.zeros(B, self.civ_gp_lux.shape[2], dtype=self.civ_gp_lux.dtype, device=self.device)
-        total = rounds + gp_n
+        # CIV6 (Zanzibar): Cinnamon and Cloves stand on no tile (`Frequency=0`)
+        # and each is `Happiness="6"` — two rounds of a SIX-city reach, the
+        # shape an invented luxury already has. They rank after those.
+        spice_n = torch.zeros_like(rounds)
+        if self._suz_c_spice >= 0 and row < self.n_majors:
+            spice_n = self._suz_effect(row, self._suz_c_spice).long() * self._suz_spice_n
+        # CIV6 (Buenos Aires): "Your bonus resources behave like luxury
+        # resources, providing +1 Amenity per resource" — the modifier's gate is
+        # OWNERSHIP, so an unimproved copy counts, and each serves ONE city.
+        bonus_n = torch.zeros_like(rounds)
+        if self._suz_c_bonus_amen >= 0 and row < self.n_majors:
+            _ba = self._suz_effect(row, self._suz_c_bonus_amen)
+            if bool(_ba.any()):
+                _nres = int(self.res_id.max().item()) + 1
+                if _nres > 0:
+                    _mine = (self.res_id >= 0) & (self.res_priority == 1)                         & (self.tile_seat == int(self._ROW_SEAT[row]))
+                    _bc = torch.zeros(B, _nres, dtype=torch.long, device=self.device)
+                    _bc.scatter_add_(1, self.res_id.clamp(min=0), _mine.long())
+                    bonus_n = (_bc > 0).long().sum(dim=1) * _ba.long()
+        total = rounds + gp_n + spice_n + bonus_n
         mx = int(total.max().item())
         if mx == 0:
             return out
         seq = torch.arange(cols, device=self.device, dtype=dt)
         kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)
+        if bool((spice_n > 0).any()):
+            kmax = max(kmax, self._suz_spice_amen)
+        if bool((bonus_n > 0).any()):
+            kmax = max(kmax, self._suz_bonus_amen)
         k = min(kmax, cols)
         krank = torch.arange(k, device=self.device).reshape(1, -1)
         for rnd in range(mx):
             act = total > rnd
             gi = (rnd - rounds).clamp(min=0, max=gp_reach.shape[1] - 1)
-            reach = torch.where(rnd < rounds,
-                                torch.full_like(rounds, self._lux_k),
-                                gp_reach.gather(1, gi.unsqueeze(1)).squeeze(1))
+            # the four segments, in the order TS concatenates them: worked
+            # luxuries, invented ones, Zanzibar's pair, Buenos Aires' bonuses
+            _after_gp = rnd - rounds - gp_n
+            reach = torch.where(
+                rnd < rounds,
+                torch.full_like(rounds, self._lux_k),
+                torch.where(
+                    _after_gp < 0,
+                    gp_reach.gather(1, gi.unsqueeze(1)).squeeze(1),
+                    torch.where(_after_gp < spice_n,
+                                torch.full_like(rounds, self._suz_spice_amen),
+                                torch.full_like(rounds, self._suz_bonus_amen))))
             need = amen_need - (amen_have + out)
             key = torch.where(alive, need * 64 - seq, torch.full_like(need, -1e9))
             top_v, top_i = key.topk(k, dim=1)
@@ -2386,20 +2418,6 @@ class SimEconomy:
         v = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
         return torch.where(ok, v, z)
 
-    def _suz_capital_mask(self, row: int) -> torch.Tensor:
-        """[B, S] — the city-states whose flat suzerain channel pays `row` this
-        turn. CIV6 (Geneva): "when you are not at war with any civilization",
-        which is a MAJOR, so a war with a minor leaves the channel standing."""
-        peace = ~self.war[:, row, : self.n_majors].any(dim=1)
-        m = self._suz_live_mask(row)
-        # CIV6 (Economic alliance 3): "Allies share the Suzerain bonus of all
-        # city-states of which they are Suzerain."
-        e3 = self._allied_type(row, 2, 3)
-        for _o in range(self.n_majors):
-            if _o != row and bool(e3[:, _o].any()):
-                m = m | (e3[:, _o].unsqueeze(1) & self._suz_live_mask(_o))
-        return m & (peace.unsqueeze(1) | ~self.citystate_suz_peace[:, : self.S])
-
     def _listening_levels(self) -> torch.Tensor:
         """[B, NM, NM] long — the best Listening Post row v has running in a
         city of column t. CIV6 (Diplomatic Visibility and Gossip): the mission
@@ -4605,6 +4623,20 @@ class SimEconomy:
                 fi_adj = add if fi_adj is None else fi_adj + add
             elif di == self._campus_idx:
                 st_adj = add
+        # CIV6 (Nan Madol): "+2 Culture" from EVERY live district on or next to
+        # shallow water — every slot, not only the ones with an adjacency yield.
+        if self._suz_c_water_cul >= 0 and row < self.n_majors:
+            _nm = self._suz_effect(row, self._suz_c_water_cul)
+            if bool(_nm.any()):
+                _wet = self.shallow_adj.gather(1, dflat).reshape_as(dreg)
+                _cnt = (dlive & _wet).sum(dim=2).double()
+                # the CITY CENTER is a district too, and it is the one this
+                # registry never encodes — TS carries it in `city.districts`
+                # from the founding, complete on its own tile.
+                _ctr_nm = self.city_center[:, row, sl]
+                _cnt = _cnt + (alive & (_ctr_nm >= 0)
+                               & self.shallow_adj.gather(1, _ctr_nm.clamp(min=0))).double()
+                dist_y[:, :, 4] = dist_y[:, :, 4] + _cnt * (_nm.unsqueeze(1).double() * self._suz_water_cul)
         if fol_live and hs_adj is not None:
             dist_y[:, :, 1] = dist_y[:, :, 1] + hs_adj * self._fol_tab_for("we", row, sl)
         # CIV6 (GS Civilopedia, Free Inquiry, Golden face): "Commercial Hub and
@@ -4797,13 +4829,6 @@ class SimEconomy:
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
-            # SOVEREIGNTY outcome B silences a whole city-state TYPE's unique
-            # suzerain bonus, which is this capital yield and `suzerainEffect`.
-            _suz = self._suz_capital_mask(row)
-            b_cap = b_cap.scatter_add(
-                1, self.citystate_suz_key[:, : self.S].clamp(min=0),
-                _suz.double() * self._citystate_suz_amt
-                * (self.citystate_suz_key[:, : self.S] >= 0).double())
         if has_bel:
             # Founder capital incomes — perF (per-N followers, empire-wide) +
             # perC (per live city). Followers = this row's own live pop sum
@@ -4890,6 +4915,15 @@ class SimEconomy:
                 _ww = _hasw & self._row_is(row, _wc, _wl).unsqueeze(1)
                 for _wy in (3, 4, 5):  # science, culture, faith
                     total[:, :, _wy] = torch.where(_ww, total[:, :, _wy] * (1.0 + _wyp / 100.0), total[:, :, _wy])
+        # CIV6 (Geneva): "+15% Science" in every city while at peace with every
+        # civilization — a percent on `m.yieldMult`, ahead of the two rows that
+        # count suzerain HEADS, which is the order TS composes them in.
+        _gsci = self._suz_science_pct(row)
+        if gym is None and bool((_gsci > 0).any()):
+            gym = torch.ones(B, 6, dtype=F64, device=dev)
+        if gym is not None and bool((_gsci > 0).any()):
+            gym = gym.clone()
+            gym[:, 3] = gym[:, 3] * (1 + _gsci.to(gym.dtype) / 100.0)
         if gym is not None:
             # a suzerainty pays CULTURE by the head, not by what Treaty
             # Organization does to its favor — `suzerainCount`'s weighting is

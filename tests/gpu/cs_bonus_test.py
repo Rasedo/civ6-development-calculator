@@ -83,12 +83,15 @@ def test_catalog(rules, path) -> None:
     assert cs["typeT1Idx"][4] == [bidx("BARRACKS"), bidx("STABLE")], "militaristic tier-1 must be the pair"
     assert cs["typeT2Idx"][4] == [bidx("ARMORY")], "militaristic tier-2 must be ARMORY"
     assert cs["typeT2Idx"][1] == [bidx("MUSEUM"), bidx("ARCHAEOLOGICAL_MUSEUM")], "cultural tier-2 is either museum"
-    assert float(sim._citystate_suz_amt) == 3.0, f"suzerain amount = {float(sim._citystate_suz_amt)}, want 3"
-    # per-CS suzerain channel round-trips from the fixture
+    # NO row rides a flat capital channel any more — every minor names a RULE
+    assert "suzerainYield" not in cs, "the flat suzerain channel is retired"
+    # per-CS suzerain RULE code round-trips from the fixture
     f = load_fixture(path)
     for s, csr in enumerate(f.get("cityStates", [])):
-        assert int(sim.citystate_suz_key[0, s]) == int(csr.get("suzKey", -1)), f"citystate_suz_key[{s}] mismatch"
-    print(f"  catalog OK: scientific→LIBRARY/UNIVERSITY, religious→SHRINE/TEMPLE, suzAmt=3, {len(BUILDING_IDS)} bldgs")
+        assert int(sim.citystate_suz_code[0, s]) == int(csr.get("suzCode", -1)), f"citystate_suz_code[{s}] mismatch"
+        assert int(csr.get("suzCode", -1)) >= 0, f"city-state {s} names no suzerain rule"
+    print(f"  catalog OK: scientific→LIBRARY/UNIVERSITY, religious→SHRINE/TEMPLE, "
+          f"every minor names a rule, {len(BUILDING_IDS)} bldgs")
 
 
 def test_building_bonus(rules, path) -> None:
@@ -213,7 +216,7 @@ def test_stable_alternative(rules, path) -> None:
     sim._citystate_yidx[0, 0] = PROD
     sim.citystate_alive[0, 0] = True
     sim.seat_citystate_met[0, 0, 0] = True
-    sim.citystate_suz_key[0, 0] = -1  # keep the suzerain crossing out of the read
+    sim.citystate_suz_code[0, 0] = -1  # keep the suzerain crossing out of the read
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
     sim.city_bldg[0, 0, 0, bidx("STABLE")] = True
@@ -246,22 +249,27 @@ def test_suzerain(rules, path) -> None:
     sim.seat_citystate_envoys[0, 0, 0] = 4
     if sim.n_majors > 1:
         sim.seat_citystate_envoys[0, 1:, 0] = 0
-    suz_amt = float(sim._citystate_suz_amt)
+    # Geneva's rule is the one whose whole effect lands on the SCIENCE column
+    assert sim._suz_c_sci_peace >= 0, "the Geneva code is missing from the rules"
+    sim.war[0, 0, : sim.n_majors] = False
+    sim.war[0, : sim.n_majors, 0] = False
+    sim.sync_war()
 
-    def cap_sci(suz_key: int) -> float:
-        sim.citystate_suz_key[0, 0] = suz_key
+    def cap_sci(code: int) -> float:
+        sim.citystate_suz_code[0, 0] = code
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE])
 
-    ship = cap_sci(SCIENCE)   # shipped science channel
-    desc = cap_sci(-1)        # descoped
-    assert ship > desc + 1e-9, f"suzerain perk did not add to the capital ({desc}->{ship})"
-    print(f"  seat-0 suzerain OK: capital science shipped {ship:.2f} vs descoped {desc:.2f} (+{suz_amt} pre-amenity)")
+    ship = cap_sci(sim._suz_c_sci_peace)
+    desc = cap_sci(-1)
+    assert ship > desc + 1e-9, f"the suzerain rule did not reach the city ({desc}->{ship})"
+    print(f"  seat-0 suzerain OK: city science {desc:.2f} -> {ship:.2f} "
+          f"(+{sim._suz_sci_pct:.0f}%)")
 
     # contest lost: a civ seat out-envoys seat 0 -> no perk
     if sim.n_majors > 1:
-        sim.citystate_suz_key[0, 0] = SCIENCE
+        sim.citystate_suz_code[0, 0] = sim._suz_c_sci_peace
         sim.seat_citystate_envoys[0, 1, 0] = 9  # civ 0 dominates
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals()
@@ -377,9 +385,9 @@ def test_civ_bonus(rules, path) -> None:
     sim.city_bldg[0, r + 1, j, li] = True
     sim.city_bldg[0, r + 1, j, ui] = True
 
-    def rsci(renvoys: int, suz_key: int = -1) -> float:
+    def rsci(renvoys: int, suz_code: int = -1) -> float:
         sim.seat_citystate_envoys[0, r + 1, 0] = renvoys
-        sim.citystate_suz_key[0, 0] = suz_key
+        sim.citystate_suz_code[0, 0] = suz_code
         sim._eff_version += 1
         # _seat_city_yields_all returns (food, prod, sci, cul, gold, faith).
         food, prod, sci, cul, gold, faith = sim._seat_city_yields_all(r + 1)
@@ -398,10 +406,13 @@ def test_civ_bonus(rules, path) -> None:
     sim.seat_citystate_envoys[0, 0, 0] = 0
     sim.seat_citystate_envoys[0, 1:, 0] = 0
     sim.seat_citystate_envoys[0, r + 1, 0] = 4
-    ship = rsci(4, suz_key=SCIENCE)
-    desc = rsci(4, suz_key=-1)
-    assert ship > desc + 1e-9, f"civ suzerain perk did not add to the capital ({desc}->{ship})"
-    print(f"  civ suzerain OK: rc capital science shipped {ship:.2f} vs descoped {desc:.2f}")
+    sim.war[0, r + 1, : sim.n_majors] = False
+    sim.war[0, : sim.n_majors, r + 1] = False
+    sim.sync_war()
+    ship = rsci(4, suz_code=sim._suz_c_sci_peace)
+    desc = rsci(4, suz_code=-1)
+    assert ship > desc + 1e-9, f"civ suzerain perk did not reach the city ({desc}->{ship})"
+    print(f"  civ suzerain OK: rc science with the rule {ship:.2f} vs without {desc:.2f}")
 
 
 def main() -> None:

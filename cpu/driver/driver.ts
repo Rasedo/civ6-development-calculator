@@ -138,8 +138,9 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     }
     // `unitPurchaseCost` is the price the applier charges — Mercenary
     // Companies moves it, and every column offered here is a military unit.
+    const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const anyU = goldBuyableUnits(state, actor.seat).some(
-      (def) => goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat))),
+      (def) => goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity))),
     );
     const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
     let tileOk = 0;

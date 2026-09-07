@@ -83,7 +83,16 @@ export type SuzEffect =
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
   | 'routePostGold'      // Bandar Brunei
-  | 'suzImprovement';    // Caguana / La Venta / Armagh
+  | 'suzImprovement'     // Caguana / La Venta / Armagh
+  | 'sciencePeace'       // Geneva
+  | 'districtGpp'        // Bologna
+  | 'waterDistrictCulture' // Nan Madol
+  | 'routeLuxuryGold'    // Venice
+  | 'spiceLuxuries'      // Zanzibar
+  | 'routeLengthGold'    // Hunza
+  | 'projectProduction'  // Hong Kong
+  | 'landPurchaseDiscount' // Ngazargamu
+  | 'bonusAmenities';    // Buenos Aires
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -94,6 +103,9 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
   'routePostGold',
+  'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
+  'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
+  'bonusAmenities',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -126,57 +138,117 @@ export const VALLETTA_WALLS_DISCOUNT_PCT = 50;
  *  specialty district in the origin city". */
 export const KUMASI_ROUTE_CULTURE = 2;
 export const KUMASI_ROUTE_GOLD = 1;
+
+/** CIV6 (Leaders.xml, MINOR_CIV_GENEVA_SCIENCE_AT_PEACE_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_CITY_YIELD_MODIFIER` YIELD_SCIENCE Amount 15,
+ *  under the requirement set PLAYER_IS_AT_PEACE_WITH_ALL_MAJORS — a PERCENT on every city's
+ *  science, not a flat capital yield. */
+export const GENEVA_SCIENCE_PCT = 15;
+
+/** CIV6 (Expansion2_Leaders.xml, the nine MINOR_CIV_BOLOGNA_GREAT_*_POINTS
+ *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_GREAT_PERSON_POINT` Amount 1
+ *  each, under a BUILDING requirement — the TIER-1 building of the class's own
+ *  district. Barracks and Stable are ONE requirement set (TEST_ANY), so a city
+ *  holding either pays the General's point once. */
+export const BOLOGNA_DISTRICT_GPP = 1;
+export const BOLOGNA_GPP_BUILDING: Record<string, readonly string[]> = {
+  WRITER: ['AMPHITHEATER'],
+  ARTIST: ['AMPHITHEATER'],
+  MUSICIAN: ['AMPHITHEATER'],
+  SCIENTIST: ['LIBRARY'],
+  MERCHANT: ['MARKET'],
+  ENGINEER: ['WORKSHOP'],
+  ADMIRAL: ['LIGHTHOUSE'],
+  GENERAL: ['BARRACKS', 'STABLE'],
+  PROPHET: ['SHRINE'],
+};
+
+/** CIV6 (Leaders.xml, MINOR_CIV_NAN_MADOL_DISTRICTS_CULTURE_BONUS):
+ *  `MODIFIER_PLAYER_DISTRICTS_ADJUST_YIELD_CHANGE` YIELD_CULTURE Amount 2,
+ *  under the requirement set PLOT_IS_OR_ADJACENT_TO_COAST (TEST_ANY of `REQUIREMENT_PLOT_IS_COAST`
+ *  and REQUIREMENT_PLOT_ADJACENT_TO_COAST). This engine's LAKE is the install's
+ *  COAST, so the predicate is "on or next to SHALLOW WATER". */
+export const NAN_MADOL_WATER_CULTURE = 2;
+
+/** CIV6 (Leaders.xml, MINOR_CIV_AMSTERDAM_LUXURY_TRADE_ROUTE_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_FOR
+ *  _INTERNATIONAL` YIELD_GOLD Amount 1 — per DISTINCT luxury resource standing
+ *  on the destination city's own tiles. (The install spells this bonus on
+ *  AMSTERDAM, and on Antioch in Expansion1; see the roster note.) */
+export const VENICE_DEST_LUXURY_GOLD = 1;
+
+/** CIV6 (Leaders.xml, MINOR_CIV_ZANZIBAR_{CINNAMON,CLOVES}_RESOURCE_BONUS):
+ *  two `MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT` rows, Amount 1 each, for
+ *  RESOURCE_CINNAMON and RESOURCE_CLOVES — both RESOURCECLASS_LUXURY with
+ *  `Happiness="6" Frequency="0"` (Resources.xml): they are never placed on a
+ *  map and each serves SIX cities. This model carries a luxury as its REACH,
+ *  which is exactly what `gpLuxuries` already holds. */
+export const ZANZIBAR_LUXURIES = 2;
+export const ZANZIBAR_LUXURY_AMENITIES = 6;
+
+/** CIV6 (GranColombia_Maya_Leaders.xml,
+ *  MINOR_CIV_HUNZA_GOLD_FROM_TRADE_ROUTE_LENGTH):
+ *  `MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE` YIELD_GOLD Amount
+ *  0.2 — the trait text's "+1 Gold for every 5 tiles a Trade Route travels".
+ *  Taken as the text's whole gold per five tiles rather than as a fifth per
+ *  tile: a fraction summed on two engines drifts, an integer does not. */
+export const HUNZA_TILES_PER_GOLD = 5;
+export const HUNZA_ROUTE_GOLD = 1;
+
+/** CIV6 (Leaders.xml, MINOR_CIV_HONG_KONG_PROJECT_PRODUCTION_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_ALL_PROJECTS_PRODUCTION` Amount 20. */
+export const HONG_KONG_PROJECT_PCT = 20;
+
+/** CIV6 (Expansion2_Leaders.xml, the three MINOR_CIV_NGAZARGAMU_*_PURCHASE
+ *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_UNITS_PURCHASE_COST` Amount 20
+ *  with `UnitDomain DOMAIN_LAND`, one row per Encampment building — Barracks OR
+ *  Stable (one TEST_ANY set), Armory, Military Academy. Three rows stack to
+ *  60% off. The gate is the modifier's own DOMAIN_LAND; the trait text says
+ *  "land combat or support units", which the DLL alone could tell apart. */
+export const NGAZARGAMU_PURCHASE_PCT = 20;
+export const NGAZARGAMU_BUILDINGS: readonly (readonly string[])[] = [
+  ['BARRACKS', 'STABLE'], ['ARMORY'], ['MILITARY_ACADEMY'],
+];
+
+/** CIV6 (Leaders.xml, MINOR_CIV_BUENOS_AIRES_BONUS_RESOURCE_AMENITY_BONUS):
+ *  `MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES` Amount 1. The gate
+ *  the modifier names is OWNERSHIP, not an improvement — so every distinct
+ *  bonus resource on this seat's tiles serves ONE city, the reach an
+ *  `Happiness="1"` luxury would have. */
+export const BUENOS_AIRES_AMENITIES = 1;
 export interface SuzerainBonusDef {
   name: string;
   type: CityStateType;
   bonus: string;
-  channel?: YieldKey | 'amenities' | 'production-capital' | 'none';
-  /** the modeled RULE, when the perk is one; rows without it pay the flat
-   *  channel yield or nothing. */
-  suz?: SuzEffect;
+  /** the modeled RULE — every catalog row names one. */
+  suz: SuzEffect;
   note?: string;
 }
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
-  Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% bonus Science output when you are not at war with any civilization.', channel: 'science', note: 'the +15% is degraded to the flat channel yield' },
-  Bologna: { name: 'Bologna', type: 'scientific', bonus: 'Your districts with a building provide +1 Great Person point of their type (Writer, Artist, and Musician for Theater Square districts with a building).', channel: 'science', note: 'a per-district GREAT PERSON point channel keyed to building tiers; the flat science channel stands in' },
+  Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% bonus Science output when you are not at war with any civilization.', suz: 'sciencePeace' },
+  Bologna: { name: 'Bologna', type: 'scientific', bonus: 'Your districts with a building provide +1 Great Person point of their type (Writer, Artist, and Musician for Theater Square districts with a building).', suz: 'districtGpp' },
   Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience' },
   Vilnius: { name: 'Vilnius', type: 'cultural', bonus: 'When you enter a new era, earn 1 random Inspiration from that era.', suz: 'eraInspiration' },
-  'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', channel: 'culture', note: 'a per-district water-adjacency term; the flat channel stands in' },
+  'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', suz: 'waterDistrictCulture' },
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
   Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', suz: 'suzImprovement' },
-  Venice: { name: 'Venice', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', channel: 'gold', note: 'the destination luxury count is not a route term here; the flat channel stands in' },
-  Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', channel: 'gold', note: 'two luxuries that exist nowhere else on the map; the flat channel stands in' },
-  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold', note: 'the GOING-TO half; a route stores no path, so the PASSING-THROUGH half has no carrier' },
-  Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', channel: 'gold', note: 'the Trader walks a real path now, but the gold channel is FLAT — the per-5-tiles scaling stands in' },
-  'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', channel: 'production', note: 'a PROJECT-only production multiplier; the flat channel stands in' },
-  'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', channel: 'amenities' },
+  Venice: { name: 'Venice', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', suz: 'routeLuxuryGold', note: 'the install spells this bonus on AMSTERDAM (base) and Antioch (Expansion1); no Civ 6 city-state is named Venice' },
+  Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', suz: 'spiceLuxuries' },
+  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold', note: 'the install spells this bonus on JAKARTA; Bandar Brunei is a scenario minor there' },
+  Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', suz: 'routeLengthGold' },
+  'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', suz: 'projectProduction' },
+  'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', suz: 'bonusAmenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
   Akkad: { name: 'Akkad', type: 'militaristic', bonus: "Melee and anti-cavalry units' attacks do full damage to the city's walls.", suz: 'wallsFullDamage' },
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
-  Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', channel: 'production', note: 'a per-building GOLD PURCHASE discount; the flat production channel stands in' },
+  Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', suz: 'landPurchaseDiscount' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', suz: 'suzImprovement' },
-};
-
-export const CITY_STATE_SUZERAIN_YIELD = 3;
-
-/** CIV6 (Geneva): "when you are not at war with any civilization" — the one
- *  suzerain channel a war with a MAJOR silences. A city-state war does not:
- *  a minor is not a civilization. */
-export const CITY_STATE_SUZERAIN_PEACE_ONLY: readonly string[] = ['Geneva'];
-export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
-  Geneva: 'science',
-  Bologna: 'science',
-  'Nan Madol': 'culture',
-  Venice: 'gold',
-  Zanzibar: 'gold',
-  'Hong Kong': 'production',
-  Ngazargamu: 'production',
 };
 
 export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {

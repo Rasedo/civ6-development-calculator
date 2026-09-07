@@ -4,7 +4,6 @@ import {
   CITY_STATE_NAMES,
   CITY_STATE_TYPES,
   CITY_STATE_SUZERAIN_BONUS,
-  CITY_STATE_SUZERAIN_LIVE,
   SUZ_EFFECTS,
 } from '../../../cpu/data/cityStates';
 import type { CityStateType } from '../../../cpu/core/types';
@@ -49,13 +48,9 @@ describe('the city-state roster', () => {
     }
   });
 
-  it('pays every catalog row exactly one way — a rule or a channel', () => {
+  it('pays every catalog row with a RULE — no row rides a flat channel', () => {
     for (const [name, row] of Object.entries(CITY_STATE_SUZERAIN_BONUS)) {
-      const rule = row.suz !== undefined;
-      const live = CITY_STATE_SUZERAIN_LIVE[name] !== undefined;
-      expect(rule && live, `${name} pays both a rule and a channel`).toBe(false);
-      if (rule) expect(SUZ_EFFECTS).toContain(row.suz!);
-      if (live) expect(row.channel).toBe(CITY_STATE_SUZERAIN_LIVE[name]);
+      expect(SUZ_EFFECTS, `${name} names an unknown perk`).toContain(row.suz);
     }
   });
 

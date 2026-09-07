@@ -207,32 +207,31 @@ def main() -> None:
     print("mexico city ok")
 
     # --- Geneva pays only at PEACE ------------------------------------------
-    # CIV6 (Geneva): "when you are not at war with any civilization" — the one
-    # flat suzerain channel a war silences.
-    flags = sim.citystate_suz_peace[0, : sim.S]
-    if not bool(flags.any()):
-        # the seeder DRAWS the minor roster now, so this fixture may have
-        # placed no peace-gated city-state — force the per-row flag
-        sim.citystate_suz_peace[0, 0] = True
-        sim._eff_version += 1
-        flags = sim.citystate_suz_peace[0, : sim.S]
-    sp = int(flags.long().argmax())
-    hold(sim, 0, 0, sp)
+    # CIV6 (Geneva): "+15% Science when you are not at war with any
+    # civilization" — the rule a war with a MAJOR silences.
+    assert sim._suz_c_sci_peace >= 0, "the Geneva code is missing from the rules"
+    hold(sim, 0, sim._suz_c_sci_peace)
     foe = 1 % sim.n_majors
     sim.war[0, 0, : sim.n_majors] = False
     sim.war[0, : sim.n_majors, 0] = False
     sim.sync_war()
-    assert bool(sim._suz_capital_mask(0)[0, sp]), "peace must pay the channel"
+    assert float(sim._suz_science_pct(0)[0]) == sim._suz_sci_pct, "peace must pay the percent"
     sim.war[0, 0, foe] = sim.war[0, foe, 0] = True
     sim.sync_war()
-    assert not bool(sim._suz_capital_mask(0)[0, sp]), "a war with a MAJOR silences it"
-    other = next((s for s in range(sim.S) if s != sp and not bool(flags[s])), -1)
-    if other >= 0:
-        hold(sim, 0, 0, other)
-        assert bool(sim._suz_capital_mask(0)[0, other]), "an ungated row keeps paying"
+    assert float(sim._suz_science_pct(0)[0]) == 0.0, "a war with a MAJOR silences it"
     sim.war[0, 0, foe] = sim.war[0, foe, 0] = False
     sim.sync_war()
-    print("geneva ok — the flat channel is a PEACE channel, and only its own row")
+    # a war with a MINOR is not a war with a civilization
+    if sim.NS > sim.n_majors:
+        _mrow = sim.n_majors
+        sim.war[0, 0, _mrow] = sim.war[0, _mrow, 0] = True
+        sim.sync_war()
+        assert float(sim._suz_science_pct(0)[0]) == sim._suz_sci_pct, "a minor war must not silence it"
+        sim.war[0, 0, _mrow] = sim.war[0, _mrow, 0] = False
+        sim.sync_war()
+    drop(sim)
+    assert float(sim._suz_science_pct(0)[0]) == 0.0, "a non-suzerain pays nothing"
+    print("geneva ok — a PEACE percent on science, and a minor war does not silence it")
 
     # --- Akkad lends the ram's bit, at every walls tier ----------------------
     # CIV6 (Akkad): "Melee and anti-cavalry units' attacks do full damage to
@@ -260,8 +259,78 @@ def main() -> None:
                                  tile, torch.zeros(sim.B, dtype=torch.long))[0]) == 0,         "the bit outlived the suzerainty"
     print("akkad ok — the ram's bit at every tier, for melee and anti-cavalry alone")
 
-    print("SUZERAIN RULES OK — all seven coded perks fire, only for the strict "
-          "suzerain, and Geneva's channel only at peace")
+    # --- the nine rows that came off the flat channel -----------------------
+    codes = {
+        "sciencePeace": sim._suz_c_sci_peace, "districtGpp": sim._suz_c_dist_gpp,
+        "waterDistrictCulture": sim._suz_c_water_cul, "routeLuxuryGold": sim._suz_c_dest_lux,
+        "spiceLuxuries": sim._suz_c_spice, "routeLengthGold": sim._suz_c_route_len,
+        "projectProduction": sim._suz_c_proj_prod, "landPurchaseDiscount": sim._suz_c_land_buy,
+        "bonusAmenities": sim._suz_c_bonus_amen,
+    }
+    for nm, cd in codes.items():
+        assert cd >= 0, f"the {nm} code is missing from the rules"
+    # the install's magnitudes, as exported
+    _sz = sim.rules.citystate["suz"]
+    assert sim._suz_sci_pct == float(_sz["sciencePct"]) == 15.0, "Geneva is +15% Science"
+    assert sim._suz_dist_gpp == 1.0, "Bologna pays ONE point"
+    assert sim._suz_water_cul == 2.0, "Nan Madol pays +2 Culture"
+    assert sim._suz_dest_lux_gold == 1.0, "Venice pays +1 Gold per destination luxury"
+    assert (sim._suz_spice_n, sim._suz_spice_amen) == (2, 6), "Zanzibar is two luxuries of six"
+    assert (sim._suz_route_tiles_per, sim._suz_route_len_gold) == (5, 1.0), "Hunza is +1 per 5 tiles"
+    assert sim._suz_proj_pct == 20.0, "Hong Kong is +20% on projects"
+    assert sim._suz_buy_pct == 20.0, "Ngazargamu is 20% off per building"
+    assert sim._suz_bonus_amen == 1, "Buenos Aires' bonus resource serves one city"
+    # Bologna's nine rows name their class's own district's tier-1 building
+    assert sim._suz_gpp_bldg.shape[0] == sim.civ_gpp.shape[2], "a GP class has no Bologna row"
+    assert bool((sim._suz_gpp_bldg >= 0).any(dim=1).all()), "a GP class names no building"
+    # the three Encampment rows, Barracks OR Stable sharing one
+    assert sim._suz_buy_bldg.shape[0] == 3, "Ngazargamu has three building rows"
+    print("suzerain magnitudes ok — nine rules, every code resolved")
+
+    # shallow water reads the TILE or a NEIGHBOUR, and nothing else
+    _sw = sim.shallow_water[0]
+    _sa = sim.shallow_adj[0]
+    assert bool((_sa | ~_sw).all()), "a shallow tile must be shallow-adjacent to itself"
+    _t = int(_sw.long().argmax()) if bool(_sw.any()) else -1
+    if _t >= 0:
+        for _n in sim.neigh[_t].tolist():
+            if _n >= 0:
+                assert bool(_sa[_n]), "a neighbour of shallow water must read adjacent"
+    print("shallow water ok — the tile and its six neighbours, lake and coast alike")
+
+    # Ngazargamu: one row per Encampment building, Barracks OR Stable sharing one
+    hold(sim, 0, sim._suz_c_land_buy)
+    _bl = sim.city_bldg[0, 0, 0]
+    _bi = [int(x) for x in sim._suz_buy_bldg.reshape(-1).tolist() if int(x) >= 0]
+    for _b in _bi:
+        _bl[_b] = False
+    assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "an empty city pays full price"
+    _bl[int(sim._suz_buy_bldg[0, 0])] = True
+    assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "one row is 20% off"
+    if int(sim._suz_buy_bldg[0, 1]) >= 0:
+        _bl[int(sim._suz_buy_bldg[0, 1])] = True  # the OTHER half of the same row
+        assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "the pair is ONE row"
+    _bl[int(sim._suz_buy_bldg[1, 0])] = True
+    _bl[int(sim._suz_buy_bldg[2, 0])] = True
+    assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.4) < 1e-12, "three rows are 60% off"
+    drop(sim)
+    assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "the discount outlived the suzerainty"
+    print("ngazargamu ok — 20% a row, the pair sharing one, gone with the suzerainty")
+
+    # Hunza's course: origin -> chain -> destination, in whole hexes
+    _o = int(sim.city_center[0, 0, 0])
+    _d = int(sim.citystate_center[0, 0])
+    _empty = torch.full((sim.B, 1, 1), -1, dtype=torch.long)
+    _ot = torch.full((sim.B, 1), _o, dtype=torch.long)
+    _dt = torch.full((sim.B, 1), _d, dtype=torch.long)
+    _direct = int(sim._route_travel_tiles(_empty, _ot, _dt)[0, 0])
+    assert _direct == int(sim.pair_dist[_o, _d]), "a chainless course is the plain distance"
+    _mid = torch.full((sim.B, 1, 1), _d, dtype=torch.long)
+    assert int(sim._route_travel_tiles(_mid, _ot, _dt)[0, 0]) == _direct,         "a hop AT the destination adds nothing"
+    print("hunza ok — the course is origin through the chain to the destination")
+
+    print("SUZERAIN RULES OK — every coded perk fires, only for the strict "
+          "suzerain, and Geneva's percent only at peace")
 
 
 if __name__ == "__main__":

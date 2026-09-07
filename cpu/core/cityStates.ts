@@ -14,7 +14,7 @@ import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/se
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -328,18 +328,28 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
   return { capital, buildingAdd };
 }
 
-export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): Partial<Yields> {
-  const out: Partial<Yields> = {};
-  const atWar = state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat));
-  const holders = suzerainShareSeats(state, seat);
-  for (const cityState of state.cityStates) {
-    if (!holders.some((h) => isSuzerain(state, cityState, h)) || suzerainBonusBlocked(state, cityState)) continue;
-    if (atWar && CITY_STATE_SUZERAIN_PEACE_ONLY.includes(cityState.name)) continue;
-    const key = CITY_STATE_SUZERAIN_LIVE[cityState.name];
-    if (!key) continue; // descoped row
-    out[key] = (out[key] ?? 0) + CITY_STATE_SUZERAIN_YIELD;
-  }
-  return out;
+/** CIV6 (Geneva): "+15% Science when you are not at war with ANY
+ *  civilization" (the requirement set PLAYER_IS_AT_PEACE_WITH_ALL_MAJORS). A city-state war does
+ *  not silence it: a minor is not a civilization. */
+export function suzerainSciencePct(state: GameState, seat: number): number {
+  if (!suzerainEffect(state, seat, 'sciencePeace')) return 0;
+  if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 0;
+  return GENEVA_SCIENCE_PCT;
+}
+
+/** CIV6 (Hong Kong): "+20% Production towards city projects." */
+export function suzerainProjectMult(state: GameState, seat: number): number {
+  return suzerainEffect(state, seat, 'projectProduction') ? 1 + HONG_KONG_PROJECT_PCT / 100 : 1;
+}
+
+/** CIV6 (Ngazargamu): land units are `NGAZARGAMU_PURCHASE_PCT` cheaper to buy
+ *  with gold PER Encampment building standing in the buying city — Barracks or
+ *  Stable answer one row between them. */
+export function suzerainLandPurchaseMult(state: GameState, seat: number, city: City): number {
+  if (!suzerainEffect(state, seat, 'landPurchaseDiscount')) return 1;
+  let rows = 0;
+  for (const any of NGAZARGAMU_BUILDINGS) if (any.some((b) => city.buildings.includes(b))) rows += 1;
+  return Math.max(0, 1 - (NGAZARGAMU_PURCHASE_PCT / 100) * rows);
 }
 
 export function envoyBonusDelta(state: GameState, cityState: CityState, seat: number): Yields {

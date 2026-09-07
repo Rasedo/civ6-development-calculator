@@ -29,7 +29,6 @@ without an entry. No percentage: closed weight is deleted by design.
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
-| B-21r suzerain rows on flat channels | 3 | nine `CITY_STATE_SUZERAIN_BONUS` rows degraded to a flat channel; eight are buildable now, Zanzibar needs two new luxuries |
 | B-22r World Congress competitions | 1 | Aid Request's gold-to-rival scorer, three more scored quantities |
 | B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
@@ -46,7 +45,6 @@ without an entry. No percentage: closed weight is deleted by design.
 | **B. Fidelity vs real Civ 6** | **20** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 7), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
-| C-5 stockpiles | 1 | Zanzibar's luxuries (B-21r) |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
 | C-22 Preserve housing table | 1 | middle bands stylized |
@@ -103,6 +101,12 @@ the entry and the line leaves.
     tested report says a UNIT keeps its progress and a BUILDING's is wasted;
     this engine banks both, on the standing rule that hammers never burn.
     One forum post against a principle — the owner's call.
+11. **Two city-state names this roster invented.** "Venice" and "Bandar
+    Brunei" are not Civ 6 city-states. Their bonuses are AMSTERDAM's (base;
+    Antioch carries the same text in Expansion1) and JAKARTA's. Both
+    MECHANICS are built and sourced; only the names are wrong. Renaming
+    them touches `seeder/place.ts`, which is hashed into `genStamp`, so the
+    fix costs a reseed and a fresh `worlds.lock`. Rename, or keep the names?
 
 ## A. Engine vs engine
 
@@ -118,16 +122,6 @@ Nothing open.
   - Civ 6 fixes the park rhombus's vertical; this hex frame has none, so
     every rhombus is offered. A model choice; nothing to build until a
     vertical is chosen.
-- **B-21r. SUZERAIN ROWS ON FLAT CHANNELS.** Weight 3.
-  Each row's `note` in `cpu/data/cityStates.ts` names its gap.
-  - Buildable now: Geneva +15% Science (flat +3 stands in); Bologna +1 GPP
-    per district with a building; Nan Madol +2 Culture per district on or
-    beside water; Venice +1 Gold per destination luxury; Bandar Brunei's
-    PASSING-THROUGH half (the course is stored now); Hunza +1 Gold per 5
-    tiles of the course; Hong Kong +20% Production on projects; Ngazargamu
-    20% gold-purchase discount per Encampment building.
-  - Zanzibar's Cinnamon and Cloves need two luxury ids that exist nowhere
-    else (C-5 reads them).
 - **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 2.
   The machinery takes one data row per scored competition.
   - AID REQUEST scores gold SENT to the target player — needs a
@@ -261,8 +255,6 @@ Nothing open.
     unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS`
     a side, an offer standing two turns; a war does not end a standing
     deal.
-- **C-5. STRATEGIC-RESOURCE STOCKPILES.** Weight 1.
-  - Zanzibar's two exists-nowhere-else luxuries — B-21r.
 - **C-16. THE SPY'S SECOND HALF.** Weight 1.
   - WHAT A LEVEL IS WORTH. The install's UnitOperations rows publish
     `BaseProbability` (13 Siphon Funds, Foment Unrest, Fabricate Scandal;

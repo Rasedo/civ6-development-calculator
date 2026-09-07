@@ -14,6 +14,8 @@ import { governorMult } from './governors';
 import { getModifiers } from './effects';
 import { computeCityStats } from './city';
 import { spawnUnit, extraCharges } from './units';
+import { suzerainEffect } from './cityStates';
+import { BOLOGNA_GPP_BUILDING, BOLOGNA_DISTRICT_GPP } from '../data/cityStates';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -148,6 +150,7 @@ export function greatPersonPointsPerTurn(
 ): Record<GreatPersonClass, number> {
   const out = Object.fromEntries(GP_CLASSES.map((c) => [c, 0])) as Record<GreatPersonClass, number>;
   const gppFlat = getModifiers(state, seat).gppFlat;
+  const bolognaGpp = suzerainEffect(state, seat, 'districtGpp');
   out.PROPHET += goldenProphetPoints(state, seat);
   for (const city of citiesOf(state, seat)) {
     // CIV6 (Grants): "+100% Great People points generated per turn in the
@@ -176,7 +179,11 @@ export function greatPersonPointsPerTurn(
       for (const r of getModifiers(state, seat).gppBuildings) {
         if (r.cls === cls && city.buildings.includes(r.building)) out[cls] += r.amount * cityMult;
       }
-      out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed
+      // CIV6 (Bologna): "+1 Great Person point of their type" from a district
+      // holding a building — the TIER-1 building of this class's own district.
+      const bologna = bolognaGpp && BOLOGNA_GPP_BUILDING[cls]?.some((b) => city.buildings.includes(b))
+        ? BOLOGNA_DISTRICT_GPP : 0;
+      out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed + bologna
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length) * cityMult;
     }
     // CIV6: a wonder's per-turn Great Person points are the owner's, paid

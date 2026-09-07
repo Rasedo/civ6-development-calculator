@@ -1488,6 +1488,14 @@ class SimSeats:
             & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0) \
             & self._civ_unit_ok(row)
 
+    def _seat_buy_unit_slot(self, row: int) -> torch.Tensor:
+        """[B] — the column a scripted gold purchase SPAWNS in, capital first,
+        else the row's first living city. Its buildings price the unit."""
+        alive_row = self.city_alive[:, row, : self.RC]
+        cap_is = self.city_is_cap[:, row]
+        has_cap = cap_is.any(dim=1)
+        return torch.where(has_cap, cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
+
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor, faith: bool = False) -> torch.Tensor:
         # No hull and no plane on the GOLD rung: it spawns at the capital and
         # asks no city question, and `trainableUnits(state, seat)` with no city
@@ -1513,9 +1521,13 @@ class SimSeats:
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
         # every column offered here is one.
         merc = self._congress_unit_buy_mult(0).unsqueeze(1)
+        # CIV6 (Ngazargamu): the BUYING city's Encampment buildings discount a
+        # land unit's gold price. Every column offered here is a land unit.
+        _ngz = self._suz_land_buy_mult(row).gather(
+            1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
         afford = self._afford(self.civ_treasury[:, row].unsqueeze(1),
                               self._gold_price(row, self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult
-                                               * merc * self._land_unit_price_mult(row)))
+                                               * merc * _ngz * self._land_unit_price_mult(row)))
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
@@ -2060,6 +2072,7 @@ class SimSeats:
                         pick_ty, init_xp=xp_u)
                     price_u = self._gold_price(row, self._type_cost.gather(0, pick_ty).double() * mult
                                                * self._congress_unit_buy_mult(0)
+                                               * self._suz_land_buy_mult(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1)
                                                * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
                     for _ui, _sl, _c in self._res_slot_units:
@@ -4123,6 +4136,69 @@ class SimSeats:
         if row >= self.n_majors:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self._suz_effect_rows(code)[:, row]
+
+    def _city_lux_distinct(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — DISTINCT luxury resources standing on each
+        city's own tiles, the count Venice's suzerain pays a route per head.
+        Ownership is the gate, not an improvement: the modifier reads the
+        resource AT the destination."""
+        B, NM, RC, NL = self.B, self.n_majors, self.RC, self._n_lux
+        dump = NM * RC * NL
+        seen = torch.zeros(B, dump + 1, dtype=torch.bool, device=self.device)
+        if NL == 0:
+            return torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
+        has = self.lux_id >= 0
+        for r in range(NM):
+            sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
+            ok = has & (sl >= 0)
+            idx = (r * RC + sl.clamp(min=0)) * NL + self.lux_id.clamp(min=0)
+            idx = torch.where(ok, idx, torch.full_like(idx, dump))
+            seen.scatter_(1, idx, torch.ones_like(idx, dtype=torch.bool))
+        return seen[:, :dump].reshape(B, NM, RC, NL).sum(dim=3)
+
+    def _route_travel_tiles(self, ch: torch.Tensor, octr: torch.Tensor, dctr: torch.Tensor) -> torch.Tensor:
+        """`routeTravelTiles`'s twin, [B, K] long — the tiles a route walks from
+        its origin through the stored chain to its destination."""
+        at = octr
+        n = torch.zeros_like(octr)
+        for c in range(ch.shape[2]):
+            nxt = ch[:, :, c]
+            ok = nxt >= 0
+            step = self.pair_dist[at.reshape(-1), nxt.clamp(min=0).reshape(-1)].reshape_as(at).long()
+            n = n + torch.where(ok, step, torch.zeros_like(step))
+            at = torch.where(ok, nxt, at)
+        return n + self.pair_dist[at.reshape(-1), dctr.reshape(-1)].reshape_as(at).long()
+
+    def _suz_science_pct(self, row: int) -> torch.Tensor:
+        """`suzerainSciencePct`'s twin, [B] f64 percent. CIV6 (Geneva): "+15%
+        Science when you are not at war with any civilization"
+        (the requirement set PLAYER_IS_AT_PEACE_WITH_ALL_MAJORS) — a war with a MINOR leaves it
+        standing, because a minor is not a civilization."""
+        if self._suz_c_sci_peace < 0 or row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        peace = ~self.war[:, row, : self.n_majors].any(dim=1)
+        return (self._suz_effect(row, self._suz_c_sci_peace) & peace).double() * self._suz_sci_pct
+
+    def _suz_land_buy_mult(self, row: int, cols: slice | None = None) -> torch.Tensor:
+        """`suzerainLandPurchaseMult`'s twin, [B, RC] f64. CIV6 (Ngazargamu):
+        a land unit is `purchasePct` cheaper per Encampment building row the
+        BUYING city holds — Barracks and Stable are one row between them."""
+        sl = cols if cols is not None else slice(None)
+        bl = self.city_bldg[:, row, sl]  # [B, C, NB]
+        out = torch.ones(bl.shape[0], bl.shape[1], dtype=torch.float64, device=self.device)
+        if self._suz_c_land_buy < 0:
+            return out
+        on = self._suz_effect(row, self._suz_c_land_buy)
+        if not bool(on.any()):
+            return out
+        rows = torch.zeros(bl.shape[0], bl.shape[1], dtype=torch.float64, device=self.device)
+        for r in range(self._suz_buy_bldg.shape[0]):
+            idx = [int(x) for x in self._suz_buy_bldg[r].tolist() if int(x) >= 0]
+            if not idx:
+                continue
+            rows = rows + bl[:, :, idx].any(dim=2).double()
+        return torch.where(on.unsqueeze(1),
+                           (1.0 - (self._suz_buy_pct / 100.0) * rows).clamp(min=0.0), out)
 
     def _cav_hill_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cavalryHillCS`'s twin, [B] long. CIV6 (Preslav's suzerain): "Your
@@ -6778,6 +6854,14 @@ class SimSeats:
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
+            # CIV6 (Venice): "+1 Gold for each Luxury resource at the
+            # destination" of an international route.
+            if self._suz_c_dest_lux >= 0:
+                _ven = self._suz_effect(row, self._suz_c_dest_lux)
+                if bool(_ven.any()):
+                    _lux_d = self._city_lux_distinct().gather(1, _rx).gather(2, _col).squeeze(2)
+                    gold_i = gold_i + (_lux_d.double() * self._suz_dest_lux_gold
+                                       * _ven.double().unsqueeze(1))
             # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
             # to this city provide +1 Science and +1 Gold for them" — the
             # DESTINATION's wonder registry pays the sender.
@@ -6890,7 +6974,40 @@ class SimSeats:
                 _cntw = (_d3 & _ownc & (self.res_cat == 1).unsqueeze(1)).sum(dim=2).double()
                 inc.scatter_add_(1, from_j * 6 + 2,
                                  (_pw * _cntw).gather(1, from_j) * (act & has_from).double())
-        ch = self.seat_route_chain[:, row]  # [B, K, CMAX]
+        ch = self.seat_route_chain[:, row]  # [B, K, CMAX] the stored course
+        # CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
+        # (`..._PER_PATH_TILE`, Amount 0.2) — every leg, whichever kind, once
+        # its destination resolves.
+        if self._suz_c_route_len >= 0:
+            _hz = self._suz_effect(row, self._suz_c_route_len)
+            if bool(_hz.any()):
+                _octr = self.city_center[:, row].gather(1, from_j)
+                # the DOMESTIC destination
+                _dctr_h = torch.where(rr[:, :, 1] >= 0,
+                                      self.city_center[:, row].gather(1, dest_j),
+                                      torch.zeros_like(from_j))
+                _pays_h = pays_d
+                # the CITY-STATE destination, on the same liveness gate the
+                # minor leg itself pays on
+                if self.S > 0:
+                    _cssh = citystate_s.clamp(max=self.S - 1)
+                    _cs_okh = self.citystate_alive[:, : self.S].gather(1, _cssh) & (citystate_s < self.S)
+                    _dctr_h = torch.where(is_cs, self.citystate_center[:, : self.S].gather(1, _cssh), _dctr_h)
+                    _pays_h = _pays_h | (act & is_cs & has_from & _cs_okh)
+                _rdc = self.seat_route_dcity[:, row]
+                _intl_h = act & (_rdc >= 0)
+                if bool(_intl_h.any()):
+                    _drh = self.seat_route_dseat[:, row].clamp(min=0)
+                    _rxh = _drh.unsqueeze(2).expand(B, _rdc.shape[1], self.city_id.shape[2])
+                    _hith = (self.city_id.gather(1, _rxh) == _rdc.unsqueeze(2)) & self.city_alive.gather(1, _rxh)
+                    _colh = _hith.long().argmax(dim=2).unsqueeze(2)
+                    _dctr_h = torch.where(
+                        _intl_h, self.city_center.gather(1, _rxh).gather(2, _colh).squeeze(2), _dctr_h)
+                    _pays_h = _pays_h | (_intl_h & has_from & _hith.any(dim=2))
+                _tiles = self._route_travel_tiles(ch, _octr.clamp(min=0), _dctr_h.clamp(min=0))
+                _hgold = (_tiles // self._suz_route_tiles_per).double() * self._suz_route_len_gold
+                inc.scatter_add_(1, from_j * 6 + 2,
+                                 _hgold * (_pays_h & has_from).double() * _hz.double().unsqueeze(1))
         if bool((ch >= 0).any()):
             chf = ch.clamp(min=0).reshape(B, -1)
             live_c = self._centre_city_map().gather(1, chf).reshape(ch.shape) & (ch >= 0)
@@ -6902,6 +7019,15 @@ class SimSeats:
             if bool(_rome.any()):
                 own_c = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) == row)
                 cg = cg + own_c.double().sum(dim=2) * self._rome_post_gold * _rome.double().unsqueeze(1)
+            # CIV6 (Bandar Brunei): "Your Trading Posts in FOREIGN cities
+            # provide +1 Gold to your Trade Routes PASSING THROUGH ... the
+            # city" — the chain rides this seat's own posts by construction,
+            # so the only test left is whether the city is foreign.
+            if self._suz_c_route_post >= 0:
+                _bb = self._suz_effect(row, self._suz_c_route_post)
+                if bool(_bb.any()):
+                    _fgn = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) != row)
+                    cg = cg + _fgn.double().sum(dim=2) * _bb.double().unsqueeze(1)
             for r2 in range(self.n_majors):
                 if r2 == row:
                     continue

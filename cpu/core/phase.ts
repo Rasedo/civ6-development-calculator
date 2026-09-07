@@ -24,7 +24,7 @@ import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, getModifiers, governmentIndex, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -2067,8 +2067,10 @@ export function seatPhase(state: GameState): void {
       if (wantUnit && !bought && meleeCount + rangedCount < actor.cities.length * 2) {
         let pickId: string | null = null;
         let pickCombat = -Infinity;
+        // the city the purchase SPAWNS in is the one whose buildings price it
+        const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
         for (const def of goldBuyableUnits(state, actor.seat)) {
-          if (!goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat)))) continue;
+          if (!goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity)))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
             pickId = def.id;
@@ -2076,7 +2078,7 @@ export function seatPhase(state: GameState): void {
         }
         if (pickId) {
           const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-          const price = goldPrice(state, actor.seat, unitPurchaseCost(state, pickId, actor.seat));
+          const price = goldPrice(state, actor.seat, unitPurchaseCost(state, pickId, actor.seat, spawnCity));
           const u = spawnUnit(state, pickId, spawnCity.centerIndex, actor.seat);
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;
@@ -2382,7 +2384,8 @@ export function seatPhase(state: GameState): void {
         }
         // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
         if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
-        if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
+        // CIV6 (Hong Kong): "+20% Production towards city projects"
+        if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
         // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)

@@ -19,7 +19,7 @@ import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
-import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, VENICE_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
@@ -195,11 +195,50 @@ export function routePostGold(state: GameState, seat: number, destCenter: number
  *  Trade Route which passes through this city" — the stored CHAIN is the
  *  course: each chain city pays 1 (the owner's own post, which the chain
  *  rides by construction) plus the OTHER civs' posts standing there. */
+/** The tiles a route TRAVELS: origin to destination, hopping through the
+ *  stored chain. `hexDistance` is the leg the Trader walks, which is how
+ *  `routeChain` itself measures a leg. */
+export function routeTravelTiles(state: GameState, originCenter: number, destCenter: number, r: TradeRoute): number {
+  const tiles = state.map.tiles;
+  const leg = (a: number, b: number): number =>
+    hexDistance(tiles[a].col, tiles[a].row, tiles[b].col, tiles[b].row);
+  let at = originCenter;
+  let n = 0;
+  for (const c of r.chain ?? []) { n += leg(at, c); at = c; }
+  return n + leg(at, destCenter);
+}
+
+/** CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
+ *  (`MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE`, Amount 0.2). */
+export function routeLengthGold(state: GameState, seat: number, originCenter: number, destCenter: number, r: TradeRoute): number {
+  if (!suzerainEffect(state, seat, 'routeLengthGold')) return 0;
+  return HUNZA_ROUTE_GOLD * Math.floor(routeTravelTiles(state, originCenter, destCenter, r) / HUNZA_TILES_PER_GOLD);
+}
+
+/** CIV6 (Venice): "+1 Gold for each Luxury resource at the destination" of an
+ *  international route — DISTINCT luxuries standing on the destination city's
+ *  own tiles. */
+export function routeDestLuxuryGold(state: GameState, seat: number, dest: City): number {
+  if (!suzerainEffect(state, seat, 'routeLuxuryGold')) return 0;
+  const seen = new Set<string>();
+  for (const t of state.map.tiles) {
+    if (t.ownerSeat !== dest.seat || t.ownerCity !== dest.id || !t.resource) continue;
+    if (RESOURCES[t.resource]?.category === 'luxury') seen.add(t.resource);
+  }
+  return VENICE_DEST_LUXURY_GOLD * seen.size;
+}
+
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
   let g = 0;
+  // CIV6 (Bandar Brunei): "Your Trading Posts in FOREIGN cities provide +1
+  // Gold to your Trade Routes PASSING THROUGH or going to the city" — the
+  // passing-through half. The chain rides this seat's own posts by
+  // construction, so the only test left is whether the city is foreign.
+  const brunei = suzerainEffect(state, seat, 'routePostGold');
   for (const c of r.chain ?? []) {
     if (!centreHasCity(state, c)) continue;
     g += 1;
+    if (brunei && tileSeat(state.map.tiles[c]) !== seat) g += 1;
     // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
     // Posts in your own cities" — a chain hop IS one of the seat's posts.
     if (civOf(state, seat) === 'ROME' && tileSeat(state.map.tiles[c]) === seat) g += ROME_OWN_POST_GOLD;
@@ -579,6 +618,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         // minor leg, forever
         out.gold += emergencyCsRouteGold(state, seat);
         out.gold += routePostGold(state, seat, cityState.centerIndex);
+        out.gold += routeLengthGold(state, seat, city.centerIndex, cityState.centerIndex, route);
         // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
         // provide +2 Culture and +1 Gold for every specialty district in the
         // ORIGIN city" — this city, whichever minor the route reaches.
@@ -621,6 +661,9 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
           addYields(out, getModifiers(state, seat).allyRouteYield);
         }
         out.gold += routePostGold(state, seat, civCity.centerIndex);
+        out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
+        // CIV6 (Venice): the destination's own luxuries pay this seat's route
+        out.gold += routeDestLuxuryGold(state, seat, civCity);
         // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
         // to this city provide +1 Science and +1 Gold for them."
         const snd = wonderRouteSenderYields(state, civCity);
@@ -640,6 +683,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest) {
       addYields(out, routeYields(state, dest));
+      out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
       // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
       // the same reader the international leg uses
       addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);

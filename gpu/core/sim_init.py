@@ -115,6 +115,8 @@ class SimInit:
         # OCEAN tiles need CARTOGRAPHY to enter (COAST/LAKE do not); the gate is
         # applied per-mover.
         self.ocean_tile = torch.tensor([[t.get("ocean", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # SHALLOW water (COAST or LAKE) — the ground the install calls "coast"
+        self.shallow_water = torch.tensor([[t["shw"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
 
         self.work_ok = torch.tensor([[t.get("work", t["pass"]) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # Luxury amenity source (mirrors luxuryAmenities): per tile, the
@@ -134,6 +136,13 @@ class SimInit:
         self.tile_goody = torch.tensor([[t.get("goody", 0) for t in f["tiles"]] for f in fixtures],
                                        dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        # `onOrNextToShallowWater`'s twin, baked: TEST_ANY of "the plot IS
+        # coast" and "the plot is ADJACENT to coast". Terrain is static on both
+        # engines today; the day a tile's terrain can CHANGE (a drowned tile
+        # becoming water) this bake must move with it.
+        _shn = self.neigh.clamp(min=0)  # [T, 6]
+        _shv = self.shallow_water[:, _shn.reshape(-1)].reshape(-1, self.T, 6)
+        self.shallow_adj = self.shallow_water | (_shv & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         # The distance-2 ring, [T, 12], each row SORTED ASCENDING and padded -1
         # at map edges. Column order IS tile-index order, the engine's own
         # target tie-break, so scanning SNIPE columns in order scans ring tiles
@@ -196,8 +205,6 @@ class SimInit:
         self.register_alias("citystate_center", lambda sim: sim.city_center[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_pop = self.city_pop[:, _m0:_m0 + s_pad, 0]
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
-        self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_suz_peace = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # tourism SENT per (from, to) major pair — real Civ 6 accrues toward
         # each foreign civ separately, through its own summed modifier
         self.civ_tourism_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
@@ -228,8 +235,6 @@ class SimInit:
                 self.citystate_type[b, s] = cs["type"]
                 self.citystate_center[b, s] = cs["center"]
                 self.citystate_pop[b, s] = cs["pop"]
-                self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
-                self.citystate_suz_peace[b, s] = bool(cs.get("suzPeace", 0))
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
                 self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
@@ -290,7 +295,6 @@ class SimInit:
         self._citystate_t2idx = _t2p[self.citystate_type.clamp(min=0)]  # [B, S, w2]
         # the minor's own build ladder raises the FIRST tier-1 member
         self._citystate_t1b = self._citystate_t1idx[:, :, 0]  # [B, S]
-        self._citystate_suz_amt = float(rules.citystate.get("suzerainYield", 3))  # flat suzerain capital-yield amount
         # Suzerain perks modeled as RULES — `effects` is the code order the
         # per-CS `suzCode` plane indexes; -1 = the perk is not in this build.
         _suz = rules.citystate["suz"]
@@ -307,6 +311,15 @@ class SimInit:
         self._suz_c_walls_full = _sfx.index("wallsFullDamage") if "wallsFullDamage" in _sfx else -1
         self._suz_c_faith_bldg = _sfx.index("faithBuildings") if "faithBuildings" in _sfx else -1
         self._suz_c_route_post = _sfx.index("routePostGold") if "routePostGold" in _sfx else -1
+        self._suz_c_sci_peace = _sfx.index("sciencePeace") if "sciencePeace" in _sfx else -1
+        self._suz_c_dist_gpp = _sfx.index("districtGpp") if "districtGpp" in _sfx else -1
+        self._suz_c_water_cul = _sfx.index("waterDistrictCulture") if "waterDistrictCulture" in _sfx else -1
+        self._suz_c_dest_lux = _sfx.index("routeLuxuryGold") if "routeLuxuryGold" in _sfx else -1
+        self._suz_c_spice = _sfx.index("spiceLuxuries") if "spiceLuxuries" in _sfx else -1
+        self._suz_c_route_len = _sfx.index("routeLengthGold") if "routeLengthGold" in _sfx else -1
+        self._suz_c_proj_prod = _sfx.index("projectProduction") if "projectProduction" in _sfx else -1
+        self._suz_c_land_buy = _sfx.index("landPurchaseDiscount") if "landPurchaseDiscount" in _sfx else -1
+        self._suz_c_bonus_amen = _sfx.index("bonusAmenities") if "bonusAmenities" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -314,7 +327,30 @@ class SimInit:
         self._suz_relic_sci = float(_suz["relicScience"])
         self._suz_route_cul = float(_suz["routeCulture"])
         self._suz_route_gold = float(_suz["routeGold"])
-
+        # Geneva / Bologna / Nan Madol / Venice / Zanzibar / Hunza / Hong Kong /
+        # Ngazargamu / Buenos Aires — the nine rows that used to ride a flat
+        # capital channel, each now its own rule.
+        self._suz_sci_pct = float(_suz["sciencePct"])
+        self._suz_dist_gpp = float(_suz["districtGpp"])
+        _gb = _suz["gppBuildingIdx"]
+        _gbw = max(max((len(x) for x in _gb), default=1), 1)
+        # [n_gp, w] building indices, -1 padded — the class's tier-1 building(s)
+        self._suz_gpp_bldg = torch.tensor(
+            [list(x) + [-1] * (_gbw - len(x)) for x in _gb], dtype=torch.long, device=device)
+        self._suz_water_cul = float(_suz["waterDistrictCulture"])
+        self._suz_dest_lux_gold = float(_suz["destLuxuryGold"])
+        self._suz_spice_n = int(_suz["spiceLuxuries"])
+        self._suz_spice_amen = int(_suz["spiceAmenities"])
+        self._suz_route_tiles_per = int(_suz["routeTilesPerGold"])
+        self._suz_route_len_gold = float(_suz["routeLengthGold"])
+        self._suz_proj_pct = float(_suz["projectPct"])
+        self._suz_buy_pct = float(_suz["purchasePct"])
+        _pb = _suz["purchaseBuildingIdx"]
+        _pbw = max(max((len(x) for x in _pb), default=1), 1)
+        # [rows, w] Encampment building indices; a ROW pays once (Barracks OR Stable)
+        self._suz_buy_bldg = torch.tensor(
+            [list(x) + [-1] * (_pbw - len(x)) for x in _pb], dtype=torch.long, device=device)
+        self._suz_bonus_amen = int(_suz["bonusAmenities"])
         rr = rules.seats
         n_gp = len(rr.get("gpClassDistrict", [])) or 5
 

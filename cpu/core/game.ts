@@ -21,7 +21,7 @@ import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, t
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect } from './cityStates';
+import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
@@ -693,13 +693,22 @@ export function goldAffordable(treasury: number, cost: number): boolean {
   return Math.round(treasury * 1000) >= Math.round(cost * 1000);
 }
 
-export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
+/** CIV6 (Ngazargamu): the modifier's own gate is `UnitDomain DOMAIN_LAND` —
+ *  a chassis that is neither naval nor air. */
+export function unitIsLandDomain(unitType: string): boolean {
+  const d = UNITS[unitType];
+  return !!d && !d.naval && d.air === undefined;
+}
+
+export function unitPurchaseCost(state: GameState, unitType: string, seat: number, city?: City): number {
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
   // Mercenary Companies names a CURRENCY and moves the price of a MILITARY
   // unit bought with it.
   const merc = (UNITS[unitType]?.combat ?? 0) > 0 ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
-  return base * GOLD_PURCHASE_MULT * m * merc * landUnitPriceMult(state, seat, unitType);
+  // CIV6 (Ngazargamu): 20% off per Encampment building in the BUYING city
+  const suz = city && unitIsLandDomain(unitType) ? suzerainLandPurchaseMult(state, seat, city) : 1;
+  return base * GOLD_PURCHASE_MULT * m * merc * suz * landUnitPriceMult(state, seat, unitType);
 }
 
 /**
@@ -756,7 +765,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   // CIV6 (Spy): "Cannot be purchased with Gold."
   if (UNITS[unitType]?.noGold) return { ok: false, reason: 'This unit cannot be purchased with Gold.' };
-  const cost = goldPrice(state, seat, unitPurchaseCost(state, unitType, seat));
+  const cost = goldPrice(state, seat, unitPurchaseCost(state, unitType, seat, city));
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;

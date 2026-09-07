@@ -19,8 +19,8 @@ import type { PlunderRow, ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
-import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, VENICE_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
@@ -729,7 +729,6 @@ export function buildRules() {
       districtBonus: CITY_STATE_DISTRICT_BONUS,
       typeT1Idx: CITY_STATE_TYPES.map((t) => CITY_STATE_TYPE_TIER1[t].map((b) => buildingIdx.get(b) ?? -1)),
       typeT2Idx: CITY_STATE_TYPES.map((t) => CITY_STATE_TYPE_TIER2[t].map((b) => buildingIdx.get(b) ?? -1)),
-      suzerainYield: CITY_STATE_SUZERAIN_YIELD,
       // Suzerain perks modeled as RULES — `effects` is the code order the
       // per-CS `suzCode` plane indexes.
       suz: {
@@ -741,6 +740,32 @@ export function buildRules() {
         relicScience: ANSHAN_RELIC_SCIENCE,
         routeCulture: KUMASI_ROUTE_CULTURE,
         routeGold: KUMASI_ROUTE_GOLD,
+        // Geneva: percent on every city's science while at peace with all majors
+        sciencePct: GENEVA_SCIENCE_PCT,
+        // Bologna: +1 GPP of a class per GP class, keyed to the class's tier-1
+        // building — one row per GP class, in GP_CLASSES order
+        districtGpp: BOLOGNA_DISTRICT_GPP,
+        gppBuildingIdx: GP_CLASSES.map(
+          (c) => (BOLOGNA_GPP_BUILDING[c] ?? []).map((b) => buildingIdx.get(b) ?? -1)),
+        // Nan Madol: culture per district on or next to shallow water
+        waterDistrictCulture: NAN_MADOL_WATER_CULTURE,
+        // Venice: gold per DISTINCT luxury on the destination city's tiles
+        destLuxuryGold: VENICE_DEST_LUXURY_GOLD,
+        // Zanzibar: two luxuries that stand on no tile, each serving 6 cities
+        spiceLuxuries: ZANZIBAR_LUXURIES,
+        spiceAmenities: ZANZIBAR_LUXURY_AMENITIES,
+        // Hunza: gold per whole `routeTilesPerGold` tiles the route travels
+        routeTilesPerGold: HUNZA_TILES_PER_GOLD,
+        routeLengthGold: HUNZA_ROUTE_GOLD,
+        // Hong Kong: percent production toward projects
+        projectPct: HONG_KONG_PROJECT_PCT,
+        // Ngazargamu: percent off a land unit's gold price per Encampment
+        // building row present (Barracks OR Stable answer one row)
+        purchasePct: NGAZARGAMU_PURCHASE_PCT,
+        purchaseBuildingIdx: NGAZARGAMU_BUILDINGS.map(
+          (any) => any.map((b) => buildingIdx.get(b) ?? -1)),
+        // Buenos Aires: reach of a bonus resource turned luxury
+        bonusAmenities: BUENOS_AIRES_AMENITIES,
       },
       // CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown

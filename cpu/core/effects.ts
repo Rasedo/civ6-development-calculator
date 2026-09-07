@@ -20,7 +20,8 @@ import { tileAppeal, appealBand, type GpAppeal } from './appeal';
 import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
-import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain, suzerainOf } from './cityStates';
+import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
+import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
 
 
 import { GP_PERM } from '../data/greatPeople';
@@ -303,6 +304,8 @@ export interface Modifiers {
   tilePurchaseMult: number;
   encampHarborProdMult: number;
   yieldMult: Partial<Yields>;
+  /** CIV6 (Nan Madol): Culture every district on or next to shallow water pays. */
+  waterDistrictCulture: number;
   featureYields: Partial<Record<string, Partial<Yields>>>;
   /** extra ADJACENCY rules a district type reads, by type — the three
    *  pantheons that pay a Holy Site per adjacent tile of a kind its own
@@ -534,6 +537,7 @@ export function defaultModifiers(): Modifiers {
     tilePurchaseMult: 1,
     encampHarborProdMult: 1,
     yieldMult: {},
+    waterDistrictCulture: 0,
     featureYields: {},
     districtAdjacencyAdd: {},
     improvementOnResource: [],
@@ -943,7 +947,11 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
       const cur = (mods.buildingYieldAdd[building] ??= {});
       addPartial(cur, y);
     }
-    addPartial(mods.capitalYields, cityStateSuzerainCapitalBonus(state, seat));
+    // CIV6 (Geneva): "+15% Science" in EVERY city while this seat is at peace
+    // with every civilization — a percent on the yield, not a capital lump.
+    if (suzerainEffect(state, seat, 'waterDistrictCulture')) mods.waterDistrictCulture = NAN_MADOL_WATER_CULTURE;
+    const genevaPct = suzerainSciencePct(state, seat);
+    if (genevaPct) mods.yieldMult.science = (mods.yieldMult.science ?? 1) * (1 + genevaPct / 100);
     // a suzerainty pays a YIELD by the head — `suzerainCount`'s Treaty
     // Organization weighting is what one pays in FAVOR, not here
     const suz = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;

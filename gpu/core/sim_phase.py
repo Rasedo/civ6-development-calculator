@@ -742,6 +742,14 @@ class SimPhase:
             if bool((_pm != 1).any()) and self._proj_rows:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
+        # CIV6 (Hong Kong): "+20% Production towards city projects" — last of
+        # the three project factors, the order TS composes them in.
+        if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
+            _hk = self._suz_effect(row, self._suz_c_proj_prod)[bidx]
+            if bool(_hk.any()):
+                _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
+                _emall = torch.where(_proj_i & _hk,
+                                     _emall * (1.0 + self._suz_proj_pct / 100.0), _emall)
         # CIV6 (Founder of Carthage): "+50% Production toward districts in the
         # city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
         if self._plaza_district_prod_rows and self._govplaza_didx >= 0:
@@ -1735,7 +1743,17 @@ class SimPhase:
                         continue
                     nb_r = nb_r + (self.city_bldg[:, row, :, _gb]
                                    & self._row_is(row, _gc, _gl).unsqueeze(1)).double() * _ga
-                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + nb_r + c2) * gm).sum(dim=1)
+                # CIV6 (Bologna): "+1 Great Person point of their type" from a
+                # district holding a building — the TIER-1 building of this
+                # class's own district, one point however many it holds.
+                bol = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
+                if self._suz_c_dist_gpp >= 0 and row < self.n_majors and cls < self._suz_gpp_bldg.shape[0]:
+                    _bi = [int(x) for x in self._suz_gpp_bldg[cls].tolist() if int(x) >= 0]
+                    if _bi:
+                        _bon = self._suz_effect(row, self._suz_c_dist_gpp)
+                        bol = (self.city_bldg[:, row, :, _bi].any(dim=2)
+                               & _bon.unsqueeze(1)).double() * self._suz_dist_gpp
+                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + nb_r + c2 + bol) * gm).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:

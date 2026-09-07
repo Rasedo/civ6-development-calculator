@@ -27,7 +27,7 @@ import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from '
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect, minorLuxuries } from './cityStates';
-import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
+import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
@@ -431,9 +431,28 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   // CIV6 (John Spilsbury, Helena Rubinstein, Levi Strauss, Estee Lauder): an
   // INVENTED luxury serves cities exactly like a worked one, and its own row
   // says how many it reaches.
+  // CIV6 (Zanzibar): Cinnamon and Cloves are luxuries with `Frequency="0"` —
+  // they stand on no map tile, so they cannot be a resource id here. Each is
+  // `Happiness="6"`, which this model spells as a SIX-city reach, the same
+  // shape an invented luxury already has.
+  const zanzibar = suzerainEffect(state, seat, 'spiceLuxuries')
+    ? new Array<number>(ZANZIBAR_LUXURIES).fill(ZANZIBAR_LUXURY_AMENITIES) : [];
+  // CIV6 (Buenos Aires): "Your bonus resources behave like luxury resources,
+  // providing +1 Amenity per resource"
+  // (`MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES`, Amount 1). The
+  // modifier's gate is OWNERSHIP, so an unimproved copy counts.
+  const bonusLux = new Set<string>();
+  if (suzerainEffect(state, seat, 'bonusAmenities')) {
+    for (const t of state.map.tiles) {
+      if (!t.resource || tileSeat(t) !== seat) continue;
+      if (RESOURCES[t.resource]?.category === 'bonus') bonusLux.add(t.resource);
+    }
+  }
   const reach = [
     ...new Array<number>(luxuries.size + Math.max(0, dupCopies - 1)).fill(LUXURY_AMENITY_CITIES),
     ...(seatOf(state, seat)?.gpLuxuries ?? []),
+    ...zanzibar,
+    ...new Array<number>(bonusLux.size).fill(BUENOS_AIRES_AMENITIES),
   ];
   for (const n of reach) {
     const ranked = [...cities].sort((a, b) => {

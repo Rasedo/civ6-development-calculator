@@ -2,6 +2,7 @@
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
 import { citiesOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
+import type { GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
 import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
@@ -317,14 +318,25 @@ export function buildingVariantAdjacency(civ: string | null, city: City, type: D
   return out;
 }
 
+/** CIV6 (Nan Madol, requirement set PLOT_IS_OR_ADJACENT_TO_COAST): TEST_ANY of "the plot IS
+ *  coast" and "the plot is ADJACENT to coast". This engine's LAKE is the
+ *  install's COAST, so both arms read SHALLOW water. */
+export function onOrNextToShallowWater(map: GameMap, tile: Tile): boolean {
+  const shallow = (t: Tile): boolean => t.terrain === 'COAST' || t.terrain === 'LAKE';
+  return shallow(tile) || neighbors(map, tile).some(shallow);
+}
+
 export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
+  const nanMadol = ctx.mods.waterDistrictCulture;
   for (const d of city.districts) {
     const tile = ctx.map.tiles[d.tileIndex];
     if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged = dark
     const def = DISTRICTS[d.type];
     const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
     if (cityStateAdd) addYields(out, cityStateAdd);
+    // CIV6 (Nan Madol): "+2 Culture" from every district on or next to water
+    if (nanMadol && onOrNextToShallowWater(ctx.map, tile)) out.culture += nanMadol;
     if (def.adjacencyYield) {
       const adj = effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
       out[def.adjacencyYield] += adj;

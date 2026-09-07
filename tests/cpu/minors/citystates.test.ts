@@ -10,9 +10,9 @@ import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assignEnvoy, cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
+import { assignEnvoy, cityStateEnvoyBonuses, envoyBonusDelta, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
-import { ENVOY_COST, CITY_STATE_SUZERAIN_YIELD } from '../../../cpu/data/cityStates';
+import { ENVOY_COST, GENEVA_SCIENCE_PCT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
 function addCs(
@@ -280,58 +280,53 @@ describe('civ envoys and the suzerain contest', () => {
   });
 });
 
-describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
-  it('grants the shipped channel yield to a strict seat-0 suzerain', () => {
+describe("the suzerain's own rule (Geneva's science percent)", () => {
+  it('pays a strict seat-0 suzerain', () => {
     const state = makeState();
-    // Geneva (scientific) is a SHIPPED row -> science channel.
     const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
     expect(isSuzerain(state, cityState, 0)).toBe(true);
-    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
+    expect(suzerainSciencePct(state, 0)).toBe(GENEVA_SCIENCE_PCT);
   });
 
-  it('pays nothing for a descoped row or a non-suzerain', () => {
+  it('pays nothing for another minor, or below the envoy bar', () => {
     const state = makeState();
-    // Kumasi (cultural) pays a RULE, not a channel -> no live channel yield.
-    const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Kumasi', envoys: { [0]: 4 } });
-    expect(isSuzerain(state, desc, 0)).toBe(true);
-    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
-    // A shipped row but only 2 envoys -> not suzerain -> no perk.
+    // Kumasi pays its OWN rule, never Geneva's.
+    const other = addCs(state, 8, 8, { type: 'cultural', name: 'Kumasi', envoys: { [0]: 4 } });
+    expect(isSuzerain(state, other, 0)).toBe(true);
+    expect(suzerainSciencePct(state, 0)).toBe(0);
     const weak = addCs(state, 4, 4, { type: 'scientific', name: 'Geneva', envoys: { [0]: 2 } });
     expect(isSuzerain(state, weak, 0)).toBe(false);
-    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
+    expect(suzerainSciencePct(state, 0)).toBe(0);
   });
 
-  it('loses the perk when a civ wins the strict contest', () => {
+  it('loses the rule when a civ wins the strict contest', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    cityState.envoys = { [1]: 4 }; // civ 0 out-envoys seat 0
+    cityState.envoys = { [1]: 4 }; // civ 1 out-envoys seat 0
     expect(isSuzerain(state, cityState, 0)).toBe(false);
-    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
+    expect(suzerainSciencePct(state, 0)).toBe(0);
   });
 
-  it("Geneva's channel is a PEACE channel, and a war silences only ITS row", () => {
+  it('is a PEACE rule — a war with a major silences it', () => {
     // CIV6 (Geneva): "when you are not at war with any civilization".
     const state = makeState();
     state.seats.push(emptySeat(1));
     const geneva = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    const bologna = addCs(state, 4, 4, { type: 'scientific', name: 'Bologna', envoys: { [0]: 3 } });
-    expect(isSuzerain(state, geneva, 0) && isSuzerain(state, bologna, 0)).toBe(true);
-    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(2 * CITY_STATE_SUZERAIN_YIELD);
+    expect(isSuzerain(state, geneva, 0)).toBe(true);
+    expect(suzerainSciencePct(state, 0)).toBe(GENEVA_SCIENCE_PCT);
     setWar(state, 0, 1, true);
-    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
+    expect(suzerainSciencePct(state, 0)).toBe(0);
     setWar(state, 0, 1, false);
-    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(2 * CITY_STATE_SUZERAIN_YIELD);
+    expect(suzerainSciencePct(state, 0)).toBe(GENEVA_SCIENCE_PCT);
   });
 
-  it('grants the perk to a strict civ suzerain (the civ twin)', () => {
+  it('pays a strict CIV suzerain the same way (the civ twin)', () => {
     const state = makeState();
-    // Nan Madol (cultural) is SHIPPED -> culture channel.
-    const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Nan Madol', envoys: { [0]: 0 } });
+    const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 0 } });
     cityState.envoys = { [1]: 3 };
     expect(isSuzerain(state, cityState, 1)).toBe(true);
-    expect(cityStateSuzerainCapitalBonus(state, 1).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
-    // no perk for a civ that is not the suzerain
-    expect(cityStateSuzerainCapitalBonus(state, 2)).toEqual({});
+    expect(suzerainSciencePct(state, 1)).toBe(GENEVA_SCIENCE_PCT);
+    expect(suzerainSciencePct(state, 2)).toBe(0);
   });
 });
 
