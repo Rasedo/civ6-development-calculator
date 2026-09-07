@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import ASSIST_RAM
-from warmup import settle_all
+from warmup import settle_all, hold_works, clear_works
 
 
 def build():
@@ -88,9 +88,9 @@ def main() -> None:
     # ---- Anshan: science per Great Work of Writing / Relic / Artifact ------
     col = int(sim.city_alive[0, 0].long().argmax())
     assert bool(sim.city_alive[0, 0, col])
-    sim.city_gw_writing[0, 0, col] = 2
-    sim.city_relics[0, 0, col] = 1
-    sim.city_artifacts[0, 0, col] = 3
+    hold_works(sim, 0, 0, col, 5, 2)
+    hold_works(sim, 0, 0, col, 7, 1)
+    hold_works(sim, 0, 0, col, 4, 3)
     sim._eff_version += 1
     # SAME suzerainty both reads (the flat channel and the envoy thresholds
     # move the walk too) — only the CODE differs.
@@ -104,9 +104,7 @@ def main() -> None:
     want = (sim._suz_writing_sci * 2 + sim._suz_relic_sci * (1 + 3)) * yf
     got = with_s - without
     assert abs(got - want) < 1e-9, (got, want)
-    sim.city_gw_writing[0, 0, col] = 0
-    sim.city_relics[0, 0, col] = 0
-    sim.city_artifacts[0, 0, col] = 0
+    clear_works(sim)
     sim._eff_version += 1
     print("anshan ok")
 

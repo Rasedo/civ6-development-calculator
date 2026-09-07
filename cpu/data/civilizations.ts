@@ -9,6 +9,7 @@ import type { YieldKey } from '../core/types';
 import type { Era } from './techs';
 import type { SlotKind } from './policies';
 import type { CivId, LeaderId } from './seats';
+import { GWO_ARTIFACT, GWO_RELIC, GWO_SCULPTURE } from './greatWorks';
 import type { WarKindId } from './warKinds';
 
 /** CIV6 (Iteru, TRAIT_RIVER_FASTER_BUILDTIME_DISTRICT / _WONDER): "+15%
@@ -424,25 +425,30 @@ export const CENTER_ADJ_ROWS: readonly CenterAdjRow[] = [
 ];
 
 /** CIV6 (Nkisi, EFFECT_ADJUST_CITY_GREATWORK_YIELD): "+2 Food, +2 Production,
- *  +1 Faith, and +4 Gold from each Relic, Artifact, and Sculpture" — the
- *  Relic and the Artifact are counted; a Work of Art carries no
- *  sculpture/painting kind on either engine, so that third row waits. */
+ *  +1 Faith, and +4 Gold from each Relic, Artifact, and Sculpture" — one row
+ *  per (object type, yield), `TRAIT_GREAT_WORK_*_SCULPTURE` the sculpture
+ *  four. */
 export interface GreatWorkYieldRow {
   civ?: CivId;
   leader?: LeaderId;
-  kind: 'relic' | 'artifact';
+  /** the work's object type (`GWO_*`) */
+  obj: number;
   yield: YieldKey;
   amount: number;
 }
 export const GREAT_WORK_YIELD_ROWS: readonly GreatWorkYieldRow[] = [
-  { civ: 'KONGO', kind: 'relic', yield: 'food', amount: 2 },
-  { civ: 'KONGO', kind: 'relic', yield: 'production', amount: 2 },
-  { civ: 'KONGO', kind: 'relic', yield: 'faith', amount: 1 },
-  { civ: 'KONGO', kind: 'relic', yield: 'gold', amount: 4 },
-  { civ: 'KONGO', kind: 'artifact', yield: 'food', amount: 2 },
-  { civ: 'KONGO', kind: 'artifact', yield: 'production', amount: 2 },
-  { civ: 'KONGO', kind: 'artifact', yield: 'faith', amount: 1 },
-  { civ: 'KONGO', kind: 'artifact', yield: 'gold', amount: 4 },
+  { civ: 'KONGO', obj: GWO_RELIC, yield: 'food', amount: 2 },
+  { civ: 'KONGO', obj: GWO_RELIC, yield: 'production', amount: 2 },
+  { civ: 'KONGO', obj: GWO_RELIC, yield: 'faith', amount: 1 },
+  { civ: 'KONGO', obj: GWO_RELIC, yield: 'gold', amount: 4 },
+  { civ: 'KONGO', obj: GWO_ARTIFACT, yield: 'food', amount: 2 },
+  { civ: 'KONGO', obj: GWO_ARTIFACT, yield: 'production', amount: 2 },
+  { civ: 'KONGO', obj: GWO_ARTIFACT, yield: 'faith', amount: 1 },
+  { civ: 'KONGO', obj: GWO_ARTIFACT, yield: 'gold', amount: 4 },
+  { civ: 'KONGO', obj: GWO_SCULPTURE, yield: 'food', amount: 2 },
+  { civ: 'KONGO', obj: GWO_SCULPTURE, yield: 'production', amount: 2 },
+  { civ: 'KONGO', obj: GWO_SCULPTURE, yield: 'faith', amount: 1 },
+  { civ: 'KONGO', obj: GWO_SCULPTURE, yield: 'gold', amount: 4 },
 ];
 
 /** CIV6 (Nkisi, EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): "Receive 50% more
@@ -1502,37 +1508,6 @@ export interface UnitPopCostRow {
  *  no chassis to charge — it is not on the wire (docs/roster_ledger.json). */
 export const UNIT_POP_COST_ROWS: readonly UnitPopCostRow[] = [
   { leader: 'SULEIMAN', unit: 'JANISSARY', amount: -1, foundedOnly: true },
-];
-
-/** CIV6 (Kristina, EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS):
- *  "Buildings with at least three Great Work slots and wonders with at least
- *  two Great Work slots are automatically themed when they have all their
- *  slots filled." */
-export interface AutoThemeRow {
-  civ?: CivId;
-  leader?: LeaderId;
-  /** the slot count at or above which the carrier themes itself */
-  slots: number;
-  wonder: boolean;
-}
-/** OPEN against C-59: only a MUSEUM themes on either engine, and a wonder
- *  never does, so a generic themed carrier has nowhere to land. Not on the
- *  wire (docs/roster_ledger.json). */
-export const AUTO_THEME_ROWS: readonly AutoThemeRow[] = [
-  { leader: 'KRISTINA', slots: 3, wonder: false },
-  { leader: 'KRISTINA', slots: 2, wonder: true },
-];
-
-/** CIV6 (Kristina, EFFECT_ADJUST_ALL_GREAT_WORKS_YIELDS_MODIFIER /
- *  _TOURISM_MODIFIER): what a THEMED carrier pays over its works' face. */
-export interface ThemedBonusRow {
-  civ?: CivId;
-  leader?: LeaderId;
-  yieldPct: number;
-  tourismPct: number;
-}
-export const THEMED_BONUS_ROWS: readonly ThemedBonusRow[] = [
-  { leader: 'KRISTINA', yieldPct: 100, tourismPct: 100 },
 ];
 
 // ---------------------------------------------------------------------------

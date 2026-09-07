@@ -1519,15 +1519,13 @@ class SimPhase:
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
         _nat_gen = self._tourism_of(
-            self.city_gw_writing[:, row],
-            self.city_gw_art[:, row] + self._art_themed_works(row),
-            self.city_gw_music[:, row],
+            self._gw_tourism_general(
+                row,
+                self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
+                self._congress_gw_kmult()),
             self.city_alive[:, row],
             self.tile_seat == row,
             self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]),
-            self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
-            self._artifact_theming_counts(row),
-            gw_kmult=self._congress_gw_kmult(),
             resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
             park_mult=torch.where(self._golden_ded(row, self._ded_wish),
                                   torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),

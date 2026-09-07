@@ -1,7 +1,7 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
 import { LUXURY_AMENITY_CITIES } from './constants';
-import { BUILDINGS } from './buildings';
+import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -389,248 +389,61 @@ export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
 
 /**
- * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN carries
- * GW_WORKS_PER_PERSON[kind] Great Works that seek an OPEN SLOT of the matching
- * building in the claiming civ's cities.
- * Charges with no open slot ANYWHERE degrade to the person's instant culture
- * lump, one lump per overflowing charge.
- *
- * THE REAL CIV 6 MAPPING. Reachability is a measurement tool, never a licence
- * to deviate: a building past this repo's gate horizon still gets its real
- * home, because a model trained on a deliberately-wrong mechanic has learned
- * the wrong game. Verified against the Civilization wiki ("Great Work (Civ6)",
- * per-building and per-Great-Person pages):
- *
- *   kind 0 WRITING — Amphitheater,      2 slots, +2 culture / +2 tourism, Writer   makes 2
- *   kind 1 ART     — Art Museum,        3 slots, +2 culture / +2 tourism, Artist   makes 3
- *   kind 2 MUSIC   — Broadcast Center,  1 slot,  +4 culture / +4 tourism, Musician makes 2
- *
- * (RELICS are the fourth Great Work kind and live in their own constants below
- * — they sit in a Temple slot and pay faith + tourism, not culture.)
- *
- * NO Great Work pays gold.
+ * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN makes the works
+ * `personWorkObjects` names, each seeking an open slot that takes it
+ * (`placeGreatWork`, cpu/core/greatWorks.ts); a work with no slot degrades to
+ * the person's instant culture lump. CIV6 (GreatWorks.xml): a Writer makes 2
+ * Works of Writing, an Artist 3 Works of Art, a Musician 2 Works of Music.
  */
-export const GW_WRITING = 0;
-export const GW_ART = 1;
-export const GW_MUSIC = 2;
-
-export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as const;
-
-export const ARTIFACT_BUILDING = 'ARCHAEOLOGICAL_MUSEUM';
-export const ARTIFACT_SLOTS = 3;
-export const ARTIFACT_CULTURE = 3;
-export const ARTIFACT_TOURISM = 3;
-export const ARCHAEOLOGIST_CHARGES = 3;
-export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
-
-type ArtCity = {
-  artifacts?: number;
-  artifactEras?: number[];
-  artifactSeats?: number[];
-  buildings?: readonly string[];
-};
-
-/** artifacts standing IN the Archaeological Museum, as opposed to the
- *  any-work pool — the theming rule and its DOUBLE reach exactly these. */
-function artifactsInMuseum(city: ArtCity): number {
-  return city.buildings?.includes(ARTIFACT_BUILDING)
-    ? Math.min(city.artifacts ?? 0, ARTIFACT_SLOTS) : 0;
-}
-
-/**
- * Is this city's ARCHAEOLOGICAL MUSEUM themed? CIV6: the slots must
- * be full, every Artifact from the SAME ERA, and no two from the same
- * civilization (a city-state, a Free City and the Barbarians each count as
- * one). A themed museum DOUBLES the yields of everything in it.
- */
-export function museumThemed(city: ArtCity): boolean {
-  // a pool-standing find never themes — the museum itself must STAND and
-  // hold its three
-  if (artifactsInMuseum(city) < ARTIFACT_SLOTS) return false;
-  const eras = city.artifactEras ?? [];
-  const seats = city.artifactSeats ?? [];
-  if (eras.length < ARTIFACT_SLOTS || seats.length < ARTIFACT_SLOTS) return false;
-  for (let i = 1; i < ARTIFACT_SLOTS; i++) if (eras[i] !== eras[0]) return false;
-  for (let i = 0; i < ARTIFACT_SLOTS; i++) {
-    for (let j = i + 1; j < ARTIFACT_SLOTS; j++) if (seats[i] === seats[j]) return false;
-  }
-  return true;
-}
-
-export const THEMING_MULT = 2;
-
-export function artifactCulture(city: ArtCity): number {
-  const inM = artifactsInMuseum(city);
-  return (inM * (museumThemed(city) ? THEMING_MULT : 1)
-    + (city.artifacts ?? 0) - inM) * ARTIFACT_CULTURE;
-}
-export function artifactTourism(city: ArtCity): number {
-  const inM = artifactsInMuseum(city);
-  return (inM * (museumThemed(city) ? THEMING_MULT : 1)
-    + (city.artifacts ?? 0) - inM) * ARTIFACT_TOURISM;
-}
-/** every slot an Artifact can STAND in per city — the museum's own plus the
- *  whole any-work pool; the width of the provenance arrays both engines
- *  compare. */
-export const ARTIFACT_PROV_W = ARTIFACT_SLOTS
-  + Object.values(BUILDINGS).reduce((n, b) => n + (b.anyWorkSlots ?? 0), 0);
-
-export const GW_SLOTS = [2, 3, 1] as const;
-/** How many KINDS of Great Work there are — writing, art, music. */
-export const GW_KINDS = 3;
-/** CIV6: Great Work slots a COMPLETE wonder adds to its city, in kind order
- *  (writing, art, music) — additive with GW_BUILDINGS' slots, so a wonder
- *  holds works in a city with no Amphitheater at all. Great Library "+2 Great
- *  Works of Writing slots"; Hermitage "+4 Landscape Great Works of Art slots"
- *  (the LANDSCAPE restriction needs a per-work TYPE this model does not
- *  carry, so all four take any Art work); Bolshoi Theatre "+1 Great Work of
- *  Writing slot, +1 Great Work of Music slot". */
-export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {
-  GREAT_LIBRARY: [2, 0, 0],
-  OXFORD_UNIVERSITY: [2, 0, 0],
-  HERMITAGE: [0, 4, 0],
-  BOLSHOI_THEATRE: [1, 0, 1],
-};
-
-/** CIV6: RELIC slots a COMPLETE wonder adds to its city, additive with the
- *  TEMPLE's. St. Basil's Cathedral "+3 Relic slots", Mont St. Michel
- *  "2 Relic slots". */
-export const RELIC_WONDER_SLOTS: Record<string, number> = {
-  ST_BASILS_CATHEDRAL: 3,
-  MONT_ST_MICHEL: 2,
-};
-/**
- * The four TYPES a Great Work of Art can have, from the theming rule that
- * reads them: "Great Works of Art of the same type (i.e., Sculptures,
- * Portraits, Landscapes, or Religious)".
- */
-export const ART_RELIGIOUS = 0;
-export const ART_SCULPTURE = 1;
-export const ART_PORTRAIT = 2;
-export const ART_LANDSCAPE = 3;
-
-/**
- * The three works each Great Artist makes, in creation order — transcribed from
- * the Great Artist (Civ6) roster's own "Great Works of Art" column, one row per
- * artist and indexed the same way as `GREAT_PEOPLE.ARTIST`.
- */
-export const ARTIST_WORKS: readonly (readonly number[])[] = [
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-  [ART_RELIGIOUS, ART_SCULPTURE, ART_SCULPTURE],
-  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-  [ART_PORTRAIT, ART_PORTRAIT, ART_RELIGIOUS],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_LANDSCAPE],
-  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_PORTRAIT],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
-  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
-  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
-  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
-  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
-  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
-  [ART_PORTRAIT, ART_LANDSCAPE, ART_LANDSCAPE],
-  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
-  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-];
-
-
 export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
-export const GW_CULTURE = [2, 2, 4] as const;
-export const GW_TOURISM = [2, 2, 4] as const;
-
 export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
-  WRITER: GW_WRITING,
-  ARTIST: GW_ART,
-  MUSICIAN: GW_MUSIC,
+  WRITER: GW_KIND_WRITING,
+  ARTIST: GW_KIND_ART,
+  MUSICIAN: GW_KIND_MUSIC,
 };
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
-type GwCity = {
-  greatWorksWriting?: number;
-  greatWorksArt?: number;
-  greatWorksMusic?: number;
-  /** The ART MUSEUM's own slots, in fill order: what each holds and who made
-   *  it. Only the museum themes, so only its `GW_SLOTS[GW_ART]` slots need a
-   *  provenance — a wonder's art slots never do. */
-  gwArtType?: number[];
-  gwArtArtist?: number[];
-  wonders?: { id: string; tileIndex: number }[];
-};
+export const ARCHAEOLOGIST_CHARGES = 3;
+export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
 
 /**
- * Is this city's ART MUSEUM themed? CIV6: "its slots must be filled with Great
- * Works of Art of the same type ... made by different Great Artists. This means
- * that a minimum of three Great Artists are needed to activate each Art
- * Museum's theming bonus." A themed museum DOUBLES the yields of everything in
- * it.
+ * The three works each Great Artist makes, in creation order — CIV6
+ * (GreatWorks.xml, the Babylon pack for Behzad, Tohaku and Kandinsky), one
+ * row per artist indexed as `GREAT_PEOPLE.ARTIST`, in object types.
  */
-export function artMuseumThemed(city: GwCity): boolean {
-  const n: number = GW_SLOTS[GW_ART];
-  const types = city.gwArtType ?? [];
-  const artists = city.gwArtArtist ?? [];
-  if (gwCount(city, GW_ART) < n || types.length < n || artists.length < n) return false;
-  for (let i = 1; i < n; i++) if (types[i] !== types[0]) return false;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) if (artists[i] === artists[j]) return false;
-  }
-  return true;
-}
+const OS = GWO_SCULPTURE, OP = GWO_PORTRAIT, OL = GWO_LANDSCAPE, OR = GWO_RELIGIOUS;
+export const ARTIST_WORKS: readonly (readonly number[])[] = [
+  [OR, OR, OR], // Rublev
+  [OR, OS, OS], // Michelangelo
+  [OS, OS, OS], // Donatello
+  [OR, OR, OR], // Bosch
+  [OL, OL, OP], // Behzad
+  [OP, OP, OR], // Rembrandt
+  [OR, OR, OL], // El Greco
+  [OL, OL, OL], // Qiu Ying
+  [OR, OR, OP], // Titian
+  [OL, OL, OL], // Tohaku
+  [OL, OL, OL], // Jang Seung-eop
+  [OP, OP, OP], // Anguissola
+  [OP, OP, OP], // Kauffman
+  [OL, OL, OL], // Hokusai
+  [OS, OS, OS], // Lewis
+  [OL, OL, OL], // Monet
+  [OS, OS, OS], // Collot
+  [OL, OL, OL], // Van Gogh
+  [OP, OP, OP], // Sher-Gil
+  [OS, OS, OS], // Orlovsky
+  [OP, OL, OL], // Klimt
+  [OP, OP, OP], // Cassatt
+  [OL, OP, OL], // Kandinsky
+];
 
-export function gwCount(city: GwCity, kind: number): number {
-  return (kind === GW_WRITING ? city.greatWorksWriting : kind === GW_ART ? city.greatWorksArt : city.greatWorksMusic) ?? 0;
-}
-
-function gwSet(city: GwCity, kind: number, n: number): void {
-  if (kind === GW_WRITING) city.greatWorksWriting = n;
-  else if (kind === GW_ART) city.greatWorksArt = n;
-  else city.greatWorksMusic = n;
-}
-
-/** How many works of `kind` this city can hold: the slot BUILDING's own,
- *  plus whatever its completed wonders add. */
-export function gwCapacity(city: GwCity & { buildings: string[] }, kind: number, extra = 0): number {
-  return (city.buildings.includes(GW_BUILDINGS[kind]) ? GW_SLOTS[kind] : 0) + extra;
-}
-
-/** Hand a work OUT of this city, returning the provenance it was made with
- *  ([-1, -1] for the two kinds that carry none). The LAST slot goes: the
- *  museum fills from the front, so it is the only one whose removal leaves
- *  the rest contiguous. */
-export function gwTake(city: GwCity, kind: number): [number, number] {
-  const used = gwCount(city, kind);
-  let prov: [number, number] = [-1, -1];
-  if (kind === GW_ART) {
-    const types = (city.gwArtType ??= []);
-    const artists = (city.gwArtArtist ??= []);
-    const at = used - 1;
-    if (at >= 0 && at < GW_SLOTS[GW_ART]) {
-      prov = [types[at] ?? -1, artists[at] ?? -1];
-      types[at] = -1;
-      artists[at] = -1;
-    }
-  }
-  gwSet(city, kind, Math.max(0, used - 1));
-  return prov;
-}
-
-/** Take a work IN, with the provenance it was made with — a gifted work is
- *  still that artist's, which is what the receiving museum themes on. */
-export function gwGive(city: GwCity, kind: number, prov: [number, number]): void {
-  const used = gwCount(city, kind);
-  if (kind === GW_ART) {
-    const types = (city.gwArtType ??= []);
-    const artists = (city.gwArtArtist ??= []);
-    for (let s = types.length; s < GW_SLOTS[GW_ART]; s++) { types[s] = -1; artists[s] = -1; }
-    if (used < GW_SLOTS[GW_ART]) { types[used] = prov[0]; artists[used] = prov[1]; }
-  }
-  gwSet(city, kind, used + 1);
+/** the object types one person's works have, in creation order */
+export function personWorkObjects(cls: GreatPersonClass, at: number): number[] {
+  if (cls === 'WRITER') return new Array<number>(GW_WORKS_PER_PERSON[GW_KIND_WRITING]).fill(GWO_WRITING);
+  if (cls === 'MUSICIAN') return new Array<number>(GW_WORKS_PER_PERSON[GW_KIND_MUSIC]).fill(GWO_MUSIC);
+  if (cls === 'ARTIST') return [...(ARTIST_WORKS[at] ?? ARTIST_WORKS[0]!)];
+  return [];
 }
 
 /**
@@ -641,122 +454,6 @@ export function gwGive(city: GwCity, kind: number, prov: [number, number]): void
  */
 export const GW_PRINTING_TECH = 'PRINTING';
 export const GW_PRINTING_WRITING_MULT = 2;
-
-/** How many ART works pay TWICE: the themed museum's own slots, and only
- *  those — a wonder's art slots sit outside the bonus. */
-function artThemedWorks(city: GwCity): number {
-  return artMuseumThemed(city) ? (THEMING_MULT - 1) * GW_SLOTS[GW_ART] : 0;
-}
-
-export function greatWorkTourism(city: GwCity, printing = false, kmult: readonly [number, number, number] = [1, 1, 1]): number {
-  const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING) * kmult[0];
-  const art = gwCount(city, GW_ART) + artThemedWorks(city);
-  return writing + GW_TOURISM[GW_ART] * art * kmult[1] + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC) * kmult[2];
-}
-
-/**
- * RELICS — the fourth Great Work kind. Real Civ 6 holds
- * a Relic in a TEMPLE's single slot and pays it +4 Faith and +8 Tourism, the
- * densest tourism source in the game (verified: Civilization wiki
- * "Relics"/"Great Work (Civ6)", Gathering Storm). Relics pay no culture, which
- * is why they sit outside the GW_* kind arrays above.
- *
- * SOURCE: real Civ 6 creates a relic when an Apostle carrying the MARTYR
- * promotion is killed in theological combat, which `theologicalCombatPhase`
- * reads off the unit's own promotion bits. A dead MISSIONARY never yields one.
- */
-export const RELIC_BUILDING = 'TEMPLE';
-export const RELIC_SLOTS_PER_BUILDING = 1;
-export const RELIC_FAITH = 4;
-export const RELIC_TOURISM = 8;
-
-export function relicFaith(city: { relics?: number }): number {
-  return RELIC_FAITH * (city.relics ?? 0);
-}
-
-export function relicTourism(city: { relics?: number }): number {
-  return RELIC_TOURISM * (city.relics ?? 0);
-}
-
-/**
- * Place ONE relic into `cities` (visited in array order — the
- * acquisition/slot order both engines share). A city's capacity is its
- * TEMPLE's slots plus `extra` (the wonder slots its caller sums), so a
- * cathedral holds relics in a city with no Temple. Returns true when it found
- * a home.
- *
- * A relic that finds no open slot anywhere is LOST. Real Civ 6 holds it in
- * reserve until a slot opens; that reserve is an OPEN gap, not a decision.
- */
-type RelicCity = { buildings: string[]; relics?: number; wonders?: { id: string; tileIndex: number }[] };
-
-export function placeRelic(cities: RelicCity[], extra?: (city: RelicCity) => number): boolean {
-  for (const c of cities) {
-    const cap = (c.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0) + (extra?.(c) ?? 0);
-    const used = c.relics ?? 0;
-    if (used >= cap) continue;
-    c.relics = used + 1;
-    return true;
-  }
-  return false;
-}
-
-/** Hand out held Relics — one per open slot, LOWEST city first, until the
- *  reserve or the capacity runs out. The `placeRelic` loop, drained. */
-export function drainRelicReserve(
-  held: number,
-  cities: RelicCity[],
-  extra?: (city: RelicCity) => number,
-): number {
-  let left = held;
-  while (left > 0 && placeRelic(cities, extra)) left -= 1;
-  return left;
-}
-
-export function cityGreatWorks(city: GwCity): number {
-  return gwCount(city, GW_WRITING) + gwCount(city, GW_ART) + gwCount(city, GW_MUSIC);
-}
-
-export function greatWorkCulture(city: GwCity): number {
-  const art = gwCount(city, GW_ART) + artThemedWorks(city);
-  return GW_CULTURE[GW_WRITING] * gwCount(city, GW_WRITING) + GW_CULTURE[GW_ART] * art + GW_CULTURE[GW_MUSIC] * gwCount(city, GW_MUSIC);
-}
-
-export function placeGreatWorks(
-  cities: (GwCity & { buildings: string[] })[],
-  kind: number,
-  extra?: (city: GwCity & { buildings: string[] }) => number,
-  artist = 0,
-): number {
-  const per: number = GW_WORKS_PER_PERSON[kind];
-  let remaining: number = per;
-  for (const c of cities) {
-    if (remaining <= 0) break;
-    // Capacity is the BUILDING's slots plus any wonder's, so a wonder holds
-    // works in a city with no Amphitheater at all — which is how Civ 6 works.
-    const cap = gwCapacity(c, kind, extra?.(c) ?? 0);
-    const used = gwCount(c, kind);
-    const open = cap - used;
-    if (open <= 0) continue;
-    const take = Math.min(open, remaining);
-    if (kind === GW_ART) {
-      // WHO made it and WHAT it is, for the museum's own slots. The work index
-      // is the ARTIST's (their first, second or third), which is what names
-      // the type; the slot index is the museum's.
-      const works = ARTIST_WORKS[artist] ?? ARTIST_WORKS[0];
-      const types = (c.gwArtType ??= []);
-      const artists = (c.gwArtArtist ??= []);
-      for (let s = types.length; s < GW_SLOTS[GW_ART]; s++) { types[s] = -1; artists[s] = -1; }
-      for (let k = 0; k < take && used + k < GW_SLOTS[GW_ART]; k++) {
-        types[used + k] = works[(per - remaining) + k] ?? works[0];
-        artists[used + k] = artist;
-      }
-    }
-    gwSet(c, kind, used + take);
-    remaining -= take;
-  }
-  return remaining;
-}
 
 /** Specialist yields per district type (Civ 6-ish; only these take specialists). */
 /** CIV6 (wiki "Specialists (Civ6)", GS values): base yields per specialist
@@ -1048,7 +745,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // ---- GENERAL: promotions, free units, and the war-weariness cut ----
   GP_BOUDICA: { unmodelled: true },
   GP_HANNIBAL_BARCA: { promotionLevels: 1 },
-  GP_SUN_TZU: { greatWorkKind: 0 }, // GW_WRITING
+  GP_SUN_TZU: { greatWorkKind: 0 }, // one Work of Writing (GREATWORK_SUN_TZU)
   GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
   GP_THELFLD: { unit: 'KNIGHT' },
   GP_EL_CID: { formation: 1 },

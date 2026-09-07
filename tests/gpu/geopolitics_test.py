@@ -69,7 +69,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import BARB_SEAT
-from warmup import settle_all
+from warmup import settle_all, works_of
 import drive
 
 
@@ -262,42 +262,49 @@ def poke_agreements(rules, path):
 
 def poke_gift(rules, path):
     """i2. A GREAT WORK changes hands: out of the giver's first holding city,
-    into the taker's first with room, provenance and all."""
+    into the taker's first with an open slot that takes it, provenance and
+    all."""
     sim, _, _ = controlled_pair(rules, path)
-    kind, bcol = 1, sim._gw_bidx[1]
-    if bcol < 0:
-        print("  i2 gift SKIPPED (no ART slot building in the catalog)")
-        return
+    kind = 1
+    hid = [h["id"] for h in sim.rules.seats["greatWorks"]["holders"]]
+    H_MUS = hid.index("MUSEUM")
+    bcol = sim._gw_holder_bidx[H_MUS]
+    ms = (sim._gw_slot_holder == H_MUS).nonzero(as_tuple=True)[0].tolist()
     ja = int(sim.city_alive[0, 1].nonzero(as_tuple=True)[0][0])
     jb = int(sim.city_alive[0, 2].nonzero(as_tuple=True)[0][0])
+    sim.city_is_cap[0, :, :] = False  # the Palace slots aside: the museums alone decide
     sim.city_bldg[0, 1, ja, bcol] = True
     sim.city_bldg[0, 2, jb, bcol] = True
-    sim.city_gw_art[0, 1, ja] = 1
-    sim.city_gwart_type[0, 1, ja, 0] = 7
-    sim.city_gwart_artist[0, 1, ja, 0] = 3
+    sim.city_gw_obj[0, 1, ja, ms[0]] = 2   # a landscape
+    sim.city_gw_maker[0, 1, ja, ms[0]] = 3
+    sim._eff_version += 1
+    art = (0, 1, 2, 3)
 
     want(sim, 1, "gift", 2, kind=kind)
-    assert int(sim.city_gw_art[0, 1, ja]) == 0, "the giver loses the work"
-    assert int(sim.city_gw_art[0, 2, jb]) == 1, "the taker gains it"
-    assert int(sim.city_gwart_type[0, 1, ja, 0]) == -1, "the giver's slot empties"
-    assert int(sim.city_gwart_artist[0, 1, ja, 0]) == -1, "...artist and all"
-    assert int(sim.city_gwart_type[0, 2, jb, 0]) == 7, "the work keeps WHAT it is"
-    assert int(sim.city_gwart_artist[0, 2, jb, 0]) == 3, "...and WHO made it"
+    assert works_of(sim, 0, 1, ja, art) == 0, "the giver loses the work"
+    assert works_of(sim, 0, 2, jb, art) == 1, "the taker gains it"
+    assert int(sim.city_gw_obj[0, 1, ja, ms[0]]) == -1 and int(sim.city_gw_maker[0, 1, ja, ms[0]]) == -1, "the giver's slot empties, maker and all"
+    assert int(sim.city_gw_obj[0, 2, jb, ms[0]]) == 2, "the work keeps WHAT it is, in the taker's first art slot"
+    assert int(sim.city_gw_maker[0, 2, jb, ms[0]]) == 3, "...and WHO made it"
 
     # nothing to give, and nowhere to put it, are both refusals
     want(sim, 1, "gift", 2, kind=kind)
-    assert int(sim.city_gw_art[0, 2, jb]) == 1, "a seat with no work gives nothing"
-    sim.city_gw_art[0, 1, ja] = 1
-    sim.city_gw_art[0, 2, jb] = int(sim._gw_slots_k[1])
+    assert works_of(sim, 0, 2, jb, art) == 1, "a seat with no work gives nothing"
+    sim.city_gw_obj[0, 1, ja, ms[0]] = 2
+    for sl in ms:
+        sim.city_gw_obj[0, 2, jb, sl] = 0
+    sim._eff_version += 1
     want(sim, 1, "gift", 2, kind=kind)
-    assert int(sim.city_gw_art[0, 1, ja]) == 1, "a full receiver refuses the gift"
+    assert works_of(sim, 0, 1, ja, art) == 1, "a full receiver refuses the gift"
     # CIV6 (Trading): "You can trade with all the leaders except the ones
     # you're at war with."
-    sim.city_gw_art[0, 2, jb] = 0
+    for sl in ms:
+        sim.city_gw_obj[0, 2, jb, sl] = -1
+    sim._eff_version += 1
     sim.war[0, 1, 2] = sim.war[0, 2, 1] = True
     sim.sync_war()
     want(sim, 1, "gift", 2, kind=kind)
-    assert int(sim.city_gw_art[0, 1, ja]) == 1, "a seat at war gives nothing"
+    assert works_of(sim, 0, 1, ja, art) == 1, "a seat at war gives nothing"
     print("  i2 gift OK (work + provenance move, empty/full/at-war all refuse)")
 
 

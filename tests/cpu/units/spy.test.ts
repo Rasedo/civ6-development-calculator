@@ -7,7 +7,7 @@
  * `phase.ts` uses, so a rule that only the applier knows cannot hide.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
 import { spawnUnit, trainableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/core/seats';
@@ -41,6 +41,7 @@ import { SPY_OFFENSIVE_MISSIONS } from '../../../cpu/data/espionage';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import type { City, CityState, GameState } from '../../../cpu/core/types';
+import { GWO_PORTRAIT } from '../../../cpu/data/greatWorks';
 
 /** `rngState` seeds whose FIRST draw clears the 50% success bar, and whose
  *  first two draws are fail-then-caught. Picked so no lane has to guard its
@@ -223,7 +224,7 @@ describe('what a city offers', () => {
     const theater = district(state, theirs, 'THEATER_SQUARE');
     const spy = spyAt(state, 0, theirs, theater);
     expect(missionOffered(state, spy, SPY_M_GREAT_WORK_HEIST)).toBe(false);
-    theirs.greatWorksArt = 1;
+    holdWorks(theirs, GWO_PORTRAIT, 1);
     expect(missionOffered(state, spy, SPY_M_GREAT_WORK_HEIST)).toBe(true);
   });
 });

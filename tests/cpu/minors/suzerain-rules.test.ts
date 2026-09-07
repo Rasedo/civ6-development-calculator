@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, holdWorks } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack, cavalryHillCS, defenderCS } from '../../../cpu/core/combat';
@@ -20,6 +20,7 @@ import { REGIONAL_RANGE } from '../../../cpu/data/constants';
 import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT } from '../../../cpu/data/religion';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, City, GameState } from '../../../cpu/core/types';
+import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../../../cpu/data/greatWorks';
 
 /** a city-state from the REAL catalog — `suzerainEffect` keys on the name. */
 function addNamedCs(state: GameState, name: string, type: CityStateType, col: number, row: number, envoys: Record<number, number> = {}): CityState {
@@ -105,9 +106,9 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     const state = makeState(makeMap(20, 20));
     const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
     const anshan = addNamedCs(state, 'Anshan', 'scientific', 3, 3, { 0: 3 });
-    city.greatWorksWriting = 2;
-    city.relics = 1;
-    city.artifacts = 3;
+    holdWorks(city, GWO_WRITING, 2);
+    holdWorks(city, GWO_RELIC, 1);
+    holdWorks(city, GWO_ARTIFACT, 3);
     const withSuz = computeCityStats(state, city).breakdown.buildings.science;
     anshan.envoys = {};
     const without = computeCityStats(state, city).breakdown.buildings.science;

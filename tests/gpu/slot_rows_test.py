@@ -21,7 +21,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, hold_works, clear_works
 
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -134,9 +134,7 @@ def test_eleanor(rules, path) -> None:
     def pull(name, leader, works: int, near: bool = True) -> float:
         s2 = fresh(rules, path)
         seat(s2, 1, name, leader)
-        s2.city_gw_writing[B0, 1] = 0
-        s2.city_gw_art[B0, 1] = 0
-        s2.city_gw_music[B0, 1] = 0
+        clear_works(s2)
         here_t = int(s2.city_center[B0, 0, 0])
         if near:
             # the fixture's own cities sit past the row's range, and a skipped
@@ -157,9 +155,9 @@ def test_eleanor(rules, path) -> None:
                 if bool(s2.city_alive[B0, 1, 1]):
                     break
             assert bool(s2.city_alive[B0, 1, 1]),                 f"none of the {len(cands)} candidates at distance {want} founded"
-            s2.city_gw_writing[B0, 1, 1] = works
+            hold_works(s2, B0, 1, 1, 5, works)
         else:
-            s2.city_gw_writing[B0, 1, 0] = works
+            hold_works(s2, B0, 1, 0, 5, works)
         s2._eff_version += 1
         here = s2.city_center[B0, 0, 0].reshape(1)
         return float(s2._great_work_loyalty(0, here)[0])
@@ -172,7 +170,7 @@ def test_eleanor(rules, path) -> None:
     # her OWN cities never pull her down
     s3 = fresh(rules, path)
     lead(s3, 0, "ENGLAND", "ELEANOR_ENGLAND")
-    s3.city_gw_writing[B0, 0, 0] = 5
+    hold_works(s3, B0, 0, 0, 5, 5)
     s3._eff_version += 1
     here0 = s3.city_center[B0, 0, 0].reshape(1)
     assert float(s3._great_work_loyalty(0, here0)[0]) == 0.0, "her own works pulled her down"

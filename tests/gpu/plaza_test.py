@@ -76,7 +76,8 @@ def poke_catalog(rules, path):
     assert int(sim._b_grant_new_city[ah]) == u.index("BUILDER"), "Ancestral Hall grants a BUILDER"
     assert float(sim._b_conquest_pct[wt]) == 20.0, "Warlord's Throne +20% production"
     assert int(sim._b_conquest_turns[wt]) == 5, "Warlord's Throne runs five turns"
-    assert int(sim._b_any_work[nh]) == 4, "National History Museum: four any-work slots"
+    _nhm = [h for h in sim.rules.seats["greatWorks"]["holders"] if h["id"] == "NATIONAL_HISTORY_MUSEUM"][0]
+    assert _nhm["slots"] == 4 and _nhm["bidx"] == nh, "National History Museum: four slots for any Great Work"
     assert int(sim._b_heal_kill[wd]) == 20, "War Department heals 20"
     assert float(sim._b_project_charge[rs]) == 2.0, "Royal Society pays 2% a charge"
     for i in range(len(cat)):
@@ -84,13 +85,11 @@ def poke_catalog(rules, path):
             assert float(sim._b_settler_prod[i]) == 0.0 and int(sim._b_grant_new_city[i]) < 0, cat[i]
         if i != wt:
             assert float(sim._b_conquest_pct[i]) == 0.0 and int(sim._b_conquest_turns[i]) == 0, cat[i]
-        if i != nh:
-            assert int(sim._b_any_work[i]) == 0, cat[i]
         if i != wd:
             assert int(sim._b_heal_kill[i]) == 0, cat[i]
         if i != rs:
             assert float(sim._b_project_charge[i]) == 0.0, cat[i]
-    assert sim._heal_kill_live and sim._any_work_live, "both catalog gates arm"
+    assert sim._heal_kill_live, "the catalog gate arms"
     assert sim._project_charge_live and sim._A_BOOST >= 0, "the Royal Society's verb is wired"
     print("  1 catalog OK — five rows, five channels, nothing else carrying them")
 
@@ -208,33 +207,45 @@ def poke_conquest_prod(rules, path):
 
 
 def poke_any_work_pool(rules, path):
+    """CIV6 (Building_GreatWorks): the National History Museum is four
+    GREATWORKSLOT_PALACE slots, a type that takes every object; a holder's
+    dedicated slots come before it in the table."""
     sim = fresh(rules, path)
     col = bidx_of(sim, ROW)
-    assert int(sim._any_work_free_all()[0, ROW, col]) == 0, "no museum, no pool"
+    sim.city_is_cap[0, ROW, col] = False  # the capital's own Palace slot aside
+    sim._eff_version += 1
+    assert not bool(sim._gw_room_by_obj(ROW)[0, col].any()), "no museum, no pool"
     stand(sim, ROW, col, "NATIONAL_HISTORY_MUSEUM")
-    assert int(sim._any_work_free_all()[0, ROW, col]) == 4, "the museum opens four"
-    # every kind draws on the same pool
-    assert int(sim._gw_capacity(ROW, 0)[0, col]) == 4
-    assert int(sim._gw_capacity(ROW, 2)[0, col]) == 4
-    sim.city_gw_writing[0, ROW, col] = 2
-    assert int(sim._any_work_free_all()[0, ROW, col]) == 2, "two works did not take two slots"
-    assert int(sim._gw_capacity(ROW, 1)[0, col]) == 2, "the art capacity ignored the pool"
-    sim.city_relics[0, ROW, col] = 1
-    assert int(sim._any_work_free_all()[0, ROW, col]) == 1, "a relic did not take a slot"
-    assert int(sim._relic_cap()[0, ROW, col]) == 2, "the relic capacity ignored the pool"
+    sim._eff_version += 1
+    assert bool(sim._gw_room_by_obj(ROW)[0, col].all()), "the museum opens four slots to every kind"
+    nhm = holder_slots(sim, "NATIONAL_HISTORY_MUSEUM")
+    assert len(nhm) == 4
+
+    def put(s, obj):
+        B = s.B
+        full = lambda v: torch.full((B,), v, dtype=torch.long)  # noqa: E731
+        before = s.city_gw_obj[0, ROW, col].clone()
+        ok = s._gw_place(ROW, torch.ones(B, dtype=torch.bool), full(col), full(obj), full(0), full(-1), full(0))
+        return int(((s.city_gw_obj[0, ROW, col] >= 0) & (before < 0)).nonzero()[0]) if bool(ok[0]) else -1
+
+    assert [put(sim, 5), put(sim, 5)] == nhm[:2], "two writing works take the first two"
+    assert put(sim, 7) == nhm[2], "a RELIC takes from the same four"
+    assert put(sim, 1) == nhm[3], "... and a portrait the last"
+    assert not bool(sim._gw_room_by_obj(ROW)[0, col].any()), "four filled, nothing left"
 
     # a DEDICATED slot is spent first: the Amphitheater's own two come before
-    # anything reaches the pool
+    # anything reaches the museum
     sim2 = fresh(rules, path)
     col2 = bidx_of(sim2, ROW)
+    sim2.city_is_cap[0, ROW, col2] = False
     stand(sim2, ROW, col2, "NATIONAL_HISTORY_MUSEUM")
     stand(sim2, ROW, col2, "AMPHITHEATER")
-    assert int(sim2._gw_capacity(ROW, 0)[0, col2]) == 6, "two dedicated plus four pooled"
-    sim2.city_gw_writing[0, ROW, col2] = 2
-    assert int(sim2._any_work_free_all()[0, ROW, col2]) == 4, "the dedicated slots touched the pool"
-    sim2.city_gw_writing[0, ROW, col2] = 3
-    assert int(sim2._any_work_free_all()[0, ROW, col2]) == 3, "the third work missed the pool"
-    print("  6 National History Museum OK — one shared pool over three kinds and relics")
+    sim2._eff_version += 1
+    col, colsave = col2, col
+    got = [put(sim2, 5) for _ in range(7)]
+    col = colsave
+    assert got == holder_slots(sim2, "AMPHITHEATER") + holder_slots(sim2, "NATIONAL_HISTORY_MUSEUM") + [-1], got
+    print("  6 National History Museum OK — four slots for any object, after the dedicated ones")
 
 
 def poke_heal_on_kill(rules, path):
@@ -369,6 +380,17 @@ def poke_boost_needs_the_building(rules, path):
     rank = int((smap[0] == slot + sim.POOL_LO["major"]).long().argmax())
     assert not bool(um[0, rank, sim._A_BOOST]), "a seat with no Society still pays"
     print("  9 the verb needs the building — the column is shut without it")
+
+
+def holder_bidx(sim, hid: str) -> int:
+    """the building column of one great-work holder (`GW_HOLDERS`)"""
+    return sim._gw_holder_bidx[[h["id"] for h in sim.rules.seats["greatWorks"]["holders"]].index(hid)]
+
+
+def holder_slots(sim, hid: str) -> list[int]:
+    """the layout slots of one great-work holder"""
+    h = [x["id"] for x in sim.rules.seats["greatWorks"]["holders"]].index(hid)
+    return (sim._gw_slot_holder == h).nonzero(as_tuple=True)[0].tolist()
 
 
 def main() -> None:

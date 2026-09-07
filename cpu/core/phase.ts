@@ -1,8 +1,9 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
-import { advanceGreatPeople, gwExtraSlots, passGreatPerson, patronizeGreatPerson, relicSlotsIn } from './greatPeople';
+import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
-import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from '../data/greatPeople';
+import { GW_KINDS } from '../data/greatWorks';
+import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
 import { isExplored, revealAround, unitSight } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
@@ -1039,21 +1040,11 @@ export function transferCity(
     // Religion travels with the city here too (the GPU twin keeps it).
     religionPressure: civCity.religionPressure ? [...civCity.religionPressure] : undefined,
     followedReligion: civCity.followedReligion,
-    greatWorksWriting: civCity.greatWorksWriting,
-    greatWorksArt: civCity.greatWorksArt,
-    greatWorksMusic: civCity.greatWorksMusic,
-    relics: civCity.relics,
+    greatWorks: civCity.greatWorks ? civCity.greatWorks.map((w) => ({ ...w })) : undefined,
     // the laser stations ride the flip with the Spaceport that holds them —
     // and go on drawing Power from whoever owns the city now
     laserStations: civCity.laserStations,
     powered: false, // the new owner's own turn re-resolves the grid
-    artifacts: civCity.artifacts, // artifacts ride the flip too
-    // ...and so does every museum's PROVENANCE, or a captured themed museum
-    // would keep its works and lose the bonus that reads them.
-    artifactEras: civCity.artifactEras ? [...civCity.artifactEras] : undefined,
-    artifactSeats: civCity.artifactSeats ? [...civCity.artifactSeats] : undefined,
-    gwArtType: civCity.gwArtType ? [...civCity.gwArtType] : undefined,
-    gwArtArtist: civCity.gwArtArtist ? [...civCity.gwArtArtist] : undefined,
     // a CONQUERED city is taken at half health; a city that revolts or joins
     // was never hit, and keeps what it had
     hp: why === 'conquered' ? Math.round(CITY_MAX_HP / 2) : civCity.hp,
@@ -1839,15 +1830,15 @@ export function seatPhase(state: GameState): void {
       const target = seatOf(state, tj);
       if (!target || !isCiv(tj) || target.cities.length === 0) continue;
       if (civsAtWar(state, actor.seat, tj)) continue;
-      // WHICH city gives and WHICH receives is not a decision — the works are
-      // counts, not identities, so both engines take the giver's FIRST city
-      // holding one and the receiver's first with a free slot, in the city
-      // order `placeGreatWorks` already walks.
-      const slots = gwExtraSlots(state, kind);
-      const from = actor.cities.find((c) => gwCount(c, kind) > 0);
-      const home = target.cities.find((c) => gwCount(c, kind) < gwCapacity(c, kind, slots(c)));
-      if (!from || !home) continue;
-      gwGive(home, kind, gwTake(from, kind));
+      // WHICH work goes is not a decision: the giver's FIRST city holding one
+      // of the kind gives its LAST-placed such work, and the receiver's first
+      // city with an open slot that takes it receives — the same walk the
+      // deal item and the heist make.
+      const from = actor.cities.find((c) => gwCountKind(c, kind) > 0);
+      const work = from ? gwLastOfKind(from, kind) : undefined;
+      const home = work ? target.cities.find((c) => gwHasRoom(state, c, work.obj)) : undefined;
+      if (!from || !work || !home) continue;
+      moveGreatWork(state, from, work.slot, home);
       state.eventLog.push(`${actor.name} gifts a Great Work to ${target.name}.`);
     }
   }
@@ -1921,7 +1912,7 @@ export function seatPhase(state: GameState): void {
     // A Relic held for want of a slot goes out at the owner's next turn —
     // before the yield walk, so a slot opened last turn pays this one.
     if ((actor.relicReserve ?? 0) > 0) {
-      actor.relicReserve = drainRelicReserve(actor.relicReserve, actor.cities, relicSlotsIn(state));
+      actor.relicReserve = drainRelicReserve(state, actor.relicReserve, actor.cities, actor.seat);
     }
 
     warWearinessTurn(state, actor.seat);

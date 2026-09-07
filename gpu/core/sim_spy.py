@@ -239,7 +239,7 @@ class SimSpy:
                            hcol: torch.Tensor) -> torch.Tensor:
         """the per-mission gates beyond "the district is there"."""
         if m == self._spy_m_heist:
-            return self._heist_kind(hrow, hcol) >= 0
+            return self._heist_pick(row, hrow, hcol)[0]
         if m == self._spy_m_steal:
             return self._steal_first(row).gather(
                 1, hrow.clamp(min=0).reshape(self.B, -1)).reshape(hrow.shape) >= 0
@@ -247,18 +247,24 @@ class SimSpy:
             return self._city_has_governor(hrow, hcol)
         return torch.ones_like(hrow, dtype=torch.bool)
 
-    def _gw_plane(self, kind: int) -> torch.Tensor:
-        return (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind]
-
-    def _heist_kind(self, hrow: torch.Tensor, hcol: torch.Tensor) -> torch.Tensor:
+    def _heist_pick(self, row: int, hrow: torch.Tensor, hcol: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """CIV6 (Great Work Heist): "Great Works of Writing will be displayed
         first, Great Works of Art and Artifacts second, and Great Works of
-        Music last" — the first non-empty of the three, -1 for none."""
-        out = torch.full_like(hrow, -1)
+        Music last" — the LAST-placed work of the first kind present, and the
+        thief needs a city with an open slot that takes it (`heistTarget`).
+        Returns ([B, N] ok, [B, N] slot, [B, N] obj)."""
+        slot = torch.full_like(hrow, -1)
         for kind in (2, 1, 0):
-            have = self._city_cell(self._gw_plane(kind), hrow, hcol) > 0
-            out = torch.where(have, torch.full_like(out, kind), out)
-        return out
+            last = self._city_cell(self._gw_last_of_kind_all(kind), hrow, hcol)
+            slot = torch.where(last >= 0, last, slot)
+        ok = slot >= 0
+        obj = torch.full_like(slot, -1)
+        if bool(ok.any()):
+            b = torch.arange(self.B, device=self.device).unsqueeze(1).expand_as(hrow)
+            obj = torch.where(ok, self.city_gw_obj[b, hrow.clamp(min=0), hcol.clamp(min=0), slot.clamp(min=0)], obj)
+            room = (self._gw_room_by_obj(row) & self.city_alive[:, row].unsqueeze(2)).any(dim=1)  # [B, 8]
+            ok = ok & room.gather(1, obj.clamp(min=0, max=7))
+        return ok, slot, obj
 
     def _steal_first(self, row: int) -> torch.Tensor:
         """[B, n_majors] — the FIRST tech each major holds that `row` has
@@ -517,16 +523,15 @@ class SimSpy:
             self.civ_treasury[b, hr] = max(0.0, float(self.civ_treasury[b, hr]) - take)
             self.civ_treasury[b, row] += take
         elif m == self._spy_m_heist:
-            kind = int(self._heist_kind(
-                torch.tensor([[hr]], device=self.device),
-                torch.tensor([[hc]], device=self.device))[0, 0])
-            if kind >= 0:
-                plane = self._gw_plane(kind)
-                plane[b, hr, hc] -= 1
-                home = int(self.city_alive[b, row].long().argmax())
-                if bool(self.city_alive[b, row, home]):
-                    plane[b, row, home] += 1
-                self._eff_version += 1
+            _ok, _slot, _obj = self._heist_pick(row, torch.tensor([[hr]], device=self.device),
+                                                torch.tensor([[hc]], device=self.device))
+            if bool(_ok[0, 0]):
+                _any, _dcol = self._gw_home_for(row, torch.full((self.B,), int(_obj[0, 0]), dtype=torch.long, device=self.device))
+                _go = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _go[b] = bool(_any[b])
+                self._gw_move(hr, torch.full((self.B,), hc, dtype=torch.long, device=self.device),
+                              torch.full((self.B,), int(_slot[0, 0]), dtype=torch.long, device=self.device),
+                              row, _dcol, _go)
         elif m == self._spy_m_sabotage:
             # CIV6 (Sabotage Production): "Pillage all buildings in the
             # industrial zone." — the BUILDINGS, not the district: its

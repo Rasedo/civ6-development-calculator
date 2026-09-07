@@ -5,7 +5,7 @@ None of this is gate-reachable: the Archaeologist waits on NATURAL_HISTORY
 a driven 250-turn game reaches neither. So the semantics are pinned directly
 on the tensors here, turn-exact with the TS contract (cpu/core/units.ts
 naturalistPark / archaeologistExcavate, cpu/core/city.ts parkAmenities +
-seatTourism, cpu/data/greatPeople.ts museumThemed).
+seatTourism, cpu/core/greatWorks.ts holderThemed).
 
 Proven here:
   * the exported constants: park min appeal 2, owner amenities 2, four other
@@ -20,8 +20,9 @@ Proven here:
     2 / 1-to-four;
   * `_do_excavate` works an antiquity site AND a shipwreck, carries the
     provenance into the museum slot, clears the dig and spends the charge;
-  * `_museum_themed` wants one era, three civilizations and every slot full,
-    and a themed museum DOUBLES artifact tourism.
+  * the Archaeological Museum themes on one era, three civilizations and
+    every slot full (`_gw_themed`), and a themed museum DOUBLES artifact
+    tourism.
 """
 
 from __future__ import annotations
@@ -35,10 +36,21 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.engine import _MUTABLE
-from warmup import settle_all
+from warmup import settle_all, works_of
 
 PLANES = ("antiquity_era", "antiquity_seat", "shipwreck", "shipwreck_era",
-          "shipwreck_seat", "park", "city_artifact_era", "city_artifact_seat")
+          "shipwreck_seat", "park", "city_gw_obj", "city_gw_era", "city_gw_seat")
+
+
+def holder_bidx(sim, hid: str) -> int:
+    """the building column of one great-work holder (`GW_HOLDERS`)"""
+    return sim._gw_holder_bidx[[h["id"] for h in sim.rules.seats["greatWorks"]["holders"]].index(hid)]
+
+
+def holder_slots(sim, hid: str) -> list[int]:
+    """the layout slots of one great-work holder"""
+    h = [x["id"] for x in sim.rules.seats["greatWorks"]["holders"]].index(hid)
+    return (sim._gw_slot_holder == h).nonzero(as_tuple=True)[0].tolist()
 
 
 def main() -> None:
@@ -53,7 +65,7 @@ def main() -> None:
     assert ri["parkAmenitiesOwner"] == 2, "NATIONAL_PARK_AMENITIES_OWNING_CITY"
     assert ri["parkAmenitiesNear"] == 1
     assert ri["parkAmenityCities"] == 4, "NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES"
-    assert rj["seats"]["themingMult"] == 2, "a themed museum doubles what it holds"
+    assert rj["seats"]["greatWorks"]["themingMult"] == 2, "a themed museum doubles what it holds"
     assert ri["shipwreckCivic"] >= 0, "CULTURAL_HERITAGE must resolve or wrecks are unworkable"
     for _p in PLANES:
         assert _p in _MUTABLE, f"{_p} must be _MUTABLE — it rides snapshot/restore"
@@ -65,7 +77,7 @@ def main() -> None:
         t = getattr(sim, _p)
         assert t.shape == (sim.B, sim.T), f"{_p} shape"
         assert t.dtype == torch.long, f"{_p} dtype"
-    assert sim.city_artifact_era.shape[-1] == sim._artifact_prov_w
+    assert sim.city_gw_era.shape[-1] == sim.GW_W
     print("constants + planes ok")
 
     # --- 2) the rhombus ----------------------------------------------------
@@ -146,10 +158,9 @@ def main() -> None:
     slot = int(((s2.major_unit_seat[0] == row) & s2.major_unit_alive[0]
                 & (s2.major_unit_type[0] == s2._naturalist_idx)).long().argmax())
     tour_before = s2._tourism_of(
-        s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
+        s2._gw_tourism_general(row, None, None),
         s2.city_alive[:, row], s2.tile_seat == row,
-        s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        None, s2._artifact_theming_counts(row))[0]
+        s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]))[0]
     s2._do_park(row, torch.ones(s2.B, dtype=torch.bool),
                 torch.full((s2.B,), ctr, dtype=torch.long),
                 torch.full((s2.B,), slot, dtype=torch.long))
@@ -160,10 +171,9 @@ def main() -> None:
     assert not bool(s2.major_unit_alive[0, slot]), "the Naturalist is CONSUMED"
     ap2 = s2._tile_appeal()[0]
     tour_after = s2._tourism_of(
-        s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
+        s2._gw_tourism_general(row, None, None),
         s2.city_alive[:, row], s2.tile_seat == row,
-        s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        None, s2._artifact_theming_counts(row))[0]
+        s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]))[0]
     want = sum(int(ap2[t]) for t in parked)
     assert int(tour_after - tour_before) == want, f"park tourism = total appeal ({want}), got {int(tour_after - tour_before)}"
     amen = s2._park_amenities(row)[0]
@@ -179,7 +189,8 @@ def main() -> None:
     s3.antiquity[0, site] = True
     s3.antiquity_era[0, site] = 3
     s3.antiquity_seat[0, site] = 2
-    s3.city_bldg[0, row, 0, s3._artifact_bidx] = True
+    s3.city_bldg[0, row, 0, holder_bidx(s3, "ARCHAEOLOGICAL_MUSEUM")] = True
+    s3._eff_version += 1
     assert bool(s3._museum_room(row)[0]), "a free slot must exist for the find to land"
     ok = s3._spawn_unit(row, torch.ones(s3.B, dtype=torch.bool),
                         torch.full((s3.B,), site, dtype=torch.long), s3._archaeologist_idx)
@@ -192,9 +203,10 @@ def main() -> None:
     s3._do_excavate(row, torch.ones(s3.B, dtype=torch.bool),
                     torch.full((s3.B,), site, dtype=torch.long),
                     torch.full((s3.B,), slot, dtype=torch.long))
-    assert int(s3.city_artifacts[0, row, 0]) == 1, "the find lands in the museum"
-    assert int(s3.city_artifact_era[0, row, 0, 0]) == 3, "and carries its era"
-    assert int(s3.city_artifact_seat[0, row, 0, 0]) == 2, "...and its civilization"
+    assert works_of(s3, 0, row, 0, [4]) == 1, "the find lands in the city"
+    _fs = int((s3.city_gw_obj[0, row, 0] == 4).nonzero()[0])
+    assert int(s3.city_gw_era[0, row, 0, _fs]) == 3, "and carries its era"
+    assert int(s3.city_gw_seat[0, row, 0, _fs]) == 2, "...and its civilization"
     assert not bool(s3.antiquity[0, site]), "the dig is spent"
     assert int(s3.antiquity_era[0, site]) == -1, "its provenance goes with it"
 
@@ -213,33 +225,34 @@ def main() -> None:
 
     # --- 5) theming --------------------------------------------------------
     s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    row, n = 0, s4._artifact_slots
-    s4.city_artifacts[0, row, 0] = n
-    for i in range(n):
-        s4.city_artifact_era[0, row, 0, i] = 2
-        s4.city_artifact_seat[0, row, 0, i] = i
-    assert not bool(s4._museum_themed(row)[0, 0]),         "a set with no standing museum must not theme"
-    s4.city_bldg[0, row, 0, s4._artifact_bidx] = True   # the museum STANDS
-    assert bool(s4._museum_themed(row)[0, 0]), "one era, three civilizations, every slot"
-    s4.city_artifact_seat[0, row, 0, 1] = 0  # a repeated civilization
-    assert not bool(s4._museum_themed(row)[0, 0])
-    s4.city_artifact_seat[0, row, 0, 1] = 1
-    s4.city_artifact_era[0, row, 0, 1] = 5   # a mixed era
-    assert not bool(s4._museum_themed(row)[0, 0])
-    s4.city_artifact_era[0, row, 0, 1] = 2
-    s4.city_artifacts[0, row, 0] = n - 1     # an empty slot
-    assert not bool(s4._museum_themed(row)[0, 0])
-    s4.city_artifacts[0, row, 0] = n
-    own = s4.tile_seat == row
-    era = s4._civ_era(s4.civ_techs[:, row], s4.civ_civics[:, row])
-    t_themed = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
-                              s4.city_alive[:, row], own, era, None,
-                              s4._artifact_theming_counts(row))[0]
-    s4.city_artifact_seat[0, row, 0, 1] = 0   # a repeated civilization un-themes
-    t_plain = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
-                             s4.city_alive[:, row], own, era, None,
-                             s4._artifact_theming_counts(row))[0]
-    assert int(t_themed - t_plain) == s4._artifact_tourism * n, "theming DOUBLES the museum's tourism"
+    row = 0
+    H_ARCH = [h["id"] for h in rj["seats"]["greatWorks"]["holders"]].index("ARCHAEOLOGICAL_MUSEUM")
+    ms = holder_slots(s4, "ARCHAEOLOGICAL_MUSEUM")
+    n = len(ms)
+    for i, sl in enumerate(ms):
+        s4.city_gw_obj[0, row, 0, sl] = 4
+        s4.city_gw_era[0, row, 0, sl] = 2
+        s4.city_gw_seat[0, row, 0, sl] = i
+    s4._eff_version += 1
+    assert not bool(s4._gw_themed(row)[0, 0, H_ARCH]), "a set with no standing museum must not theme"
+    s4.city_bldg[0, row, 0, holder_bidx(s4, "ARCHAEOLOGICAL_MUSEUM")] = True   # the museum STANDS
+    s4._eff_version += 1
+    assert bool(s4._gw_themed(row)[0, 0, H_ARCH]), "one era, three civilizations, every slot"
+    s4.city_gw_seat[0, row, 0, ms[1]] = 0  # a repeated civilization
+    assert not bool(s4._gw_themed(row)[0, 0, H_ARCH])
+    s4.city_gw_seat[0, row, 0, ms[1]] = 1
+    s4.city_gw_era[0, row, 0, ms[1]] = 5   # a mixed era
+    assert not bool(s4._gw_themed(row)[0, 0, H_ARCH])
+    s4.city_gw_era[0, row, 0, ms[1]] = 2
+    s4.city_gw_obj[0, row, 0, ms[2]] = -1     # an empty slot
+    assert not bool(s4._gw_themed(row)[0, 0, H_ARCH])
+    s4.city_gw_obj[0, row, 0, ms[2]] = 4
+    s4._eff_version += 1
+    t_themed = int(s4._gw_tourism_general(row, None, None)[0, 0])
+    s4.city_gw_seat[0, row, 0, ms[1]] = 0   # a repeated civilization un-themes
+    s4._eff_version += 1
+    t_plain = int(s4._gw_tourism_general(row, None, None)[0, 0])
+    assert t_themed - t_plain == 3 * n, "theming DOUBLES the museum's tourism"
     print("theming ok")
 
     # --- 6) snapshot/restore ----------------------------------------------
@@ -247,10 +260,10 @@ def main() -> None:
     snap = s5.snapshot()
     s5.park[0, 0] = 7
     s5.shipwreck[0, 0] = True
-    s5.city_artifact_era[0, 0, 0, 0] = 4
+    s5.city_gw_era[0, 0, 0, 0] = 4
     s5.restore(snap)
     assert int(s5.park[0, 0]) == -1 and not bool(s5.shipwreck[0, 0])
-    assert int(s5.city_artifact_era[0, 0, 0, 0]) == -1
+    assert int(s5.city_gw_era[0, 0, 0, 0]) == -1
     print("snapshot ok")
 
     # --- the district and outpost appeal terms ----------------------------

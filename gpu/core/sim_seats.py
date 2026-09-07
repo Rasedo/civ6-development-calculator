@@ -3785,13 +3785,13 @@ class SimSeats:
             if _dr.numel():
                 _keep = self._promo_flag(self.major_unit_type[_dr, _dj],
                                          self.major_unit_promos[_dr, _dj], "MARTYR")
-                if bool(_keep.any()) and self._relic_bidx >= 0:
+                if bool(_keep.any()):
                     self._grant_relic(_dr[_keep], self.major_unit_seat[_dr, _dj][_keep])
             _ar = rows[atk_dead]
             if _ar.numel():
                 _keep = self._promo_flag(self.major_unit_type[_ar, u],
                                          self.major_unit_promos[_ar, u], "MARTYR")
-                if bool(_keep.any()) and self._relic_bidx >= 0:
+                if bool(_keep.any()):
                     self._grant_relic(_ar[_keep], a_seat[_ar][_keep])
             # A killed unit must also LEAVE ITS TILE: TS's `disbandUnit` drops
             # it from `state.units` entirely, so clearing `alive` alone would
@@ -3891,77 +3891,35 @@ class SimSeats:
         if bool(emb.any()):
             self.embarked_at[(rows[emb], t[emb])] = -1
 
-    def _relic_cap(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — each city's relic capacity: its DEDICATED
-        slots, or what it already holds where that is more, plus whatever is
-        left of the any-work pool. The `placeRelic` capacity expression under
-        `relicSlotsIn`."""
-        ded = self._relic_dedicated()
-        return ded + self._in_pool(ded, self.city_relics[:, : self.n_majors],
-                                   self._any_work_pool_all()) + self._any_work_free_all()
-
-    def _relic_dedicated(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — the relic slots each city owns outright: the
-        relic building's plus every COMPLETE wonder it holds, for every major
-        row at once (the wonder registry is majors-only, which is who can hold a
-        wonder)."""
-        cap = self.city_bldg[:, : self.n_majors, :, self._relic_bidx].long() * self._relic_slots
-        if getattr(self, "_wond_relic", None) is None or int(self._wond_relic.sum()) == 0:
-            return cap
-        wreg = self.city_wonder[:, : self.n_majors]  # [B, n_majors, RC, nW] tile index per wonder
-        compw = (wreg >= 0) & self.built_wonder_complete.gather(
-            1, wreg.clamp(min=0).reshape(self.B, -1)
-        ).reshape_as(wreg)
-        return cap + (compw.long() * self._wond_relic.reshape(1, 1, 1, -1)).sum(dim=3)
-
     def _grant_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
-        """The `placeRelic` mirror: hand each row's seat ONE relic, placed in the
-        LOWEST city with a free relic slot — city ARRAY order, which the dense
-        city/rc slot order mirrors. A relic that finds no slot is LOST, as TS
-        discards the return value the same way.
-
-        `seat` [n] IS the row in the merged city block, so one walk places
-        every seat's relic."""
-        if rows.numel() == 0 or self._relic_bidx < 0:
+        """A RELIC for each listed game's seat row, placed in the row's FIRST
+        live city with an open slot that takes one (`placeGreatWorkIn`).
+        CIV6: a homeless Relic is HELD, not lost — `_drain_relic_reserve`
+        hands it out at the owner's next turn."""
+        if rows.numel() == 0:
             return
-        row = seat.clamp(min=0, max=self.n_majors - 1)
-        cap = self._relic_cap()
         placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
-        for j in range(self.RC):
-            take = (
-                ~placed
-                & self.city_alive[rows, row, j]
-                & (self.city_relics[rows, row, j] < cap[rows, row, j])
-            )
-            if bool(take.any()):
-                self.city_relics[rows[take], row[take], j] += 1
-                placed = placed | take
-        # CIV6: a homeless Relic is HELD, not lost — `_drain_relic_reserve`
-        # hands it out at the owner's next turn.
+        for r in seat.unique().tolist():
+            r = int(r)
+            sel = seat == r
+            want = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            want[rows[sel]] = True
+            done = self._gw_place_first(r, want, 7)
+            placed = placed | (sel & done[rows])
         if bool((~placed).any()):
             miss = ~placed
-            self.civ_relic_reserve[rows[miss], row[miss]] += 1
-        self._eff_version += 1
+            self.civ_relic_reserve[rows[miss], seat[miss]] += 1
 
     def _drain_relic_reserve(self, row: int, active: torch.Tensor) -> None:
         """The `drainRelicReserve` mirror: hand held Relics to open slots,
-        LOWEST city first, until the reserve or the capacity runs out. One
-        prefix-sum allocation is the same fill a one-at-a-time loop makes."""
-        held = self.civ_relic_reserve[:, row]
-        run = active & (held > 0)
-        if not bool(run.any()):
-            return
-        cap = self._relic_cap()[:, row]                       # [B, RC]
-        used = self.city_relics[:, row]
-        openc = (cap - used).clamp(min=0) * self.city_alive[:, row].long()
-        want = torch.where(run, held, torch.zeros_like(held))
-        prefix = openc.cumsum(dim=1) - openc
-        alloc = (want.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
-        if not bool((alloc != 0).any()):
-            return
-        self.city_relics[:, row] = used + alloc
-        self.civ_relic_reserve[:, row] = held - alloc.sum(dim=1)
-        self._eff_version += 1
+        first city first, one per pass until the reserve or the room runs
+        out."""
+        for _ in range(int(self.civ_relic_reserve[:, row].max()) if bool(active.any()) else 0):
+            run = active & (self.civ_relic_reserve[:, row] > 0)
+            done = self._gw_place_first(row, run, 7)
+            if not bool(done.any()):
+                return
+            self.civ_relic_reserve[:, row] = self.civ_relic_reserve[:, row] - done.long()
 
     def _religious_victor(self) -> torch.Tensor:
         B, O, nrow = self.B, self.n_majors, self.n_majors
@@ -5320,9 +5278,7 @@ class SimSeats:
         else:
             al = self.city_alive[:, row].long()
             counts = torch.stack([
-                (self.city_gw_writing[:, row] * al).sum(dim=1),
-                (self.city_gw_art[:, row] * al).sum(dim=1),
-                (self.city_gw_music[:, row] * al).sum(dim=1),
+                (self._gw_kind_count(row, k) * al).sum(dim=1) for k in range(3)
             ], dim=1).double()
         return a, self._argmax_low(counts)
 
@@ -7744,15 +7700,8 @@ class SimSeats:
         self.city_prod_bank[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
-        self.city_gw_writing[b, row, col] = 0
-        self.city_gw_art[b, row, col] = 0
-        self.city_gw_music[b, row, col] = 0
-        self.city_relics[b, row, col] = 0
-        self.city_artifacts[b, row, col] = 0
-        self.city_artifact_era[b, row, col, :] = -1
-        self.city_artifact_seat[b, row, col, :] = -1
-        self.city_gwart_type[b, row, col, :] = -1
-        self.city_gwart_artist[b, row, col, :] = -1
+        for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
+            getattr(self, _p)[b, row, col, :] = -1
         self.city_dist_tile[b, row, col, :] = -1
         self.city_spec_pin[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
@@ -7836,14 +7785,9 @@ class SimSeats:
         old_acq = int(self.city_acquired[b, src_row, src_col])
         old_orig = int(self.city_orig_cap[b, src_row, src_col])
         old_founder = int(self.city_founder[b, src_row, src_col])
-        old_gww = int(self.city_gw_writing[b, src_row, src_col])
-        old_gwa = int(self.city_gw_art[b, src_row, src_col])
-        old_gwm = int(self.city_gw_music[b, src_row, src_col])
-        old_rel = int(self.city_relics[b, src_row, src_col])
-        old_art = int(self.city_artifacts[b, src_row, src_col])
         old_lz = int(self.city_lasers[b, src_row, src_col])
-        old_prov = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in
-                    ("city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist")]
+        # the GREAT WORKS ride the flip in their slots, provenance and all
+        old_gw = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat")]
         old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
         # a pillaged building stays pillaged in the new owner's hands — the
         # repair is the queue's, whoever holds the queue
@@ -7948,15 +7892,9 @@ class SimSeats:
         self.city_free_press[b, dst_row, col, :] = 0
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
-        self.city_gw_writing[b, dst_row, col] = old_gww
-        self.city_gw_art[b, dst_row, col] = old_gwa
-        self.city_gw_music[b, dst_row, col] = old_gwm
-        self.city_relics[b, dst_row, col] = old_rel
-        self.city_artifacts[b, dst_row, col] = old_art
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
         self.city_powered[b, dst_row, col] = False  # the new owner's own turn re-resolves the grid
-        for _p, _v in zip(("city_artifact_era", "city_artifact_seat",
-                           "city_gwart_type", "city_gwart_artist"), old_prov):
+        for _p, _v in zip(("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"), old_gw):
             getattr(self, _p)[b, dst_row, col, :] = _v
         self.city_bldg[b, dst_row, col, :] = old_bldg
         self.city_bldg_pillaged[b, dst_row, col, :] = old_bpil
@@ -8304,15 +8242,8 @@ class SimSeats:
         self.city_pressure[rows, row, slot, :] = 0
         self.city_followed[rows, row, slot] = -1
         self.city_prod_bank[rows, row, slot] = 0
-        self.city_gw_writing[rows, row, slot] = 0
-        self.city_gw_art[rows, row, slot] = 0
-        self.city_gw_music[rows, row, slot] = 0
-        self.city_relics[rows, row, slot] = 0
-        self.city_artifacts[rows, row, slot] = 0
-        self.city_artifact_era[rows, row, slot, :] = -1
-        self.city_artifact_seat[rows, row, slot, :] = -1
-        self.city_gwart_type[rows, row, slot, :] = -1
-        self.city_gwart_artist[rows, row, slot, :] = -1
+        for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
+            getattr(self, _p)[rows, row, slot, :] = -1
         self.city_spec_pin[rows, row, slot, :] = -1
         self.city_loyalty[rows, row, slot] = 100.0
         self.city_acquired[rows, row, slot] = 0
@@ -8948,15 +8879,14 @@ class SimSeats:
 
     def _do_excavate(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
         """EXCAVATE for the games in `mask` — `archaeologistExcavate`'s twin.
-        The find lands in the LOWEST-id own city with artifact ROOM — the
-        museum's own slots or the any-work pool's — carrying the dig's
-        PROVENANCE into that city's next slot; the dig is cleared and a
-        charge is spent. A unit
+        The find lands in the LOWEST-id own city with an open slot that takes
+        an Artifact, carrying the dig's PROVENANCE into that slot; the dig is
+        cleared and a charge is spent. A unit
         out of charges is disbanded, exactly as `spendCharge` does it."""
         if not bool(mask.any()):
             return
         tc = tile.clamp(min=0)
-        room = self.city_alive[:, row] & (self._artifact_free(row) > 0)
+        room = self.city_alive[:, row] & self._gw_room(row, 4)
         # TS sorts the candidate cities by CITY ID; the id plane holds it.
         BIG = 1 << 30
         key = torch.where(room, self.city_id[:, row], torch.full_like(self.city_id[:, row], BIG))
@@ -8965,14 +8895,15 @@ class SimSeats:
         if not bool(go.any()):
             return
         rows = go.nonzero(as_tuple=True)[0]
-        hslot = home[rows]
         land = self.antiquity[rows, tc[rows]]
         era = torch.where(land, self.antiquity_era[rows, tc[rows]], self.shipwreck_era[rows, tc[rows]])
         dseat = torch.where(land, self.antiquity_seat[rows, tc[rows]], self.shipwreck_seat[rows, tc[rows]])
-        nxt = self.city_artifacts[rows, row, hslot].clamp(max=self._artifact_prov_w - 1)
-        self.city_artifact_era[rows, row, hslot, nxt] = era
-        self.city_artifact_seat[rows, row, hslot, nxt] = dseat
-        self.city_artifacts[rows, row, hslot] = self.city_artifacts[rows, row, hslot] + 1
+        _eraB = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        _seatB = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        _eraB[rows] = era
+        _seatB[rows] = dseat
+        self._gw_place(row, go, home, torch.full((self.B,), 4, dtype=torch.long, device=self.device),
+                       torch.full((self.B,), -1, dtype=torch.long, device=self.device), _eraB, _seatB)
         # CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
         # extracted."
         self._dedication_event(row, self._ded_wish, go)
@@ -11291,8 +11222,7 @@ class SimSeats:
                     if bool(self._row_is(r2, r[0], r[1]).any())]
             if not rows:
                 continue
-            works = (self.city_gw_writing[:, r2] + self.city_gw_art[:, r2]
-                     + self.city_gw_music[:, r2]).long()          # [B, RC]
+            works = self._gw_created_count(r2)                    # [B, RC]
             live = self.city_alive[:, r2] & (self.city_center[:, r2] >= 0)
             ctr = self.city_center[:, r2].clamp(min=0)
             d = self.pair_dist[here.unsqueeze(1), ctr]            # [n, RC]

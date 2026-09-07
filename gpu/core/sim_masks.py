@@ -2337,10 +2337,9 @@ class SimMasks:
 
 
     def _museum_room(self, row: int) -> torch.Tensor:
-        """[B] bool — does this seat hold a city with a free artifact slot
-        anywhere — the museum's own or the any-work pool's? The excavation's
-        landing place."""
-        return (self.city_alive[:, row] & (self._artifact_free(row) > 0)).any(dim=1)
+        """[B] bool — does this seat hold a city with an open slot that takes
+        an Artifact? The excavation's landing place."""
+        return (self.city_alive[:, row] & self._gw_room(row, 4)).any(dim=1)
 
     def _dig_here(self, row: int, tc: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — is there a workable dig under these tiles?
@@ -2661,7 +2660,7 @@ class SimMasks:
             return civ_ok
         C = self.RC
         need = self._type_needs_slot.reshape(1, 1, -1)
-        room = (self._artifact_free(row) > 0).unsqueeze(2)
+        room = self._gw_room(row, 4).unsqueeze(2)
         out = civ_ok.unsqueeze(1) & (~need | room)
         # CIV6 (Military Engineer): "can only be built in a city that has an
         # Encampment with an Armory" — the building carries its district.

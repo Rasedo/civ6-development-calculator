@@ -7,9 +7,8 @@
  * and the exporter bakes it per tile into `wok`; everything that can change
  * during a game stays live in `canPlaceWonder` / `_wonder_cand`.
  *
- * A wonder that adds GREAT WORK or RELIC slots pays them through
- * `GW_WONDER_SLOTS` / `RELIC_WONDER_SLOTS` (data/greatPeople.ts), additive
- * with the buildings' slots. Each row's `description` states what the row
+ * A wonder that holds GREAT WORKS is a holder row of `GW_HOLDERS`
+ * (data/greatWorks.ts), with its own slots beside the buildings'. Each row's `description` states what the row
  * PAYS here; docs/AUDIT.md carries the effects still missing.
  */
 

@@ -32,7 +32,8 @@ import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
-import { artifactFree } from './greatPeople';
+import { gwHasRoom, placeGreatWork } from './greatWorks';
+import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { OPEN_TERRAINS, civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
@@ -1197,13 +1198,13 @@ export function trainableUnits(
     if (!civUnitAllowed(civOf(state, seat), d.id)) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
     if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic, seat)) return false;
-    // An ARCHAEOLOGIST may only be trained where its city still has a FREE
-    // artifact slot — the museum's own or the any-work pool's (the real
-    // Civ 6 rule: with no room the unit has nowhere to put what it digs up).
+    // An ARCHAEOLOGIST may only be trained where its city still has an open
+    // slot an Artifact fits (the real Civ 6 rule: with no room the unit has
+    // nowhere to put what it digs up).
     if (d.id === 'ARCHAEOLOGIST' && !state.sandbox) {
       if (!city) return false;
       const held = seatOf(state, seat)!.cities.find((c) => c.centerIndex === city.centerIndex);
-      if (!held || artifactFree(state, held) <= 0) return false;
+      if (!held || !gwHasRoom(state, held, GWO_ARTIFACT)) return false;
     }
     // A unit whose CITY must already hold a building (the Military Engineer's
     // Armory, which carries its Encampment with it).
@@ -1313,10 +1314,9 @@ export function digUnderfoot(state: GameState, tile: Tile | undefined, seat: num
  * an ANTIQUITY SITE or a SHIPWRECK, hold a charge, and the tile must be its
  * own or unclaimed — real Civ 6 additionally allows foreign territory under
  * an OPEN BORDERS treaty, which neither engine has any concept of. The
- * artifact lands in the LOWEST-id own city that has an ARCHAEOLOGICAL MUSEUM
- * with a free slot (the placeRelic ordering) and carries its PROVENANCE (the
- * era it was buried in, and whose event buried it) into that museum's slot,
- * where the theming rule reads it. The dig is consumed. With no free slot
+ * artifact lands in the LOWEST-id own city with an open slot that takes an
+ * Artifact and carries its PROVENANCE (the era it was buried in, and whose
+ * event buried it) into that slot, where the theming rule reads it. The dig is consumed. With no free slot
  * anywhere the excavation is refused rather than silently losing the find.
  */
 export function archaeologistExcavate(state: GameState, unitId: number, seat: number): RuleResult {
@@ -1334,15 +1334,18 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
     return no('That dig lies behind a closed border.');
   }
   const home = seatOf(state, seat)!.cities
-    .filter((c) => artifactFree(state, c) > 0)
+    .filter((c) => gwHasRoom(state, c, GWO_ARTIFACT))
     .sort((a, b) => a.id - b.id)[0];
   if (!home) return no('No city has a free artifact slot.');
-  home.artifacts = (home.artifacts ?? 0) + 1;
+  placeGreatWork(state, home, {
+    obj: GWO_ARTIFACT,
+    maker: -1,
+    era: (kind === 'antiquity' ? tile.antiquityEra : tile.shipwreckEra) ?? 0,
+    seat: (kind === 'antiquity' ? tile.antiquitySeat : tile.shipwreckSeat) ?? NO_SEAT,
+  });
   // CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
   // extracted."
   dedicationEvent(state, unit.seat, DED_WISH);
-  (home.artifactEras ??= []).push((kind === 'antiquity' ? tile.antiquityEra : tile.shipwreckEra) ?? 0);
-  (home.artifactSeats ??= []).push((kind === 'antiquity' ? tile.antiquitySeat : tile.shipwreckSeat) ?? NO_SEAT);
   if (kind === 'antiquity') {
     tile.antiquity = false;
     tile.antiquityEra = undefined;

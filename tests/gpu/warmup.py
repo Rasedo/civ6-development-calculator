@@ -105,3 +105,35 @@ def settle_all(sim, warm: int = 0):
     for _ in range(warm):
         sim.step()
     return sim
+
+
+def hold_works(sim, b: int, row: int, col: int, obj: int, n: int = 1,
+               maker: int = -1, era: int = -1, seat: int = -1) -> list[int]:
+    """The poke's shorthand for a city that already HOLDS works: `n` works of
+    object `obj` in the first empty layout slots whose type takes it, holders
+    standing or not. Returns the slots taken."""
+    acc = sim._gw_accepts[sim._gw_slot_type][:, obj]
+    out: list[int] = []
+    for s in range(sim.GW_W):
+        if len(out) >= n:
+            break
+        if bool(acc[s]) and int(sim.city_gw_obj[b, row, col, s]) < 0:
+            sim.city_gw_obj[b, row, col, s] = obj
+            sim.city_gw_maker[b, row, col, s] = maker
+            sim.city_gw_era[b, row, col, s] = era
+            sim.city_gw_seat[b, row, col, s] = seat
+            out.append(s)
+    sim._eff_version += 1
+    return out
+
+
+def works_of(sim, b: int, row: int, col: int, objs) -> int:
+    """how many works of these object types one city holds"""
+    o = sim.city_gw_obj[b, row, col]
+    return int(sum(int((o == x).sum()) for x in objs))
+
+
+def clear_works(sim) -> None:
+    for p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
+        getattr(sim, p).fill_(-1)
+    sim._eff_version += 1

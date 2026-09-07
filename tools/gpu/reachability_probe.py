@@ -171,8 +171,7 @@ def main() -> None:
         # The DIPLOMATIC verbs are decided outside `_decide_turn`, so a probe
         # that skips this measures a table with no agreements in it.
         drive.geo_decide_and_apply(sim, seeds)
-        gw_before = [p[:, :sim.n_majors].clone() for p in
-                     (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)]
+        gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
             rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
             # `_decide_turn`'s record, by position: prod, dtile, tech, civic,
@@ -367,8 +366,8 @@ def main() -> None:
         # a WORK that changed hands: one seat's holding fell while the table's
         # total held, which only the gift verb does.
         if gw_before is not None:
-            for _now, _was in zip((sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music), gw_before):
-                _n = _now[:, :sim.n_majors]
+            for _k, _was in enumerate(gw_before):
+                _n = sim._gw_kind_count_all(_k)[:, :sim.n_majors]
                 mark("workGift", ((_n.sum(dim=2) < _was.sum(dim=2)).any(dim=1)
                                   & (_n.sum(dim=(1, 2)) >= _was.sum(dim=(1, 2)))), t)
         # THE PACT'S EXACT SIGNATURE: the war head only ever marks a war FORMAL
@@ -382,7 +381,7 @@ def main() -> None:
         mark("tileLock", sim.tile_locked.any(dim=1), t)
         # a DIG's product is an ARTIFACT in a museum slot; the site plane
         # alone only says a site exists.
-        mark("antiquityDig", (sim.city_artifacts > 0).any(dim=2).any(dim=1), t)
+        mark("antiquityDig", (sim.city_gw_obj == 4).any(dim=3).any(dim=2).any(dim=1), t)
 
         # theological combat's PRECONDITION: two religious units of different
         # religions standing adjacent. The resolver cannot fire without it, so
@@ -416,11 +415,9 @@ def main() -> None:
     n_seeds_w = int(wdone.any(dim=1).sum())
     print(f"  wonders FINISHED: {int(wdone.sum())} across {n_seeds_w}/{sim.B} seeds")
 
-    _gw = sum(int(p[:, :sim.n_majors].sum()) for p in
-              (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music))
-    _slots = sum(int((sim.city_bldg[:, :sim.n_majors, :, c] & sim.city_alive[:, :sim.n_majors]).sum())
-                 for c in sim._gw_bidx if c >= 0)
-    print(f"  great works HELD at the final turn: {_gw}, in {_slots} slot buildings")
+    _gw = sum(int(sim._gw_kind_count_all(k)[:, :sim.n_majors].sum()) for k in range(3))
+    _slots = sum(int((sim._gw_holder_present(r) & sim.city_alive[:, r].unsqueeze(2)).sum()) for r in range(sim.n_majors))
+    print(f"  great works HELD at the final turn: {_gw}, in {_slots} standing holders")
 
     _liv = (sim.seat_friend_turns > 0).sum(), (sim.seat_ally_turns > 0).sum(), (sim.seat_borders_turns > 0).sum()
     print(f"  agreements STANDING at the final turn (pair cells): "

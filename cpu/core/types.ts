@@ -1,4 +1,5 @@
 export * from '../../world/types';
+import type { GreatWork } from '../data/greatWorks';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
 
@@ -121,36 +122,13 @@ export interface City {
   projectBoostTurn?: number;
   religionPressure?: number[];
   followedReligion?: number | null;
-  /**
-   * Great Works stored in this city. `greatWorksWriting` occupies AMPHITHEATER
-   * slots (2 max), `greatWorksMusic` MUSEUM slots (2 max); each work yields
-   * GREAT_WORK_CULTURE culture/turn (building-tier). Absent = 0.
-   * Carried on capture: the captor keeps the works held in the buildings that
-   * survive the flip. Yield-bearing, so the GPU mirror bumps _eff_version on
-   * every write.
-   */
-  greatWorksWriting?: number;
-  /** Great Works of ART, in ART MUSEUM slots (3) — the real Civ 6 home. */
-  greatWorksArt?: number;
-  greatWorksMusic?: number;
-  /** the ART MUSEUM's own slots, in fill order: what each holds, and who made it */
-  gwArtType?: number[];
-  gwArtArtist?: number[];
+  /** the Great Works held here, one per occupied layout slot (`GW_LAYOUT`):
+   *  object type, maker, era and civilization. Carried on capture.
+   *  Yield-bearing, so the GPU mirror bumps _eff_version on every write. */
+  greatWorks?: GreatWork[];
   /** permanent per-city adders a Great Person left behind, by `GP_CITY_PERM`
    *  position. */
   gpPerm?: number[];
-  /** RELICS held in this city's TEMPLE slot (cap 1). Each pays
-   *  +4 faith and +8 tourism — the densest tourism source in real Civ 6. */
-  relics?: number;
-  artifacts?: number;
-  /** the PROVENANCE of the artifacts in this city's Archaeological
-   *  Museum, in dig order: the era each was buried in, and the seat whose
-   *  event buried it. A THEMED museum is three full slots sharing ONE era
-   *  with no civilization repeated, and it DOUBLES its artifacts' culture
-   *  and tourism (real Civ 6: "the bonus doubles the yields of all items in
-   *  the Museum"). Parallel arrays, same length as `artifacts`. */
-  artifactEras?: number[];
-  artifactSeats?: number[];
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */

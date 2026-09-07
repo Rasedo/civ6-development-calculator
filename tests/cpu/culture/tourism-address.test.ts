@@ -2,7 +2,7 @@ import { slotGreedily } from '../../../cpu/core/effects';
 import { describe, it, expect } from 'vitest';
 import { seatOf, setBorderTurnsFrom } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { settleFirstCity, holdWorks } from '../helpers';
 import { tourismIntlPct } from '../../../cpu/core/city';
 import { seatAccumulators } from '../../../cpu/core/seatTurn';
 import { computeAdoption } from '../../../cpu/core/effects';
@@ -10,7 +10,8 @@ import {
   TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, GOV_INTOLERANCE, TOURISM_GOV_MULT, ENLIGHTENMENT_CIVIC,
 } from '../../../cpu/data/seats';
 import { POLICIES } from '../../../cpu/data/policies';
-import { RELIC_TOURISM } from '../../../cpu/data/greatPeople';
+import { GWO_RELIC, GWO_TOURISM } from '../../../cpu/data/greatWorks';
+const RELIC_TOURISM = GWO_TOURISM[GWO_RELIC]!;
 import type { GameState, Seat } from '../../../cpu/core/types';
 
 // INTERNATIONAL MODIFIERS. CIV6 (Tourism): "After national modifiers have been
@@ -122,7 +123,7 @@ describe('the per-rival bank', () => {
   function relicGame(opponents: number) {
     const state = newGame(opponents);
     const own = seatOf(state, 0)!;
-    own.cities[0].relics = RELICS; // a known RELIGIOUS half, nothing general
+    holdWorks(own.cities[0], GWO_RELIC, RELICS); // a known RELIGIOUS half, nothing general
     own.tourismTo = [];
     own.tourismReligiousTo = [];
     return { state, own };

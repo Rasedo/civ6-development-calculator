@@ -7,6 +7,8 @@
  * enemy cities and your own, and what exactly they will do depends on the city
  * you send them to."
  */
+import { gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
+import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, type GreatWork } from '../data/greatWorks';
 import { hexDistance } from '../../world/hex';
 import { darkBuildings, pillageBuilding } from './yields';
 import { UNITS, UNIT_ERA_INDEX } from '../data/units';
@@ -205,7 +207,7 @@ export function missionOffered(state: GameState, unit: Unit, m: number): boolean
   } else if (tile.district !== def.district || !tile.districtComplete || tile.districtPillaged) {
     return false;
   }
-  if (m === SPY_M_GREAT_WORK_HEIST && heistTarget(here.city) === null) return false;
+  if (m === SPY_M_GREAT_WORK_HEIST && heistTarget(state, unit.seat, here.city) === null) return false;
   if (m === SPY_M_STEAL_TECH_BOOST && stealableTech(state, unit.seat, here.seat.seat) === null) return false;
   if (m === SPY_M_NEUTRALIZE_GOVERNOR && !hasGovernor(state, here.seat, here.city)) return false;
   // CIV6 (Espionage Pact, outcome B): "Target Operation is unavailable."
@@ -373,11 +375,14 @@ function counterspiesGuarding(state: GameState, holder: number, city: City, tile
 }
 
 /** CIV6 (Great Work Heist): "Great Works of Writing will be displayed first,
- *  Great Works of Art and Artifacts second, and Great Works of Music last." */
-function heistTarget(city: City): 'W' | 'A' | 'M' | null {
-  if ((city.greatWorksWriting ?? 0) > 0) return 'W';
-  if ((city.greatWorksArt ?? 0) > 0) return 'A';
-  if ((city.greatWorksMusic ?? 0) > 0) return 'M';
+ *  Great Works of Art and Artifacts second, and Great Works of Music last."
+ *  The work taken is the LAST placed of the first kind present, and the
+ *  thief needs a city with an open slot that takes it. */
+function heistTarget(state: GameState, thief: number, city: City): GreatWork | null {
+  for (const kind of [GW_KIND_WRITING, GW_KIND_ART, GW_KIND_MUSIC]) {
+    const w = gwLastOfKind(city, kind);
+    if (w) return citiesOf(state, thief).some((c) => gwHasRoom(state, c, w.obj)) ? w : null;
+  }
   return null;
 }
 
@@ -587,17 +592,10 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       return;
     }
     case SPY_M_GREAT_WORK_HEIST: {
-      const kind = heistTarget(city);
-      if (kind === 'W' && (city.greatWorksWriting ?? 0) > 0) {
-        city.greatWorksWriting = (city.greatWorksWriting ?? 0) - 1;
-        homeFor(state, unit, 'W');
-      } else if (kind === 'A' && (city.greatWorksArt ?? 0) > 0) {
-        city.greatWorksArt = (city.greatWorksArt ?? 0) - 1;
-        homeFor(state, unit, 'A');
-      } else if (kind === 'M' && (city.greatWorksMusic ?? 0) > 0) {
-        city.greatWorksMusic = (city.greatWorksMusic ?? 0) - 1;
-        homeFor(state, unit, 'M');
-      }
+      const w = heistTarget(state, unit.seat, city);
+      if (!w) return;
+      const home = citiesOf(state, unit.seat).find((c) => gwHasRoom(state, c, w.obj));
+      if (home) moveGreatWork(state, city, w.slot, home);
       return;
     }
     case SPY_M_SABOTAGE_PRODUCTION:
@@ -643,14 +641,6 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
     default:
       return;
   }
-}
-
-function homeFor(state: GameState, unit: Unit, kind: 'W' | 'A' | 'M'): void {
-  const home = citiesOf(state, unit.seat)[0];
-  if (!home) return;
-  if (kind === 'W') home.greatWorksWriting = (home.greatWorksWriting ?? 0) + 1;
-  else if (kind === 'A') home.greatWorksArt = (home.greatWorksArt ?? 0) + 1;
-  else home.greatWorksMusic = (home.greatWorksMusic ?? 0) + 1;
 }
 
 function pillageDistrict(state: GameState, city: City, district: string): void {

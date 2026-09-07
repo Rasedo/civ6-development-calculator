@@ -2849,218 +2849,385 @@ class SimEconomy:
             self._eff_version += 1
         return place
 
-    def _art_museum_themed(self, row: int) -> torch.Tensor:
-        """[B, RC] bool — is this city's ART MUSEUM themed? CIV6: "its slots
-        must be filled with Great Works of Art of the same type ... made by
-        different Great Artists." `artMuseumThemed` is the twin."""
-        n = self._gw_slots_k[1]
-        types = self.city_gwart_type[:, row, :, :n]     # [B, RC, n]
-        artists = self.city_gwart_artist[:, row, :, :n]
-        full = (self.city_gw_art[:, row] >= n) & (types >= 0).all(dim=2)
-        one_type = (types == types[:, :, :1]).all(dim=2)
-        distinct = torch.ones_like(full)
-        for i in range(n):
-            for j in range(i + 1, n):
-                distinct = distinct & (artists[:, :, i] != artists[:, :, j])
-        return full & one_type & distinct
+    # ------------------------------------------------------------ GREAT WORKS
+    # Works are held PER HOLDER: `city_gw_obj/_maker/_era/_seat` [B, ROWS, RC,
+    # W] index the fixed slot layout the wire carries (`GW_LAYOUT`), a slot's
+    # holder and type being `_gw_slot_holder` / `_gw_slot_type`. The TS twins
+    # are cpu/core/greatWorks.ts, reading by name.
 
-    def _art_themed_works(self, row: int) -> torch.Tensor:
-        """[B, RC] long — how many ART works pay TWICE: the themed museum's own
-        slots, and only those. A wonder's art slots sit outside the bonus."""
-        return self._art_museum_themed(row).long() * ((self._theming_mult - 1) * self._gw_slots_k[1])
+    def _gw_holder_present(self, row: int) -> torch.Tensor:
+        """[B, RC, H] bool — is each holder PRESENT in each of this row's
+        cities: a building held (the Palace by the capital flag), a wonder
+        COMPLETE. Pillage is not asked here — a pillaged holder keeps and
+        pays its works."""
+        out = torch.zeros(self.B, self.RC, self.GW_H, dtype=torch.bool, device=self.device)
+        bl = self.city_bldg[:, row]
+        for h in range(self.GW_H):
+            bi, wi = self._gw_holder_bidx[h], self._gw_holder_widx[h]
+            if wi >= 0:
+                if row < self.n_majors:
+                    wt = self.city_wonder[:, row, :, wi]
+                    out[:, :, h] = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
+            elif bi == -2:
+                out[:, :, h] = self.city_is_cap[:, row]
+            else:
+                out[:, :, h] = bl[:, :, bi]
+        return out
 
-    def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int,
-                     artist: torch.Tensor | None = None,
-                     only_col: torch.Tensor | None = None) -> None:
-        """`only_col` narrows the walk to ONE city column per game — what an
-        ACTIVATION does, where the works land in the city the charge was spent
-        in rather than across the whole seat."""
-        bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
-        dt = torch.float64
-        civic = self.civ_civic_prog
-        if bcol < 0:
-            civic[:, row] = civic[:, row] + hit.to(dt) * nworks * culture_val
-            return
-        gw_base = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind]
-        used = gw_base[:, row]  # [B, RC]
-        cap = self.city_bldg[:, row, :, bcol].long() * nslots  # [B, RC] (a city holds 1 such building max)
-        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            wreg = self.city_wonder[:, row]
-            compw = (wreg >= 0) & self.built_wonder_complete.gather(
-                1, wreg.clamp(min=0).reshape(self.B, -1)
-            ).reshape_as(wreg)
-            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
-        alive = self.city_alive[:, row]  # [B, RC]
-        openc = (cap - used).clamp(min=0) * alive.long()  # [B, RC] open slots per live city
-        if only_col is not None:
-            _sel = torch.arange(openc.shape[1], device=openc.device).reshape(1, -1) == only_col.unsqueeze(1)
-            openc = openc * _sel.long()
-        W = nworks * hit.long()  # [B] works to place this earn
-        prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
-        alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
-        placed = alloc.sum(dim=1)
-        overflow = (W - placed).clamp(min=0)
-        if kind == 1 and artist is not None and self._artist_works:
-            # WHO made it and WHAT it is, for the museum's own slots. The work
-            # index is the ARTIST's (their first, second or third), which is
-            # what names the type; the slot index is the museum's.
-            works = torch.tensor(self._artist_works, dtype=torch.long, device=self.device)
-            aw = works[artist.clamp(min=0, max=works.shape[0] - 1)]  # [B, nworks]
-            # works already spent by EARLIER cities in slot order
-            spent = W.unsqueeze(1) - (W.unsqueeze(1) - prefix).clamp(min=0)
-            for sl in range(self._gw_slots_k[1]):
-                k = sl - used
-                on = (k >= 0) & (k < alloc) & (spent + k < nworks)
-                if not bool(on.any()):
-                    continue
-                wi = (spent + k).clamp(min=0, max=nworks - 1)
-                self.city_gwart_type[:, row, :, sl] = torch.where(
-                    on, aw.gather(1, wi.clamp(min=0, max=aw.shape[1] - 1)), self.city_gwart_type[:, row, :, sl])
-                self.city_gwart_artist[:, row, :, sl] = torch.where(
-                    on, artist.unsqueeze(1).expand_as(on), self.city_gwart_artist[:, row, :, sl])
-        gw_base[:, row] = gw_base[:, row] + alloc
-        civic[:, row] = civic[:, row] + overflow.to(dt) * culture_val
-        if bool((alloc != 0).any()):
-            self._eff_version += 1
+    def _gw_holder_open(self, row: int, present: torch.Tensor) -> torch.Tensor:
+        """[B, RC, H] bool — present AND not dark: a pillaged holder accepts
+        nothing new (`workContext`'s `open`)."""
+        out = present.clone()
+        dark = self._bldg_dark(self.city_dist_tile[:, row], self.city_bldg_pillaged[:, row])
+        for h in range(self.GW_H):
+            bi = self._gw_holder_bidx[h]
+            if bi >= 0:
+                out[:, :, h] = present[:, :, h] & ~dark[:, :, bi]
+        return out
 
-    def _gw_capacity(self, row: int, kind: int) -> torch.Tensor:
-        """[B, RC] — how many works of `kind` each of this row's cities holds
-        room for: its DEDICATED slots, or what it already holds where that is
-        more, plus whatever is left of the any-work pool. `gwCapacity`'s twin
-        under `gwExtraSlots`, and `_place_works`' own `cap`."""
-        held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind][:, row]
-        ded = self._gw_dedicated(row, kind)
-        return ded + self._in_pool(ded, held, self._any_work_pool_all()[:, row]) \
-            + self._any_work_free_all()[:, row]
+    def _gw_seat_extra(self, row: int) -> torch.Tensor:
+        """[B, H] long — the extra slots this row's roster rows open per holder
+        (Nkisi's four Palace slots)."""
+        out = torch.zeros(self.B, self.GW_H, dtype=torch.long, device=self.device)
+        for _c, _l, _h, _n in self._gw_extra_rows:
+            out[:, _h] = out[:, _h] + self._row_is(row, _c, _l).long() * _n
+        return out
 
-    @staticmethod
-    def _in_pool(dedicated: torch.Tensor, held: torch.Tensor,
-                 pool: torch.Tensor) -> torch.Tensor:
-        """How many of the any-work POOL's slots one kind already stands in.
-        Never more than the pool: a city that loses a dedicated slot under an
-        occupied work keeps the work, not a slot conjured to hold it."""
-        return torch.minimum((held - dedicated).clamp(min=0), pool)
+    def _gw_slot_carried(self, row: int, present: torch.Tensor) -> torch.Tensor:
+        """[B, RC, W] bool — does this seat's copy of the slot's holder carry
+        the slot at all: present, and an extra slot only up to the seat's own
+        row (`slotCarried`)."""
+        hp = present[:, :, self._gw_slot_holder]                              # [B, RC, W]
+        xr = self._gw_slot_extra.reshape(1, 1, -1)
+        allowed = self._gw_seat_extra(row)[:, self._gw_slot_holder].unsqueeze(1)  # [B, 1, W]
+        return hp & ((xr < 0) | (xr < allowed))
 
-    def _artifact_free(self, row: int) -> torch.Tensor:
-        """[B, RC] — room for one more ARTIFACT in each city: the
-        Archaeological Museum's own slots plus what is left of the any-work
-        pool. `artifactFree`'s twin — per-CITY capacity, never the bare
-        museum constant."""
-        ded = (self.city_bldg[:, row, :, self._artifact_bidx].long() * self._artifact_slots
-               if self._artifact_bidx >= 0
-               else torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device))
-        return (ded - self.city_artifacts[:, row]).clamp(min=0) + self._any_work_free_all()[:, row]
+    def _gw_slot_open(self, row: int) -> torch.Tensor:
+        """[B, RC, W] bool — slots that can take a work now: carried, the
+        holder open, and empty (`gwFreeSlot`'s candidates)."""
+        present = self._gw_holder_present(row)
+        openh = self._gw_holder_open(row, present)
+        return (self._gw_slot_carried(row, present) & openh[:, :, self._gw_slot_holder]
+                & (self.city_gw_obj[:, row] < 0))
 
-    def _artifact_theming_counts(self, row: int) -> torch.Tensor:
-        """[B, RC] — artifact counts with the theming DOUBLE folded in: a
-        themed Archaeological Museum doubles what IT holds, never a find
-        standing in the any-work pool (`artifactCulture`'s split)."""
-        c = self.city_artifacts[:, row]
-        mus = (self.city_bldg[:, row, :, self._artifact_bidx] if self._artifact_bidx >= 0
-               else torch.zeros_like(c, dtype=torch.bool))
-        inm = torch.minimum(c, torch.full_like(c, self._artifact_slots)) * mus.long()
-        tm = torch.where(self._museum_themed(row), self._theming_mult, 1)
-        return inm * tm + (c - inm)
+    def _gw_room_by_obj(self, row: int) -> torch.Tensor:
+        """[B, RC, 8] bool — per city, is there an open slot taking each
+        object type (`gwHasRoom` for every object at once)."""
+        openslots = self._gw_slot_open(row)                                   # [B, RC, W]
+        acc = self._gw_accepts[self._gw_slot_type]                            # [W, 8]
+        return (openslots.unsqueeze(3) & acc.reshape(1, 1, -1, 8)).any(dim=2)
 
-    def _any_work_pool_all(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — the any-work slots each city's STANDING
-        buildings open, before anything takes one."""
-        pool = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
-        if not self._any_work_live:
-            return pool
-        for r in range(self.n_majors):
-            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r], self.city_bldg_pillaged[:, r])
-            pool[:, r] = torch.einsum("bjn,n->bj", stand.long(), self._b_any_work)
-        return pool
+    def _gw_room(self, row: int, obj: int) -> torch.Tensor:
+        """[B, RC] bool — `gwHasRoom` for one object type."""
+        return self._gw_room_by_obj(row)[:, :, obj]
 
-    def _any_work_free_all(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — CIV6 (National History Museum): "Provides 4
-        slots for any Great Work". ONE shared pool per city, which a work of any
-        kind falls into once the slots of its OWN kind are full, so what is left
-        of it is the pool minus everything already standing in it.
-        `anyWorkFree`'s twin."""
-        z = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
-        if not self._any_work_live:
-            return z
-        pool = self._any_work_pool_all()
-        used = z.clone()
-        rded = self._relic_dedicated()
-        for r in range(self.n_majors):
-            for k in range(3):
-                held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[k][:, r]
-                used[:, r] = used[:, r] + (held - self._gw_dedicated(r, k)).clamp(min=0)
-            used[:, r] = used[:, r] + (self.city_relics[:, r] - rded[:, r]).clamp(min=0)
-            aded = (self.city_bldg[:, r, :, self._artifact_bidx].long() * self._artifact_slots
-                    if self._artifact_bidx >= 0 else torch.zeros_like(used[:, r]))
-            used[:, r] = used[:, r] + (self.city_artifacts[:, r] - aded).clamp(min=0)
-        return (pool - used).clamp(min=0)
+    def _gw_place(self, row: int, cells: torch.Tensor, col: torch.Tensor, obj: torch.Tensor,
+                  maker: torch.Tensor, era: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """THE placement composer (`placeGreatWork`): for every game in
+        `cells`, the work lands in city column `col`'s FIRST open slot that
+        takes its object; returns [B] bool = placed. A game whose city has no
+        such slot writes nothing."""
+        B = self.B
+        if not bool(cells.any()):
+            return torch.zeros(B, dtype=torch.bool, device=self.device)
+        cc = col.clamp(min=0, max=self.RC - 1)
+        openslots = self._gw_slot_open(row).gather(1, cc.reshape(B, 1, 1).expand(B, 1, self.GW_W)).squeeze(1)  # [B, W]
+        acc = self._gw_accepts[self._gw_slot_type][:, obj.clamp(min=0, max=7)].transpose(0, 1)   # [B, W]
+        cand = openslots & acc & cells.unsqueeze(1) & (col >= 0).unsqueeze(1) & (obj >= 0).unsqueeze(1)
+        placed = cand.any(dim=1)
+        if not bool(placed.any()):
+            return placed
+        idx = cand.long().argmax(dim=1)
+        g = placed.nonzero(as_tuple=True)[0]
+        self.city_gw_obj[g, row, cc[g], idx[g]] = obj[g]
+        self.city_gw_maker[g, row, cc[g], idx[g]] = maker[g]
+        self.city_gw_era[g, row, cc[g], idx[g]] = era[g]
+        self.city_gw_seat[g, row, cc[g], idx[g]] = seat[g]
+        self._eff_version += 1
+        return placed
 
-    def _gw_dedicated(self, row: int, kind: int) -> torch.Tensor:
-        """[B, RC] — the slots of `kind` each of this row's cities owns outright:
-        the slot BUILDING's own plus whatever its completed wonders add."""
-        bcol, nslots = self._gw_bidx[kind], self._gw_slots_k[kind]
-        base = self.city_gw_writing[:, row]
-        if bcol < 0:
-            return torch.zeros_like(base)
-        cap = self.city_bldg[:, row, :, bcol].long() * nslots
-        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            wreg = self.city_wonder[:, row]
-            compw = (wreg >= 0) & self.built_wonder_complete.gather(
-                1, wreg.clamp(min=0).reshape(self.B, -1)
-            ).reshape_as(wreg)
-            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
-        return cap
+    def _gw_place_first(self, row: int, want: torch.Tensor, obj: int, maker: torch.Tensor | None = None,
+                        era: torch.Tensor | None = None, seat: torch.Tensor | None = None) -> torch.Tensor:
+        """`placeGreatWorkIn`: the work lands in the row's FIRST live city
+        (column order) with room for it; returns [B] bool = placed."""
+        room = self.city_alive[:, row] & self._gw_room(row, obj)
+        ok = want & room.any(dim=1)
+        col = room.long().argmax(dim=1)
+        B = self.B
+        full = lambda v: torch.full((B,), v, dtype=torch.long, device=self.device)  # noqa: E731
+        return self._gw_place(row, ok, col, full(obj),
+                              full(-1) if maker is None else maker,
+                              full(-1) if era is None else era,
+                              full(int(self._ROW_SEAT[row])) if seat is None else seat)
+
+    def _gw_clear(self, row: int, g: torch.Tensor, col: torch.Tensor, slot: torch.Tensor) -> None:
+        """`removeGreatWork`: empty one slot per listed game."""
+        for pl in (self.city_gw_obj, self.city_gw_maker, self.city_gw_era, self.city_gw_seat):
+            pl[g, row, col, slot] = -1
+        self._eff_version += 1
+
+    def _gw_move(self, src_row: int, src_col: torch.Tensor, src_slot: torch.Tensor,
+                 dst_row: int, dst_col: torch.Tensor, go: torch.Tensor) -> torch.Tensor:
+        """`moveGreatWork`: a work changes hands keeping everything but its
+        slot; returns [B] bool = moved (a destination with no slot moves
+        nothing)."""
+        B = self.B
+        if not bool(go.any()):
+            return torch.zeros(B, dtype=torch.bool, device=self.device)
+        sc, ss = src_col.clamp(min=0), src_slot.clamp(min=0)
+        ar = torch.arange(B, device=self.device)
+        obj = self.city_gw_obj[ar, src_row, sc, ss]
+        maker = self.city_gw_maker[ar, src_row, sc, ss]
+        era = self.city_gw_era[ar, src_row, sc, ss]
+        seat = self.city_gw_seat[ar, src_row, sc, ss]
+        go = go & (src_slot >= 0) & (obj >= 0)
+        # the source empties first: a work moving within one city must not
+        # find its own slot still full
+        g = go.nonzero(as_tuple=True)[0]
+        if g.numel() == 0:
+            return go
+        self._gw_clear(src_row, g, sc[g], ss[g])
+        placed = self._gw_place(dst_row, go, dst_col, obj, maker, era, seat)
+        back = go & ~placed
+        if bool(back.any()):
+            gb = back.nonzero(as_tuple=True)[0]
+            self.city_gw_obj[gb, src_row, sc[gb], ss[gb]] = obj[gb]
+            self.city_gw_maker[gb, src_row, sc[gb], ss[gb]] = maker[gb]
+            self.city_gw_era[gb, src_row, sc[gb], ss[gb]] = era[gb]
+            self.city_gw_seat[gb, src_row, sc[gb], ss[gb]] = seat[gb]
+        return placed
+
+    def _gw_is_obj(self, plane: torch.Tensor, objs: list[int]) -> torch.Tensor:
+        out = torch.zeros_like(plane, dtype=torch.bool)
+        for o in objs:
+            out = out | (plane == o)
+        return out
+
+    def _gw_kind_objs(self, kind: int) -> list[int]:
+        """the object types of one created kind (0 writing / 1 art / 2 music)"""
+        return [o for o in range(8) if int(self._gw_obj_kind[o]) == kind]
+
+    def _gw_count_objs(self, row: int, objs: list[int]) -> torch.Tensor:
+        """[B, RC] long — works of these object types per city."""
+        return self._gw_is_obj(self.city_gw_obj[:, row], objs).long().sum(dim=2)
+
+    def _gw_kind_count(self, row: int, kind: int) -> torch.Tensor:
+        """[B, RC] long — `gwCountKind`."""
+        return self._gw_count_objs(row, self._gw_kind_objs(kind))
+
+    def _gw_kind_count_all(self, kind: int) -> torch.Tensor:
+        """[B, ROWS, RC] long — `gwCountKind` over every city row."""
+        return self._gw_is_obj(self.city_gw_obj, self._gw_kind_objs(kind)).long().sum(dim=3)
+
+    def _gw_created_count(self, row: int) -> torch.Tensor:
+        """[B, RC] long — `cityGreatWorks`: the writing, art and music held."""
+        return self._gw_count_objs(row, [o for o in range(8) if int(self._gw_obj_kind[o]) >= 0])
+
+    def _gw_counts_by_obj(self, row: int) -> torch.Tensor:
+        """[B, RC, 8] long — `gwCountsByObj`."""
+        return torch.stack([(self.city_gw_obj[:, row] == o).long().sum(dim=2) for o in range(8)], dim=2)
+
+    def _gw_last_of_kind_all(self, kind: int) -> torch.Tensor:
+        """[B, ROWS, RC] long — `gwLastOfKind`: the HIGHEST slot holding a work
+        of the kind, -1 for none."""
+        m = self._gw_is_obj(self.city_gw_obj, self._gw_kind_objs(kind))
+        idx = torch.arange(self.GW_W, device=self.device).reshape(1, 1, 1, -1)
+        return torch.where(m, idx, torch.full_like(idx, -1)).max(dim=3).values
+
+    def _gw_gift_pick(self, giver: int, kind: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """The work a gift, a deal or a heist takes from `giver`: the first
+        live city holding one of the kind gives its last-placed such work.
+        Returns ([B] has, [B] col, [B] slot, [B] obj)."""
+        last = self._gw_last_of_kind_all(kind)[:, giver]                      # [B, RC]
+        have = self.city_alive[:, giver] & (last >= 0)
+        has = have.any(dim=1)
+        col = have.long().argmax(dim=1)
+        slot = last.gather(1, col.unsqueeze(1)).squeeze(1).clamp(min=0)
+        ar = torch.arange(self.B, device=self.device)
+        obj = torch.where(has, self.city_gw_obj[ar, giver, col, slot], torch.full_like(slot, -1))
+        return has, col, slot, obj
+
+    def _gw_home_for(self, row: int, obj: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """The row's first live city with room for each game's object:
+        ([B] any, [B] col)."""
+        rb = self._gw_room_by_obj(row) & self.city_alive[:, row].unsqueeze(2)  # [B, RC, 8]
+        room = rb.gather(2, obj.clamp(min=0, max=7).reshape(self.B, 1, 1).expand(self.B, self.RC, 1)).squeeze(2)
+        room = room & (obj >= 0).unsqueeze(1)
+        return room.any(dim=1), room.long().argmax(dim=1)
 
     def _gift_work(self, giver: int, taker: int, kind: int, ok: torch.Tensor) -> None:
         """One GREAT WORK changes hands. CIV6 (Trading): "You may trade almost
         anything in the game, including ... Great Works", and the one-sided
         half of that screen is the gift — "Click it and you gift your items to
-        your rival."
+        your rival." The giver's first city holding one of the kind gives its
+        last-placed such work; the taker's first city with an open slot that
+        takes it receives, provenance and all."""
+        has, scol, sslot, obj = self._gw_gift_pick(giver, kind)
+        room, dcol = self._gw_home_for(taker, obj)
+        self._gw_move(giver, scol, sslot, taker, dcol, ok & has & room)
 
-        The work leaves the giver's first city holding one and lands in the
-        taker's first with room, in the same city order `_place_works` fills.
-        An ART work carries its provenance with it: a gifted work is still that
-        artist's, which is what the receiving museum themes on. `gwTake` and
-        `gwGive`'s twin."""
-        B, RC = self.B, self.RC
-        gw = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind]
-        src_have = self.city_alive[:, giver] & (gw[:, giver] > 0)
-        dst_room = self.city_alive[:, taker] & (gw[:, taker] < self._gw_capacity(taker, kind))
-        move = ok & src_have.any(dim=1) & dst_room.any(dim=1)
-        if not bool(move.any()):
+    def _gw_gift_ok(self, giver: int, taker: int, kind: int) -> torch.Tensor:
+        """[B] bool — `dealItemPayable`'s Great Work arm."""
+        has, _c, _s, obj = self._gw_gift_pick(giver, kind)
+        room, _d = self._gw_home_for(taker, obj)
+        return has & room
+
+    def _gw_person_objs(self, cls: torch.Tensor, at: torch.Tensor) -> torch.Tensor:
+        """[..., 3] long — `personWorkObjects`: the object types one person's
+        works have, -1 padding a two-work class."""
+        shape = cls.shape
+        out = torch.full(shape + (3,), -1, dtype=torch.long, device=self.device)
+        wr_c, ar_c, mu_c = self._gw_cls
+        for kind, k_cls in ((0, wr_c), (2, mu_c)):
+            if k_cls < 0:
+                continue
+            objs = self._gw_kind_objs(kind)
+            n = self._gw_works_k[kind]
+            hit = cls == k_cls
+            for k in range(min(n, 3)):
+                out[..., k] = torch.where(hit, torch.full_like(out[..., k], objs[0]), out[..., k])
+        if ar_c >= 0 and self._gw_artist_objs.numel():
+            na = self._gw_artist_objs.shape[0]
+            aw = self._gw_artist_objs[at.clamp(min=0, max=na - 1)]            # [..., 3]
+            out = torch.where((cls == ar_c).unsqueeze(-1), aw, out)
+        return out
+
+    def _gw_activation_room_at(self, row: int, cls: torch.Tensor, at: torch.Tensor, tc: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — `gwOpen`: the city on each rank's tile has an open
+        slot taking at least one of the person's works."""
+        B = self.B
+        col = self.city_slot_at(row).gather(1, tc)                           # [B, N]
+        rb = self._gw_room_by_obj(row).reshape(B, self.RC * 8)               # [B, RC*8]
+        objs = self._gw_person_objs(cls, at)                                 # [B, N, 3]
+        out = torch.zeros_like(col, dtype=torch.bool)
+        for k in range(3):
+            o = objs[:, :, k]
+            idx = col.clamp(min=0) * 8 + o.clamp(min=0)
+            out = out | (rb.gather(1, idx) & (col >= 0) & (o >= 0))
+        return out
+
+    def _gw_room_kind(self, row: int, kind: int) -> torch.Tensor:
+        """[B, RC] bool — an open slot taking ANY object of the kind: what a
+        person of the class walks toward (`_gp_site_plane`)."""
+        rb = self._gw_room_by_obj(row)
+        out = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        for o in self._gw_kind_objs(kind):
+            out = out | rb[:, :, o]
+        return out
+
+    def _gw_place_person(self, row: int, m: torch.Tensor, col: torch.Tensor, cls: torch.Tensor,
+                         at: torch.Tensor, culture_val: torch.Tensor) -> None:
+        """`activateGreatPerson`'s works: each of the person's works seeks its
+        own slot in the city at `col`; every work with none is one instant
+        culture lump."""
+        if not bool(m.any()):
             return
-        si = src_have.long().argmax(dim=1)
-        di = dst_room.long().argmax(dim=1)
-        col = torch.arange(RC, device=self.device).reshape(1, RC)
-        src_cell = move.unsqueeze(1) & (col == si.unsqueeze(1))
-        dst_cell = move.unsqueeze(1) & (col == di.unsqueeze(1))
-        if kind == 1:
-            ns = self._gw_slots_k[1]
-            su = gw[:, giver].gather(1, si.unsqueeze(1)).squeeze(1) - 1  # the giver's LAST filled slot
-            du = gw[:, taker].gather(1, di.unsqueeze(1)).squeeze(1)      # the taker's first free one
-            held = (su >= 0) & (su < ns)
-            sc = su.clamp(0, ns - 1).reshape(B, 1, 1).expand(B, 1, 1)
-            gi = si.reshape(B, 1, 1).expand(B, 1, ns)
-            ptype = torch.where(held, self.city_gwart_type[:, giver].gather(1, gi).squeeze(1).gather(1, sc.squeeze(2)).squeeze(1),
-                                torch.full_like(su, -1))
-            partist = torch.where(held, self.city_gwart_artist[:, giver].gather(1, gi).squeeze(1).gather(1, sc.squeeze(2)).squeeze(1),
-                                  torch.full_like(su, -1))
-            for sl in range(ns):
-                out = src_cell & (su.unsqueeze(1) == sl)
-                self.city_gwart_type[:, giver, :, sl] = torch.where(
-                    out, torch.full_like(self.city_gwart_type[:, giver, :, sl], -1),
-                    self.city_gwart_type[:, giver, :, sl])
-                self.city_gwart_artist[:, giver, :, sl] = torch.where(
-                    out, torch.full_like(self.city_gwart_artist[:, giver, :, sl], -1),
-                    self.city_gwart_artist[:, giver, :, sl])
-                into = dst_cell & (du.unsqueeze(1) == sl)
-                self.city_gwart_type[:, taker, :, sl] = torch.where(
-                    into, ptype.unsqueeze(1).expand(B, RC), self.city_gwart_type[:, taker, :, sl])
-                self.city_gwart_artist[:, taker, :, sl] = torch.where(
-                    into, partist.unsqueeze(1).expand(B, RC), self.city_gwart_artist[:, taker, :, sl])
-        gw[:, giver] = gw[:, giver] - src_cell.long()
-        gw[:, taker] = gw[:, taker] + dst_cell.long()
-        self._eff_version += 1
+        objs = self._gw_person_objs(cls, at)                                 # [B, 3]
+        seat = torch.full((self.B,), int(self._ROW_SEAT[row]), dtype=torch.long, device=self.device)
+        era = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        overflow = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for k in range(3):
+            o = objs[:, k]
+            go = m & (o >= 0) & (col >= 0)
+            placed = self._gw_place(row, go, col, o, at.clamp(min=0), era, seat)
+            overflow = overflow + (go & ~placed).long()
+        # a person with no city at all pays the ONE lump `activateGreatPerson`'s
+        # else-arm pays
+        overflow = overflow + (m & (col < 0)).long()
+        self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + overflow.to(torch.float64) * culture_val
+
+    def _gw_themed(self, row: int) -> torch.Tensor:
+        """[B, RC, H] bool — `holderThemed`: the holder's rule over every slot
+        the seat's copy carries, all full (the Art Museum: one object type,
+        distinct makers; the Archaeological Museum: one era, distinct
+        civilizations), or Kristina's row: at least her count of slots, all
+        full, whatever the rule."""
+        B, RC = self.B, self.RC
+        present = self._gw_holder_present(row)
+        carried = self._gw_slot_carried(row, present)                        # [B, RC, W]
+        obj = self.city_gw_obj[:, row]
+        filled = obj >= 0
+        out = torch.zeros(B, RC, self.GW_H, dtype=torch.bool, device=self.device)
+        auto_rows = [(self._row_is(row, _c, _l), int(_n), bool(_w)) for _c, _l, _n, _w in self._gw_auto_theme_rows]
+        for h in range(self.GW_H):
+            cols = (self._gw_slot_holder == h).nonzero(as_tuple=True)[0]
+            if cols.numel() == 0:
+                continue
+            car = carried[:, :, cols]                                        # [B, RC, n]
+            nslots = car.long().sum(dim=2)                                   # [B, RC]
+            full = present[:, :, h] & (nslots > 0) & (~car | filled[:, :, cols]).all(dim=2)
+            rule = self._gw_holder_theme[h]
+            by_rule = torch.zeros_like(full)
+            if rule in (1, 2):
+                key = obj[:, :, cols] if rule == 1 else self.city_gw_era[:, row][:, :, cols]
+                who = self.city_gw_maker[:, row][:, :, cols] if rule == 1 else self.city_gw_seat[:, row][:, :, cols]
+                same = torch.ones_like(full)
+                distinct = torch.ones_like(full)
+                n = cols.numel()
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        both = car[:, :, i] & car[:, :, j]
+                        same = same & (~both | (key[:, :, i] == key[:, :, j]))
+                        distinct = distinct & (~both | (who[:, :, i] != who[:, :, j]))
+                by_rule = full & same & distinct
+            by_auto = torch.zeros_like(full)
+            for rmask, need, is_w in auto_rows:
+                if is_w != self._gw_holder_wonder[h]:
+                    continue
+                by_auto = by_auto | (rmask.unsqueeze(1) & full & (nslots >= need))
+            out[:, :, h] = by_rule | by_auto
+        return out
+
+    def _gw_slot_mult(self, row: int) -> torch.Tensor:
+        """[B, RC, W] long — what each slot's holder theming multiplies its
+        work by (`gwSlotMults`)."""
+        themed = self._gw_themed(row)[:, :, self._gw_slot_holder]
+        return torch.where(themed, torch.full_like(themed, self._gw_theming_mult, dtype=torch.long),
+                           torch.ones_like(themed, dtype=torch.long))
+
+    def _gw_yields(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B, RC] culture, [B, RC] faith) double — `greatWorkYields`: the
+        works' own face, a themed holder's paying twice."""
+        obj = self.city_gw_obj[:, row]
+        held = obj >= 0
+        if not bool(held.any()):
+            z = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+            return z, z
+        mult = self._gw_slot_mult(row).double()
+        oc = obj.clamp(min=0)
+        cul = (self._gw_obj_culture[oc] * mult * held.double()).sum(dim=2)
+        fai = (self._gw_obj_faith[oc] * mult * held.double()).sum(dim=2)
+        return cul, fai
+
+    def _gw_tourism_general(self, row: int, printing: torch.Tensor | None, km: torch.Tensor | None) -> torch.Tensor:
+        """[B, RC] long — `greatWorkTourism`: every work but a Relic, PRINTING
+        doubling a Work of Writing's, the Congress multiplier by created kind,
+        a themed holder doubling its own."""
+        obj = self.city_gw_obj[:, row]
+        held = obj >= 0
+        if not bool(held.any()):
+            return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        oc = obj.clamp(min=0)
+        base = self._gw_obj_tourism[oc] * (held & (obj != 7)).long()
+        if printing is not None:
+            pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
+                             torch.ones(self.B, dtype=torch.long, device=self.device))
+            base = torch.where(obj == 5, base * pm.reshape(-1, 1, 1), base)
+        if km is not None:
+            kind = self._gw_obj_kind[oc]                                     # [B, RC, W]
+            kk = torch.cat([km, torch.ones(self.B, 1, dtype=torch.long, device=self.device)], dim=1)  # kind -1 -> column 3
+            kmul = kk.gather(1, torch.where(kind < 0, torch.full_like(kind, 3), kind).reshape(self.B, -1)).reshape_as(kind)
+            base = base * kmul
+        return (base * self._gw_slot_mult(row)).sum(dim=2)
+
+    def _gw_tourism_relic(self, row: int) -> torch.Tensor:
+        """[B, RC] long — `relicTourism`: what the Relics pay, a themed holder
+        doubling its own; the holding city's wonder multiplier is the caller's."""
+        obj = self.city_gw_obj[:, row]
+        rel = obj == 7
+        if not bool(rel.any()):
+            return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        return (self._gw_obj_tourism[7] * rel.long() * self._gw_slot_mult(row)).sum(dim=2)
 
     def _spread_religious_pressure(self) -> None:
         """The spreadReligiousPressure twin. CIV6 (GlobalParameters): every
@@ -3863,57 +4030,22 @@ class SimEconomy:
             we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
         return we
 
-    def _museum_themed(self, row: int) -> torch.Tensor:
-        """[B, RC] bool — is this city's ARCHAEOLOGICAL MUSEUM themed?
-        CIV6: every slot full, all Artifacts from ONE era, no two from the
-        same civilization; a themed museum DOUBLES the yields of what it
-        holds. `museumThemed` is the twin."""
-        n = self._artifact_slots
-        eras = self.city_artifact_era[:, row, :, :n]   # [B, RC, n]
-        seats = self.city_artifact_seat[:, row, :, :n]
-        full = self.city_artifacts[:, row] >= n
-        if self._artifact_bidx >= 0:
-            # a pool-standing find never themes — the museum must STAND
-            full = full & self.city_bldg[:, row, :, self._artifact_bidx]
-        one_era = (eras == eras[:, :, :1]).all(dim=2)
-        distinct = torch.ones_like(full)
-        for i in range(n):
-            for j in range(i + 1, n):
-                distinct = distinct & (seats[:, :, i] != seats[:, :, j])
-        return full & one_era & distinct
-
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_tour: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
         tile ownership rather than by worked-tile assignment so the seats
-        cannot drift on citizen placement. `gw_w`/`gw_m` are the seat's
-        per-city Great Work counts, `alive` the matching per-city alive mask,
-        `own` a [B, T] tile-ownership mask."""
+        cannot drift on citizen placement. `gw_tour` is the seat's per-city
+        Great Work tourism (`_gw_tourism_general`), `alive` the matching
+        per-city alive mask, `own` a [B, T] tile-ownership mask."""
         # ALIVE-masked: TS iterates the seat's cities list, which a captured or
         # razed city has already left. Summing every column would keep paying
         # tourism for a city the seat no longer owns.
-        # PRINTING doubles the WRITING term (tourism only).
-        _wmult = self._gw_tour_k[0] * torch.where(
-            printing if printing is not None else torch.zeros(self.B, dtype=torch.bool, device=self.device),
-            torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
-            torch.ones(self.B, dtype=torch.long, device=self.device),
-        )
-        # CIV6 (Heritage Organization): x2 / x0 tourism by Great Work KIND.
-        km = gw_kmult if gw_kmult is not None else torch.ones(self.B, 3, dtype=torch.long, device=self.device)
         # CIV6 (Curator): "+100% Tourism from Great Works in this city." The
         # multiplier is the CITY's, so it folds into the per-city term rather
         # than the seat total.
         av = alive.long() if gw_mult is None else alive.long() * gw_mult
-        t = (
-            _wmult * km[:, 0] * (gw_w * av).sum(dim=1)
-            + self._gw_tour_k[1] * km[:, 1] * (gw_a * av).sum(dim=1)
-            + self._gw_tour_k[2] * km[:, 2] * (gw_m * av).sum(dim=1)
-        )
-        if artifacts is not None:
-            # per-city artifact counts with the museum's theming DOUBLE
-            # already folded in by the caller (`_artifact_theming_counts`)
-            t = t + self._artifact_tourism * (artifacts * av).sum(dim=1)
+        t = (gw_tour * av).sum(dim=1)
         w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
         if bool(w_live.any()):
             w_era = self._wonder_era[self.built_wonder.clamp(min=0, max=max(self._wonder_era.numel() - 1, 0))]
@@ -3962,10 +4094,10 @@ class SimEconomy:
         generate +8 Religious Tourism per turn" — a religion's Holy City pays
         its CURRENT owner (`seatTourismReligious`)."""
         alive = self.city_alive[:, row]
-        relics = self.city_relics[:, row]
+        relics = self._gw_tourism_relic(row)
         rm = (self._city_wonder_mult(row, self._wond_relictour).long()
               if self._wond_n else torch.ones_like(relics))
-        t = self._relic_tour * (relics * alive.long() * rm).sum(dim=1)
+        t = (relics * alive.long() * rm).sum(dim=1)
         centres = self.city_center[:, row]
         for g in range(self.n_majors):
             ht = self.holy_tile[:, g]
@@ -4550,20 +4682,16 @@ class SimEconomy:
                 bld_y = bld_y + _impy[:, sl]
             if fol_live:
                 bld_y[:, :, 5] = bld_y[:, :, 5] + self._fol_tab_for("fpw", row, sl) * compw.sum(dim=2).double()
-        # Slotted GREAT WORKS (culture/turn per work BY KIND), ARTIFACT culture,
-        # the Golden PEN, BRUSH AND VOICE culture per COMPLETED SPECIALTY
-        # district, and RELIC faith — TS's own four consecutive lines at the
-        # tail of the buildings bucket.
-        bld_y[:, :, 4] = bld_y[:, :, 4] + (
-            self._gw_cul_k[0] * self.city_gw_writing[:, row, sl].double()
-            + self._gw_cul_k[1] * (self.city_gw_art[:, row, sl] + self._art_themed_works(row)[:, sl]).double()
-            + self._gw_cul_k[2] * self.city_gw_music[:, row, sl].double()
-        ) * alivef
-        bld_y[:, :, 4] = bld_y[:, :, 4] + self._artifact_culture * self._artifact_theming_counts(row)[:, sl].double() * alivef
+        # The GREAT WORKS held (culture, and a Relic's faith — a themed
+        # holder's paying twice), then the Golden PEN, BRUSH AND VOICE culture
+        # per COMPLETED SPECIALTY district — TS's own lines at the tail of the
+        # buildings bucket.
+        _gwc, _gwf = self._gw_yields(row)
+        bld_y[:, :, 4] = bld_y[:, :, 4] + _gwc[:, sl] * alivef
         _pb = self._golden_ded(row, self._ded_pen_brush)
         if bool(_pb.any()):
             bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef
-        bld_y[:, :, 5] = bld_y[:, :, 5] + self._relic_faith * self.city_relics[:, row, sl].double() * alivef
+        bld_y[:, :, 5] = bld_y[:, :, 5] + _gwf[:, sl] * alivef
         # CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
         _ml = bldg[:, :, rd.b_maxloy_culture]
         if _ml.numel() and bool(_ml.any()):
@@ -4573,18 +4701,18 @@ class SimEconomy:
         # CIV6 (Anshan's suzerain): "+2 Science from each Great Work of
         # Writing. +1 Science from each Relic and Artifact."
         _ans = self._suz_effect(row, self._suz_c_works)
+        _byo = self._gw_counts_by_obj(row)[:, sl]                            # [B, cols, 8]
         if bool(_ans.any()):
             bld_y[:, :, 3] = bld_y[:, :, 3] + _ans.double().unsqueeze(1) * (
-                self._suz_writing_sci * self.city_gw_writing[:, row, sl].double()
-                + self._suz_relic_sci * (self.city_relics[:, row, sl] + self.city_artifacts[:, row, sl]).double()
+                self._suz_writing_sci * _byo[:, :, 5].double()
+                + self._suz_relic_sci * (_byo[:, :, 7] + _byo[:, :, 4]).double()
             ) * alivef
         # CIV6 (EFFECT_ADJUST_CITY_GREATWORK_YIELD): the roster's per-work rows
-        # (`GREAT_WORK_YIELD_ROWS`) — a Relic or an Artifact held here
+        # (`GREAT_WORK_YIELD_ROWS`), per work of the row's object type held here
         for _gc, _gl, _gk, _gy, _ga in self._great_work_yield_rows:
             _gw = self._row_is(row, _gc, _gl)
             if bool(_gw.any()):
-                _gn = (self.city_relics if _gk == 0 else self.city_artifacts)[:, row, sl].double()
-                bld_y[:, :, _gy] = bld_y[:, :, _gy] + _ga * _gw.double().unsqueeze(1) * _gn * alivef
+                bld_y[:, :, _gy] = bld_y[:, :, _gy] + _ga * _gw.double().unsqueeze(1) * _byo[:, :, _gk].double() * alivef
 
         # ================= bucket 4: CITIZENS ===============================
         # THE non-dyadic term (CITIZEN_CULTURE = 0.3), so its POSITION is the

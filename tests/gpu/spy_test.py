@@ -15,7 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, hold_works
 
 
 def fresh(rules, path, turns=30):
@@ -181,15 +181,22 @@ def main() -> None:
     # -- 5: Great Work Heist waits for a work -------------------------------
     sim.unit_tile[0, v] = ctr_t
     sim._gen_ver += 1
-    hk = sim._heist_kind(torch.tensor([[foe]]), torch.tensor([[theirs]]))
-    assert int(hk[0, 0]) == -1, "an empty city offers nothing to steal"
-    sim.city_gw_music[0, foe, theirs] = 1
-    assert int(sim._heist_kind(torch.tensor([[foe]]), torch.tensor([[theirs]]))[0, 0]) == 2
-    sim.city_gw_writing[0, foe, theirs] = 1
+    _pick = lambda: sim._heist_pick(row, torch.tensor([[foe]]), torch.tensor([[theirs]]))  # noqa: E731
+    assert not bool(_pick()[0][0, 0]), "an empty city offers nothing to steal"
+    _m = hold_works(sim, 0, foe, theirs, 6, 1)
+    assert int(_pick()[2][0, 0]) == 6, "a music work is the pick"
+    _w = hold_works(sim, 0, foe, theirs, 5, 1)
     # CIV6: "Works of Writing will be displayed first ... Music last"
-    assert int(sim._heist_kind(torch.tensor([[foe]]), torch.tensor([[theirs]]))[0, 0]) == 0
-    sim.city_gw_writing[0, foe, theirs] = 0
-    sim.city_gw_music[0, foe, theirs] = 0
+    assert int(_pick()[2][0, 0]) == 5 and bool(_pick()[0][0, 0])
+    # ... and the thief needs a city with an open slot that takes it
+    _cap = sim.city_is_cap[0, row].clone()
+    sim.city_is_cap[0, row, :] = False
+    sim._eff_version += 1
+    assert not bool(_pick()[0][0, 0]), "no room at home, no heist"
+    sim.city_is_cap[0, row] = _cap
+    for sl in _m + _w:
+        sim.city_gw_obj[0, foe, theirs, sl] = -1
+    sim._eff_version += 1
 
     # -- 6: Steal Tech Boost waits for a tech the thief lacks ----------------
     sim.civ_techs[0, foe] = sim.civ_techs[0, row].clone()

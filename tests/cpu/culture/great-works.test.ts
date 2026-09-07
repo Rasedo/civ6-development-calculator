@@ -1,26 +1,27 @@
 /**
- * Great Works. A WRITER/MUSICIAN carries 2 Great Works that fill open
- * AMPHITHEATER (writing, 2) / ART MUSEUM (art, 3) / BROADCAST CENTER (music, 1)
- * slots — the real Civ 6 homes — lowest city then lowest slot first. Each
- * slotted work yields building-tier culture and tourism BY KIND (the real GS
- * values: writing +2, music +4; no Great Work pays gold).
- * Charges with no open slot overflow to an instant culture lump.
- * These pin placeGreatWorks + cityGreatWorks +
- * greatWorkCulture + the building-tier yield; the GPU great_works_test battery
- * lane mirrors them across both seats.
+ * Great Works. A WRITER / ARTIST / MUSICIAN's works each seek an open slot
+ * that takes them — the Amphitheater's two writing slots, the Art Museum's
+ * three art slots, the Broadcast Center's one music slot, a wonder's own —
+ * and a work with no slot degrades to the person's instant culture lump.
+ * CIV6 (GreatWorks.xml, GS): a Work of Writing pays +2 Culture / 2 Tourism,
+ * a Work of Art +3 / 2, Music +4 / 4; no Great Work pays gold. These pin the
+ * placement composer, the yields and the Art Museum's theming rule; the GPU
+ * great_works_test lane mirrors them.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
+import { makeMap, makeState, tileAtCoords, expandBorders, holdWorks } from '../helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, artMuseumThemed, THEMING_MULT, ART_RELIGIOUS, ART_SCULPTURE, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC, GW_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
-// The kind arrays replaced the writing/music pair — these aliases keep the
-// existing assertions readable now that ART is a real kind with its own slots.
-const GW_WRITING_CULTURE = GW_CULTURE[GW_WRITING];
-const GW_MUSIC_CULTURE = GW_CULTURE[GW_MUSIC];
-const WORKS_PER_PERSON = GW_WORKS_PER_PERSON[GW_WRITING];
-const SLOTS_PER_BUILDING = GW_SLOTS[GW_WRITING];
-import type { City } from '../../../cpu/core/types';
+import { ARTIST_WORKS, GW_WORKS_PER_PERSON, personWorkObjects } from '../../../cpu/data/greatPeople';
+import {
+  GW_HOLDERS, GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_CULTURE, GWO_LANDSCAPE, GWO_MUSIC, GWO_RELIGIOUS,
+  GWO_SCULPTURE, GWO_TOURISM, GWO_WRITING, THEMING_MULT, holderSlots,
+} from '../../../cpu/data/greatWorks';
+import {
+  cityGreatWorks, greatWorkTourism, greatWorkYields, gwCountKind, gwWorks, holderThemed, placeGreatWork, workContext,
+  type WorkCity,
+} from '../../../cpu/core/greatWorks';
+import type { City, GameState } from '../../../cpu/core/types';
 
 /** A city with a completed Theater Square + Amphitheater (2 writing slots). */
 function cityWithAmphitheater() {
@@ -33,186 +34,188 @@ function cityWithAmphitheater() {
   expect(ts.districtComplete).toBe(true);
   expect(queueBuilding(state, city.id, 'AMPHITHEATER', 0).ok).toBe(true);
   expect(city.buildings.includes('AMPHITHEATER')).toBe(true);
+  // the Palace's own any-object slot comes FIRST in the holder table; these
+  // scenes read the Amphitheater alone
+  city.buildings = city.buildings.filter((b) => b !== 'PALACE');
   return { state, city };
 }
 
+/** spend one person's charge in `city`: every work placed, the rest counted */
+function activate(state: GameState, city: City, cls: 'WRITER' | 'ARTIST' | 'MUSICIAN', at = 0): number {
+  let overflow = 0;
+  for (const obj of personWorkObjects(cls, at)) {
+    if (placeGreatWork(state, city, { obj, maker: at, era: -1, seat: city.seat }) < 0) overflow += 1;
+  }
+  return overflow;
+}
+
+const holder = (id: string) => GW_HOLDERS.findIndex((h) => h.id === id);
+const culture = (state: GameState, city: City) => computeCityStats(state, city).breakdown.buildings.culture;
+
 describe('Great Works', () => {
-  it('slots a writing person into Amphitheater slots and yields +2 culture/work', () => {
+  it('slots a Writer into the Amphitheater and pays +2 culture per work', () => {
     const { state, city } = cityWithAmphitheater();
-    const before = computeCityStats(state, city).breakdown.buildings.culture;
-
-    const overflow = placeGreatWorks([city], GW_WRITING); // one Writer = 2 works
-    expect(overflow).toBe(0); // both works fit the 2 Amphitheater slots
-    expect(cityGreatWorks(city)).toBe(WORKS_PER_PERSON);
-    expect(city.greatWorksWriting).toBe(2);
-
-    const after = computeCityStats(state, city).breakdown.buildings.culture;
-    expect(after - before).toBe(GW_WRITING_CULTURE * WORKS_PER_PERSON); // +4 culture
+    const before = culture(state, city);
+    expect(activate(state, city, 'WRITER')).toBe(0); // both works fit the 2 Amphitheater slots
+    expect(cityGreatWorks(city)).toBe(GW_WORKS_PER_PERSON[GW_KIND_WRITING]);
+    expect(gwCountKind(city, GW_KIND_WRITING)).toBe(2);
+    expect(gwWorks(city).map((w) => w.slot)).toEqual(holderSlots(holder('AMPHITHEATER')));
+    expect(culture(state, city) - before).toBe(GWO_CULTURE[GWO_WRITING]! * 2);
   });
 
-  // MUSIC lives in the BROADCAST CENTER, its real Civ 6 home, and that
-  // building has exactly ONE slot — so a Musician's 2 works always leave 1
-  // overflowing. The Museum is the ART Museum now and holds 3 art works.
   it('a MUSIC work pays double a writing work (4 vs 2) and no gold', () => {
     const { state, city } = cityWithAmphitheater();
     expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true); // requiresAny AMPHITHEATER
     expect(queueBuilding(state, city.id, 'BROADCAST_CENTER', 0).ok).toBe(true); // requiresAny MUSEUM
-    expect(city.buildings.includes('BROADCAST_CENTER')).toBe(true);
     const b0 = computeCityStats(state, city).breakdown.buildings;
-    const [cul0, gold0] = [b0.culture, b0.gold];
-
-    expect(placeGreatWorks([city], GW_MUSIC)).toBe(1); // 2 works, 1 Broadcast Center slot
-    expect(city.greatWorksMusic).toBe(GW_SLOTS[GW_MUSIC]);
-
+    expect(activate(state, city, 'MUSICIAN')).toBe(1); // 2 works, 1 Broadcast Center slot
+    expect(gwCountKind(city, GW_KIND_MUSIC)).toBe(1);
     const b1 = computeCityStats(state, city).breakdown.buildings;
-    expect(b1.culture - cul0).toBe(GW_MUSIC_CULTURE * GW_SLOTS[GW_MUSIC]); // +4 for the one slotted work
-    expect(GW_MUSIC_CULTURE).toBe(2 * GW_WRITING_CULTURE); // the real GS ratio
-    expect(b1.gold - gold0).toBe(0); // NO Great Work pays gold in Civ 6
+    expect(b1.culture - b0.culture).toBe(GWO_CULTURE[GWO_MUSIC]!);
+    expect(GWO_CULTURE[GWO_MUSIC]).toBe(2 * GWO_CULTURE[GWO_WRITING]!); // the real GS ratio
+    expect(b1.gold - b0.gold).toBe(0); // NO Great Work pays gold in Civ 6
   });
 
-  // ART is a real kind — the ART MUSEUM's 3 slots, +2 culture apiece, and
-  // a Great Artist carries exactly 3 works, so one Artist fills a Museum.
-  it('an ARTIST fills the Art Museum (3 slots, +2 culture each)', () => {
+  it('an ARTIST fills the Art Museum (3 slots, +3 culture each)', () => {
     const { state, city } = cityWithAmphitheater();
     expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true);
-    const cul0 = computeCityStats(state, city).breakdown.buildings.culture;
-
-    expect(GW_WORKS_PER_PERSON[GW_ART]).toBe(3); // real Civ 6: an Artist makes 3
-    expect(GW_SLOTS[GW_ART]).toBe(3); // ... and the Art Museum holds exactly 3
-    expect(placeGreatWorks([city], GW_ART)).toBe(0); // so one Artist fits exactly
-    expect(city.greatWorksArt).toBe(3);
-
-    const cul1 = computeCityStats(state, city).breakdown.buildings.culture;
-    expect(cul1 - cul0).toBe(GW_CULTURE[GW_ART] * 3); // +6
+    const cul0 = culture(state, city);
+    expect(GW_WORKS_PER_PERSON[GW_KIND_ART]).toBe(3); // real Civ 6: an Artist makes 3
+    expect(activate(state, city, 'ARTIST', 2)).toBe(0); // Donatello's three sculptures fit exactly
+    expect(gwCountKind(city, GW_KIND_ART)).toBe(3);
+    expect(culture(state, city) - cul0).toBe(GWO_CULTURE[GWO_SCULPTURE]! * 3); // +9
   });
 
-  // PRINTING doubles the TOURISM of Great Works of WRITING (real
-  // Civ 6 — the tourism, not the Amphitheater's slot count). Culture is
-  // untouched, and the other two kinds are untouched.
   it('PRINTING doubles WRITING tourism only', () => {
-    const w = { greatWorksWriting: 2 };
-    expect(greatWorkTourism(w, false)).toBe(GW_TOURISM[GW_WRITING] * 2);
-    expect(greatWorkTourism(w, true)).toBe(GW_TOURISM[GW_WRITING] * 2 * 2);
+    const state = makeState();
+    const w: WorkCity = { seat: 0, buildings: [] };
+    holdWorks(w, GWO_WRITING, 2);
+    expect(greatWorkTourism(state, w, false)).toBe(GWO_TOURISM[GWO_WRITING]! * 2);
+    expect(greatWorkTourism(state, w, true)).toBe(GWO_TOURISM[GWO_WRITING]! * 2 * 2);
     // ... art and music are NOT doubled
-    const am = { greatWorksArt: 2, greatWorksMusic: 1 };
-    expect(greatWorkTourism(am, true)).toBe(greatWorkTourism(am, false));
+    const am: WorkCity = { seat: 0, buildings: [] };
+    holdWorks(am, GWO_LANDSCAPE, 2);
+    holdWorks(am, GWO_MUSIC, 1);
+    expect(greatWorkTourism(state, am, true)).toBe(greatWorkTourism(state, am, false));
     // ... and CULTURE never moves
-    expect(greatWorkCulture(w)).toBe(GW_CULTURE[GW_WRITING] * 2);
+    expect(greatWorkYields(state, w).culture).toBe(GWO_CULTURE[GWO_WRITING]! * 2);
   });
 
-  it('greatWorkCulture weights every kind separately', () => {
-    expect(greatWorkCulture({ greatWorksWriting: 2 })).toBe(4);
-    expect(greatWorkCulture({ greatWorksMusic: 2 })).toBe(8);
-    expect(greatWorkCulture({ greatWorksArt: 2 })).toBe(4);
-    expect(greatWorkCulture({ greatWorksWriting: 1, greatWorksArt: 1, greatWorksMusic: 1 })).toBe(8);
-    expect(greatWorkCulture({})).toBe(0);
+  it('greatWorkYields weights every object type separately', () => {
+    const state = makeState();
+    const mk = (fill: (c: WorkCity) => void) => {
+      const c: WorkCity = { seat: 0, buildings: [] };
+      fill(c);
+      return greatWorkYields(state, c).culture;
+    };
+    expect(mk((c) => holdWorks(c, GWO_WRITING, 2))).toBe(4);
+    expect(mk((c) => holdWorks(c, GWO_MUSIC, 2))).toBe(8);
+    expect(mk((c) => holdWorks(c, GWO_RELIGIOUS, 2))).toBe(6);
+    expect(mk((c) => { holdWorks(c, GWO_WRITING, 1); holdWorks(c, GWO_SCULPTURE, 1); holdWorks(c, GWO_MUSIC, 1); })).toBe(9);
+    expect(mk(() => undefined)).toBe(0);
   });
 
   it('caps at 2 writing slots and overflows further charges', () => {
     const { state, city } = cityWithAmphitheater();
-    placeGreatWorks([city], GW_WRITING); // fills both slots
-    const overflow = placeGreatWorks([city], GW_WRITING); // second Writer: no slots left
-    expect(overflow).toBe(WORKS_PER_PERSON); // both charges overflow
-    expect(city.greatWorksWriting).toBe(SLOTS_PER_BUILDING); // still capped at 2
-    void computeCityStats(state, city); // yield stays at the 2-work level
-    expect(cityGreatWorks(city)).toBe(SLOTS_PER_BUILDING);
+    expect(activate(state, city, 'WRITER')).toBe(0); // fills both slots
+    expect(activate(state, city, 'WRITER')).toBe(2); // second Writer: no slots left
+    expect(gwCountKind(city, GW_KIND_WRITING)).toBe(2); // still capped at 2
+    expect(cityGreatWorks(city)).toBe(2);
   });
 
   it('music works overflow when no Broadcast Center exists', () => {
-    const { city } = cityWithAmphitheater();
-    const overflow = placeGreatWorks([city], GW_MUSIC); // Musician, no Broadcast Center
-    expect(overflow).toBe(GW_WORKS_PER_PERSON[GW_MUSIC]); // no music slot -> full overflow
-    expect(city.greatWorksMusic ?? 0).toBe(0);
-  });
-
-  it('fills the LOWEST city first, then the next (deterministic order)', () => {
-    // Two cities, both with an Amphitheater: 3 works fill city A (2) then city B (1).
-    const a = { buildings: ['AMPHITHEATER'] } as unknown as City;
-    const b = { buildings: ['AMPHITHEATER'] } as unknown as City;
-    // First Writer (2 works) -> all into A.
-    expect(placeGreatWorks([a, b], GW_WRITING)).toBe(0);
-    expect(a.greatWorksWriting).toBe(2);
-    expect(b.greatWorksWriting ?? 0).toBe(0);
-    // Second Writer (2 works) -> A is full, both spill into B (only 1 slot fits... B has 2).
-    expect(placeGreatWorks([a, b], GW_WRITING)).toBe(0);
-    expect(b.greatWorksWriting).toBe(2);
-  });
-
-  it('sourced wonder slots: Great Library 2 writing, Hermitage 4 art, Bolshoi 1+1', () => {
-    expect(GW_WONDER_SLOTS.GREAT_LIBRARY).toEqual([2, 0, 0]);
-    expect(GW_WONDER_SLOTS.HERMITAGE).toEqual([0, 4, 0]);
-    expect(GW_WONDER_SLOTS.BOLSHOI_THEATRE).toEqual([1, 0, 1]);
+    const { state, city } = cityWithAmphitheater();
+    expect(activate(state, city, 'MUSICIAN')).toBe(GW_WORKS_PER_PERSON[GW_KIND_MUSIC]);
+    expect(gwCountKind(city, GW_KIND_MUSIC)).toBe(0);
   });
 
   it('a wonder holds works in a city with NO matching building, and adds to one that has', () => {
-    const bare = { buildings: [] as string[] } as unknown as City;
-    // Hermitage alone: 4 art slots, so a whole Artist (3 works) fits.
-    expect(placeGreatWorks([bare], GW_ART, () => GW_WONDER_SLOTS.HERMITAGE[GW_ART])).toBe(0);
-    expect(bare.greatWorksArt).toBe(GW_WORKS_PER_PERSON[GW_ART]);
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    city.buildings = city.buildings.filter((b) => b !== 'PALACE'); // no Palace slot in the way
+    const wt = tileAtCoords(state.map, 9, 9);
+    // Hermitage alone: 4 art slots, so a whole Artist (3 works) fits
+    city.wonders.push({ id: 'HERMITAGE', tileIndex: wt.index });
+    expect(activate(state, city, 'ARTIST', 7)).toBe(3); // ... once it is COMPLETE
+    wt.builtWonderComplete = true;
+    expect(activate(state, city, 'ARTIST', 7)).toBe(0);
+    expect(gwWorks(city).map((w) => w.slot)).toEqual(holderSlots(holder('HERMITAGE')).slice(0, 3));
 
-    // Amphitheater (2) + Great Library (2) = 4 writing slots: two Writers fit.
-    const lib = { buildings: ['AMPHITHEATER'] } as unknown as City;
-    const extra = () => GW_WONDER_SLOTS.GREAT_LIBRARY[GW_WRITING];
-    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(0);
-    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(0);
-    expect(lib.greatWorksWriting).toBe(4);
-    // The fifth work has nowhere to go and overflows.
-    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(GW_WORKS_PER_PERSON[GW_WRITING]);
+    // Amphitheater (2) + Great Library (2) = 4 writing slots: two Writers fit,
+    // the building's slots before the wonder's
+    const lt = tileAtCoords(state.map, 7, 7);
+    city.buildings.push('AMPHITHEATER');
+    city.wonders.push({ id: 'GREAT_LIBRARY', tileIndex: lt.index });
+    lt.builtWonderComplete = true;
+    expect(activate(state, city, 'WRITER')).toBe(0);
+    expect(gwWorks(city).filter((w) => w.obj === GWO_WRITING).map((w) => w.slot)).toEqual(holderSlots(holder('AMPHITHEATER')));
+    expect(activate(state, city, 'WRITER')).toBe(0);
+    expect(gwCountKind(city, GW_KIND_WRITING)).toBe(4);
+    // the fifth work has nowhere to go and overflows
+    expect(activate(state, city, 'WRITER')).toBe(GW_WORKS_PER_PERSON[GW_KIND_WRITING]);
   });
 
-  // CIV6 ("Theming bonus (Civ6)"): an Art Museum themes when "its slots must
-  // be filled with Great Works of Art of the same type ... made by different
-  // Great Artists. This means that a minimum of three Great Artists are needed
-  // to activate each Art Museum's theming bonus."
-  it('every Great Work of Art records its TYPE and its ARTIST', () => {
-    const city = { buildings: ['MUSEUM'], greatWorksArt: 0 } as never;
-    // Michelangelo is artist index 1: Religious, Sculpture, Sculpture.
-    expect(placeGreatWorks([city], GW_ART, undefined, 1)).toBe(0);
-    expect((city as { gwArtType?: number[] }).gwArtType)
-      .toEqual([ART_RELIGIOUS, ART_SCULPTURE, ART_SCULPTURE]);
-    expect((city as { gwArtArtist?: number[] }).gwArtArtist).toEqual([1, 1, 1]);
+  // CIV6 (Building_GreatWorks, BUILDING_MUSEUM_ART): ThemingSameObjectType +
+  // ThemingUniquePerson — "its slots must be filled with Great Works of Art of
+  // the same type ... made by different Great Artists".
+  it('every Great Work of Art records its object type and its maker', () => {
+    const state = makeState();
+    const city = { seat: 0, buildings: ['MUSEUM'] } as unknown as City;
+    // Michelangelo is artist index 1: Religious, Sculpture, Sculpture
+    expect(activate(state, city, 'ARTIST', 1)).toBe(0);
+    expect(gwWorks(city).map((w) => w.obj)).toEqual([GWO_RELIGIOUS, GWO_SCULPTURE, GWO_SCULPTURE]);
+    expect(gwWorks(city).map((w) => w.maker)).toEqual([1, 1, 1]);
+    expect(ARTIST_WORKS[1]).toEqual([GWO_RELIGIOUS, GWO_SCULPTURE, GWO_SCULPTURE]);
     // one artist's own three works can never theme a museum
-    expect(artMuseumThemed(city)).toBe(false);
+    expect(holderThemed(state, workContext(state, city), city, holder('MUSEUM'))).toBe(false);
   });
 
   it('three artists of ONE type theme the museum and double what it holds', () => {
-    const mk = () => ({ buildings: ['MUSEUM'], greatWorksArt: 0 }) as never;
+    const state = makeState();
+    const museum = holder('MUSEUM');
+    const mk = () => ({ seat: 0, buildings: ['MUSEUM'] } as unknown as City);
     // Rublev (0), Michelangelo (1) and Bosch (3) each open with a RELIGIOUS
-    // work, so one slot from each fills a same-type, three-artist museum.
+    // work, so one slot from each fills a same-type, three-artist museum
     const city = mk();
-    for (const artist of [0, 1, 3]) {
-      const one = mk();
-      placeGreatWorks([one], GW_ART, undefined, artist);
-      const t = (one as { gwArtType?: number[] }).gwArtType!;
-      const a = (one as { gwArtArtist?: number[] }).gwArtArtist!;
-      const c = city as { gwArtType?: number[]; gwArtArtist?: number[]; greatWorksArt?: number };
-      (c.gwArtType ??= []).push(t[0]);
-      (c.gwArtArtist ??= []).push(a[0]);
-      c.greatWorksArt = (c.greatWorksArt ?? 0) + 1;
+    for (const maker of [0, 1, 3]) {
+      expect(placeGreatWork(state, city, { obj: ARTIST_WORKS[maker]![0]!, maker, era: -1, seat: 0 })).toBeGreaterThanOrEqual(0);
     }
-    expect(artMuseumThemed(city)).toBe(true);
+    expect(holderThemed(state, workContext(state, city), city, museum)).toBe(true);
     // "the bonus doubles the yields of all items in the Museum"
-    expect(greatWorkCulture(city)).toBe(GW_CULTURE[GW_ART] * GW_SLOTS[GW_ART] * THEMING_MULT);
-    expect(greatWorkTourism(city)).toBe(GW_TOURISM[GW_ART] * GW_SLOTS[GW_ART] * THEMING_MULT);
+    expect(greatWorkYields(state, city).culture).toBe(GWO_CULTURE[GWO_RELIGIOUS]! * 3 * THEMING_MULT);
+    expect(greatWorkTourism(state, city, false)).toBe(GWO_TOURISM[GWO_RELIGIOUS]! * 3 * THEMING_MULT);
 
-    // a repeated ARTIST breaks it, and so does a mismatched TYPE
-    const dupArtist = { ...(city as object) } as never;
-    (dupArtist as { gwArtArtist?: number[] }).gwArtArtist = [0, 0, 3];
-    expect(artMuseumThemed(dupArtist)).toBe(false);
-    const dupType = { ...(city as object) } as never;
-    (dupType as { gwArtType?: number[] }).gwArtType = [ART_RELIGIOUS, ART_SCULPTURE, ART_RELIGIOUS];
-    expect(artMuseumThemed(dupType)).toBe(false);
+    // a repeated MAKER breaks it, and so does a mismatched TYPE
+    const dup = mk();
+    for (const maker of [0, 0, 3]) placeGreatWork(state, dup, { obj: GWO_RELIGIOUS, maker, era: -1, seat: 0 });
+    expect(holderThemed(state, workContext(state, dup), dup, museum)).toBe(false);
+    const mixed = mk();
+    let k = 0;
+    for (const obj of [GWO_RELIGIOUS, GWO_SCULPTURE, GWO_RELIGIOUS]) placeGreatWork(state, mixed, { obj, maker: k++, era: -1, seat: 0 });
+    expect(holderThemed(state, workContext(state, mixed), mixed, museum)).toBe(false);
+    expect(greatWorkYields(state, mixed).culture).toBe(GWO_CULTURE[GWO_RELIGIOUS]! * 3);
   });
 
-  it('a WONDER art slot sits outside the theming bonus', () => {
-    const city = {
-      buildings: ['MUSEUM'],
-      greatWorksArt: 4, // three museum slots plus one Hermitage slot
-      gwArtType: [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
-      gwArtArtist: [0, 1, 3],
-    } as never;
-    expect(artMuseumThemed(city)).toBe(true);
+  it("a Hermitage art slot sits outside the museum's own theming", () => {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    city.buildings = city.buildings.filter((b) => b !== 'PALACE');
+    city.buildings.push('MUSEUM');
+    const wt = tileAtCoords(state.map, 9, 9);
+    city.wonders.push({ id: 'HERMITAGE', tileIndex: wt.index });
+    wt.builtWonderComplete = true;
+    // three themed museum slots, then a fourth work lands in the Hermitage
+    let k = 0;
+    for (const maker of [0, 1, 3, 5]) {
+      expect(placeGreatWork(state, city, { obj: GWO_RELIGIOUS, maker, era: -1, seat: 0 })).toBeGreaterThanOrEqual(0);
+      k += 1;
+    }
+    expect(k).toBe(4);
+    expect(gwWorks(city).map((w) => w.slot)).toEqual([...holderSlots(holder('MUSEUM')), holderSlots(holder('HERMITAGE'))[0]]);
+    const ctx = workContext(state, city);
+    expect(holderThemed(state, ctx, city, holder('MUSEUM'))).toBe(true);
+    expect(holderThemed(state, ctx, city, holder('HERMITAGE'))).toBe(false);
     // three works double; the fourth pays once
-    expect(greatWorkCulture(city)).toBe(GW_CULTURE[GW_ART] * (4 + GW_SLOTS[GW_ART]));
+    expect(greatWorkYields(state, city).culture).toBe(GWO_CULTURE[GWO_RELIGIOUS]! * (3 * THEMING_MULT + 1));
   });
 });

@@ -69,7 +69,8 @@ import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { ARTIFACT_PROV_W, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 import { grantedMoves } from './units';
@@ -685,28 +686,18 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.freePressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
-  greatWorksWriting: overCities((r) => r.city.greatWorksWriting ?? 0),
-  greatWorksArt: overCities((r) => r.city.greatWorksArt ?? 0),
-  greatWorksMusic: overCities((r) => r.city.greatWorksMusic ?? 0),
-  relics: overCities((r) => r.city.relics ?? 0),
+  // every layout slot's work — object, maker, era, civilization; -1s for an
+  // empty slot — which is what the theming rules and the yields read.
+  greatWorks: overCities((r) => {
+    const works = r.city.greatWorks ?? [];
+    const out: number[] = [];
+    for (let i = 0; i < GW_LAYOUT_W; i++) {
+      const w = works.find((x) => x.slot === i);
+      out.push(w ? w.obj : -1, w ? w.maker : -1, w ? w.era : -1, w ? w.seat : -1);
+    }
+    return out;
+  }),
   powered: overCities((r) => (r.city.powered ? 1 : 0)),
-  artifacts: overCities((r) => r.city.artifacts ?? 0),
-  // the museum's PROVENANCE, slot by slot — what the theming rule reads.
-  artifactProv: overCities((r) => {
-    const eras = r.city.artifactEras ?? [];
-    const seats = r.city.artifactSeats ?? [];
-    const out: number[] = [];
-    for (let i = 0; i < ARTIFACT_PROV_W; i++) out.push(eras[i] ?? -1, seats[i] ?? -1);
-    return out;
-  }),
-  // the ART MUSEUM's provenance, slot by slot — the other theming rule.
-  gwArtProv: overCities((r) => {
-    const types = r.city.gwArtType ?? [];
-    const artists = r.city.gwArtArtist ?? [];
-    const out: number[] = [];
-    for (let i = 0; i < GW_SLOTS[GW_ART]; i++) out.push(types[i] ?? -1, artists[i] ?? -1);
-    return out;
-  }),
 };
 
 const UNIT_G: Record<string, Extractor> = {

@@ -104,8 +104,8 @@ export interface GreatWorkHolderDef {
 
 /** CIV6 `Building_GreatWorks`, Base <- Expansion1 <- Expansion2 <- the civ
  *  DLC that carries a row, restricted to the holders this engine builds, in
- *  the install's row order. The Hermitage's row is `GREATWORKSLOT_ART` with
- *  no object restriction, and the Apadana's is two `GREATWORKSLOT_PALACE`
+ *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
+ *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
  *  slots, which take any object. */
 export const GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1 }], theme: GW_THEME_NONE },
@@ -134,7 +134,7 @@ export interface ExtraSlotRow {
   type: number;
   amount: number;
 }
-/** CIV6 (Nkisi, `TRAIT_EXTRA_PALACE_SLOTS`): BuildingType PALACE,
+/** CIV6 (Nkisi, TRAIT_EXTRA_PALACE_SLOTS): BuildingType PALACE,
  *  GreatWorkSlotType PALACE, Amount 4. */
 export const EXTRA_SLOT_ROWS: readonly ExtraSlotRow[] = [
   { civ: 'KONGO', holder: 'PALACE', type: GWS_PALACE, amount: 4 },
@@ -189,8 +189,8 @@ export interface AutoThemeRow {
   slots: number;
   wonder: boolean;
 }
-/** `AUTO_THEME_AT_LEAST_3_SLOTS` (Amount 3, IsWonder false) and
- *  `AUTO_THEME_AT_LEAST_2_SLOTS` (Amount 2, IsWonder true). */
+/** AUTO_THEME_AT_LEAST_3_SLOTS (Amount 3, IsWonder false) and
+ *  AUTO_THEME_AT_LEAST_2_SLOTS (Amount 2, IsWonder true). */
 export const AUTO_THEME_ROWS: readonly AutoThemeRow[] = [
   { leader: 'KRISTINA', slots: 3, wonder: false },
   { leader: 'KRISTINA', slots: 2, wonder: true },

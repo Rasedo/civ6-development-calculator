@@ -21,7 +21,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from warmup import settle_all, hold_works
 
 
 def main() -> None:
@@ -211,7 +211,10 @@ def main() -> None:
     if sim.districts_on:
         civic0 = sim.civ_civic_prog[:, 0].clone()
         earned0 = sim.gp_earned[:, 7].clone()
-        gw0 = (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item()
+        # the capital's Palace slot would take one work: fill it, so both lump
+        for _b in range(sim.B):
+            hold_works(sim, _b, 0, 0, 7, 1)
+        gw0 = int((sim.city_gw_obj[:, 0] >= 0).sum())
         live0 = sim.major_unit_alive[0].sum().item()
         sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
@@ -228,7 +231,7 @@ def main() -> None:
         sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_w, hc_w)
         d_civic = (sim.civ_civic_prog[:, 0] - civic0)
         assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2x60): {d_civic.tolist()}"
-        assert (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
+        assert int((sim.city_gw_obj[:, 0] >= 0).sum()) == gw0, "no AMPHITHEATER -> no slotted work"
 
     # --- a seat-0 PROPHET banks its faith-column effect at the SPEND --------
     # Confucius (PROPHET class 3, roster idx 0) carries fx.faith; `_gp_apply`

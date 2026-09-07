@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
-import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
+import { makeMap, makeState, tileAtCoords, expandBorders, holdWorks } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
@@ -15,6 +15,7 @@ import { terrainDefense } from '../../../cpu/core/combat';
 import { seatWonderSum, seatWonderFlag } from '../../../cpu/core/wonders';
 import { addEraScore } from '../../../cpu/core/eras';
 import type { City, GameState } from '../../../cpu/core/types';
+import { GWO_RELIC } from '../../../cpu/data/greatWorks';
 
 /** Stand a COMPLETE wonder on a tile of `city`, the way completeQueueItem does. */
 function stand(state: GameState, city: City, id: string, col: number, row: number): number {
@@ -179,7 +180,7 @@ describe('wonder effects, sourced', () => {
     // relics live in the RELIGIOUS bank, so the multiplier shows there and
     // the GENERAL body never moves with them.
     const { state, city } = oneCity();
-    city.relics = 2;
+    holdWorks(city, GWO_RELIC, 2);
     const plainGeneral = seatTourism(state, 0);
     const plain = seatTourismReligious(state, 0);
     stand(state, city, 'ST_BASILS_CATHEDRAL', 9, 8);
