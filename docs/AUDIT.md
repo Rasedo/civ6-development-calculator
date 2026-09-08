@@ -27,7 +27,7 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **1** | A-1 and A-2 CLOSED (#246l, #246s); A-3 a Missionary one tile apart at seed 9287 turn 156 |
+| **A. Engine vs engine** | **1** | A-1 and A-2 CLOSED; A-3 is a first-fire LADDER — three layers closed (the SUPPORT plane at spawn, the `unitDomain` sweep, the over-threshold xp clamp), the gate re-runs |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
@@ -220,226 +220,64 @@ the gate reaches is worth more here than one that re-reads the exporter.
     by ARRAY POSITION breaks the moment the roster can shrink. This roster
     can, and did.
 
-- **A-3. A MISSIONARY ONE TILE APART.** OPEN, and the first fire now that A-2
-  is gone — seed 9287 turn 156, eleven seeds and thirty-nine turns deeper
-  than where this round started.
+- **A-3. THE FIRST-FIRE LADDER.** OPEN. Three layers reached and closed so
+  far, each one a real defect the layer above it was hiding. The narrative of
+  how each was first misread is deleted; what the wrong readings left behind
+  is kept below as rules, because those are the reusable part.
 
-        unit[649]: GPU-ONLY row {seat 1, type 14, hp 100, charges 3, ...}
-        unit[645]: TS-ONLY  row {seat 1, type 14, hp 100, charges 3, ...}
-
-  - The keys decode to (tile 162, slot 1) and (tile 161, slot 1): the SAME
-    Missionary, the same stacking class, every other field identical, on
-    ADJACENT tiles. Not a key or a class question — a step.
-  - The `spread` twin did not flag, so both engines chose the same target;
-    what differs is the walk to it. Both replay the same record, and
-    `rec.units` is one entry per STEP, so one engine took a step the other
-    refused.
-  - THE STEP HALF SHIPPED (#246u-#246x) and the pair reads. At turn 155, one
-    turn BEFORE the digest flags, seat 2 steps to different destinations from
-    the SAME origins:
-
-        D-TS   st:2:357:356 t155 moved     D-GPU  st:2:357:401 t155 blocked
-        D-TS   st:2:492:449 t155 moved     D-GPU  st:2:492:536 t155 blocked
-
-    The deltas are -1 / -43 on TS and +44 / +43 on the GPU — different
-    DIRECTIONS out of the same tile.
-  - RULED OUT: the direction decode. `phase.ts` uses `neighborTile`, the
-    slot-preserving decoder, under a comment naming this exact hazard, and
-    the GPU gathers from a `neigh` plane that keeps its -1. Neither
-    compacts.
-  - THE TWO CANDIDATES LEFT. Either the engines hold DIFFERENT UNITS at the
-    same tile — in which case the order reached different chassis and the
-    origins matching is a coincidence of position — or the replay's row-to-
-    unit alignment has slipped, which `phase.ts`' own comment already warns
-    about: "row j addresses the seat's j-th unit in SPAWN order ... this is
-    an ASSUMPTION the gate has to hold ... if it ever breaks, every seat's
-    orders land on the wrong units and the failure looks like chaos rather
-    than an ordering bug." Same origin with a different destination is what
-    that would look like.
-  - A CORRECTION TO THIS ENTRY. #246A read two ADJACENT lines as a matched
-    pair; they were two UNPAIRED lines, because the pairs print (GPU, TS) and
-    an edge key cannot pair a step whose destinations differ. The conclusion
-    below still holds — both engines independently log rank j3, type 20, out
-    of tile 357 — but it rests on the FIELDS, not on the display, and the key
-    is now the ORDER (seat, turn, rank) so the case the log exists for can
-    actually pair.
-  - THE ALIGNMENT HOLDS, and that fork is closed (#246z). With the rank and
-    the type on the line:
-
-        D-TS   st:2:357:356 t155 j3 ty20 moved
-        D-GPU  st:2:357:401 t155 j3 ty20 blocked
-        D-TS   st:2:492:449 t155 j9 ty14 moved
-        D-GPU  st:2:492:536 t155 j9 ty14 blocked
-
-    Same rank, same type, same origin, different destination. The order
-    reached the SAME chassis on both engines, so this is not the row-to-unit
-    slip `phase.ts` warns about, and it is not two units sharing a tile.
-  - THE DIRECTION TABLES AGREE, checked by hand rather than assumed. TS's
-    `AXIAL_DIRS` through `offsetToAxial`/`axialToOffset` yields, for an EVEN
-    row, [(1,0), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)], and for an ODD row
-    [(1,0), (1,-1), (0,-1), (-1,0), (0,1), (1,1)] — element for element the
-    GPU's `even` and `odd` lists in `simbase`. Both keep their -1 slots, so
-    the compaction is out too.
-  - THE ACTION NUMBERS MATCH; THE GPU IS ONE STEP AHEAD. Keyed on the ORDER
-    the pairs finally line up, and they say something different from what the
-    edge-keyed lines suggested:
-
-        D-GPU  st:2:155:13 ty20 a5 at447 to491 blocked
-        D-TS   st:2:155:13 ty20 a5 at402 to447 moved
-        D-GPU  st:2:155:9  ty14 a4 at492 to536 blocked
-        D-TS   st:2:155:9  ty14 a4 at449 to492 moved
-
-    Same rank, same type, SAME ACTION — and the GPU already stands on the
-    tile TS is only now moving into. The GPU took a further step for that
-    rank which TS never attempted at all: TS's last line for the rank is a
-    completed move, not a refusal.
-  - SO IT IS MOVEMENT POINTS. `applySeatUnitOrders` skips a unit whose
-    `movesLeft <= 0` and the GPU's step arm gates on `mp > 0`; the record
-    carries the same steps to both. One engine had the movement for another
-    hop and the other did not.
-  - AND THE COMPARISON COULD NOT HAVE SHOWN IT. `movesLeft` IS a compared
-    field, but once the two engines put the unit on different tiles its
-    census KEY differs, so the row prints as GPU-ONLY / TS-ONLY and no field
-    is ever compared. A key built from mutable position hides every field of
-    a row that moved — worth remembering before trusting a keyed diff's
-    silence.
-  - ONE CAVEAT ON THE EVIDENCE, because it would mislead a reader who did not
-    run it: the OTHER step pairs in that dump show different ORIGINS (TS
-    402->447 against GPU 447->490). That is a window artifact — the log keeps
-    24 lines per kind and a turn's steps for one seat exceed it, so the two
-    sides show different subsets of the same walk. Only the pairs that SHARE
-    an origin are evidence. Widening that window, or keying the line by step
-    index, is the next thing the instrument needs.
-  - **THE READING ABOVE WAS THE INSTRUMENT, NOT THE ENGINES.** Adding the
-    pre-step MP to the line was supposed to settle "who had the movement";
-    what it actually exposed is that the pairs were never pairs. A turn's
-    unit record is K ROWS, not one — `applySeatUnitOrders` walks
-    `for (const step of steps)` and `apply_seat_unit_sequence` walks
-    `for k in range(seq.shape[2])` — and the key named (seat, turn, rank)
-    only. Every row of a turn therefore collided on one key, and the pairing
-    keeps the LAST line per key, so a GPU line from row 2 printed against a
-    TS line from row 0. "The GPU is one step ahead" was exactly that: the
-    GPU's later row against TS's earlier one.
-  - THE SECOND HALF OF THE SAME DEFECT: TS refuses a spent unit at a gate
-    ABOVE the log site (`movesLeft <= 0` returns before the movement arm),
-    while the GPU carries `mp > 0` as a term of `ok` and logs the refusal.
-    So a spent unit printed one-sided, which reads as the GPU attempting a
-    hop the oracle never tried. It never tried it either; it just did not
-    say so. Both engines now print the refusal.
-  - WHAT THE INSTRUMENT LOOKS LIKE NOW, and it is the shape the next hunt
-    reads: the key is `st:<seat>:<turn>:<k>:<rank>`; the step window is the
-    last two TURNS on both engines rather than the last N lines, because a
-    line count straddles the turn boundary at a different place on each
-    side; the pairing sorts keys FIELD BY FIELD AND NUMERICALLY (a string
-    sort put rank 10 before rank 2, so "the first disagreement" was not the
-    first line printed) and caps each kind at ten pairs, since once a unit
-    stands on the wrong tile every later step of the turn disagrees as a
-    consequence.
-  - STILL OPEN, and no longer claimed to be movement points: the seed 9287
-    turn 156 unit divergence. The two ruled-out causes survive — the
-    row-to-unit alignment holds and the direction tables agree — and
-    `movesLeft` remains uncomparable once the tiles differ, for the reason
-    given above. Everything between those two facts is unmeasured again.
-  - **AND THE FIXED INSTRUMENT NAMED IT: NOT ONE ORDERED STEP DISAGREES.**
-    With the sequence row in the key and TS printing its refusals, the seed
-    9287 turn 156 dump carries ZERO `st:` disagreements — every ordered step
-    of turns 155 and 156 pairs term for term on both engines — while the unit
-    census still holds one seat-1 Builder at tile 162 on the GPU and 161 on
-    TS. A unit that ends the turn somewhere else than the oracle put it, with
-    every step it was ordered to take agreeing, is not moving by its own
-    order. It is being CARRIED.
-  - **THE ESCORT DRAGGED ONE RIDER WHERE TS DRAGS THE LIST.** `stepUnit`
-    takes `escortRiders`' whole list and walks it twice — once to refuse the
-    step if a rider cannot stand at the destination or afford the cost, once
-    to move them all. `_escort_rider` returned ONE candidate, the first of
-    the civilian, support and embarked planes to answer, and `_step_verb`
-    carried that one. While the two non-military stacking classes were ONE
-    class the two rules were the same rule; the SUPPORT split made a
-    three-member formation reachable, and from that commit the GPU left the
-    second rider standing. Nothing in the step log could show it: the
-    MOVER's step agrees, and the rider is carried inside the verb.
-  - TWO MORE OF THE SAME ROOT, found by writing the poke that reproduces it —
-    and the poke could not even build the scene until both were fixed:
-    - the GPU's escort GATE read `is_civ | u_emb`, and a Battering Ram is
-      not `civilian` on the wire (it carries no build charges), so nine
-      chassis could never join a formation at all. TS's `escortable` is a
-      passenger at sea or `unitIsNoncombat` — the civilian class AND the
-      support one.
-    - the GPU's refusal walked the civilian and embarked planes and turned
-      away ANY escorted rider standing there, whatever its class, where
-      `escortUnit` refuses only a second rider of the SAME class. Even with
-      the gate widened, the Builder beside the Ram would have refused it.
-    - and `_escort_rider`'s `carrier` asked "not civilian, not embarked"
-      where TS asks `unitDomain(...) === 'military'`, so a support chassis
-      counted as an ESCORT on the GPU and could drag a rider of its own.
-    All three are one sentence read wrong: `_type_civilian` is the CLASS, and
-    what these rules wanted was `unitIsNoncombat`. This is the
-    new-class-invariant sweep the SUPPORT split owed and did not pay.
-  - THE REVEAL FOLLOWED THE LIST TOO: `stepUnit` lights the circle at the
-    WIDEST sight in the formation, which is the whole reason a formation
-    carries an Observation Balloon or a Drone. Reading one rider revealed a
-    three-member formation at the wrong radius.
-  - PINNED ON BOTH ENGINES: `escort_test`'s section 10 (a Warrior with a
-    Builder and a Battering Ram steps, and all three land, all three pay)
-    and `escort.test.ts`'s "drags BOTH riders when the escort steps".
-  - **AND THE PLACEMENT LOG NAMED IT IN ONE LINE EACH.**
-
-        D-GPU  sp:1:156:161:14 at162
-        D-TS   sp:1:156:161:14 at161
-
-    Same seat, same turn, the SAME anchor and the same chassis: TS put the
-    Builder on the tile it was asked for and the GPU walked to a neighbour,
-    because the GPU held that plot's CIVILIAN slot occupied.
-  - THE CAUSE: `_spawn_unit` wrote the occupancy planes BY HAND, two arms off
-    `_type_civilian` — and `_type_civilian` is the NONCOMBAT set, not the
-    civilian stacking class. Every support chassis was therefore born into
-    the wrong plane: the Military Engineer (build charges, no combat) among
-    the civilians, the Battering Ram and the Medic among the military. A
+  - **LAYER 1 — seed 9287 turn 156. CLOSED (#246J).** A seat-1 Builder stood
+    one tile from where TS put it, with every ordered step of the turn
+    agreeing term for term — so it had been PLACED there, not moved there.
+    `_spawn_unit` wrote the occupancy planes by hand, two arms off
+    `_type_civilian` (the charges-and-no-combat flag, not the stacking
+    class), so every support chassis was born into the wrong plane and a
     Builder trained onto a plot holding a Military Engineer was refused a
-    tile `spawnUnit` gives it, and walked one hex away.
-  - THE SECOND HALF, found in the same read: `_vacate` cleared the civilian,
-    military and embarked planes — the three that existed before the split —
-    so a despawned SUPPORT unit went on holding its plot for the rest of the
-    game. It now clears through `_occ_clear`, which has always walked all
-    four, and the two are one reader again.
-  - BOTH ARE THE SAME MISS, and it is the one this project already has a
-    name for: a new per-slot plane misses every existing walk. `_occ_set`,
-    `_occ_clear`, the fixture loader and even the escort poke's own `put`
-    helper were all taught the three-way split when the SUPPORT class landed
-    — the helper had the identical bug and was fixed then. `_spawn_unit` and
-    `_vacate` were the two the sweep did not reach.
-  - PINNED: `escort_test`'s section 11 spawns a Military Engineer through
-    `_spawn_unit`, asserts it holds the SUPPORT plane and neither of the
-    others, spawns a Builder at the same anchor and asserts it lands ON that
-    anchor, then vacates the Engineer and asserts the plane is given back.
-  - **THE SWEEP THE SUPPORT CLASS OWED, PAID IN FULL.** `_type_civilian` is
-    the wire flag `charges !== undefined && !(combat > 0)`, and its own
-    exporter comment claimed it was `unitIsNoncombat`'s set "the nine SUPPORT
-    rows included" — which the formula has never made: the seven support
-    chassis carrying NO build charges read 0 there, so every `~_type_civilian`
-    site took them for MILITARY. On the GPU a Battering Ram therefore
-    defended a stack against a ranged attack (`stackDefender` filters on
-    `unitDomain === 'military'`), counted as flank SUPPORT for a neighbour
-    (`supportCount`, same gate), took the Chaplain's +20 heal (`chaplainHeal`,
-    same gate), was eligible for experience (`xpEligible`: military or air),
-    survived a storm that `unitIsNoncombat` kills outright, was NOT capturable
-    as a passenger, and could be the ESCORT of a formation (`_carrying`, which
-    also walked only the civilian and embarked planes and so could not see a
-    formation whose one rider was a support unit).
-  - No new wire column was needed: `military` already carries
-    `unitIsMilitary` — the military OR air domain — so the two sentences the
-    rules speak are `_type_dom_mil` (that set without the aircraft) and
-    `_type_noncombat` (its complement less the Spy). `_type_civilian` keeps
-    its narrow meaning and its two honest readers, the occupancy split and the
-    spent-charges despawn.
-  - ONE ASYMMETRY FOUND WHILE READING THE APPLIERS, recorded rather than
-    fixed because nothing has shown it firing: TS refuses EVERY verb from a
-    unit with `movesLeft <= 0` (spies excepted), while the GPU has no such
-    global gate — only individual arms carry one. It is unreachable from
-    today's driver, whose follow-on rows are movement-only by construction
-    (`best = key.argmin(dim=1)` is a direction, 0..5) and whose row 0 runs
-    on a refreshed pool. A driver that ever emitted a verb after a spend
-    would split the two engines here.
+    tile `spawnUnit` gives it. `_vacate` had the same hole in reverse: it
+    named three planes and a despawned support unit held its plot for the
+    rest of the game. Both go through `_occ_set` / `_occ_clear` now.
+  - **LAYER 2 — the class sweep that reading it turned up. CLOSED (#246K).**
+    Six more rules asked `_type_civilian` where the twin asks `unitDomain`,
+    so a Battering Ram defended a stack, gave flank support, took the
+    Chaplain's heal, earned experience, survived a storm and could be the
+    ESCORT of a formation. `_type_dom_mil` and `_type_noncombat` name the two
+    sentences once; no new wire column was needed.
+  - **LAYER 3 — seed 9196 turn 165. CLOSED (#246N).** `unit[2344].xp: GPU 15
+    vs TS 28` on a unit whose every other field agreed, at the turn a flat +2
+    was banked for surviving a city strike. `bankXp` RETURNS on a pool
+    already at or past its level's requirement; `_bank_xp` computed
+    `min(need, ...)` over the whole expression instead, which does not leave
+    such a pool alone — it drags it down to `need`. A pool above the
+    threshold is reachable because two writers move it without the clamp (a
+    tribal village's grant, a corps merge's inheritance), so a level-1 unit
+    holding 28 was pulled back to 15 the next time it banked anything at all.
+    Pinned on both engines.
+
+  **THE INSTRUMENT, which is this round's most reusable product.** The
+  decomposition log now carries five kinds and the rules that make them pair:
+
+  - the KEY names the DECISION, never the outcome: a step is keyed on (seat,
+    turn, sequence row, rank) and a placement on the ANCHOR it was asked for,
+    because a disagreement about the destination is the very thing being
+    measured and an outcome key files the two sides as two unrelated lines;
+  - every FIELD that can distinguish two events belongs in the key. The step
+    log omitted the sequence row and collided every row of a turn onto one
+    key; the xp log put the WRITER in the value and collided every writer of
+    a turn the same way. Both read as a disagreement that was not one.
+  - the WINDOW is a turn window, not a line count: `st:`, `sp:` and `xp:`
+    keep the last two turns on both engines, because a count straddles the
+    turn boundary in a different place on each side;
+  - both engines must print their REFUSALS. TS refuses a spent unit above the
+    log site where the GPU logs a blocked step, so a spent unit printed
+    one-sided and read as the GPU attempting a hop the oracle never tried;
+  - the pairing sorts keys field by field and NUMERICALLY, and caps each kind
+    at ten pairs — once a unit stands on the wrong tile every later step of
+    the turn disagrees as a consequence, and the cause is what must survive.
+
+  **AND ONE FACT ABOUT THE CENSUS ITSELF**, worth more than the layers: a key
+  built from mutable position hides every field of a row that moved. `xp` and
+  `movesLeft` are both compared, but once two engines put a unit on different
+  tiles the row prints as GPU-ONLY / TS-ONLY and no field is compared at all.
+  A keyed diff's silence about a field is not evidence that the field agrees.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 

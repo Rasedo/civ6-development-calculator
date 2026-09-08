@@ -217,6 +217,30 @@ def test_apostle_offer(sim) -> None:
     print(f"  apostle OK — three distinct columns a draw, {len(seen)}/{n} rows reached over 24")
 
 
+def test_bank_over_threshold(sim) -> None:
+    """A pool ALREADY at or past its level's requirement is LEFT ALONE.
+
+    `bankXp` returns before touching such a unit; it does not clamp it back
+    to the requirement. The difference is reachable because two writers move
+    the pool without the clamp — a tribal village's experience grant and a
+    corps merge's inheritance — so a level-1 unit can legitimately stand
+    above 15, and this used to drag it back to 15 the next time it banked
+    anything (seed 9196 turn 165: GPU 15 against TS 28, on a flat +2 for
+    surviving a city strike)."""
+    per = int(sim._promo_xp_per_level)
+    lvl1 = torch.ones(1, dtype=torch.long)
+    over = torch.full((1,), per + 13, dtype=torch.long)
+    got = int(sim._bank_xp(over, lvl1, torch.full((1,), 2, dtype=torch.long))[0])
+    assert got == per + 13, f"an over-threshold pool was dragged to {got}, not left at {per + 13}"
+    # ...and BELOW the threshold it still fills and stops there
+    under = torch.full((1,), per - 5, dtype=torch.long)
+    assert int(sim._bank_xp(under, lvl1, torch.full((1,), 2, dtype=torch.long))[0]) == per - 3, \
+        "a pool below the threshold did not take its gain"
+    assert int(sim._bank_xp(under, lvl1, torch.full((1,), 50, dtype=torch.long))[0]) == per, \
+        "a pool below the threshold overshot it"
+    print("  bank OK — at the threshold it holds, below it fills and stops")
+
+
 def main() -> None:
     sim = build()
     assert sim._A_PROMOTE >= 0, "no PROMOTE head in the action enum"
@@ -226,6 +250,7 @@ def main() -> None:
     test_evaluator(sim)
     test_mask_and_apply(sim)
     test_apostle_offer(sim)
+    test_bank_over_threshold(sim)
     print("PROMOTIONS OK")
 
 

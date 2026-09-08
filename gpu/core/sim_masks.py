@@ -918,9 +918,18 @@ class SimMasks:
         return torch.where(level >= mx, torch.zeros_like(level), per * level)
 
     def _bank_xp(self, xp: torch.Tensor, level: torch.Tensor, gain: torch.Tensor) -> torch.Tensor:
-        """the new xp pool: it clamps at the level's requirement and stops."""
+        """the new xp pool: it clamps at the level's requirement and stops.
+
+        A pool ALREADY at or past the requirement is left exactly as it is —
+        `bankXp` returns before touching it. That is not the same as clamping
+        it to the requirement, and the difference is reachable: a goody hut's
+        grant and a corps merge's inheritance both write the pool without the
+        clamp, so a unit can legitimately stand ABOVE its threshold, and this
+        used to drag it back down the next time it banked anything at all.
+        """
         need = self._xp_to_next(level)
-        return torch.where(need <= 0, xp, torch.minimum(need, torch.where(xp >= need, xp, xp + gain)))
+        held = (need <= 0) | (xp >= need)
+        return torch.where(held, xp, torch.minimum(need, xp + gain))
 
     def _battle_xp(
         self, own_cs: torch.Tensor, foe_cs: torch.Tensor, *,

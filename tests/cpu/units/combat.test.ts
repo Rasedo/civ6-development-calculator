@@ -531,6 +531,13 @@ describe('XP & levels', () => {
     const maxed = { level: MAX_LEVEL, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 * MP_SCALE } as never as import('../../../cpu/core/types').Unit;
     bankXp(maxed, 8);
     expect(maxed.xp).toBe(0);
+    // ...and a pool ALREADY PAST the threshold is left exactly where it is,
+    // not dragged back to it. Two writers put it there without the clamp — a
+    // tribal village's grant and a corps merge's inheritance — so the state
+    // is reachable, and the GPU twin used to lower it (seed 9196 t165).
+    const over = { level: 1, xp: XP_PER_LEVEL + 13, type: 'WARRIOR', hp: 100, movesLeft: 2 * MP_SCALE } as never as import('../../../cpu/core/types').Unit;
+    bankXp(over, 2);
+    expect(over.xp).toBe(XP_PER_LEVEL + 13);
   });
 
   it('a fresh unit starts level 1 with no promotions; a barbarian banks nothing', () => {
