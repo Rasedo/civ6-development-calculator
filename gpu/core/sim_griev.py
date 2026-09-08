@@ -109,15 +109,40 @@ class SimGriev:
                                 friend.long() * self._griev_friend_share)
             self._add_grievance(s, transgressor, (share * n).div(100, rounding_mode="floor"), m)
 
+    def _allied_war_discount(self, declarer: int, target: int) -> torch.Tensor:
+        """[B] bool — CIV6 (Adventures of Enkidu, `Discount` 150): is this
+        declaration landing on someone already at war with an ALLY of the
+        declarer? The DECLARER's own trait, so unlike `_enkidu_allies` (whose
+        combat and quest halves pay when either side of the alliance plays
+        Gilgamesh) this asks only about the declarer."""
+        NM = self.n_majors
+        if self._enkidu_war_discount <= 0 or declarer >= NM or target >= NM:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        lead = self._leads_vec("GILGAMESH")[:, declarer]                  # [B]
+        ally = self.seat_ally_turns[:, declarer, :NM] > 0                 # [B, NM]
+        war_t = self.war[:, :NM, target]                                  # [B, NM]
+        other = torch.arange(NM, device=self.device).view(1, -1) != declarer
+        return lead & (ally & war_t & other).any(dim=1)
+
     def _grievance_war_declared(self, declarer: int, target: int, m, kind) -> None:
         """The casus belli's own DECLARATION column (WarmongerPercent of the
         war base, by the WAR_KINDS code in `kind` [B]) and "War declared on a
-        Friend or Ally: 75" to each of the target's."""
+        Friend or Ally: 75" to each of the target's.
+
+        Enkidu's `Discount` forgives THIS payment where it fires, so the
+        target's own friends and allies take their share of the reduced
+        number. The flat friend row below has its own published amount and is
+        not touched: the install publishes ONE discount, at one site."""
         base, pct = self._griev_war_base, self._war_griev_pct
+        disc = self._allied_war_discount(declarer, target)
+        D = self._enkidu_war_discount
         for k in kind[m].unique().tolist():
             kk = int(k) if 0 <= int(k) < len(pct) else 0
-            self._spread_grievance(target, declarer,
-                                   int(base * pct[kk][0] / 100 + 0.5), m & (kind == int(k)))
+            full = int(base * pct[kk][0] / 100 + 0.5)
+            mk = m & (kind == int(k))
+            if bool((mk & disc).any()):
+                self._spread_grievance(target, declarer, max(0, full - D), mk & disc)
+            self._spread_grievance(target, declarer, full, mk & ~disc)
         for s in range(self.n_majors):
             if s in (declarer, target):
                 continue

@@ -377,6 +377,46 @@ def test_golden_war(rules, path):
     print(f"  golden-age war OK (DoW {want}, capture {want_t}, raze {want_r}, peace forgets)")
 
 
+def test_enkidu_war_discount(rules, path):
+    """CIV6 (Adventures of Enkidu, `Discount` 150): a declaration on someone
+    already at war with an ALLY of the declarer is forgiven 150 grievance —
+    a Surprise war's whole 150, more than a Formal war's 100.
+
+    The DECLARER's own trait, so an allied Gilgamesh lends it to nobody."""
+    sim = build(rules, path)
+    assert sim.n_majors >= 3, "the scene wants a declarer, a target and an ally"
+    D = sim._enkidu_war_discount
+    assert D == 150, f"the exported discount is {D}, expected the install's 150"
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    kind = torch.zeros(sim.B, dtype=torch.long, device=sim.device)   # a Surprise war
+
+    gl = sim._leader_idx("GILGAMESH")
+    assert gl >= 0, "GILGAMESH is not in the exported leader list"
+
+    def owed(gilgamesh_row, ally_at_war):
+        s2 = build(rules, path)
+        s2.row_leader[:, : s2.n_majors] = -1
+        if gilgamesh_row >= 0:
+            s2.row_leader[:, gilgamesh_row] = gl
+        s2.seat_ally_turns[:, 0, 2] = 20
+        s2.seat_ally_turns[:, 2, 0] = 20
+        s2.war[:] = False
+        if ally_at_war:
+            s2.war[:, 2, 1] = True
+            s2.war[:, 1, 2] = True
+        s2.civ_grievance[:] = 0
+        s2._grievance_war_declared(0, 1, one, kind)
+        return int(s2.civ_grievance[0, 1, 0])
+
+    full = owed(-1, True)                  # nobody plays Gilgamesh
+    assert full > 0, "a plain Surprise declaration owed nothing"
+    assert owed(0, False) == full, "the discount fired with the ally at PEACE"
+    assert owed(2, True) == full, "an ALLIED Gilgamesh lent his own trait away"
+    got = owed(0, True)
+    assert got == 0, f"Gilgamesh still owed {got} of {full} (discount {D})"
+    print(f"  Enkidu allied-war discount OK ({full} -> 0, discount {D})")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -389,6 +429,7 @@ def main() -> None:
     test_peace(rules, path)
     test_capture_plunder(rules, path)
     test_cs_siege(rules, path)
+    test_enkidu_war_discount(rules, path)
     print("WAR/PEACE PLUMBING OK")
 
 

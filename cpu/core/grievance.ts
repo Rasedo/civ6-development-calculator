@@ -12,7 +12,7 @@
  * against one seat), so no caller ever touches the key.
  */
 import type { GameState } from './types';
-import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey } from './seats';
+import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey, alliedWarDiscount } from './seats';
 import { WAR_KINDS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
@@ -133,8 +133,16 @@ export function decayGrievances(state: GameState, seat: number): void {
  */
 export function grievanceWarDeclared(state: GameState, declarer: number, target: number, kind: number): void {
   const pct = (WAR_KINDS[kind] ?? WAR_KINDS[WAR_KIND_SURPRISE]).pct;
+  // CIV6 (Adventures of Enkidu): a declaration on someone already at war with
+  // one of the declarer's allies is forgiven `Discount` 150 of what it owes.
+  // It reduces THIS payment, so the target's own friends and allies take their
+  // share of the reduced number — which is what "without warmonger penalties"
+  // buys. The separate flat row every friend of the target is owed
+  // (`GRIEVANCE_WAR_ON_FRIEND` 75) has its own published amount and is not
+  // touched: the install publishes ONE discount, at one site.
   spreadGrievance(state, target, declarer,
-    Math.round((GRIEVANCE_WAR_BASE * pct[0]) / 100));
+    Math.max(0, Math.round((GRIEVANCE_WAR_BASE * pct[0]) / 100)
+      - alliedWarDiscount(state, declarer, target)));
   for (const s of state.seats) {
     if (s.seat === declarer || s.seat === target) continue;
     if (seatsAllied(state, s.seat, target) || friendTurnsWith(state, s.seat, target) > 0) {

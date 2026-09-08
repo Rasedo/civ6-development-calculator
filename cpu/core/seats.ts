@@ -2,7 +2,7 @@
 import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP } from '../data/religion';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
-import { ENKIDU_WAR_CS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
+import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
 import { WAR_KIND_SURPRISE } from '../data/warKinds';
 import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
@@ -211,6 +211,26 @@ export function enkiduAllies(state: GameState, seat: number, foe: number): numbe
     if (civsAtWar(state, o.seat, foe)) out.push(o.seat);
   }
   return out;
+}
+
+/**
+ * CIV6 (Adventures of Enkidu): the grievance a DECLARATION is forgiven when
+ * its target is already at war with an ALLY of the declarer. `Discount` 150,
+ * and 0 when the clause does not fire.
+ *
+ * The declarer's OWN trait, so unlike `enkiduAllies` — whose combat and quest
+ * halves pay when EITHER side of the alliance plays Gilgamesh — this asks
+ * only about the declarer.
+ */
+export function alliedWarDiscount(state: GameState, declarer: number, target: number): number {
+  if (leaderOf(state, declarer) !== 'GILGAMESH') return 0;
+  for (const o of state.seats) {
+    if (o.seat === declarer || o.seat === target) continue;
+    if (allyTurnsWith(state, declarer, o.seat) > 0 && civsAtWar(state, o.seat, target)) {
+      return ENKIDU_ALLIED_WAR_DISCOUNT;
+    }
+  }
+  return 0;
 }
 
 /**

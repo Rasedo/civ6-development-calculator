@@ -3142,6 +3142,7 @@ class SimInit:
         self._enkidu_cs = int(_la["enkiduWarCs"])
         self._enkidu_qp = int(_la["enkiduCommonFoeQp"])
         self._enkidu_range = int(_la["enkiduShareRange"])
+        self._enkidu_war_discount = int(_la["enkiduAlliedWarDiscount"])
         # CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows, one tensor
         # per column (`PLOT_YIELD_ROWS`)
         _py = [[int(x) if i != 3 else float(x) for i, x in enumerate(r)] for r in _uq["plotYields"]]

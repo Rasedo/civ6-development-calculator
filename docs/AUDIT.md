@@ -38,7 +38,6 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-56r inert promotions | 1 | all three are sourced: the sight table needs a WALK ruling (ask 13), Ground Crews heals after acting, Boarding is a POST_COMBAT_YIELD row |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
-| B-63r Enkidu's allied-war discount | 1 | sourced, `Discount` 150; the gang bar is a DRIVER feature, ruled out of the ledger |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
@@ -66,7 +65,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **39** | |
+| **OPEN, TOTAL** | **38** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -222,32 +221,24 @@ Nothing open.
   - `tileYields` leaves on `tile.wonder` before the adjacency add and
     `_tile_add_live` masks the same tiles; whether real Civ 6 pays it there
     is unsourced either way.
-- **B-63r. ENKIDU'S ALLIED-WAR DISCOUNT.** Weight 1.
-  - `TRAIT_ADJUST_ALLIED_WAR_DISCOUNT`,
-    `MODIFIER_PLAYER_ADJUST_ALLIED_WAR_DISCOUNT`, `Discount` 150. CIV6
-    (Adventures of Enkidu): "May declare war on anyone at war with their
-    allies without warmonger penalties." A GRIEVANCE waiver of 150 at the
-    declaration — one and a half formal wars' worth against
-    `GRIEVANCE_WAR_BASE` 100. The other two thirds of the leader ability
-    (shared combat experience within 5 tiles, shared pillage) already ship as
-    `ENKIDU_WAR_CS` / `ENKIDU_COMMON_FOE_QP` / `ENKIDU_SHARE_RANGE`. This is
-    the unbuilt third, and its number is published — it never waited on
-    anything.
-  - THE GANG-UP BAR IS NOT AN OWNER ASK (ruled 2026-09-08, owner). It was
-    filed as one on the reading that it reproduces a Civ 6 AI threshold. It
-    does not: `GRIEVANCE_GANG` has exactly ONE reader per engine and that
-    reader is the OBSERVATION renderer (`observe.ts` / `env.py`, the `cv`
-    block's `gang` field). Its only consumer is this project's OWN driver
-    heuristic (`ladder.pick_war`: declare when
-    `gang OR own_str > opp_str * ratio`). No engine rule reads it and no
-    state moves on it, so there is no fidelity question to source. It stays
-    on the wire because the observation must be identical on both engines,
-    which is a parity requirement the value cannot break.
-  - What remains is a FEATURE-DESIGN question for P8, not a gap: `gang` is
-    the only grievance signal anywhere in the observation, so one hand-set
-    bar is the entire resolution the policy gets on a subsystem with fourteen
-    sourced magnitudes feeding it. A continuous `grievancesAgainst / SCALE`
-    would let the policy learn its own bar.
+- **B-63r. THE GANG-UP BAR.** RETIRED 2026-09-08 (owner ruling).
+  - `GRIEVANCE_GANG` was filed as an ask on the reading that it reproduces a
+    Civ 6 AI threshold. It does not: it has exactly ONE reader per engine and
+    that reader is the OBSERVATION renderer (`observe.ts` / `env.py`, the
+    `cv` block's `gang` field), consumed only by this project's own driver
+    heuristic. No engine rule reads it and no state moves on it, so there is
+    no fidelity question to source. It stays on the wire because the
+    observation must be identical on both engines — a parity requirement the
+    value cannot break.
+  - Enkidu's allied-war discount, which this entry wrongly said waited on the
+    bar, SHIPPED with #242j: `Discount` 150 forgiven at a declaration on a
+    foe of the declarer's ally.
+  - NOT converted into a new ask, recorded instead: `gang` is the only
+    grievance signal anywhere in the observation, so one hand-set bar is the
+    whole resolution the policy gets on a subsystem with fourteen sourced
+    magnitudes feeding it. Whether to hand it `grievancesAgainst / SCALE` is
+    a P8 feature-design choice.
+
 - **B-66. FORMATIONS.** Weight 2.
   - AN ESCORT FORMATION IS A PAIR; real Civ 6 links military, civilian and
     support. Needs a support stacking class and a two-rider drag on both
@@ -353,9 +344,8 @@ Nothing open.
     with the hygiene pass.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 337 of 343 modifiers and `open: <item>` on 6, each under
-  C-64, C-67 or B-63r. Unique units are C-78,
-  unique infrastructure C-79 and C-69.
+  `shipped` on 338 of 343 modifiers and `open: <item>` on 5, each under C-64
+  or C-67. Unique units are C-78, unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
   - UNREAD DLL LOGIC, recorded: whether Trajan's grant fires on a CONQUERED

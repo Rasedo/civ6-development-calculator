@@ -58,6 +58,13 @@ export const HARDRADA_PILLAGE: readonly { improvement: ImprovementId; kind: 'sci
 export const ENKIDU_WAR_CS = 5;
 export const ENKIDU_COMMON_FOE_QP = 8;
 export const ENKIDU_SHARE_RANGE = 5;
+/** CIV6 (Adventures of Enkidu, `TRAIT_ADJUST_ALLIED_WAR_DISCOUNT` /
+ *  `MODIFIER_PLAYER_ADJUST_ALLIED_WAR_DISCOUNT`, `Discount` 150): "May
+ *  declare war on anyone at war with their allies without warmonger
+ *  penalties." The grievance the DECLARATION owes its target, waived by this
+ *  much — 150 against `GRIEVANCE_WAR_BASE` 100 covers a Surprise war's whole
+ *  150 and more than a Formal war's 100, which is what "without" means. */
+export const ENKIDU_ALLIED_WAR_DISCOUNT = 150;
 
 /**
  * CIV6 (EFFECT_ADJUST_PLOT_YIELD): a civilization's or leader's flat yield on
