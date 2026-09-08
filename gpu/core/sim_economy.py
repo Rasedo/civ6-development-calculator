@@ -945,6 +945,28 @@ class SimEconomy:
         if bool(_lost.any()):
             self.coastal_water[_lost] = False
             self.wok[_lost] = self.wok[_lost] & ~self._wonder_coastal_mask
+        # ...and the other side of the same ring (C-35). The drowned tile IS
+        # coastal water wherever it still touches land, and every LAND
+        # neighbour of it has just become coastal land — which is water
+        # HOUSING too, unless the city already drinks fresh.
+        # CIV6 (Sea Level Rise): a drowned OASIS stops sourcing a neighbour's
+        # Aqueduct. `aqsrc` is a DERIVED plane, so the atom moves first and the
+        # derivation is rebuilt over the ring the sea just changed (C-35).
+        _src_gone = take & self.aq_own
+        if bool(_src_gone.any()):
+            self.aq_own &= ~take
+            _ring_src = (_on & _src_gone[:, _nbc]).any(dim=2)
+            _rebuilt = self.tile_river | (_on & self.aq_own[:, _nbc]).any(dim=2)
+            self.aqsrc.copy_(torch.where(_ring_src, _rebuilt, self.aqsrc))
+        _has_land = (_on & ~self.water[:, _nbc]).any(dim=2)
+        self.coastal_water |= take & _has_land
+        _land_ring = _ring & ~self.water
+        if bool(_land_ring.any()):
+            self.coastal_land |= _land_ring
+            self.tile_wh.copy_(torch.where(
+                _land_ring & (self.tile_wh == self._h_none),
+                torch.full_like(self.tile_wh, float(self.rules.housing_coastal)),
+                self.tile_wh))
         self._air_orphans_die()   # an airstrip under water bases nothing
         self._eff_version += 1
         self._gen_ver += 1
@@ -2623,10 +2645,15 @@ class SimEconomy:
         if hit is None:
             fid = self._adj_src_feat[src] if src < len(self._adj_src_feat) else -1
             tid = self._adj_src_terr[src] if src < len(self._adj_src_terr) else -1
+            # CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water
+            # tile", so it lends the SEA's sources and none of the ground's.
+            # Both engines keep the feature and terrain UNDERNEATH on purpose,
+            # so the mask is here at the READ, where `ringTerrain` /
+            # `ringFeature` put it on TS (C-35).
             if fid >= 0:
-                on = (self.feat_id == fid) & ~self.feat_stripped
+                on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
             elif tid >= 0:
-                on = (self.terrain == tid).expand(self.B, self.T)
+                on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_submerged
             else:
                 on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
             nb = self.neigh

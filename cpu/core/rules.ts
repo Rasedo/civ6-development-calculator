@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver, naturalWonderAt } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
@@ -364,7 +364,7 @@ export function validImprovementsIn(
     flat &&
     bareGround(tile) &&
     (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
-    neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
+    neighbors(opts.map, tile).some((n) => ringTerrain(n) === 'COAST') &&
     tileAppeal(opts.map, tile, opts.camps, opts.gpAppeal) >= SEASIDE_RESORT_MIN_APPEAL
   ) {
     out.push('SEASIDE_RESORT');
@@ -540,7 +540,8 @@ export function canPlaceDistrictIn(
   if (def.placement.requiresWaterSourceOrMountain) {
     const sourced =
       hasRiver(tile) ||
-      around.some((n) => n.terrain === 'LAKE' || n.feature === 'OASIS' || isMountain(n));
+      // a drowned Lake or Oasis is SEA now, and the sea sources nothing (C-35)
+      around.some((n) => ringTerrain(n) === 'LAKE' || ringFeature(n) === 'OASIS' || isMountain(n));
     if (!sourced) return no('Needs an adjacent river, lake, oasis or mountain.');
   }
   if (def.placement.notAdjacentToCityCenter) {

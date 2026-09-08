@@ -2,7 +2,7 @@
 import { neighbors } from './hex';
 import { TERRAINS } from './terrains';
 import { FEATURES } from './features';
-import type { GameMap, Tile } from './types';
+import type { FeatureId, GameMap, TerrainId, Tile } from './types';
 
 /**
  * CIV6 (Continents): every contiguous LANDMASS gets an id, counting from 0
@@ -108,21 +108,39 @@ export function hasRiver(tile: Tile): boolean {
 
 export function hasFreshWater(map: GameMap, tile: Tile): boolean {
   if (hasRiver(tile)) return true;
-  if (tile.feature === 'OASIS') return true;
+  if (ringFeature(tile) === 'OASIS') return true;
+  // a drowned Lake or Oasis is SEA now, and the sea is not fresh (C-35)
   for (const n of neighbors(map, tile)) {
-    if (n.terrain === 'LAKE') return true;
-    if (n.feature === 'OASIS') return true;
+    if (ringTerrain(n) === 'LAKE') return true;
+    if (ringFeature(n) === 'OASIS') return true;
   }
   return false;
 }
 
+/**
+ * THE TERRAIN A TILE PRESENTS TO ITS NEIGHBOURS. CIV6 (Sea Level Rise):
+ * submerged tiles "become coastal water tiles", and both engines keep the
+ * ground's own terrain, feature and river edges UNDERNEATH — so every RING
+ * fact reads the sea, and only a rule about what lies beneath reads
+ * `tile.terrain` directly (C-35).
+ */
+export function ringTerrain(tile: Tile): TerrainId {
+  return tile.submerged ? 'COAST' : tile.terrain;
+}
+
+/** the FEATURE a tile presents to its neighbours: none, once the sea has it. */
+export function ringFeature(tile: Tile): FeatureId | null {
+  return tile.submerged ? null : tile.feature;
+}
+
 export function isCoastalLand(map: GameMap, tile: Tile): boolean {
   if (isWater(tile)) return false;
-  return neighbors(map, tile).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN');
+  return neighbors(map, tile).some((n) => ringTerrain(n) === 'COAST' || ringTerrain(n) === 'OCEAN');
 }
 
 export function isCoastalWater(map: GameMap, tile: Tile): boolean {
-  if (tile.terrain !== 'COAST' && tile.terrain !== 'LAKE') return false;
-  if (tile.feature === 'ICE') return false;
+  const terr = ringTerrain(tile);
+  if (terr !== 'COAST' && terr !== 'LAKE') return false;
+  if (ringFeature(tile) === 'ICE') return false;
   return neighbors(map, tile).some((n) => isLand(n));
 }

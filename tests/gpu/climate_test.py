@@ -185,6 +185,40 @@ def main() -> int:
     s5b._climate_turn()
     assert int(s5b.climate_idx[b]) == 5
     assert bool(s5b.tile_submerged[b, keep].all()), "and it does"
+    # C-35: the drowned ground IS coastal water, and every LAND neighbour of
+    # it has just become coastal land. Both engines keep the terrain and the
+    # feature UNDERNEATH on purpose, so the adjacency sources mask at the READ
+    # rather than the write.
+    _nb = [int(x) for x in s5b.neigh[t0] if int(x) >= 0]
+    _land_nb = [x for x in _nb if not bool(s5b.water[b, x])]
+    assert _land_nb, "the scene's drowned tile touches no land — nothing to check"
+    assert bool(s5b.coastal_water[b, t0]), (
+        "a drowned tile still touching land is COASTAL WATER")
+    for _x in _land_nb:
+        assert bool(s5b.coastal_land[b, _x]), (
+            f"tile {_x} did not become coastal land when {t0} drowned")
+        assert float(s5b.tile_wh[b, _x]) != s5b._h_none, (
+            f"tile {_x} took no water housing from the new coast")
+    # the ground's own feature is KEPT and lends NOTHING: a source that names
+    # it counts the drowned tile among a neighbour's sources no longer.
+    _fid = int(s5b.feat_id[b, t0])
+    if _fid >= 0 and not bool(s5b.feat_stripped[b, t0]):
+        _src = next((i for i, f in enumerate(s5b._adj_src_feat) if f == _fid), -1)
+        if _src >= 0:
+            _seen = s5b._adj_src_count(_src)[b]
+            assert float(_seen[_land_nb[0]]) == 0.0 or int(s5b.feat_id[b, _land_nb[0]]) == _fid, (
+                f"the drowned tile still lends feature {_fid} to {_land_nb[0]}")
+    # the Aqueduct's source is a DERIVED plane over a fact the sea can move.
+    # A drowned oasis/lake/mountain stops sourcing its neighbours, and the
+    # derivation is rebuilt rather than left as a stale bake (C-35).
+    assert not bool((s5b.aq_own[b] & s5b.tile_submerged[b]).any()), (
+        "a drowned tile still counts as an Aqueduct source")
+    _want = s5b.tile_river[b] | (
+        (s5b.neigh >= 0) & s5b.aq_own[b][s5b.neigh.clamp(min=0)]).any(dim=1)
+    assert bool((s5b.aqsrc[b] == _want).all()), (
+        "the Aqueduct-source plane went stale when the sea rose")
+    print("  5b aqueduct source OK — the derivation was rebuilt, not left baked")
+    print("  5b ring OK — the drowned tile is coastal water, its land neighbours coastal land")
     print(f"  5b submersion OK ({len(ti)} band-1 tiles lost forever at Phase IV)")
 
     # --- 5c) a barrier holds the sea off, and no CENTRE is ever taken ------

@@ -167,6 +167,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // feature on EVERY seat, so a later loyalty-flip must read that centre
       // stripped; the t0 capitals were exported already-stripped.
       fy: t.feature && FEATURES[t.feature].removable ? YIELD_KEYS.map((k) => FEATURES[t.feature!].yields?.[k] ?? 0) : [0, 0, 0, 0, 0, 0],
+      // IS THIS TILE a water source for a neighbour's Aqueduct? The ATOM the
+      // derived plane below is made of — exported so the GPU can rebuild the
+      // derivation when the sea takes an oasis (C-35).
+      aqown: t.terrain === 'LAKE' || t.feature === 'OASIS' || isMountain(t) ? 1 : 0,
       aqsrc:
         hasRiver(t) ||
         neighbors(map, t).some((n) => n.terrain === 'LAKE' || n.feature === 'OASIS' || isMountain(n))

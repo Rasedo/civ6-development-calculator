@@ -1984,6 +1984,12 @@ class SimInit:
         self.aqsrc = torch.tensor(
             [[t.get("aqsrc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
+        # the ATOM `aqsrc` is derived from: is THIS tile a lake, an oasis or a
+        # mountain? Kept so the derivation can be rebuilt when the sea takes an
+        # oasis — a baked derivation of a fact that moved is a stale one (C-35).
+        self.aq_own = torch.tensor(
+            [[t.get("aqown", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
+        )
         self.coastal_water = torch.tensor(
             [[t.get("cw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] Harbor surface: coastal/lake water adjacent to land, static

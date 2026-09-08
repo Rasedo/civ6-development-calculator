@@ -3,7 +3,7 @@ import { addYields, emptyYields, type GameState, type City, type Tile, type Yiel
 import { citiesOf, civOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
-import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
+import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
 import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
@@ -202,21 +202,27 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 }
 
 function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
+  // CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water tile",
+  // so it lends the SEA's sources and none of the ground's — the same reason
+  // `submergeTile` drops the resource rather than leaving a drowned Iron seam
+  // lending a neighbouring district an adjacency the ground never had (C-35).
+  const terrain = ringTerrain(neighbor);
+  const feature = ringFeature(neighbor);
   switch (rule.source) {
     case 'MOUNTAIN':
       return isMountain(neighbor) && !naturalWonderAt(neighbor);
     case 'RAINFOREST':
-      return neighbor.feature === 'RAINFOREST';
+      return feature === 'RAINFOREST';
     case 'WOODS':
-      return neighbor.feature === 'WOODS';
+      return feature === 'WOODS';
     case 'REEF':
-      return neighbor.feature === 'REEF';
+      return feature === 'REEF';
     case 'GEOTHERMAL_FISSURE':
-      return neighbor.feature === 'GEOTHERMAL_FISSURE';
+      return feature === 'GEOTHERMAL_FISSURE';
     case 'TUNDRA':
-      return neighbor.terrain === 'TUNDRA';
+      return terrain === 'TUNDRA';
     case 'DESERT':
-      return neighbor.terrain === 'DESERT';
+      return terrain === 'DESERT';
     case 'NATURAL_WONDER':
       return naturalWonderAt(neighbor) !== null;
     case 'BUILT_WONDER':

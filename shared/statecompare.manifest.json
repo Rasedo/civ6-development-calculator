@@ -2850,6 +2850,14 @@
     ],
     "gpu": [
       {
+        "plane": "aqsrc",
+        "why": "the Aqueduct's water source: 'this tile has an adjacent river, lake, oasis or mountain'. TS recomputes it on every read (`requiresWaterSourceOrMountain`), so there is no TS field to compare; the GPU keeps it as a plane and rebuilds it over the ring whenever `aq_own` moves. Its INPUTS are all compared (Tile.submerged, terrain, feature, riverMask), so the two engines agree by construction, and the climate poke pins the rebuild."
+      },
+      {
+        "plane": "aq_own",
+        "why": "the ATOM `aqsrc` is derived from — is THIS tile a lake, an oasis or a mountain? It is STATE only because the sea can take an oasis; TS has no stored twin at all, and the drowning itself is compared (Tile.submerged)."
+      },
+      {
         "plane": "wpass",
         "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
       },

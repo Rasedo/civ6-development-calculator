@@ -768,6 +768,9 @@ _MUTABLE = [
     "d_usable", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
     "lux_req", "res_imp", "tile_lowland",
+    # the Aqueduct's source and the atom it derives from: a drowned OASIS
+    # stops sourcing a neighbour, so both moved from map generation to state.
+    "aqsrc", "aq_own",
     # CIV6 (Builder): a HARVEST takes the resource off a tile that stays
     # workable, so every baked flag that read `t.resource` is state now —
     # the harvest copies each one's resource-free value in (`_nr_planes`).

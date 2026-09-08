@@ -52,7 +52,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed (C-77), wonder in the blast (ask) |
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
-| C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
+| C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
 | C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 12 |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
 | C-45 queue depth five | 1 | ask |
@@ -67,7 +67,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **43** | |
+| **OPEN, TOTAL** | **41** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -319,14 +319,21 @@ Nothing open.
     attempts; PATROL waits on it; C-31's delivery shares the half.
   - PRIORITY TARGET (the Jet Bomber's reach to the support unit under a
     stack) — unsourced magnitude.
-- **C-35. THE DROWNED GROUND IS COAST.** Weight 2.
+- **C-35. THE DROWNED GROUND IS COAST.** CLOSED.
   - SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
     coastal water tiles". Both engines keep terrain, feature and river edges
-    underneath (`Tile.submerged` / `_submerge`) so a drowned Woods still
-    lends adjacency. Every ring fact the exporter derives (`isCoastalLand`,
-    the Seaside Resort's coast, fresh water, the Aqueduct's source, district
-    adjacency's WOODS/RAINFOREST/REEF sources) must read a submerged tile
-    as coast on both engines.
+    underneath on purpose, so the mask is at the READ: `ringTerrain` and
+    `ringFeature` on TS, `~tile_submerged` on the GPU's source counters. A
+    drowned tile now lends the SEA's sources and none of the ground's — the
+    same reasoning `submergeTile` already applied to the RESOURCE.
+  - The ring both ways: a drowned tile IS coastal water while it still
+    touches land, and every land neighbour of it becomes coastal land, with
+    the water Housing that carries.
+  - The Aqueduct's source was a BAKED derivation of a fact the sea can move
+    (a drowned oasis). The atom it is made of (`aqown`) is exported beside
+    it, both are `_MUTABLE` now, and the derivation is REBUILT over the ring
+    rather than left stale — TS recomputes on every read, so only the GPU
+    could go stale, and the climate poke pins the rebuild.
 - **C-38. A CITY-STATE'S CITY.** Weight 1.
   Its yields ride the shared walk, and now so do the two rules that walk
   feeds.
