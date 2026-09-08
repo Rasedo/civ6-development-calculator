@@ -1645,6 +1645,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // twin, and it is the only one the replay drives. `tileFreeForUnit`
           // is the GPU's `ok`, so a refusal has to print too or the pair
           // reads as silence on one side.
+          const mpBefore = unit.movesLeft;
           const freeU = tileFreeForUnit(state, to.index, actor.seat, unit, allowEmb);
           const outU = freeU ? stepUnit(state, unit, to) : 'blocked';
           const dlS = (globalThis as { __diffLog?: string[] }).__diffLog;
@@ -1658,9 +1659,13 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             // engines sending one unit to DIFFERENT tiles produce two
             // different keys and print as two unpaired lines, which reads
             // exactly like a pair and is not one.
+            // the MP BEFORE the step rides the line. A mid-turn movement
+            // difference is invisible at a turn boundary because
+            // `refreshUnits` resets the pool, so the census can compare
+            // `movesLeft` every turn and still never see it.
             dlS.push(`st:${actor.seat}:${state.turn}:${j}`
               + ` ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
-              + ` at${here.index} to${to.index}`
+              + ` at${here.index} to${to.index} mp${mpBefore}`
               + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);
           }
         }
