@@ -10405,8 +10405,13 @@ class SimSeats:
         # the STEP half of the decomposition log, `stepUnit`'s twin: one line
         # per ordered step, the tiles it moved between and what came of it.
         if getattr(self, "_log_diff", False):
+            # gated on the ACTING mask. `dest >= 0` is true in every game
+            # whose tensors merely carry a stale destination, and printing
+            # those buried the real steps under a wall of refusals nobody
+            # ordered — a probe that prints where nothing acted is noise.
+            _act_st = ok | moved
             for _sb in range(self.B):
-                if int(dest[_sb]) < 0:
+                if not bool(_act_st[_sb]) or int(dest[_sb]) < 0 or int(here[_sb]) < 0:
                     continue
                 # keyed on the EDGE, not the unit: the GPU names a unit by
                 # merged slot and TS by id, and those two never pair. An edge

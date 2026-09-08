@@ -1018,19 +1018,6 @@ export function embarkTechMoves(state: GameState, seat: number): number {
 }
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
-  const from = unit.tileIndex;
-  const out = stepUnitBody(state, unit, to);
-  // the STEP half of the decomposition log: one line per ordered step, the
-  // tiles it moved between and what came of it. A pair that disagrees names
-  // the step rather than the position twenty turns later.
-  const dlS = (globalThis as { __diffLog?: string[] }).__diffLog;
-  // keyed on the EDGE, not the unit: the GPU names a unit by merged slot and
-  // TS by id, and those two never pair. `from` is read BEFORE the body runs.
-  if (dlS) dlS.push(`st:${unit.seat}:${from}:${to.index} t${state.turn} ${out === 'blocked' || out === 'cantAfford' ? 'blocked' : 'moved'}`);
-  return out;
-}
-
-function stepUnitBody(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
   // a formed civilian has no step of its own: the formation moves as one, and
   // Civ 6 asks for it to be broken first.

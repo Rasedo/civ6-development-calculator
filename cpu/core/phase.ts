@@ -1636,7 +1636,18 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (to) {
           const anyWarU = atWarWithAny(state, actor.seat);
           const allowEmb = anyWarU && ownerHasTech(state, unit, 'SHIPBUILDING');
-          if (tileFreeForUnit(state, to.index, actor.seat, unit, allowEmb)) stepUnit(state, unit, to);
+          // the STEP half of the decomposition log, and it belongs HERE
+          // rather than inside `stepUnit`: this call site is `_step_verb`'s
+          // twin, and it is the only one the replay drives. `tileFreeForUnit`
+          // is the GPU's `ok`, so a refusal has to print too or the pair
+          // reads as silence on one side.
+          const freeU = tileFreeForUnit(state, to.index, actor.seat, unit, allowEmb);
+          const outU = freeU ? stepUnit(state, unit, to) : 'blocked';
+          const dlS = (globalThis as { __diffLog?: string[] }).__diffLog;
+          if (dlS) {
+            dlS.push(`st:${actor.seat}:${here.index}:${to.index} t${state.turn}`
+              + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);
+          }
         }
       } else if (a >= 6 && a < 12) {
         // ATTACK — safe to replay now BECAUSE the walkers stand down for
