@@ -27,7 +27,7 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **1** | A-1 CLOSED (#246l); A-2 the route destination at seed 9014 turn 117, GPU names one city-state and TS another |
+| **A. Engine vs engine** | **0** | A-1 and A-2 both CLOSED (#246l, #246s) |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
@@ -170,30 +170,25 @@ the gate reaches is worth more here than one that re-reads the exporter.
     has the same phase-order exposure the invented count had, and every other
     reader of `res_id` owes `res_stripped` the same question this one did.
 
-- **A-2. THE ROUTE DESTINATION AT SEED 9014 TURN 117.** OPEN, and the first
-  fire now that A-1 is gone.
-
-        seed 9014 turn 117 seat 2: ROUTE [from,dest]: GPU [883, -3] vs TS [883, -2]
-
-  - Same ORIGIN, different destination: the `route` verb's dest is a centre
-    tile or `-(2 + csIndex)` for a city-state, so the two engines name city
-    state 1 and city-state 0 for the same trader.
-  - This is a DRIVER-twin question rather than an engine rule — the record
-    itself disagrees, so the candidate scan and its TS mirror have parted,
-    which is the class `driver twin mirrors mask` records and which two
-    batteries have already paid for once each.
-  - WHAT A FIRST READ ALREADY RULES OUT. The two keys have the same SHAPE:
-    `cityStateRouteYields` adds `CITY_STATE_ROUTE_GOLD` to gold and
-    `CITY_STATE_ROUTE_SPEC` to the type's own yield, and TS sums all six, so
-    its per-city-state total is the same constant the GPU's `ysum_cs` uses.
-    Both scans take strictly-greater, so both should keep the FIRST tied
-    candidate — and the first is the lower CS index, which is TS's answer.
-    So the difference is NOT the magnitude: it is either `routePostGold` /
-    `_route_post_gold` disagreeing at those two destinations, or one engine
-    holding a candidate VALID that the other refuses (met, reach, or the
-    already-connected test). Print both keys and all three gates per
-    candidate before changing anything — the amenity hunt above cost three
-    wrong hypotheses to exactly this kind of shortcut.
+- **A-2. THE ROUTE DEST CODE NAMED A POSITION.** CLOSED 2026-09-08 with
+  #246s.
+  - The wire carries a trade route as [origin CENTRE, dest code], a code of
+    `-(2 + n)` meaning a city-state. The APPLIER has always decoded `n` with
+    `cityStateById` — an ID — while the driver ENCODED `-(2 + ci)` with `ci`
+    the array position. `captureCityState` splices that array, so the two
+    halves of TS agreed only until a minor was taken; the GPU keeps a fixed
+    slot per city-state and never renumbers, so it was the encoder that was
+    wrong and its own decoder that proved it.
+  - The gate log named it by printing the CENTRE beside each code: the GPU's
+    -2/-3/-4 read 541/983/257 and TS's -2/-3 read 983/257 — the same list,
+    shifted by one, with TS missing the entry the GPU still held.
+  - `placeCityStateAt(state, i, ...)` assigns the id from fixture order, so
+    id == initial index == GPU slot, permanently. That is the invariant the
+    whole city-state wire rests on — the LEVY names an id through
+    `cityStateById` too — and it is now the one the route code uses.
+  - THE CLASS is `wire position vs id`: a wire field naming a roster member
+    by ARRAY POSITION breaks the moment the roster can shrink. This roster
+    can, and did.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 

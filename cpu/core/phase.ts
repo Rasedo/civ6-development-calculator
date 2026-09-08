@@ -2393,7 +2393,9 @@ export function seatPhase(state: GameState): void {
         if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
       }
       // the wire intent: [origin CENTRE, dest code] — a CENTRE tile, or
-      // -(2+csIndex) for a city-state. Re-validated like every wire intent
+      // -(2 + city-state ID) for a city-state: an ID, because
+      // `captureCityState` splices the array and a POSITION would shift under
+      // the wire. Re-validated like every wire intent
       // (canAdd* checks capacity, range and the free Trader the verb spends).
       const rv = rec?.route;
       if (rv) {

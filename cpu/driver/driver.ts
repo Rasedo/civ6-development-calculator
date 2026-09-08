@@ -57,7 +57,7 @@ export interface DriverOpts {
  * then every other major's EXPLORED cities (from asc, to asc, cityState asc,
  * seat asc). Best NEW in-range pair by the route's TOTAL yields,
  * strictly-greater beats, so ties keep the first pair in that scan order.
- * [origin CENTRE, dest code (CENTRE or -(2+csIndex))], [-1,-1] = none.
+ * [origin CENTRE, dest code (CENTRE or -(2 + city-state ID))], [-1,-1] = none.
  * Gated on capacity AND a free Trader — the unit the verb spends. */
 export function routeCandidateRow(state: GameState, actor: Seat): number[] {
   const routes = actor.tradeRoutes ?? [];
@@ -74,8 +74,13 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       const ySum = y.food + y.production;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
     }
-    for (let ci = 0; ci < state.cityStates.length; ci++) {
-      const cityState = state.cityStates[ci];
+    for (const cityState of state.cityStates) {
+      // THE DEST CODE NAMES THE CITY-STATE'S ID, never its position in this
+      // array. `captureCityState` splices the array, so every later position
+      // shifts the moment a minor is taken — and the APPLIER has always
+      // decoded this code with `cityStateById`, so the encoder was the half
+      // that disagreed. The GPU's slot index is the id and never moves.
+      const ci = cityState.id;
       const gMet = hasMet(cityState, actor.seat);
       const gHas = routes.some((x) => x.from === from.id && x.toCs === cityState.id);
       const gRch = routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex);
