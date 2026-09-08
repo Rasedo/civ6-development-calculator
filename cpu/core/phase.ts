@@ -2375,7 +2375,9 @@ export function seatPhase(state: GameState): void {
     const luxMap = luxuryAmenities(state, actor.seat);
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
-    for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
+    for (const civCity of actor.cities) {
+      cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods, true));
+    }
     // CIV6 (Military alliance 2): "+15% Production toward military units
     // when you or your ally are at war."
     const warBuffPct = warBuffProdPct(state, actor.seat) / 100;

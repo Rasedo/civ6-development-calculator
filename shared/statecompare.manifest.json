@@ -1755,6 +1755,15 @@
           ]
         },
         {
+          "name": "workedTiles",
+          "compare": "exact",
+          "covers": [
+            "City.workedTiles"
+          ],
+          "planes": [],
+          "note": "C-77: the tiles this city works this turn, ascending. Both engines STORE what their seat-phase walk picked, and only that walk: `computeCityStats` and `_seat_city_walk` are pure reads that the score and great-people rules call again later in the turn, so a pick recorded from those would be the post-growth one while the turn itself ran on the loop-top snapshot. City-state cities are OUT of this key: `minorCity` builds a fresh `City` view per call and has nowhere to keep the pick — they are compared in the citystate group, which carries no worked-tile row."
+        },
+        {
           "name": "foodBox",
           "compare": "milli",
           "covers": [

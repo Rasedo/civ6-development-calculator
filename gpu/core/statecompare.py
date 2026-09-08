@@ -763,6 +763,12 @@ CITY = {
     "reactorAge": _cty("city_reactor_age"),
     "projectBoostTurn": _cty("city_boost_turn"),
     "isCapital": _cty("city_is_cap"),
+    # C-77: the tiles this city actually works, ASCENDING and -1-free. The
+    # pick is a SET, so both engines canonicalise it here rather than pinning
+    # the order each happens to build it in.
+    "workedTiles": lambda sim, b, rows: [
+        sorted(x for x in sim._worked_tiles(c)[b, s].tolist() if x >= 0)
+        for c, s in rows],
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
     "tilesAcquired": _cty("city_acquired"),

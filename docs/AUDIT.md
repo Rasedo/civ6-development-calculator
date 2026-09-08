@@ -49,7 +49,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
-| C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed (C-77), wonder in the blast (ask) |
+| C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed, wonder in the blast (ask) |
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
@@ -63,11 +63,10 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-69 two unique rows with trait clauses | 0 | CLOSED — the Tsikhe and the Mission shipped with C-79's rows |
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
-| C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **41** | |
+| **OPEN, TOTAL** | **40** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -309,7 +308,10 @@ Nothing open.
     interception takes it under 50% HP — which needs the interception
     DAMAGE the install never publishes (C-34). Until that is sourced the
     page's list answers every delivery alike.
-  - THE CITIZENS A BLAST KILLS wait on C-77.
+  - THE CITIZENS A BLAST KILLS: buildable — C-77 exposed the pick, so
+    `city.workedTiles` / `_worked_tiles(row)` now name who is standing in
+    the blast. What is unsourced is HOW MANY die per ring, which is ask 8's
+    neighbour.
   - A WONDER IN THE BLAST — ask 8.
 - **C-33. THE GIANT DEATH ROBOT'S RANGE.** Weight 1.
   - The five-hex Range is a verb the action space lacks; no direction
@@ -403,11 +405,6 @@ Nothing open.
   - Waiting on it: the mission's mark, DEMAND, DISCUSS and its promises,
     the Retribution casus belli (C-2); the agendas (C-26); the preference
     weights (C-67).
-- **C-77. THE WORKED-TILE PICK IS UNEXPOSED.** Weight 1.
-  - `assignWorkedTiles` and the GPU walk's `topk` derive the pick inside the
-    yield walk; nothing stores or compares it. The carrier is one exposed
-    reader per engine and a compared per-city worked-tile list. C-31's
-    "Citizens 'working' the affected tiles are eliminated" waits on it.
 - **C-78. UNIQUE UNITS ABSENT.** Weight 1.
   - Every one of the 34 civilizations names a unique chassis now — 31 rows
     with their abilities and pins on both engines. What is left is the nine

@@ -1981,6 +1981,10 @@ class SimInit:
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
+        # C-77: the worked-tile pick per seat row, stashed by the walk that
+        # makes it and read by the state census. Instrumentation, not state:
+        # the walk rewrites it for every row every turn.
+        self._worked_pick: dict[int, torch.Tensor] = {}
         self.aqsrc = torch.tensor(
             [[t.get("aqsrc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )

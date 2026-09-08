@@ -69,6 +69,9 @@ export interface City {
   centerIndex: number;
   population: number;
   foodBox: number;
+  /** C-77: the tiles this city's last yield walk chose to work, in the walk's
+   *  own order. The pick EXPOSED — nothing reads it back into the walk. */
+  workedTiles?: number[];
   cultureBox: number;
   tilesAcquired: number;
   /** The seat this city was FOUNDED as the capital of; -1 for every other

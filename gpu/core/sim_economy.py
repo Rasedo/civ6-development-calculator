@@ -4536,7 +4536,22 @@ class SimEconomy:
             rem = rem - tk
         return spec
 
-    def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor) -> torch.Tensor:
+    def _worked_tiles(self, row: int) -> torch.Tensor:
+        """[B, RC, M] — the tiles seat row `row` works THIS TURN, -1 unused
+        (C-77), or all -1 where this turn's walk has not reached that row yet.
+
+        Deliberately NOT recomputed on demand: TS stores what its walk chose
+        and holds nothing before the walk runs, so a GPU that answered eagerly
+        would report a pick where TS reports none — which is a difference in
+        the INSTRUMENT, not in the engines. `_worked_pick` is cleared at the
+        top of every step, so a stale answer is impossible."""
+        hit = self._worked_pick.get(row)
+        if hit is None:
+            return torch.full((self.B, self.RC, 1), -1, dtype=torch.long, device=self.device)
+        return hit
+
+    def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
+                        record: bool = False) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
         yield order (food, production, gold, science, culture, faith) for ANY
         seat row, dead columns zeroed and gold NET of cityMaintenance. n is the
@@ -4637,6 +4652,14 @@ class SimEconomy:
         pop_t = pop - spec_d.sum(dim=2)
         take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
+        # C-77: the PICK, exposed. It was computed here and thrown away, so a
+        # divergence in WHICH tiles a city works could only surface indirectly
+        # as a yield difference, and C-31's "citizens 'working' the affected
+        # tiles are eliminated" had nothing to read. Stashed rather than
+        # recomputed, so this stays the ONE place the pick is made.
+        if j is None and record:
+            self._worked_pick[row] = torch.where(take, tiles.gather(2, top_idx),
+                                                 torch.full_like(top_idx, -1))
         sel = [
             c.gather(2, top_idx) * takef
             for c in (f, p, gat(ty_oth[:, :, 2]).double(), gat(ty_oth[:, :, 3]).double(),
@@ -5214,9 +5237,16 @@ class SimEconomy:
         Recomputing mid-walk behind an (_eff_version, _claim_version) key
         would model a `game.ts` endTurn city loop that does not exist — every
         seat takes its turn through `seatPhase` — and it would let two rows
-        read two different economies."""
+        read two different economies.
+
+        THIS is the walk that records the worked-tile pick (C-77), and the
+        only one: `seat_score` and `_city_totals` ride the same body at other
+        points in the turn, and a pick stashed from the SCORE walk would be
+        the post-growth one while the turn itself ran on the snapshot — a
+        difference in the INSTRUMENT, not in the engines. `seatPhase` records
+        from its loop-top snapshot for exactly the same reason."""
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
-        total = self._seat_city_walk(row, amen_yf=yield_f)
+        total = self._seat_city_walk(row, amen_yf=yield_f, record=True)
         housing = self._seat_housing(row)[1]
         pop = self.city_pop[:, row, : self.RC].double()
         surplus = total[:, :, 0] - pop * self.rules.food_per_citizen

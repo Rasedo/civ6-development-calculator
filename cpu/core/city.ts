@@ -259,6 +259,33 @@ export function tileScore(y: Yields, focus: FocusId): number {
   return score;
 }
 
+/**
+ * THE TILES A CITY ACTUALLY WORKS THIS TURN (C-77).
+ *
+ * `assignWorkedTiles` answers "which of these candidates, for this many
+ * citizens"; this answers the question the ENGINE asks — the same city, with
+ * the specialists already diverted — so the yield walk and the state census
+ * read one composer instead of two spellings of the citizen count.
+ *
+ * Returned in the WALK'S OWN ORDER — locked plots first, then by score. The
+ * pick is a set and a comparison should canonicalise it, but the walk sums
+ * f64 yields in this order and re-ordering it would move the last ulp, so the
+ * sort belongs at the census and never here.
+ *
+ * `spent` is the specialist count the caller has already computed; the walk
+ * has it in hand, and passing it keeps this the ONE place the citizen count
+ * is spelled.
+ */
+export function workedTilesOf(state: GameState, city: City, ctx?: YieldCtx, spent?: number): number[] {
+  const yctx = ctx ?? makeYieldCtx(state, city.seat);
+  let specialistTotal = spent;
+  if (specialistTotal === undefined) {
+    specialistTotal = 0;
+    for (const n of effectiveSpecialists(state, city).values()) specialistTotal += n;
+  }
+  return assignWorkedTiles(state, city, yctx, city.population - specialistTotal);
+}
+
 export function assignWorkedTiles(
   state: GameState,
   city: City,
@@ -831,6 +858,15 @@ export function computeCityStats(
   city: City,
   luxMap?: Map<number, number>,
   mods?: Modifiers,
+  /**
+   * Store this walk's worked-tile pick on the city (C-77). FALSE for every
+   * caller but `seatPhase`'s loop-top snapshot: `computeCityStats` is a pure
+   * read that four other rules call at four other points in the turn, and a
+   * pick recorded from the SCORE walk would be the post-growth one — the turn
+   * itself ran on the snapshot. One writer, so the stored pick is the pick
+   * the turn actually used.
+   */
+  record = false,
 ): CityStats {
   const base = mods ?? getModifiers(state, city.seat);
   const m = withGovernor(state,
@@ -856,7 +892,13 @@ export function computeCityStats(
   let specialistTotal = 0;
   for (const n of specialists.values()) specialistTotal += n;
 
-  const worked = assignWorkedTiles(state, city, ctx, city.population - specialistTotal);
+  const worked = workedTilesOf(state, city, ctx, specialistTotal);
+  // C-77: the pick this walk MADE, kept where the census can read it. Never a
+  // recomputation, and never from a second caller: the walk is a loop-top
+  // SNAPSHOT, so a growth landing later in the same turn would change what a
+  // fresh call answers while the turn itself ran on this one.
+  if (record) city.workedTiles = worked;
+
   const tiles = emptyYields();
   addYields(tiles, tileYieldsForCenter(ctx, center));
   // CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
