@@ -96,6 +96,22 @@ def record(results, wall: float, ok: bool, mem: dict | None = None,
             "steps": steps,
         }
         LOG.parent.mkdir(parents=True, exist_ok=True)
+        # ONE ATTEMPT, ONE ROW. A re-run that fails the SAME lanes with no
+        # green in between is the same unresolved attempt looked at again,
+        # not a second try, and a history that counts it twice reports one
+        # divergence as many catches and drags every lane average with it.
+        # The NEWEST row wins: it carries the freshest timings and memory,
+        # which is what `lane_cost` and `plan_pool` read back.
+        prev = rows[-1] if rows else None
+        if (prev is not None and prev.get("result") == "fail"
+                and rec["result"] == "fail"
+                and sorted(prev.get("failed_lanes") or []) == sorted(rec["failed_lanes"])
+                and prev.get("since_last_pass") == rec["since_last_pass"]):
+            rows[-1] = rec
+            with LOG.open("w", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(row) + "\n")
+            return
         with LOG.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec) + "\n")
     except Exception as exc:  # noqa: BLE001 — see the docstring

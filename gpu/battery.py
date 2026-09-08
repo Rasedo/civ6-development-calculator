@@ -26,6 +26,7 @@ table at the end gives per-step wall time and status.
 
 from __future__ import annotations
 
+import collections
 import os
 import re
 import subprocess
@@ -94,6 +95,28 @@ def print_hunt_reminder() -> None:
 # extract — which is also why the gate runs as two processes at all.
 POKE_WORKERS = 9
 POKE_OMP = 1
+
+# --------------------------------------------------------- the SLOW tier --
+# Never once red in 220 recorded runs, and 20s+ of pool time every run each.
+# They are not bad tests: the serve gate drives 24 seeds for 250 turns on
+# every battery, so ranged strikes, district builds, governors, encampments
+# and a whole driven game are already exercised there at a scale no scripted
+# scene reaches — these lanes re-ask in one hand-built scene what the gate
+# asks thousands of times. `ranged` alone has spent 27,000 seconds over 211
+# runs catching nothing.
+#
+# DEMOTED, NOT DELETED. `--full` runs them; the lane-drift check still sees
+# every one, so a trimmed run cannot be mistaken for a complete one. Run
+# --full at a round boundary and whenever a round CHANGED one of these
+# surfaces — a lane that has never caught a regression is evidence about the
+# regressions this project has produced, not proof it never will.
+SLOW_TIER = frozenset({
+    "ranged", "great_person", "districts", "drive", "combat_mod", "engineer",
+    "encampment", "gp_aura", "governors", "alliance_levels", "congress_vote",
+    "governor_roster", "occupancy", "centre_defence", "advance_borders",
+    "citystate_war", "seat", "controlled", "snapshot", "citystate_bonus",
+    "formation_train",
+})
 
 # ---------------------------------------------------------------- memory --
 # The battery is the heaviest thing in this repo and the box is the OWNER's,
@@ -282,6 +305,22 @@ def kill_tree(p: subprocess.Popen) -> None:
         pass
 
 
+def never_caught(rows: list) -> set[str]:
+    """Lane names that have not once gone red across the recorded runs.
+
+    A bail or a skip is not a catch — the lane never ran to a verdict — and
+    an OOM is the box, not the code.
+    """
+    seen: set[str] = set()
+    red: set[str] = set()
+    for r in rows:
+        for st in r.get("steps", []) or []:
+            seen.add(st.get("lane", ""))
+            if st.get("status") not in ("ok", "bail", "skip", "oom"):
+                red.add(st.get("lane", ""))
+    return seen - red
+
+
 def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         cap: float = LANE_CAP) -> None:
     env = os.environ.copy()
@@ -384,7 +423,7 @@ def lane(steps: list[tuple[str, list[str], int]]) -> None:
 
 
 def main() -> int:
-    # OWNER RULE (2026-08-24): the battery runs every FOUR commits, not every
+    # OWNER RULE (2026-09-08, was FOUR): the battery runs every FIVE commits, not every
     # round — batched hunts run at ~15 min/bug where isolated ones paid ~80
     # (stats/battery.jsonl audit). The per-commit bar is the compile bar plus
     # a single-seed smoke serve. A RED run never resets the clock (only a
@@ -396,11 +435,11 @@ def main() -> int:
             n = int(_stats._git("rev-list", "--count", f"{since}..HEAD"))
         except ValueError:
             n = -1  # unknown sha (rebase?) — the clock is unprovable, run
-        if 0 <= n < 4:
+        if 0 <= n < 5:
             print(
                 f"BATTERY REFUSED — cadence rule: {n} commit(s) in git history "
                 f"since the last green run ({since[:12]}); the battery unlocks "
-                f"at 4."
+                f"at 5."
             )
             print("Per-commit bar: compile bar + single-seed smoke serve "
                   "(python gpu/serve_gate.py --batched --seeds <s> --turns 250).")
@@ -678,6 +717,16 @@ def main() -> int:
         # mistaken for a complete one.
         if HUNT:
             lanes = [[_shards[0]]]
+        elif not FULL:
+            # ...and an ordinary battery defers the SLOW tier, for the same
+            # reason and with the same guarantee: the check above has already
+            # seen every lane.
+            _cut = sorted(s[0] for L in lanes for s in L if s[0] in SLOW_TIER)
+            if _cut:
+                lanes = [[s for s in L if s[0] not in SLOW_TIER] for L in lanes]
+                lanes = [L for L in lanes if L]
+                print(f"pokes: {len(_cut)} slow never-catching lanes deferred "
+                      f"to --full ({', '.join(_cut)})", flush=True)
         _cost = lane_cost()
         for L in lanes:
             if len(L) > 5:
@@ -722,6 +771,42 @@ def main() -> int:
               f"  |  serve {_srv:.0f}s over {len(_serve_names)} shards"
               f"  vs  pokes {sum(_pk):.0f}s/{_pokes} workers = {_pool:.0f}s"
               f"  ->  {'SERVE' if _srv >= _pool else 'POKES'} is the wall")
+        # THE TRIPWIRE. The trim of 2026-09-08 put the wall on the serve lane;
+        # lanes get added and the pool creeps back, so the day it returns the
+        # battery says so itself. A WARNING, never a refusal: blocking a run
+        # because its own suite got slow punishes it for a fault it did not
+        # cause, and the only thing worse than a slow battery is one nobody
+        # runs. --full is excluded because there the deferred tier is back by
+        # design and the pool is SUPPOSED to be the wall.
+        if _pool > _srv and not FULL and not HUNT:
+            _rows = _stats._rows()
+            _cold = never_caught(_rows)
+            # A YOUNG LANE HAS NOT FAILED TO CATCH ANYTHING — it has not had
+            # the runs. Only lanes present for most of the recorded history
+            # can be accused of never catching, or this advises demoting the
+            # coverage a round has just ADDED, which is backwards.
+            _runs = collections.Counter(
+                st.get("lane") for r in _rows for st in (r.get("steps") or []))
+            _old = 0.6 * len(_rows)
+            _cand = sorted(((_t.get(n, 0.0), n) for n in _poke_names
+                            if n in _cold and _t.get(n, 0.0) >= 20.0
+                            and _runs[n] >= _old), reverse=True)
+            print(f"\nWARNING — POKES ARE THE WALL AGAIN: the pool costs "
+                  f"{_pool:.0f}s against the serve lane's {_srv:.0f}s.")
+            if _cand:
+                print(f"  {len(_cand)} lane(s) here cost {sum(c for c, _ in _cand):.0f}s "
+                      f"and have never caught anything in {len(_rows)} recorded runs:")
+                print("    " + ", ".join(f"{n} {c:.0f}s" for c, n in _cand[:8])
+                      + (" ..." if len(_cand) > 8 else ""))
+                print("  ACTION: add them to SLOW_TIER in gpu/battery.py — they keep running "
+                      "under --full.")
+                print("  Unless the serve gate stopped covering what they cover, in which case "
+                      "they have become the only coverage and must STAY.")
+            else:
+                print("  ...and every expensive lane in it HAS caught something, so the pool is "
+                      "earning its time.")
+                print("  ACTION: the lever is the SERVE side now — fewer turns or fewer seeds "
+                      "per shard — not the pokes.")
     # Every run records itself — stats/battery.jsonl, read by
     # tools/gpu/test_stats.py. Which lanes ever catch anything is a
     # question for data, not for memory.
