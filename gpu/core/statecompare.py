@@ -164,7 +164,13 @@ def group_keys(sim, b: int, group: str, rows: list) -> list[int]:
         tile = sim.unit_tile[b].tolist()
         typ = sim.unit_type[b].tolist()
         emb = sim.unit_emb[b].tolist()
-        return [tile[i] * 3 + (2 if emb[i] else 1 if _is_civilian(sim, typ[i]) else 0)
+        sup = sim._type_support.tolist()
+        # FOUR slots per tile — the stacking rule allows four classes, so the
+        # key has to carry four or two units merge into one row. An AIR or SPY
+        # unit holds no plot and keys where it always did, slot 0.
+        return [tile[i] * 4 + (3 if emb[i] else 2 if sup[typ[i]]
+                               else 1 if _is_civilian(sim, typ[i]) and not sup[typ[i]]
+                               else 0)
                 for i in rows]
     if group == "tile":
         return list(rows)

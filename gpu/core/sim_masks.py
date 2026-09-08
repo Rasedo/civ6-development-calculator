@@ -1855,8 +1855,9 @@ class SimMasks:
         seat,
         is_civilian=False,
         is_naval=False,
+        is_support=False,
     ) -> torch.Tensor:
-        return (self._stack_blocked(tiles, seat, is_civilian, is_naval)
+        return (self._stack_blocked(tiles, seat, is_civilian, is_naval, is_support)
                 | self._encamp_block(tiles, seat))
 
     def _stack_blocked(
@@ -1865,6 +1866,7 @@ class SimMasks:
         seat,
         is_civilian=False,
         is_naval=False,
+        is_support=False,
     ) -> torch.Tensor:
         """Pure STACKING check for tiles [B, N] — no Encampment term.
 
@@ -1884,6 +1886,7 @@ class SimMasks:
         tc = tiles.clamp(min=0)
         mil_slot = self.military_at.gather(1, tc)
         civ_slot = self.civilian_at.gather(1, tc)
+        sup_slot = self.support_at.gather(1, tc)
         emb_slot = self.embarked_at.gather(1, tc)
 
         neg = torch.full_like(tc, -1)
@@ -1892,6 +1895,9 @@ class SimMasks:
         )
         civ_seat = torch.where(
             civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
+        )
+        sup_seat = torch.where(
+            sup_slot >= 0, self.unit_seat.gather(1, sup_slot.clamp(min=0)), neg
         )
         emb_seat = torch.where(
             emb_slot >= 0, self.unit_seat.gather(1, emb_slot.clamp(min=0)), neg
@@ -1902,20 +1908,26 @@ class SimMasks:
                 return v if v.dim() >= 2 else v.unsqueeze(1)
             return torch.full((1, 1), bool(v), dtype=torch.bool, device=tc.device)
 
-        civ_b = _flag(is_civilian)
+        sup_b = _flag(is_support)
+        # `is_civilian` is the NONCOMBAT flag every caller already computes, so
+        # a SUPPORT mover arrives with both set; the civilian arm takes the
+        # ones that are not support, exactly as `_occ_set` splits the planes.
+        civ_b = _flag(is_civilian) & ~sup_b
         emb_b = (self.water.gather(1, tc) & ~_flag(is_naval)) if self._embark_live \
             else torch.zeros_like(tc, dtype=torch.bool)
-        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (~civ_b & ~emb_b))
+        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (~civ_b & ~sup_b & ~emb_b))
         civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | (civ_b & ~emb_b))
+        sup_blocks = (sup_seat >= 0) & ((sup_seat != seat) | (sup_b & ~emb_b))
         emb_blocks = (emb_seat >= 0) & ((emb_seat != seat) | emb_b)
-        return mil_blocks | civ_blocks | emb_blocks
+        return mil_blocks | civ_blocks | sup_blocks | emb_blocks
 
-    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). `seat` is the ABSOLUTE seat spawning —
         the only thing the probe needs to know about the owner;
-        civ_mask [B] bool — True = civilian probe.
+        civ_mask [B] bool — True = NONCOMBAT probe; sup_mask [B] marks the
+        support half of that set, which holds a stacking slot of its own.
         naval_mask [B] bool marks rows spawning a NAVAL unit — those probe over
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
@@ -1931,7 +1943,8 @@ class SimMasks:
         # Encampment wall belongs here too.
         blocked = self._blocked_for(cand7, seat,
                                     is_civilian=False if civ_mask is None else civ_mask,
-                                    is_naval=False if naval_mask is None else naval_mask)
+                                    is_naval=False if naval_mask is None else naval_mask,
+                                    is_support=False if sup_mask is None else sup_mask)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.any()):
             ocean_ok = ~self.ocean_tile.gather(1, okc)
@@ -2227,7 +2240,8 @@ class SimMasks:
         no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
         naval_m = self.unit_naval[ti_n] & mask
         cart = self._row_ocean_open(row) if self._cartography_tech >= 0 else None
-        found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart)
+        found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
+                                            sup_mask=self._type_support[type_idx.clamp(min=0)])
         if bool(no_hold.any()):
             found = torch.where(no_hold, at_tile >= 0, found)
             spot = torch.where(no_hold, at_tile.clamp(min=0), spot)
@@ -2864,6 +2878,7 @@ class SimMasks:
         e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0)), neg)
 
         is_civ = (self._type_civilian[utype.clamp(min=0)]).unsqueeze(2)
+        is_sup = (self._type_support[utype.clamp(min=0)]).unsqueeze(2)
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
         is_nav = self.unit_naval[ut].unsqueeze(2)
         cart = self._row_ocean_open(row).view(B, 1, 1)
@@ -2902,11 +2917,15 @@ class SimMasks:
         if self.TUNNEL >= 0:
             terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
-        _blk = torch.where(
-            is_civ,
-            self._blocked_for(nbc, row, is_civilian=True, is_naval=_nav6).reshape(B, N, 6),
-            self._blocked_for(nbc, row, is_naval=_nav6).reshape(B, N, 6),
-        )
+        # ONE call with the mover's own class flags. It used to be two, chosen
+        # by a `where`, to skip building the civilian plane on military-only
+        # ranks; a third class would have made that three, and the flags are
+        # per-unit tensors the rule already accepts.
+        _blk = self._blocked_for(
+            nbc, row, is_naval=_nav6,
+            is_civilian=is_civ.expand(B, N, 6).reshape(B, -1),
+            is_support=is_sup.expand(B, N, 6).reshape(B, -1),
+        ).reshape(B, N, 6)
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
         has_atk = (self.unit_attacks.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = (self._cliff_block_dirs(tc, nb, own_tile,

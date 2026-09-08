@@ -67,10 +67,9 @@ def put(sim, row, tile, kind, mp=2, escorted=False):
     sim.major_unit_mp[0, slot] = mp
     sim.major_unit_mp_full[0, slot] = 2
     sim.major_unit_escorted[0, slot] = escorted
-    if bool(sim._type_civilian[ty]):
-        sim.civilian_at[0, tile] = slot + lo
-    else:
-        sim.military_at[0, tile] = slot + lo
+    # the ENGINE's own setter, not a second copy of the class split — the
+    # helper had one, and it put a support chassis in the civilian plane.
+    sim._occ_set(torch.tensor([0]), torch.tensor([tile]), torch.tensor([slot + lo]))
     sim._gen_ver += 1
     return slot + lo
 
@@ -326,6 +325,39 @@ def poke_rider_sight(rules, path):
     print("  8 rider sight OK — the formation reveals at the WIDEST member's sight")
 
 
+
+
+# ------------------------------------------------- 9 THREE TO A TILE
+def poke_support_slot(rules, path) -> None:
+    """CIV6 (Units.xml): nine chassis carry
+    `FormationClass="FORMATION_CLASS_SUPPORT"` and hold a stacking slot of
+    their own, so one plot carries a military unit, a civilian AND one of
+    them — Civ 6's three-member formation.
+
+    The GPU twin of `unitStackSlot`'s split: `_occ_set` puts them in
+    `support_at`, and `_stack_blocked` gives that plane its own arm."""
+    if "BATTERING_RAM" not in UNI:
+        print("  9 support slot SKIPPED — no support chassis in this catalog")
+        return
+    sim = fresh(rules, path)
+    a_t, _b_t = free_pair(sim)
+    war = put(sim, ROW, a_t, "WARRIOR")
+    bld = put(sim, ROW, a_t, "BUILDER")
+    ram = put(sim, ROW, a_t, "BATTERING_RAM")
+    assert int(sim.military_at[0, a_t]) == war, "the Warrior does not hold the military slot"
+    assert int(sim.civilian_at[0, a_t]) == bld, "the Builder does not hold the civilian slot"
+    assert int(sim.support_at[0, a_t]) == ram, "the Ram does not hold the SUPPORT slot"
+
+    # ...and the stacking rule agrees: a second of ONE class is refused, a
+    # first of the third is not.
+    _t1 = torch.tensor([[a_t]], dtype=torch.long)
+    _seat = int(sim._ROW_SEAT[ROW])
+    assert bool(sim._stack_blocked(_t1, _seat, is_civilian=True)[0, 0]),         "a second civilian was allowed onto a tile that already holds one"
+    assert bool(sim._stack_blocked(_t1, _seat, is_civilian=True, is_support=True)[0, 0]),         "a second SUPPORT chassis was allowed onto a tile that already holds one"
+    assert bool(sim._stack_blocked(_t1, _seat)[0, 0]),         "a second military unit was allowed onto a tile that already holds one"
+    print("  9 support slot OK — three classes to a plot, and a second of any one refused")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -340,6 +372,7 @@ def main() -> None:
     poke_orphan(rules, p)
     poke_convoy(rules, p)
     poke_rider_sight(rules, p)
+    poke_support_slot(rules, p)
     print("ESCORT POKES OK")
 
 

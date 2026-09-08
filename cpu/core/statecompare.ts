@@ -73,7 +73,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
-import { grantedMoves } from './units';
+import { grantedMoves, unitStackSlot } from './units';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -814,11 +814,6 @@ const EXTRACTORS: Record<string, Record<string, Extractor>> = {
 };
 
 
-/** Is this unit type a CIVILIAN? Spelled the way the seeder ships it into
- *  rules.units (`civilian: u.charges !== undefined`), because the GPU's
- *  `_p_civ` roster column is that same flag. */
-const isCivilianType = (type: string): boolean => UNITS[type]?.charges !== undefined;
-
 export function groupRows(state: GameState, group: string): readonly unknown[] {
   switch (group) {
     case 'game':
@@ -840,6 +835,14 @@ export function groupRows(state: GameState, group: string): readonly unknown[] {
   }
 }
 
+/** the stacking classes a unit key distinguishes, in the order it encodes
+ *  them. An AIR or SPY unit holds no plot at all, so it keys where it always
+ *  did — slot 0 — and its uniqueness rests on the same guard it always did. */
+const UNIT_KEY_SLOT: readonly string[] = ['military', 'civilian', 'support', 'embarked'];
+function unitKeySlot(u: Unit): number {
+  return Math.max(0, UNIT_KEY_SLOT.indexOf(unitStackSlot(u)));
+}
+
 export function groupKeys(group: string, rows: readonly unknown[]): number[] {
   switch (group) {
     case 'game':
@@ -851,9 +854,11 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
     case 'city':
       return (rows as CityRow[]).map((r) => r.city.centerIndex);
     case 'unit':
-      // three slots per tile, not two: a hull and its passenger share a hex.
-      return (rows as Unit[]).map(
-        (u) => u.tileIndex * 3 + (u.embarked ? 2 : isCivilianType(u.type) ? 1 : 0));
+      // FOUR slots per tile: a hull and its passenger share a hex, and so do
+      // a military unit, a civilian and a SUPPORT chassis. The key has to
+      // carry as many classes as the stacking rule allows, or two units merge
+      // into one row and the digest compares a unit against a stranger.
+      return (rows as Unit[]).map((u) => u.tileIndex * 4 + unitKeySlot(u));
     case 'tile':
       return (rows as Tile[]).map((t) => t.index);
     default:

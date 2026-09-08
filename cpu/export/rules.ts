@@ -1447,7 +1447,14 @@ export function buildRules() {
       cost: u.cost,
       combat: u.combat,
       maintenance: u.maintenance,
+      // NONCOMBAT, which is what this flag has always meant and what every
+      // reader of it wants: `unitIsNoncombat`'s set, the nine SUPPORT rows
+      // included. Their stacking slot is the separate flag below.
       civilian: u.charges !== undefined && !((u.combat ?? 0) > 0) ? 1 : 0,
+      // CIV6 (`FormationClass="FORMATION_CLASS_SUPPORT"`): a stacking slot of
+      // its own, so one tile carries a military unit, a civilian AND one of
+      // these.
+      support: u.support ? 1 : 0,
       military: unitIsMilitary(u.id) ? 1 : 0,
       charges: u.charges ?? 0,
       requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,

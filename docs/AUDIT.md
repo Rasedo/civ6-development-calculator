@@ -342,10 +342,32 @@ the gate reaches is worth more here than one that re-reads the exporter.
     magnitudes feeding it. Whether to hand it `grievancesAgainst / SCALE` is
     a P8 feature-design choice.
 
-- **B-66. FORMATIONS.** Weight 2.
-  - AN ESCORT FORMATION IS A PAIR; real Civ 6 links military, civilian and
-    support. Needs a support stacking class and a two-rider drag on both
-    engines (`escortUnit` / `_escort_rider`).
+- **B-66. FORMATIONS.** Weight 1.
+  - THE SUPPORT STACKING CLASS SHIPPED with #246o. `Units.xml` types nine
+    chassis `FormationClass="FORMATION_CLASS_SUPPORT"` — the Battering Ram,
+    the Siege Tower, the Military Engineer, the Medic, the Observation
+    Balloon, the Anti-Air Gun, the Mobile SAM, the Drone and the Supply
+    Convoy — and this engine read every one of them as a CIVILIAN, so a Ram
+    and a Settler could not share a plot and a formation could never hold
+    three. It is now a stacking slot of its own on both engines, with a
+    fourth occupancy plane beside `military_at` / `civilian_at` /
+    `embarked_at` and its own arm in the stacking rule.
+  - THE SPLIT IS NARROW ON PURPOSE. Every OTHER rule that asked "is this a
+    civilian" and meant "not a fighter" keeps its old answer through
+    `unitIsNoncombat`, which names the set the domain used to name — the
+    embark tech, the spent-charge disband and the disaster's civilian toll
+    among them. A new class invalidates every predicate that said one word
+    and meant another, and the only honest fix is to name the set they meant.
+  - TWO THINGS THE SPLIT BROKE AND THE BAR CAUGHT: the anti-air cover scan
+    skipped any slot outside its three-name list, so the two anti-air chassis
+    stopped answering strikes the moment they left the civilian slot; and the
+    census's unit KEY was `tile * 3 + class`, which a fourth class makes
+    ambiguous — a civilian and a support unit on one tile would have merged
+    into a single compared row. Both are fixed and the key is `* 4`.
+  - WHAT REMAINS is the DRAG: TS forms with one rider per class and carries
+    them all, while the GPU still drags ONE rider per step (civilian, then
+    support, then a passenger at sea). A three-member formation FORMS on both
+    engines and stacks on both; only the multi-rider step is outstanding.
   - THE RIDER'S FOG SHIPPED with #246a. Sight belongs to a UNIT and a
     formation's members stand on one tile, so the circle both engines draw is
     the WIDEST member's — which is the whole reason a formation carries an

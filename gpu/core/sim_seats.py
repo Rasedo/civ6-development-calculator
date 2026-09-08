@@ -3031,7 +3031,13 @@ class SimSeats:
                     & (self.unit_seat.gather(1, k.unsqueeze(1)).squeeze(1) == seat))
             return torch.where(good, s, none)
 
+        # CIV6 (Formations): "a military unit can create a formation with a
+        # support or civilian unit", and a tile holding all three carries all
+        # three. The GPU drags ONE rider per step, and takes them in TS's own
+        # `escortRiders` order — the civilian slot, then support, then a
+        # passenger at sea.
         cand = _pick(self.civilian_at)
+        cand = torch.where(cand >= 0, cand, _pick(self.support_at))
         cand = torch.where(cand >= 0, cand, _pick(self.embarked_at))
         cc = cand.clamp(min=0)
         live = (cand >= 0) & (here >= 0) & (dest >= 0)
@@ -3064,7 +3070,8 @@ class SimSeats:
         # `_blocked_for` asks: a civilian ashore, a passenger on water.
         stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
             dc.unsqueeze(1), seat.unsqueeze(1),
-            is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1)).squeeze(1)
+            is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1),
+            is_support=(self._type_support[rt] & ~wet).unsqueeze(1)).squeeze(1)
         may = free | (r_mp >= cost) | (r_mp >= r_full)
         okm = ~live | (stand & may)
         return torch.where(live, cand, none), free, okm
@@ -3144,7 +3151,10 @@ class SimSeats:
         for at, dist in ring:
             live_t = at >= 0
             ac = at.clamp(min=0)
-            for prank, plane in enumerate(("military_at", "civilian_at", "embarked_at")):
+            # SUPPORT is APPENDED, not inserted — the two anti-air chassis
+            # hold that slot and would answer no strike at all without it,
+            # and appending leaves every pair that had an order where it was.
+            for prank, plane in enumerate(("military_at", "civilian_at", "embarked_at", "support_at")):
                 sl = getattr(self, plane).gather(1, ac.unsqueeze(1)).squeeze(1)
                 sc = sl.clamp(min=0)
                 ty = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
@@ -4257,7 +4267,7 @@ class SimSeats:
         hex makes the class unknowable from the tile alone."""
         if rows.numel() == 0:
             return
-        for plane in (self.military_at, self.civilian_at, self.embarked_at):
+        for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             hit = plane[rows, tiles] == gslots
             if bool(hit.any()):
                 plane[(rows[hit], tiles[hit])] = -1
@@ -4269,10 +4279,16 @@ class SimSeats:
         if rows.numel() == 0:
             return
         emb = self.unit_emb[rows, gslots]
-        civ = self._type_civilian[self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)]
+        _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
+        # `_type_civilian` is the NONCOMBAT set; SUPPORT is the slot inside it
+        # that stacks on its own, so the civilian arm has to exclude it or the
+        # two classes would share one plane and one of them would vanish.
+        sup = self._type_support[_ty]
+        civ = self._type_civilian[_ty] & ~sup
         for plane, hit in ((self.embarked_at, emb),
+                           (self.support_at, sup & ~emb),
                            (self.civilian_at, civ & ~emb),
-                           (self.military_at, ~civ & ~emb)):
+                           (self.military_at, ~civ & ~sup & ~emb)):
             if bool(hit.any()):
                 plane[(rows[hit], tiles[hit])] = gslots[hit]
 

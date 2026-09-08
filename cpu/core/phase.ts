@@ -11,7 +11,7 @@ import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from 
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -1766,7 +1766,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
               state.map.tiles[tt].improvement = 'MOUNTAIN_TUNNEL';
               unit.charges = (unit.charges ?? 0) - 1;
               unit.movesLeft = 0;
-              if (unit.charges <= 0 && unitDomain(unit.type) === 'civilian') disbandUnit(state, unit.id);
+              if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
             }
             return;
           }
@@ -1793,7 +1793,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
             // CIV6 (Legion): a military chassis outlives its last charge.
-            if (unit.charges <= 0 && unitDomain(unit.type) === 'civilian') disbandUnit(state, unit.id);
+            if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
           }
         }
       } else if (a >= A_SPREAD && a < A_SPREAD + 7) {

@@ -196,6 +196,12 @@ export interface UnitDef {
   /** the chassis's own SIGHT, when it differs from `SIGHT_RANGE` (the
    *  Destroyer's "Has Sight of 3"). Reveal Stealth reaches this far. */
   sight?: number;
+  /** CIV6 (Units.xml, `FormationClass="FORMATION_CLASS_SUPPORT"`): this
+   *  chassis holds the SUPPORT stacking slot rather than the civilian one, so
+   *  one tile carries a military unit, a civilian AND one of these — Civ 6's
+   *  three-member formation. A STACKING fact only: everything else these rows
+   *  do is what a civilian does, which `unitIsNoncombat` names. */
+  support?: boolean;
   /** the ESPIONAGE civilian. It never walks — it jumps between revealed
    *  cities and runs one mission at a time out of a district. */
   spy?: boolean;
@@ -580,6 +586,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // here; every other entry on that list is an open gap.
     U({
       id: 'MILITARY_ENGINEER',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Military Engineer',
       cost: 170,
       maintenance: 2,
@@ -702,6 +709,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // never fights. Neither carries a build job, so both sit at 0 charges.
     U({
       id: 'BATTERING_RAM',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Battering Ram',
       upgradesTo: 'MEDIC',
       cost: 65,
@@ -716,6 +724,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'SIEGE_TOWER',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Siege Tower',
       upgradesTo: 'MEDIC',
       cost: 100,
@@ -943,6 +952,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'MEDIC',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Medic',
       cost: 370,
       maintenance: 5,
@@ -1029,6 +1039,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'SUPPLY_CONVOY',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Supply Convoy',
       cost: 450,
       maintenance: 2,
@@ -1040,6 +1051,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'OBSERVATION_BALLOON',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Observation Balloon',
       cost: 240,
       maintenance: 2,
@@ -1105,6 +1117,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'ANTI_AIR_GUN',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Anti-Air Gun',
       cost: 455,
       maintenance: 2,
@@ -1131,6 +1144,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'DRONE',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Drone',
       cost: 420,
       maintenance: 3,
@@ -1232,6 +1246,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'MOBILE_SAM',
+      support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Mobile SAM',
       cost: 590,
       maintenance: 4,

@@ -122,7 +122,7 @@ export function canEmbark(
   unit: { type: string; seat: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false;
-  const tech = unitDomain(unit.type) === 'civilian' ? 'SAILING' : 'SHIPBUILDING';
+  const tech = unitIsNoncombat(unit.type) ? 'SAILING' : 'SHIPBUILDING';
   return ownerHasTech(state, unit, tech);
 }
 
@@ -377,13 +377,29 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
  * nor a spy is a garrison, exerts zone of control, is anybody's melee
  * defender, banks experience or ever fortifies.
  */
-export function unitDomain(type: string): 'civilian' | 'military' | 'air' | 'spy' {
+export function unitDomain(type: string): 'civilian' | 'support' | 'military' | 'air' | 'spy' {
   if (UNITS[type]?.air !== undefined) return 'air';
   if (isSpy(type)) return 'spy';
   const d = UNITS[type];
+  // CIV6 (FORMATION_CLASS_SUPPORT): the nine support chassis hold a stacking
+  // slot of their own, so one tile carries a military unit, a civilian and
+  // one of these. It is a STACKING answer: every rule that asked this
+  // function for "not a fighter" asks `unitIsNoncombat` instead.
+  if (d?.support) return 'support';
   // CIV6 (Legion): a charge-carrier that fights is a military unit — the
   // charge is what it builds with, not what it is.
   return d?.charges !== undefined && !((d.combat ?? 0) > 0) ? 'civilian' : 'military';
+}
+
+/**
+ * THE SET `unitDomain` USED TO CALL 'civilian' — a unit that neither fights
+ * nor flies nor spies. Splitting SUPPORT out of the civilian domain changed
+ * what one word meant in a dozen predicates that never cared about stacking,
+ * so the set they meant has a name of its own and they ask for it.
+ */
+export function unitIsNoncombat(type: string): boolean {
+  const d = unitDomain(type);
+  return d === 'civilian' || d === 'support';
 }
 
 /** CIV6 (To Arms!, Golden face): "+15% Production towards military units."
@@ -402,7 +418,7 @@ export function unitIsMilitary(type: string): boolean {
  * and an Admiral." So a water tile holds up to three: the hull, the Admiral,
  * and ONE passenger of either domain.
  */
-export type StackSlot = 'civilian' | 'military' | 'air' | 'spy' | 'embarked';
+export type StackSlot = 'civilian' | 'support' | 'military' | 'air' | 'spy' | 'embarked';
 export function unitStackSlot(u: { type: string; embarked?: boolean }): StackSlot {
   const d = unitDomain(u.type);
   return u.embarked && d !== 'air' ? 'embarked' : d;
@@ -851,7 +867,7 @@ export function escortOf(state: GameState, unit: Unit): Unit | undefined {
  *  "may also create a formation with embarked land units" — which is exactly
  *  the two stacking classes that are not the tile's military slot. */
 export function escortable(unit: Unit): boolean {
-  return !!unit.embarked || unitDomain(unit.type) === 'civilian';
+  return !!unit.embarked || unitIsNoncombat(unit.type);
 }
 
 /** the units this military one is escorting — at most one of each stacking
@@ -879,9 +895,15 @@ export function escortUnit(state: GameState, unit: Unit): RuleResult {
       && unitDomain(u.type) === 'military' && !u.embarked,
   );
   if (!esc) return no('No military unit here to escort it.');
-  // ONE rider to an escort: the drag takes a single passenger, so a second
-  // flag on the tile would be a formation nothing moves.
-  if (escortRiders(state, esc).length > 0) return no('That unit already escorts one.');
+  // ONE RIDER PER STACKING CLASS. CIV6 (Formations): a military unit forms
+  // with "a support or civilian unit", and a tile holding all three carries
+  // all three — which is exactly what `escortRiders`' own comment has always
+  // said and what the slot split now makes reachable. A second rider of the
+  // SAME class is still refused: two of one class cannot stand here anyway.
+  const slot = unitStackSlot(unit);
+  if (escortRiders(state, esc).some((r) => unitStackSlot(r) === slot)) {
+    return no('That unit already escorts one of that class.');
+  }
   unit.escorted = true;
   return ok;
 }

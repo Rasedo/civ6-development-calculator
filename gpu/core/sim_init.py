@@ -1030,6 +1030,10 @@ class SimInit:
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.military_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.civilian_at = torch.full((B, T), -1, dtype=torch.long, device=device)
+        # CIV6 (FORMATION_CLASS_SUPPORT): the nine support chassis hold a
+        # stacking slot of their own, so one tile carries a military unit, a
+        # civilian AND one of these — the three-member formation.
+        self.support_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # CIV6 (Movement, "Stacking"): "Embarked units are also considered a
         # separate class, and may stack with both a military ship and an
         # Admiral" — so a water tile holds a hull, an Admiral and ONE
@@ -2980,7 +2984,10 @@ class SimInit:
         self._type_cost_step = torch.tensor([u.get("costStep", 0) for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
+        # NONCOMBAT — the set `unitIsNoncombat` names on TS, the support rows
+        # included. Their STACKING slot is `_type_support` below.
         self._type_civilian = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_support = torch.tensor([bool(u.get("support", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_military = torch.tensor([bool(u["military"]) for u in ru], dtype=torch.bool, device=device)
         self._type_ranged_strength = torch.tensor([u.get("rangedStrength", 0) for u in ru], dtype=torch.long, device=device)  # 0 = melee-only
         self._type_ranged_range = torch.tensor([u.get("rangedRange", 0) for u in ru], dtype=torch.long, device=device)  # strike range
@@ -3609,7 +3616,11 @@ class SimInit:
                     self.major_unit_mp[b, i] = _m0u
                     self.major_unit_mp_full[b, i] = _m0u
                     self.major_unit_attacks[b, i] = 1
-                    if bool(self._type_civilian[ti]):
+                    # the same three-way split `_occ_set` makes: SUPPORT is a
+                    # slot inside the noncombat set, not beside it.
+                    if bool(self._type_support[ti]):
+                        self.support_at[(b, int(u_["tile"]))] = i
+                    elif bool(self._type_civilian[ti]):
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i

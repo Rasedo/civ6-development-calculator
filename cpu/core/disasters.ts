@@ -11,7 +11,7 @@ import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
 import { rowIsFor } from '../data/civilizations';
-import { cityAtIndex } from './units';
+import { cityAtIndex, unitIsNoncombat } from './units';
 import { outerPool } from './rules';
 import { pillageBuilding } from './yields';
 import { unitsAt } from './units';
@@ -215,7 +215,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
         if (outer > 0) held.city.outerHp = Math.max(0, outer - dmg);
       }
       for (const u of [...unitsAt(state, tile.index)]) {
-        if (unitDomain(u.type) === 'civilian') {
+        if (unitIsNoncombat(u.type)) {
           // "Civilians killed" is its own column — a chance, not damage.
           if (rCivilian < FLOOD_POP_P[sev]) disbandUnit(state, u.id);
         } else {

@@ -307,8 +307,11 @@ export function antiAirCover(type: string): number {
 export const AIR_COVER_MAX = Object.values(UNITS)
   .reduce((m, u) => Math.max(m, u.antiAirRange ?? 0), 0);
 
-/** the STACK order a tile answers in, and the tie-break both engines share. */
-const COVER_SLOTS = ['military', 'civilian', 'embarked'] as const;
+/** the STACK order a tile answers in, and the tie-break both engines share.
+ *  SUPPORT is APPENDED, not inserted: the two anti-air chassis hold that slot
+ *  and would otherwise answer no strike at all, and appending leaves every
+ *  pair that already had an order exactly where it was. */
+const COVER_SLOTS = ['military', 'civilian', 'embarked', 'support'] as const;
 
 /**
  * The anti-air weapon that answers a strike at `tileIndex`, or none.

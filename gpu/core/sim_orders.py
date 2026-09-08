@@ -616,18 +616,15 @@ class SimOrders:
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                # Both arms are pure reads; build the civilian plane only when
-                # a civilian is actually moving this rank — most ranks are
-                # military-only and the second _blocked_for was half the cost.
+                # ONE call with the mover's own class flags. It used to be two,
+                # chosen by a `where`, to skip the civilian plane on ranks with
+                # no civilian moving; a third class would have made that three,
+                # and the rule already takes per-unit tensors.
                 is_nav = self.unit_naval[ut]
-                blocked = self._blocked_for(tgt.unsqueeze(1), row, is_naval=is_nav).squeeze(1)
-                if bool((mv & is_civ).any()):
-                    blocked = torch.where(
-                        is_civ,
-                        self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True,
-                                          is_naval=is_nav).squeeze(1),
-                        blocked,
-                    )
+                blocked = self._blocked_for(
+                    tgt.unsqueeze(1), row, is_naval=is_nav,
+                    is_civilian=is_civ, is_support=self._type_support[utp.clamp(min=0)],
+                ).squeeze(1)
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
                 _canal = self._canal_pass().gather(1, tc.unsqueeze(1)).squeeze(1)
                 cart = self._row_ocean_open(row)

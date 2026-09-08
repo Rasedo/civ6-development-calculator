@@ -11,7 +11,7 @@
     "per-seat": "one row per CIV seat; key = the absolute seat id (cpu/core/seats.ts)",
     "per-city-state": "one row per living city-state; key = its id",
     "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index — globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
-    "per-unit": "one row per living unit; key = tileIndex * 3 + (embarked ? 2 : civilian ? 1 : 0). Both engines allow at most one unit of each STACKING class per tile (the GPU's military_at/civilian_at/embarked_at trio), so the triple is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
+    "per-unit": "one row per living unit; key = tileIndex * 4 + the stacking class (military 0, civilian 1, support 2, embarked 3). Both engines allow at most one unit of each STACKING class per tile (the GPU's military_at/civilian_at/support_at/embarked_at four), so the quadruple is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
     "per-tile": "one row per map tile; key = the tile index"
   },
   "censusTypes": [
@@ -3000,6 +3000,10 @@
       },
       {
         "plane": "civilian_at",
+        "why": "occupancy index (see military_at)."
+      },
+      {
+        "plane": "support_at",
         "why": "occupancy index (see military_at)."
       },
       {

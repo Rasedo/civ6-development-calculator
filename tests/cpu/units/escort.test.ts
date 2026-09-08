@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { makeMap, makeState } from '../helpers';
-import { spawnUnit, stepUnit, escortUnit, breakEscort, inEscort } from '../../../cpu/core/units';
+import { spawnUnit, stepUnit, escortUnit, breakEscort, inEscort, escortRiders, unitDomain, unitIsNoncombat, unitIsMilitary, tileFreeForUnit, unitsAt } from '../../../cpu/core/units';
 import { convoyCS } from '../../../cpu/core/combat';
 import { promoRows } from '../../../cpu/data/promotions';
 import { UNITS } from '../../../cpu/data/units';
@@ -221,5 +221,58 @@ describe('the rider\u2019s sight', () => {
       .filter((t) => hexDistance(t.col, t.row, centre.col, centre.row) === 3);
     // a Builder sees no further than its escort, so the third ring stays dark
     expect(far.some((t) => seen(state, t.index))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THREE TO A TILE.
+//
+// CIV6 (Units.xml): nine chassis carry `FormationClass="FORMATION_CLASS_SUPPORT"`
+// and hold a stacking slot of their own, so one plot carries a military unit,
+// a civilian AND one of them — which is Civ 6's three-member formation and
+// what `escortRiders`' own comment has always described.
+// ---------------------------------------------------------------------------
+describe('the support stacking class', () => {
+  it('is its own slot, and the nine install rows carry it', () => {
+    for (const id of ['BATTERING_RAM', 'SIEGE_TOWER', 'MILITARY_ENGINEER', 'MEDIC',
+      'OBSERVATION_BALLOON', 'ANTI_AIR_GUN', 'MOBILE_SAM', 'DRONE', 'SUPPLY_CONVOY']) {
+      expect(UNITS[id].support).toBe(true);
+      expect(unitDomain(id)).toBe('support');
+      // ...and every rule that asked "is this a fighter" still says no
+      expect(unitIsNoncombat(id)).toBe(true);
+      expect(unitIsMilitary(id)).toBe(false);
+    }
+    expect(unitDomain('BUILDER')).toBe('civilian');
+    expect(unitDomain('WARRIOR')).toBe('military');
+  });
+
+  it('lets a military unit, a civilian and a support chassis share one plot', () => {
+    const state = makeState(makeMap(10, 10));
+    const [a] = twoAdjacent(state);
+    put(state, a, 'WARRIOR');
+    put(state, a, 'BUILDER');
+    // the Ram could not stand here before: it held the civilian slot
+    expect(tileFreeForUnit(state, a, SEAT, { type: 'BATTERING_RAM', seat: SEAT })).toBe(true);
+    put(state, a, 'BATTERING_RAM');
+    expect(unitsAt(state, a)).toHaveLength(3);
+    // ...and a SECOND of any one class still cannot
+    expect(tileFreeForUnit(state, a, SEAT, { type: 'MEDIC', seat: SEAT })).toBe(false);
+    expect(tileFreeForUnit(state, a, SEAT, { type: 'SETTLER', seat: SEAT })).toBe(false);
+  });
+
+  it('forms with one rider of EACH class, and refuses a second of one', () => {
+    const state = makeState(makeMap(10, 10));
+    const [a] = twoAdjacent(state);
+    put(state, a, 'WARRIOR');
+    const bld = put(state, a, 'BUILDER');
+    const ram = put(state, a, 'BATTERING_RAM');
+    expect(escortUnit(state, bld).ok).toBe(true);
+    expect(escortUnit(state, ram).ok).toBe(true);
+    const war = state.units.find((u) => u.type === 'WARRIOR')!;
+    expect(escortRiders(state, war)).toHaveLength(2);
+    // a second civilian cannot even stand here, so the class cap is the
+    // stacking rule's — what this pins is that the FORMATION took both.
+    expect(inEscort(state, bld)).toBe(true);
+    expect(inEscort(state, ram)).toBe(true);
   });
 });
