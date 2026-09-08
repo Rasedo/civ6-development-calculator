@@ -72,6 +72,34 @@ def digest_diff(man: dict, gdig: dict, tdig: dict | None) -> tuple[list[str], li
     return bad, reps
 
 
+def amen_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
+    """The amenity log, paired by CITY and trimmed to the disagreements.
+
+    Both sides emit `c:<id> base.. lux.. ww.. have.. need.. bal.. tier..` once
+    per recorded walk, so the LAST line for a city is that turn's. A seat's
+    whole dump is a wall; what a hunt wants is the cities where the two walls
+    differ, and nothing else — the same reason the combat log prints at the
+    first diff rather than the whole stream.
+    """
+    def by_city(lines: list[str]) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for ln in lines:
+            out[ln.split(" ", 1)[0]] = ln
+        return out
+
+    g, t = by_city(gpu_lines), by_city(ts_lines)
+    reps: list[str] = []
+    for c in sorted(set(g) | set(t)):
+        gl, tl = g.get(c), t.get(c)
+        if gl == tl:
+            continue
+        reps.append(f"  AM-GPU {gl if gl is not None else '(no line)'}")
+        reps.append(f"  AM-TS  {tl if tl is not None else '(no line)'}")
+    if not reps:
+        reps.append(f"  AM     {len(g)} cities agree term for term")
+    return reps
+
+
 def dump_diff(man: dict, group: str, gdump: dict, tdump: dict,
               cap: int = int(os.environ.get("CIV6_DIFF_CAP", "12"))) -> list[str]:
     """The by-name diff of one group's keyed dumps — the report names the
@@ -431,10 +459,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                 for ev in dmp.get("cb", []):
                                     print(f"  CB-TS  {ev}")
                             if sim._log_amen:
-                                for ev in sim._amen_events.get(b, []):
-                                    print(f"  AM-GPU {ev}")
-                                for ev in dmp.get("am", []):
-                                    print(f"  AM-TS  {ev}")
+                                for ln in amen_pairs(sim._amen_events.get(b, []),
+                                                     dmp.get("am", [])):
+                                    print(ln)
                 if ckpt_every and (t + 1) % ckpt_every == 0:
                     assert ckpt_dir is not None
                     ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{t + 1}.json")}) + "\n")

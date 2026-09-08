@@ -283,7 +283,10 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
             print(f"  {name:<14} {dt:6.1f}s  OOM  (memory, not a test failure)", flush=True)
         elif p.returncode != 0:
             failed.set()
-            tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-15:]
+            # WIDE ENOUGH TO CARRY AN INSTRUMENT. At fifteen a keyed diff of
+            # any width pushed the two-sided logs off the top, and a run that
+            # prints half a comparison reads as a silent half.
+            tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-40:]
             print("    | " + "\n    | ".join(tail), flush=True)
 
 
