@@ -190,5 +190,23 @@ class SimStep:
         self.winner = torch.where(self.victory_row >= 0, self.victory_row,
                                   torch.where(self.game_over, lead, torch.full_like(dom, -1)))
 
+        # THE POPULATION SNAPSHOT, at the census's own moment and over the
+        # census's own rows — `_city_rows` walks the majors and then the Free
+        # Cities row, and so does this. It rode the amenity walk once, which
+        # never reaches a Free City on either engine, and therefore agreed
+        # about every city except the one that differed.
+        if getattr(self, "_log_diff", False):
+            _rows = list(range(self.n_majors)) + [self.FREE_ROW]
+            for _b in range(self.B):
+                _ev = self._diff_events.setdefault(_b, [])
+                for _r in _rows:
+                    for _c in range(self.RC):
+                        if not bool(self.city_alive[_b, _r, _c]):
+                            continue
+                        _ev.append(
+                            f"pop:{int(self._ROW_SEAT[_r])}:{int(self.turn)}"
+                            f":{int(self.city_center[_b, _r, _c])}:sn"
+                            f" {int(self.city_pop[_b, _r, _c])}")
+
         if simbase._ALIAS_CHECK:
             self._check_state_discipline()

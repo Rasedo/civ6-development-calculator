@@ -16,7 +16,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import type { City, DistrictId, GameState, Seat, Tile } from '../core/types';
-import { allCities, campTiles, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
+import { allCities, campTiles, cityHolders, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from '../core/trade';
@@ -434,6 +434,18 @@ for (let t = 0; t < N_TURNS; t++) {
       const sx = state.seats[s];
       if (!sx) continue;
       console.error(`t${state.turn - 1} seat ${s} cities=${sx.cities.length} pop=${sx.cities.map((c) => c.population).join(',')}`);
+    }
+  }
+  // THE POPULATION SNAPSHOT, at the census's own moment and over the
+  // census's own rows (`cityHolders` is what `groupRows('city')` walks).
+  // It rode the amenity walk once, which is a MAJOR-row walk, and so said
+  // nothing at all about the Free City the two engines disagreed on.
+  const dlP = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (dlP) {
+    for (const holder of cityHolders(state)) {
+      for (const c of holder.cities) {
+        dlP.push(`pop:${holder.seat}:${state.turn}:${c.centerIndex}:sn ${c.population}`);
+      }
     }
   }
   o.send({ digest: stateDigest(state) });

@@ -1168,11 +1168,6 @@ export function computeCityStats(
     dl.push(`c:${city.seat}:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
       + ` ww${warWearinessPenalty(wwMax(seatOf(state, city.seat)))} have${have} need${needed} bal${balance}`
       + ` tier${amenityTierIndex(tier.name)}`);
-    // ...and an unconditional SNAPSHOT of the count, so a population that
-    // differs with no writer behind it can still be placed in time: a
-    // divergence present at the previous turn is a different fault from one
-    // that arrives with the turn.
-    dl.push(`pop:${city.seat}:${state.turn}:${city.centerIndex}:sn ${city.population}`);
   }
   // the tier this walk RAN ON, kept where the census can read it — never a
   // recomputation, for the same reason `workedTiles` is not one: the walk is
