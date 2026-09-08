@@ -250,6 +250,40 @@ the gate reaches is worth more here than one that re-reads the exporter.
     holding 28 was pulled back to 15 the next time it banked anything at all.
     Pinned on both engines.
 
+  - **LAYER 4 — seed 9079 turn 204. CLOSED (#246W).** A FREE CITY at centre
+    692: `population` GPU 4 against TS 3, agreeing at turn 203. Both GPU
+    disaster walks iterate `range(self.n_majors)` under the comment "only a
+    major keeps a city list" — true when written, false since the Free Cities
+    row landed, because that row keeps `city_alive`, `city_pop` and a slot map
+    like any other and `_city_rows` walks it, which is why the census compares
+    those cities at all. TS has no such loop: `seatOf(state, seat).cities`
+    resolves the free seat like any other holder. So a flood took the citizen
+    on TS and the GPU kept it. TS is the faithful side — a Free City is a
+    city. The walk now carries a ROW AND SEAT pair, because `tile_seat` holds
+    an ABSOLUTE seat and the old `== _r` worked only where a major's row IS
+    its seat; comparing 300 against a row index would have matched nothing,
+    silently.
+  - GETTING THERE COST FOUR INSTRUMENT BUGS, all of one family — the
+    instrument was aimed at a different set, or a different moment, from the
+    comparison it served:
+    - the snapshot rode the AMENITY walk, which is a major-row walk on both
+      engines, so the one city group that disagreed was the one group
+      neither engine stamped. It now walks what the census walks
+      (`cityHolders` / the majors plus `FREE_ROW`).
+    - the driver stamped `state.turn` AFTER `endTurn` advanced it, so its
+      lines went out a turn ahead of their own engine: they could not pair,
+      and the inflated maximum dragged the whole log's turn window forward
+      and dropped the previous turn's step lines with it.
+    - the GPU then did the same thing, `self.turn += 1` running at the top of
+      `step()` and the snapshot sitting at the bottom. With one engine fixed
+      and the other not, the two stamped one NUMBER for two different turns
+      and every ordinary growth read as a divergence.
+    - and TS's two disaster writers were the only population writers left
+      with no tag, which is exactly where the answer was hiding.
+  - A TIMESTAMP TAKEN AT THE WRONG MOMENT IS NOT A SMALLER ERROR THAN A WRONG
+    KEY. Both times the key was right and the value in it came from after the
+    event.
+
   **THE INSTRUMENT, which is this round's most reusable product.** The
   decomposition log now carries five kinds and the rules that make them pair:
 

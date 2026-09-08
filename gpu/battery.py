@@ -374,7 +374,11 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
             # WIDE ENOUGH TO CARRY AN INSTRUMENT. At fifteen a keyed diff of
             # any width pushed the two-sided logs off the top, and a run that
             # prints half a comparison reads as a silent half.
-            tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-40:]
+            _lines = (p.stdout + "\n" + p.stderr).strip().splitlines()
+            # CIV6_DIFFLOG_ALL asks for the WHOLE decomposition log, so the
+            # tail must not clip it: an instrument whose output does not
+            # survive the harness carrying it is not an instrument yet.
+            tail = _lines if os.environ.get("CIV6_DIFFLOG_ALL") else _lines[-40:]
             print("    | " + "\n    | ".join(tail), flush=True)
             # ...and the seed/turn the gate named, so the hunt reminder can
             # print the exact command instead of a shape to fill in.

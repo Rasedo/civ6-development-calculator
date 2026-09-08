@@ -1223,12 +1223,19 @@ class SimEconomy:
         bld = (hit & (r_bldg < self._st_bldg_pill[ev])).nonzero(as_tuple=True)[0]
         if bld.numel():
             self._pillage_tile_buildings(bld, tc[bld])
-        # a CITIZEN of the tile's owning city, on its own roll — only a major
-        # keeps a city list
+        # a CITIZEN of the tile's owning city, on its own roll — every holder
+        # that keeps a city list, which since the Free Cities row is not the
+        # majors alone.
         pr = (hit & (r_pop < self._st_pop[ev])).nonzero(as_tuple=True)[0]
         if pr.numel():
-            for _r in range(self.n_majors):
-                sel = pr[owner[pr] == _r]
+            # ...AND THE FREE CITIES ROW. `tile_seat` is an ABSOLUTE seat, so
+            # the row and the seat are carried as a pair: a major's row IS
+            # its seat, the free row's is FREE_SEAT, and comparing the two
+            # by row alone would match nothing at all and say nothing.
+            _rows = ([(_m, _m) for _m in range(self.n_majors)]
+                     + [(self.FREE_ROW, FREE_SEAT)])
+            for _r, _seat in _rows:
+                sel = pr[owner[pr] == _seat]
                 if sel.numel() == 0:
                     continue
                 # gather over the WHOLE batch, then take `sel`
@@ -1448,11 +1455,18 @@ class SimEconomy:
                             self._vacate(pool, dr, ds)
         # A CITIZEN of the tile's owning city, on its own roll. TS puts this
         # beside the damage block, not inside it — a city-state's tile pays
-        # nothing either way, since only a major keeps a city list.
+        # nothing either way, since a minor keeps no city list. A FREE CITY
+        # does keep one, and pays.
         pr = (raw & (r_pop < self._flood_pop_p[sev])).nonzero(as_tuple=True)[0]
         if pr.numel():
-            for _r in range(self.n_majors):
-                sel = pr[seat_at[pr] == _r]
+            # ...AND THE FREE CITIES ROW. `tile_seat` is an ABSOLUTE seat, so
+            # the row and the seat are carried as a pair: a major's row IS
+            # its seat, the free row's is FREE_SEAT, and comparing the two
+            # by row alone would match nothing at all and say nothing.
+            _rows = ([(_m, _m) for _m in range(self.n_majors)]
+                     + [(self.FREE_ROW, FREE_SEAT)])
+            for _r, _seat in _rows:
+                sel = pr[seat_at[pr] == _seat]
                 if sel.numel() == 0:
                     continue
                 # gather over the WHOLE batch, then take `sel`: a gather whose

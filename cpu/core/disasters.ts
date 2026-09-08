@@ -1,5 +1,6 @@
 
 import type { City, GameState, Tile } from './types';
+import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
@@ -227,7 +228,10 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
     if (rPop < FLOOD_POP_P[sev]) {
       const owner = seatOf(state, seat);
       const home = owner?.cities.find((c) => c.id === tile.ownerCity);
-      if (home && home.population > 1) home.population -= 1;
+      if (home && home.population > 1) {
+        home.population -= 1;
+        logPopWrite(state, home, 'ds');
+      }
     }
   }
   // FERTILIZATION. Each yield is its own roll, so one flood may pay both.
@@ -408,7 +412,10 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
   if (rBldgS < ev.bldgPill) pillageTileBuildings(state, tile);
   if (rPop < ev.pop) {
     const home = seatOf(state, owner)?.cities.find((c) => c.id === tile.ownerCity);
-    if (home && home.population > 1) home.population -= 1;
+    if (home && home.population > 1) {
+      home.population -= 1;
+      logPopWrite(state, home, 'ds');
+    }
   }
   const landHit = rLand < ev.landP;
   const navalHit = rNaval < ev.navalP;
