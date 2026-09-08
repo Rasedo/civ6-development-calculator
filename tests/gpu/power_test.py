@@ -460,8 +460,12 @@ def test_generator_ground(sim) -> None:
     # the Geothermal Plant shares the arm; its own feature clause is proven
     # in tests/gpu/geothermal_test.py
     plant_i = sim._imp_ids.index("GEOTHERMAL_PLANT")
+    # The CITY PARK shares the arm too since the governor improvements landed:
+    # it is ground-only with its own terrain list, and its extra gate is the
+    # governor promotion rather than anything this test measures.
+    park_i = sim._imp_ids.index("CITY_PARK") if "CITY_PARK" in sim._imp_ids else -1
     assert not any(sim._imp_ground[k] for k in range(len(sim._imp_ids))
-                   if k not in (solar_i, wind_i, plant_i)), "and no other row claims that arm"
+                   if k not in (solar_i, wind_i, plant_i, park_i)),         "and no row beyond the three generators and the City Park claims that arm"
     sol, wnd = sim._imp_ground_ok(solar_i)[0], sim._imp_ground_ok(wind_i)[0]
     hills, snow = sim.hills[0], sim.terrain[0] == sim._imp_xterr[solar_i][0]
     assert bool((wnd == hills).all()), "CIV6 (Wind Farm): Hills, and only Hills"

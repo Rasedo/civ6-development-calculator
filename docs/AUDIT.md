@@ -186,7 +186,17 @@ Nothing open.
     lowest-loyalty city) — a decision for P8's surface.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - `ROUTE_CHAIN_MAX` 6 is a capacity choice — ask 3.
-  - `PLUNDER_ROUTE_GOLD` 50 is unsourced.
+  - `PLUNDER_ROUTE_GOLD` 50 is a MODEL NUMBER, and a 2026-09-08 pass of the
+    install says it will stay one: `GlobalParameters.xml` carries no plunder
+    amount of any kind, and the only trade-route plunder rows anywhere are
+    Lisbon's immunity and an Admiral's bonus, neither of which publishes a
+    figure. Not "unsourced pending a look" — looked at, and absent.
+  - The IMPROVEMENT pillage table, by contrast, IS published and this engine
+    already matches it: 26 of 26 rows agree with `PlunderType` /
+    `PlunderAmount` (Gold 50, Faith 25, Heal 50), checked row by row on
+    2026-09-08. `PLUNDER_NONE` on the Mountain Tunnel, with an Amount of 50
+    beside it, is the install's own typo for `NO_PLUNDER` and is read as
+    "no plunder" rather than modelled as a fifth kind.
   - The destination is one candidate row plus take/skip; the free-choice
     head is P8 work.
 - **B-34r. FLOOD TAILS.** Weight 1.

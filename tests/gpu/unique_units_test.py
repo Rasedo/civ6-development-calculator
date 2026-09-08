@@ -324,14 +324,21 @@ def main() -> int:
             "the merge leaked into a game that plays no Ottoman")
     print("  12 merged columns OK — the base row everywhere, the variant on the seated game alone")
 
-    # 13 — the TWELVE unique IMPROVEMENTS: the wire's own rows, appended last
+    # 13 — the TWELVE unique IMPROVEMENTS: the wire's own rows, at their own
+    # SEATS. Pinned by POSITION, not as "the last twelve": a Builder's action
+    # code IS this list's index, so what must not move is where each id SITS,
+    # and slicing the tail made the pin depend on nothing ever being appended
+    # after them. The two governor improvements were.
     _iids = list(rules.improvements["ids"])
     _irows = rules.improvements["rows"]
     _WANT_I = ["CHATEAU", "CHEMAMULL", "GOLF_COURSE", "GREAT_WALL", "ICE_HOCKEY_RINK",
                "KURGAN", "MAORI_PA", "MEKEWAP", "MISSION", "OPEN_AIR_MUSEUM",
                "POLDER", "STEPWELL"]
-    assert _iids[-len(_WANT_I):] == _WANT_I, "the unique improvements are not the LAST build columns"
+    assert [_iids.index(_n) for _n in _WANT_I] == list(range(23, 35)),         "a unique improvement's build column moved"
     assert _iids.index("MOUNTAIN_TUNNEL") == 22, "an earlier build column moved"
+    # ...and the governor improvements follow them, with nothing after yet
+    assert _iids.index("FISHERY") == 35 and _iids.index("CITY_PARK") == 36,         "the governor improvements are not the last build columns"
+    assert len(_iids) == 37, "a build column was added without a pin"
     _byid = {r["id"]: r for r in _irows}
     for _n in _WANT_I:
         assert int(_byid[_n]["uniq"]) >= 0, f"{_n} names no civilization"
