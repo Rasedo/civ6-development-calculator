@@ -96,7 +96,11 @@ the entry and the line leaves.
 
 8. **C-76 — the opinion deltas.** The install names every
    `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
-   nothing.
+   nothing. The ANCHORS are fully sourced (100 / 83 / 66 / 50 / 33 / 16 / 0,
+   with a `DiplomaticYieldBonus` beside each); what no source gives is what
+   MOVES a pair between them. Ruling this unblocks the whole of C-76 at once
+   — a carrier without deltas is a constant, so neither half can ship
+   alone.
 
 9. **C-2 — what a mid-build gold purchase does to the hammers.** One
     tested report says a UNIT keeps its progress and a BUILDING's is wasted;
@@ -496,10 +500,31 @@ Nothing open.
     ruling: the install counts eruptions per GAME, this engine rolls per
     VOLCANO; C-1's reactor is the same shape. Ask 7.
 - **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 2.
-  - The install's DiplomaticStates table names the scale (Allied 100 ...
-    Denounced 16, War 0, `RelationshipLevel`); what moves it is DLL. The
-    carrier is a compared per-directed-pair opinion on both engines with
-    those anchors; the deltas are ask 8.
+  - THE ANCHORS, in full (Base `DiplomaticActions.xml`, `DiplomaticStates`).
+    A second published column the entry had not recorded rides beside the
+    scale:
+
+        state              RelationshipLevel   DiplomaticYieldBonus
+        ALLIED                    100                   50
+        DECLARED_FRIEND            83                   25
+        FRIENDLY                   66                   25
+        NEUTRAL                    50                    0
+        UNFRIENDLY                 33                  -25
+        DENOUNCED                  16                  -75
+        WAR                         0                 -100
+
+    This engine already holds four of the seven as explicit facts — WAR,
+    DENOUNCED, DECLARED_FRIEND and ALLIED. FRIENDLY, NEUTRAL and UNFRIENDLY
+    are exactly the bands an OPINION lands in, which is why they do not
+    exist here.
+  - THE CARRIER IS NOT SEPARABLE FROM THE DELTAS (2026-09-08). A per-pair
+    opinion built now would be initialised at NEUTRAL 50 and never move, so
+    it would be a compared plane holding a constant and three unreachable
+    bands — dead state, not a carrier. Both halves land together or neither
+    does, so C-76 is BLOCKED on ask 8 rather than half-buildable.
+  - What `DiplomaticYieldBonus` is paid IN is not published either; the
+    column sits on the state row and the leaders' own
+    `MODIFIER_PLAYER_ADD_DIPLOMATIC_YIELD_MODIFIER` is a separate channel.
   - Waiting on it: the mission's mark, DEMAND, DISCUSS and its promises,
     the Retribution casus belli (C-2); the agendas (C-26); the preference
     weights (C-67).
