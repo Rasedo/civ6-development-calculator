@@ -1544,6 +1544,48 @@
           "note": "the minor city's Gold, banked; nothing spends it yet"
         },
         {
+          "name": "minorPop",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "city_pop"
+          ],
+          "note": "the minor city's POPULATION. Compared since C-38 gave it a real food box: before that both engines moved it on the same 12-turn clock and it could not diverge."
+        },
+        {
+          "name": "minorFoodBox",
+          "compare": "milli",
+          "covers": [
+            "CityState.foodBox"
+          ],
+          "planes": [
+            "city_growth"
+          ],
+          "note": "the minor city's food box — the install has ONE city rule, so it grows exactly as a major's does (C-38)"
+        },
+        {
+          "name": "minorCultureBox",
+          "compare": "milli",
+          "covers": [
+            "CityState.cultureBox"
+          ],
+          "planes": [
+            "city_cbox"
+          ],
+          "note": "the minor city's culture box, which buys its next tile"
+        },
+        {
+          "name": "minorTilesAcquired",
+          "compare": "exact",
+          "covers": [
+            "CityState.tilesAcquired"
+          ],
+          "planes": [
+            "city_acquired"
+          ],
+          "note": "how many tiles the minor's border has bought — the next tile's price reads it"
+        },
+        {
           "name": "minorFaith",
           "compare": "milli",
           "covers": [

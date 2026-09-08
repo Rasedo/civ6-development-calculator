@@ -669,6 +669,12 @@ CITY_STATE = {
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
     "minorTreasury": lambda sim, b, rows: [float(sim.citystate_treasury[b, s]) for s in rows],
+    # a minor's row is a row of the CITY BLOCK, so its population and its
+    # three boxes are read straight off it — no second name for one fact
+    "minorPop": lambda sim, b, rows: [int(sim.citystate_pop[b, s]) for s in rows],
+    "minorFoodBox": lambda sim, b, rows: [float(sim.city_growth[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
+    "minorCultureBox": lambda sim, b, rows: [float(sim.city_cbox[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
+    "minorTilesAcquired": lambda sim, b, rows: [int(sim.city_acquired[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorFaith": lambda sim, b, rows: [float(sim.citystate_faith[b, s]) for s in rows],
     "minorBuildingsPillaged": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg_pillaged[b, sim._CITY_MINOR0 + s, 0].tolist()) if on] for s in rows],

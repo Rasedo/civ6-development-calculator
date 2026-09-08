@@ -771,6 +771,13 @@ export interface CityState extends Seat {
    *  compares them for a minor (`minorTreasury` / `minorFaith`). */
   treasury: number;
   faith: number;
+  /** CIV6 (City-state): the install has ONE city rule, so a minor's city
+   *  grows on its FOOD BOX and claims tiles on its CULTURE BOX exactly as a
+   *  major's does. Before C-38 these were hardcoded 0 in `minorCity` and the
+   *  population moved on a 12-turn clock instead. */
+  foodBox?: number;
+  cultureBox?: number;
+  tilesAcquired?: number;
   /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];

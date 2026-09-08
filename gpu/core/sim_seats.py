@@ -1640,8 +1640,11 @@ class SimSeats:
         if nbs is None:
             nbs = self.neigh[tc.reshape(-1)].reshape(self.B, -1, 6)
         nbf = nbs.clamp(min=0).reshape(self.B, -1)
+        # `tile_seat` is the ABSOLUTE seat (0 seat 0, 1..99 civs, 100+ the
+        # city-states), so a row is matched through `_ROW_SEAT` — a minor's
+        # border claims its own ground too (C-38).
         return (
-            (self.tile_seat.gather(1, nbf).reshape(self.B, -1, 6) == row)
+            (self.tile_seat.gather(1, nbf).reshape(self.B, -1, 6) == int(self._ROW_SEAT[row]))
             & (self.tile_city.gather(1, nbf).reshape(self.B, -1, 6) == cid.reshape(self.B, 1, 1))
             & (nbs >= 0)
         ).any(dim=2)
@@ -8875,8 +8878,14 @@ class SimSeats:
         # integral base curve is exact, so the expression is unchanged.
         _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
         # CIV6 (Land Acquisition): +20% culture toward border expansion —
-        # the governor divides the cost the way the city.ts twin does.
-        _gpct = self._governor_sum(row, "borderExpansionPct")[bidx, col].double()
+        # the governor divides the cost the way the city.ts twin does. A
+        # CITY-STATE's row reaches this body too (C-38) and appoints nobody,
+        # so the governor planes are asked only of a major, exactly as every
+        # other governor term here is; TS is safe by construction, because a
+        # minor's city carries id -1 and `governorSum` finds nothing on it.
+        _gpct = (self._governor_sum(row, "borderExpansionPct")[bidx, col].double()
+                 if self.n_governors and row < self.n_majors
+                 else torch.zeros(self.B, dtype=torch.float64, device=self.device))
 
         def _cost() -> torch.Tensor:
             base = self._border_cost(self.city_acquired[bidx, row, col])
@@ -8908,10 +8917,14 @@ class SimSeats:
             if bool(claim.any()):
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = tiles[rows, best[rows]]
-                self.tile_seat[rows, spot] = row  # setTileOwner's two halves:
+                self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
                 self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
                 self._tile_owner_ver += 1
-                self._reveal_around(rows, row, spot, 1)  # acquireTile's revealAround(seat, tile, 1)
+                # acquireTile's revealAround(seat, tile, 1). MAJOR rows only:
+                # `revealAround` returns early for anyone else, because
+                # "nothing reads a city-state's or the barbarians' fog".
+                if row < self.n_majors:
+                    self._reveal_around(rows, row, spot, 1)
                 # A claim widens a LATER city's workable candidates, so every
                 # walk that already ran this turn is stale.
                 self._claim_version += 1

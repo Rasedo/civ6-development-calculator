@@ -25,6 +25,8 @@ import { CIVICS } from '../data/civics';
 import { CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1 } from '../data/cityStates';
 import { ENCAMPMENT_HP } from '../data/units';
 import { canPlaceDistrictIn, outerPool, wallsMax } from './rules';
+import { seatGrowth } from './seatTurn';
+import { cityBorderGrowth } from './phase';
 import { districtCostIn, DISTRICT_SPECIALTY_COST } from './game';
 import { computeCityStats } from './city';
 import { minorCity } from './cityStates';
@@ -74,15 +76,34 @@ export function minorPhase(state: GameState): void {
   }
 }
 
-/** The city's yields, once a turn, through the walk every major's city rides.
- *  Food is not consumed: the minor's population keeps its own clock. */
+/**
+ * The city's yields, once a turn, through the walk every major's city rides —
+ * and then the two rules that walk feeds.
+ *
+ * CIV6 (City-state): the install has ONE city rule, so the minor's city GROWS
+ * on its food box and CLAIMS ground on its culture box exactly as a major's
+ * does (C-38). Both rules are the majors' own composers, and the boxes live
+ * on the `CityState` record because `minorCity` builds a fresh `City` view
+ * every call — so the results are written back.
+ *
+ * Its Gold and Faith still only bank: what the install lets a city-state
+ * SPEND them on is DLL AI with no data behind it (question ledger).
+ */
 function minorAccrue(state: GameState, cityState: CityState): void {
-  const y = computeCityStats(state, minorCity(cityState)).total;
+  const city = minorCity(cityState);
+  const stats = computeCityStats(state, city);
+  const y = stats.total;
   cityState.prodProgress = (cityState.prodProgress ?? 0) + y.production;
   cityState.treasury += y.gold;
   cityState.research.techProgress += y.science;
   cityState.research.civicProgress += y.culture;
   cityState.faith += y.faith;
+  seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded);
+  cityBorderGrowth(state, city, cityState.seat, y.culture);
+  cityState.population = city.population;
+  cityState.foodBox = city.foodBox;
+  cityState.cultureBox = city.cultureBox;
+  cityState.tilesAcquired = city.tilesAcquired;
 }
 
 /** The cheapest available row completes (table order on a price tie), at most

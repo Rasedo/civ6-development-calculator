@@ -474,6 +474,36 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
   return FREE_CITY_LOYALTY_PER_TURN + pressureTerm(own, foreign) + builtLoyalty(state, city);
 }
 
+/**
+ * THE BORDER, for ANY city: its Culture fills a box, and every time the box
+ * covers the next tile's price the city takes the best tile it can reach.
+ *
+ * CIV6 (City-state): the install has ONE city rule, so a minor's city claims
+ * ground exactly as a major's does — which is why this is a composer rather
+ * than a block inside the seat loop (C-38).
+ *
+ * CIV6 (Border Control Treaty, outcome B): "Target player's borders cannot
+ * grow via Culture." The box still FILLS; nothing is bought.
+ */
+export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
+  city.cultureBox += culture;
+  const frozen = congressBorderFrozen(state, seat);
+  const cost = () =>
+    Math.round(
+      (borderGrowthCost(city.tilesAcquired) * getModifiers(state, seat).borderCostMult * 100) /
+        (100 + governorSum(state, city, (e) => e.borderExpansionPct)),
+    );
+  while (!frozen && city.cultureBox >= cost()) {
+    const next = pickBorderTile(state, city, makeYieldCtx(state, seat));
+    if (next === null) {
+      city.cultureBox = Math.min(city.cultureBox, cost());
+      break;
+    }
+    city.cultureBox -= cost();
+    acquireTile(state, city, next);
+  }
+}
+
 /** CIV6 (Monument): "+1 Loyalty", and (Government Plaza) "+8 Loyalty to this
  *  city" — the flat per-turn term of what STANDS in the city, paid to whoever
  *  holds it, the Free Cities player included. A district pays only once
@@ -2506,24 +2536,7 @@ export function seatPhase(state: GameState): void {
           else civCity.productionBank = (civCity.productionBank ?? 0) + over;
         }
       }
-      civCity.cultureBox += culC;
-      // CIV6 (Border Control Treaty, outcome B): "Target player's borders
-      // cannot grow via Culture." The box still fills; nothing is bought.
-      const _frozen = congressBorderFrozen(state, actor.seat);
-      const civCityBorderCost = () =>
-        Math.round(
-          (borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult * 100) /
-            (100 + governorSum(state, civCity, (e) => e.borderExpansionPct)),
-        );
-      while (!_frozen && civCity.cultureBox >= civCityBorderCost()) {
-        const next = pickBorderTile(state, civCity, makeYieldCtx(state, actor.seat));
-        if (next === null) {
-          civCity.cultureBox = Math.min(civCity.cultureBox, civCityBorderCost());
-          break;
-        }
-        civCity.cultureBox -= civCityBorderCost();
-        acquireTile(state, civCity, next);
-      }
+      cityBorderGrowth(state, civCity, actor.seat, culC);
       const civCityCenter = state.map.tiles[civCity.centerIndex];
       // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
       // a city or defensible district has been completely destroyed, its ranged

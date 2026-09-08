@@ -53,7 +53,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 2 | every ring fact must read a submerged tile as coast on both engines |
-| C-38 a city-state's city | 2 | growth and border from its own food and culture, what it spends gold and faith on |
+| C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 12 |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
 | C-45 queue depth five | 1 | ask |
 | C-49 named storms | 1 | the storm's walk (DLL) |
@@ -67,7 +67,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **44** | |
+| **OPEN, TOTAL** | **43** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -105,6 +105,10 @@ the entry and the line leaves.
     MECHANICS are built and sourced; only the names are wrong. Renaming
     them touches `seeder/place.ts`, which is hashed into `genStamp`, so the
     fix costs a reseed and a fresh `worlds.lock`. Rename, or keep the names?
+12. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
+    nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs
+    and all five are placement; no XML row anywhere names a city-state
+    purchase, build weight or reserve. Leave them banking, or name a rule?
 
 ## A. Engine vs engine
 
@@ -323,18 +327,23 @@ Nothing open.
     the Seaside Resort's coast, fresh water, the Aqueduct's source, district
     adjacency's WOODS/RAINFOREST/REEF sources) must read a submerged tile
     as coast on both engines.
-- **C-38. A CITY-STATE'S CITY.** Weight 2.
-  Its yields ride the shared walk; Production, Science and Culture are
-  spent, Food, Gold and Faith are not.
-  - FOOD: the population keeps its 12-turn clock and the border never grows.
-    Does a city-state's city grow on the food box and claim tiles on
-    Culture as a major's does (the install has one city rule), and what
-    does its citizen work?
-  - GOLD AND FAITH bank in `CityState.treasury` / `.faith`. What does the
-    install let a city-state spend them on?
+- **C-38. A CITY-STATE'S CITY.** Weight 1.
+  Its yields ride the shared walk, and now so do the two rules that walk
+  feeds.
+  - FOOD AND CULTURE ARE IN. The install has ONE city rule, so the minor's
+    city grows on its FOOD BOX and claims ground on its CULTURE BOX through
+    the majors' own composers (`seatGrowth`, `cityBorderGrowth` /
+    `_seat_city_growth`, `_seat_border_growth`). The 12-turn population clock
+    is gone from both engines, and the minor's population and three boxes are
+    compared state.
+  - GOLD AND FAITH still only bank in `CityState.treasury` / `.faith`.
+    `GlobalParameters.xml` holds five MINOR knobs and every one is PLACEMENT
+    (`START_DISTANCE_*`, `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER`); there is no
+    city-state economy parameter of any kind, so what it spends them on is
+    DLL AI with no data behind it — ask 12.
   - POWER: C-1's minor arm, due when the ladder reaches a load.
-  - Foreign Investor and Affluence (B-24r) wait on a minor that improves
-    and accumulates.
+  - Foreign Investor and Affluence (B-24r) wait on a minor that improves and
+    accumulates.
 - **C-41. VOLCANIC SOIL.** Weight 1.
   - WHERE an eruption lays it — ask 2. The carrier (`addFeature` /
     `_add_feature`) is in.

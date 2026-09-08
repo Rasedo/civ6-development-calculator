@@ -9,8 +9,6 @@ class SimMinors:
     def _city_state_phase(self) -> None:
         if self.S == 0:
             return
-        if self.turn % 12 == 0:
-            self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         citystate_max = int(self.rules.citystate.get("maxHp", 150))
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
         # each minor in turn: its city's yields, then the research they buy,
@@ -25,24 +23,33 @@ class SimMinors:
             self._minor_build(s)
 
     def _minor_accrue(self, s: int) -> None:
-        """THE MINOR'S CITY PAYS ITS YIELDS. CIV6 (City-state): a city-state's
-        city is an ordinary city — its Campus yields Science, its Commercial
-        Hub Gold — and "it will apparently research certain techs" on that
-        output. The minor's row rides `_seat_city_walk`, the walk every major's
-        city rides, over the minor's own research record and no roster row:
-        Science and Culture feed the two research pots, Production the build
-        pot, Gold and Faith are banked (`citystate_treasury` /
-        `citystate_faith`) and nothing spends either yet. Food is not
-        consumed: the minor's population keeps its own clock."""
+        """THE MINOR'S CITY PAYS ITS YIELDS, AND THEN GROWS AND CLAIMS ON THEM.
+
+        CIV6 (City-state): a city-state's city is an ordinary city — its Campus
+        yields Science, its Commercial Hub Gold — and the install has ONE city
+        rule, so it grows on its FOOD BOX and takes ground on its CULTURE BOX
+        exactly as a major's does (C-38). Its row is a row of the CITY BLOCK,
+        so `_seat_city_growth` and `_seat_border_growth` are the majors' own
+        bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
+        growth write moves it with no mirror of its own.
+
+        Science and Culture also feed the two research pots and Production the
+        build pot; Gold and Faith are banked (`citystate_treasury` /
+        `citystate_faith`) and nothing spends either — what the install lets a
+        city-state SPEND them on is DLL AI with no data behind it."""
         row = self._CITY_MINOR0 + s
         keep = self.citystate_alive[:, s].double()
-        yf = self._seat_amenity(row)[2][:, 0:1]
-        tot = self._seat_city_walk(row, 0, amen_yf=yf)[:, 0]  # [B, 6], zero where the city is dead
+        total, eff, need, _tier = self._seat_city_stats(row)
+        tot = total[:, 0]  # [B, 6], zero where the city is dead
         self.citystate_prod[:, s] += tot[:, 1] * keep
         self.citystate_treasury[:, s] += tot[:, 2] * keep
         self.citystate_tech_prog[:, s] += tot[:, 3] * keep
         self.citystate_civic_prog[:, s] += tot[:, 4] * keep
         self.citystate_faith[:, s] += tot[:, 5] * keep
+        col = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        act = self.citystate_alive[:, s]
+        self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
+        self._seat_border_growth(row, col, act, tot[:, 4] * keep)
 
     def _minor_research(self, s: int) -> None:
         """The cheapest available row completes (table order on a price tie),

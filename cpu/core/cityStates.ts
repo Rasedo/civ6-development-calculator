@@ -523,9 +523,6 @@ export function questLabel(quest: CityStateQuest): string {
 export function cityStatePhase(state: GameState): void {
   if (state.cityStates.length === 0) return;
 
-  if (state.turn % 12 === 0) {
-    for (const cityState of state.cityStates) cityState.population = Math.min(10, cityState.population + 1);
-  }
   for (const cityState of state.cityStates) {
     if (cityState.hp !== undefined && cityState.hp < CITY_STATE_MAX_HP) cityState.hp = Math.min(CITY_STATE_MAX_HP, cityState.hp + 10);
   }
@@ -550,9 +547,11 @@ export function minorCity(cityState: CityState): City {
     hp: cityState.hp ?? CITY_STATE_MAX_HP,
     centerIndex: cityState.centerIndex,
     population: cityState.population,
-    foodBox: 0,
-    cultureBox: 0,
-    tilesAcquired: 0,
+    // the minor's OWN boxes, not zeroes: its city grows and claims like any
+    // other (C-38). `minorAccrue` writes them back after the shared rules run.
+    foodBox: cityState.foodBox ?? 0,
+    cultureBox: cityState.cultureBox ?? 0,
+    tilesAcquired: cityState.tilesAcquired ?? 0,
     focus: 'balanced',
     queue: [],
     isCapital: false,
