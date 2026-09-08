@@ -1122,10 +1122,16 @@ export function computeCityStats(
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')
     + gpCityPermOf(city, 'housing');
-  let have =
+  // THE RANKING BASE — everything `luxuryAmenities` ranks cities on, and the
+  // one split point both engines share. Named so the amenity log can print
+  // it: a disagreement here is a different sum, a disagreement in `lux`
+  // alone is a different allocation of the same one.
+  const amenBase =
     localAmenities(state, city) +
     parkAmenities(state, city) +
-    regional.amenities +
+    regional.amenities;
+  let have =
+    amenBase +
     wonderRegionalAmenities(state, city) +
     wonderCityFlat(state, city, 'cityAmenities') +
     wonderImprovementAmenities(state, city) +
@@ -1155,6 +1161,12 @@ export function computeCityStats(
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
   const tier = amenityTier(balance);
+  const am = (globalThis as { __amLog?: string[] }).__amLog;
+  if (am && record) {
+    am.push(`c:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
+      + ` ww${warWearinessPenalty(wwMax(seatOf(state, city.seat)))} have${have} need${needed} bal${balance}`
+      + ` tier${amenityTierIndex(tier.name)}`);
+  }
   // the tier this walk RAN ON, kept where the census can read it — never a
   // recomputation, for the same reason `workedTiles` is not one: the walk is
   // a loop-top snapshot and the turn's own growth moves what a fresh call

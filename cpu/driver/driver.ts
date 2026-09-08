@@ -393,7 +393,11 @@ for (let t = 0; t < N_TURNS; t++) {
     const dumps: Record<string, unknown> = {};
     for (const g of ctl.dump) dumps[g] = groupDump(state, g);
     const cb = (globalThis as { __cbLog?: string[] }).__cbLog;
-    o.send(cb ? { dumps, cb: cb.slice(-16) } : { dumps });
+    const am = (globalThis as { __amLog?: string[] }).__amLog;
+    const out: Record<string, unknown> = { dumps };
+    if (cb) out.cb = cb.slice(-16);
+    if (am) out.am = am.slice(-24);
+    o.send(out);
   }
 }
 }

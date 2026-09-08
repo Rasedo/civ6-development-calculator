@@ -2013,6 +2013,12 @@ class SimInit:
         # samples or applies it; scripted/parity paths never pass war=.
         self._rl_war_active = True
         self._log_combat_b: int | None = None
+        # CIV6_AMLOG collects the amenity decomposition for EVERY game, a
+        # trimmed window each — the twin of `_combat_events`, but keyed by
+        # game because which game fails is not known until it does, and the
+        # battery's shards do not publish their b for a seed.
+        self._log_amen: bool = False
+        self._amen_events: dict[int, list[str]] = {}
         self._combat_events: list[str] = []
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device

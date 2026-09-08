@@ -222,6 +222,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     _cb = os.environ.get("CIV6_CBLOG_B")
     if _cb is not None:
         sim._log_combat_b = int(_cb)
+    # CIV6_AMLOG_B arms the AMENITY decomposition for one game, the way
+    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_AMLOG from
+    # the environment it inherits.
+    if os.environ.get("CIV6_AMLOG"):
+        sim._log_amen = True
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
@@ -425,6 +430,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                     print(f"  CB-GPU {ev}")
                                 for ev in dmp.get("cb", []):
                                     print(f"  CB-TS  {ev}")
+                            if sim._log_amen:
+                                for ev in sim._amen_events.get(b, []):
+                                    print(f"  AM-GPU {ev}")
+                                for ev in dmp.get("am", []):
+                                    print(f"  AM-TS  {ev}")
                 if ckpt_every and (t + 1) % ckpt_every == 0:
                     assert ckpt_dir is not None
                     ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{t + 1}.json")}) + "\n")
@@ -538,6 +548,11 @@ def main() -> None:
     _cb = os.environ.get("CIV6_CBLOG_B")
     if _cb is not None:
         sim._log_combat_b = int(_cb)
+    # CIV6_AMLOG_B arms the AMENITY decomposition for one game, the way
+    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_AMLOG from
+    # the environment it inherits.
+    if os.environ.get("CIV6_AMLOG"):
+        sim._log_amen = True
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]

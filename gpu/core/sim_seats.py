@@ -8677,6 +8677,9 @@ class SimSeats:
         # NATIONAL PARK amenities join baseHave BEFORE the luxury ranking,
         # exactly where `parkAmenities` sits in city.ts.
         have = have + self._park_amenities(row)
+        # THE RANKING BASE — everything `luxuryAmenities` ranks on, and the one
+        # split point both engines share. Kept for the amenity log alone.
+        _amen_base = have
         need = torch.ceil((self.city_pop[:, row, :cols].double() - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(row, have, need)
         # A spent Great Person's permanent amenity joins AFTER the ranking, at
@@ -8730,6 +8733,26 @@ class SimSeats:
         tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
+        # THE AMENITY LOG: one keyed line per live city of the logged game, in
+        # the SAME named terms `computeCityStats` prints. A disagreement in
+        # `base` is a different sum; in `lux` alone, a different allocation of
+        # the same one; in `have` with both of those equal, one of the terms
+        # that join after the ranking.
+        if getattr(self, "_log_amen", False):
+            _wwv = self._ww_penalty(row, torch.float64)
+            for _ab in range(self.B):
+                _ww1 = float(_wwv[_ab])
+                _lines = self._amen_events.setdefault(_ab, [])
+                for _c in range(cols):
+                    if not bool(alive[_ab, _c]):
+                        continue
+                    _lines.append(
+                        f"c:{int(self.city_id[_ab, row, _c])} base{float(_amen_base[_ab, _c]):g}"
+                        f" lux{float(lux_add[_ab, _c]):g} ww{_ww1:g}"
+                        f" have{float(balance[_ab, _c] + need[_ab, _c] + _ww1):g}"
+                        f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
+                        f" tier{int(tier_idx[_ab, _c])}")
+                del _lines[:-32]
         return tier_idx, growth_f.double(), yield_f.double(), lux_add
 
     def _clear_city_slot(self, b: int, row: int, col: int) -> None:
