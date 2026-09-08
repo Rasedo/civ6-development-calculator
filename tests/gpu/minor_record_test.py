@@ -100,7 +100,7 @@ def test_civ_levels(rules) -> None:
     """CIV6 (`CivilizationLevels`): ten permissions per class of player, and
     the one that forks a live rule is `CanAnnexTilesWithCulture` — TRUE for a
     full civ, FALSE for a city-state, the Free Cities player and a barbarian
-    tribe alike. Their culture box still FILLS; nothing is bought (C-60)."""
+    tribe alike. Their culture box still FILLS; nothing is bought."""
     sim = build(rules)
     lvl = {d["level"]: d for d in sim.rules.civ_levels}
     assert set(lvl) == {"TRIBE", "CITY_STATE", "FULL_CIV", "FREE_CITIES"}, lvl.keys()
@@ -192,7 +192,7 @@ def test_containment(rules) -> None:
 
 
 def test_minor_conversion(rules) -> None:
-    """B-59r: a minor's city row takes pressure like any other, so a
+    """a minor's city row takes pressure like any other, so a
     city-state CAN be converted — `city_pressure` reaches the minor rows."""
     sim = build(rules)
     m0 = sim._CITY_MINOR0

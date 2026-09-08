@@ -1659,7 +1659,7 @@ class SimSeats:
         nbf = nbs.clamp(min=0).reshape(self.B, -1)
         # `tile_seat` is the ABSOLUTE seat (0 seat 0, 1..99 civs, 100+ the
         # city-states), so a row is matched through `_ROW_SEAT` — a minor's
-        # border claims its own ground too (C-38).
+        # border claims its own ground too.
         return (
             (self.tile_seat.gather(1, nbf).reshape(self.B, -1, 6) == int(self._ROW_SEAT[row]))
             & (self.tile_city.gather(1, nbf).reshape(self.B, -1, 6) == cid.reshape(self.B, 1, 1))
@@ -2563,7 +2563,7 @@ class SimSeats:
                 c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
                 # the research factor is the seat's; the BASE is the row's own
                 # (`Districts.Cost`) — a shared 54 priced an Aqueduct as a
-                # Campus (B-67)
+                # Campus
                 d_fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
                 d_per = dcp.get("perDistrict") or []
                 d_disc = dcp.get("discountPct") or []
@@ -2582,7 +2582,7 @@ class SimSeats:
                         continue
                     # this row's OWN base (`Districts.Cost`) against the seat's
                     # research factor — a shared 54 priced an Aqueduct as a
-                    # Campus (B-67)
+                    # Campus
                     _b_si = float(d_per[di]) if di < len(d_per) else float(dcp.get("base", 32))
                     d_cost = torch.floor(_b_si * d_fac).to(self.dtype)
                     if fc >= 0:
@@ -3426,7 +3426,7 @@ class SimSeats:
         improvement beyond terrain and elevation (`uniqueGroundOk`): an Appeal
         floor, a Bonus-or-Luxury neighbour, and a count of passable LAND
         neighbours. `BuildInLine` is the install's line-DRAWING helper for the
-        placement UI, not a legality rule (C-79); the frontier and the
+        placement UI, not a legality rule; the frontier and the
         one-per-city clauses join at their own callers, because both need a
         seat (`_uniq_improvement_ok`)."""
         ok = torch.ones(self.B, self.T, dtype=torch.bool, device=self.device)
@@ -3544,7 +3544,7 @@ class SimSeats:
 
         The charge goes into the wonder itself, so the plot is the wonder's
         own site from the city registry, and only the queue HEAD accrues on
-        either engine (C-55)."""
+        either engine."""
         B, N = tiles.shape
         out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
         if self._builder_idx < 0 or not self._wonder_charge_rows:
@@ -3657,7 +3657,7 @@ class SimSeats:
         is `canBuildRoad(t, owns) || <improvement site> || <20% charge>` and
         offers no rail arm at all. This read `~road | ~railroad`, which is true
         of every unrailroaded tile in the game, so the GPU walked engineers to
-        roaded city centres TS never considered (A-3r).
+        roaded city centres TS never considered.
         """
         B = self.B
         dev = self.device
@@ -5329,7 +5329,7 @@ class SimSeats:
             1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
         return (home >= 0) & (got == home)
 
-    # ---------------------------------------------------------------- C-47
+    # ------------------------------------------------- THE TRIBAL VILLAGE
     def _goody_eligible(self, has_city: bool) -> list[int]:
         """Indices into `_goody_sub` a claimer may draw right now.
 
@@ -5393,7 +5393,7 @@ class SimSeats:
 
     def _claim_goody_hut(self, mask: torch.Tensor, tile: torch.Tensor,
                          seat: torch.Tensor, slot: torch.Tensor | None = None) -> None:
-        """A unit entering a TRIBAL VILLAGE claims it (C-47).
+        """A unit entering a TRIBAL VILLAGE claims it.
 
         Real Civ 6 gives the village to whoever reaches it first, so any civ
         seat claims it; barbarians and city-states neither settle nor research
@@ -5518,7 +5518,7 @@ class SimSeats:
         resource reveal, so this reads "the most advanced one with a live
         source", falling back to slot 0. The stockpile's slot order IS era
         order. `mostAdvancedStrategic`'s twin, and the ONE model choice in
-        C-47."""
+        the install's own subtype table."""
         owned = ((self.tile_seat[b] == row) & ~self.pillaged[b]
                  & (self.improvement[b] == self.res_imp[b]))
         slot = 0
@@ -5598,7 +5598,7 @@ class SimSeats:
         """CIV6 (Dynastic Cycle): "When completing a wonder receive a random
         Eureka and Inspiration from the era of the wonder, if available."
         `grantEraBoosts`'s twin — TECHS first, then CIVICS, because both
-        engines replay one rng stream (C-54)."""
+        engines replay one rng stream."""
         if not self._wonder_era_boost_rows:
             return
         t_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -7224,7 +7224,7 @@ class SimSeats:
         # Oranje's +2 Culture per foreign route in), and the destination side
         # of the improvement rows. Naming only Cleopatra left Wilhelmina's +2
         # unpaid the turn her last outgoing route expired — TS pays it
-        # regardless (seed 9001 t90, the whole of A-4r).
+        # regardless (seed 9001 t90, the whole of that hunt).
         _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").any())
                       or any(bool(self._row_is(row, r[0], r[1]).any())
                              for r in self._incoming_route_yield_rows)
@@ -7257,7 +7257,7 @@ class SimSeats:
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
-        # rows, the same shape the international leg pays (C-48)
+        # rows, the same shape the international leg pays
         if self._domestic_route_rows:
             _octr_d = self.city_center[:, row].gather(1, from_j)
             _dctr_d = self.city_center[:, row].gather(1, dest_j)
@@ -7419,7 +7419,7 @@ class SimSeats:
             # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
             # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
             # on different landmasses, and it ADDS to the plain row rather
-            # than replacing it (`addRouteRows`, C-48).
+            # than replacing it (`addRouteRows`).
             _octr_i = self.city_center[:, row].gather(1, from_j)  # [B, K]
             _across_i = self._route_intercontinental(_octr_i, _dctr)
             for _rc, _rl, _ry, _ra, _rx_i in self._intl_route_rows:
@@ -7835,7 +7835,7 @@ class SimSeats:
 
         "Beside water" is the requirement set's TEST_ANY: a river edge of its
         own, or any water neighbour. The neighbour test reads `self.water`,
-        which a drowned tile joins (C-35)."""
+        which a drowned tile joins."""
         z = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
         if not self._imp_water_amenity_any:
             return z
@@ -9002,7 +9002,7 @@ class SimSeats:
         _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
         # CIV6 (Land Acquisition): +20% culture toward border expansion —
         # the governor divides the cost the way the city.ts twin does. A
-        # CITY-STATE's row reaches this body too (C-38) and appoints nobody,
+        # CITY-STATE's row reaches this body too and appoints nobody,
         # so the governor planes are asked only of a major, exactly as every
         # other governor term here is; TS is safe by construction, because a
         # minor's city carries id -1 and `governorSum` finds nothing on it.
@@ -9021,7 +9021,7 @@ class SimSeats:
         # CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE only
         # for a full civ, so a city-state, the Free Cities player and a
         # barbarian tribe all bank the culture and buy nothing — the same
-        # shape, at the same spend (C-60).
+        # shape, at the same spend.
         act = act & ~self._congress_border_frozen(row)
         if not bool(self._row_annex_culture[row]):
             return
@@ -10233,7 +10233,7 @@ class SimSeats:
         # turn 1: the granted Scout on the hut tile against TS's on the next).
         self._occ_set(rows, dest[rows], gs)
         # TS claims the village between the Pilgrim's charge and the camp
-        # clear, and the rng order is the whole point of matching it (C-47)
+        # clear, and the rng order is the whole point of matching it
         # `gslot`, NOT `gs`: `gs = gslot[rows]` is indexed by position within
         # the moved-games subset, while the claim indexes by GAME. At B=1 the
         # two coincide, so every single-seed run passed and the battery's
@@ -11923,7 +11923,7 @@ class SimSeats:
                                * _e2[:, _o].double() * self._suzerain_mask(_o)[:, : self.S].sum(dim=1).double())
         # CIV6 (Monarchy legacy): "bonus influence points toward earning more
         # Envoys" — a percentage of the WHOLE per-turn sum, so it multiplies
-        # here rather than inside any one term (C-73).
+        # here rather than inside any one term.
         if self._gov_has_effects:
             pt = pt * self._gov_mods(row)[12]["inflmult"].double()
         # CIV6 (Rogue State): "Earn no influence toward new Envoys."
@@ -12812,7 +12812,7 @@ class SimSeats:
             # INTERCONTINENTAL row is a fact about both endpoints, so this
             # twin cannot stay [B, D] once one exists — the engine pays it
             # per leg and the driver must value it the same way, clause for
-            # clause (C-48).
+            # clause.
             _ys3 = ysum_ip.unsqueeze(1).expand(B, RC, D).clone()
             if self._intl_route_rows:
                 _octr3 = self.city_center[:, row, :RC]

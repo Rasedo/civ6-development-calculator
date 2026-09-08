@@ -1078,7 +1078,7 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
 def poke_boarding(rules, path, PRIVATEER, GALLEY, WARRIOR):
     """CIV6 (Boarding): BOARDING_GOLD_FROM_NAVAL_VICTORY,
     MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD, PercentDefeatedStrength 100,
-    YIELD_GOLD, against an opponent of DOMAIN_SEA. The magnitude B-56r called
+    YIELD_GOLD, against an opponent of DOMAIN_SEA. The magnitude the AUDIT called
     unpublished, paid by the KILLER's own promotion — so it needs the killer's
     promo word, and a city's shot (which passes none) pays nothing."""
     sim = build(rules, path)

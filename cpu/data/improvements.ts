@@ -143,7 +143,7 @@ export interface ImprovementDef {
   /** CIV6 (PLOT_DAMAGE_TO_WALKING_INTO / PLOT_DAMAGE_TO_WALKING_ADJACENT):
    *  what an enemy unit takes for stepping onto the tile, and for walking
    *  beside it. RECORDED, not read: this engine has no damage-on-entry hook,
-   *  which is unit-movement machinery (C-33, C-79). */
+   *  which is unit-movement machinery. */
   damageEntering?: number;
   damageAdjacent?: number;
   /** CIV6 (`RequiresAdjacentBonusOrLuxury`): the row refuses a tile with no
@@ -182,7 +182,7 @@ export interface ImprovementDef {
   /** CIV6 (`DisasterResistant`): a storm or a flood leaves it standing. */
   disasterResistant?: boolean;
   /** CIV6 (Golf Course, Open-Air Museum): "Tiles with <row> cannot be
-   *  swapped" — recorded; this engine has no tile-swap verb (C-79). */
+   *  swapped" — recorded; this engine has no tile-swap verb. */
   noSwap?: boolean;
   /**
    * CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION the
@@ -590,7 +590,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   // be pillaged or removed." Expansion2_Improvements.xml: PrereqTech
   // TECH_CHEMISTRY, `Improvement_ValidBuildUnits` names UNIT_MILITARY_ENGINEER
   // alone, `Improvement_ValidTerrains` the five mountain rows,
-  // `CanBuildOutsideTerritory`, PlunderType PLUNDER_NONE (C-20).
+  // `CanBuildOutsideTerritory`, PlunderType PLUNDER_NONE.
   MOUNTAIN_TUNNEL: {
     id: 'MOUNTAIN_TUNNEL',
     name: 'Mountain Tunnel',
@@ -883,7 +883,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     ],
     // The description's "+1 Faith beside a Holy Site, +1 Food beside a Farm"
     // has NO `Improvement_Adjacencies` row in the install — both halves are
-    // DLL-side, so they are recorded rather than invented (C-79).
+    // DLL-side, so they are recorded rather than invented.
     description: '+1 food +1 housing on flat ground, never beside another Stepwell. +1 faith from Feudalism, +1 more food from Professional Sports.',
   },
   // ---- THE TWO GOVERNOR IMPROVEMENTS ----
@@ -891,7 +891,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   // LAST layer and it is the one that gives the Fishery its Housing and
   // TilesRequired). Neither is a civilization's unique: each is unlocked by a
   // GOVERNOR PROMOTION in the city that holds the plot, which is why both
-  // promotions have sat in `governors.ts` with empty effects (B-24r).
+  // promotions have sat in `governors.ts` with empty effects.
   FISHERY: {
     id: 'FISHERY',
     name: 'Fishery',

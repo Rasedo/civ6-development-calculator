@@ -1,4 +1,4 @@
-"""A CITYLESS SEAT'S GOVERNOR PHASE DOES NOT RUN (A-8r) — the GPU half.
+"""A CITYLESS SEAT'S GOVERNOR PHASE DOES NOT RUN — the GPU half.
 
     python tests/gpu/governor_cityless_test.py
 

@@ -8,7 +8,7 @@ import { POLICY_LIST, POLICIES } from '../../../cpu/data/policies';
 import type { GameState, SeatActionRecord } from '../../../cpu/core/types';
 
 /**
- * THE SLOTTED-CARD STORE (C-75).
+ * THE SLOTTED-CARD STORE.
  *
  * Which cards a seat slots is a DRIVER decision on the wire: `unlockedPolicyIds`
  * is the one gate the greedy reference, the record's validator and the effects

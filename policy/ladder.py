@@ -313,7 +313,7 @@ def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
     order, each kind filling its own slots, the overflow and the wildcard-kind
     cards taking the W slots. LEGACY-FIRST hands the W slots to the unlocked
     LEGACY cards before anything else — the one style that ever slots one,
-    which is what makes C-73's accrued payout reachable. MILITARY-FIRST hands
+    which is what makes the government legacy's accrued payout reachable. MILITARY-FIRST hands
     the W slots to the military overflow first."""
     greedy = _lay_by_kind(mask, nslots, kind)
     if style is None:

@@ -260,7 +260,7 @@ export function tileScore(y: Yields, focus: FocusId): number {
 }
 
 /**
- * THE TILES A CITY ACTUALLY WORKS THIS TURN (C-77).
+ * THE TILES A CITY ACTUALLY WORKS THIS TURN.
  *
  * `assignWorkedTiles` answers "which of these candidates, for this many
  * citizens"; this answers the question the ENGINE asks — the same city, with
@@ -605,7 +605,7 @@ function wonderImprovementAmenities(state: GameState, city: City): number {
  * second City Park beside water pays a second amenity.
  *
  * "Beside water" reads the RING, so a drowned neighbour counts as the sea it
- * now is (C-35), and a river edge counts as well — the requirement set is a
+ * now is, and a river edge counts as well — the requirement set is a
  * TEST_ANY over coast, river and lake.
  */
 function improvementWaterAmenities(state: GameState, city: City): number {
@@ -882,7 +882,7 @@ export function computeCityStats(
   luxMap?: Map<number, number>,
   mods?: Modifiers,
   /**
-   * Store this walk's worked-tile pick on the city (C-77). FALSE for every
+   * Store this walk's worked-tile pick on the city. FALSE for every
    * caller but `seatPhase`'s loop-top snapshot: `computeCityStats` is a pure
    * read that four other rules call at four other points in the turn, and a
    * pick recorded from the SCORE walk would be the post-growth one — the turn
@@ -916,7 +916,7 @@ export function computeCityStats(
   for (const n of specialists.values()) specialistTotal += n;
 
   const worked = workedTilesOf(state, city, ctx, specialistTotal);
-  // C-77: the pick this walk MADE, kept where the census can read it. Never a
+  // the pick this walk MADE, kept where the census can read it. Never a
   // recomputation, and never from a second caller: the walk is a loop-top
   // SNAPSHOT, so a growth landing later in the same turn would change what a
   // fresh call answers while the turn itself ran on this one.

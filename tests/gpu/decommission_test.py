@@ -9,7 +9,7 @@ CIV6 (Expansion2_Emergencies.xml,
 CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}): `ScoreAmount` 100
 apiece, `FromProject` the decommission row.
 
-No rollout path builds a power plant (C-1's reach is ZERO), so this lane
+No rollout path builds a power plant (the power plants' reach is ZERO), so this lane
 drives the gate and the completion by hand — its whole GPU reach.
 
 Run: PYTHONIOENCODING=utf-8 python tests/gpu/decommission_test.py

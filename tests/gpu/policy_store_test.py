@@ -1,4 +1,4 @@
-"""THE SLOTTED-CARD STORE (C-75) — the GPU half.
+"""THE SLOTTED-CARD STORE — the GPU half.
 
     python tests/gpu/policy_store_test.py
 

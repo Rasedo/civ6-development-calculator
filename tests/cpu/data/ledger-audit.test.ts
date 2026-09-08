@@ -9,7 +9,7 @@ import { join } from 'node:path';
  * open items — the mechanic and the gap, with the gap naming its blocker — and
  * that "recorded" is a deferral, never a closure. A blocker that lives only as
  * free text in `roster_ledger.json` is invisible to every pass that reads the
- * AUDIT, which is how twenty rows quietly stopped being work (C-64..C-72).
+ * AUDIT, which is how twenty rows quietly stopped being work (a whole run of entries).
  *
  * Nothing guarded that until this lane: the ledger had drifted to a row whose
  * cited item did not exist, and to a modifier with no row at all, and only a

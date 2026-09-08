@@ -178,7 +178,7 @@ export interface PolicyEffects {
   grievanceNoDecay?: boolean;
   /** Automated Workforce: production toward city PROJECTS. */
   projectProdMult?: number;
-  /** C-73: the government legacy channels this model had no shape for —
+  /** the government legacy channels this model had no shape for —
    *  Monarchy's envoy influence and the two purchase discounts. */
   influenceMult?: number;
   goldBuyDiscountPct?: number;
@@ -481,7 +481,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
 /** CIV6: the nine accumulating bonus kinds the install's `GovernmentBonusNames`
  *  lists, less its own "none" row. Each government names exactly one — which is why a
  *  legacy card is worth a percentage of ONE thing and not the government's
- *  whole inherent package (C-73). */
+ *  whole inherent package. */
 export type GovBonusType =
   | 'wonderConstruction' | 'combatExperience' | 'greatPeople' | 'envoys'
   | 'faithPurchases' | 'goldPurchases' | 'unitProduction'
@@ -616,7 +616,7 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
 // `effects` here is NOT what the card pays. A legacy card is worth the
 // percentage its government has ACCUMULATED against its own BonusType, which
 // only a seat can answer, so `applyGovernment` builds the real payload from
-// `legacyEffects` and never reads this field for a legacy card (C-73). It
+// `legacyEffects` and never reads this field for a legacy card. It
 // stays because the wire and the UI both name a card's effects, and an empty
 // object there would read as "this card does nothing".
 for (const g of Object.values(GOVERNMENTS)) {

@@ -1,5 +1,5 @@
 /**
- * THE DROWNED GROUND IS COAST (C-35).
+ * THE DROWNED GROUND IS COAST.
  *
  * SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
  * coastal water tiles". Both engines keep the ground's terrain, feature and

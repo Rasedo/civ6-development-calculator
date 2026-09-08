@@ -1,5 +1,5 @@
 /**
- * BOARDING'S MAGNITUDE (B-56r).
+ * BOARDING'S MAGNITUDE.
  *
  * The AUDIT called it unpublished. It is not: BOARDING_GOLD_FROM_NAVAL_VICTORY
  * is MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD with PercentDefeatedStrength 100

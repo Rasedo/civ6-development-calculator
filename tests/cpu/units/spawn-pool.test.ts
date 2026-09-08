@@ -7,7 +7,7 @@ import { MP_SCALE, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../../../cpu/data/
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * A unit is BORN with the pool `unitFullMoves` gives it (A-2r).
+ * A unit is BORN with the pool `unitFullMoves` gives it.
  *
  * `spawnUnit` used to re-add the chassis moves, the raider bonus, the golden
  * bonus and the start tile by hand, and so dropped the three terms

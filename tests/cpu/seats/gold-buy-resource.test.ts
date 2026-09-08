@@ -9,7 +9,7 @@ import { STRATEGIC_PER_TURN } from '../../../cpu/data/constants';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * A GOLD-BOUGHT STRATEGIC UNIT PAYS ITS RESOURCE (A-10r).
+ * A GOLD-BOUGHT STRATEGIC UNIT PAYS ITS RESOURCE.
  *
  * CIV6 (GS): a unit that asks for a strategic resource pays it "at the moment
  * you start production (or the moment you purchase it)". `purchaseUnit` and

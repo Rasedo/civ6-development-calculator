@@ -11,7 +11,7 @@ import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
 /**
- * THE EIGHT NAMED STORMS (C-49) — the TS half; the GPU twin is
+ * THE EIGHT NAMED STORMS — the TS half; the GPU twin is
  * tests/gpu/storms_test.py.
  *
  * CIV6 (`Expansion2_RandomEvents.xml`): a storm's FAMILY is the terrain it

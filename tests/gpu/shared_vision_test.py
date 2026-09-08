@@ -1,4 +1,4 @@
-"""AN ALLIANCE THAT SHARES WHAT IT SEES — the GPU half (C-70).
+"""AN ALLIANCE THAT SHARES WHAT IT SEES — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/shared_vision_test.py

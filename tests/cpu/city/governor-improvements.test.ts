@@ -1,5 +1,5 @@
 /**
- * THE TWO GOVERNOR IMPROVEMENTS (B-24r): the Fishery and the City Park.
+ * THE TWO GOVERNOR IMPROVEMENTS: the Fishery and the City Park.
  *
  * Every column off DLC/Expansion2/Data/Expansion1_Improvements.xml, which is
  * the LAST layer and the one that gives the Fishery its Housing and

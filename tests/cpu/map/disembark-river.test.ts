@@ -12,7 +12,7 @@ import type { Tile } from '../../../cpu/core/types';
  * nothing pinned it, and the GPU twin had folded the river charge into the
  * one cost it used for BOTH arms. A disembark onto a river tile therefore
  * cost 4 MP there and 1 MP here, which stranded a unit on the water for a
- * turn and, at seed 9235 t191, cost a whole theological combat (A-1r).
+ * turn and, at seed 9235 t191, cost a whole theological combat.
  *
  * The GPU twin is tests/gpu/golden_move_test.py's disembark lane.
  */

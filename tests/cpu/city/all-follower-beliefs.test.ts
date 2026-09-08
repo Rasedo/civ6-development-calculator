@@ -15,7 +15,7 @@ import type { GameState } from '../../../cpu/core/types';
  * Every other seat pays exactly ONE follower belief — its city's own followed
  * religion. This is the QUANTIFIER, and it was the one half of the ability
  * with no reader: the row, the `Modifiers` field, the wire and the GPU row
- * list all shipped, and nothing consumed any of them (C-57).
+ * list all shipped, and nothing consumed any of them.
  *
  * The GPU twin is tests/gpu/all_follower_beliefs_test.py.
  */

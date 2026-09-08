@@ -12,7 +12,7 @@ import type { GameState } from '../../../cpu/core/types';
 /**
  * CIV6 (Dynastic Cycle): "When completing a wonder receive a random Eureka
  * and Inspiration from the era of the wonder, IF AVAILABLE." The install
- * writes the two as separate modifiers, each Amount 1 (C-54).
+ * writes the two as separate modifiers, each Amount 1.
  *
  * The GPU twin is tests/gpu/wonder_era_boost_test.py.
  */

@@ -1,4 +1,4 @@
-"""THE EIGHT NAMED STORMS (C-49) — the GPU half.
+"""THE EIGHT NAMED STORMS — the GPU half.
 
     python tests/gpu/storms_test.py
 

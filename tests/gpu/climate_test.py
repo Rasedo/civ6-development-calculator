@@ -185,7 +185,7 @@ def main() -> int:
     s5b._climate_turn()
     assert int(s5b.climate_idx[b]) == 5
     assert bool(s5b.tile_submerged[b, keep].all()), "and it does"
-    # C-35: the drowned ground IS coastal water, and every LAND neighbour of
+    # the drowned ground IS coastal water, and every LAND neighbour of
     # it has just become coastal land. Both engines keep the terrain and the
     # feature UNDERNEATH on purpose, so the adjacency sources mask at the READ
     # rather than the write.
@@ -210,7 +210,7 @@ def main() -> int:
                 f"the drowned tile still lends feature {_fid} to {_land_nb[0]}")
     # the Aqueduct's source is a DERIVED plane over a fact the sea can move.
     # A drowned oasis/lake/mountain stops sourcing its neighbours, and the
-    # derivation is rebuilt rather than left as a stale bake (C-35).
+    # derivation is rebuilt rather than left as a stale bake.
     assert not bool((s5b.aq_own[b] & s5b.tile_submerged[b]).any()), (
         "a drowned tile still counts as an Aqueduct source")
     _want = s5b.tile_river[b] | (

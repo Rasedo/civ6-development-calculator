@@ -393,7 +393,7 @@ class SimPhase:
                 continue
             out = out + (self.civ_techs[:, row, _tt] & self._row_is(row, _tc, _tl)).long() * _ta
         # ...and the titles a TRIBAL VILLAGE handed over, which no held state
-        # derives, so they need a store of their own (C-47)
+        # derives, so they need a store of their own
         return out + self.civ_granted_titles[:, row]
 
     def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
@@ -855,7 +855,7 @@ class SimPhase:
                         if _eramax >= 0:
                             _hit = _hit & (self._type_era[_ui] <= _eramax)
                     # every catalog row carries a scalar pct; a LEGACY
-                    # card's is per GAME, because it is an accrual (C-73).
+                    # card's is per GAME, because it is an accrual.
                     # ...gathered per city row like every other per-game mask
                     # in this walk (`_fw[bidx]`), never broadcast against it
                     _pctv = (_pct.to(_add.dtype)[bidx]
@@ -1693,7 +1693,7 @@ class SimPhase:
             # sits ABOVE this line in seatPhase — so a city-less seat writes
             # neither the mask nor the clock. The mask never showed the
             # difference because `|=` is idempotent; the clock would have
-            # grown by one every turn (C-63).
+            # grown by one every turn.
             _gov_on = _has & active
             self.civ_gov_held[:, row] |= torch.where(
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))

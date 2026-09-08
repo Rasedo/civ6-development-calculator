@@ -9,7 +9,7 @@ import { CIVICS } from '../../../cpu/data/civics';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * THE LEGACY PURCHASE DISCOUNTS (C-73's last two channels).
+ * THE LEGACY PURCHASE DISCOUNTS (the government legacy's last two channels).
  *
  * CIV6: the Merchant Republic's legacy accrues a percent off GOLD purchases
  * (BonusType goldPurchases) and Theocracy's off FAITH purchases

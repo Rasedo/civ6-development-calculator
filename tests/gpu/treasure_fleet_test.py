@@ -9,7 +9,7 @@ CIV6 (Treasure Fleet): "Trade Routes receive +3 Gold, +2 Faith, and +1
 Production. Trade Routes between multiple continents receive TRIPLE these
 numbers." The install ships the plain row and a second one carrying
 `Intercontinental` at DOUBLE, so the two together make the triple — which is
-why the intercontinental row ADDS rather than replaces (C-48).
+why the intercontinental row ADDS rather than replaces.
 
 No fixture seats Spain, so no gate lane reaches these rows: this is the only
 evidence they are paid, and paid only across a real continent boundary.

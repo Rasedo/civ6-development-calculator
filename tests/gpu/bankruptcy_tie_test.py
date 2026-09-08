@@ -1,4 +1,4 @@
-"""A BANKRUPTCY TIE GOES TO THE EARLIEST-SPAWNED UNIT (A-7r) — the GPU half.
+"""A BANKRUPTCY TIE GOES TO THE EARLIEST-SPAWNED UNIT — the GPU half.
 
     python tests/gpu/bankruptcy_tie_test.py
 

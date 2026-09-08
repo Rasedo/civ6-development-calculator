@@ -11,7 +11,7 @@ import type { GameState } from '../../../cpu/core/types';
  * CIV6 (Poundmaker, TRAIT_ALLIANCE_SHARED_VIS): the install writes
  * EFFECT_ADJUST_PLAYER_ALL_ALLIANCES_PROVIDE_SHARED_VIS with `ShareVis: true`
  * — a boolean, no direction and no level. Read as MUTUAL, which is what
- * "shared" means in the alliance system it names (C-70).
+ * "shared" means in the alliance system it names.
  *
  * The GPU twin is tests/gpu/shared_vision_test.py.
  */

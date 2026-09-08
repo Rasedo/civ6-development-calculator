@@ -332,7 +332,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   // CIV6 (BOARDING_GOLD_FROM_NAVAL_VICTORY,
   // MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD): PercentDefeatedStrength 100,
   // YieldType YIELD_GOLD, against an opponent of DOMAIN_SEA. The AUDIT called
-  // this magnitude unpublished (B-56r); it is 100, and the engine already
+  // this magnitude unpublished; it is 100, and the engine already
   // exports and reads a post-combat yield channel.
   P('BOARDING', 'NAVAL_RAIDER', 1, [], cs('NAVAL_KILL_GOLD', 100)),
   P('LOOT', 'NAVAL_RAIDER', 1, [], cs('RAID_GOLD', 50)),

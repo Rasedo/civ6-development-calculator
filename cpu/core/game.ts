@@ -81,7 +81,7 @@ export const DISTRICT_SPECIALTY_COST = 54;
  * REQUIRED: the install gives each row its own (`Districts.Cost` — Aqueduct
  * 36, Canal and Dam 81, Government Plaza and Diplomatic Quarter 30,
  * Neighborhood 54), and a defaulted one silently priced every district as a
- * Campus (B-67). It speed-scales like every other production cost, and
+ * Campus. It speed-scales like every other production cost, and
  * `districtDiscounted` carries the under-represented discount on top.
  */
 export function districtCostIn(research: ResearchState, base: number): number {
@@ -337,7 +337,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
  * real Civ 6 shape. Outside units mode (the classic calculator) and in
  * sandbox there are no units to spend, so founding is free.
  */
-/** a feature ARRIVES after t0 — C-41's carrier. Nothing in the rollout
+/** a feature ARRIVES after t0 — the eruption's carrier. Nothing in the rollout
  *  calls it yet: WHERE a feature lands (and what it does to an improvement)
  *  is an open owner question, so the refusal set is the conservative
  *  envelope — bare land only — mirrored clause for clause by
@@ -1793,7 +1793,7 @@ function religiousVictor(state: GameState): number {
  * era, and nothing at all where the era holds none. ONE body for both kinds,
  * so the tech and the civic pool cannot drift apart, and the draws are taken
  * in a fixed order (techs, then civics) because both engines replay the same
- * stream (C-54).
+ * stream.
  */
 export function grantEraBoosts(state: GameState, seat: number, era: string): void {
   const rows = getModifiers(state, seat).wonderEraBoost;
@@ -1969,7 +1969,7 @@ function spreadReligiousPressure(state: GameState): void {
   // spread-religion operation row carries no owner filter; and the
   // `RELIGION_SPREAD_*` parameters are written per CITY. So a Free City is a
   // city here — it takes pressure, it follows what holds the majority, and
-  // once it follows it PRESSES like any other (C-60).
+  // once it follows it PRESSES like any other.
   //
   // `cityHolders` and not `allCities`: `allCities` answers a different
   // question at four other sites (combat, capture, the trade walk), and the

@@ -142,7 +142,7 @@ class SimDeals:
     def _deal_move_res(self, giver: int, taker: int, va: torch.Tensor,
                        vb: torch.Tensor, ok: torch.Tensor) -> None:
         """A lump of a CONSUMABLE resource, capped by what the taker can hold.
-        C-5's stockpile is the only resource with a quantity to hand over."""
+        The strategic stockpile is the only resource with a quantity to hand over."""
         ns = self.civ_stockpile.shape[2]
         idx = va.clamp(min=0, max=ns - 1).unsqueeze(1)
         held = self.civ_stockpile[:, taker].gather(1, idx).squeeze(1)

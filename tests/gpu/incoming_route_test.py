@@ -1,4 +1,4 @@
-"""A ROUTE COMING IN IS PAID WITH NO ROUTE GOING OUT (A-4r).
+"""A ROUTE COMING IN IS PAID WITH NO ROUTE GOING OUT.
 
     python tests/gpu/incoming_route_test.py
 
@@ -10,7 +10,7 @@ gold. Radio Oranje's "+2 Culture from each Trade Route another civilization
 sends to this one" is paid inside the same walk, so the turn Wilhelmina's
 last outgoing route expired, her +2 for the route still coming IN stopped
 with it. TS pays it regardless. Seed 9001 t90, city[412].cultureBox, the
-whole of A-4r.
+whole of.
 
 The guard now derives from the ROWS: any destination-side row this seat
 carries keeps the walk alive.

@@ -1,4 +1,4 @@
-"""TRIBAL VILLAGES — the GPU half (C-47).
+"""TRIBAL VILLAGES — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/tribal_villages_test.py
@@ -152,7 +152,7 @@ def test_the_draw_moves_one_games_stream(rules, path) -> None:
 
 def test_the_hut_is_its_own_live_plane(rules, path) -> None:
     """`camp_ok` must NOT bake the hut: a village is claimed mid-game, and a
-    baked flag would stay stale for the rest of it (the C-52 class)."""
+    baked flag would stay stale for the rest of it (the baked-derivation class)."""
     sim = build(path)
     assert "tile_goody" in [n for n in dir(sim) if n == "tile_goody"], "no hut plane"
     t = int(sim.unit_tile[B0, 0])

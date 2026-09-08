@@ -1,5 +1,5 @@
 /**
- * TRIBAL VILLAGES — the install's own reward table (C-47).
+ * TRIBAL VILLAGES — the install's own reward table.
  *
  * Source: `GoodyHuts` and `GoodyHutSubTypes` (Base + Expansion2), with each
  * row's payload read off the modifier its `ModifierID` names. Nothing here is

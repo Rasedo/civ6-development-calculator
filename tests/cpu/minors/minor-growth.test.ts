@@ -1,5 +1,5 @@
 /**
- * A CITY-STATE'S CITY GROWS AND CLAIMS LIKE ANY OTHER (C-38).
+ * A CITY-STATE'S CITY GROWS AND CLAIMS LIKE ANY OTHER.
  *
  * CIV6 (City-state): the install has ONE city rule, so the minor's city fills
  * a FOOD BOX and takes ground on a CULTURE BOX exactly as a major's does.

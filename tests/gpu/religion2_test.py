@@ -486,7 +486,7 @@ def poke_presr(rules, rj, path):
 
 
 def poke_free_city_pressure(rules, rj, path):
-    """6b. THE FREE ROW IS IN THE WALK (C-60). `CivilizationLevels` names no
+    """6b. THE FREE ROW IS IN THE WALK. `CivilizationLevels` names no
     religion column and the spread operation carries no owner filter, so a
     Free City takes pressure like any other city and presses back once it
     follows. The walk covered the majors alone on both engines.

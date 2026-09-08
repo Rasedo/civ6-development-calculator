@@ -221,7 +221,7 @@ export interface Tile {
   continent?: number;
   /** CIV6 (Mountain Tunnel): "a movement portal on a mountain range" — the
    *  connected component of MOUNTAIN tiles this one belongs to, -1 off a
-   *  mountain. Static, like `continent`: mountains never move (C-20). */
+   *  mountain. Static, like `continent`: mountains never move. */
   mountainRange?: number;
   /** the sea has been over this tile: it is pillaged and pays no improvement
    *  bonus, but is still workable and can be repaired behind a Flood

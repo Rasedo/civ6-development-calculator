@@ -12,7 +12,7 @@ import type { GameState } from '../../../cpu/core/types';
 /**
  * CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): a government
  * accumulates +Increment% against its own BonusType for every Interval turns
- * it is held, and a seat keeps what it accrued after switching (C-63).
+ * it is held, and a seat keeps what it accrued after switching.
  *
  * The install spells this ACCUMULATING, never "legacy", which is why an
  * earlier sourcing pass searched `Governments`, `GovernmentBonusNames` and
@@ -112,7 +112,7 @@ describe('the government legacy accrual', () => {
 });
 
 /**
- * C-73: a legacy card is worth the percentage its government has ACCUMULATED
+ * a legacy card is worth the percentage its government has ACCUMULATED
  * against the ONE BonusType it names — not that government's whole inherent
  * bonus, which is what `POLICIES[LEGACY_*].effects` still holds.
  */
@@ -156,7 +156,7 @@ describe('what a legacy card pays', () => {
   });
 
   it('REACHABILITY: the greedy reference slots no legacy card; a stored one is paid', () => {
-    // C-75 CLOSED: the slotted cards are the driver's decision, carried on
+    // CLOSED: the slotted cards are the driver's decision, carried on
     // the wire. The greedy REFERENCE still slots none — legacy cards sit last
     // in the table and an earlier card takes every wildcard — which was the
     // gap; the driver's legacy-first style (policy/ladder.py) slots them, the

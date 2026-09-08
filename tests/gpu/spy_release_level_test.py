@@ -1,4 +1,4 @@
-"""A RELEASED SPY IS THE SPY THAT WAS CAUGHT (C-16) — the GPU half.
+"""A RELEASED SPY IS THE SPY THAT WAS CAUGHT — the GPU half.
 
     python tests/gpu/spy_release_level_test.py
 

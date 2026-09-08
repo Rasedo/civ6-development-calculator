@@ -284,7 +284,7 @@ const rawList: BuildingDef[] = [
     // Maintenance column and no `Building_GreatWorks` row at all. Its
     // modifiers pay +1 Culture and +1 Faith on every passable-feature tile of
     // the city; the Tourism third is a per-tile tourism channel this engine
-    // has no carrier for (recorded on C-79).
+    // has no carrier for (recorded in docs/AUDIT.md).
     civVariants: [{
       civ: 'MAORI', name: 'Marae', maintenance: 0, noGreatWorks: true,
       featureTileYields: { culture: 1, faith: 1 },
@@ -298,7 +298,7 @@ const rawList: BuildingDef[] = [
     // same two Culture rows and the same single MUSIC great-work slot. Its
     // one clause is "+100% Tourism pressure from this city towards other
     // civilizations in the Modern era", a per-PAIR tourism pressure this
-    // engine does not carry (recorded on C-79).
+    // engine does not carry (recorded in docs/AUDIT.md).
     civVariants: [{ civ: 'AMERICA', name: 'Film Studio' }],
   },
   { id: 'MARKET', name: 'Market', district: 'COMMERCIAL_HUB', cost: 120, yields: { gold: 2 }, maintenance: 0 },
@@ -329,7 +329,7 @@ const rawList: BuildingDef[] = [
     // Production 4 where the Factory pays 3 — the regional row every city
     // centre within six tiles is paid. Its "+4 Culture after Electricity"
     // half is a TECH-gated building yield this catalog has no column for
-    // (recorded on C-79).
+    // (recorded in docs/AUDIT.md).
     civVariants: [{
       civ: 'JAPAN', name: 'Electronics Factory', yields: { production: 4 },
     }],
@@ -371,7 +371,7 @@ const rawList: BuildingDef[] = [
     // Production 2 of its own, RegionalRange 6 — both reach every city centre
     // within six tiles, as the Zoo's Amenity does. THERMALBATH_ADDAMENITIES
     // pays +2 MORE Amenities while the city holds a Geothermal Fissure (its
-    // Tourism third is the channel C-79 records).
+    // Tourism third is the channel docs/AUDIT.md records).
     civVariants: [{
       civ: 'HUNGARY', name: 'Thermal Bath', cost: 291,
       amenities: 2, yields: { production: 2 },

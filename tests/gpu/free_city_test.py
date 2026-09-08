@@ -1,4 +1,4 @@
-"""THE FREE CITY STEP (C-60) — the GPU half.
+"""THE FREE CITY STEP — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/free_city_test.py

@@ -520,11 +520,11 @@ export function buildRules() {
       // the SPECIALTY base, still what a district with no row of its own pays
       base: Math.round(DISTRICT_SPECIALTY_COST * GAME_SPEED), scale: 9,
       // ...and each PLACEABLE row's own base and under-represented discount,
-      // straight off `Districts.Cost` and `CostProgressionParam1` (B-67)
+      // straight off `Districts.Cost` and `CostProgressionParam1`
       perDistrict: PLACEABLE_DISTRICTS.map((d) => Math.round((DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST) * GAME_SPEED)),
       discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
     },
-    // TRIBAL VILLAGES (C-47) — the install's `GoodyHuts` + `GoodyHutSubTypes`
+    // TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`
     // straight through, so the GPU draws from the same table TS does. Kinds
     // are indices into `kinds`; `payload` is the channel index into
     // `payloadKinds` with its own amount, and a weight of 0 is a subtype this
@@ -1589,7 +1589,7 @@ export function buildRules() {
         r.districtItem !== undefined ? PLACEABLE_DISTRICTS.indexOf(r.districtItem) : -1,
         r.every === 'building' ? 1 : r.every === 'unit' ? 2 : r.every === 'district' ? 3 : 0,
         r.unit !== undefined ? Object.keys(UNITS).indexOf(r.unit) : -1,
-        // the row pays only in a city OFF the seat's home continent (C-48)
+        // the row pays only in a city OFF the seat's home continent
         r.offHomeContinent ? 1 : 0,
       ]),
       // [civ, leaderRow, district, amount, source (0 adjacent districts / 1 the river)]
@@ -1659,7 +1659,7 @@ export function buildRules() {
       allFollowerBeliefs: ALL_FOLLOWER_BELIEFS_ROWS.map((r) => [rowCiv(r), rowLeader(r)]),
       campGoody: CAMP_GOODY_ROWS.map((r) => [rowCiv(r), rowLeader(r)]),
       // [civ, leaderRow, featureIdx, amount] — the appeal an adjacent
-      // FEATURE is worth to this seat, over the map-global walk (C-50)
+      // FEATURE is worth to this seat, over the map-global walk
       allianceSharedVis: ALLIANCE_SHARED_VIS_ROWS.map((r) => [rowCiv(r), rowLeader(r)]),
       featureAppeal: FEATURE_APPEAL_ROWS.map((r) => [
         rowCiv(r), rowLeader(r), FEAT_IDS.indexOf(r.feature), r.amount]),
@@ -1672,7 +1672,7 @@ export function buildRules() {
       // [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
       postCombatLoyalty: POST_COMBAT_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount, r.goldenExtra]),
       // [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat]
-      // [civ, leaderRow, governmentIndex, ratePct] (C-63)
+      // [civ, leaderRow, governmentIndex, ratePct]
       legacyRates: LEGACY_RATE_ROWS.map((r) => [rowCiv(r), rowLeader(r),
                                                 GOVERNMENT_LIST.findIndex((g) => g.id === r.government),
                                                 r.ratePct]),
@@ -1686,7 +1686,7 @@ export function buildRules() {
       // percentage is a Builder's CHARGE rather than per-turn Production
       wonderCharge: WONDER_CHARGE_ROWS.map((r) => [rowCiv(r), rowLeader(r), ERAS.indexOf(r.startEra), ERAS.indexOf(r.endEra), r.pct]),
       // [civ, leaderRow, techs, civics] — a random Eureka and Inspiration
-      // from the ERA of the wonder just completed (C-54)
+      // from the ERA of the wonder just completed
       wonderEraBoost: WONDER_ERA_BOOST_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.techs, r.civics]),
       // CIV6 (Mediterranean Colonies): the civilizations whose COASTAL cities
       // on their home continent are 100% Loyal
@@ -1762,7 +1762,7 @@ export function buildRules() {
       capital: CAPITAL_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.firstCityPop ?? 0, r.palaceHousing ?? 0, r.palaceAmenities ?? 0, ...YIELD_KEYS.map((k) => r.presettleYields?.[k] ?? 0)]),
       // [civ, leaderRow, yield, amount, intercontinental] — the last is the
       // install's `Intercontinental` argument: the row pays only where the
-      // route's two ENDPOINTS sit on different landmasses (C-48).
+      // route's two ENDPOINTS sit on different landmasses.
       intlRouteYields: INTL_ROUTE_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount, r.intercontinental ? 1 : 0]),
       domesticRouteYields: DOMESTIC_ROUTE_YIELD_ROWS.map((r) => [rowCiv(r), rowLeader(r), YIELD_KEYS.indexOf(r.yield), r.amount, r.intercontinental ? 1 : 0]),
       // [civ, leaderRow, amount, classMask (CLASS_BIT), when]
@@ -1784,7 +1784,7 @@ export function buildRules() {
         rowCiv(r), rowLeader(r), r.amount,
         r.tech !== undefined ? (techIdx.get(r.tech) ?? -1) : -1,
         r.needsCapital ? 1 : 0, r.govPlaza ? 1 : 0, r.govTier ?? -1,
-        // the amount is paid once PER city off the home continent (C-48)
+        // the amount is paid once PER city off the home continent
         r.perForeignCity ? 1 : 0,
       ]),
       leaderAbilities: {
@@ -2190,7 +2190,7 @@ export function buildRules() {
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,
       tier: g.tier,
-      // C-63: the accumulating bonus — [bonusTypeIndex, increment, interval],
+      // the accumulating bonus — [bonusTypeIndex, increment, interval],
       // -1 in the first slot for the Chiefdom, which accumulates nothing.
       bonus: g.bonus
         ? [GOV_BONUS_TYPES.indexOf(g.bonus.type), g.bonus.increment, g.bonus.interval]

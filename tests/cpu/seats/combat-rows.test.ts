@@ -135,7 +135,7 @@ describe('the site census', () => {
     //  - `cityStrikeDefenderCS` is what a CITY's shot is shooting at, and
     //    neither engine pays a roster row there (the GPU's
     //    `_seat_city_strike` defence carries none either) — recorded under
-    //    C-26. It moved into this file when the two strike keys stopped
+    //. It moved into this file when the two strike keys stopped
     //    assembling it inline; the exemption came with it.
     const allowed = new Set(['congressUnitCS', 'cityStrikeDefenderCS']);
     expect(missing.filter((n) => !allowed.has(n))).toEqual([]);

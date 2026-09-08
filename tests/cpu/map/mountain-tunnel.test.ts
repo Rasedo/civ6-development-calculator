@@ -14,7 +14,7 @@ import type { GameState } from '../../../cpu/core/types';
  * 2 Movement. ... Can only be built on an adjacent Mountain tile. Cannot be
  * pillaged or removed." Expansion2_Improvements.xml gives PrereqTech
  * TECH_CHEMISTRY, UNIT_MILITARY_ENGINEER alone, the five mountain terrains
- * and PlunderType PLUNDER_NONE (C-20).
+ * and PlunderType PLUNDER_NONE.
  *
  * The GPU twin is tests/gpu/mountain_tunnel_test.py.
  */

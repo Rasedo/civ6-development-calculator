@@ -245,7 +245,7 @@ def test_theological(sim) -> None:
 
 
 def test_flanking_layer(sim) -> None:
-    """B-50r: a theological duel is flanked by the RELIGIOUS layer."""
+    """a theological duel is flanked by the RELIGIOUS layer."""
     ctr = int(sim.city_center[0, ROW, 0])
     ta = free_tile(sim, ctr)
     tb = free_tile(sim, ta)

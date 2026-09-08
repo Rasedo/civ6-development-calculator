@@ -98,7 +98,7 @@ class Rules:
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
-    goody_huts: dict  # TRIBAL VILLAGES (C-47): the install's kind + subtype tables
+    goody_huts: dict  # TRIBAL VILLAGES: the install's kind + subtype tables
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
@@ -759,7 +759,7 @@ _MUTABLE = [
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
-    "city_worked",  # the worked-tile pick (C-77) — a city plane, so it rides the compaction
+    "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
@@ -785,7 +785,7 @@ _MUTABLE = [
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
-    "tile_goody",  # TRIBAL VILLAGES: claimed and gone (C-47)
+    "tile_goody",  # TRIBAL VILLAGES: claimed and gone
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`

@@ -3,7 +3,7 @@ import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disasters';
-// C-74 (2026-09-04): the flood rate is the install's MODERATE 4.5 per 500-turn
+// OWNER RULING 2026-09-04: the flood rate is the install's MODERATE 4.5 per 500-turn
 // game, ~5x rarer than the stylized 0.05 these scenes were written against.
 // Every loop below is a WAIT for a roll to land, so the budgets grew with the
 // rarity; no assertion changed.

@@ -308,7 +308,7 @@ export function tradeRouteMinDuration(state: GameState): number {
 /** Gold paid to the seat whose unit plunders a route. The DESTRUCTION rule is
  * sourced (an enemy unit on the Trader's tile kills route and Trader and pays
  * its owner gold); this magnitude is a stylization — the real base value is
- * not documented anywhere public (AUDIT B-31r). */
+ * not documented anywhere public (docs/AUDIT.md). */
 export const PLUNDER_ROUTE_GOLD = 50;
 
 /** A walker STUCK by terrain change (flood/volcano blocking its descent) can
@@ -485,7 +485,7 @@ export const INTL_ROUTE_GOLD = 3;
  * CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): `origin` is
  * REQUIRED because a row may be intercontinental, and that is a fact about
  * the route's two ENDPOINTS — a defaulted origin would let a caller pay the
- * plain amount on a leg that earns triple (C-48).
+ * plain amount on a leg that earns triple.
  */
 export function routeYieldsInternational(state: GameState, origin: City, dest: City, seat: number): Yields {
   const out = emptyYields();

@@ -8,7 +8,7 @@ import { neighbors } from '../../../world/hex';
  * CIV6 (Continents): every contiguous LANDMASS gets an id; water is -1. A
  * seat's HOME continent is its ORIGINAL capital's, which is what the
  * install's requirements read (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT
- * and its city/unit siblings) — C-48.
+ * and its city/unit siblings).
  *
  * The GPU twin is tests/gpu/continents_test.py, which also pins that the
  * fixture's shipped ids are exactly these.

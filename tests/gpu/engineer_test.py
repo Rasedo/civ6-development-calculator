@@ -290,7 +290,7 @@ def main() -> None:
     # tier". A roaded, unrailroaded tile is a legal RAIL site but is NOT
     # engineer WORK: TS's twin list is canBuildRoad || improvement || charge
     # and carries no rail arm, so a `~road | ~railroad` here walks engineers to
-    # tiles TS never considers — every unrailroaded tile in the game (A-3r).
+    # tiles TS never considers — every unrailroaded tile in the game.
     cand = (~sim.water[0] & sim.passable[0] & ~sim.nwonder[0] & ~sim.road[0]
             & ((sim.tile_seat[0] == row) | (sim.tile_seat[0] < 0)))
     assert bool(cand.any()), "no engineer-eligible unroaded tile to road"

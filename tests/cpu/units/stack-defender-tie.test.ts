@@ -6,7 +6,7 @@ import { stackDefender, stackDefenceCS } from '../../../cpu/core/combat';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
 /**
- * A RANGED HIT ON A STACKED HEX GOES TO THE HULL ON A TIE (A-9r).
+ * A RANGED HIT ON A STACKED HEX GOES TO THE HULL ON A TIE.
  *
  * CIV6 (Flanking and Support): against a ranged attack "the unit with the
  * higher Combat Strength will defend". The engines agreed on the comparison

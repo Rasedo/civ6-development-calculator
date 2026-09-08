@@ -103,7 +103,7 @@ export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): bool
  * improvement in the game with a target that is not the builder's own tile.
  * The action space carries no target, so the pick is deterministic: the
  * LOWEST-index adjacent mountain that is bare. A MODEL choice, recorded in
- * C-20, and the same shape as every other tie this engine breaks by index.
+ * a MODEL choice, and the same shape as every other tie this engine breaks by index.
  *
  * Answers -1 when there is nothing to tunnel.
  */
@@ -117,7 +117,7 @@ export const PORTAL_MP = 2;
  * The action space carries six DIRECTIONS and no target, so "another portal"
  * has to be deterministic. Wrapping-next reaches every portal on the range
  * under repeated use, where a fixed "lowest" would make one tunnel a hub. A
- * MODEL choice, recorded in C-20; the install's EFFECT_MOUNTAIN_PORTAL
+ * MODEL choice, recorded in docs/AUDIT.md; the install's EFFECT_MOUNTAIN_PORTAL
  * carries no arguments at all.
  *
  * -1 when this tile is not a tunnel, or is the only one on its range.
@@ -178,7 +178,7 @@ export function bareGround(tile: Tile): boolean {
  * neighbour, a count of passable LAND neighbours, and the frontier.
  *
  * `BuildInLine` is NOT here: it is the install's line-DRAWING helper for the
- * placement UI, not a legality rule (C-79).
+ * placement UI, not a legality rule.
  */
 function uniqueGroundOk(
   def: ImprovementDef,
@@ -564,7 +564,7 @@ export function canPlaceDistrictIn(
   if (def.placement.requiresWaterSourceOrMountain) {
     const sourced =
       hasRiver(tile) ||
-      // a drowned Lake or Oasis is SEA now, and the sea sources nothing (C-35)
+      // a drowned Lake or Oasis is SEA now, and the sea sources nothing
       around.some((n) => ringTerrain(n) === 'LAKE' || ringFeature(n) === 'OASIS' || isMountain(n));
     if (!sourced) return no('Needs an adjacent river, lake, oasis or mountain.');
   }

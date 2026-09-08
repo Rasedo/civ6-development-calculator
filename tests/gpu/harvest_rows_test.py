@@ -8,7 +8,7 @@ The TS twin is tests/cpu/seats/harvest-rows.test.ts.
 CIV6 (Resource_Harvests): a Builder takes a resource off the tile for a
 one-off lump. TS harvests with `tile.resource = null`, so the twin must take
 the WHOLE resource off the tile — every baked flag that reads the tile's
-resource has its resource-free value in `_nr_planes` (C-52).
+resource has its resource-free value in `_nr_planes`.
 """
 
 from __future__ import annotations

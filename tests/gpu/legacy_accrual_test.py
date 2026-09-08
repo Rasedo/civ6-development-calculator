@@ -1,4 +1,4 @@
-"""THE GOVERNMENT LEGACY ACCRUAL — the GPU half (C-63).
+"""THE GOVERNMENT LEGACY ACCRUAL — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/legacy_accrual_test.py
@@ -180,7 +180,7 @@ def test_the_rate_is_per_game(rules, path) -> None:
 
 
 def test_the_card_pays_its_bonus_type(rules, path) -> None:
-    """C-73: a legacy card is worth its government's ACCUMULATED percentage
+    """a legacy card is worth its government's ACCUMULATED percentage
     against the one BonusType it names. The nine channels are corroborated
     twice — the install's Increment/Interval, and the community's reported
     percentages, which match those rows exactly."""
@@ -213,7 +213,7 @@ def test_the_memo_sees_the_clock(rules, path) -> None:
 
 
 def test_a_legacy_card_is_reachable(rules, path) -> None:
-    """C-75 CLOSED: the slotted cards are the driver's decision, and its
+    """THE SLOTTED CARDS ARE THE DRIVER'S DECISION, and its
     LEGACY-FIRST style hands the wildcard slots to the unlocked legacy cards
     before anything else — so with every civic researched and every
     government held, a legacy card is slotted, the store accepts it, and the
@@ -233,7 +233,7 @@ def test_a_legacy_card_is_reachable(rules, path) -> None:
     assert bool((mask & is_leg.unsqueeze(0)).any()), "no legacy card is even unlocked in the scene"
     greedy = ladder.pick_policies(mask, nslots, sim._pol_kind, legacy=is_leg,
                                   style=torch.full((sim.B,), ladder.CARDS_GREEDY, dtype=torch.long))
-    assert not bool((greedy & is_leg.unsqueeze(0)).any()), "the greedy style slotted a legacy card — the gap C-75 recorded is not what it was"
+    assert not bool((greedy & is_leg.unsqueeze(0)).any()), "the greedy style slotted a legacy card — the gap that entry recorded is not what it was"
     legacy = ladder.pick_policies(mask, nslots, sim._pol_kind, legacy=is_leg,
                                   style=torch.full((sim.B,), ladder.CARDS_LEGACY, dtype=torch.long))
     n_leg = int((legacy[0] & is_leg).sum())
@@ -248,7 +248,7 @@ def test_a_legacy_card_is_reachable(rules, path) -> None:
 
 
 def test_the_purchase_discounts(rules, path) -> None:
-    """C-73's last two channels: a stored Merchant Republic legacy takes its
+    """The government legacy's last two channels: a stored Merchant Republic legacy takes its
     accrued percent off a GOLD purchase and nothing off faith; Theocracy's the
     other way. `_gold_price` / `_faith_price` are `goldPrice` / `faithPrice`'s
     twins, applied where every purchase is priced and paid."""

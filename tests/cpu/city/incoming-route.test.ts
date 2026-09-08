@@ -6,10 +6,10 @@ import { CIV_LEADERS } from '../../../cpu/data/seats';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * A ROUTE COMING IN IS PAID WITH NO ROUTE GOING OUT (A-4r).
+ * A ROUTE COMING IN IS PAID WITH NO ROUTE GOING OUT.
  *
  * CIV6 (Radio Oranje): "+2 Culture from each Trade Route another civilization
- * sends to this one." TS always paid it — this side is the oracle A-4r was
+ * sends to this one." TS always paid it — this side is the oracle that hunt was
  * measured against. The GPU's route walk returned early for a seat with no
  * outgoing route, holding the exit open for Cleopatra's incoming gold alone,
  * so Wilhelmina's +2 stopped the turn her last outgoing route expired.

@@ -130,9 +130,9 @@ class SimInit:
         self._n_lux = int(rules.improvements["nLuxuries"])
         self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # TRIBAL VILLAGES (C-47) — MUTABLE: a village is claimed and gone, and
+        # TRIBAL VILLAGES — MUTABLE: a village is claimed and gone, and
         # `camp_ok` deliberately does NOT bake it, so every camp-placement read
-        # ANDs the two live (the baked-derivation trap C-52 exists for).
+        # ANDs the two live (the baked-derivation trap).
         self.tile_goody = torch.tensor([[t.get("goody", 0) for t in f["tiles"]] for f in fixtures],
                                        dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
@@ -480,7 +480,7 @@ class SimInit:
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
         # ...as COUNTS BY LEVEL, so the spy that is traded back is the one that
-        # was caught (C-16): [B, pw, pw, level].
+        # was caught: [B, pw, pw, level].
         self.seat_spy_held = torch.zeros(B, _pw, _pw, int(rules.eras["espionage"]["maxLevel"]) + 1,
                                          dtype=torch.long, device=device)
         # THE SCORED COMPETITION running right now: which one (-1 = none), the
@@ -696,7 +696,7 @@ class SimInit:
         # legacy card, and the one fact `_adopted_gov` cannot re-derive because
         # it depends on the ORDER the civics arrived in.
         self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        # ...and the CLOCK (C-63): turns this seat has spent in each government,
+        # ...and the CLOCK: turns this seat has spent in each government,
         # which is what an accumulating bonus accrues on. `civ_gov_held` answers
         # "ever" and this answers "how long"; they are written on the same line
         # under the same condition, because an idempotent `|=` hides a gating
@@ -998,7 +998,7 @@ class SimInit:
             # CIV6 (The Raven King): this unit came from a city-state LEVY.
             # Nothing here returns a levied unit, so the mark is permanent and
             # survives an upgrade — which is what makes the 75% upgrade
-            # discount meaningful (C-66).
+            # discount meaningful.
             ("levied", torch.bool),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
@@ -1098,7 +1098,7 @@ class SimInit:
         # the CITY-STATE this governor is posted to, by roster index (-1 =
         # none). Only the catalog's `_gov_minor_ok` rows ever hold one.
         # governor titles a TRIBAL VILLAGE granted outright — nothing derives
-        # them, so they need a store, and it is MUTABLE (C-47)
+        # them, so they need a store, and it is MUTABLE
         self.civ_granted_titles = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_gov_minor = torch.full((B, self.n_majors, _ng), -1, dtype=torch.long, device=device)
         self.civ_gov_establish = torch.zeros(B, self.n_majors, _ng, dtype=torch.long, device=device)
@@ -1519,7 +1519,7 @@ class SimInit:
         self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
         # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
         # and never its queued price, which is what "the ORIGINAL wonder
-        # cost" means for the Builder's charge (C-55)
+        # cost" means for the Builder's charge
         self._wond_cost = torch.tensor(
             [float(w["cost"]) for w in self._wond_rows] or [0.0],
             dtype=torch.float64, device=device)
@@ -1543,7 +1543,7 @@ class SimInit:
         self.park = torch.full((B, self.T), -1, dtype=torch.long, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
-        # THE WORKED-TILE PICK (C-77), one window per city slot, -1 unused.
+        # THE WORKED-TILE PICK, one window per city slot, -1 unused.
         # It is a per-CITY fact, so it is a REGISTERED CITY PLANE and not a
         # side table: `_compact_city_rows` derives its list from `_MUTABLE` by
         # geometry, and anything kept outside that list is handed to the
@@ -1634,11 +1634,11 @@ class SimInit:
             self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
             self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
             self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
-            # CIV6 (Builder): the resource goes for its own lump (C-52)
+            # CIV6 (Builder): the resource goes for its own lump
             self._A_HARVEST = self._act.get("HARVEST", -1)
-            # CIV6 (The First Emperor): a charge into the wonder underfoot (C-55)
+            # CIV6 (The First Emperor): a charge into the wonder underfoot
             self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
-            # CIV6 (Mountain Tunnel): the portal step, 2 Movement (C-20)
+            # CIV6 (Mountain Tunnel): the portal step, 2 Movement
             self._A_PORTAL = self._act.get("PORTAL", -1)
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
@@ -1945,7 +1945,7 @@ class SimInit:
             [[int(t.get("cont", -1)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=device)
         # CIV6 (Mountain Tunnel): the connected MOUNTAIN component per tile, -1
-        # off a mountain — "a movement portal on a mountain range" (C-20).
+        # off a mountain — "a movement portal on a mountain range".
         self.tile_range = torch.tensor(
             [[int(t.get("mrange", -1)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=device)
@@ -2002,7 +2002,7 @@ class SimInit:
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
-        # C-77: the worked-tile pick per seat row, stashed by the walk that
+        # the worked-tile pick per seat row, stashed by the walk that
         # makes it and read by the state census. Instrumentation, not state:
         # the walk rewrites it for every row every turn.
         self.aqsrc = torch.tensor(
@@ -2010,7 +2010,7 @@ class SimInit:
         )
         # the ATOM `aqsrc` is derived from: is THIS tile a lake, an oasis or a
         # mountain? Kept so the derivation can be rebuilt when the sea takes an
-        # oasis — a baked derivation of a fact that moved is a stale one (C-35).
+        # oasis — a baked derivation of a fact that moved is a stale one.
         self.aq_own = torch.tensor(
             [[t.get("aqown", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
@@ -2022,7 +2022,7 @@ class SimInit:
         # while TS recomputes it live, so the fixture ships each resource
         # tile's resource-free value in `nr` and the harvest copies it in.
         # A district pave never needed this: it hides the loss behind a
-        # zero-yield district. Keyed by the plane the flag feeds (C-52).
+        # zero-yield district. Keyed by the plane the flag feeds.
         self._nr_planes: list[tuple[str, torch.Tensor]] = []
         _nr_map = (
             ("y", "tile_yields"), ("res", "res_priority"), ("res", "res_cat"),
@@ -2076,7 +2076,7 @@ class SimInit:
         self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
-        # C-73: the wire's GOV_BONUS_TYPES order (cpu/data/policies.ts),
+        # the wire's GOV_BONUS_TYPES order (cpu/data/policies.ts),
         # named so the payout switch reads as the mapping it is.
         (self.GB_WONDER, self.GB_COMBAT_XP, self.GB_GREAT_PEOPLE, self.GB_ENVOYS,
          self.GB_FAITH_BUY, self.GB_GOLD_BUY, self.GB_UNIT_PROD,
@@ -2093,7 +2093,7 @@ class SimInit:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
-            # C-63 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): [nGov] each,
+            # MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS: [nGov] each,
             # the bonus TYPE this government accumulates (-1 = none, the Chiefdom
             # alone), the percent per step and the turns per step.
             assert self.civ_gov_turns.shape[2] == self._ngov, "the clock's width is not the government roster's"
@@ -2347,7 +2347,7 @@ class SimInit:
         self._city_centre_air_slots = 1
         self._aerodrome_air_slots = 4
         self._mp_scale = int(rules.mp_scale)
-        # CIV6 (Mountain Tunnel): the published exit price, "2 Movement" (C-20)
+        # CIV6 (Mountain Tunnel): the published exit price, "2 Movement"
         self._portal_mp = 2
         self._road_tier_mp = list(rules.road_tier_mp)
         self._road_tier_bridges = list(rules.road_tier_bridges)
@@ -3172,7 +3172,7 @@ class SimInit:
         _pcl = list(rules.promo_classes)
         # [civ, leaderRow, building, buildings-of-district, promoClass, pct, districtItem, every (1 building / 2 unit), unit]
         # ...the last field gates the row on the city sitting OFF the seat's
-        # home continent (`offHomeContinent`, C-48)
+        # home continent (`offHomeContinent`)
         self._prod_mult_rows: list[tuple[int, int, int, int, int, float, int, int, int, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), int(r[3]), (_pcl.index(r[4]) if r[4] in _pcl else -1), float(r[5]),
              int(r[6]), int(r[7]), int(r[8]), int(r[9]))
@@ -3207,7 +3207,7 @@ class SimInit:
         # [civ, leaderRow, unit, tech, firstCity]
         # [civ, leaderRow, unit, tech, firstCity, promoClass, foreignContinent]
         # — unit -1 with a promoClass means "the best chassis of that class
-        # the seat could train" (`bestTrainableOfClass`, C-48)
+        # the seat could train" (`bestTrainableOfClass`)
         self._grant_unit_rows: list[tuple[int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["grantUnits"]]  # type: ignore[misc]
         self._spy_capacity_rows: list[tuple[int, int, int, int]] = [
@@ -3336,11 +3336,11 @@ class SimInit:
         self._wonder_era_prod_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderEraProd"]]  # type: ignore[misc]
         # [civ, leaderRow, startEra, endEra, pct] — the same band, spent as a
-        # Builder's CHARGE rather than per-turn Production (C-55)
+        # Builder's CHARGE rather than per-turn Production
         self._wonder_charge_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderCharge"]]  # type: ignore[misc]
         # [civ, leaderRow, techs, civics] — a random Eureka and Inspiration
-        # from the ERA of the wonder just completed (C-54)
+        # from the ERA of the wonder just completed
         self._wonder_era_boost_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["wonderEraBoost"]]  # type: ignore[misc]
         self._wonder_tourism_rows: list[tuple[int, int, int]] = [
@@ -3383,18 +3383,18 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["allFollowerBeliefs"]]  # type: ignore[misc]
         # CIV6 (Epic Quest): a cleared barbarian outpost pays a village reward —
         # the install maps the camp to a goody hut outright, so it is the SAME
-        # draw off the SAME table (C-47)
+        # draw off the SAME table
         self._camp_goody_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["campGoody"]]  # type: ignore[misc]
         # [civ, leaderRow, featureIdx, amount] — CIV6 (Amazon): what an adjacent
-        # FEATURE is worth to this seat's appeal, over the map-global walk (C-50)
+        # FEATURE is worth to this seat's appeal, over the map-global walk
         self._feature_appeal_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["featureAppeal"]]  # type: ignore[misc]
-        # CIV6 (Poundmaker): this seat's alliances share MAP visibility (C-70)
+        # CIV6 (Poundmaker): this seat's alliances share MAP visibility
         self._alliance_shared_vis_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["allianceSharedVis"]]  # type: ignore[misc]
 
-        # TRIBAL VILLAGES (C-47) — the install's own table, straight off the
+        # TRIBAL VILLAGES — the install's own table, straight off the
         # wire so the GPU draws what TS draws. Kind weights are all equal, so
         # the kind draw is uniform over the kinds with an eligible subtype.
         _gh = rules.goody_huts
@@ -3424,9 +3424,9 @@ class SimInit:
         # [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
         self._post_combat_loyalty_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postCombatLoyalty"]]  # type: ignore[misc]
-        # [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat] (C-66)
+        # [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat]
         # [civ, leaderRow, governmentIndex, ratePct] — America's nine
-        # TRAIT_*_BONUS_RATE rows, added to the base 100 (C-63).
+        # TRAIT_*_BONUS_RATE rows, added to the base 100.
         self._legacy_rate_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["legacyRates"]]  # type: ignore[misc]
         self._levy_rows: list[tuple[int, int, int, int, int, int]] = [
@@ -3444,7 +3444,7 @@ class SimInit:
         self._apply_roster_start()
         # [civ, leaderRow, yield, amount, intercontinental] — the last gates
         # the row on the route's two ENDPOINTS sitting on different
-        # landmasses (`_route_intercontinental`, C-48)
+        # landmasses (`_route_intercontinental`)
         self._intl_route_rows: list[tuple[int, int, int, float, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
             for r in _uq["intlRouteYields"]]
@@ -3452,7 +3452,7 @@ class SimInit:
             (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
             for r in _uq["domesticRouteYields"]]
         # ...the last field pays the amount once PER city off the home
-        # continent (`perForeignCity`, C-48)
+        # continent (`perForeignCity`)
         self._route_cap_rows: list[tuple[int, int, int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["routeCapacity"]]  # type: ignore[misc]
         # [civ, leaderRow, amount, classMask, when, per (1 = per slotted MILITARY policy)]
@@ -3753,7 +3753,7 @@ class SimInit:
         _rs[self.BARB_ROW] = BARB_SEAT
         _rs[self.FREE_ROW] = FREE_SEAT
         self._ROW_SEAT = _rs
-        # THE INSTALL'S `CivilizationLevels` TABLE, per ROW (C-60). A rule that
+        # THE INSTALL'S `CivilizationLevels` TABLE, per ROW. A rule that
         # forks on the class of player reads this vector instead of spelling
         # "row < n_majors" again — the classes are the install's, and the
         # engine's four row spaces map onto them one for one.

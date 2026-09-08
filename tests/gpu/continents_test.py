@@ -8,7 +8,7 @@ The TS twin is tests/cpu/map/continents.test.ts.
 CIV6 (Continents): every contiguous LANDMASS gets an id; water is -1. A
 seat's HOME continent is its ORIGINAL capital's, which is what the install's
 requirements read (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT and its
-city/unit siblings) — C-48.
+city/unit siblings).
 
 The ids are NOT flood-filled here: the exporter derives them once and ships
 them per tile, so this half's job is to prove the plane arrives intact and

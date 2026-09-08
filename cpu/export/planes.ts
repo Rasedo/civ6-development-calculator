@@ -64,7 +64,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   // resource off a tile that stays workable (a district pave hides the loss
   // behind a zero-yield district). So each resource tile also ships `nr`:
   // the keys whose value would DIFFER if the tile carried no resource, which
-  // is exactly what the twin copies in when the resource is harvested (C-52).
+  // is exactly what the twin copies in when the resource is harvested.
   const tileRec = (t: (typeof map.tiles)[number]) => {
     // the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
@@ -116,7 +116,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       rr: t.railroad ? 1 : 0, // the RAILROAD plane (false at t0)
       // the HUT clause is deliberately NOT baked in: a village is claimed
       // mid-game, so it ships as its own mutable plane and both engines AND
-      // it in live (the baked-derivation trap C-52 exists for).
+      // it in live (the baked-derivation trap).
       camp: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.district && !t.builtWonder ? 1 : 0,
       goody: t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
@@ -169,7 +169,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       fy: t.feature && FEATURES[t.feature].removable ? YIELD_KEYS.map((k) => FEATURES[t.feature!].yields?.[k] ?? 0) : [0, 0, 0, 0, 0, 0],
       // IS THIS TILE a water source for a neighbour's Aqueduct? The ATOM the
       // derived plane below is made of — exported so the GPU can rebuild the
-      // derivation when the sea takes an oasis (C-35).
+      // derivation when the sea takes an oasis.
       aqown: t.terrain === 'LAKE' || t.feature === 'OASIS' || isMountain(t) ? 1 : 0,
       aqsrc:
         hasRiver(t) ||
@@ -286,7 +286,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // SAME ids rather than each flood-filling its own.
       cont: t.continent ?? -1,
       // CIV6 (Mountain Tunnel): the connected MOUNTAIN component this tile
-      // belongs to, -1 off a mountain. Static, so it bakes (C-20).
+      // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
       dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,

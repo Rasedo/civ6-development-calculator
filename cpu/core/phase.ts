@@ -401,7 +401,7 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
       applyTrainingGrants(state, minorCity(cityState), lv);
       // ...and RE-POOL: `spawnUnit` priced the pool before the mark existed,
       // so without this a levied unit is born 2 Movement short and only comes
-      // right at the next refresh — A-2r exactly (C-66).
+      // right at the next refresh — the levy's own lesson exactly.
       lv.movesLeft = unitFullMoves(state, lv);
       lv.movesFull = lv.movesLeft;
     }
@@ -480,7 +480,7 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  *
  * CIV6 (City-state): the install has ONE city rule, so a minor's city claims
  * ground exactly as a major's does — which is why this is a composer rather
- * than a block inside the seat loop (C-38).
+ * than a block inside the seat loop.
  *
  * CIV6 (Border Control Treaty, outcome B): "Target player's borders cannot
  * grow via Culture." The box still FILLS; nothing is bought.
@@ -1624,7 +1624,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           !!t.districtComplete && !t.districtPillaged;
         // CIV6 (Mountain Tunnel): "Cannot be pillaged or removed" — the one
         // improvement the verb refuses outright rather than wrecking for
-        // nothing, the same shape as the Encampment's district clause (C-20).
+        // nothing, the same shape as the Encampment's district clause.
         const impWreckable = (t: Tile): boolean => !!t.improvement && !t.pillaged
           && !IMPROVEMENTS[t.improvement as keyof typeof IMPROVEMENTS]?.noPillage;
         if (impWreckable(here) && hereOwned) {
@@ -1686,7 +1686,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // CIV6 (Mountain Tunnel): the ONE improvement whose target is not
           // the builder's own tile — "Can only be built on an adjacent
           // Mountain tile". The engineer stands off the mountain, so the
-          // legality and the write both move to `tunnelTarget` (C-20).
+          // legality and the write both move to `tunnelTarget`.
           if (imp === 'MOUNTAIN_TUNNEL') {
             const tt = tunnelTarget(state.map, here);
             const unl = computeUnlocks(state, actor.seat);
@@ -1749,7 +1749,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         }
       } else if (a === A_HARVEST) {
         // CIV6 (Builder): the resource goes, and its own lump is paid — the
-        // legality and the payout both live in `builderHarvest` (C-52)
+        // legality and the payout both live in `builderHarvest`
         builderHarvest(state, unit.id);
       } else if (a === A_WONDER_CHARGE) {
         // CIV6 (The First Emperor): a charge into the wonder underfoot
@@ -1757,7 +1757,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       } else if (a === A_PORTAL) {
         // CIV6 (Mountain Tunnel): "move into it and exit from another portal
         // at the cost of 2 Movement". The exit is the NEXT tunnel on the same
-        // range by ascending tile index, wrapping (C-20).
+        // range by ascending tile index, wrapping.
         const exit = portalExit(state.map, here);
         if (exit >= 0 && unit.movesLeft >= PORTAL_MP * MP_SCALE
             && tileFreeForUnit(state, exit, unit.seat, unit)) {
@@ -2022,7 +2022,7 @@ export function seatPhase(state: GameState): void {
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
           // CIV6 (Monarchy legacy): "bonus influence points toward earning
           // more Envoys" — a percentage of the WHOLE per-turn sum, which is
-          // why it multiplies here and not inside any one term (C-73).
+          // why it multiplies here and not inside any one term.
           const _infl = INFLUENCE_PER_TURN + tier
             + getModifiers(state, actor.seat).influencePerTurn
             + seatBuildingSum(state, actor.seat, 'influencePerTurn')
@@ -2824,7 +2824,7 @@ export function seatPhase(state: GameState): void {
     // completed civic can move it, which is why this sits at the loop's exit.
     const _govNow = computeAdoption(rsr).government;
     actor.government.held |= governmentBit(_govNow);
-    // ...and the CLOCK the legacy bonus accrues on (C-63). It rides the same
+    // ...and the CLOCK the legacy bonus accrues on. It rides the same
     // line as `held` deliberately: `|=` is idempotent, so a gating difference
     // between the engines is invisible in the mask and grows without bound in
     // the counter. One site, one condition, both engines.

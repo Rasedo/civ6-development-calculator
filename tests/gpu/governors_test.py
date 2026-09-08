@@ -392,7 +392,7 @@ def poke_capital_immunity(rules, path):
 
 
 def poke_governor_improvements(rules, path):
-    """B-24r: the FISHERY and the CITY PARK are opened by a governor promotion
+    """the FISHERY and the CITY PARK are opened by a governor promotion
     held in the city that owns the plot (AQUACULTURE, PARKS_AND_RECREATION),
     and the install pays a SECOND, separate plot yield while that governor
     stays. Both engines gate the build and pay the yield off the same

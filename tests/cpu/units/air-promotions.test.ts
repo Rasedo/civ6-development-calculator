@@ -465,7 +465,7 @@ describe('the rows that ship inert, and say so', () => {
   it('GROUND CREWS carries no effect yet — and BOARDING no longer', () => {
     // GROUND CREWS waits on a mechanic neither engine has: it heals "while
     // patrolling or deployed", and PATROL turns out to be no data row at all
-    // (C-34) — no operation, no command, no promotion, just the UI's name for
+    // — no operation, no command, no promotion, just the UI's name for
     // a fighter sitting ready. It exists so the tree's shape and its
     // prerequisites are the source's.
     const crews = promoRows('AIR_FIGHTER').find((p) => p.id === 'GROUND_CREWS')!;

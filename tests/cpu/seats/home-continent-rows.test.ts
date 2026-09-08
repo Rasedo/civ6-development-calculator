@@ -9,7 +9,7 @@ import type { GameState } from '../../../cpu/core/types';
 
 /**
  * The three clauses that read a city's landmass against its seat's HOME one
- * (C-48): Spain's district Production off the capital's continent, Victoria's
+ *: Spain's district Production off the capital's continent, Victoria's
  * Trade Route capacity per foreign-continent city, and Phoenicia's 100%-loyal
  * coastal cities at home.
  *

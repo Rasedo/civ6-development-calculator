@@ -3,7 +3,7 @@ import { GOODY_KINDS, GOODY_SUBTYPES, type GoodyKind, type GoodySubType } from '
 import type { GameState } from './types';
 
 /**
- * THE TRIBAL VILLAGE DRAW (C-47).
+ * THE TRIBAL VILLAGE DRAW.
  *
  * The install publishes two weighted tables and no rule joining them, so the
  * shape below is the natural reading of that pair and is recorded as a MODEL

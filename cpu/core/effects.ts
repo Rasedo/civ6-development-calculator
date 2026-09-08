@@ -236,9 +236,9 @@ export interface Modifiers {
   /** CIV6 (Epic Quest): a cleared barbarian outpost pays a village reward */
   campGoody: boolean;
   /** CIV6 (Amazon): what an adjacent FEATURE is worth to this seat's appeal,
-   *  over and above the map-global walk (C-50) */
+   *  over and above the map-global walk */
   featureAppeal: readonly FeatureAppealRow[];
-  /** CIV6 (Poundmaker): this seat's alliances share map visibility (C-70) */
+  /** CIV6 (Poundmaker): this seat's alliances share map visibility */
   allianceSharedVis: boolean;
   routePressure: readonly RoutePressureRow[];
   foreignFollowerYields: readonly ForeignFollowerYieldRow[];
@@ -249,7 +249,7 @@ export interface Modifiers {
   startBoosts: readonly string[];
   postCombatLoyalty: readonly PostCombatLoyaltyRow[];
   levy: readonly LevyRow[];
-  /** C-63: the seat's accrual RATE per government, above the base 100. */
+  /** the seat's accrual RATE per government, above the base 100. */
   legacyRates: readonly LegacyRateRow[];
   domesticRouteLoyalty: number;
   incomingRouteYields: readonly IncomingRouteYieldRow[];
@@ -396,7 +396,7 @@ export interface Modifiers {
   navalRaiderMoves: number;
   grievanceNoDecay: boolean;
   projectProdMult: number;
-  /** C-73: the legacy channels. `influenceMult` multiplies the ONE envoy
+  /** the legacy channels. `influenceMult` multiplies the ONE envoy
    *  accrual sum; the two discounts are percentages OFF a purchase price. */
   influenceMult: number;
   goldBuyDiscountPct: number;
@@ -432,7 +432,7 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
  * The roster's production multipliers for one queue item. `offHome` is
  * REQUIRED — a row may be keyed on the city sitting off the seat's home
  * continent (Treasure Fleet), and a defaulted flag would pay it in every
- * city or none (C-48).
+ * city or none.
  */
 export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }, offHome: boolean): number {
   let m = 1;
@@ -1238,7 +1238,7 @@ export function governmentBit(id: string | null): number {
  *  whole increment instead of only at the end.
  *
  *  ONE composer: the card's payout, the observation and both tests read it
- *  here (C-63). */
+ *  here. */
 export function legacyBonusPct(state: GameState, seat: number, govId: string): number {
   const gi = governmentIndex(govId);
   if (gi < 0) return 0;
@@ -1271,7 +1271,7 @@ export function legacyRatePct(state: GameState, seat: number, govId: string): nu
 /** CIV6: what ONE government's accumulated percentage actually pays. Each
  *  government names exactly ONE `BonusType`, so a legacy card is worth a
  *  percentage of one thing — not the government's whole inherent package,
- *  which is what this engine used to hand back (C-73).
+ *  which is what this engine used to hand back.
  *
  *  The channel each name maps to is corroborated twice over: the install's
  *  own Increment/Interval, and the community's independently-reported
@@ -1449,7 +1449,7 @@ function applyGovernment(mods: Modifiers, research: ResearchState, stored: reado
     if (!card) continue;
     // CIV6: a LEGACY card is worth the percentage its government has
     // ACCUMULATED against its own BonusType — not that government's whole
-    // inherent bonus, which is what `card.effects` still holds (C-73).
+    // inherent bonus, which is what `card.effects` still holds.
     // `legacyPct` is a closure because this body has no seat to ask.
     applyPolicyEffects(mods, card.legacyOf !== undefined
       ? legacyEffects(GOVERNMENTS[card.legacyOf], legacyPct(card.legacyOf))

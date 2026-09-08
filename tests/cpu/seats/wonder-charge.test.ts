@@ -15,7 +15,7 @@ import type { GameState, City, Tile } from '../../../cpu/core/types';
  * Classical wonders you may spend Builder charges to complete 15% of the
  * original wonder cost." The install's modifier carries Amount 15 and NO
  * requirement set, so the era band comes from the leader's own description
- * text in the same install (C-55).
+ * text in the same install.
  *
  * The GPU twin is tests/gpu/wonder_charge_test.py. No fixture seats China,
  * so no gate lane can reach this verb — these lanes are the only evidence.

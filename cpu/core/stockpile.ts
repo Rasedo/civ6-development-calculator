@@ -227,7 +227,7 @@ export function upgradeGoldCost(
   if (!levied) return raw;
   // CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
   // PERCENT): levied units upgrade at a 75% discount. The row shipped and
-  // nothing read it until now (C-66).
+  // nothing read it until now.
   let pct = 0;
   for (const r of getModifiers(state, seat).levy) pct = Math.max(pct, r.upgradeDiscountPct);
   return Math.round(raw * (1 - Math.min(100, pct) / 100));

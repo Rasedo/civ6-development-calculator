@@ -69,7 +69,7 @@ export interface City {
   centerIndex: number;
   population: number;
   foodBox: number;
-  /** C-77: the tiles this city's last yield walk chose to work, in the walk's
+  /** the tiles this city's last yield walk chose to work, in the walk's
    *  own order. The pick EXPOSED — nothing reads it back into the walk. */
   workedTiles?: number[];
   cultureBox: number;
@@ -165,7 +165,7 @@ export interface GovernmentState {
    *  each government, indexed by `GOVERNMENT_LIST` position. `held` answers
    *  "ever", this answers "how long" — and unlike `held`'s idempotent OR a
    *  counter shows any gating difference between the engines immediately,
-   *  so both tick it at the ONE site that writes `held` (C-63). */
+   *  so both tick it at the ONE site that writes `held`. */
   govTurns?: number[];
 }
 
@@ -442,7 +442,7 @@ export interface Unit {
   /** CIV6 (The Raven King): this unit came from a city-state LEVY. Nothing
    *  in this engine returns a levied unit, so the mark is permanent and
    *  survives an upgrade — which is what makes the upgrade discount
-   *  meaningful (C-66). */
+   *  meaningful. */
   levied?: boolean;
   /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
    *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
@@ -776,7 +776,7 @@ export interface CityState extends Seat {
   faith: number;
   /** CIV6 (City-state): the install has ONE city rule, so a minor's city
    *  grows on its FOOD BOX and claims tiles on its CULTURE BOX exactly as a
-   *  major's does. Before C-38 these were hardcoded 0 in `minorCity` and the
+   *  major's does. Before a minor's city grew and claimed, these were hardcoded 0 in `minorCity` and the
    *  population moved on a 12-turn clock instead. */
   foodBox?: number;
   cultureBox?: number;

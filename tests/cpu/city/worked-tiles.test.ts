@@ -1,9 +1,9 @@
 /**
- * THE WORKED-TILE PICK, EXPOSED (C-77).
+ * THE WORKED-TILE PICK, EXPOSED.
  *
  * `assignWorkedTiles` always ANSWERED which tiles a city works; nothing kept
  * the answer, so a divergence in the pick could only surface indirectly, as a
- * yield difference three buckets later, and C-31's "citizens working the
+ * yield difference three buckets later, and the nuclear strike's "citizens working the
  * affected tiles are eliminated" had nothing to read.
  *
  * `workedTilesOf` is the one composer: it spells the citizen count ONCE

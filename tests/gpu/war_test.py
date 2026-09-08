@@ -257,7 +257,7 @@ def test_cs_siege(rules, path):
     # BUILD the premise the assertions below stand on, do not inherit it from
     # the stream: twenty decision-free turns leave this city-state wherever the
     # barbarians left it. Under the stylized disaster rates that happened to
-    # be 150/150 with nobody near; under the install's MODERATE rates (C-74)
+    # be 150/150 with nobody near; under the install's MODERATE rates
     # the same twenty turns left it at 11/150 with three barbarians in reach,
     # and "one hit must not kill a full-hp CS" failed on a CS that was not
     # full. The capture half below already clears the barbarians for its own

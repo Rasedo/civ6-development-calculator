@@ -102,7 +102,7 @@ export function warConditionHolds(state: GameState, seat: number, target: number
       // Arms!' Dedication"
       return goldenDedication(state, seat, DED_TO_ARMS);
     case 'brokenPromise':
-      // neither engine holds a promise (docs/AUDIT.md C-76)
+      // neither engine holds a promise (docs/AUDIT.md)
       return false;
     case 'differentLateGovernment': {
       // CIV6 (Ideological War): "a player who is in a different Tier 3

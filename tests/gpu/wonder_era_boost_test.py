@@ -7,7 +7,7 @@ The TS twin is tests/cpu/city/wonder-era-boost.test.ts.
 
 CIV6 (Dynastic Cycle): "When completing a wonder receive a random Eureka and
 Inspiration from the era of the wonder, IF AVAILABLE." Each of the install's
-two modifiers is Amount 1 (C-54).
+two modifiers is Amount 1.
 
 The parity-critical half is the rng: TS returns out of its draw loop when a
 pool is empty, so the stream must not move for that game either.

@@ -15,7 +15,7 @@ import type { GameState, Tile } from '../../../cpu/core/types';
 /**
  * THE HARVEST (CIV6 Resource_Harvests): a Builder takes a resource off the
  * tile for a one-off lump. The verb had a body and no caller for months, so
- * it also read and paid SEAT 0 whoever acted (C-52).
+ * it also read and paid SEAT 0 whoever acted.
  *
  * The GPU twin is tests/gpu/harvest_rows_test.py.
  */

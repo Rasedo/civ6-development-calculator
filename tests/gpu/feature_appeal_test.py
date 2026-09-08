@@ -1,4 +1,4 @@
-"""A SEAT'S OWN READING OF AN ADJACENT FEATURE — the GPU half (C-50).
+"""A SEAT'S OWN READING OF AN ADJACENT FEATURE — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/feature_appeal_test.py

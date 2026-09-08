@@ -101,7 +101,7 @@ class SimGp:
         # instead of the usual -1" — a per-SEAT term over the map-global walk.
         # It rides THIS plane rather than a per-row appeal cache because the
         # plane is already keyed by the tile's owner and already threaded
-        # through every consumer (`cityAppealResolver`'s twin, C-50).
+        # through every consumer (`cityAppealResolver`'s twin).
         for _fc, _fl, _fi, _fa in self._feature_appeal_rows:
             if _fi < 0:
                 continue

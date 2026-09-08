@@ -654,7 +654,7 @@ const CITY: Record<string, Extractor> = {
   reactorAge: overCities((r) => r.city.reactorAge ?? -1),
   projectBoostTurn: overCities((r) => r.city.projectBoostTurn ?? 0),
   isCapital: overCities((r) => (r.city.isCapital ? 1 : 0)),
-  // C-77: the tiles this city actually works, ASCENDING. The pick is a SET,
+  // the tiles this city actually works, ASCENDING. The pick is a SET,
   // so both engines canonicalise here rather than pinning the order each
   // happens to build it in (the walk sums in ITS order, and must keep it).
   workedTiles: overCities((r) => (r.city.workedTiles ?? []).slice().sort((a, b) => a - b)),

@@ -1174,7 +1174,7 @@ class SimMasks:
         # — the mark is the whole condition — so it rides here rather than as a
         # `combatCs` row with a `when`. `_seat_is` gives the row test in the
         # caller's own shape, which is why every site can pass its unit's mark
-        # the same way it already passes that unit's formation (C-66).
+        # the same way it already passes that unit's formation.
         lv = z
         if levied is not None and self._levy_rows:
             for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
@@ -2107,7 +2107,7 @@ class SimMasks:
         advance-into-freed-tile and unit capture/transfers (TS writes
         tileIndex directly — no stepUnit, no reveal). The old FOG-DEBT note
         here named a goody-hut MAPS reward with no twin; both halves of it are
-        gone — the mechanic ships (C-47) and the install's own reward table
+        gone — the mechanic ships and the install's own reward table
         carries no maps arm, that was the unsourced stub's invention."""
         if not self.fog_of_war or rows.numel() == 0:
             return
@@ -2122,7 +2122,7 @@ class SimMasks:
         # ally sees what this seat uncovers, and the clause is MUTUAL, so
         # either side carrying it opens both. The discovery event below is the
         # discoverer's ALONE: a seat merely SHOWN a natural wonder scores no
-        # era points for it, which is why this write sits above it (C-70).
+        # era points for it, which is why this write sits above it.
         if self._alliance_shared_vis_rows:
             self._share_fog_with_allies(rows, seat_row, disk)
         cnt = (new & self.nwonder[rows]).sum(dim=1) * self._dracones_disc
@@ -2175,8 +2175,8 @@ class SimMasks:
         """Recompute one unit's MOVEMENT pool after a mark that changes it.
 
         `_spawn_unit` prices the pool at birth, so a flag written AFTER the
-        spawn leaves the unit short until the next refresh — the shape of A-2r.
-        The levy is the one caller (C-66)."""
+        spawn leaves the unit short until the next refresh — the shape of.
+        The levy is the one caller."""
         if rows.numel() == 0:
             return
         full = self._full_mp("major")
@@ -2190,7 +2190,7 @@ class SimMasks:
         wrapping to the lowest. `portalExit`'s twin: the action space carries
         six directions and no target, so the exit has to be deterministic, and
         wrapping-next reaches every portal on the range where a fixed "lowest"
-        would make one tunnel a hub (a MODEL choice, C-20)."""
+        would make one tunnel a hub (a MODEL choice)."""
         out = torch.full_like(tiles, -1)
         if self.TUNNEL < 0:
             return out
@@ -2898,7 +2898,7 @@ class SimMasks:
         # CIV6 (Mountain Tunnel): "allowing units to move into it" — a tunnelled
         # mountain is ENTERABLE by anything, and only that. It rides the jump's
         # site rather than `passable` because fourteen exported flags derive
-        # from impassability and none of them should move (C-20).
+        # from impassability and none of them should move.
         if self.TUNNEL >= 0:
             terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
@@ -3057,7 +3057,7 @@ class SimMasks:
                     # Mountain tile" — the engineer stands OFF the mountain, so
                     # the ground rule is about a NEIGHBOUR, not this tile. The
                     # applier writes the lowest-index bare adjacent mountain
-                    # (`tunnelTarget`'s twin, C-20).
+                    # (`tunnelTarget`'s twin).
                     _tnb = self.neigh[tc.reshape(-1)].reshape(tc.shape + (6,))
                     _tnc = _tnb.clamp(min=0)
                     _tflat = _tnc.reshape(B, -1)
@@ -3404,7 +3404,7 @@ class SimMasks:
         # the cost of 2 Movement" — offered where the unit STANDS on a tunnel,
         # another portal shares its range, and the 2 Movement is affordable.
         # The applier asks `_portal_exit` too, so a legal column cannot land in
-        # no arm (C-20).
+        # no arm.
         _pt: list[torch.Tensor] = []
         if getattr(self, "_A_PORTAL", -1) >= 0:
             _pex = self._portal_exit(tc.reshape(-1)).reshape(tc.shape)
@@ -3749,7 +3749,7 @@ class SimMasks:
         # CIV6 (The Raven King,
         # EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT): a LEVIED
         # unit upgrades at 75% off. The row shipped long ago and nothing read
-        # it until now (C-66).
+        # it until now.
         if self._levy_rows:
             _lpct = 0
             for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:

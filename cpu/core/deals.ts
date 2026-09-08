@@ -135,7 +135,7 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
     case DEAL_FAVOR:
       return a > 0 && (gs.diplomaticFavor ?? 0) >= a;
     case DEAL_RESOURCE:
-      // C-5's stockpile is the only resource here with a QUANTITY: a luxury is
+      // the strategic stockpile is the only resource here with a QUANTITY: a luxury is
       // a boolean access gate, with nothing to hand over a lump of.
       return a >= 0 && a < STRATEGIC_IDS.length && b > 0 && stockOf(state, giver, STRATEGIC_IDS[a]) >= b;
     case DEAL_GREAT_WORK:

@@ -1,4 +1,4 @@
-"""THE MOVING CAPITAL (C-61) — the GPU half.
+"""THE MOVING CAPITAL — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/move_capital_test.py
@@ -10,7 +10,7 @@ a Cothon they founded by completing a unique project in that city." Two
 carriers land here: a civilization-UNIQUE project row (`cv`/`ld` on the wire,
 `_proj_seat_ok` in the production mask and the applier) and `_move_capital`,
 the one composer for everything the capital identity reaches. The Cothon's
-own project waits on the Cothon district (docs/AUDIT.md C-69), so the wire
+own project waits on the Cothon district (docs/AUDIT.md), so the wire
 carries no gated row yet and these scenes drive the two composers directly.
   1. the wire: every shipped row is everyone's and none moves the capital
   2. the seat gate: a Phoenicia-keyed row opens for Phoenicia alone, a

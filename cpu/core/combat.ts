@@ -79,7 +79,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
   // CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture
   // a barbarian outpost" — the install maps the camp to a goody hut outright,
-  // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`, C-47).
+  // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`).
   if (clearer && getModifiers(state, unit.seat).campGoody) {
     drawAndPayGoody(state, unit, state.map.tiles[tileIndex]);
   }
@@ -409,7 +409,7 @@ export const CLASS_ANTICAV_VS_CAV = 10;
  * attack and carries a -10 CS penalty." A CLIFF does not soften the attack, it
  * forbids it: "melee units have to physically be able to move into the attacked
  * tile", and a cliff closes that shore. The Amphibious promotion that waives
- * the penalty is C-3's.
+ * the penalty is the river-crossing rule's.
  */
 export const AMPHIBIOUS_ATTACK_CS = 10;
 
@@ -1099,7 +1099,7 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
   // CIV6 (The Raven King): a LEVIED unit carries
   // EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Flat and clause-free —
   // the mark is the whole condition — so it is added here rather than as a
-  // `combatCs` row with a `when` (C-66).
+  // `combatCs` row with a `when`.
   const levyCs = own.levied
     ? mods.levy.reduce((n, r) => Math.max(n, r.levyCombat), 0) : 0;
   const def = UNITS[own.type];

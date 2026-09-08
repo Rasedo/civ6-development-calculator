@@ -366,7 +366,7 @@ export function cityAppealResolver(state: GameState): GpAppeal {
   // instead of the usual -1" — a per-SEAT term over the map-global walk, and
   // this resolver is where it belongs: it is already keyed by the tile's
   // OWNER, already reads neighbours for the governor's own near-feature
-  // clause, and is already threaded through every appeal consumer, so C-50
+  // clause, and is already threaded through every appeal consumer, so the Amazon's rainforest rule
   // needs no per-seat plane of its own. An unowned tile takes none of it,
   // which is right for all four consumers (housing, amenities, the Seaside
   // Resort's gold and the National Park's site all concern owned ground).

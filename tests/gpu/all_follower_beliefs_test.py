@@ -9,8 +9,7 @@ CIV6 (Dharma, EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS): "Receives Follower
 Belief bonuses in a city from each Religion that has at least 1 Follower."
 Every other seat pays exactly ONE — its city's own followed religion. This is
 the QUANTIFIER, and it was the half of the ability with no reader on either
-engine: the row, the wire and this list all shipped and nothing read them
-(C-57).
+engine: the row, the wire and this list all shipped and nothing read them.
 """
 
 from __future__ import annotations

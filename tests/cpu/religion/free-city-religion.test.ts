@@ -1,5 +1,5 @@
 /**
- * A FREE CITY IS A CITY, AND RELIGION TREATS IT AS ONE (C-60).
+ * A FREE CITY IS A CITY, AND RELIGION TREATS IT AS ONE.
  *
  * SOURCED — by what the install does NOT say. `CivilizationLevels` is the one
  * table that states in data what the Free Cities player may not do (found

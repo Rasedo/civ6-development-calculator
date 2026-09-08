@@ -5,8 +5,7 @@
 
 The TS twin is tests/cpu/seats/home-continent-rows.test.ts.
 
-The three clauses that read a city's landmass against its seat's HOME one
-(C-48): Spain's district Production off the capital's continent, Victoria's
+The three clauses that read a city's landmass against its seat's HOME one: Spain's district Production off the capital's continent, Victoria's
 Trade Route capacity per foreign-continent city, and Phoenicia's 100%-loyal
 coastal cities at home. No fixture seats any of the three, so these lanes are
 the only evidence any of them fires.

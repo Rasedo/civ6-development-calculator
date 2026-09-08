@@ -1,4 +1,4 @@
-"""A DEFEATED CAVALRY UNIT MAY BE CAPTURED (C-58) — the GPU half.
+"""A DEFEATED CAVALRY UNIT MAY BE CAPTURED — the GPU half.
 
     python tests/gpu/capture_cavalry_test.py
 

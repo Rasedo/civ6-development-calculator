@@ -59,7 +59,7 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         // CIV6 (Fishery_SeaResourceAdjacency, AdjacentSeaResource): a
         // neighbour that is WATER and carries a resource. `ringTerrain`
         // rather than the ground beneath, so a drowned tile counts as the
-        // sea it now is (C-35).
+        // sea it now is.
         (!!r.seaResource && nb.resource !== null && isWater(nb));
       if (hit) n += 1;
     }
@@ -217,7 +217,7 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
   // CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water tile",
   // so it lends the SEA's sources and none of the ground's — the same reason
   // `submergeTile` drops the resource rather than leaving a drowned Iron seam
-  // lending a neighbouring district an adjacency the ground never had (C-35).
+  // lending a neighbouring district an adjacency the ground never had.
   const terrain = ringTerrain(neighbor);
   const feature = ringFeature(neighbor);
   switch (rule.source) {

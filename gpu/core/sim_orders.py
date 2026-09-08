@@ -409,7 +409,7 @@ class SimOrders:
             if _rk_harvest[n] and _hvc >= 0 and self._builder_idx >= 0:
                 # CIV6 (Builder): the resource is GONE and pays its own lump —
                 # `Resource_Harvests`' base times the progress scale, into the
-                # channel that yield uses (`builderHarvest`, C-52)
+                # channel that yield uses (`builderHarvest`)
                 _rid_h = self.res_id.gather(1, hc.unsqueeze(1)).squeeze(1)
                 _nres = int(self._res_harvest_y.numel())
                 _ridc = _rid_h.clamp(min=0, max=max(_nres - 1, 0))
@@ -438,7 +438,7 @@ class SimOrders:
                     # becomes the same tile with NO resource: every baked
                     # flag takes its resource-free value (`_nr_planes`), not
                     # just the stripped bit. A paved tile never needed this —
-                    # a zero-yield district hides the loss (C-52).
+                    # a zero-yield district hides the loss.
                     self.res_stripped[_r, _t] = True
                     for _p, _bare in self._nr_planes:
                         getattr(self, _p)[_r, _t] = _bare[_r, _t]
@@ -472,7 +472,7 @@ class SimOrders:
             if _ptc >= 0 and self.TUNNEL >= 0:
                 # CIV6 (Mountain Tunnel): "move into it and exit from another
                 # portal at the cost of 2 Movement". The exit is the mask's own
-                # reader, so a legal column cannot land in no arm (C-20).
+                # reader, so a legal column cannot land in no arm.
                 _ptm = act & (a == _ptc)
                 if bool(_ptm.any()):
                     _pex = self._portal_exit(here)
@@ -492,7 +492,7 @@ class SimOrders:
                 # CIV6 (The First Emperor): a charge into the queued WONDER
                 # underfoot, worth a percentage of that wonder's WHOLE cost.
                 # The site and the era band are the mask's own reader, so a
-                # legal column cannot land in no arm (C-55).
+                # legal column cannot land in no arm.
                 _wcm = act & (a == _wcc) & (utp == self._builder_idx) & (u_charges > 0)
                 if bool(_wcm.any()):
                     _wcol = self._wonder_charge_slot(row, here.unsqueeze(1)).squeeze(1)
@@ -653,7 +653,7 @@ class SimOrders:
                 if bool(_jmp.any()):
                     terr = terr | (_jmp & self.tile_mountain.gather(1, tc.unsqueeze(1)).squeeze(1))
                 # CIV6 (Mountain Tunnel): a tunnelled mountain is ENTERABLE
-                # by anything — `tunnelAt`'s twin, on the jump's own site (C-20)
+                # by anything — `tunnelAt`'s twin, on the jump's own site
                 if self.TUNNEL >= 0:
                     terr = terr | (self.improvement.gather(1, tc.unsqueeze(1)).squeeze(1) == self.TUNNEL)
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
@@ -953,7 +953,7 @@ class SimOrders:
                 # Mountain tile" — the ONE improvement whose target is not the
                 # builder's own tile, so it gets its own write. The pick is the
                 # LOWEST-index adjacent bare mountain, `tunnelTarget`'s twin
-                # and a MODEL choice recorded in C-20 (the action space carries
+                # and a MODEL choice recorded in docs/AUDIT.md (the action space carries
                 # no target).
                 if self.TUNNEL >= 0 and self.TUNNEL < len(self._A_IMP) and self._A_IMP[self.TUNNEL] >= 0:
                     _tcol = self._A_IMP[self.TUNNEL]
@@ -1041,7 +1041,7 @@ class SimOrders:
                 )
                 # CIV6 (Mountain Tunnel): "Cannot be pillaged or removed" —
                 # the verb refuses it outright rather than wrecking it for
-                # nothing, `impWreckable`'s twin (C-20)
+                # nothing, `impWreckable`'s twin
                 _himp = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1)
                 _hi = (_himp >= 0) & ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
                 if self.TUNNEL >= 0:
@@ -1641,7 +1641,7 @@ class SimOrders:
             alive_w = self.city_alive[wr, :self.n_majors].reshape(len(wr), -1)
             near_city_w = ((self.pair_dist[cc_w.clamp(min=0)] < 5) & alive_w.unsqueeze(2)).any(dim=1)  # [n, T]
             # the HUT clause is LIVE, not baked into camp_ok: a village is
-            # claimed mid-game (`tileClaimed(t) || t.goodyHut`, C-47)
+            # claimed mid-game (`tileClaimed(t) || t.goodyHut`)
             cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0) & ~self.tile_goody[wr]
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major

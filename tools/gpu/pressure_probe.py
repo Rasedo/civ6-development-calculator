@@ -1,9 +1,9 @@
-"""THE PRESSURE-SCALE PROBE (C-46) — what each reading DOES, measured.
+"""THE PRESSURE-SCALE PROBE — what each reading DOES, measured.
 
     python tools/gpu/pressure_probe.py                # 8 fixtures x 250 turns
     python tools/gpu/pressure_probe.py --seeds 4 --turns 120
 
-OWNER RULING 2026-09-04: C-46 is not decided from my summary of two readings
+OWNER RULING 2026-09-04: the follow rule is not decided from my summary of two readings
 but from their measured consequences. The install publishes the pressure
 TERMS and never the rule that combines them; two readings fit and differ by
 two orders of magnitude. This tool drives the same games under each and

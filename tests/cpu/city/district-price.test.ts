@@ -11,7 +11,7 @@ import type { GameState } from '../../../cpu/core/types';
  * and Dam 81, Government Plaza and Diplomatic Quarter 30, Spaceport 1800,
  * every specialty row 54 — where this engine priced them all as a Campus.
  * And `Districts.CostProgressionParam1` is the UNDER-REPRESENTED discount: 40
- * everywhere the install writes it, 25 for the two plaza rows (B-67).
+ * everywhere the install writes it, 25 for the two plaza rows.
  *
  * The GPU twin is tests/gpu/district_price_test.py.
  */

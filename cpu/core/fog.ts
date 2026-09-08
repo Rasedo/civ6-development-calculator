@@ -47,7 +47,7 @@ export function revealAround(
   // sees what this seat uncovers, and the clause is MUTUAL, so either side
   // carrying it opens both. The discovery EVENT above is the discoverer's
   // alone: an ally SHOWN a natural wonder earns no era score for it, which is
-  // why the fog write and the event are separated here (C-70).
+  // why the fog write and the event are separated here.
   if (!ALLIANCE_SHARED_VIS_ROWS.length) return;
   for (const o of state.seats) {
     if (o.seat === seat || !isCiv(o.seat)) continue;

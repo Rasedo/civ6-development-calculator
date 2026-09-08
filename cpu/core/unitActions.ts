@@ -137,7 +137,7 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // target — the exit is the NEXT tunnel on the same mountain range by
   // ascending tile index, wrapping, which reaches every portal under repeated
   // use and needs no encoding the six-direction move space cannot carry. A
-  // MODEL choice, recorded in C-20. Appended last, like every verb since
+  // MODEL choice, recorded in docs/AUDIT.md. Appended last, like every verb since
   // FOUND_CITY.
   names.push('PORTAL');
   return names;

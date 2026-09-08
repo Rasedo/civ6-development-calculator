@@ -28,7 +28,7 @@ class SimMinors:
         CIV6 (City-state): a city-state's city is an ordinary city — its Campus
         yields Science, its Commercial Hub Gold — and the install has ONE city
         rule, so it grows on its FOOD BOX and takes ground on its CULTURE BOX
-        exactly as a major's does (C-38). Its row is a row of the CITY BLOCK,
+        exactly as a major's does. Its row is a row of the CITY BLOCK,
         so `_seat_city_growth` and `_seat_border_growth` are the majors' own
         bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
         growth write moves it with no mirror of its own.
@@ -149,7 +149,7 @@ class SimMinors:
             t_pct = self.citystate_techs[:, s].sum(dim=1).double() / float(nT_c)
             c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(nC_c)
             # the research factor is the minor's; the BASE is the row's own,
-            # picked inside the ladder where the district is known (B-67)
+            # picked inside the ladder where the district is known
             d_fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
             d_per = dcp.get("perDistrict") or []
             site_s = self._minor_district_site(s)

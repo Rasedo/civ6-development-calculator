@@ -1,4 +1,4 @@
-"""A LEVIED UNIT UPGRADES CHEAPLY — the GPU half (C-66).
+"""A LEVIED UNIT UPGRADES CHEAPLY — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/levied_upgrade_test.py
@@ -78,7 +78,7 @@ def test_the_ability_pays_movement_and_combat(rules, path) -> None:
     """CIV6 (The Raven King): a LEVIED unit carries +2 Movement and +5 Combat.
     Both ride the ONE composer on each side — the pool builder and
     `_roster_cs` — so a levied unit is born with the Movement rather than
-    gaining it at the next refresh (A-2r's lesson)."""
+    gaining it at the next refresh (the levy's own lesson)."""
     sim = build(path)
     _c, li, _pct, _env, moves, combat = sim._levy_rows[0]
     assert moves == 2 and combat == 5, f"the install writes 2 and 5, wire has {moves}/{combat}"

@@ -41,7 +41,7 @@ export function deriveContinents(map: GameMap): void {
  * No table names a range, so one is the connected component of MOUNTAIN tiles
  * — the same flood fill `deriveContinents` runs over land, and static for the
  * same reason: mountains never move, so this bakes at export and never has to
- * be a mutable plane (C-20).
+ * be a mutable plane.
  */
 export function deriveMountainRanges(map: GameMap): void {
   const rng = new Int32Array(map.tiles.length).fill(-1);
@@ -109,7 +109,7 @@ export function hasRiver(tile: Tile): boolean {
 export function hasFreshWater(map: GameMap, tile: Tile): boolean {
   if (hasRiver(tile)) return true;
   if (ringFeature(tile) === 'OASIS') return true;
-  // a drowned Lake or Oasis is SEA now, and the sea is not fresh (C-35)
+  // a drowned Lake or Oasis is SEA now, and the sea is not fresh
   for (const n of neighbors(map, tile)) {
     if (ringTerrain(n) === 'LAKE') return true;
     if (ringFeature(n) === 'OASIS') return true;
@@ -122,7 +122,7 @@ export function hasFreshWater(map: GameMap, tile: Tile): boolean {
  * submerged tiles "become coastal water tiles", and both engines keep the
  * ground's own terrain, feature and river edges UNDERNEATH — so every RING
  * fact reads the sea, and only a rule about what lies beneath reads
- * `tile.terrain` directly (C-35).
+ * `tile.terrain` directly.
  */
 export function ringTerrain(tile: Tile): TerrainId {
   return tile.submerged ? 'COAST' : tile.terrain;

@@ -115,7 +115,7 @@ export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile
  * Gun AA, the Battleship and the SAM while a submarine launch answers to the
  * SAM alone, and that a BOMBER's delivery turns on the interception taking it
  * under 50% HP — needs the interception DAMAGE the install never publishes
- * (C-34), so the page's own list stands for every delivery.
+ *, so the page's own list stands for every delivery.
  *
  * Ties: the lowest tile index, then the tile's own occupancy order — the same
  * total order `airCoverAgainst` walks.

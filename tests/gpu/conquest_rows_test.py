@@ -86,7 +86,7 @@ def test_wire(rules, path) -> None:
     assert len(sim._evict_pct_rows) == 1
     light = sorted(UNITS[i] for i in range(sim.NU) if bool(sim._type_lightcav[i]))
     # the four base rows, plus every unique LIGHT CAVALRY chassis the
-    # roster names (C-78): a new unique of that class joins this list
+    # roster names: a new unique of that class joins this list
     assert light == ["CAVALRY", "COSSACK", "COURSER", "HELICOPTER",
                      "HORSEMAN", "HUSZAR", "MALON_RAIDER", "MOUNTIE"], light
     print("  1 wire OK — 13 families, 4 light-cavalry chassis")

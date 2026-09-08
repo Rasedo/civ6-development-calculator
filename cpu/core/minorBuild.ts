@@ -82,7 +82,7 @@ export function minorPhase(state: GameState): void {
  *
  * CIV6 (City-state): the install has ONE city rule, so the minor's city GROWS
  * on its food box and CLAIMS ground on its culture box exactly as a major's
- * does (C-38). Both rules are the majors' own composers, and the boxes live
+ * does. Both rules are the majors' own composers, and the boxes live
  * on the `CityState` record because `minorCity` builds a fresh `City` view
  * every call — so the results are written back.
  *

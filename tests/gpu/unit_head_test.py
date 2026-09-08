@@ -67,8 +67,8 @@ def main() -> None:
         ("SPY_MISSION_", len(esp["missions"])),
         ("NUKE_", rj["nuclear"]["nukeCols"] * len(rj["nuclear"]["devices"])),
     ]
-    # ...+ 1 for HARVEST (C-52), + 1 for WONDER_CHARGE (C-55) and + 1 for
-    # PORTAL, the newest last-append (C-20). This sum is a COUNT PIN and it
+    # ...+ 1 for HARVEST, + 1 for WONDER_CHARGE and + 1 for
+    # PORTAL, the newest last-append. This sum is a COUNT PIN and it
     # lives in a file no verb's author is editing — every new verb has to come
     # back here, which is the whole reason the lane exists.
     want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1)
@@ -92,9 +92,9 @@ def main() -> None:
              # ...and the nuclear head, one per device row
              + [f"NUKE_{k}_{c}" for k in range(len(rj["nuclear"]["devices"]))
                 for c in range(rj["nuclear"]["nukeCols"])]
-             # ...the improvement REMOVER, the Builder's HARVEST (C-52), its
-             # charge into a wonder (C-55), and the Mountain Tunnel's PORTAL —
-             # the newest last-append (C-20)
+             # ...the improvement REMOVER, the Builder's HARVEST, its
+             # charge into a wonder, and the Mountain Tunnel's PORTAL —
+             # the newest last-append
              + ["REMOVE_IMPROVEMENT", "HARVEST", "WONDER_CHARGE", "PORTAL"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so

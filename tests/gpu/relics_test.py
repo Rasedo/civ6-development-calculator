@@ -185,7 +185,7 @@ def main() -> None:
     hold_works(s4, 0, row, hi, RELIC, 2)
     hold_works(s4, 0, row, hi, 1, 3, maker=11)
     keep_id = int(s4.city_id[0, row, hi])
-    # C-77: the worked-tile pick is a per-CITY fact and rides the same
+    # the worked-tile pick is a per-CITY fact and rides the same
     # permutation. A 24-seed serve lane caught it when it did not — one city
     # reported the pick of whichever city compaction had moved into its slot.
     s4.city_worked[0, row, hi, :3] = torch.tensor([11, 22, 33])

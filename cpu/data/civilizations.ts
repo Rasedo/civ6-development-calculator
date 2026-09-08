@@ -330,7 +330,7 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = [
   { leader: 'LAUTARO', amount: 10, when: 'foeGolden' },
   // CIV6 (Roosevelt Corollary): "Units receive a +5 Combat Strength on their
   // home continent" — REQUIREMENTS_UNIT_ON_HOME_CONTINENT, the ORIGINAL
-  // capital's landmass (C-48).
+  // capital's landmass.
   { leader: 'T_ROOSEVELT', amount: 5, when: 'onHomeContinent' },
 ];
 
@@ -592,7 +592,7 @@ export const ROUTE_IMPROVEMENT_ROWS: readonly RouteImprovementRow[] = [
 /** CIV6 (EFFECT_GRANT_UNIT_IN_CITY): a free unit in the capital at a
  *  technology (the Cree Trader at Pottery, Catherine's Spy at Castles), or in
  *  the FIRST city at its founding (Kupe's Builder). Spain's Builder on a
- *  foreign continent waits on C-48. */
+ *  foreign continent waits on. */
 import type { PromoClass } from './promotions';
 
 export interface GrantUnitRow {
@@ -1182,7 +1182,7 @@ export const ALL_FOLLOWER_BELIEFS_ROWS: readonly AllFollowerBeliefsRow[] = [
  *  reward each time you capture a barbarian outpost." The install spells it
  *  as EFFECT_ADJUST_IMPROVEMENT_GOODY_HUT, mapping IMPROVEMENT_BARBARIAN_CAMP
  *  to IMPROVEMENT_GOODY_HUT — so it is the SAME draw, not a reward of its own
- *  (C-47). */
+ *. */
 export interface CampGoodyRow {
   civ?: CivId;
   leader?: LeaderId;
@@ -1195,7 +1195,7 @@ export const CAMP_GOODY_ROWS: readonly CampGoodyRow[] = [
  *  provide +1 Appeal to adjacent tiles, instead of the usual -1" — the
  *  install writes it as EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER on
  *  FEATURE_JUNGLE with Amount 2, which is exactly the swing from -1 to +1.
- *  The engine spells the install's JUNGLE as RAINFOREST (C-50). */
+ *  The engine spells the install's JUNGLE as RAINFOREST. */
 export interface FeatureAppealRow {
   civ?: CivId;
   leader?: LeaderId;
@@ -1212,7 +1212,7 @@ export const FEATURE_APPEAL_ROWS: readonly FeatureAppealRow[] = [
  *  is what "shared" means in the alliance system it names: the holder and its
  *  ally each see what the other uncovers. The DISCOVERY event stays the
  *  discoverer's own — an ally shown a natural wonder earns no era score for
- *  it (C-70). */
+ *  it. */
 export interface AllianceSharedVisRow {
   civ?: CivId;
   leader?: LeaderId;
@@ -1306,7 +1306,7 @@ export const POST_COMBAT_LOYALTY_ROWS: readonly PostCombatLoyaltyRow[] = [
  *  trait — TRAIT_AUTOCRACY_BONUS_RATE and its eight siblings — each carrying
  *  `BonusRate: 100` and NO ModifierType, which is DLL-read data rather than
  *  an effect. Keyed by government here for the same reason: nine rows in the
- *  install, nine rows on the wire (C-63). */
+ *  install, nine rows on the wire. */
 export interface LegacyRateRow {
   civ?: CivId;
   leader?: LeaderId;
@@ -1329,7 +1329,7 @@ export interface LevyRow {
   /** CIV6 (The Raven King): LEVY_UNITS_GRANT_ABILITY grants levied units
    *  ABILITY_THE_RAVEN_KING, whose two modifiers are
    *  EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 and
-   *  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5 (C-66). */
+   *  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. */
   levyMoves: number;
   levyCombat: number;
 }
@@ -1732,7 +1732,7 @@ export const WONDER_CHARGE_ROWS: readonly WonderChargeRow[] = [
  * CIVIC twin): "When completing a wonder receive a random Eureka and
  * Inspiration from the era of the wonder, if available." The install writes
  * the two as separate modifiers, each Amount 1, so the row carries both
- * counts and a seat may hold one without the other (C-54).
+ * counts and a seat may hold one without the other.
  */
 export interface WonderEraBoostRow {
   civ?: CivId;

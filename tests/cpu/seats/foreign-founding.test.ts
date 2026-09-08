@@ -13,7 +13,7 @@ import type { GameState } from '../../../cpu/core/types';
  * home continent receive a free melee unit." CIV6 (Treasure Fleet): "Cities
  * not on your original Capital's continent receive ... a builder when
  * founded." Both fire at the SAME hook, keyed on the founded tile's landmass
- * against the seat's original capital's (C-48).
+ * against the seat's original capital's.
  *
  * The GPU twin is tests/gpu/foreign_founding_test.py.
  */

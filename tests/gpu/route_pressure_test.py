@@ -1,4 +1,4 @@
-"""A TRADE ROUTE'S RELIGIOUS PRESSURE (C-56) — the GPU half.
+"""A TRADE ROUTE'S RELIGIOUS PRESSURE — the GPU half.
 
     python tests/gpu/route_pressure_test.py
 

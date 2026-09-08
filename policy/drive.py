@@ -441,7 +441,7 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     # walk: the driver may freely choose (the applier validates and TS
     # replays the same orders), so steering at one is free coverage of a
     # mechanic the scripted walk otherwise never reaches — 250 turns over a
-    # village-carrying world claimed NOTHING without this (C-47).
+    # village-carrying world claimed NOTHING without this.
     if bool(sim.tile_goody.any()):
         gnb = sim.neigh[tiles.clamp(min=0)]                       # [B, N, 6]
         B_, N_ = tiles.shape
@@ -588,7 +588,7 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         # HARVEST and the wonder charge sit AHEAD of the improvement run:
         # both are one-off lumps on the tile underfoot, and taking them
         # first is what makes either verb reachable at all — the gate
-        # cannot compare an arm no driver orders (C-52, C-55).
+        # cannot compare an arm no driver orders.
         bcols = ([c for c in (getattr(sim, "_A_FINISH", -1),) if c >= 0]
                  + [c for c in (getattr(sim, "_A_HARVEST", -1),) if c >= 0]
                  + [c for c in (getattr(sim, "_A_WONDER_CHARGE", -1),) if c >= 0]

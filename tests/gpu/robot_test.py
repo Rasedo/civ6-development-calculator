@@ -1,4 +1,4 @@
-"""THE GIANT DEATH ROBOT — the GPU halves of C-33.
+"""THE GIANT DEATH ROBOT — the GPU halves of.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/robot_test.py

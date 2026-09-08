@@ -12,7 +12,7 @@ import { governorTitlesEarned } from '../../../cpu/core/governors';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
 /**
- * TRIBAL VILLAGES (C-47) — the install's `GoodyHuts` + `GoodyHutSubTypes`.
+ * TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`.
  *
  * Seven kinds at Weight 100 each and 24 subtypes with their own weights,
  * gates and payloads. The engine's older six-arm reward was unsourced and is

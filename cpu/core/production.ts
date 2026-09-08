@@ -288,7 +288,7 @@ export function completeQueueItem(
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
       addEraScore(state, city.seat, ERA_SCORE_WONDER);
       // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
-      // THE WONDER, before any other completion payout draws (C-54)
+      // THE WONDER, before any other completion payout draws
       grantEraBoosts(state, city.seat, ERAS[WONDER_ERA_INDEX[item.wonder] ?? 0]);
       const fx = BUILT_WONDERS[item.wonder]?.effects;
       // CIV6: Statue of Liberty pays +4 Diplomatic Victory points on

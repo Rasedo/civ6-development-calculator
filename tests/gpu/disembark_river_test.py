@@ -10,7 +10,7 @@ crosses none. `stepUnit` says it by construction — `riverCharge` rides the
 NON-transition arm alone — but the twin folded the charge into the single
 `land_cost` it used for BOTH arms, so a disembark onto a river tile cost
 4 MP here and 1 MP on TS. That stranded a unit on the water for a turn and,
-at seed 9235 t191, cost a whole theological combat (A-1r).
+at seed 9235 t191, cost a whole theological combat.
 """
 
 from __future__ import annotations

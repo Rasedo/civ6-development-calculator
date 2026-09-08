@@ -61,7 +61,7 @@ export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: numbe
 
 /**
  * What one recruit pays out. Real Civ 6 gives every Great Person a UNIQUE
- * ability, most of which this engine has no channel for (C-21); what it models
+ * ability, most of which this engine has no channel for; what it models
  * instead is one lump in the class's own currency, sized by the era the person
  * belongs to. The roster below supplies the names, the classes and the eras —
  * the magnitude is this model's own.

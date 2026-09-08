@@ -1,4 +1,4 @@
-"""THE MOUNTAIN TUNNEL — the GPU half (C-20).
+"""THE MOUNTAIN TUNNEL — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/mountain_tunnel_test.py
@@ -71,7 +71,7 @@ def test_the_range_plane_is_a_flood_fill(rules, path) -> None:
 
 def test_it_is_enterable_and_still_a_mountain(rules, path) -> None:
     """The fourteen exported flags derive from impassability and NONE of them
-    may move: a tunnel opens the tile to movement and nothing else (C-20)."""
+    may move: a tunnel opens the tile to movement and nothing else."""
     sim = build(path)
     _rid, tiles = _ridge(sim)
     t = tiles[0]

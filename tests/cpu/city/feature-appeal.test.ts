@@ -13,7 +13,7 @@ import type { GameState } from '../../../cpu/core/types';
  * CIV6 (Amazon, TRAIT_AMAZON_RAINFOREST_EXTRA_APPEAL): "Rainforest tiles
  * provide +1 Appeal to adjacent tiles, instead of the usual -1." The install
  * writes it as EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER on FEATURE_JUNGLE with
- * Amount 2 — exactly the swing from -1 to +1 (C-50).
+ * Amount 2 — exactly the swing from -1 to +1.
  *
  * The term rides `cityAppealResolver`, which is already keyed by the tile's
  * OWNER and already threaded through every appeal consumer, so no per-seat

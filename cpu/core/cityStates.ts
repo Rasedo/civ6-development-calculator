@@ -548,7 +548,7 @@ export function minorCity(cityState: CityState): City {
     centerIndex: cityState.centerIndex,
     population: cityState.population,
     // the minor's OWN boxes, not zeroes: its city grows and claims like any
-    // other (C-38). `minorAccrue` writes them back after the shared rules run.
+    // other. `minorAccrue` writes them back after the shared rules run.
     foodBox: cityState.foodBox ?? 0,
     cultureBox: cityState.cultureBox ?? 0,
     tilesAcquired: cityState.tilesAcquired ?? 0,

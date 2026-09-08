@@ -8,25 +8,25 @@ GPU-only and driven exactly as the serve gate drives it (the same
 `_decide_turn` over the same seat order), because reachability is a property
 of the DRIVEN GAME, not of the comparison. What it answers, in order:
 
-  apostleBuy    the driver emitting faith-buy kind 6 (B-18r's latent needs it)
+  apostleBuy    the driver emitting faith-buy kind 6 (a latent faith-buy needs it)
   urbanization  the URBANIZATION civic, which gates the Neighborhood column
   placed:<ID>   a district column actually placed, for the late-unlock rows
-  secondShip    any seat holding two hulls at once (B-28r's one-galley cap)
-  intlRoute     an INTERNATIONAL trade leg (B-31r)
+  secondShip    any seat holding two hulls at once (the one-galley cap)
+  intlRoute     an INTERNATIONAL trade leg
   theoAdjacent  two religious units of DIFFERENT religions standing adjacent —
                 theological combat's precondition, not its outcome
   antiquityDig  an antiquity site excavated
   natHistory    NATURAL_HISTORY, the Archaeologist's civic — the dig's blocker
   conservation  CONSERVATION, the Naturalist's civic
-  csWar         a (major, city-state) war cell live (B-44r)
+  csWar         a (major, city-state) war cell live
   csPeace       a minor war ENDED through the sue column
-  specPin       a citizen pinned into a district's specialist slots (B-30r)
+  specPin       a citizen pinned into a district's specialist slots
   tileLock      a plot pinned by the lock head
-  ballot        a turn on which the driver submits a Congress ballot (B-22r)
+  ballot        a turn on which the driver submits a Congress ballot
   carbon        any seat's lifetime CO2 above zero — a plant burning fuel or a
                 unit drawing it, the only two emitters that exist
   climatePhase  the world crossing into Phase I, which is what every warming
-                body below it waits on (C-24)
+                body below it waits on
   engineer      a Military Engineer alive on the map at all
   engImp        one of the engineer's own improvements standing somewhere
   engRoadOffer  a turn on which the mask offers it the road column
@@ -52,8 +52,8 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   gpPerm        a permanent per-seat channel a spent person left behind
   gpCityPerm    ... and a permanent per-city one
   vallettaSuz   a seat holding the faith-buys-a-class suzerain
-  vallettaBuy   ... and a legal, affordable class purchase for it to take (C-9)
-  faithUnitGrant  a seat that may buy land combat units with Faith (C-9)
+  vallettaBuy   ... and a legal, affordable class purchase for it to take
+  faithUnitGrant  a seat that may buy land combat units with Faith
   faithUnitBuy    ... and an affordable land unit for it to take
 
 Run: python tools/gpu/reachability_probe.py [--turns 250]
@@ -296,7 +296,7 @@ def main() -> None:
         mark("gpSpent", (sim.civ_gp_used > 0).any(dim=1), t)
         mark("gpPerm", (sim.civ_gp_perm != 0).any(dim=2).any(dim=1), t)
         mark("gpCityPerm", (sim.city_gp_perm != 0).any(dim=3).any(dim=2).any(dim=1), t)
-        # C-9: the suzerain that sells a CLASS of building for faith, and the
+        # the suzerain that sells a CLASS of building for faith, and the
         # purchase itself landing.
         if getattr(sim, "_suz_c_faith_bldg", -1) >= 0:
             _vsz = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
@@ -341,7 +341,7 @@ def main() -> None:
         free_now = sim.city_alive[:, sim.FREE_ROW].sum(dim=1)
         mark("freeCity", free_now > 0, t)
         mark("freeLeft", free_now < free_seen, t)
-        # C-60: the religion walk covers the free row. A Free City that TAKES
+        # the religion walk covers the free row. A Free City that TAKES
         # pressure, and one that has come to FOLLOW — the second is what says
         # the widening is exercised rather than merely present.
         _fr = sim.city_alive[:, sim.FREE_ROW]

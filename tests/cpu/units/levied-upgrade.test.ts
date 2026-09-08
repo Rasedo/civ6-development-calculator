@@ -14,7 +14,7 @@ import type { GameState } from '../../../cpu/core/types';
  * CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
  * PERCENT): a LEVIED unit upgrades at 75% off. The row has shipped since
  * batch 11 and NOTHING READ IT — the gap was the mark, not the magnitude
- * (C-66).
+ *.
  *
  * The GPU twin is tests/gpu/levied_upgrade_test.py.
  */

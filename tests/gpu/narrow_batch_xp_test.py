@@ -1,4 +1,4 @@
-"""A NARROWED XP AWARD MUST READ ITS OWN GAME (A-5r).
+"""A NARROWED XP AWARD MUST READ ITS OWN GAME.
 
     python tests/gpu/narrow_batch_xp_test.py
 

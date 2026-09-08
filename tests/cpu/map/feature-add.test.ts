@@ -1,5 +1,5 @@
 /**
- * A FEATURE ARRIVES AFTER t0 — `addFeature`, C-41's carrier. Nothing in the
+ * A FEATURE ARRIVES AFTER t0 — `addFeature`, the eruption's carrier. Nothing in the
  * rollout calls it yet (WHERE a feature lands is an open owner question), so
  * this file is its whole TS reach. The GPU twin is
  * tests/gpu/feature_add_test.py.

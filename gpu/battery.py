@@ -436,8 +436,8 @@ def main() -> int:
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),
                 ("feature_add", [py, "tests/gpu/feature_add_test.py"], 2),  # the carrier for a feature that ARRIVES after t0 — no rollout caller yet  # a flood pillages the district on the floodplain
                 ("cree_claim", [py, "tests/gpu/cree_claim_test.py"], 2),  # the Cree Trader claims unclaimed ground within 3 of its own city
-                ("decommission", [py, "tests/gpu/decommission_test.py"], 2),  # C-1 the three plant-removal projects, opened by a Climate Accords window
-                ("worlds_fair", [py, "tests/gpu/worlds_fair_test.py"], 2),  # B-22r the second scored competition, on the Great Person points earned
+                ("decommission", [py, "tests/gpu/decommission_test.py"], 2),  # the three plant-removal projects, opened by a Climate Accords window
+                ("worlds_fair", [py, "tests/gpu/worlds_fair_test.py"], 2),  # the second scored competition, on the Great Person points earned
                 ("unique_units", [py, "tests/gpu/unique_units_test.py"], 2),  # the 31 unique chassis and their ability clauses
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
@@ -528,40 +528,40 @@ def main() -> int:
                 ("title_rows", [py, "tests/gpu/title_rows_test.py"], 4),  # Hwarang's promotions, the Nobel Prize, Mana's start and bans, Righteousness of the Faith, Religious Convert
                 ("conquest_rows", [py, "tests/gpu/conquest_rows_test.py"], 4),  # the second horse, the conquered city, the boost, the Canal, Satyagraha, the Vizier
                 ("follower_rows", [py, "tests/gpu/follower_rows_test.py"], 4),  # Dharma, the Last Prophet, the Jeli's faith door, Swift Hawk, Radio Oranje
-                ("all_follower_beliefs", [py, "tests/gpu/all_follower_beliefs_test.py"], 2),  # C-57 Dharma stacks every present religion
-                ("tribal_villages", [py, "tests/gpu/tribal_villages_test.py"], 7),  # C-47 the install's 24-subtype reward table
-                ("feature_appeal", [py, "tests/gpu/feature_appeal_test.py"], 5),  # C-50 the Amazon reads a rainforest her own way
-                ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # C-70 an alliance shares what it sees
-                ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # C-20 the portal on a mountain range
-                ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # C-66 the levy mark and its 75% discount
-                ("legacy_accrual", [py, "tests/gpu/legacy_accrual_test.py"], 6),  # C-63 the government clock an accumulating bonus rides
+                ("all_follower_beliefs", [py, "tests/gpu/all_follower_beliefs_test.py"], 2),  # Dharma stacks every present religion
+                ("tribal_villages", [py, "tests/gpu/tribal_villages_test.py"], 7),  # the install's 24-subtype reward table
+                ("feature_appeal", [py, "tests/gpu/feature_appeal_test.py"], 5),  # the Amazon reads a rainforest her own way
+                ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # an alliance shares what it sees
+                ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # the portal on a mountain range
+                ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # the levy mark and its 75% discount
+                ("legacy_accrual", [py, "tests/gpu/legacy_accrual_test.py"], 6),  # the government clock an accumulating bonus rides
                 ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
-                ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # A-5r a narrowed XP award must read its own game
-                ("incoming_route", [py, "tests/gpu/incoming_route_test.py"], 2),  # A-4r a route coming in is paid with none going out
-                ("bankruptcy_tie", [py, "tests/gpu/bankruptcy_tie_test.py"], 2),  # A-7r a bankruptcy tie goes to the earliest-spawned unit
-                ("governor_cityless", [py, "tests/gpu/governor_cityless_test.py"], 2),  # A-8r a cityless seat's governor phase does not run
-                ("stack_defender_tie", [py, "tests/gpu/stack_defender_tie_test.py"], 2),  # A-9r a ranged hit on a stacked hex goes to the hull on a tie
-                ("capture_cavalry", [py, "tests/gpu/capture_cavalry_test.py"], 2),  # C-58 a beaten cavalry unit may change hands
-                ("free_city", [py, "tests/gpu/free_city_test.py"], 2),  # C-60 a revolt makes a Free City; Eleanor skips the step; anyone may take it
-                ("move_capital", [py, "tests/gpu/move_capital_test.py"], 2),  # C-61 a civ-unique project's seat gate; the original capital moves whole
-                ("storms", [py, "tests/gpu/storms_test.py"], 2),  # C-49 the eight named storms and the roster rows on them
-                ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # C-16 the released spy is the one that was caught
-                ("spy_district", [py, "tests/gpu/spy_district_test.py"], 4),  # C-16 the spy stands on the district it works from; Surveillance's reach; Sabotage pillages the Zone's buildings and the queue repairs them
-                ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # C-38 the minor's city pays its yields; its research and build pots take them; the levy's Barracks experience
-                ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # C-56 a trade route carries religious pressure both ways
-                ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # C-75 step 1: the slotted-card store, mask and validator
+                ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # a narrowed XP award must read its own game
+                ("incoming_route", [py, "tests/gpu/incoming_route_test.py"], 2),  # a route coming in is paid with none going out
+                ("bankruptcy_tie", [py, "tests/gpu/bankruptcy_tie_test.py"], 2),  # a bankruptcy tie goes to the earliest-spawned unit
+                ("governor_cityless", [py, "tests/gpu/governor_cityless_test.py"], 2),  # a cityless seat's governor phase does not run
+                ("stack_defender_tie", [py, "tests/gpu/stack_defender_tie_test.py"], 2),  # a ranged hit on a stacked hex goes to the hull on a tie
+                ("capture_cavalry", [py, "tests/gpu/capture_cavalry_test.py"], 2),  # a beaten cavalry unit may change hands
+                ("free_city", [py, "tests/gpu/free_city_test.py"], 2),  # a revolt makes a Free City; Eleanor skips the step; anyone may take it
+                ("move_capital", [py, "tests/gpu/move_capital_test.py"], 2),  # a civ-unique project's seat gate; the original capital moves whole
+                ("storms", [py, "tests/gpu/storms_test.py"], 2),  # the eight named storms and the roster rows on them
+                ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # the released spy is the one that was caught
+                ("spy_district", [py, "tests/gpu/spy_district_test.py"], 4),  # the spy stands on the district it works from; Surveillance's reach; Sabotage pillages the Zone's buildings and the queue repairs them
+                ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # the minor's city pays its yields; its research and build pots take them; the levy's Barracks experience
+                ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # a trade route carries religious pressure both ways
+                ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # step 1: the slotted-card store, mask and validator
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip
                 ("culture_bomb_rows", [py, "tests/gpu/culture_bomb_rows_test.py"], 4),  # the roster's two culture-bomb carriers, improvement and district
                 ("wonder_charge", [py, "tests/gpu/wonder_charge_test.py"], 4),  # the Builder's charge into an Ancient or Classical wonder
-                ("disembark_river", [py, "tests/gpu/disembark_river_test.py"], 4),  # a step off the water crosses no river edge (A-1r)
-                ("continents", [py, "tests/gpu/continents_test.py"], 4),  # the landmass id and the home continent (C-48)
+                ("disembark_river", [py, "tests/gpu/disembark_river_test.py"], 4),  # a step off the water crosses no river edge
+                ("continents", [py, "tests/gpu/continents_test.py"], 4),  # the landmass id and the home continent
                 ("treasure_fleet", [py, "tests/gpu/treasure_fleet_test.py"], 4),  # Spain's route rows, plain and intercontinental
-                ("foreign_founding", [py, "tests/gpu/foreign_founding_test.py"], 4),  # a city founded off the home continent (C-48)
+                ("foreign_founding", [py, "tests/gpu/foreign_founding_test.py"], 4),  # a city founded off the home continent
                 ("home_continent_rows", [py, "tests/gpu/home_continent_rows_test.py"], 4),  # Spain's districts, Victoria's capacity, Phoenicia's loyalty
-                ("district_price", [py, "tests/gpu/district_price_test.py"], 4),  # each row's own base and discount (B-67)
-                ("wonder_era_boost", [py, "tests/gpu/wonder_era_boost_test.py"], 4),  # Dynastic Cycle's Eureka and Inspiration (C-54)
+                ("district_price", [py, "tests/gpu/district_price_test.py"], 4),  # each row's own base and discount
+                ("wonder_era_boost", [py, "tests/gpu/wonder_era_boost_test.py"], 4),  # Dynastic Cycle's Eureka and Inspiration
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
                 ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
                 ("fallout", [py, "tests/gpu/fallout_test.py"], 4),  # the device catalog, the arsenal upkeep, the contaminated ground and CLEAN_FALLOUT

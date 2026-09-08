@@ -8,7 +8,7 @@ The TS twin is tests/cpu/seats/wonder-charge.test.ts.
 CIV6 (The First Emperor, EFFECT_ADJUST_PLAYER_UNIT_WONDER_PERCENT): "When
 building Ancient and Classical wonders you may spend Builder charges to
 complete 15% of the original wonder cost." No fixture seats China, so no gate
-lane can reach this verb — these lanes are the only evidence (C-55).
+lane can reach this verb — these lanes are the only evidence.
 """
 
 from __future__ import annotations

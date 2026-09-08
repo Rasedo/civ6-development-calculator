@@ -10,7 +10,7 @@ import type { CivId, LeaderId } from './seats';
 /**
  * CIV6 (`RandomEvent_Frequencies`, REALISM_SETTING_MODERATE): every disaster
  * has a published `OccurrencesPerGame` at each of five Realism settings.
- * OWNER RULING 2026-09-04 (C-74): this engine models MODERATE, and a per-game
+ * OWNER RULING 2026-09-04: this engine models MODERATE, and a per-game
  * count becomes a per-turn chance by dividing by the STANDARD game length —
  * Civ 6's 500 turns, the span the install's count is written over. This
  * engine plays 250 of those turns and so sees half a game's worth, which is
@@ -32,7 +32,7 @@ export const FLOOD_SEVERITY_P = [
 export const FLOOD_CHANCE = FLOOD_TOTAL / STANDARD_GAME_TURNS;
 
 /** MODERATE droughts: DROUGHT_MAJOR 23 + DROUGHT_EXTREME 5. This engine has
- *  ONE drought kind, so the two are summed — the EXTREME severity is C-49's
+ *  ONE drought kind, so the two are summed — the EXTREME severity is the storm table's
  *  sibling gap, not a magnitude this line invents. */
 export const DROUGHT_CHANCE = (23 + 5) / STANDARD_GAME_TURNS;
 
@@ -195,7 +195,7 @@ export const STORM_UNIT_ROWS: readonly StormUnitRow[] = [
   { civ: 'RUSSIA', event: 'BLIZZARD_CRIPPLING', effect: 'doubleOpposing', amount: 100 },
 ];
 
-/** NOT covered by the C-74 ruling: the install counts eruptions per GAME
+/** NOT covered by the per-GAME-counts ruling: the install counts eruptions per GAME
  *  (VOLCANO_GENTLE 4, CATASTROPHIC 2.5, MEGACOLOSSAL 1.5 at MODERATE) where
  *  this engine rolls per VOLCANO, and the conversion needs the map's volcano
  *  count. Still the old stylization; still an open question. */

@@ -9,7 +9,7 @@ import { MP_SCALE, CAPTURED_UNIT_HP } from '../../../cpu/data/constants';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
 /**
- * A DEFEATED CAVALRY UNIT MAY BE CAPTURED (C-58).
+ * A DEFEATED CAVALRY UNIT MAY BE CAPTURED.
  *
  * CIV6 (Mongol Horde): cavalry gains "a chance to capture defeated enemy
  * cavalry class units". The install publishes the PERMISSION and one number

@@ -35,7 +35,7 @@
  * JOINT WAR is NOT a row. Its columns are identical to Third Party War's, and
  * the only thing that separates them is that its target is not yet at war —
  * which needs a two-sided agreement object the deal table does not carry
- * (docs/AUDIT.md C-2). A row for it would be a duplicate of the row below
+ * (docs/AUDIT.md). A row for it would be a duplicate of the row below
  * with no condition of its own.
  */
 /** CIV6 (Formal War, DenouncementTurnsRequired): "Denounced ... at least 5
@@ -67,7 +67,7 @@ export type WarCondition =
   | 'toArms'
   /** CIV6 (War of Retribution): "a player who has broken a promise to you
    *  within the past 30 turns" — neither engine holds a promise, so no seat
-   *  ever meets it (docs/AUDIT.md C-76). */
+   *  ever meets it (docs/AUDIT.md). */
   | 'brokenPromise'
   /** CIV6 (Ideological War): "a player who is in a different Tier 3 government" */
   | 'differentLateGovernment'
@@ -77,7 +77,7 @@ export type WarCondition =
    *  has no consent, so it reads the other player as an ALLY — the one
    *  relationship it holds that means "would agree with me", and the one the
    *  install itself attaches to this situation when it writes Enkidu's trait
-   *  as "anyone at war with their allies". A READING, recorded under C-2, and
+   *  as "anyone at war with their allies". A READING, recorded in docs/AUDIT.md, and
    *  the conservative one: it can only make the kind rarer. */
   | 'allyAtWarWith';
 

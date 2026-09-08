@@ -378,9 +378,10 @@ Nothing open.
     so a sweep of which roster members this install cannot source belongs
     with the hygiene pass.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
-  The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 338 of 343 modifiers and `open: <item>` on 5, each under C-64
-  or C-67. Unique units are C-78, unique infrastructure C-79 and C-69.
+  The census is `docs/ROSTER.md`, refreshed against the ledger on 2026-09-08;
+  the ledger `docs/roster_ledger.json` reads `shipped` on 338 of 343 modifiers
+  and `open: <item>` on 5, each under C-64 or C-67. Unique units are C-78,
+  unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
   - UNREAD DLL LOGIC, recorded: whether Trajan's grant fires on a CONQUERED

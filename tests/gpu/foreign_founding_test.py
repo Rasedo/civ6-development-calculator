@@ -9,7 +9,7 @@ CIV6 (Pax Britannica): "All cities founded on a continent other than your
 home continent receive a free melee unit." CIV6 (Treasure Fleet): "Cities not
 on your original Capital's continent receive ... a builder when founded."
 Both fire at the SAME hook, keyed on the founded tile's landmass against the
-seat's ORIGINAL capital's (C-48).
+seat's ORIGINAL capital's.
 
 No fixture seats Spain or England, so no gate lane reaches either row.
 """

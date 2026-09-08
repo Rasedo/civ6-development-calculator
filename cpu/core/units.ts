@@ -921,7 +921,7 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
  * mountain is ENTERABLE by anything — and only that. It does not become
  * workable, campable or farmable, which is why this rides `gdrJump`'s two
  * movement sites rather than `isImpassable` itself: fourteen exported flags
- * derive from that predicate and none of them should move (C-20).
+ * derive from that predicate and none of them should move.
  */
 export function tunnelAt(tile: Tile): boolean {
   return tile.improvement === 'MOUNTAIN_TUNNEL';
@@ -958,8 +958,8 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
   // CIV6 (The Raven King): ABILITY_THE_RAVEN_KING gives a LEVIED unit
-  // EFFECT_ADJUST_UNIT_MOVEMENT Amount 2 (C-66). It joins the one composer, so
-  // a levied unit is born with it — A-2r's lesson.
+  // EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the one composer, so
+  // a levied unit is born with it — the levy's own lesson.
   const levy = unit.levied
     ? getModifiers(state, unit.seat).levy.reduce((n, r) => Math.max(n, r.levyMoves), 0) : 0;
   return MP_SCALE * (
@@ -1704,7 +1704,7 @@ export function spawnUnit(
     // rung every HULL reads, Enhanced Mobility, and the emergency march. A
     // naval unit was therefore born a whole Movement short and only came
     // right at the next `refreshUnits`, which does call this. Its first turn
-    // was the divergence (A-2r).
+    // was the divergence.
     movesLeft: unitFullMoves(state, { type: unitType, seat, tileIndex: spot.index }),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
@@ -2081,7 +2081,7 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   // CIV6 (Mana): "Resources cannot be harvested" (`SEAT_BAN_ROWS`)
   if (getModifiers(state, unit!.seat).seatBans.has('harvest')) return no('This civilization cannot harvest resources.');
   // the ACTING unit's seat, both times: this body read and paid seat 0 for
-  // as long as nothing called it (C-52)
+  // as long as nothing called it
   const grant = harvestGrant(state, tile, unit!.seat);
   if (!grant) {
     return no(
@@ -2129,7 +2129,7 @@ export function walkToward(state: GameState, unit: Unit, target: Tile, stopWithi
  * and neither engine models resource reveal — so this reads "the most
  * advanced one the seat has a live source of", falling back to the first
  * slot. `STRATEGIC_IDS` is already in ascending era order, so the most
- * advanced is the last match. THE ONE MODEL CHOICE in C-47, recorded there.
+ * advanced is the last match. THE ONE MODEL CHOICE in the goody-hut table, recorded in docs/AUDIT.md.
  */
 export function mostAdvancedStrategic(state: GameState, seat: number): number {
   let slot = 0;
@@ -2156,7 +2156,7 @@ function nearestCityTo(state: GameState, owner: Seat, tile: Tile): City | undefi
 }
 
 /**
- * CLAIM a tribal village with a unit standing on it (C-47).
+ * CLAIM a tribal village with a unit standing on it.
  *
  * Real Civ 6 gives the village to whoever reaches it first, so any civ seat
  * claims it; barbarians and city-states neither settle nor research and take

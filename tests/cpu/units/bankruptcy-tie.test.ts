@@ -7,7 +7,7 @@ import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * A BANKRUPTCY TIE GOES TO THE EARLIEST-SPAWNED UNIT, NOT THE LOWEST ID (A-7r).
+ * A BANKRUPTCY TIE GOES TO THE EARLIEST-SPAWNED UNIT, NOT THE LOWEST ID.
  *
  * When a seat's treasury goes negative, the priciest unit is disbanded and a
  * tie is broken by SPAWN ORDER — the earliest in `state.units`, which is the

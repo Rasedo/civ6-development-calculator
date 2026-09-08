@@ -8,8 +8,7 @@ The TS twin is tests/cpu/seats/harvest-rows.test.ts.
 CIV6 (EFFECT_ADD_CULTURE_BOMB_TRIGGER): completing a named IMPROVEMENT or
 DISTRICT claims the neighbouring tiles. Both engines already bombed off a
 district's completion (the Congress, the Preserve); these are the roster's
-own two carriers — the Maori's Fishing Boats and the Netherlands' Harbour
-(C-53). No gate lane seats either civilization, so this is the only evidence
+own two carriers — the Maori's Fishing Boats and the Netherlands' Harbour. No gate lane seats either civilization, so this is the only evidence
 the rows reach the bomb at all.
 """
 

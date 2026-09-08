@@ -508,7 +508,7 @@ class SimEconomy:
                 * self._feat_added().unsqueeze(2).to(self.dtype))
 
     def _add_feature(self, att: torch.Tensor, tile: torch.Tensor, fid: int) -> torch.Tensor:
-        """`addFeature` — a feature ARRIVES after t0, the carrier C-41 names.
+        """`addFeature` — a feature ARRIVES after t0, the eruption's own carrier.
         Nothing in the rollout calls it yet: WHERE a feature lands (and what
         it does to an improvement) is an open owner question, so the refusal
         set is the conservative envelope — bare land only — mirrored clause
@@ -945,13 +945,13 @@ class SimEconomy:
         if bool(_lost.any()):
             self.coastal_water[_lost] = False
             self.wok[_lost] = self.wok[_lost] & ~self._wonder_coastal_mask
-        # ...and the other side of the same ring (C-35). The drowned tile IS
+        # ...and the other side of the same ring. The drowned tile IS
         # coastal water wherever it still touches land, and every LAND
         # neighbour of it has just become coastal land — which is water
         # HOUSING too, unless the city already drinks fresh.
         # CIV6 (Sea Level Rise): a drowned OASIS stops sourcing a neighbour's
         # Aqueduct. `aqsrc` is a DERIVED plane, so the atom moves first and the
-        # derivation is rebuilt over the ring the sea just changed (C-35).
+        # derivation is rebuilt over the ring the sea just changed.
         _src_gone = take & self.aq_own
         if bool(_src_gone.any()):
             self.aq_own &= ~take
@@ -1869,7 +1869,7 @@ class SimEconomy:
         interval rather than multiplying the result, so the two readings agree
         at every whole increment and not only at the end.
 
-        ONE composer, the twin of `legacyBonusPct` (C-63).
+        ONE composer, the twin of `legacyBonusPct`.
         """
         z = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if not self._ngov or gov < 0 or gov >= self._ngov:
@@ -2062,7 +2062,7 @@ class SimEconomy:
             "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _o.clone(),
             "pillm": _o.clone(),
             "rgold": _z.clone(), "infl": _z.clone(),
-            # C-73: Monarchy's envoy influence, and the two purchase
+            # Monarchy's envoy influence, and the two purchase
             # discounts. The discounts have no READER on either engine
             # yet — the price is composed at a dozen sites and a
             # discount added at eleven of them is the two-composers
@@ -2166,7 +2166,7 @@ class SimEconomy:
                            & self._policy_unlocked(civics2, dark, era, held, _ad)
                            & _hg.unsqueeze(1))
             # a LEGACY card pays its ACCRUAL (the loop below) and never its table row,
-            # which still holds the government's whole package (C-73) — the ordinary
+            # which still holds the government's whole package — the ordinary
             # channels read the CARDS, the returned mask and the payout loop the full set
             cards = slotted & (self._pol_legacy < 0).unsqueeze(0)
             fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
@@ -2218,7 +2218,7 @@ class SimEconomy:
                 # CIV6: a LEGACY card is worth the percentage its own
                 # government has ACCUMULATED against the ONE BonusType it
                 # names — not that government's whole inherent bonus, which
-                # is what `_pol_*` still holds for it (C-73). Nine cards at
+                # is what `_pol_*` still holds for it. Nine cards at
                 # most, so a loop over the legacy ones beats a table.
                 if row is not None and self._ngov:
                     for _p in range(self._npol):
@@ -2649,7 +2649,7 @@ class SimEconomy:
             # tile", so it lends the SEA's sources and none of the ground's.
             # Both engines keep the feature and terrain UNDERNEATH on purpose,
             # so the mask is here at the READ, where `ringTerrain` /
-            # `ringFeature` put it on TS (C-35).
+            # `ringFeature` put it on TS.
             if fid >= 0:
                 on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
             elif tid >= 0:
@@ -3429,7 +3429,7 @@ class SimEconomy:
         """The city-block rows RELIGION walks: the majors, then the Free
         Cities row. Two contiguous ranges concatenated rather than an
         advanced index — the same shape `_compact_city_rows` uses, and it
-        keeps the write-back two plain `.copy_()` slices (C-60).
+        keeps the write-back two plain `.copy_()` slices.
 
         CITY-STATE rows are NOT here. Their pressure is a separate plane the
         route term writes into directly, and a minor follows nothing."""
@@ -3466,7 +3466,7 @@ class SimEconomy:
         founded = self.holy_tile >= 0  # [B, O]
         # THE ROW AXIS IS NOT THE RELIGION AXIS. `O` counts RELIGIONS (each is
         # keyed by its founder's major row); `NSC` counts the CITY ROWS this
-        # walk covers, which since C-60 is the majors PLUS the Free Cities
+        # walk covers, which since the free row joined is the majors PLUS the Free Cities
         # row. They were the same number for as long as the walk was
         # majors-only, and three sites below read one where they meant the
         # other.
@@ -3587,7 +3587,7 @@ class SimEconomy:
         pressure straight into its row and follows nothing.
 
         The RECEIVER axis is the caller's row set — the majors and the Free
-        Cities row (C-60) — so a route ending at a Free City lands in `add`
+        Cities row — so a route ending at a Free City lands in `add`
         like any other. The route OWNER loop stays over the majors: the Free
         Cities player runs no trade route."""
         B, O, S = self.B, self.n_majors, self.S
@@ -4132,7 +4132,7 @@ class SimEconomy:
             base = base + self._seat_war_buff(getattr(self, f"{pre}_unit_seat"), 2)
         # CIV6 (The Raven King): a LEVIED unit carries
         # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so a
-        # levied unit is born with it — A-2r's lesson (C-66).
+        # levied unit is born with it — the levy's own lesson.
         if self._levy_rows:
             _lv = getattr(self, f"{pre}_unit_levied")
             if bool(_lv.any()):
@@ -4582,7 +4582,7 @@ class SimEconomy:
         return spec
 
     def _worked_tiles(self, row: int) -> torch.Tensor:
-        """[B, RC, M] — the tiles seat row `row` works, -1 unused (C-77).
+        """[B, RC, M] — the tiles seat row `row` works, -1 unused.
 
         Deliberately NOT recomputed on demand: TS STORES what its walk chose,
         on the city, and it keeps it until the next walk overwrites it. So
@@ -4693,9 +4693,9 @@ class SimEconomy:
         pop_t = pop - spec_d.sum(dim=2)
         take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
-        # C-77: the PICK, exposed. It was computed here and thrown away, so a
+        # the PICK, exposed. It was computed here and thrown away, so a
         # divergence in WHICH tiles a city works could only surface indirectly
-        # as a yield difference, and C-31's "citizens 'working' the affected
+        # as a yield difference, and the nuclear strike's "citizens 'working' the affected
         # tiles are eliminated" had nothing to read. Stashed rather than
         # recomputed, so this stays the ONE place the pick is made.
         if j is None and record:
@@ -5280,7 +5280,7 @@ class SimEconomy:
         seat takes its turn through `seatPhase` — and it would let two rows
         read two different economies.
 
-        THIS is the walk that records the worked-tile pick (C-77), and the
+        THIS is the walk that records the worked-tile pick, and the
         only one: `seat_score` and `_city_totals` ride the same body at other
         points in the turn, and a pick stashed from the SCORE walk would be
         the post-growth one while the turn itself ran on the snapshot — a

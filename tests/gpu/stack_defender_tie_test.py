@@ -1,4 +1,4 @@
-"""A RANGED HIT ON A STACKED HEX GOES TO THE HULL ON A TIE (A-9r) — GPU half.
+"""A RANGED HIT ON A STACKED HEX GOES TO THE HULL ON A TIE — GPU half.
 
     python tests/gpu/stack_defender_tie_test.py
 

@@ -153,7 +153,7 @@ def test_site_census(rules, path) -> None:
                 missing.append(f"{name}::{fn.name}")
     # a CITY's own strike composes its DEFENDER without the roster's rows on
     # BOTH engines (`seatPhase`'s city-strike block does the same), so the two
-    # agree; the gap is recorded under C-26, not fixed on one side only
+    # agree; the gap is recorded in docs/AUDIT.md, not fixed on one side only
     allow = {"gpu/core/sim_phase.py::_seat_city_strike"}
     assert not (set(missing) - allow), f"a strength composition without the roster's own: {missing}"
     print(f"  5 site census OK — every `_congress_unit_cs` site carries `_roster_cs`")
