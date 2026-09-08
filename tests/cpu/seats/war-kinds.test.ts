@@ -22,7 +22,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import {
   emptySeat, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setFriendTurnsWith, setTileOwner,
-  setWarTurnsWith, warDeclaredBy, warKindWith, warTurnsWith, civsAtWar,
+  setWarTurnsWith, setWar, warDeclaredBy, warKindWith, warTurnsWith, civsAtWar,
 } from '../../../cpu/core/seats';
 import {
   defaultWarKind, warBuffCS, warBuffLive, warBuffMoves, warBuffProdPct, warKindAllowed,
@@ -30,14 +30,14 @@ import {
 import { rosterCS } from '../../../cpu/core/combat';
 import { spawnUnit, unitFullMoves } from '../../../cpu/core/units';
 import { spreadReligiousPressureForTest } from '../../../cpu/core/game';
-import { grievanceWith } from '../../../cpu/core/grievance';
+import { grievanceWith, grievanceWarDeclared } from '../../../cpu/core/grievance';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import {
   AGREEMENT_TURNS, ALLIANCE_L3_QP, ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, CIV_LEADERS, DED_TO_ARMS,
   GRIEVANCE_WAR_BASE,
 } from '../../../cpu/data/seats';
 import {
-  FORMAL_WAR_MIN_TURNS, WAR_BUFF_TURNS, WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_LIBERATION,
+  FORMAL_WAR_MIN_TURNS, WAR_BUFF_TURNS, WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_LIBERATION, WAR_KIND_THIRD_PARTY,
   WAR_KIND_RECONQUEST, WAR_KIND_SURPRISE, WAR_KIND_TERRITORIAL,
 } from '../../../cpu/data/warKinds';
 import { tilesWithin } from '../../../world/hex';
@@ -236,5 +236,59 @@ describe('the war kinds', () => {
     seeded.seats[2].cities[0].religionPressure = [1, 0, 0];
     spreadReligiousPressureForTest(seeded);
     expect(seeded.seats[2].cities[0].religionPressure![1]).toBe(5);
+  });
+});
+
+describe('the THIRD PARTY war', () => {
+  // CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_THIRD_PARTY_WAR):
+  // "Join another player's war against a target civilization."
+  // InitiatorPrereqCivic CIVIC_FOREIGN_TRADE, NO DenouncementTurnsRequired,
+  // WarmongerPercent / Capture / Raze 100 / 100 / 300. `Agreement="true"` is
+  // how the UI reaches it, not what it costs — see warKinds.ts.
+  const scene = (): GameState => {
+    const state = table();
+    state.seats[0]!.research.civics.push('FOREIGN_TRADE');
+    return state;
+  };
+
+  it('carries the install row column for column', () => {
+    const d = WAR_KINDS[WAR_KIND_THIRD_PARTY]!;
+    expect(d.id).toBe('thirdParty');
+    expect(d.civic).toBe('FOREIGN_TRADE');
+    expect(d.denounceTurns).toBe(-1); // no denouncement column at all
+    expect([...d.pct]).toEqual([100, 100, 300]);
+  });
+
+  it('opens only when an ALLY is already at war with the target', () => {
+    const state = scene();
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_THIRD_PARTY)).toBe(false);
+    setAllyTurnsWith(state, 0, 2, 20);
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_THIRD_PARTY)).toBe(false); // ally at peace
+    setWar(state, 2, 1, true);
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_THIRD_PARTY)).toBe(true);
+  });
+
+  it('asks for its civic and for no denouncement', () => {
+    const bare = table(); // no FOREIGN_TRADE
+    setAllyTurnsWith(bare, 0, 2, 20);
+    setWar(bare, 2, 1, true);
+    expect(warKindAllowed(bare, 0, 1, WAR_KIND_THIRD_PARTY)).toBe(false);
+
+    const state = scene();
+    setAllyTurnsWith(state, 0, 2, 20);
+    setWar(state, 2, 1, true);
+    // a FORMAL war at the same price is shut here: it wants a five-turn-old
+    // denouncement, and that is exactly what this row is for.
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_FORMAL)).toBe(false);
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_THIRD_PARTY)).toBe(true);
+  });
+
+  it('prices the declaration at the Formal war percent', () => {
+    const state = scene();
+    setAllyTurnsWith(state, 0, 2, 20);
+    setWar(state, 2, 1, true);
+    grievanceWarDeclared(state, 0, 1, WAR_KIND_THIRD_PARTY);
+    expect(grievanceWith(state, 1, 0))
+      .toBe(Math.round((GRIEVANCE_WAR_BASE * WAR_KINDS[WAR_KIND_THIRD_PARTY]!.pct[0]) / 100));
   });
 });

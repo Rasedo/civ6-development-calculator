@@ -119,10 +119,7 @@ class SimGriev:
         if self._enkidu_war_discount <= 0 or declarer >= NM or target >= NM:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         lead = self._leads_vec("GILGAMESH")[:, declarer]                  # [B]
-        ally = self.seat_ally_turns[:, declarer, :NM] > 0                 # [B, NM]
-        war_t = self.war[:, :NM, target]                                  # [B, NM]
-        other = torch.arange(NM, device=self.device).view(1, -1) != declarer
-        return lead & (ally & war_t & other).any(dim=1)
+        return lead & self._ally_at_war_with(declarer, target)
 
     def _grievance_war_declared(self, declarer: int, target: int, m, kind) -> None:
         """The casus belli's own DECLARATION column (WarmongerPercent of the

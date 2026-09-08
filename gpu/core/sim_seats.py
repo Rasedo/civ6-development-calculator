@@ -736,6 +736,11 @@ class SimSeats:
             # CIV6 (Golden Age War): "while you are in a Golden Age with a 'To
             # Arms!' Dedication"
             return self._golden_ded(row, self._ded_to_arms)
+        if cond == 10:
+            # CIV6 (Third Party War): "Join another player's war against a
+            # target civilization" — the other player read as an ALLY (see
+            # `WarCondition` in warKinds.ts).
+            return self._ally_at_war_with(row, tgt)
         if cond == 9:
             # CIV6 (Ideological War): "a player who is in a different Tier 3
             # government" — both LATE, and not the same one
@@ -746,6 +751,18 @@ class SimSeats:
             return h1 & h2 & (g1 != g2) & (self._gov_tier[g1] >= 3) & (self._gov_tier[g2] >= 3)
         # 8: a broken promise — neither engine holds a promise
         return zero
+
+    def _ally_at_war_with(self, row: int, tgt: int) -> torch.Tensor:
+        """[B] bool — is an ALLY of `row` already at war with `tgt`? The Third
+        Party War's condition and the situation Enkidu's discount names, so it
+        is ONE predicate on this engine too."""
+        NM = self.n_majors
+        if row >= NM or tgt >= NM:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        ally = self.seat_ally_turns[:, row, :NM] > 0                      # [B, NM]
+        war_t = self.war[:, :NM, tgt]                                     # [B, NM]
+        other = torch.arange(NM, device=self.device).view(1, -1) != row
+        return (ally & war_t & other).any(dim=1)
 
     def _war_kinds_allowed(self, row: int, tgt: int) -> torch.Tensor:
         """[B, K] bool — `warKindAllowed` for every kind: the civic (or its

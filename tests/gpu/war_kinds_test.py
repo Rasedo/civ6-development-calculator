@@ -249,6 +249,43 @@ def poke_alliance_pressure(rules, path):
     print(f"  d alliance pressure OK ({plain} -> {boosted} with the level-3 Religious ally)")
 
 
+def poke_third_party(rules, path):
+    """CIV6 (DIPLOACTION_THIRD_PARTY_WAR): "Join another player's war against
+    a target civilization." InitiatorPrereqCivic CIVIC_FOREIGN_TRADE, NO
+    denouncement column, 100 / 100 / 300. The other player is read as an ALLY
+    (see `WarCondition` in warKinds.ts) — one predicate shared with Enkidu's
+    discount, so the two cannot drift."""
+    sim = build(rules, path)
+    TP = len(sim._war_kinds) - 1
+    civic, dturns, cond, p0, p1, p2 = sim._war_kinds[TP]
+    assert (dturns, p0, p1, p2) == (-1, 100, 100, 300), sim._war_kinds[TP]
+    assert civic >= 0, "the third-party row lost its civic gate"
+
+    sim.civ_civics[:] = False
+    sim.seat_ally_turns[:] = 0
+    sim.war[:] = False
+    assert not bool(sim._war_kinds_allowed(0, 1)[0, TP]), "open with nothing held"
+
+    sim.civ_civics[:, 0, civic] = True
+    assert not bool(sim._war_kinds_allowed(0, 1)[0, TP]), "the civic alone opened it"
+
+    sim.seat_ally_turns[:, 0, 2] = 20
+    sim.seat_ally_turns[:, 2, 0] = 20
+    assert not bool(sim._war_kinds_allowed(0, 1)[0, TP]), "an ally at PEACE opened it"
+
+    sim.war[:, 2, 1] = True
+    sim.war[:, 1, 2] = True
+    assert bool(sim._war_kinds_allowed(0, 1)[0, TP]), "the ally's war did not open it"
+    # ...and it asks for no denouncement, which is the whole point: a FORMAL
+    # war at the same price is shut here.
+    assert not bool(sim._war_kinds_allowed(0, 1)[0, FORMAL]), "FORMAL opened without a denouncement"
+    # the condition is ONE predicate, shared with Enkidu's discount
+    assert bool(sim._ally_at_war_with(0, 1)[0]), "the shared predicate disagrees"
+    sim.civ_civics[:, 0, civic] = False
+    assert not bool(sim._war_kinds_allowed(0, 1)[0, TP]), "it survived losing its civic"
+    print(f"  e third-party war OK (row {TP}, civic {civic}, no denouncement, {p0}/{p1}/{p2})")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -256,6 +293,7 @@ def main() -> int:
     poke_default_kind(rules, path)
     poke_buff_clock(rules, path)
     poke_alliance_pressure(rules, path)
+    poke_third_party(rules, path)
     print("BATTERY OK war_kinds")
     return 0
 

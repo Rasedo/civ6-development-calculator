@@ -302,11 +302,30 @@ Nothing open.
     WASTED — which contradicts this engine's standing rule that hammers
     never burn, on one forum post. Both engines BANK; the disposition is an
     ask.
-  - JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT (unpublished science)
-    and ASK-FOR-PROMISE (C-76) — four agreements the table can carry and
-    nothing acts on.
+  - JOIN ONGOING WAR SHIPPED with #242k, as a WAR KIND rather than an
+    agreement: `DIPLOACTION_THIRD_PARTY_WAR` publishes every column a kind
+    needs (`InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE, no
+    `DenouncementTurnsRequired`, 100 / 100 / 300), and `Agreement="true"`
+    says how the UI reaches it, not what it costs.
+  - JOINT WAR is the same row column for column; the only thing separating
+    them is that its target is not yet at war, which needs a TWO-SIDED
+    agreement object the deal table does not carry. `DEAL_ITEM_KINDS` has no
+    war item; a joint war is one seat's offer that binds the other's
+    declaration next turn, so the item has to survive a turn boundary and
+    apply to a seat that did not choose it.
+  - RESEARCH AGREEMENT: the GATE is published and the PAYOUT is not.
+    `InitiatorPrereqTech` and `TargetPrereqTech` are both
+    TECH_SCIENTIFIC_THEORY, `NoCurrentResearchAgreement` makes it one live
+    agreement per pair, and Worth/Cost rows exist ONLY at DIPLO_STATE_ALLIED
+    (40) and DIPLO_STATE_DECLARED_FRIEND (20) — so the state floor is data,
+    not lore. What no row anywhere carries is how much science it pays or
+    how long it runs; `Duration` is absent from the row.
+  - ASK-FOR-PROMISE waits on C-76.
   - A LUXURY HAS NO LUMP TO TRADE: a luxury is a boolean access gate; the
-    RESOURCE item names a strategic only.
+    RESOURCE item names a strategic only. This is a MODEL choice, not a
+    missing datum — the install trades the resource and its ACCESS, never an
+    amount of a luxury, so there is nothing to source and the entry keeps it
+    only as a note.
   - A MISSION LEAVES NO MARK ("a small positive bonus in your
     relationship"), DEMAND and DISCUSS (the four promises of
     `Expansion2_DiplomaticActions.xml`, FavorCost 30, GrievancesForRefusal
@@ -314,8 +333,12 @@ Nothing open.
     RequiresBrokenPromise all wait on C-76.
   - Readings with no source, identical on both engines: the intel bonus is
     unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS`
-    a side, an offer standing two turns; a war does not end a standing
-    deal.
+    a side, an offer standing two turns; a war does not end a standing deal;
+    and the Third Party War's "another player" read as an ALLY, because
+    consent is what `Agreement="true"` means and an alliance is the only
+    relationship this engine holds that says "would agree with me" — the
+    install itself attaches the ally relationship to this situation when it
+    writes Enkidu's trait as "anyone at war with their allies".
 - **C-16. THE SPY'S SECOND HALF.** Weight 1.
   - WHAT A LEVEL IS WORTH. The install's UnitOperations rows publish
     `BaseProbability` (13 Siphon Funds, Foment Unrest, Fabricate Scandal;

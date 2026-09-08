@@ -224,13 +224,23 @@ export function enkiduAllies(state: GameState, seat: number, foe: number): numbe
  */
 export function alliedWarDiscount(state: GameState, declarer: number, target: number): number {
   if (leaderOf(state, declarer) !== 'GILGAMESH') return 0;
+  return allyAtWarWith(state, declarer, target) ? ENKIDU_ALLIED_WAR_DISCOUNT : 0;
+}
+
+/**
+ * IS AN ALLY OF `seat` ALREADY AT WAR WITH `target`?
+ *
+ * The Third Party War's condition and the situation Enkidu's discount names,
+ * which is why it is ONE predicate: "declare war on anyone at war with their
+ * allies" is the same question the casus belli asks, and a second spelling
+ * would drift the moment either grew a clause.
+ */
+export function allyAtWarWith(state: GameState, seat: number, target: number): boolean {
   for (const o of state.seats) {
-    if (o.seat === declarer || o.seat === target) continue;
-    if (allyTurnsWith(state, declarer, o.seat) > 0 && civsAtWar(state, o.seat, target)) {
-      return ENKIDU_ALLIED_WAR_DISCOUNT;
-    }
+    if (o.seat === seat || o.seat === target) continue;
+    if (allyTurnsWith(state, seat, o.seat) > 0 && civsAtWar(state, o.seat, target)) return true;
   }
-  return 0;
+  return false;
 }
 
 /**

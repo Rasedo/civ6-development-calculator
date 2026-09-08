@@ -11,8 +11,7 @@
 import type { GameState } from './types';
 import {
   citiesOf, civOf, civsAtWar, friendTurnsWith, isCiv, leaderOf, seatOf, seatsAllied,
-  warDenounceHeld, warTurnsWith,
-} from './seats';
+  warDenounceHeld, warTurnsWith, allyAtWarWith } from './seats';
 import { goldenDedication } from './eras';
 import { isSuzerain } from './cityStates';
 import { civEraIndex } from './city';
@@ -113,6 +112,10 @@ export function warConditionHolds(state: GameState, seat: number, target: number
       if (!g1 || !g2 || g1 === g2) return false;
       return (GOVERNMENTS[g1]?.tier ?? 0) >= LATE_GOVERNMENT_TIER && (GOVERNMENTS[g2]?.tier ?? 0) >= LATE_GOVERNMENT_TIER;
     }
+    case 'allyAtWarWith':
+      // CIV6 (Third Party War): "Join another player's war against a target
+      // civilization." The other player read as an ALLY — see WarCondition.
+      return allyAtWarWith(state, seat, target);
     default:
       return false;
   }
