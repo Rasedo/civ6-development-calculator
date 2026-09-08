@@ -93,6 +93,15 @@ class SimEconomy:
         # the multiplier has to clear any id this engine can mint: need is
         # tens at most and halves at worst, so 2**20 leaves a 2**19 gap
         # between adjacent need levels and stays exact in f64.
+        if getattr(self, "_log_amen", False):
+            for _rb in range(B):
+                _rr = [self._lux_k] * int(rounds[_rb])
+                _rr += [int(gp_reach[_rb, _i]) for _i in range(int(gp_n[_rb]))]
+                _rr += [self._suz_spice_amen] * int(spice_n[_rb])
+                _rr += [self._suz_bonus_amen] * int(bonus_n[_rb])
+                self._amen_events.setdefault(_rb, []).append(
+                    f"r:{int(self._ROW_SEAT[row])} lux{int((counts > 0).long().sum(dim=1)[_rb])}"
+                    f" dup{int(dup[_rb])} reach[{','.join(str(x) for x in _rr)}]")
         seq = self.city_id[:, row, :cols].to(dt)
         kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)
         if bool((spice_n > 0).any()):
