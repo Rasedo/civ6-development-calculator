@@ -74,15 +74,21 @@ def seat(sim, row: int, name, leader=None):
 
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
-    assert len(sim._extra_unit_copy_rows) == 1 and len(sim._conquest_pop_rows) == 1
+    # the SAKA HORSE ARCHER's second copy is a row that names a CHASSIS
+    # rather than a class, so the copy table holds two
+    assert len(sim._extra_unit_copy_rows) == 2 and len(sim._conquest_pop_rows) == 1
     assert len(sim._not_founded_rows) == 2 and len(sim._extra_district_rows) == 1
     assert len(sim._city_tiles_rows) == 1 and len(sim._boost_pct_rows) == 2
-    assert len(sim._district_prereq_rows) == 1 and len(sim._war_weariness_rows) == 1
+    # the Canal's tech override, and the M'banza's CIVIC one
+    assert len(sim._district_prereq_rows) == 2 and len(sim._war_weariness_rows) == 1
     assert len(sim._peaceful_founder_rows) == 1 and len(sim._yield_per_suzerain_rows) == 1
     assert len(sim._governor_title_grant_rows) == 1 and len(sim._gp_refund_rows) == 1
     assert len(sim._evict_pct_rows) == 1
     light = sorted(UNITS[i] for i in range(sim.NU) if bool(sim._type_lightcav[i]))
-    assert light == ["CAVALRY", "COURSER", "HELICOPTER", "HORSEMAN"], light
+    # the four base rows, plus every unique LIGHT CAVALRY chassis the
+    # roster names (C-78): a new unique of that class joins this list
+    assert light == ["CAVALRY", "COSSACK", "COURSER", "HELICOPTER",
+                     "HORSEMAN", "HUSZAR", "MALON_RAIDER", "MOUNTIE"], light
     print("  1 wire OK — 13 families, 4 light-cavalry chassis")
 
 

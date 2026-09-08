@@ -683,6 +683,26 @@ export function localAmenities(state: GameState, city: City): number {
     n += civVariantOf(state, city.seat, DISTRICTS[d.type].civVariants)?.amenities ?? 0;
   }
   const civA = civOf(state, city.seat);
+  // THE VARIANT AMENITY CLAUSES pay the city that HOLDS the row, whether or
+  // not that row is regional: the Thermal Bath's "+2 additional Amenities if
+  // there is at least one Geothermal Fissure in this city's borders" names
+  // THIS city, and the Zoo it replaces is regional — reading them inside the
+  // non-regional walk below meant neither ever paid anybody.
+  for (const id of city.buildings) {
+    if (dark.has(id)) continue;
+    const bv = buildingVariantFor(civA, id);
+    if (!bv) continue;
+    // CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): more while its city's
+    // border holds a tile of one feature.
+    const awf = bv.amenitiesWithFeature;
+    if (awf && cityHasFeature(state, city, awf.feature)) n += awf.amount;
+    // CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES Amount 1): "Receive
+    // 1 Amenity for every Luxury resource this city has improved" — the
+    // DISTINCT kinds inside its own borders, so a second copy pays nothing.
+    if (bv.amenityPerLuxuryType) {
+      n += bv.amenityPerLuxuryType * cityImprovedResourceKinds(state, city, 'luxury').size;
+    }
+  }
   for (const id of city.buildings) {
     const def = effectiveBuilding(civA, id);
     if (!def || def.regional) continue;
@@ -690,16 +710,6 @@ export function localAmenities(state: GameState, city: City): number {
     n += def.amenities ?? 0;
     // CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): a unique building may
     // pay MORE while its city holds a tile of one feature.
-    const bvA = buildingVariantFor(civA, id);
-    const awf = bvA?.amenitiesWithFeature;
-    if (awf && cityHasFeature(state, city, awf.feature)) n += awf.amount;
-    // CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES Amount 1): "Receive
-    // 1 Amenity for every Luxury resource this city has improved" — the
-    // DISTINCT kinds inside this city's own borders, so a second copy of one
-    // pays nothing.
-    if (bvA?.amenityPerLuxuryType) {
-      n += bvA.amenityPerLuxuryType * cityImprovedResourceKinds(state, city, 'luxury').size;
-    }
     // CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
     if (def.autoCapital) for (const r of getModifiers(state, city.seat).capital) n += r.palaceAmenities ?? 0;
     if (def.poweredAmenities && city.powered) n += def.poweredAmenities;

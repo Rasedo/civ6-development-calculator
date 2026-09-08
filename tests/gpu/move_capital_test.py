@@ -54,9 +54,15 @@ def fresh(rules, path) -> BatchSim:
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
     assert len(sim._proj_seat_rows) == len(sim._proj_rows)
-    assert all(c < 0 and l < 0 for c, l in sim._proj_seat_rows), "a shipped project row is seat-gated"
-    assert not sim._proj_move_cap, "a shipped project row moves the capital"
-    print("  1 the wire OK — no gated row until the Cothon exists")
+    # THE COTHON'S PROJECT is the one seat-gated row and the one that moves a
+    # capital, and it is the LAST in the catalog, because a project's index IS
+    # its action code.
+    gated = [i for i, (c, l) in enumerate(sim._proj_seat_rows) if c >= 0 or l >= 0]
+    assert gated == [len(sim._proj_rows) - 1], f"the seat-gated projects are {gated}"
+    # `_proj_move_cap` is a SET of project indices, not a per-row flag list
+    assert sorted(sim._proj_move_cap) == gated, (
+        f"the capital-moving projects are {sorted(sim._proj_move_cap)}, the gated {gated}")
+    print("  1 the wire OK — the Cothon's project alone is gated, and it is last")
 
 
 def test_seat_gate(rules, path) -> None:

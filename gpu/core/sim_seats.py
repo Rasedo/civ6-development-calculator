@@ -8319,13 +8319,19 @@ class SimSeats:
         _bc = self._b_cols(row)
         selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols]) & ~_bc["regional"].unsqueeze(1)
         have = torch.einsum("bjn,bn->bj", selb.to(torch.float64), _bc["amenities"])
-        # CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): a unique building may
-        # pay MORE while its city's border holds a tile of one feature.
+        # THE VARIANT AMENITY CLAUSES pay the city that HOLDS the row, whether
+        # or not that row is REGIONAL: the Thermal Bath's Geothermal Amenities
+        # name "this city" and the Zoo it replaces is regional, so reading them
+        # off `selb` (which drops every regional row) paid nobody.
+        _held = self.city_bldg[:, row, :cols] & ~self._bldg_dark(
+            dreg, self.city_bldg_pillaged[:, row, :cols])
+        # CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): more while its city's
+        # border holds a tile of one feature.
         for (_abi, _aciv), (_afeat, _aamt) in self._bvar_amen_feat.items():
             _aw = self._row_plays_idx(row, _aciv)
             if not bool(_aw.any()):
                 continue
-            have = have + (selb[:, :, _abi] & _aw.unsqueeze(1)
+            have = have + (_held[:, :, _abi] & _aw.unsqueeze(1)
                            & self._city_has_feature(row, _afeat)).double() * _aamt
         # CIV6 (Grand Bazaar, GRANDBAZAAR_AMENITIES_LUXURIES): "Receive 1
         # Amenity for every Luxury resource this city has improved" — the
@@ -8334,7 +8340,7 @@ class SimSeats:
             _lw = self._row_plays_idx(row, _lciv)
             if not bool(_lw.any()):
                 continue
-            have = have + ((selb[:, :, _lbi] & _lw.unsqueeze(1)).double()
+            have = have + ((_held[:, :, _lbi] & _lw.unsqueeze(1)).double()
                            * self._city_improved_res_kinds(row, 3).double() * _lamt)
         # CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
         for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:

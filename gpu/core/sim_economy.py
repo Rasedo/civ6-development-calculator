@@ -4770,17 +4770,22 @@ class SimEconomy:
             elif di == self._campus_idx:
                 st_adj = add
         # CIV6 (M'banza, `MODIFIER_PLAYER_DISTRICT_ADJUST_BASE_YIELD_CHANGE`):
-        # a unique district's own FLAT yields, on top of its adjacency.
+        # a unique district's own FLAT yields, on top of its adjacency — PER
+        # INSTANCE, not once per city. The M'banza is a NEIGHBORHOOD and a
+        # city may hold several, which TS says by walking `city.districts` and
+        # the one-tile-per-type registry cannot say at all. `_dist_counts` is
+        # the same COUNT the district amenity and the loyalty terms read.
         if self._d_variant_flat and row < self.n_majors:
+            _fcnt = self._dist_counts(row)[:, :n].double()
             for _fdi, _fcivs in self._d_variant_flat.items():
                 for _fciv, _fvec in _fcivs.items():
                     _fw = self._row_plays_idx(row, _fciv)
                     if not bool(_fw.any()):
                         continue
-                    _flive = dlive[:, :, _fdi] & _fw.unsqueeze(1)
+                    _flive = _fcnt[:, :, _fdi] * _fw.unsqueeze(1).double()
                     for _fy, _fa in enumerate(_fvec):
                         if _fa:
-                            dist_y[:, :, _fy] = dist_y[:, :, _fy] + _flive.double() * _fa
+                            dist_y[:, :, _fy] = dist_y[:, :, _fy] + _flive * _fa
         # CIV6 (Nan Madol): "+2 Culture" from EVERY live district on or next to
         # shallow water — every slot, not only the ones with an adjacency yield.
         if self._suz_c_water_cul >= 0 and row < self.n_majors:
