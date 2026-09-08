@@ -35,7 +35,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
-| B-56r inert promotions | 1 | all three are sourced: the sight table needs a WALK ruling (ask 13), Ground Crews heals after acting, Boarding is a POST_COMBAT_YIELD row |
+| B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 13); Ground Crews waits on a PATROL that is no data row at all |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
@@ -216,11 +216,15 @@ Nothing open.
     `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION`, and NO amount: the
     modifier type is the whole rule, so the engine's own healing supplies the
     number. PATROL turns out to be no data row at all (C-34).
-  - BOARDING — `BOARDING_GOLD_FROM_NAVAL_VICTORY`,
-    `MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD`, `PercentDefeatedStrength 100`,
-    `YieldType YIELD_GOLD`, against an opponent of `DOMAIN_SEA`. It has a
-    magnitude, and this engine already exports and reads
-    `POST_COMBAT_YIELD_ROWS` — a missing ROW, not a missing mechanic.
+  - BOARDING SHIPPED with #242n. PercentDefeatedStrength 100, YIELD_GOLD,
+    against an opponent of DOMAIN_SEA. It was never a missing mechanic — but
+    it was not the seat-level POST_COMBAT_YIELD_ROWS channel either, because
+    the promotion belongs to the KILLING UNIT. It became a NAVAL_KILL_GOLD
+    promotion kind read at the kill event, which taught the GPU's
+    `_unit_kill_event` the killer's promo word: four of its eight call sites
+    already held it for the `_disciples_spread` standing right beside them,
+    and the other four are a city's shot or a nuke, where TS passes no killer
+    either.
 - **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
   - Ten `open: B-61r` rows in `docs/roster_ledger.json`: tourism x4,
     regional range x2, city-state absorption, barbarian conversion, ocean
