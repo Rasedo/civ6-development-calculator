@@ -444,7 +444,13 @@ for (let t = 0; t < N_TURNS; t++) {
   if (dlP) {
     for (const holder of cityHolders(state)) {
       for (const c of holder.cities) {
-        dlP.push(`pop:${holder.seat}:${state.turn}:${c.centerIndex}:sn ${c.population}`);
+        // `endTurn` has ALREADY advanced the clock by the time this runs, and
+        // every other emitter on this engine stamps the turn from inside the
+        // seat phase. Stamping `state.turn` here put these lines a turn ahead
+        // of their own engine: they could never pair with the GPU's, and the
+        // inflated maximum dragged the whole log's turn WINDOW forward with
+        // them, dropping the step lines of the turn before.
+        dlP.push(`pop:${holder.seat}:${state.turn - 1}:${c.centerIndex}:sn ${c.population}`);
       }
     }
   }
