@@ -250,15 +250,29 @@ the gate reaches is worth more here than one that re-reads the exporter.
     [(1,0), (1,-1), (0,-1), (-1,0), (0,1), (1,1)] — element for element the
     GPU's `even` and `odd` lists in `simbase`. Both keep their -1 slots, so
     the compaction is out too.
-  - AND THE ACTION NUMBER IS INDEED WHAT DIFFERS (#246C). At t155, seat 2,
-    rank j3, type 20, out of tile 357: TS replays `a3` and moves west; the
-    GPU applies `a5` and tries south-east. Rank j9 type 14 out of 492 is the
-    same story, `a1` against `a4`.
-  - THE REMAINING QUESTION is therefore not movement at all: it is whether
-    the record TS replays is the one the GPU applied. `_extract_record` reads
-    `sim._driven_useq[row]`, the multi-rank sequence, and the GPU applies the
-    same tensor — so either the sequence is re-decided between the apply and
-    the extract, or the two are indexing its ranks differently.
+  - THE ACTION NUMBERS MATCH; THE GPU IS ONE STEP AHEAD. Keyed on the ORDER
+    the pairs finally line up, and they say something different from what the
+    edge-keyed lines suggested:
+
+        D-GPU  st:2:155:13 ty20 a5 at447 to491 blocked
+        D-TS   st:2:155:13 ty20 a5 at402 to447 moved
+        D-GPU  st:2:155:9  ty14 a4 at492 to536 blocked
+        D-TS   st:2:155:9  ty14 a4 at449 to492 moved
+
+    Same rank, same type, SAME ACTION — and the GPU already stands on the
+    tile TS is only now moving into. The GPU took a further step for that
+    rank which TS never attempted at all: TS's last line for the rank is a
+    completed move, not a refusal.
+  - SO IT IS MOVEMENT POINTS. `applySeatUnitOrders` skips a unit whose
+    `movesLeft <= 0` and the GPU's step arm gates on `mp > 0`; the record
+    carries the same steps to both. One engine had the movement for another
+    hop and the other did not.
+  - AND THE COMPARISON COULD NOT HAVE SHOWN IT. `movesLeft` IS a compared
+    field, but once the two engines put the unit on different tiles its
+    census KEY differs, so the row prints as GPU-ONLY / TS-ONLY and no field
+    is ever compared. A key built from mutable position hides every field of
+    a row that moved — worth remembering before trusting a keyed diff's
+    silence.
   - ONE CAVEAT ON THE EVIDENCE, because it would mislead a reader who did not
     run it: the OTHER step pairs in that dump show different ORIGINS (TS
     402->447 against GPU 447->490). That is a window artifact — the log keeps
