@@ -8754,11 +8754,11 @@ class SimSeats:
         # `base` is a different sum; in `lux` alone, a different allocation of
         # the same one; in `have` with both of those equal, one of the terms
         # that join after the ranking.
-        if getattr(self, "_log_amen", False):
+        if getattr(self, "_log_diff", False):
             _wwv = self._ww_penalty(row, torch.float64)
             for _ab in range(self.B):
                 _ww1 = float(_wwv[_ab])
-                _lines = self._amen_events.setdefault(_ab, [])
+                _lines = self._diff_events.setdefault(_ab, [])
                 for _c in range(cols):
                     if not bool(alive[_ab, _c]):
                         continue
@@ -8772,7 +8772,10 @@ class SimSeats:
                 # turns before the walk that reads its count, and trimming it
                 # away is exactly the evidence this pair needs.
                 _keep = [x for x in _lines if x.startswith("g:")]
-                del _lines[:-32]
+                # wide enough to hold a turn's whole decomposition — the city
+                # lines, the seat's reach and every route candidate — because
+                # a window that drops half of one is a pair that cannot be read.
+                del _lines[:-96]
                 for _g in _keep:
                     if _g not in _lines:
                         _lines.insert(0, _g)
@@ -12980,8 +12983,24 @@ class SimSeats:
                 & ~exists_cs
                 & want.reshape(B, 1, 1)
             )
-            key_cs = torch.where(valid_cs, ysum_cs + self._route_post_gold(row, csc).unsqueeze(1).expand(B, RC, S),
+            _post_cs = self._route_post_gold(row, csc)                      # [B, S]
+            key_cs = torch.where(valid_cs, ysum_cs + _post_cs.unsqueeze(1).expand(B, RC, S),
                                  torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
+            # the ROUTE decomposition, `routeCandidateRow`'s twin: one line per
+            # city-state candidate that PASSED the gates, so a disagreeing pair
+            # names the term. A candidate one engine prints and the other does
+            # not is a gate, not a magnitude.
+            if getattr(self, "_log_diff", False):
+                for _rb in range(B):
+                    for _j in range(RC):
+                        for _s in range(S):
+                            if not bool(valid_cs[_rb, _j, _s]):
+                                continue
+                            self._diff_events.setdefault(_rb, []).append(
+                                f"rc:{int(self._ROW_SEAT[row])}:{-(2 + _s)}"
+                                f" f{int(centers[_rb, _j])} y{ysum_cs}"
+                                f" post{int(_post_cs[_rb, _s])}"
+                                f" key{int(key_cs[_rb, _j, _s])}")
             key = torch.cat([key, key_cs], dim=2)
             W2 = RC + S
         # INTERNATIONAL destinations join the SAME scan on the same key: any

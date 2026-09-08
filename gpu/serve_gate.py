@@ -72,7 +72,7 @@ def digest_diff(man: dict, gdig: dict, tdig: dict | None) -> tuple[list[str], li
     return bad, reps
 
 
-def amen_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
+def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
     """The amenity log, paired by CITY and trimmed to the disagreements.
 
     Both sides emit `c:<id> base.. lux.. ww.. have.. need.. bal.. tier..` once
@@ -93,8 +93,8 @@ def amen_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
         gl, tl = g.get(c), t.get(c)
         if gl == tl:
             continue
-        reps.append(f"  AM-GPU {gl if gl is not None else '(no line)'}")
-        reps.append(f"  AM-TS  {tl if tl is not None else '(no line)'}")
+        reps.append(f"  D-GPU  {gl if gl is not None else '(no line)'}")
+        reps.append(f"  D-TS   {tl if tl is not None else '(no line)'}")
     if not reps:
         reps.append(f"  AM     {len(g)} cities agree term for term")
     return reps
@@ -250,11 +250,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     _cb = os.environ.get("CIV6_CBLOG_B")
     if _cb is not None:
         sim._log_combat_b = int(_cb)
-    # CIV6_AMLOG_B arms the AMENITY decomposition for one game, the way
-    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_AMLOG from
+    # CIV6_DIFFLOG_B arms the AMENITY decomposition for one game, the way
+    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_DIFFLOG from
     # the environment it inherits.
-    if os.environ.get("CIV6_AMLOG"):
-        sim._log_amen = True
+    if os.environ.get("CIV6_DIFFLOG"):
+        sim._log_diff = True
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
@@ -458,9 +458,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                     print(f"  CB-GPU {ev}")
                                 for ev in dmp.get("cb", []):
                                     print(f"  CB-TS  {ev}")
-                            if sim._log_amen:
-                                for ln in amen_pairs(sim._amen_events.get(b, []),
-                                                     dmp.get("am", [])):
+                            if sim._log_diff:
+                                for ln in diff_pairs(sim._diff_events.get(b, []),
+                                                     dmp.get("dl", [])):
                                     print(ln)
                 if ckpt_every and (t + 1) % ckpt_every == 0:
                     assert ckpt_dir is not None
@@ -575,11 +575,11 @@ def main() -> None:
     _cb = os.environ.get("CIV6_CBLOG_B")
     if _cb is not None:
         sim._log_combat_b = int(_cb)
-    # CIV6_AMLOG_B arms the AMENITY decomposition for one game, the way
-    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_AMLOG from
+    # CIV6_DIFFLOG_B arms the AMENITY decomposition for one game, the way
+    # CIV6_CBLOG_B arms the combat rolls. The TS child reads CIV6_DIFFLOG from
     # the environment it inherits.
-    if os.environ.get("CIV6_AMLOG"):
-        sim._log_amen = True
+    if os.environ.get("CIV6_DIFFLOG"):
+        sim._log_diff = True
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]

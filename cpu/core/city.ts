@@ -500,8 +500,8 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     ...zanzibar,
     ...new Array<number>(bonusLux.size).fill(BUENOS_AIRES_AMENITIES),
   ];
-  const amR = (globalThis as { __amLog?: string[] }).__amLog;
-  if (amR) amR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
+  const dlR = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (dlR) dlR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
   for (const n of reach) {
     const ranked = [...cities].sort((a, b) => {
       const needA = amenitiesNeeded(a.population) - (baseHave.get(a.id)! + result.get(a.id)!);
@@ -1163,9 +1163,9 @@ export function computeCityStats(
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
   const tier = amenityTier(balance);
-  const am = (globalThis as { __amLog?: string[] }).__amLog;
-  if (am && record) {
-    am.push(`c:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
+  const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (dl && record) {
+    dl.push(`c:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
       + ` ww${warWearinessPenalty(wwMax(seatOf(state, city.seat)))} have${have} need${needed} bal${balance}`
       + ` tier${amenityTierIndex(tier.name)}`);
   }

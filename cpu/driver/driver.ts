@@ -80,8 +80,15 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
       if (!routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex)) continue;
       const cy = cityStateRouteYields(cityState);
-      const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith
-        + routePostGold(state, actor.seat, cityState.centerIndex);
+      const post = routePostGold(state, actor.seat, cityState.centerIndex);
+      const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith + post;
+      // the ROUTE decomposition: one line per city-state candidate that got
+      // this far, so a pair that disagrees names the term rather than the
+      // answer. Only candidates PAST the three gates reach here, which is
+      // itself the evidence when one engine prints a line and the other does
+      // not.
+      const dlC = (globalThis as { __diffLog?: string[] }).__diffLog;
+      if (dlC) dlC.push(`rc:${actor.seat}:${-(2 + ci)} f${from.centerIndex} y${ySum - post} post${post} key${ySum}`);
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
     }
     // An INTERNATIONAL destination competes on the same total-yield key as a
@@ -393,10 +400,10 @@ for (let t = 0; t < N_TURNS; t++) {
     const dumps: Record<string, unknown> = {};
     for (const g of ctl.dump) dumps[g] = groupDump(state, g);
     const cb = (globalThis as { __cbLog?: string[] }).__cbLog;
-    const am = (globalThis as { __amLog?: string[] }).__amLog;
+    const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
     const out: Record<string, unknown> = { dumps };
     if (cb) out.cb = cb.slice(-16);
-    if (am) out.am = am.slice(-24);
+    if (dl) out.dl = dl.slice(-96);
     o.send(out);
   }
 }

@@ -51,9 +51,9 @@ if (process.env.CIV6_SERVE_LOAD) {
 // CIV6_CBLOG arms the combat-roll log (combat.ts appends to the global when
 // it exists); the {dump} reply ships its tail beside the keyed group dumps.
 if (process.env.CIV6_CBLOG) (globalThis as { __cbLog?: string[] }).__cbLog = [];
-// CIV6_AMLOG arms the AMENITY decomposition log — city.ts appends one keyed
+// CIV6_DIFFLOG arms the AMENITY decomposition log — city.ts appends one keyed
 // line per recorded city walk, and the gate pairs them with the GPU's.
-if (process.env.CIV6_AMLOG) (globalThis as { __amLog?: string[] }).__amLog = [];
+if (process.env.CIV6_DIFFLOG) (globalThis as { __diffLog?: string[] }).__diffLog = [];
 
 const rd = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 const techList = Object.values(TECHS);
