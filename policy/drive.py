@@ -1188,7 +1188,8 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         else:
             cstyle = None
         policies = ladder.pick_policies(m["policies"], sim._seat_policy_slots(row), sim._pol_kind,
-                                        legacy=sim._pol_legacy >= 0, style=cstyle)
+                                        legacy=sim._pol_legacy >= 0, style=cstyle,
+                                        dark=sim._pol_dark_lo >= 0)
     war = None
     if seeds is not None and turn is not None:
         rng_w = {

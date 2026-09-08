@@ -12,9 +12,10 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     out, and the two engines are chatty in different proportions — so the two
     sides end up holding different turns and nothing pairs. Each prefix keeps
     its own last `keep`; the GRANT lines keep all, because a grant can sit
-    many turns before the walk that reads its count; and the STEP lines keep
-    the last two TURNS, because a line count straddles the turn boundary at a
-    different place on each engine and a straddled window pairs nothing.
+    many turns before the walk that reads its count; and the STEP and SPAWN
+    lines keep the last two TURNS, because a line count straddles the turn
+    boundary at a different place on each engine and a straddled window pairs
+    nothing.
     """
     by: dict[str, list[str]] = {}
     for ln in lines:
@@ -23,7 +24,7 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     for kind, group in by.items():
         if kind == "g":
             out.extend(group)
-        elif kind == "st":
+        elif kind in ("st", "sp"):
             _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
             out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
         else:

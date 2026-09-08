@@ -56,7 +56,7 @@ import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suz
 import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, UNIT_TYPE_IDX } from './units';
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, DISTRICT_SPECIALTY_COST, districtDiscountMult } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -1464,7 +1464,6 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
  */
 /** the unit catalog's order, which IS the GPU's type index — the
  *  decomposition log prints the number so the two sides compare directly. */
-const UNIT_TYPE_IDX = Object.keys(UNITS);
 
 export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][]): void {
   if (!steps || steps.length === 0) return;

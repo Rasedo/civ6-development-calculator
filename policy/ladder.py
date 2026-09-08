@@ -245,6 +245,8 @@ STYLE_PRESETS = {
     "scientist": {"deep": True, "dist_pref": "CAMPUS"},
     "faithful": {"dist_pref": "HOLY_SITE"},
     "culturist": {"dist_pref": "THEATER_SQUARE"},
+    # the reachability carrier for the thirteen Dark Age cards
+    "darkage": {"cards": "dark"},
     "navalist": {"dist_pref": "HARBOR",
                  "tier_order": ("settler", "trader", "galley", "district", "building",
                                 "wonder", "builder", "archaeologist", "engineer",
@@ -262,10 +264,15 @@ def style_of(name: str) -> dict:
 # seat (a style beats epsilon noise: the gate cannot see a decision, the
 # reachability probe can). Model choices, not fidelity claims — real Civ 6
 # leaves the choice to the player, and these are three players.
-CARDS_GREEDY, CARDS_LEGACY, CARDS_MILITARY = 0, 1, 2
-CARD_STYLE_NAMES = ("greedy", "legacy", "military")
+CARDS_GREEDY, CARDS_LEGACY, CARDS_MILITARY, CARDS_DARK = 0, 1, 2, 3
+CARD_STYLE_NAMES = ("greedy", "legacy", "military", "dark")
 CARD_LEGACY_SHARE = 0.34     # r < this: legacy-first
 CARD_MILITARY_SHARE = 0.33   # the next band: military-first; the rest greedy
+# DARK is NOT in the draw. `card_style_of` splits [0, 1) into three bands and
+# every rollout on record depends on where those edges fall; a fourth band
+# would move every seat's style in every fixture for no fidelity reason. It
+# is reachable through the STYLE TABLE alone (`--styles darkage`), which is
+# what a reachability carrier is for.
 
 
 def card_style_of(r: torch.Tensor) -> torch.Tensor:
@@ -302,19 +309,24 @@ def _lay_by_kind(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
 
 def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
                   legacy: torch.Tensor | None = None,
-                  style: torch.Tensor | None = None) -> torch.Tensor:
+                  style: torch.Tensor | None = None,
+                  dark: torch.Tensor | None = None) -> torch.Tensor:
     """[B, nPol] bool — the SLOTTED CARDS verb: which of the cards `mask`
     offers the seat slots this turn, under `nslots` [B, 4] per kind
     (military, economic, diplomatic, wildcard) with `kind` [nPol] per card,
     `legacy` [nPol] the legacy-card flag and `style` [B] the seat's card
-    style (`card_style_of`; None = greedy everywhere).
+    style (`card_style_of`; None = greedy everywhere) and `dark` [nPol] the
+    Dark Age flag.
 
     GREEDY is the fill both engines used to compute for themselves — table
     order, each kind filling its own slots, the overflow and the wildcard-kind
     cards taking the W slots. LEGACY-FIRST hands the W slots to the unlocked
     LEGACY cards before anything else — the one style that ever slots one,
     which is what makes the government legacy's accrued payout reachable. MILITARY-FIRST hands
-    the W slots to the military overflow first."""
+    the W slots to the military overflow first. DARK-FIRST hands them to the
+    Dark Age cards, which are wildcard-only and unlocked by no civic at all,
+    so no other style ever asks for one — the carrier that makes those rows
+    reachable rather than a claim about how anyone plays."""
     greedy = _lay_by_kind(mask, nslots, kind)
     if style is None:
         return greedy
@@ -322,8 +334,15 @@ def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
     legacy_first = _lay_by_kind(mask, nslots, kind, w_first=leg.unsqueeze(0).expand_as(mask))
     military_first = _lay_by_kind(mask, nslots, kind, w_first=(kind == 0).unsqueeze(0).expand_as(mask))
     st = style.unsqueeze(1)
-    return torch.where(st == CARDS_LEGACY, legacy_first,
-                       torch.where(st == CARDS_MILITARY, military_first, greedy))
+    out = torch.where(st == CARDS_LEGACY, legacy_first,
+                      torch.where(st == CARDS_MILITARY, military_first, greedy))
+    # the DARK fill is built only when a seat actually wears the style: no
+    # draw ever lands on it, so on every ordinary rollout this is free.
+    if dark is not None and bool((style == CARDS_DARK).any()):
+        dark_first = _lay_by_kind(mask, nslots, kind,
+                                  w_first=dark.unsqueeze(0).expand_as(mask))
+        out = torch.where(st == CARDS_DARK, dark_first, out)
+    return out
 
 
 def pick_research(blocks: dict, mask: torch.Tensor, kind: str,

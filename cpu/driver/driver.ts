@@ -75,10 +75,10 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
   const out: string[] = [];
   for (const [k, g] of by) {
     if (k === 'g') { out.push(...g); continue; }
-    // the STEP lines keep the last two TURNS, not the last N lines: a count
+    // the STEP and SPAWN lines keep the last two TURNS, not the last N: a count
     // straddles the turn boundary at a different place on each engine, and a
     // straddled window pairs the tail of one turn against the head of another.
-    if (k === 'st') {
+    if (k === 'st' || k === 'sp') {
       const ts = [...new Set(g.map((ln) => Number(ln.split(':')[2])))].sort((x, y) => x - y).slice(-2);
       out.push(...g.filter((ln) => ts.includes(Number(ln.split(':')[2]))));
       continue;

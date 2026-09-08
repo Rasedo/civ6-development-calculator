@@ -1705,6 +1705,10 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
   return best;
 }
 
+/** the catalog's order, which is how both engines name a chassis on the
+ *  wire and in the decomposition log. */
+export const UNIT_TYPE_IDX = Object.keys(UNITS);
+
 export function spawnUnit(
   state: GameState,
   unitType: string,
@@ -1746,6 +1750,15 @@ export function spawnUnit(
   // otherwise carry none until the next turn — the GPU's `_spawn_unit` writes
   // `unit_mp_full` beside `unit_mp` for the same reason.
   unit.movesFull = unit.movesLeft;
+  // the PLACEMENT half of the decomposition log. Keyed on the ANCHOR the
+  // caller asked for, never on the spot chosen: a disagreement about the
+  // spot is the whole point, and a key built from it would file the two
+  // sides as two unrelated lines instead of a pair.
+  const dlSp = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (dlSp) {
+    dlSp.push(`sp:${seat}:${state.turn}:${nearIndex}:${UNIT_TYPE_IDX.indexOf(unitType)}`
+      + ` at${spot.index}`);
+  }
   // FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
   if (capsOf(seat).xp) unit.xp = 0;
