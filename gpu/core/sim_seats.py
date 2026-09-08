@@ -8752,7 +8752,14 @@ class SimSeats:
                         f" have{float(balance[_ab, _c] + need[_ab, _c] + _ww1):g}"
                         f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
                         f" tier{int(tier_idx[_ab, _c])}")
+                # the GRANT lines survive the window: a grant can be many
+                # turns before the walk that reads its count, and trimming it
+                # away is exactly the evidence this pair needs.
+                _keep = [x for x in _lines if x.startswith("g:")]
                 del _lines[:-32]
+                for _g in _keep:
+                    if _g not in _lines:
+                        _lines.insert(0, _g)
         return tier_idx, growth_f.double(), yield_f.double(), lux_add
 
     def _clear_city_slot(self, b: int, row: int, col: int) -> None:

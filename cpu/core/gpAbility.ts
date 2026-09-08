@@ -284,6 +284,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if (fx.luxuryCopies) {
     const inv = (owner.gpLuxuries ??= []);
     for (let i = 0; i < fx.luxuryCopies; i++) inv.push(fx.luxuryAmenities ?? 1);
+    // THE GRANT, stamped — the GPU twin prints the same line, and what the
+    // pair has to separate is a whole-turn offset from a double grant.
+    const amG = (globalThis as { __amLog?: string[] }).__amLog;
+    if (amG) amG.push(`g:${unit.seat} t${state.turn} n${inv.length}`);
   }
   // CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
   if (fx.greatWorkKind !== undefined && city) {

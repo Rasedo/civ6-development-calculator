@@ -527,6 +527,15 @@ class SimGp:
             r = fits.nonzero(as_tuple=True)[0]
             self.civ_gp_lux[r, row, slot[r]] = reach[r]
             self.civ_gp_lux_n[r, row] = slot[r] + 1
+            # THE GRANT, stamped. `gpLuxuries` compares clean at the dump
+            # while the walk reads different counts, so what the log still
+            # has to separate is a whole-turn offset from a double grant.
+            if getattr(self, "_log_amen", False):
+                for _gb in r.tolist():
+                    self._amen_events.setdefault(_gb, []).append(
+                        f"g:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
+                        f" cls{int(cls[_gb])} at{int(at[_gb])}"
+                        f" n{int(self.civ_gp_lux_n[_gb, row])}")
 
     def _gp_strategic(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor) -> None:
         k = self._gp_fx(cls, at, "strategicSlot").long()
