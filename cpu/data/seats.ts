@@ -778,12 +778,41 @@ export const COMPETITION_TURNS = AGREEMENT_TURNS;
 export const COMPETITION_SILVER_PCT = 25;
 export const COMPETITION_BRONZE_PCT = 50;
 
+/**
+ * WHAT A COMPETITION COUNTS. CIV6 (Expansion2_Emergencies.xml,
+ * `<EmergencyScoreSources>`): one row per (competition, quantity), each with
+ * its own `ScoreAmount`, and several competitions score on more than one at
+ * once — which is why this is a LIST and not a single value.
+ *
+ * The install's own vocabulary, in its own words:
+ *   co2       `FromCO2Footprint`  — "Having CO2 emissions much lower than the
+ *                                   biggest CO2 polluter", per turn
+ *   gpp       `FromGreatPerson`   — the named class's Great Person POINTS
+ *                                   earned this turn
+ *   project   `FromProject`       — once, "Completing the X project"
+ *   building  `FromBuilding`      — per turn, "Maintaining Stadiums"
+ *   district  `FromDistrict`      — per turn, "Maintaining Campus Districts"
+ *
+ * `FromGold`, `FromFavor`, `FromAtWar` and `FromBadCO2Footprint` are the
+ * install's other four; they belong to the Aid Request, which needs a
+ * gold-gift verb this engine does not have yet.
+ */
+export type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district';
+export interface ScoreRow {
+  source: ScoreSource;
+  amount: number;
+  /** the row the source NAMES — a project id, a building id, a district id or
+   *  a Great Person class. `co2` names nothing. */
+  of?: string;
+}
+
 export interface CompetitionDef {
   id: string;
   name: string;
-  /** WHAT the competition counts each turn: the Climate Accords' emission
-   *  gap, or the World's Fair's Great Person points. */
-  scored: 'co2' | 'gpp';
+  /** WHAT the competition counts, one install `<EmergencyScoreSources>` row
+   *  apiece. Read in order; a competition scoring nothing this turn adds
+   *  nothing. */
+  scored: readonly ScoreRow[];
   /** Diplomatic Victory Points to the single highest score. */
   goldPoints: number;
   /** Diplomatic Favor to the top quarter, the gold winner included. */
@@ -806,34 +835,70 @@ export interface CompetitionDef {
  * A row belongs here only when its SCORED QUANTITY and all three tiers are
  * published — the ones that are not are open AUDIT items.
  */
+/** the eight classes the World's Fair scores — every Great Person class but
+ *  the Prophet (`WORLDS_FAIR_SCORE_GPP_*`, ScoreAmount 1 apiece). */
+const FAIR_GPP: readonly ScoreRow[] = ([
+  'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
+] as const).map((of) => ({ source: 'gpp' as const, amount: 1, of }));
+
 export const COMPETITIONS: readonly CompetitionDef[] = [
   // CIV6 (Climate Accords): scored "1 point per turn for each CO2 emission
-  // less than the highest polluter"; Gold "2 Diplomatic Victory points",
-  // Silver "100 Diplomatic Favor", Bronze "50 Diplomatic Favor".
-  { id: 'CLIMATE_ACCORDS', name: 'Climate Accords', scored: 'co2', goldPoints: 2, silverFavor: 100, bronzeFavor: 50 },
+  // less than the highest polluter", plus 100 apiece for the three
+  // decommission projects (CLIMATE_ACCORDS_SCORE_DECOMMISSION_*). Gold "2
+  // Diplomatic Victory points", Silver "100 Diplomatic Favor", Bronze "50".
+  {
+    id: 'CLIMATE_ACCORDS', name: 'Climate Accords',
+    scored: [
+      { source: 'co2', amount: 1 },
+      { source: 'project', amount: 100, of: 'DECOMMISSION_COAL_POWER_PLANT' },
+      { source: 'project', amount: 100, of: 'DECOMMISSION_OIL_POWER_PLANT' },
+      { source: 'project', amount: 100, of: 'DECOMMISSION_NUCLEAR_POWER_PLANT' },
+    ],
+    goldPoints: 2, silverFavor: 100, bronzeFavor: 50,
+  },
   // CIV6 (Expansion2_Emergencies.xml, EMERGENCY_WORLDS_FAIR): Duration 29,
   // LockoutTime 60; scored 1 point per Great Person POINT of every class
-  // earned during the window (eight `WORLDS_FAIR_SCORE_GPP_*` rows,
-  // ScoreAmount 1, over GENERAL/ADMIRAL/ENGINEER/MERCHANT/SCIENTIST/
-  // WRITER/ARTIST/MUSICIAN — the Prophet is not among them). FIRST PLACE
-  // +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
-  // Favor and 2 random civic boosts of the Industrial..Information eras;
-  // BOTTOM TIER 1 such boost.
+  // earned during the window. FIRST PLACE +1 Diplomatic Victory point and
+  // +100 Great Person points; TOP TIER +50 Favor and 2 random civic boosts of
+  // the Industrial..Information eras; BOTTOM TIER 1 such boost.
   {
-    id: 'WORLDS_FAIR', name: "World's Fair", scored: 'gpp',
+    id: 'WORLDS_FAIR', name: "World's Fair", scored: FAIR_GPP,
     goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
     goldGpp: 100, silverBoosts: 2, bronzeBoosts: 1,
     boostEras: ['Industrial', 'Information'],
   },
+  // CIV6 (EMERGENCY_WORLD_GAMES): Duration 29; scored 50 for "Completing the
+  // Training Athletes project" and 1 per turn for "Maintaining Stadiums" and
+  // "Maintaining Aquatic Centers". FIRST PLACE +1 Diplomatic Victory point;
+  // TOP TIER +50 Favor.
+  {
+    id: 'WORLD_GAMES', name: 'World Games',
+    scored: [
+      { source: 'project', amount: 50, of: 'TRAIN_ATHLETES' },
+      { source: 'building', amount: 1, of: 'STADIUM' },
+      { source: 'building', amount: 1, of: 'AQUATICS_CENTER' },
+    ],
+    goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
+  },
+  // CIV6 (EMERGENCY_SPACE_STATION): Duration 29; scored 30 for "Completing
+  // the Training Astronauts project", 5 per turn for "Maintaining Spaceport
+  // Districts" and 1 for "Maintaining Campus Districts". FIRST PLACE +1
+  // Diplomatic Victory point; TOP TIER +50 Favor.
+  {
+    id: 'SPACE_STATION', name: 'Space Station',
+    scored: [
+      { source: 'project', amount: 30, of: 'TRAIN_ASTRONAUTS' },
+      { source: 'district', amount: 5, of: 'SPACEPORT' },
+      { source: 'district', amount: 1, of: 'CAMPUS' },
+    ],
+    goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
+  },
 ];
-/** CIV6 (Expansion2_Emergencies.xml,
- *  CLIMATE_ACCORDS_SCORE_DECOMMISSION_{COAL,OIL,NUCLEAR}): `ScoreAmount`
- *  100 apiece, `FromProject` the decommission row — the Accords score the
- *  three projects alongside the emission gap. */
-export const COMPETITION_DECOMMISSION_SCORE = 100;
 
 export const COMPETITION_CLIMATE = 0;
 export const COMPETITION_WORLDS_FAIR = 1;
+export const COMPETITION_WORLD_GAMES = 2;
+export const COMPETITION_SPACE_STATION = 3;
 
 
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic

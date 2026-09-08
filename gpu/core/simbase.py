@@ -67,6 +67,15 @@ def neighbor_table(width: int, height: int) -> torch.Tensor:
 
 
 
+# The <EmergencyScoreSources> kinds, in the exporter's SCORE_SOURCES order —
+# this is the WIRE, so the positions are fixed.
+SCORE_CO2 = 0
+SCORE_GPP = 1
+SCORE_PROJECT = 2
+SCORE_BUILDING = 3
+SCORE_DISTRICT = 4
+
+
 @dataclass
 class Rules:
     focus_base: torch.Tensor

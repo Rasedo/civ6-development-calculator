@@ -26,6 +26,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core import simbase
 from warmup import settle_all
 
 
@@ -561,6 +562,70 @@ def main() -> None:
     assert int(simC.civ_diplo_points[0, 2]) == 0, "the tie paid gold twice"
     assert int(simC.civ_diplo_favor[0, 2]) == int(defn["bronze"]), "the tied runner-up missed bronze"
     print("  the competition runs its 30 turns, scores the CO2 gap and pays all three tiers")
+
+    # --- the two HOLDING-scored competitions --------------------------------
+    # CIV6 (Expansion2_Emergencies.xml): "Maintaining Stadiums" and
+    # "Maintaining Campus Districts" score every turn the venue STANDS, while
+    # "Completing the Training Athletes project" scores once. The engine walks
+    # the score TABLE, so what is proved here is the walk, not a per-row fork.
+    _cids = [c["id"] for c in simC._comps]
+    for _name, _kindf in (("WORLD_GAMES", simbase.SCORE_BUILDING),
+                          ("SPACE_STATION", simbase.SCORE_DISTRICT)):
+        assert _name in _cids, f"the catalog lost {_name}"
+        _k = _cids.index(_name)
+        _rows = simC._comp_scored[_k]
+        _held = [(a_, o_) for kk, a_, o_ in _rows if kk == _kindf]
+        _proj = [(a_, o_) for kk, a_, o_ in _rows if kk == simbase.SCORE_PROJECT]
+        assert len(_held) == 2 and len(_proj) == 1, (
+            f"{_name} scores {len(_held)} holdings and {len(_proj)} projects")
+
+        _s = build()
+        _s.comp_kind[:] = -1
+        _s.comp_score[:] = 0
+        _s.comp_member[:] = False
+        _kv = torch.full((_s.B,), _k, dtype=torch.long, device=_s.device)
+        _fl = torch.ones(_s.B, nrow, dtype=torch.bool, device=_s.device)
+        _s._start_competition(torch.ones(_s.B, dtype=torch.bool, device=_s.device), _kv, _fl)
+        _j = int(_s.city_alive[0, 0].long().argmax())
+        _amt, _of = _held[0]
+        if _kindf == simbase.SCORE_BUILDING:
+            _s.city_bldg[0, 0, _j, _of] = True
+        else:
+            # a district counts only once it STANDS: park it on a tile the
+            # city owns and leave it INCOMPLETE first
+            _t = int(_s.city_center[0, 0, _j])
+            _s.city_dist_tile[0, 0, _j, _of] = _t
+            _s.district_complete[0, _t] = False
+        _b0 = float(_s.comp_score[0, 0])
+        _s._competition_score()
+        if _kindf == simbase.SCORE_DISTRICT:
+            assert float(_s.comp_score[0, 0]) == _b0, (
+                f"{_name} scored a district that had not finished")
+            _s.district_complete[0, _t] = True
+            _s._competition_score()
+        assert float(_s.comp_score[0, 0]) == _b0 + _amt, (
+            f"{_name} scored {float(_s.comp_score[0, 0]) - _b0} for one holding, wanted {_amt}")
+        # ...and again next turn, because it is MAINTAINED
+        _s._competition_score()
+        assert float(_s.comp_score[0, 0]) == _b0 + 2 * _amt, (
+            f"{_name} did not pay its holding a second turn")
+        # a seat outside the field scores nothing at all
+        assert float(_s.comp_score[0, 1]) == 0.0, f"{_name} paid a seat with no venue"
+
+        # the PROJECT is an event: once, and only inside the field
+        _pa, _pi = _proj[0]
+        _hit = torch.zeros(_s.B, dtype=torch.bool, device=_s.device)
+        _hit[0] = True
+        _b1 = float(_s.comp_score[0, 0])
+        _s._score_project(0, _hit, _pi)
+        assert float(_s.comp_score[0, 0]) == _b1 + _pa, (
+            f"{_name} paid {float(_s.comp_score[0, 0]) - _b1} for its project, wanted {_pa}")
+        _s.comp_member[0, 1] = False
+        _b2 = float(_s.comp_score[0, 1])
+        _s._score_project(1, _hit, _pi)
+        assert float(_s.comp_score[0, 1]) == _b2, f"{_name} paid a seat outside the field"
+    print("  the World Games and the Space Station score their holdings per turn "
+          "and their project once")
 
     # --- ARMS CONTROL: the Congress reaches into the arsenal ----------------
     # CIV6 (Arms Control): "A: All players have their weapons of Mass

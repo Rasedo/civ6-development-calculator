@@ -1,6 +1,6 @@
 import type { City, GameState, Seat, Unit } from './types';
 import { repairBuilding } from './yields';
-import { scoreDecommission } from './competition';
+import { scoreProject } from './competition';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf } from './seats';
 import { NO_SEAT } from '../../world/types';
@@ -69,6 +69,10 @@ export function completeProject(state: GameState, city: City, projectId: string,
   if (!def) return;
   const owner = seatOf(state, city.seat);
   if (!owner) return;
+  // CIV6 (`FromProject`): a scored competition pays for "Completing the X
+  // project" whatever the project then goes on to do, so the score lands
+  // BEFORE the arms below, every one of which returns.
+  scoreProject(state, city.seat, def.id);
 
   if (def.repair) {
     // CIV6: "Once completed, it fully restores the HP of the city's (and
@@ -104,7 +108,6 @@ export function completeProject(state: GameState, city: City, projectId: string,
     city.buildings = city.buildings.filter((x) => x !== b);
     repairBuilding(city, b);
     if (b === 'NUCLEAR_POWER_PLANT') delete city.reactorAge;
-    scoreDecommission(state, city.seat);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }

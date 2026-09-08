@@ -15,7 +15,7 @@ import { availableProjects } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
 import { startCompetition } from '../../../cpu/core/competition';
 import { PROJECTS } from '../../../cpu/data/projects';
-import { COMPETITION_CLIMATE, COMPETITION_DECOMMISSION_SCORE } from '../../../cpu/data/seats';
+import { COMPETITION_CLIMATE, COMPETITIONS } from '../../../cpu/data/seats';
 import { GAME_SPEED } from '../../../cpu/data/constants';
 import type { City, GameState } from '../../../cpu/core/types';
 
@@ -46,9 +46,12 @@ describe('the decommission projects', () => {
       expect(p.cost).toBe(Math.round(400 * GAME_SPEED));
       expect(p.district).toBe('INDUSTRIAL_ZONE');
       expect(p.consumesBuilding).toBe(plant);
-      expect(p.accordsOnly).toBe(true);
+      expect(p.competitionOnly).toBe('CLIMATE_ACCORDS');
+      // ...and the Accords' own score table names the project at 100
+      const row = COMPETITIONS[COMPETITION_CLIMATE].scored
+        .find((r) => r.source === 'project' && r.of === id);
+      expect(row?.amount).toBe(100);
     }
-    expect(COMPETITION_DECOMMISSION_SCORE).toBe(100);
   });
 
   it('are offered only while a CLIMATE ACCORDS competition runs', () => {
@@ -74,7 +77,7 @@ describe('the decommission projects', () => {
     completeProject(state, city, 'DECOMMISSION_NUCLEAR_POWER_PLANT', 0);
     expect(city.buildings).not.toContain('NUCLEAR_POWER_PLANT');
     expect(city.reactorAge).toBeUndefined();
-    expect(state.competition!.score[0]).toBe(before + COMPETITION_DECOMMISSION_SCORE);
+    expect(state.competition!.score[0]).toBe(before + 100);
     expect(seatOf(state, 0)).toBeTruthy();
   });
 

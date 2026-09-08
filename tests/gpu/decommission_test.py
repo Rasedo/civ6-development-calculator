@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES  # noqa: E402
 from warmup import settle_all  # noqa: E402
+from core import simbase  # noqa: E402
 
 B0 = 0
 ROW = 0
@@ -45,7 +46,10 @@ def main() -> int:
 
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
     bids = [b["id"] for b in rj["buildings"]]
-    rows = [(i, r) for i, r in enumerate(sim._proj_rows) if int(r.get("ao", 0))]
+    # `ao` names the COMPETITION that unlocks the row, so the three
+    # decommission rows are the ones the Climate Accords open
+    rows = [(i, r) for i, r in enumerate(sim._proj_rows)
+            if int(r.get("ao", -1)) == sim._comp_climate]
     assert len(rows) == 3, f"the catalog carries {len(rows)} decommission rows, wanted 3"
 
     # 1 — the install's own columns
@@ -53,9 +57,12 @@ def main() -> int:
         cb = int(r.get("cb", -1))
         assert cb >= 0, "a decommission row names no building to consume"
         assert bids[cb].endswith("POWER_PLANT"), f"row consumes {bids[cb]}, not a plant"
-    assert sim._decommission_score == 100, (
-        f"CLIMATE_ACCORDS_SCORE_DECOMMISSION is 100, this sim says {sim._decommission_score}")
-    print(f"  1 catalog OK — 3 rows, each consuming its own plant, score {sim._decommission_score}")
+    # the Accords' own <EmergencyScoreSources> table names each row at 100
+    _acc = sim._comp_scored[sim._comp_climate]
+    for pi_c, _ in rows:
+        _amt = sum(a for k, a, o in _acc if k == simbase.SCORE_PROJECT and o == pi_c)
+        assert _amt == 100, f"CLIMATE_ACCORDS_SCORE_DECOMMISSION is 100, the table says {_amt}"
+    print("  1 catalog OK — 3 rows, each consuming its own plant, each scored 100")
 
     # 2 — the GATE: no Accords, no offer; and only the plant standing here
     pi, prow = rows[0]
@@ -64,17 +71,17 @@ def main() -> int:
     sim.city_bldg[B0, ROW, j, cb] = True
     sim.comp_kind[B0] = -1
     sim._eff_version += 1
-    assert not bool(sim._decommission_ok(ROW, j, pi)[B0]), (
+    assert not bool(sim._competition_project_ok(ROW, j, pi)[B0]), (
         "a decommission project was offered with no Climate Accords running")
 
     sim.comp_kind[B0] = sim._comp_climate
     sim._eff_version += 1
-    assert bool(sim._decommission_ok(ROW, j, pi)[B0]), (
+    assert bool(sim._competition_project_ok(ROW, j, pi)[B0]), (
         "the Accords are running and the plant stands, yet the row was refused")
 
     sim.city_bldg[B0, ROW, j, cb] = False
     sim._eff_version += 1
-    assert not bool(sim._decommission_ok(ROW, j, pi)[B0]), (
+    assert not bool(sim._competition_project_ok(ROW, j, pi)[B0]), (
         "a decommission project was offered with its plant absent")
     print("  2 gate OK — the Accords open it, the plant standing here is its second half")
 
@@ -99,10 +106,9 @@ def main() -> int:
     assert not bool(sim2.city_bldg[B0, ROW, j2, cb]), "the project did not consume its plant"
     assert not bool(sim2.city_bldg_pillaged[B0, ROW, j2, cb]), (
         "a pillage mark outlived the building it named")
-    assert float(sim2.comp_score[B0, ROW]) == before + sim2._decommission_score, (
-        f"the Accords scored {float(sim2.comp_score[B0, ROW]) - before}, "
-        f"wanted {sim2._decommission_score}")
-    print(f"  3 completion OK — the plant is gone and the Accords scored {sim2._decommission_score}")
+    assert float(sim2.comp_score[B0, ROW]) == before + 100, (
+        f"the Accords scored {float(sim2.comp_score[B0, ROW]) - before}, wanted 100")
+    print("  3 completion OK — the plant is gone and the Accords scored 100")
 
     print("DECOMMISSION OK")
     return 0

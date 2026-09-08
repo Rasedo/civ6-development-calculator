@@ -79,9 +79,11 @@ export interface ProjectDef {
   /** Gating CIVIC — the research half a tech cannot express. */
   requiresCivic?: string;
   /** CIV6 (Expansion2_Projects.xml, `UnlocksFromEffect`): offered only while
-   *  a CLIMATE ACCORDS competition is running — the effect that unlocks the
-   *  three decommission rows. */
-  accordsOnly?: boolean;
+   *  the NAMED scored competition is running — the effect that unlocks the
+   *  three decommission rows for the Climate Accords, the athletes for the
+   *  World Games and the astronauts for the Space Station. The value is the
+   *  competition's catalog id. */
+  competitionOnly?: string;
   /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor and reduces the
    *  civilization's lifetime carbon emissions by 50 CO2 points", and "allows
    *  the lifetime carbon emissions of a civilization to go below 0". */
@@ -238,9 +240,9 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // Cost 400 apiece, PrereqDistrict DISTRICT_INDUSTRIAL_ZONE,
     // `UnlocksFromEffect` (the Climate Accords competition opens them), and
     // each one's `Project_BuildingCosts` row names the plant it consumes.
-    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', accordsOnly: true, description: 'Removes the Coal Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', accordsOnly: true, description: 'Removes the Oil Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', accordsOnly: true, description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Coal Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Oil Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
 
     // CIV6 (Expansion2_Projects.xml, PROJECT_COTHON_CAPITAL_MOVE):
     // PrereqDistrict DISTRICT_COTHON, Cost 100,
@@ -248,6 +250,12 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // `MaxSimultaneousInstances=1`. APPENDED LAST — a project's catalog index
     // IS its action code, so an insert would shift every later one.
     P({ id: 'COTHON_CAPITAL_MOVE', name: 'Move the Capital', district: 'HARBOR', civ: 'PHOENICIA', yield: null, gpClass: null, cost: 100, costProgressGame: 1500, movesCapital: true, description: 'When complete, this seat capital moves to this city.' }),
+    // CIV6 (Expansion2_Projects.xml): the two SCORED-COMPETITION projects,
+    // both `UnlocksFromEffect` and both Cost 200 — offered only while their
+    // competition runs, repeatable while it does. APPENDED LAST, because a
+    // project's catalog index IS its action code.
+    P({ id: 'TRAIN_ATHLETES', name: 'Training Athletes', district: 'CITY_CENTER', yield: null, gpClass: null, cost: 200, competitionOnly: 'WORLD_GAMES', description: 'Repeatable while the World Games run: scores 50 for this seat.' }),
+    P({ id: 'TRAIN_ASTRONAUTS', name: 'Training Astronauts', district: 'SPACEPORT', yield: null, gpClass: null, cost: 200, competitionOnly: 'SPACE_STATION', description: 'Repeatable while the Space Station competition runs: scores 30 for this seat.' }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 

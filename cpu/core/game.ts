@@ -27,7 +27,7 @@ import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } f
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITION_CLIMATE } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
@@ -578,13 +578,14 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
       if (p.requiresProject && !done.includes(p.requiresProject)) return false;
       return canRunProject(state, city.seat, p.id);
     }
-    if (p.accordsOnly) {
-      // CIV6 (`UnlocksFromEffect`): the three decommission rows are opened by
-      // the CLIMATE ACCORDS competition and close with it; each one asks for
-      // the plant it consumes to be standing here.
+    if (p.competitionOnly) {
+      // CIV6 (`UnlocksFromEffect`): a competition project is opened by its
+      // own competition and closes with it. Where the row also CONSUMES a
+      // building (the three decommission rows), that building must be
+      // standing here.
       const live = competitionOf(state);
-      if (!live || live.kind !== COMPETITION_CLIMATE) return false;
-      return !!p.consumesBuilding && city.buildings.includes(p.consumesBuilding);
+      if (!live || COMPETITIONS[live.kind]?.id !== p.competitionOnly) return false;
+      return !p.consumesBuilding || city.buildings.includes(p.consumesBuilding);
     }
     if (p.recommission) {
       // CIV6: offered to a city whose Industrial Zone holds a Nuclear Power

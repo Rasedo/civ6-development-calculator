@@ -29,7 +29,7 @@ without an entry. No percentage: closed weight is deleted by design.
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
-| B-22r World Congress competitions | 1 | Aid Request's gold-to-rival scorer, three more scored quantities |
+| B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
@@ -155,11 +155,37 @@ Nothing open.
   - Civ 6 fixes the park rhombus's vertical; this hex frame has none, so
     every rhombus is offered. A model choice; nothing to build until a
     vertical is chosen.
-- **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 2.
-  The machinery takes one data row per scored competition.
-  - AID REQUEST scores gold SENT to the target player — needs a
-    gold-to-a-rival scorer. BORDER DISPUTE, CATASTROPHE and MILITARY
-    COMPETITION each want their own scored quantity.
+- **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 1.
+  - THE SCORE TABLE SHIPPED with #244s. `<EmergencyScoreSources>` is one row
+    per (competition, quantity) with its own `ScoreAmount`, and several
+    competitions score on more than one at once, so `scored` stopped being a
+    single value and became a LIST of (kind, amount, of) rows on both
+    engines. Five kinds are live: `FromCO2Footprint`, `FromGreatPerson`,
+    `FromProject`, `FromBuilding`, `FromDistrict`. The Climate Accords'
+    decommission bonus, which had its own constant and its own call site,
+    folded into the table as three ordinary `FromProject` rows.
+  - THE WORLD GAMES and the SPACE STATION shipped with it — both score on
+    holdings ("Maintaining Stadiums", "Maintaining Campus Districts") plus a
+    project, and both publish all three tiers (FIRST PLACE 1 Diplomatic
+    Victory point, TOP TIER 50 Favor). Their two projects, `TRAIN_ATHLETES`
+    and `TRAIN_ASTRONAUTS`, are `UnlocksFromEffect` rows like the
+    decommission three, so `accordsOnly` became `competitionOnly`, naming
+    the competition that opens the row.
+  - NEITHER competition's EXTRA rewards are modelled: the World Games pay
+    tourism onto a first-place Campus and onto each tier's Stadiums and
+    Aquatics Centers (2/2/1), and the Space Station pays space-race project
+    production (+40% top tier, +20% bottom) and a first-place spaceship
+    speed. All published, none built — a reward channel each engine lacks.
+  - AID REQUEST is the one competition still absent. It scores `FromGold`
+    ("Sending gifts of Gold to the Target", 1 per gold), `FromProject`
+    `PROJECT_SEND_AID` at 200, `FromAtWar` at -30 and `FromBadCO2Footprint`
+    at -400; its tiers are published too (2 Diplomatic Victory points, 100
+    and 50 Favor). What it needs is a GOLD-GIFT verb — no engine can send
+    gold to a named rival — and a disaster TRIGGER, since it is the one
+    competition the Congress does not vote in.
+  - BORDER DISPUTE and CATASTROPHE, which an earlier draft of this entry
+    named, are in neither the install's fifteen emergency types nor this
+    engine's catalog. They were never rows; the line is withdrawn.
   - THE NOBEL PRIZE competitions are Sweden-only (C-26).
 - **B-24r. GOVERNOR TAILS.** Weight 2.
   - The district PURCHASE verb SHIPPED with #244p, gold and faith both, and

@@ -174,8 +174,10 @@ describe("the Cothon's project", () => {
     expect(early).toBe(PROJECTS.COTHON_CAPITAL_MOVE.cost);
   });
 
-  it('is the LAST row in the catalog, so no action code moved', () => {
+  it('sits past every row that existed when it landed, so no action code moved', () => {
+    // The pin is the POSITION, not the last slot: the catalog is append-only,
+    // so later rows land behind this one and the count grows.
     const ids = Object.keys(PROJECTS);
-    expect(ids[ids.length - 1]).toBe('COTHON_CAPITAL_MOVE');
+    expect(ids.indexOf('COTHON_CAPITAL_MOVE')).toBe(ids.indexOf('DECOMMISSION_NUCLEAR_POWER_PLANT') + 1);
   });
 });

@@ -647,9 +647,15 @@ class SimInit:
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])
         self._comps = list(_er2["competitions"])
-        self._comp_climate = [c["id"] for c in self._comps].index("CLIMATE_ACCORDS")
         _cids = [c["id"] for c in self._comps]
+        self._comp_climate = _cids.index("CLIMATE_ACCORDS")
         self._comp_fair = _cids.index("WORLDS_FAIR") if "WORLDS_FAIR" in _cids else -1
+        # ONE <EmergencyScoreSources> table per competition, as [kind, amount,
+        # of] rows: kind indexes the SCORE_* constants, `of` names the Great
+        # Person class / project / building / district the kind reads, and -1
+        # where the kind names nothing.
+        self._comp_scored = [[(int(k), int(a), int(o)) for k, a, o in c["scored"]]
+                             for c in self._comps]
         self._c_wr_rs = int(_er2["congressWorldReligionRs"])
         self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
@@ -2416,7 +2422,6 @@ class SimInit:
         self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
         self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
         self._flood_bldg_p = torch.tensor([float(x) for x in _ds["floodBldgP"]], dtype=torch.float64, device=device)
-        self._decommission_score = int(_ds["decommissionScore"])
         self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
         self._flood_dmg_lo = torch.tensor([int(x) for x in _ds["floodDmgLo"]], dtype=torch.long, device=device)
         self._flood_dmg_hi = torch.tensor([int(x) for x in _ds["floodDmgHi"]], dtype=torch.long, device=device)

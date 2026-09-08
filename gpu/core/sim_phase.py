@@ -1124,6 +1124,10 @@ class SimPhase:
                     hit = made_p & (pi == pidx)
                     if not bool(hit.any()):
                         continue
+                    # CIV6 (FromProject): a scored competition pays for
+                    # "Completing the X project" whatever the project then
+                    # goes on to do, so the score lands FIRST, as TS's does.
+                    self._score_project(row, hit, pidx)
                     y_i = int(prow.get("y", -1))
                     # ORACLE: applyLumpYield's science/culture arms feed the
                     # LIFETIME banks alongside the pools.
@@ -1161,18 +1165,13 @@ class SimPhase:
                         # CIV6 (Project_BuildingCosts): the project CONSUMES the
                         # plant it names — "removes the Power Plant and all its
                         # effects from this city". Its pillage mark and the
-                        # reactor's own age go with it, and the CLIMATE ACCORDS
-                        # score the completion (ScoreAmount 100).
+                        # reactor's own age go with it.
                         _dr = hit.nonzero(as_tuple=True)[0]
                         if len(_dr) > 0:
                             self.city_bldg[_dr, row, col[_dr], _cb] = False
                             self.city_bldg_pillaged[_dr, row, col[_dr], _cb] = False
                             if _cb == self._nuclear_bidx:
                                 self.city_reactor_age[_dr, row, col[_dr]] = 0
-                            _sc = ((self.comp_kind[_dr] == self._comp_climate)
-                                   & self.comp_member[_dr, row])
-                            if bool(_sc.any()):
-                                self.comp_score[_dr[_sc], row] += self._decommission_score
                             self._eff_version += 1
                     if int(prow.get("rec", 0)):
                         # CIV6 (Recommission Nuclear Reactor): the age counts

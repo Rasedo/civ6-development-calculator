@@ -341,8 +341,8 @@ class SimSeats:
                     okp_m = okp_m & self._wmd_project_ok(row, pi_m)
                 elif int(prow_m.get("rec", 0)):
                     okp_m = okp_m & self._recommission_ok(row, j, pi_m)
-                elif int(prow_m.get("ao", 0)):
-                    okp_m = okp_m & self._decommission_ok(row, j, pi_m)
+                elif int(prow_m.get("ao", -1)) >= 0:
+                    okp_m = okp_m & self._competition_project_ok(row, j, pi_m)
                 _rv = int(prow_m.get("rv", -1))
                 if _rv >= 0:
                     okp_m = okp_m & self.civ_civics[:, row, _rv]
@@ -2918,16 +2918,20 @@ class SimSeats:
             ok = ok & self.civ_techs[:, row, rt]
         return ok
 
-    def _decommission_ok(self, row: int, j: int, pi: int) -> torch.Tensor:
-        """[B] — may city slot `j` start a DECOMMISSION project? CIV6
-        (`UnlocksFromEffect`): the three rows are opened by the CLIMATE
-        ACCORDS competition and close with it, and each asks for the plant
-        it consumes to be standing here (`availableProjects` twin)."""
-        cb = int(self._proj_rows[pi].get("cb", -1))
-        if cb < 0:
+    def _competition_project_ok(self, row: int, j: int, pi: int) -> torch.Tensor:
+        """[B] — may city slot `j` start a COMPETITION project? CIV6
+        (`UnlocksFromEffect`): the row is opened by its own scored competition
+        and closes with it, and where it also CONSUMES a building (the three
+        decommission rows) that building must be standing here
+        (`availableProjects` twin)."""
+        k = int(self._proj_rows[pi].get("ao", -1))
+        if k < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        live = (self.comp_kind >= 0) & (self.comp_kind == self._comp_climate)
-        return live & self.city_bldg[:, row, j, cb]
+        ok = (self.comp_kind >= 0) & (self.comp_kind == k)
+        cb = int(self._proj_rows[pi].get("cb", -1))
+        if cb >= 0:
+            ok = ok & self.city_bldg[:, row, j, cb]
+        return ok
 
     def _project_resource_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — can this seat pay the project's one-time resource charge?"""
@@ -6099,24 +6103,58 @@ class SimSeats:
         self.comp_member[fire] = (field & live)[fire]
 
     def _competition_score(self) -> None:
-        """CIV6 (Climate Accords): "1 point per turn for each CO2 emission less
-        than the highest polluter" — the WORLD's highest, so the top polluter
-        scores nothing. `scoreTurn`'s twin."""
-        run = (self.comp_kind >= 0) & (self.comp_kind == self._comp_climate)
-        if bool(run.any()):
-            emit = self.civ_co2_turn[:, : self.n_majors]
-            top = emit.max(dim=1, keepdim=True).values
-            gain = (top - emit).clamp(min=0)
+        """THE TURN'S SCORE, one <EmergencyScoreSources> row at a time —
+        `scoreTurn`'s twin.
+
+        Every PER-TURN kind is here; `FromProject` is an EVENT and is paid at
+        the completion instead, so a competition whose rows are all projects
+        adds nothing on an ordinary turn."""
+        # the WORLD's biggest polluter, read once — the top polluter scores
+        # nothing off its own emission
+        emit = self.civ_co2_turn[:, : self.n_majors]
+        top = emit.max(dim=1, keepdim=True).values
+        for k, rows in enumerate(self._comp_scored):
+            run = (self.comp_kind >= 0) & (self.comp_kind == k)
+            if not bool(run.any()):
+                continue
             add = run.unsqueeze(1) & self.comp_member
+            gain = torch.zeros(self.B, self.n_majors, dtype=torch.float64, device=self.device)
+            for kind, amount, of in rows:
+                if kind == simbase.SCORE_CO2:
+                    gain += amount * (top - emit).clamp(min=0).double()
+                elif kind == simbase.SCORE_GPP and of >= 0:
+                    gain += amount * self.civ_gpp_turn[:, : self.n_majors, of].double()
+                elif kind == simbase.SCORE_BUILDING and of >= 0:
+                    # CIV6 (FromBuilding): "Maintaining Stadiums" — every copy
+                    # this seat holds, every turn.
+                    for r in range(self.n_majors):
+                        gain[:, r] += amount * (
+                            self.city_alive[:, r] & self.city_bldg[:, r, :, of]).sum(dim=1).double()
+                elif kind == simbase.SCORE_DISTRICT and of >= 0:
+                    # CIV6 (FromDistrict): "Maintaining Campus Districts" — a
+                    # district counts once it STANDS.
+                    for r in range(self.n_majors):
+                        reg = self.city_dist_tile[:, r, :, of]
+                        live = ((reg >= 0)
+                                & self.district_complete.gather(1, reg.clamp(min=0))
+                                & self.city_alive[:, r])
+                        gain[:, r] += amount * live.sum(dim=1).double()
             self.comp_score += torch.where(add, gain, torch.zeros_like(gain)).to(self.comp_score.dtype)
-        # CIV6 (World's Fair): "1 point per Great Person POINT of every class"
-        # earned during the window — the eight `WORLDS_FAIR_SCORE_GPP_*` rows,
-        # ScoreAmount 1 apiece. The Prophet is not among them.
-        fair = (self.comp_kind >= 0) & (self.comp_kind == self._comp_fair)
-        if bool(fair.any()) and self._fair_gp_classes:
-            gp = self.civ_gpp_turn[:, : self.n_majors][:, :, self._fair_gp_classes].sum(dim=2)
-            addf = fair.unsqueeze(1) & self.comp_member
-            self.comp_score += torch.where(addf, gp, torch.zeros_like(gp)).to(self.comp_score.dtype)
+
+    def _score_project(self, row: int, hit: torch.Tensor, pi: int) -> None:
+        """CIV6 (FromProject): "Completing the X project" scores its
+        `ScoreAmount` once, for a seat inside the field. `scoreProject`'s
+        twin — the three decommission rows, the athletes and the astronauts
+        all arrive here."""
+        if row >= self.n_majors or not bool(hit.any()):
+            return
+        for k, rows in enumerate(self._comp_scored):
+            amt = sum(a for kind, a, of in rows if kind == simbase.SCORE_PROJECT and of == pi)
+            if not amt:
+                continue
+            pay = hit & (self.comp_kind == k) & self.comp_member[:, row]
+            if bool(pay.any()):
+                self.comp_score[:, row] += pay.to(self.comp_score.dtype) * amt
 
     def _boost_random_civics(self, row: int, hit: torch.Tensor, n: int,
                              lo: int, hi: int) -> None:

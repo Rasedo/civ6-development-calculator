@@ -20,10 +20,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { resolveCompetition, startCompetition, competitionOf } from '../../../cpu/core/competition';
+import { resolveCompetition, startCompetition, competitionOf, scoreProject } from '../../../cpu/core/competition';
 import { emitCarbon } from '../../../cpu/core/climate';
 import {
   COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS, COMPETITION_WORLDS_FAIR,
+  COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION,
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
@@ -77,7 +78,13 @@ describe("the World's Fair", () => {
     // CIV6 (Expansion2_Emergencies.xml, EMERGENCY_WORLDS_FAIR): FIRST PLACE
     // +1 Diplomatic Victory point and +100 Great Person points; TOP TIER +50
     // Favor and 2 random Industrial..Information civic boosts; BOTTOM 1.
-    expect(FAIR.scored).toBe('gpp');
+    // the eight `WORLDS_FAIR_SCORE_GPP_*` rows, ScoreAmount 1 apiece — every
+    // Great Person class but the Prophet
+    expect(FAIR.scored.map((r) => r.source)).toEqual(Array(8).fill('gpp'));
+    expect(FAIR.scored.map((r) => r.of)).toEqual([
+      'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
+    ]);
+    expect(FAIR.scored.every((r) => r.amount === 1)).toBe(true);
     expect(FAIR.goldPoints).toBe(1);
     expect(FAIR.goldGpp).toBe(100);
     expect(FAIR.silverFavor).toBe(50);
@@ -163,5 +170,86 @@ describe('a scored competition', () => {
     for (let i = 0; i < COMPETITION_TURNS; i++) burn(state, [10, 0, 0]);
     expect(state.seats[1].diplomaticPoints).toBe(CLIMATE.goldPoints);
     expect(state.seats[2].diplomaticPoints ?? 0).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE TWO COMPETITIONS THAT SCORE ON HOLDINGS.
+//
+// CIV6 (Expansion2_Emergencies.xml): "Maintaining Stadiums" and "Maintaining
+// Campus Districts" score every turn the building or district STANDS, while
+// "Completing the Training Athletes project" scores once. That split is the
+// whole point of the table being a list — the World Games score on all three
+// at once, and the engine walks the rows rather than forking on the row's id.
+// ---------------------------------------------------------------------------
+describe('the World Games', () => {
+  it('carries the install score table and rewards', () => {
+    const g = COMPETITIONS[COMPETITION_WORLD_GAMES];
+    expect(g.scored).toEqual([
+      { source: 'project', amount: 50, of: 'TRAIN_ATHLETES' },
+      { source: 'building', amount: 1, of: 'STADIUM' },
+      { source: 'building', amount: 1, of: 'AQUATICS_CENTER' },
+    ]);
+    expect(g.goldPoints).toBe(1);
+    expect(g.silverFavor).toBe(50);
+    expect(g.bronzeFavor).toBe(0);
+  });
+
+  it('scores a Stadium every turn it stands, and each city separately', () => {
+    const state = table();
+    startCompetition(state, COMPETITION_WORLD_GAMES, [0, 1, 2]);
+    state.seats[0].cities[0].buildings.push('STADIUM', 'AQUATICS_CENTER');
+    state.seats[1].cities[0].buildings.push('STADIUM');
+    resolveCompetition(state);
+    const c = competitionOf(state)!;
+    expect(c.score[0]).toBe(2);   // both venues, 1 apiece
+    expect(c.score[1]).toBe(1);
+    expect(c.score[2]).toBe(0);
+    resolveCompetition(state);
+    expect(c.score[0]).toBe(4);   // ...and again next turn: it is MAINTAINED
+  });
+
+  it('pays the athletes project once, at its completion', () => {
+    const state = table();
+    startCompetition(state, COMPETITION_WORLD_GAMES, [0, 1, 2]);
+    scoreProject(state, 0, 'TRAIN_ATHLETES');
+    const c = competitionOf(state)!;
+    expect(c.score[0]).toBe(50);
+    // a project no row names pays nothing, and a seat outside the field
+    // scores nothing at all
+    scoreProject(state, 0, 'TRAIN_ASTRONAUTS');
+    expect(c.score[0]).toBe(50);
+    c.member[1] = 0;
+    scoreProject(state, 1, 'TRAIN_ATHLETES');
+    expect(c.score[1]).toBe(0);
+  });
+});
+
+describe('the Space Station', () => {
+  it('carries the install score table and rewards', () => {
+    const s = COMPETITIONS[COMPETITION_SPACE_STATION];
+    expect(s.scored).toEqual([
+      { source: 'project', amount: 30, of: 'TRAIN_ASTRONAUTS' },
+      { source: 'district', amount: 5, of: 'SPACEPORT' },
+      { source: 'district', amount: 1, of: 'CAMPUS' },
+    ]);
+    expect(s.goldPoints).toBe(1);
+    expect(s.silverFavor).toBe(50);
+  });
+
+  it('counts only districts that STAND', () => {
+    const state = table();
+    startCompetition(state, COMPETITION_SPACE_STATION, [0, 1, 2]);
+    const city = state.seats[0].cities[0];
+    const port = tileAtCoords(state.map, 4, 6);
+    port.district = 'SPACEPORT';
+    port.districtComplete = false;
+    city.districts.push({ type: 'SPACEPORT', tileIndex: port.index });
+    resolveCompetition(state);
+    const c = competitionOf(state)!;
+    expect(c.score[0]).toBe(0);   // queued, not finished
+    port.districtComplete = true;
+    resolveCompetition(state);
+    expect(c.score[0]).toBe(5);
   });
 });

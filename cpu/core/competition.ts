@@ -21,9 +21,7 @@ import { boostRandom } from './gpAbility';
 import { ERAS } from '../data/techs';
 import type { Era } from '../data/techs';
 import {
-  COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_CLIMATE,
-  COMPETITION_DECOMMISSION_SCORE, COMPETITION_SILVER_PCT,
-  COMPETITION_TURNS,
+  COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_SILVER_PCT, COMPETITION_TURNS,
 } from '../data/seats';
 import { isCiv, seatOf } from './seats';
 import { getModifiers } from './effects';
@@ -52,46 +50,71 @@ export function startCompetition(state: GameState, kind: number, field: readonly
   state.competition = { kind, left: COMPETITION_TURNS, score: Array.from({ length: n }, () => 0), member };
 }
 
-/** CIV6 (Climate Accords): "1 point per turn for each CO2 emission less than
- *  the highest polluter" — the world's highest, not the field's, and a seat
- *  that IS the highest polluter scores nothing. */
+/**
+ * THE TURN'S SCORE, one `<EmergencyScoreSources>` row at a time.
+ *
+ * Every PER-TURN source is here; the one EVENT source, `FromProject`, is paid
+ * by `scoreProject` at the completion instead. A competition whose rows are
+ * all events adds nothing on an ordinary turn, which is why this walks the
+ * table rather than forking on the competition.
+ */
 function scoreTurn(state: GameState, c: Competition): void {
   const def = COMPETITIONS[c.kind];
   if (!def) return;
-  if (def.scored === 'co2') {
-    let top = 0;
-    for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2Turn ?? 0);
-    for (let i = 0; i < c.member.length; i++) {
-      if (!c.member[i]) continue;
-      const sx = seatOf(state, i);
-      if (!sx) continue;
-      c.score[i] += Math.max(0, top - (sx.co2Turn ?? 0));
-    }
-    return;
-  }
-  // CIV6 (World's Fair): "1 point per Great Person POINT of every class"
-  // earned during the window — the eight `WORLDS_FAIR_SCORE_GPP_*` rows,
-  // ScoreAmount 1 apiece. The Prophet is not among them.
+  // CIV6 (`FromCO2Footprint`): "Having CO2 emissions much lower than the
+  // biggest CO2 polluter" — the WORLD's biggest, not the field's, so the top
+  // polluter scores nothing. Read once, not once per member.
+  let top = 0;
+  for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2Turn ?? 0);
   for (let i = 0; i < c.member.length; i++) {
     const sx = c.member[i] ? seatOf(state, i) : undefined;
     if (!sx) continue;
-    let sum = 0;
-    for (const cls of FAIR_CLASSES) sum += sx.gppTurn?.[cls] ?? 0;
-    c.score[i] += sum;
+    let gain = 0;
+    for (const row of def.scored) {
+      switch (row.source) {
+        case 'co2':
+          gain += row.amount * Math.max(0, top - (sx.co2Turn ?? 0));
+          break;
+        // CIV6 (`FromGreatPerson`): the named class's points EARNED this turn.
+        case 'gpp':
+          gain += row.amount * (sx.gppTurn?.[row.of as GreatPersonClass] ?? 0);
+          break;
+        // CIV6 (`FromBuilding`): "Maintaining Stadiums" — every copy this
+        // seat holds, every turn.
+        case 'building':
+          for (const city of sx.cities) if (city.buildings.includes(row.of ?? '')) gain += row.amount;
+          break;
+        // CIV6 (`FromDistrict`): "Maintaining Campus Districts" — a district
+        // counts once it STANDS, so an unfinished one pays nothing.
+        case 'district':
+          for (const city of sx.cities) {
+            for (const d of city.districts) {
+              if (d.type === row.of && state.map.tiles[d.tileIndex]?.districtComplete) gain += row.amount;
+            }
+          }
+          break;
+        default:
+          break;  // 'project' is an event, paid by `scoreProject`
+      }
+    }
+    c.score[i] += gain;
   }
 }
 
-/** CIV6 (CLIMATE_ACCORDS_SCORE_DECOMMISSION_*): a decommission project
- *  completed during the window scores its seat `ScoreAmount` 100, beside the
- *  per-turn emission gap. A seat outside the field scores nothing. */
-export function scoreDecommission(state: GameState, seat: number): void {
+/** CIV6 (`FromProject`): "Completing the X project" scores its `ScoreAmount`
+ *  once, for a seat inside the field. The three decommission rows, the
+ *  athletes and the astronauts all arrive here. */
+export function scoreProject(state: GameState, seat: number, project: string): void {
   const c = state.competition;
-  if (!c || c.kind !== COMPETITION_CLIMATE || !c.member[seat]) return;
-  c.score[seat] += COMPETITION_DECOMMISSION_SCORE;
+  if (!c || !c.member[seat]) return;
+  for (const row of COMPETITIONS[c.kind]?.scored ?? []) {
+    if (row.source === 'project' && row.of === project) c.score[seat] += row.amount;
+  }
 }
 
 /** CIV6 (Expansion2_Emergencies.xml): the eight classes the World's Fair
- *  scores — every Great Person class but the Prophet. */
+ *  scores — every Great Person class but the Prophet. Its GOLD reward spreads
+ *  over the same eight. */
 const FAIR_CLASSES: readonly GreatPersonClass[] = [
   'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
 ];

@@ -322,11 +322,13 @@ def test_repair_project(rules, path) -> None:
     rep = next(i for i, p in enumerate(sim._proj_rows) if int(p.get("rep", 0)))
     assert int(sim._proj_rows[rep].get("cc", 0)) == 1, "the repair must ride the CITY CENTER channel"
     # The channel is shared now (the nuclear chain runs in the City Center
-    # too), so what it must not do is skip a row own gate: every cc row
-    # carries one of the repair / one-time / device flags.
+    # too, and so do the scored-competition projects), so what it must not do
+    # is skip a row's own gate: every cc row carries one of the repair /
+    # one-time / device flags, or names the competition window that opens it.
     for _p in sim._proj_rows:
         if int(_p.get("cc", 0)):
-            assert int(_p.get("rep", 0)) or int(_p["one"]) or int(_p.get("wmd", 0)), \
+            assert (int(_p.get("rep", 0)) or int(_p["one"]) or int(_p.get("wmd", 0))
+                    or int(_p.get("ao", -1)) >= 0), \
                 "a City Center project with no gate of its own would be offered forever"
     for bi in sim._walls_rows:
         sim.city_bldg[0, 0, 0, bi] = False
