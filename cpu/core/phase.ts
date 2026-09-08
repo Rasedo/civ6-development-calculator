@@ -1181,7 +1181,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
  * `apply_seat_actions`: the idle gate, then the same cost/progress semantics. */
 export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatActionRecord): void {
-  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, formLo, promoteLo } = prodLayout();
+  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, formLo } = prodLayout();
   // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
   // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
   // apply_turn needed on the GPU side, and the second driven-parity red: every
@@ -1290,16 +1290,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
     const a = aCol;
-    // A city takes another order while its queue has ROOM — the head is
-    // merely the item being worked, and the rest wait behind it.
+    // A city takes an order only while it is building NOTHING: the queue is
+    // one deep, so an order given to a busy city is refused rather than
+    // stacked behind the head.
     if (a < 0) continue;
-    if (a >= promoteLo) {
-      // PROMOTE: entry k+1 moves to the head, the rest closing up behind it.
-      // Every entry keeps its own progress, so the move spends nothing.
-      const k = a - promoteLo + 1;
-      if (k < civCity.queue.length) civCity.queue.unshift(...civCity.queue.splice(k, 1));
-      continue;
-    }
     if (civCity.queue.length >= PRODUCTION_QUEUE_MAX) continue;
     if (a < NB) {
       const id = buildings[a];

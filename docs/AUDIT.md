@@ -35,14 +35,14 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
-| B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 13); Ground Crews waits on a PATROL that is no data row at all |
+| B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 12); Ground Crews waits on a PATROL that is no data row at all |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
 | **B. Fidelity vs real Civ 6** | **17** | |
-| C-1 power | 1 | accident roll and damage tables (sourced, on ask 6), a minor's grid when C-38 gives one a load |
+| C-1 power | 1 | accident roll and damage tables (sourced, on ask 5), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
@@ -52,9 +52,8 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
-| C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 11 |
+| C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 10 |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
-| C-45 queue depth five | 1 | ask |
 | C-49 named storms | 1 | the storm's walk (DLL) |
 | C-60 the Free City's own play | 1 | two owner rulings and nothing to build: its units/walls/retaliation, its amenities |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
@@ -65,7 +64,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **37** | |
+| **OPEN, TOTAL** | **36** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -76,25 +75,23 @@ the entry and the line leaves.
 1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
 
-2. **C-45 — the queue's depth.** Five is a tensor dimension. Acceptable, or
-   name a depth?
 
-3. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6, the same shape.
+2. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6, the same shape.
 
-4. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
+3. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
    zeroes; the district's own pool rides through. No rule reached.
 
-5. **C-64 — the majority-religion tie.** Two religions in equal cities; no
+4. **C-64 — the majority-religion tie.** Two religions in equal cities; no
    source names the winner.
 
-6. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
+5. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
    counts eruptions and reactor accidents per game; this engine rolls per
    volcano and would roll per reactor. PROPOSAL: divide the per-turn rate
    by the map's count of objects at risk.
 
-7. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
+6. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
 
-8. **C-76 — the opinion deltas.** The install names every
+7. **C-76 — the opinion deltas.** The install names every
    `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
    nothing. The ANCHORS are fully sourced (100 / 83 / 66 / 50 / 33 / 16 / 0,
    with a `DiplomaticYieldBonus` beside each); what no source gives is what
@@ -102,43 +99,43 @@ the entry and the line leaves.
    — a carrier without deltas is a constant, so neither half can ship
    alone.
 
-9. **C-2 — what a mid-build gold purchase does to the hammers.** One
+8. **C-2 — what a mid-build gold purchase does to the hammers.** One
     tested report says a UNIT keeps its progress and a BUILDING's is wasted;
     this engine banks both, on the standing rule that hammers never burn.
     One forum post against a principle — the owner's call.
 
-10. **Two city-state names this roster invented.** "Venice" and "Bandar
+9. **Two city-state names this roster invented.** "Venice" and "Bandar
     Brunei" are not Civ 6 city-states. Their bonuses are AMSTERDAM's (base;
     Antioch carries the same text in Expansion1) and JAKARTA's. Both
     MECHANICS are built and sourced; only the names are wrong. Renaming
     them touches `seeder/place.ts`, which is hashed into `genStamp`, so the
     fix costs a reseed and a fresh `worlds.lock`. Rename, or keep the names?
 
-11. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
+10. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
     nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs
     and all five are placement; no XML row anywhere names a city-state
     purchase, build weight or reserve. Leave them banking, or name a rule?
 
-12. **C-16 — a Free City as spy ground.** The install carries NO data gate:
+11. **C-16 — a Free City as spy ground.** The install carries NO data gate:
     the ten `UnitOperations` spy rows name a `TargetDistrict` and nothing
     else, and no requirement set anywhere keys on `CivilizationLevels`.
     Which cities a spy may travel to is DLL. Both engines walk the major
     rows today. Open the Free City to spies, or leave it closed?
 
-13. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
+12. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
     Rainforest, Hills 1; Mountains and the great natural wonders 2) and
     `SightModifier` (Hills +1, Mountains +2) are published; the WALK is not.
     Two readings fit the columns: a sight BUDGET spent along the hex path, or
     a radius with tiles occluded BEHIND a blocker. They differ on every map
     with a ridge, so neither engine ships one until this is ruled.
 
-14. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
+13. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
     the seat's luxuries and policies, and the Free Cities player has none —
     so every Free City sits at the bottom band forever. `CivilizationLevels`
     has no amenity column and no XML row names one. Give the free row a
     fixed tier, or let the bottom band stand?
 
-15. **C-60 — a Free City's defence.** "Will repair pillaged improvements
+14. **C-60 — a Free City's defence.** "Will repair pillaged improvements
     and spawn units to defend itself, and may build walls", "will try to
     retaliate". No XML row names the unit, the cadence or the walls, and
     its strike needs a target rule. Name them, or leave the floor-15
@@ -185,7 +182,7 @@ Nothing open.
   - Who to hire and where to seat him is a heuristic (catalog order,
     lowest-loyalty city) — a decision for P8's surface.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
-  - `ROUTE_CHAIN_MAX` 6 is a capacity choice — ask 3.
+  - `ROUTE_CHAIN_MAX` 6 is a capacity choice — ask 2.
   - `PLUNDER_ROUTE_GOLD` 50 is a MODEL NUMBER, and a 2026-09-08 pass of the
     install says it will stay one: `GlobalParameters.xml` carries no plunder
     amount of any kind, and the only trade-route plunder rows anywhere are
@@ -309,7 +306,7 @@ Nothing open.
     pillaged 100%, buildings DESTROYED 100%, district pillaged 100%,
     population -80%, radiation 20 turns, units 100% @ 20-50, garrison 100%
     @ 20-50, civilians 100%. The age SCALING is DLL. The clock ships
-    (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 6.
+    (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 5.
   - A CITY-STATE'S CITIES ARE NEVER POWERED: `resolveSeatPower` /
     `_resolve_seat_power` run for majors only. Vacuous today (nothing in
     `minorLadder` draws or supplies Power, pinned by
@@ -373,7 +370,7 @@ Nothing open.
     base rates are the model values a published composition replaces.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
     a spy's ground, and the install carries no data gate to say whether that
-    is right — ask 12.
+    is right — ask 11.
 - **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1.
   - "Trade Routes traveling through it can multiply the Gold they get from
     districts at their destination" — no published magnitude, DLL-side.
@@ -422,9 +419,9 @@ Nothing open.
     page's list answers every delivery alike.
   - THE CITIZENS A BLAST KILLS: buildable — C-77 exposed the pick, so
     `city.workedTiles` / `_worked_tiles(row)` now name who is standing in
-    the blast. What is unsourced is HOW MANY die per ring, which is ask 7's
+    the blast. What is unsourced is HOW MANY die per ring, which is ask 6's
     neighbour.
-  - A WONDER IN THE BLAST — ask 7.
+  - A WONDER IN THE BLAST — ask 6.
 - **C-33. THE GIANT DEATH ROBOT'S RANGE.** Weight 1.
   - The five-hex Range is a verb the action space lacks; no direction
     encoding reaches five hexes.
@@ -479,15 +476,26 @@ Nothing open.
     `GlobalParameters.xml` holds five MINOR knobs and every one is PLACEMENT
     (`START_DISTANCE_*`, `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER`); there is no
     city-state economy parameter of any kind, so what it spends them on is
-    DLL AI with no data behind it — ask 11.
+    DLL AI with no data behind it — ask 10.
   - POWER: C-1's minor arm, due when the ladder reaches a load.
   - Foreign Investor and Affluence (B-24r) wait on a minor that improves and
     accumulates.
 - **C-41. VOLCANIC SOIL.** Weight 1.
   - WHERE an eruption lays it — ask 1. The carrier (`addFeature` /
     `_add_feature`) is in.
-- **C-45. THE QUEUE'S DEPTH.** Weight 1.
-  - `PRODUCTION_QUEUE_MAX` 5 is `sim.QD`, a tensor dimension — ask 2.
+- **C-45. THE QUEUE'S DEPTH.** CLOSED 2026-09-08 (owner ruling).
+  - The queue is ONE deep: the "queue" is the current build.
+  - The depth was never a mechanic. Only the HEAD accrued — every
+    `progress +=` in the engine reads slot 0 — so an entry behind it held an
+    id and a permanent zero. What makes hammers survive a switch is the
+    per-item ledger and the city's own bank, both independent of depth.
+  - What the slots DID cost was an action head nothing could use: Q-1 promote
+    columns per city, legal every turn, asking for "bring entry k forward"
+    while the per-city observation showed only the head's progress and a
+    "something is queued" bit. The driver reached them with a 6% dice roll
+    whose comment said they were "legal every turn and chosen never".
+  - Removed with the depth: the promote block from both layouts, both
+    appliers, `_q_promote`, the driver's reorder fuzz and its share knob.
 - **C-49. NAMED STORMS.** Weight 1.
   - THE WALK: `Movement 8` on every storm row is DLL logic; a storm stays on
     its centre for its three turns. How does it choose a heading and how far
@@ -497,15 +505,15 @@ Nothing open.
   to attack, and since #242i the religion walk). NOTHING BUILDABLE REMAINS —
   both bullets are owner rulings, with no magnitude either engine could
   invent:
-  - ITS DEFENCE — ask 15. Today: floor-15 defence plus the walls it
+  - ITS DEFENCE — ask 14. Today: floor-15 defence plus the walls it
     revolted with, healing 20 a turn.
-  - ITS AMENITIES — ask 14.
+  - ITS AMENITIES — ask 13.
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   - Three ledger rows wait (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
     `TRAIT_COMBAT_BONUS_OTHER_RELIGION`,
     `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`). The carrier is a
     per-seat majority over its cities' followed religions on both engines;
-    the tie rule is ask 5.
+    the tie rule is ask 4.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
   - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
     `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
@@ -543,7 +551,7 @@ Nothing open.
     opinion built now would be initialised at NEUTRAL 50 and never move, so
     it would be a compared plane holding a constant and three unreachable
     bands — dead state, not a carrier. Both halves land together or neither
-    does, so C-76 is BLOCKED on ask 8 rather than half-buildable.
+    does, so C-76 is BLOCKED on ask 7 rather than half-buildable.
   - What `DiplomaticYieldBonus` is paid IN is not published either; the
     column sits on the state row and the leaders' own
     `MODIFIER_PLAYER_ADD_DIPLOMATIC_YIELD_MODIFIER` is a separate channel.

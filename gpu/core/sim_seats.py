@@ -118,22 +118,6 @@ class SimSeats:
             p[rows, row, col] = torch.where(
                 keep.gather(1, order), moved, torch.full_like(moved, empty))
 
-    def _q_promote(self, row: int, col, hit: torch.Tensor, k: int) -> None:
-        """Move queue entry `k` to the HEAD, the rest closing up behind it —
-        the reorder a player makes when the thing they are building is no
-        longer the thing they want first. Every entry keeps its own progress,
-        so nothing is spent by the move."""
-        if k <= 0 or k >= self.QD:
-            return
-        bidx = self._bidx
-        live = hit & (self.city_current[bidx, row, col, k] >= 0)
-        if not bool(live.any()):
-            return
-        order = [k] + [i for i in range(self.QD) if i != k]
-        for p, _empty in self._q_planes():
-            cur = p[bidx, row, col]
-            p[bidx, row, col] = torch.where(live.unsqueeze(1), cur[:, order], cur)
-
     def _cancel_queue_item(self, b: int, row: int, col: int, k: int) -> None:
         """`cancelQueueItem`'s twin, poke-level — no engine path cancels (the
         driver never uses the verb). The item keeps its own hammers
@@ -286,11 +270,10 @@ class SimSeats:
             w_okc.append(okc_m if okc_m is not None and bool(okc_m.any()) else None)
         prod_cols = []
         for j in range(self.RC):
-            # A REORDER needs no room, so a FULL queue still has its promote
-            # columns and only the expensive legality bodies are skipped.
-            prom_j = (self.city_current[:, row, j, 1:] >= 0) & alive[:, j].unsqueeze(1)
+            # A city already building something offers no column at all: the
+            # queue is one deep, so there is nothing to stack behind the head.
             if not bool(room[:, j].any()):
-                prod_cols.append(torch.cat([dead_col[:, :self.PROMOTE_BASE], prom_j], dim=1))
+                prod_cols.append(dead_col[:, :self.PROD_W])
                 continue
             ok_b = bld_q[:, j]
             ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
@@ -377,7 +360,7 @@ class SimSeats:
                 ok_f[:, self.NU:] = base_f & form_civ[1] & res_f[1]
             room_j = room[:, j].unsqueeze(1)
             prod_cols.append(torch.cat(
-                [base_j & room_j, ok_w & room_j, ok_p & room_j, ok_f & room_j, prom_j], dim=1))
+                [base_j & room_j, ok_w & room_j, ok_p & room_j, ok_f & room_j], dim=1))
         return torch.stack(prod_cols, dim=1)
 
     def seat_masks(self, row: int) -> dict[str, torch.Tensor]:
@@ -2516,13 +2499,9 @@ class SimSeats:
         for j in range(min(int(production.shape[1]), self.RC)):
             a = production[:, j].to(torch.long)
             alive_j = self.city_alive[:, row, j]
-            # THE REORDER ARM, ahead of the room gate: promoting an entry
-            # commits nothing, so a full queue may still do it.
-            is_pr = (a >= self.PROMOTE_BASE) & ext & alive_j
-            if bool(is_pr.any()):
-                for _k in sorted(set((a[is_pr] - self.PROMOTE_BASE).tolist())):
-                    self._q_promote(row, j, is_pr & (a == self.PROMOTE_BASE + _k), int(_k) + 1)
-            act = (a >= 0) & (a < self.PROMOTE_BASE) & ext & alive_j & self._q_room(row)[:, j]
+            # No reorder arm: the queue is one deep, so an order given to a
+            # busy city is refused rather than stacked behind the head.
+            act = (a >= 0) & (a < self.PROD_W) & ext & alive_j & self._q_room(row)[:, j]
             is_b = act & (a >= 0) & (a < NBn)
             if bool(is_b.any()):
                 bi = a.clamp(min=0, max=NBn - 1)

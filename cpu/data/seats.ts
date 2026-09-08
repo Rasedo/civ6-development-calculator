@@ -73,7 +73,27 @@ export const CITY_SLOTS_PER_SEAT = 24;
  * carry, because the GPU's queue is a tensor dimension and must be finite.
  * MODEL: the number itself is a capacity choice, not a sourced magnitude.
  */
-export const PRODUCTION_QUEUE_MAX = 5;
+/**
+ * THE CITY BUILDS ONE THING. Depth 1: the "queue" is the current build and
+ * nothing else.
+ *
+ * OWNER RULING 2026-09-08. The deeper slots were never a mechanic — only the
+ * HEAD accrues (every `progress +=` in this engine reads `queue[0]`), so an
+ * entry behind it held an id and a permanent zero. They were not what makes
+ * hammers survive a switch either; that is `productionBank`, a separate
+ * per-city store that works with or without a queue.
+ *
+ * What they DID cost was an action head nobody could use: Q-1 promote columns
+ * per city, legal every turn, asking for "move entry k to the front" while the
+ * observation showed only the head — so the choice was uncorrelated with
+ * anything visible. Nothing ever reached them but a 6% dice roll in the
+ * scripted driver, whose own comment admitted they were "legal every turn and
+ * chosen never".
+ *
+ * A human UI would want a queue. It would sit in the UI and emit one build
+ * order a turn, which is exactly this.
+ */
+export const PRODUCTION_QUEUE_MAX = 1;
 /** CIV 6: a war must run **10** turns before either side may negotiate peace
  *  (the leaders' action panel unlocks the offer then). One floor for every
  *  pairing here, majors and city-states alike. */

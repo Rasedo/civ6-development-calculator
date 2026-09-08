@@ -1098,27 +1098,6 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
     return out
 
 
-def _maybe_reorder(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
-                   seeds, turn) -> torch.Tensor:
-    """Sometimes bring a waiting item to the head instead of queuing another.
-
-    A reorder commits nothing, so the applier can only ever refuse it for want
-    of an entry to move; that makes it free variation, and without it the
-    promote columns are legal every turn and chosen never."""
-    lo = sim.PROMOTE_BASE
-    if seeds is None or mask.shape[2] <= lo:
-        return prod
-    legal = mask[:, :, lo:]                                   # [B, C, QD-1]
-    any_l = legal.any(dim=2)
-    if not bool(any_l.any()):
-        return prod
-    hit = any_l & (_policy_rng(sim, seeds, turn or 0, row, 6) < ladder.REORDER_SHARE).unsqueeze(1)
-    if not bool(hit.any()):
-        return prod
-    # the SHALLOWEST waiting entry — the one a player reaches for first
-    return torch.where(hit, lo + legal.long().argmax(dim=2), prod)
-
-
 def _maybe_form_tier(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
                      seeds, turn) -> torch.Tensor:
     """Sometimes train the corps instead of the unit — and rarely the army.
@@ -1171,7 +1150,6 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row),
                                   tier_order=style["tier_order"])
     prod = _maybe_form_tier(sim, row, m["production"], prod, seeds, turn)
-    prod = _maybe_reorder(sim, row, m["production"], prod, seeds, turn)
     dtile = _district_tiles(sim, row, prod)
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
     if style["deep"] is not None:

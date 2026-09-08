@@ -18,9 +18,6 @@
  *                        block then the army block; a column is legal only
  *                        with the enabling building standing and the tier's
  *                        civic in
- *     [promoteLo, +Q-1)  move queue entry k+1 to the HEAD (k = 0 names the
- *                        second entry — the first is already the head, so
- *                        there is no column for it)
  * There is no PURCHASE block: gold and faith spending is the BUY WIRE (kinds
  * 0-7, one purchase per seat per turn), which every seat records and both
  * engines re-validate at the gold block's own phase position.
@@ -31,7 +28,6 @@ import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
-import { PRODUCTION_QUEUE_MAX } from '../data/seats';
 
 export const BUILDING_DISTRICTS: Set<string> = new Set<string>([
   'CITY_CENTER',
@@ -73,7 +69,6 @@ export interface ProdLayout {
   wonderLo: number;
   projectLo: number;
   formLo: number;
-  promoteLo: number;
   width: number;
 }
 
@@ -88,7 +83,6 @@ export function prodLayout(): ProdLayout {
   const wonderLo = NB + 2 + NU + nS;
   const projectLo = wonderLo + wonders.length;
   const formLo = projectLo + projects.length;
-  const promoteLo = formLo + 2 * NU;
   return {
     NB,
     NU,
@@ -103,8 +97,7 @@ export function prodLayout(): ProdLayout {
     wonderLo,
     projectLo,
     formLo,
-    promoteLo,
-    width: promoteLo + PRODUCTION_QUEUE_MAX - 1,
+    width: formLo + 2 * NU,
   };
 }
 

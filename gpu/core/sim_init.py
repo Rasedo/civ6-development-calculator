@@ -2943,11 +2943,11 @@ class SimInit:
         self.WONDER_BASE = self.DISTRICT_BASE + len(self._scaffold)
         self.PROJECT_BASE = self.WONDER_BASE + self._wond_n
         # FORM trains the unit AS A FORMATION — the corps block then the army
-        # block — and PROMOTE closes the layout: code PROMOTE_BASE + k moves
-        # queue entry k+1 to the head. There is no column for entry 0 — it is
-        # the head already.
+        # block — and it CLOSES the layout. There is no promote block: the
+        # queue is one deep, so there is never an entry behind the head to
+        # bring forward (owner ruling 2026-09-08, `PRODUCTION_QUEUE_MAX`).
         self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
-        self.PROMOTE_BASE = self.FORM_BASE + 2 * self.NU
+        self.PROD_W = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the flat
         # CostProgressionParam1 each copy already acquired adds to the next.

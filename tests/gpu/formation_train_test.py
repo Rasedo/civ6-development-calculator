@@ -109,7 +109,7 @@ def test_the_building_and_the_civic_gate_the_columns(rules, path) -> None:
 
     grant(sim, j)  # nothing standing, nothing in
     m = sim.production_mask()[B0, j]
-    assert not bool(m[sim.FORM_BASE:sim.PROMOTE_BASE].any()), \
+    assert not bool(m[sim.FORM_BASE:sim.PROD_W].any()), \
         "a formation column lit with no enabling building and no civic"
 
     grant(sim, j, ma=True)  # the building alone
@@ -146,10 +146,13 @@ def test_the_order_costs_the_formation_price(rules, path) -> None:
     assert float(sim.city_cost[B0, ROW, j, 0]) == expected_cost(sim, ui, 1), \
         f"corps cost {float(sim.city_cost[B0, ROW, j, 0])}, wanted {expected_cost(sim, ui, 1)}"
 
+    # the queue is ONE deep, so the army is priced on its own turn rather
+    # than stacked behind the corps
+    clear_queue(sim, j)
     apply_code(sim, j, sim.FORM_BASE + sim.NU + ui)
-    assert int(sim.city_current[B0, ROW, j, 1]) == sim.FORM_BASE + sim.NU + ui, "the army order did not queue"
-    assert float(sim.city_cost[B0, ROW, j, 1]) == expected_cost(sim, ui, 2), \
-        f"army cost {float(sim.city_cost[B0, ROW, j, 1])}, wanted {expected_cost(sim, ui, 2)}"
+    assert int(sim.city_current[B0, ROW, j, 0]) == sim.FORM_BASE + sim.NU + ui, "the army order did not queue"
+    assert float(sim.city_cost[B0, ROW, j, 0]) == expected_cost(sim, ui, 2),         f"army cost {float(sim.city_cost[B0, ROW, j, 0])}, wanted {expected_cost(sim, ui, 2)}"
+
     print(f"  2 price OK — corps {expected_cost(sim, ui, 1):.0f}, army {expected_cost(sim, ui, 2):.0f}")
 
 
@@ -257,7 +260,7 @@ def test_the_completion_spawns_the_tier(rules, path) -> None:
 
 def test_the_fold_touches_only_the_form_block(rules, path) -> None:
     sim = build(rules, path)
-    width = sim.PROMOTE_BASE + sim.QD - 1
+    width = sim.PROD_W
     codes = torch.arange(-1, width, dtype=torch.long)
     folded = sim._q_unit_of(codes)
     tiers = sim._q_form_tier(codes)
