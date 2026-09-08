@@ -393,6 +393,55 @@ def poke_three_drag(rules, path) -> None:
     print("  10 three-member drag OK — civilian AND support ride with the escort")
 
 
+# ------------------------------------ 11 A SPAWN TAKES ITS OWN SLOT
+def poke_spawn_slot(rules, path) -> None:
+    """`_spawn_unit` writes the occupancy plane its STACKING CLASS names.
+
+    It used to hand-roll two arms off `_type_civilian`, which is the
+    NONCOMBAT set rather than the class: a Military Engineer (build charges,
+    no combat) was born into `civilian_at`, and a Builder trained onto that
+    plot was then refused the tile `spawnUnit` hands it. That is the seed
+    9287 divergence, one line from each engine:
+
+        D-GPU  sp:1:156:161:14 at162
+        D-TS   sp:1:156:161:14 at161
+
+    and the second half of it is `_vacate`, which named three planes by hand
+    and so let a despawned support unit hold its plot for the rest of the
+    game."""
+    if "MILITARY_ENGINEER" not in UNI:
+        print("  11 spawn slot SKIPPED — no Military Engineer in this catalog")
+        return
+    sim = fresh(rules, path)
+    a_t, _b_t = free_pair(sim)
+    m = torch.zeros(sim.B, dtype=torch.bool)
+    m[0] = True
+    at = torch.full((sim.B,), a_t, dtype=torch.long)
+
+    assert bool(sim._spawn_unit(ROW, m, at, UNI.index("MILITARY_ENGINEER"))[0]), \
+        "the Military Engineer did not spawn"
+    eng = int(sim.support_at[0, a_t])
+    assert eng >= 0, "the Military Engineer did not take the SUPPORT slot"
+    assert int(sim.civilian_at[0, a_t]) < 0, \
+        "the Military Engineer took the CIVILIAN slot — the noncombat set is not the class"
+    assert int(sim.military_at[0, a_t]) < 0, \
+        "the Military Engineer took the MILITARY slot"
+
+    # ...so the plot still takes a Builder, ON THE ANCHOR it was asked for
+    assert bool(sim._spawn_unit(ROW, m, at, UNI.index("BUILDER"))[0]), \
+        "the Builder did not spawn"
+    bld = int(sim.civilian_at[0, a_t])
+    assert bld >= 0 and int(sim.unit_tile[0, bld]) == a_t, \
+        "a support unit standing there pushed the Builder off its anchor"
+
+    # ...and a despawn gives the SUPPORT plane back
+    sim._vacate("major", torch.tensor([0]),
+                torch.tensor([eng - sim.POOL_LO["major"]]))
+    assert int(sim.support_at[0, a_t]) < 0, \
+        "a vacated SUPPORT slot still holds its tile"
+    print("  11 spawn slot OK — born into the SUPPORT plane, and it is given back")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -409,6 +458,7 @@ def main() -> None:
     poke_rider_sight(rules, p)
     poke_support_slot(rules, p)
     poke_three_drag(rules, p)
+    poke_spawn_slot(rules, p)
     print("ESCORT POKES OK")
 
 

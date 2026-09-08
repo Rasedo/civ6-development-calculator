@@ -382,6 +382,36 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - PINNED ON BOTH ENGINES: `escort_test`'s section 10 (a Warrior with a
     Builder and a Battering Ram steps, and all three land, all three pay)
     and `escort.test.ts`'s "drags BOTH riders when the escort steps".
+  - **AND THE PLACEMENT LOG NAMED IT IN ONE LINE EACH.**
+
+        D-GPU  sp:1:156:161:14 at162
+        D-TS   sp:1:156:161:14 at161
+
+    Same seat, same turn, the SAME anchor and the same chassis: TS put the
+    Builder on the tile it was asked for and the GPU walked to a neighbour,
+    because the GPU held that plot's CIVILIAN slot occupied.
+  - THE CAUSE: `_spawn_unit` wrote the occupancy planes BY HAND, two arms off
+    `_type_civilian` — and `_type_civilian` is the NONCOMBAT set, not the
+    civilian stacking class. Every support chassis was therefore born into
+    the wrong plane: the Military Engineer (build charges, no combat) among
+    the civilians, the Battering Ram and the Medic among the military. A
+    Builder trained onto a plot holding a Military Engineer was refused a
+    tile `spawnUnit` gives it, and walked one hex away.
+  - THE SECOND HALF, found in the same read: `_vacate` cleared the civilian,
+    military and embarked planes — the three that existed before the split —
+    so a despawned SUPPORT unit went on holding its plot for the rest of the
+    game. It now clears through `_occ_clear`, which has always walked all
+    four, and the two are one reader again.
+  - BOTH ARE THE SAME MISS, and it is the one this project already has a
+    name for: a new per-slot plane misses every existing walk. `_occ_set`,
+    `_occ_clear`, the fixture loader and even the escort poke's own `put`
+    helper were all taught the three-way split when the SUPPORT class landed
+    — the helper had the identical bug and was fixed then. `_spawn_unit` and
+    `_vacate` were the two the sweep did not reach.
+  - PINNED: `escort_test`'s section 11 spawns a Military Engineer through
+    `_spawn_unit`, asserts it holds the SUPPORT plane and neither of the
+    others, spawns a Builder at the same anchor and asserts it lands ON that
+    anchor, then vacates the Engineer and asserts the plane is given back.
   - ONE ASYMMETRY FOUND WHILE READING THE APPLIERS, recorded rather than
     fixed because nothing has shown it firing: TS refuses EVERY verb from a
     unit with `movesLeft <= 0` (spies excepted), while the GPU has no such

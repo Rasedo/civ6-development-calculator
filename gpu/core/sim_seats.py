@@ -4337,22 +4337,16 @@ class SimSeats:
 
     def _vacate(self, pool: str, rows: torch.Tensor, slots: torch.Tensor) -> None:
         """Clear whichever occupancy plane points at these slots. A slot whose
-        unit is gone must not keep holding its tile — religious units are
-        civilians, but clearing both planes means a military defender can never
-        leak either."""
+        unit is gone must not keep holding its tile, and the class it held is
+        not knowable from the tile — so the clear is keyed on the SLOT and
+        walks every plane, which is exactly `_occ_clear`. It used to name
+        three of them by hand and so missed the SUPPORT plane entirely: a
+        despawned Battering Ram went on holding its plot for the rest of the
+        game."""
         if rows.numel() == 0:
             return
-        t = getattr(self, f"{pool}_unit_tile")[rows, slots]
-        lo = self.POOL_LO[pool]
-        civ = self.civilian_at[rows, t] == slots + lo
-        if bool(civ.any()):
-            self.civilian_at[(rows[civ], t[civ])] = -1
-        mil = self.military_at[rows, t] == slots + lo
-        if bool(mil.any()):
-            self.military_at[(rows[mil], t[mil])] = -1
-        emb = self.embarked_at[rows, t] == slots + lo
-        if bool(emb.any()):
-            self.embarked_at[(rows[emb], t[emb])] = -1
+        self._occ_clear(rows, getattr(self, f"{pool}_unit_tile")[rows, slots],
+                        slots + self.POOL_LO[pool])
 
     def _grant_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
         """A RELIC for each listed game's seat row, placed in the row's FIRST

@@ -2337,14 +2337,18 @@ class SimMasks:
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
         off = self.POOL_LO[pre]
-        cu_rows = is_civ_u[rows]
-        ar_rows = no_hold[rows]
-        mil_rows = rows[~cu_rows & ~ar_rows]
-        if len(mil_rows) > 0:
-            self.military_at[(mil_rows, spot[mil_rows])] = nxt[mil_rows] + off
-        cv_rows = rows[cu_rows & ~ar_rows]
-        if len(cv_rows) > 0:
-            self.civilian_at[(cv_rows, spot[cv_rows])] = nxt[cv_rows] + off
+        # ONE occupancy writer, the one every other caller uses. This used to
+        # hand-roll two arms off `_type_civilian` — the NONCOMBAT set, not the
+        # civilian STACKING CLASS — so a support chassis was born into the
+        # wrong plane: the Military Engineer (charges, no combat) among the
+        # civilians, the Battering Ram among the military. `_occ_set` makes
+        # the three-way split, and it reads the type and the embarked flag
+        # this body has already written.
+        # An AIRCRAFT and a SPY hold no plot at all (`no_hold`), so they are
+        # still kept out of every plane.
+        _hold = rows[~no_hold[rows]]
+        if len(_hold) > 0:
+            self._occ_set(_hold, spot[_hold], nxt[_hold] + off)
         nxt[rows] += 1
         # track the seat's strongest MELEE ever fielded (city defense) — a
         # civilian's combat 0 never raises it. Gated on `can` like TS: a
