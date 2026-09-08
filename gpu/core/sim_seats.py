@@ -3955,10 +3955,12 @@ class SimSeats:
         tile = self.unit_tile.gather(1, s).squeeze(1)
         seat = self.unit_seat.gather(1, s).squeeze(1)
         ty = self.unit_type.gather(1, s).squeeze(1).clamp(min=0)
-        out = (~self._type_civilian[ty]
+        # `escortRiders` opens with `unitDomain === 'military' && !embarked`:
+        # a support chassis RIDES, it does not carry.
+        out = (self._type_dom_mil[ty]
                & ~self.unit_emb.gather(1, s).squeeze(1) & (tile >= 0))
         hit = torch.zeros_like(out)
-        for plane in (self.civilian_at, self.embarked_at):
+        for plane in (self.civilian_at, self.support_at, self.embarked_at):
             r = plane.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
             k = r.clamp(min=0).unsqueeze(1)
             hit = hit | ((r >= 0) & (r != slot)
@@ -11096,13 +11098,13 @@ class SimSeats:
         return out
 
     def _xp_eligible(self, utype: torch.Tensor) -> torch.Tensor:
-        """`xpEligible`'s chassis half: a civilian never fights, a Spy earns its
-        levels through its missions rather than through a roll, and CIV6 (Giant
-        Death Robot) "cannot earn experience or Promotions"."""
+        """`xpEligible`'s chassis half: the MILITARY or AIR domain, which is
+        exactly `_type_military` — a civilian never fights, a support chassis
+        never fights either, and a Spy earns its levels through its missions
+        rather than through a roll. CIV6 (Giant Death Robot): "Cannot earn
+        experience or Promotions"."""
         t = utype.clamp(min=0, max=self.NU - 1)
-        out = ~self._type_civilian[t]
-        if self._spy_idx >= 0:
-            out = out & (t != self._spy_idx)
+        out = self._type_military[t]
         if self._gdr_idx >= 0:
             out = out & (t != self._gdr_idx)
         return out

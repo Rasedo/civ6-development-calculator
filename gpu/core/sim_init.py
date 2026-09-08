@@ -3087,6 +3087,19 @@ class SimInit:
         self._spy_idx = next((i for i, u in enumerate(ru) if int(u.get("spy", 0))), -1)
         self._type_no_gold = torch.tensor([bool(u.get("noGold", 0)) for u in ru], dtype=torch.bool, device=device)
         self._any_air = bool((self._type_air > 0).any())
+        # THE TWO CLASS SENTENCES THE RULES ACTUALLY SPEAK, named here so no
+        # rule has to spell one out of the flags. `_type_military` is the wire
+        # column `unitIsMilitary` writes — the military OR air domain — so the
+        # military DOMAIN alone is that set without the aircraft, and
+        # `unitIsNoncombat` (the civilian and support domains) is its
+        # complement less the Spy, which is its own domain in both engines.
+        # NOT `_type_civilian`: that flag is charges-and-no-combat and reads 0
+        # for every support chassis without build charges.
+        self._type_dom_mil = self._type_military & (self._type_air <= 0)
+        _nc = ~self._type_military
+        if self._spy_idx >= 0:
+            _nc = _nc & (torch.arange(_nc.numel(), device=device) != self._spy_idx)
+        self._type_noncombat = _nc
         self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._type_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)

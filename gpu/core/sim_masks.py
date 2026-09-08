@@ -1369,10 +1369,12 @@ class SimMasks:
         neg = torch.full_like(eslot, -1)
         e0 = eslot.clamp(min=0).unsqueeze(1)
         e_seat = torch.where(eslot >= 0, self.unit_seat.gather(1, e0).squeeze(1), neg)
-        e_civ = self._type_civilian[
+        # `stackDefender` filters on `unitDomain === 'military'`: a support
+        # passenger is captured like a civilian, never fought.
+        e_dom = self._type_dom_mil[
             self.unit_type.gather(1, e0).squeeze(1).clamp(min=0, max=self.NU - 1)]
         ok_e = self._seats_hostile(seat, e_seat.unsqueeze(1)).squeeze(1)
-        e_mil = ok_e & ~e_civ
+        e_mil = ok_e & e_dom
         take = e_mil & ~ok_m
         if ranged:
             m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -1381,7 +1383,11 @@ class SimMasks:
             take = take | (e_mil & ok_m
                            & (self._embarked_def_cs(e_seat) + self._form_cs(eslot)
                               + self._convoy_cs(eslot) - self._fuel_short_cs(eslot) > cs_m))
-        e_pax = ok_e & e_civ
+        # ...and everything that is NOT of the military domain is the
+        # capturable passenger, support chassis included: `stackDefender`
+        # hands back `enemies[0]` when its `unitDomain === 'military'` filter
+        # comes up empty, and a Battering Ram is taken, not fought.
+        e_pax = ok_e & ~e_dom
         take_c = e_pax & ~ok_c
         return (torch.where(take, eslot, mslot),
                 torch.where(take, e_seat, m_seat),
@@ -1518,7 +1524,7 @@ class SimMasks:
         # "embarked LAND units" = the military domain: an embarked civilian
         # (a settler crossing water) provides no Support (supportCount's
         # unitDomain gate)
-        e_mil = ~self._type_civilian[
+        e_mil = self._type_dom_mil[
             self.unit_type.gather(1, eslot.clamp(min=0)).clamp(min=0, max=self.NU - 1)]
         friendly = (here & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & e_mil & (e_seat == def_seat.unsqueeze(1))).long()
         sup = friendly.sum(dim=1) * self._flank_support_live(def_seat).long()
@@ -2099,6 +2105,12 @@ class SimMasks:
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
+        if getattr(self, "_log_diff", False):
+            for _sb in rows.tolist():
+                self._diff_events.setdefault(_sb, []).append(
+                    f"sp:{BARB_SEAT}:{int(self.turn)}"
+                    f":{int(at_tile[_sb])}:{int(unit_type)}"
+                    f" at{int(spot[_sb])}")
         self.next_slot[rows] += 1
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius) -> None:

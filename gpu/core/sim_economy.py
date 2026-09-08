@@ -1263,7 +1263,9 @@ class SimEconomy:
                 utype = u_type[bidx, us].clamp(min=0, max=self.NU - 1)
                 useat = torch.where(on, u_seat[bidx, us], torch.full_like(slot, -1))
                 spared = self._storm_spares(useat, ev)
-                civilian = self._type_civilian[utype]
+                # `unitIsNoncombat`, the gate `stormTile` takes: a support
+                # chassis is killed outright like a civilian, not damaged.
+                civilian = self._type_noncombat[utype]
                 naval = self.unit_naval[utype]
                 kill = on & civilian & civ_hit & ~spared
                 base = torch.where(naval, naval_dmg, land_dmg)
@@ -4011,7 +4013,9 @@ class SimEconomy:
             near = torch.maximum(near, val.gather(1, nbc).reshape(nb.shape)
                                  * ((nb >= 0) & (oseat.gather(1, nbc).reshape(nb.shape)
                                                  == seat)).long())
-        return torch.where(self._type_civilian[typ], out, near.amax(dim=2))
+        # `chaplainHeal` pays the MILITARY DOMAIN alone — not "anything that
+        # is not a civilian", which would hand a Battering Ram the Medic's +20.
+        return torch.where(self._type_dom_mil[typ], near.amax(dim=2), out)
 
     def _holy_site_faith(self) -> torch.Tensor:
         """[B, T] long — each live Holy Site's OWN faith output: its adjacency

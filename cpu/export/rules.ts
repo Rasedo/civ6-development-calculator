@@ -1447,9 +1447,11 @@ export function buildRules() {
       cost: u.cost,
       combat: u.combat,
       maintenance: u.maintenance,
-      // NONCOMBAT, which is what this flag has always meant and what every
-      // reader of it wants: `unitIsNoncombat`'s set, the nine SUPPORT rows
-      // included. Their stacking slot is the separate flag below.
+      // CHARGES AND NO COMBAT, and nothing wider — this comment used to
+      // claim `unitIsNoncombat`'s set "the nine SUPPORT rows included", which
+      // the formula has never made: the seven support chassis that carry no
+      // build charges read 0 here. The noncombat set is `military` below,
+      // negated; the stacking slot is `support`.
       civilian: u.charges !== undefined && !((u.combat ?? 0) > 0) ? 1 : 0,
       // CIV6 (`FormationClass="FORMATION_CLASS_SUPPORT"`): a stacking slot of
       // its own, so one tile carries a military unit, a civilian AND one of

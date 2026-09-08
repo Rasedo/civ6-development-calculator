@@ -412,6 +412,26 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `_spawn_unit`, asserts it holds the SUPPORT plane and neither of the
     others, spawns a Builder at the same anchor and asserts it lands ON that
     anchor, then vacates the Engineer and asserts the plane is given back.
+  - **THE SWEEP THE SUPPORT CLASS OWED, PAID IN FULL.** `_type_civilian` is
+    the wire flag `charges !== undefined && !(combat > 0)`, and its own
+    exporter comment claimed it was `unitIsNoncombat`'s set "the nine SUPPORT
+    rows included" — which the formula has never made: the seven support
+    chassis carrying NO build charges read 0 there, so every `~_type_civilian`
+    site took them for MILITARY. On the GPU a Battering Ram therefore
+    defended a stack against a ranged attack (`stackDefender` filters on
+    `unitDomain === 'military'`), counted as flank SUPPORT for a neighbour
+    (`supportCount`, same gate), took the Chaplain's +20 heal (`chaplainHeal`,
+    same gate), was eligible for experience (`xpEligible`: military or air),
+    survived a storm that `unitIsNoncombat` kills outright, was NOT capturable
+    as a passenger, and could be the ESCORT of a formation (`_carrying`, which
+    also walked only the civilian and embarked planes and so could not see a
+    formation whose one rider was a support unit).
+  - No new wire column was needed: `military` already carries
+    `unitIsMilitary` — the military OR air domain — so the two sentences the
+    rules speak are `_type_dom_mil` (that set without the aircraft) and
+    `_type_noncombat` (its complement less the Spy). `_type_civilian` keeps
+    its narrow meaning and its two honest readers, the occupancy split and the
+    spent-charges despawn.
   - ONE ASYMMETRY FOUND WHILE READING THE APPLIERS, recorded rather than
     fixed because nothing has shown it firing: TS refuses EVERY verb from a
     unit with `movesLeft <= 0` (spies excepted), while the GPU has no such
