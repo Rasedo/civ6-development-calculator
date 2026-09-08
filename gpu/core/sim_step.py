@@ -8,10 +8,6 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 class SimStep:
     def step(self) -> None:
         dev = self.device
-        # C-77: this turn's worked-tile pick is made fresh by this turn's walk;
-        # nothing may read the last one.
-        self._worked_pick.clear()
-
         if self.units_mode:
             cap = self.rules.combat.get("unitHp", 100)
             for _pre in ("barb", "major"):

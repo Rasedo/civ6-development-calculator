@@ -26,7 +26,7 @@ from core.engine import _MUTABLE
 from warmup import plant_city, settle_all, hold_works, works_of, clear_works
 
 RELIC = 7
-PLANES = ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat")
+PLANES = ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_worked")
 
 
 def main() -> None:
@@ -185,12 +185,18 @@ def main() -> None:
     hold_works(s4, 0, row, hi, RELIC, 2)
     hold_works(s4, 0, row, hi, 1, 3, maker=11)
     keep_id = int(s4.city_id[0, row, hi])
+    # C-77: the worked-tile pick is a per-CITY fact and rides the same
+    # permutation. A 24-seed serve lane caught it when it did not — one city
+    # reported the pick of whichever city compaction had moved into its slot.
+    s4.city_worked[0, row, hi, :3] = torch.tensor([11, 22, 33])
     s4.city_alive[0, row, lo] = False  # kill the lower slot -> `hi` compacts down
     s4._reclaim_cities()
     where = (s4.city_alive[0, row] & (s4.city_id[0, row] == keep_id)).nonzero().flatten()
     assert len(where) == 1, "the surviving city vanished from the registry"
     k = int(where[0])
     assert works_of(s4, 0, row, k, [RELIC]) == 2 and works_of(s4, 0, row, k, [1]) == 3, "the works must follow their city through compaction"
+    assert s4.city_worked[0, row, k, :3].tolist() == [11, 22, 33], (
+        "the worked-tile pick must follow its city through compaction")
     print("  the work planes ride the slot compaction OK")
     print("BATTERY OK relics")
 

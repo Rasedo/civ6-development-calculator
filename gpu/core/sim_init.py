@@ -1543,6 +1543,15 @@ class SimInit:
         self.park = torch.full((B, self.T), -1, dtype=torch.long, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
+        # THE WORKED-TILE PICK (C-77), one window per city slot, -1 unused.
+        # It is a per-CITY fact, so it is a REGISTERED CITY PLANE and not a
+        # side table: `_compact_city_rows` derives its list from `_MUTABLE` by
+        # geometry, and anything kept outside that list is handed to the
+        # neighbouring slot at the first compaction — which is exactly what a
+        # 24-seed battery lane caught, one city reporting its neighbour's pick.
+        self.city_worked = torch.full(
+            (B, self.CITY_ROWS, self.RC, int(self._off3.shape[0])), -1,
+            dtype=torch.long, device=device)
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
@@ -1984,7 +1993,6 @@ class SimInit:
         # C-77: the worked-tile pick per seat row, stashed by the walk that
         # makes it and read by the state census. Instrumentation, not state:
         # the walk rewrites it for every row every turn.
-        self._worked_pick: dict[int, torch.Tensor] = {}
         self.aqsrc = torch.tensor(
             [[t.get("aqsrc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )

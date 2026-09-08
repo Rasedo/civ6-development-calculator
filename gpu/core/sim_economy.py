@@ -4537,18 +4537,14 @@ class SimEconomy:
         return spec
 
     def _worked_tiles(self, row: int) -> torch.Tensor:
-        """[B, RC, M] — the tiles seat row `row` works THIS TURN, -1 unused
-        (C-77), or all -1 where this turn's walk has not reached that row yet.
+        """[B, RC, M] — the tiles seat row `row` works, -1 unused (C-77).
 
-        Deliberately NOT recomputed on demand: TS stores what its walk chose
-        and holds nothing before the walk runs, so a GPU that answered eagerly
-        would report a pick where TS reports none — which is a difference in
-        the INSTRUMENT, not in the engines. `_worked_pick` is cleared at the
-        top of every step, so a stale answer is impossible."""
-        hit = self._worked_pick.get(row)
-        if hit is None:
-            return torch.full((self.B, self.RC, 1), -1, dtype=torch.long, device=self.device)
-        return hit
+        Deliberately NOT recomputed on demand: TS STORES what its walk chose,
+        on the city, and it keeps it until the next walk overwrites it. So
+        does this — `city_worked` is a registered city plane, which is what
+        makes it survive `_reclaim_cities` WITH its city rather than being
+        handed to whichever city compaction moves into the slot."""
+        return self.city_worked[:, row]
 
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
                         record: bool = False) -> torch.Tensor:
@@ -4658,8 +4654,8 @@ class SimEconomy:
         # tiles are eliminated" had nothing to read. Stashed rather than
         # recomputed, so this stays the ONE place the pick is made.
         if j is None and record:
-            self._worked_pick[row] = torch.where(take, tiles.gather(2, top_idx),
-                                                 torch.full_like(top_idx, -1))
+            self.city_worked[:, row, :n].copy_(
+                torch.where(take, tiles.gather(2, top_idx), torch.full_like(top_idx, -1)))
         sel = [
             c.gather(2, top_idx) * takef
             for c in (f, p, gat(ty_oth[:, :, 2]).double(), gat(ty_oth[:, :, 3]).double(),
