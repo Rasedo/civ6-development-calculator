@@ -24,7 +24,7 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     for kind, group in by.items():
         if kind == "g":
             out.extend(group)
-        elif kind in ("st", "sp", "xp", "rg", "rc"):
+        elif kind in ("st", "sp", "xp", "rg", "rc", "pop"):
             _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
             out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
         else:
@@ -2345,6 +2345,8 @@ class SimSeats:
                 # purchased settlers cost the spawn city a pop (real Civ 6)
                 _pop_col = self.city_pop[bidx, row, spawn_slot]
                 self.city_pop[bidx, row, spawn_slot] = torch.where(landed_s, (_pop_col - 1).clamp(min=1), _pop_col)
+                _lr = landed_s.nonzero(as_tuple=True)[0]
+                self._log_pop(_lr, row, spawn_slot[_lr], "sb")
                 bought = bought | landed_s
         if kind is not None:
             want_u = active & ext & ~bought & (kind == 2) & (army0 < 2 * n_cities)
@@ -5679,6 +5681,7 @@ class SimSeats:
         elif pay == ch["population"]:
             if near >= 0:
                 self.city_pop[b, srow, near] += amt
+                self._log_pop(torch.tensor([b]), srow, torch.tensor([near]), "gh")
         elif pay == ch["governorTitle"]:
             self.civ_granted_titles[b, srow] += amt
         elif pay == ch["envoy"]:
@@ -11030,6 +11033,26 @@ class SimSeats:
         cur[rows] += 1
         self._gen_ver += 1
 
+    def _log_pop(self, rows, row: int, cols, tag: str) -> None:
+        """`logPopWrite`'s twin — WHICH writer moved this city's count, keyed
+        on the CENTRE TILE, the one name both engines share for a city (an id
+        is a per-seat counter and the two engines number slots differently)."""
+        if not getattr(self, "_log_diff", False):
+            return
+        _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else [int(rows)]
+        _c = cols.reshape(-1).tolist() if torch.is_tensor(cols) else [int(cols)]
+        if len(_c) == 1 and len(_r) > 1:
+            _c = _c * len(_r)
+        elif len(_r) == 1 and len(_c) > 1:
+            _r = _r * len(_c)
+        for _b, _col in zip(_r, _c):
+            if _col < 0:
+                continue
+            self._diff_events.setdefault(int(_b), []).append(
+                f"pop:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                f":{int(self.city_center[_b, row, _col])}:{tag}"
+                f" {int(self.city_pop[_b, row, _col])}")
+
     def _log_xp(self, rows, slots, tag: str) -> None:
         """`logXpWrite`'s twin — WHICH writer moved this pool, keyed on (seat,
         turn, tile, chassis) so the two engines pair on the unit rather than on
@@ -11460,6 +11483,8 @@ class SimSeats:
             return
         hr, sl = hrow[fell], slot[fell]
         self.city_pop[fell, hr, sl] = ((self.city_pop[fell, hr, sl] * 3) // 4).clamp(min=1)
+        for _i in range(fell.numel()):
+            self._log_pop(fell[_i:_i + 1], int(hr[_i]), sl[_i:_i + 1], "sk")
         loss = torch.minimum(
             torch.tensor(100.0, dtype=torch.float64, device=self.device),
             js_round(js_round(self.civ_treasury[fell, hr].double() * 1000) / 1000 * 0.2).double(),

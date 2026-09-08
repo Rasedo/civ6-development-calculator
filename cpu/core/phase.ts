@@ -2559,7 +2559,7 @@ export function seatPhase(state: GameState): void {
       const culC = y.culture;
       culSum += culC;
 
-      seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded);
+      seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
       const q = civCity.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         // The seat's GOVERNMENT/POLICY encampHarborProdMult, which

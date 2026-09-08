@@ -33,7 +33,8 @@ import { grantStockpile } from './stockpile';
 import { repairDrip, urbanDefensesFit } from './rules';
 import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH } from '../data/units';
-import { logXpWrite, xpToNextLevel } from './promotions';
+import { xpToNextLevel } from './promotions';
+import { logXpWrite } from './difflog';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
 export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {

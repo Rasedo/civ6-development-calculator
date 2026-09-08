@@ -98,7 +98,7 @@ function minorAccrue(state: GameState, cityState: CityState): void {
   cityState.research.techProgress += y.science;
   cityState.research.civicProgress += y.culture;
   cityState.faith += y.faith;
-  seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded);
+  seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
   cityBorderGrowth(state, city, cityState.seat, y.culture);
   cityState.population = city.population;
   cityState.foodBox = city.foodBox;

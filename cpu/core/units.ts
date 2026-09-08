@@ -44,8 +44,8 @@ import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
   promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
-  logXpWrite,
 } from './promotions';
+import { logXpWrite, logPopWrite } from './difflog';
 import { dedicationEvent, goldenMoveBonus } from './eras';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -2274,7 +2274,10 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       break;
     case 'population': {
       const city = nearestCityTo(state, owner, tile);
-      if (city) city.population += p.amount;
+      if (city) {
+        city.population += p.amount;
+        logPopWrite(state, city, 'gh');
+      }
       break;
     }
     case 'governorTitle':

@@ -16,7 +16,8 @@ import { computeUnlocks, getModifiers, availableTechs, availableCivics, governme
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
-import { drawPromoOffer, logXpWrite, promoFlag, unitPromoRows } from './promotions';
+import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
+import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -316,6 +317,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   const cmods = getModifiers(state, seat);
   if (list.length === 1) {
     for (const r of cmods.capital) city.population += r.firstCityPop ?? 0;
+    logPopWrite(state, city, 'fc');
   }
   // CIV6 (Pax Britannica / Treasure Fleet): a city founded on a continent
   // other than the HOME one. The first city can never qualify — `capitalTile`
@@ -816,6 +818,7 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
   }
   // Purchased settlers cost the pop too (real Civ 6).
   city.population = Math.max(1, city.population - 1);
+  logPopWrite(state, city, 'sb');
   return { ok: true };
 }
 
@@ -1219,7 +1222,10 @@ export function purchaseCivilianWithFaith(
   buyer.faith = (buyer.faith ?? 0) - cost;
   // Purchased settlers cost the pop too (real Civ 6); a purchased builder
   // escalates builderCost like a trained one.
-  if (unitType === 'SETTLER') city.population = Math.max(1, city.population - 1);
+  if (unitType === 'SETTLER') {
+    city.population = Math.max(1, city.population - 1);
+    logPopWrite(state, city, 'sf');
+  }
   else buyer.buildersTrained += 1;
   return { ok: true };
 }

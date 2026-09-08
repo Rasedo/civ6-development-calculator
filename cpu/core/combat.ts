@@ -41,8 +41,8 @@ import {
   bankXp, battleXp, cityXp, holdTheLineCS, promoCS, promoFlag,
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
   promoClassOf,
-  logXpWrite,
 } from './promotions';
+import { logXpWrite, logPopWrite } from './difflog';
 import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
@@ -1212,6 +1212,7 @@ export function markShipwreck(state: GameState, tileIndex: number, civSeat: numb
  *  Barbarians sack; they never govern. `seat` owns the city being sacked. */
 function sackCity(state: GameState, city: City | City, seat: number): void {
   city.population = Math.max(1, Math.floor(city.population * 0.75));
+  logPopWrite(state, city as City, 'sk');
   // GS: milli-round the treasury before ×0.2 so a sub-milli non-dyadic-gold drift can't tip the
   // round across a .5 boundary and desync the sack by 1 gold vs the GPU (which mirrors this).
   const owner = seatOf(state, seat);

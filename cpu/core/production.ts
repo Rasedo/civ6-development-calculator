@@ -1,4 +1,5 @@
 import type { City, GameState, Seat, Unit } from './types';
+import { logPopWrite } from './difflog';
 import { repairBuilding } from './yields';
 import { scoreProject } from './competition';
 import type { QueueItem } from './types';
@@ -345,6 +346,7 @@ export function completeQueueItem(
       if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
         city.population = Math.max(1, city.population - 1);
       }
+      logPopWrite(state, city, 'se');
       break;
     case 'unit': {
       // CIV6: "Newly built aircraft will spawn in the Aerodrome, as long as it
@@ -382,6 +384,7 @@ export function completeQueueItem(
         if (r.unit !== item.unit) continue;
         if (r.foundedOnly && city.founderSeat !== city.seat) continue;
         city.population = Math.max(1, city.population + r.amount);
+        logPopWrite(state, city, 'jn');
       }
       for (let k = 0; k < copies; k++) {
         const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);

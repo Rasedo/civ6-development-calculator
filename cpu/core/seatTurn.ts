@@ -1,5 +1,6 @@
 
 import type { City, GameState, QueueItem, Seat } from './types';
+import { logPopWrite } from './difflog';
 import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
@@ -119,13 +120,15 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   decayGrievances(state, seat);
 }
 
-export function seatGrowth(city: City, surplus: number, growthNeeded: number): void {
+export function seatGrowth(city: City, surplus: number, growthNeeded: number, turn = 0): void {
   city.foodBox += surplus;
   if (city.foodBox >= growthNeeded) {
     city.population += 1;
+    logPopWrite(turn, city, 'gr');
     city.foodBox -= growthNeeded;
   } else if (city.foodBox < 0) {
     city.population = Math.max(1, city.population - 1);
+    logPopWrite(turn, city, 'sv');
     city.foodBox = 0;
   }
 }

@@ -1239,6 +1239,7 @@ class SimEconomy:
                     continue
                 pop = self.city_pop[sel, _r, sl]
                 self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
+                self._log_pop(sel, _r, sl, "ds")
         # UNITS: one share roll per domain, one HP band per tile
         land_hit = hit & (r_land < self._st_land_p[ev])
         naval_hit = hit & (r_naval < self._st_naval_p[ev])
@@ -1463,6 +1464,7 @@ class SimEconomy:
                     continue
                 pop = self.city_pop[sel, _r, sl]
                 self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
+                self._log_pop(sel, _r, sl, "ds")
         # FERTILIZATION. Each yield is its own roll, so one flood may pay both.
         # A mitigated river still silts, at half the rate.
         col = self._flood_fert_col[self.terrain.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)]

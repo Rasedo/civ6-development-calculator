@@ -604,6 +604,11 @@ class SimPhase:
         self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
         pop = self.city_pop[bidx, row, col] + grow.long()
         self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
+        if getattr(self, "_log_diff", False):
+            for _t, _m in (("gr", grow), ("sv", starve)):
+                _w = _m.nonzero(as_tuple=True)[0]
+                if _w.numel():
+                    self._log_pop(_w, row, col[_w], _t)
 
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None) -> None:
@@ -941,6 +946,9 @@ class SimPhase:
             _free = self._governor_flag(row, "settlerFreePop")[bidx, col] if self.n_governors \
                 else torch.zeros_like(made_s)
             self.city_pop[bidx, row, col] = torch.where(made_s & ~_free, (pop - 1).clamp(min=1), pop)
+            _sw = made_s.nonzero(as_tuple=True)[0]
+            if _sw.numel():
+                self._log_pop(_sw, row, col[_sw], "se")
             if self._settler_idx >= 0:
                 self._spawn_unit(row, made_s, ctr, self._settler_idx)
 
@@ -991,6 +999,9 @@ class SimPhase:
                 _pop = self.city_pop[bidx, row, col]
                 self.city_pop[bidx, row, col] = torch.where(
                     _pw, (_pop + _pa).clamp(min=1), _pop)
+                _jw = _pw.nonzero(as_tuple=True)[0]
+                if _jw.numel():
+                    self._log_pop(_jw, row, col[_jw], "jn")
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
             if self._wond_n and bool(self._wond_dupnaval.any()):
