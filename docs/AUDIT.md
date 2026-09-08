@@ -31,30 +31,30 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
-| B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
+| B-31r trade-route tails | 1 | plunder PERCENTAGES sourced and shipped, the base is DLL; chain depth is ask 2; the per-district gold shape is ask 16; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
 | B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 12); Ground Crews waits on a PATROL that is no data row at all |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
-| B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
+| B-62r suzerain adjacency at a wonder tile | 0 | CLOSED — no improvement in the install is buildable on a natural wonder plot, so the add is unreachable |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **17** | |
+| **B. Fidelity vs real Civ 6** | **16** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 5), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
-| C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
+| C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 15); a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | the ONE modifier the row names carries no arguments at all — the magnitude is wholly DLL |
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed, wonder in the blast (ask) |
 | C-33 Giant Death Robot's Range | 0 | CLOSED — the install says Range 3, this engine has 3, and the five-hex row is scenario-only |
-| C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
+| C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll); Priority Target carries NO data at all — a command row, an icon and an interface mode |
 | C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
 | C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 10 |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
-| C-49 named storms | 1 | the storm's walk (DLL) |
+| C-49 named storms | 1 | the HEADING is sourced (`PrevailingWinds`); what `Movement 8` counts is ask 17 |
 | C-60 the Free City's own play | 1 | two owner rulings and nothing to build: its units/walls/retaliation, its amenities |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
@@ -64,7 +64,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **36** | |
+| **OPEN, TOTAL** | **35** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -140,6 +140,36 @@ the entry and the line leaves.
     retaliate". No XML row names the unit, the cadence or the walls, and
     its strike needs a target rule. Name them, or leave the floor-15
     defence and the walls it revolted with?
+
+15. **C-16 — what the spy's escape chance is a chance OUT OF.** The install
+    publishes the whole term list and every term is a LEVEL:
+    `ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1 per spy level,
+    `_COUNTERSPY_LEVEL_MODIFIER` -1 per counterspy level,
+    `_POLICE_CORRECT_MODIFIER` -4, `ESPIONAGE_MAX_LEVEL` 4, and Ace Driver's
+    own `MODIFIER_PLAYER_UNIT_ESCAPE_BOOST` 4 (all three spy promotions ship
+    at the install's sizes). What no row says is the SCALE — read as percent,
+    a base of 10 makes escape nearly impossible — nor where the ROUTE comes
+    in: this engine's base is per route (Airplane 40 / Boat 50 / Vehicle 60 /
+    Foot 70) and the install has one base and no route term. Name the scale,
+    or keep the per-route table?
+
+16. **B-31r — what a trade route pays per district.** `GlobalParameters`
+    carries `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and
+    `_PER_DESTINATION_DISTRICT` 2, unmodified by either expansion. This
+    engine pays a flat 3 plus ONE gold per destination SPECIALTY district and
+    nothing for the origin's. The rows say the real model reads BOTH
+    endpoints at 2 apiece; what they do not say is how the DLL composes them
+    (all districts or specialty only, floored or halved), and taken literally
+    a mature pair of cities pays more than any observed route. Take the two
+    rows literally, or keep the flat head?
+
+17. **C-49 — what `Movement 8` counts on a storm.** The HEADING is not DLL
+    after all: `Expansion2_RandomEvents.xml` publishes `<PrevailingWinds>`,
+    22 weighted direction rows banded by latitude, and this map already
+    carries the latitude they key on. Every storm row also carries
+    `Movement="8" Duration="3" Spacing="15"`. What the data never says is
+    the unit of 8 — hexes per turn, or a movement pool a hex spends from.
+    Name the per-turn hex count and the walk is buildable in full.
 
 ## A. Engine vs engine
 
@@ -444,6 +474,23 @@ the gate reaches is worth more here than one that re-reads the exporter.
     2026-09-08. `PLUNDER_NONE` on the Mountain Tunnel, with an Amount of 50
     beside it, is the install's own typo for `NO_PLUNDER` and is read as
     "no plunder" rather than modelled as a fifth kind.
+  - THE PLUNDER PERCENTAGES, by contrast, are published and both already
+    ship at the install's size: `MODIFIER_PLAYER_UNITS_ADJUST_PLUNDER_YIELDS`
+    appears exactly twice — `TOTAL_WAR_PLUNDER_BONUS` Amount 50, which is
+    Total War's `pillageMult 1.5` / `routePlunderMult 1.5`, and
+    `LETTEROFMARQUE_PLUNDER_BONUS` Amount 100, which is the naval raider
+    card's doubling. So the shape around the base is sourced even where the
+    base is not.
+  - A NEW ASK OFF THE SAME PASS (ask 16): `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT`
+    2 and `_PER_DESTINATION_DISTRICT` 2 are in Base `GlobalParameters` and
+    neither expansion touches them, while this engine pays a flat 3 plus one
+    gold per destination SPECIALTY district and nothing for the origin's.
+    The rows say the model reads both endpoints; how the DLL composes them
+    they do not say.
+  - ALREADY SOURCED AND CORRECT, checked while there: the route's range
+    (`TRADE_ROUTE_LAND_RANGE_REFUEL` 15, `_WATER_RANGE_REFUEL` 30) and its
+    20-turn minimum with the era bump (`TRADE_ROUTE_TURN_DURATION_BASE`,
+    `TradeRouteMinimumEndTurnChange`).
   - The destination is one candidate row plus take/skip; the free-choice
     head is P8 work.
 - **B-34r. FLOOD TAILS.** Weight 1.
@@ -486,10 +533,20 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - Ten `open: B-61r` rows in `docs/roster_ledger.json`: tourism x4,
     regional range x2, city-state absorption, barbarian conversion, ocean
     passage, Tupac Amaru's per-district grant walk.
-- **B-62r. A SUZERAIN IMPROVEMENT'S ADJACENCY AT A WONDER TILE.** Weight 1.
-  - `tileYields` leaves on `tile.wonder` before the adjacency add and
-    `_tile_add_live` masks the same tiles; whether real Civ 6 pays it there
-    is unsourced either way.
+- **B-62r. A SUZERAIN IMPROVEMENT'S ADJACENCY AT A WONDER TILE.** Weight 0.
+  CLOSED 2026-09-08 on the install: the case is UNREACHABLE, so the early
+  return cannot be observed as wrong.
+  - `tileYields` leaves on a NATURAL wonder before the adjacency add and
+    `_tile_add_live` masks the same tiles. For that to be a fidelity
+    question an improvement would have to stand on such a plot.
+  - It cannot. All 34 feature rows carrying `NaturalWonder="true"` were
+    checked across Base and both expansions: NOT ONE carries
+    `Removable="true"`, so the feature can never be cleared; and
+    `Improvement_ValidFeatures` over the whole install names exactly eight
+    features — Floodplains (three rows), Forest, Geothermal Fissure, Jungle,
+    Marsh and Volcanic Soil — none of which is a natural wonder.
+  - So no improvement is buildable on a natural wonder plot in real Civ 6,
+    and an improvement-adjacency add there is a term the game never pays.
 - **B-63r. THE GANG-UP BAR.** RETIRED 2026-09-08 (owner ruling).
   - `GRIEVANCE_GANG` was filed as an ask on the reading that it reproduces a
     Civ 6 AI threshold. It does not: it has exactly ONE reader per engine and
@@ -673,6 +730,20 @@ the gate reaches is worth more here than one that re-reads the exporter.
     mission runs 8. Whatever the DLL's composition is, the enemy terms do
     not enter that mission's, which is a real constraint on any guess: a
     composition that always subtracts them cannot be right.
+  - THE ESCAPE'S TERMS ARE SOURCED, ITS SCALE IS NOT — a 2026-09-08 pass.
+    `GlobalParameters` publishes the whole term list and every term is a
+    LEVEL: `ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1 per spy
+    level, `_COUNTERSPY_LEVEL_MODIFIER` -1 per counterspy level,
+    `_POLICE_CORRECT_MODIFIER` -4, `ESPIONAGE_MAX_LEVEL` 4,
+    `ESPIONAGE_BONUS_GAIN_SOURCES` 2 and `_GAIN_SOURCES_DURATION_MULTIPLIER`
+    3. The three spy promotions all ship at the install's sizes: Ace Driver
+    `MODIFIER_PLAYER_UNIT_ESCAPE_BOOST` 4, Quartermaster
+    `MODIFIER_PLAYER_UNIT_BOOST_ALL_SPIES` 1, Seduction
+    `MODIFIER_PLAYER_UNIT_ADJUST_SPY_OPERATION_CHANCE` 2 defensive.
+    What is missing is the SCALE and the ROUTE: read as percent, a base of 10
+    makes escape nearly impossible, and this engine's base is per route
+    (Airplane 40 / Boat 50 / Vehicle 60 / Foot 70) where the install has one
+    base and no route term at all. Ask 15.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
     a spy's ground, and the install carries no data gate to say whether that
     is right — ask 11.
@@ -774,9 +845,15 @@ the gate reaches is worth more here than one that re-reads the exporter.
     are `AIR_ATTACK`, `REBASE` and the repair family. It is the UI's name for
     a fighter sitting ready, so the verb an engine would need is an INTERCEPT
     STANCE whose whole behaviour is the unpublished roll above.
-  - PRIORITY TARGET (the Jet Bomber's reach to the support unit under a
-    stack) — no such promotion exists in this install either; the row came
-    from elsewhere, like the Preserve and the Ngao Mbeba (C-22).
+  - PRIORITY TARGET IS A COMMAND WITH NO DATA. No PROMOTION of that name
+    exists, and an earlier draft stopped there; a 2026-09-08 pass found the
+    row it does have. `Expansion1_UnitCommands.xml` carries a Types row
+    `UNITCOMMAND_PRIORITY_TARGET` and one `UnitCommands` row —
+    `CategoryInUI="ATTACK"`, `InterfaceMode="INTERFACEMODE_PRIORITY_TARGET"`,
+    an icon — and the text row is the bare label "Priority Target". No
+    argument, no requirement set, no magnitude anywhere in Base or either
+    expansion. Every term of it is DLL, and it is the one item on this entry
+    that no ruling could make buildable from the install.
 - **C-35. THE DROWNED GROUND IS COAST.** CLOSED.
   - SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
     coastal water tiles". Both engines keep terrain, feature and river edges
@@ -826,9 +903,27 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - Removed with the depth: the promote block from both layouts, both
     appliers, `_q_promote`, the driver's reorder fuzz and its share knob.
 - **C-49. NAMED STORMS.** Weight 1.
-  - THE WALK: `Movement 8` on every storm row is DLL logic; a storm stays on
-    its centre for its three turns. How does it choose a heading and how far
-    does it move per turn?
+  - THE HEADING IS NOT DLL, and this entry said it was. A 2026-09-08 sourcing
+    pass found `<PrevailingWinds>` in `Expansion2_RandomEvents.xml`: 22 rows
+    giving a WEIGHTED direction per latitude band —
+
+        lat  60..90    NW 1   W 2   SW 2      lat -30..-5    NW 1   W 2   SW 2
+        lat  30..60    NE 2   E 2   SE 1      lat -60..-30   NE 1   E 2   SE 2
+        lat   5..30    NW 2   W 2   SW 1      lat -90..-60   NW 2   W 2   SW 1
+        lat   0..5     NW 1   W 1             lat  -5..0     W 1    SW 1
+
+    and the map already carries the latitude they key on: `mapgen`'s
+    `latOf(row) = (row - half) / half`, a signed degree at `latOf x 90`.
+  - WHAT IS STILL UNSOURCED is the SPEED. Every storm row carries
+    `Movement="8" Duration="3" Spacing="15"` beside its `Hexes` footprint
+    (1, 3, 7, 19 — the centred hex counts), and nothing says what 8 counts.
+    That is ask 17, and it is the whole of what stands between this row and
+    a built walk.
+  - A SEQUENCING NOTE, not a reason to defer indefinitely: a weighted
+    direction draw per storm per turn is a NEW RNG CONSUMER, which reds
+    fixtures across several classes with no engine bug behind it. It belongs
+    in a batch of its own, after the open serve-gate hunt closes, so a
+    reseed cannot be mistaken for the divergence being hunted.
 - **C-60. THE FREE CITY'S OWN PLAY.** Weight 1.
   The seat is in on both engines (revolt, race, join, Eleanor's skip, open
   to attack, and since #242i the religion walk). NOTHING BUILDABLE REMAINS —
