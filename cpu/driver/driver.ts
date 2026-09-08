@@ -76,9 +76,14 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
     }
     for (let ci = 0; ci < state.cityStates.length; ci++) {
       const cityState = state.cityStates[ci];
-      if (!hasMet(cityState, actor.seat)) continue;
-      if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
-      if (!routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex)) continue;
+      const gMet = hasMet(cityState, actor.seat);
+      const gHas = routes.some((x) => x.from === from.id && x.toCs === cityState.id);
+      const gRch = routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex);
+      // EVERY city-state, gate by gate — a candidate one engine holds and the
+      // other refuses is the whole question, and only the gates answer it.
+      const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
+      if (dlG) dlG.push(`rg:${actor.seat}:${-(2 + ci)} f${from.centerIndex} met${gMet ? 1 : 0} has${gHas ? 1 : 0} reach${gRch ? 1 : 0} ctr${cityState.centerIndex}`);
+      if (!gMet || gHas || !gRch) continue;
       const cy = cityStateRouteYields(cityState);
       const post = routePostGold(state, actor.seat, cityState.centerIndex);
       const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith + post;

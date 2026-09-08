@@ -12991,9 +12991,22 @@ class SimSeats:
             # names the term. A candidate one engine prints and the other does
             # not is a gate, not a magnitude.
             if getattr(self, "_log_diff", False):
+                _met_cs = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
+                _rch_cs = reach.gather(2, csc.unsqueeze(1).expand(B, RC, S))
                 for _rb in range(B):
                     for _j in range(RC):
+                        if not bool(alive[_rb, _j]):
+                            continue
                         for _s in range(S):
+                            # EVERY city-state, gate by gate — a candidate one
+                            # engine holds and the other refuses is the whole
+                            # question, and only the gates answer it.
+                            self._diff_events.setdefault(_rb, []).append(
+                                f"rg:{int(self._ROW_SEAT[row])}:{-(2 + _s)}"
+                                f" f{int(centers[_rb, _j])} met{int(bool(_met_cs[_rb, _s]))}"
+                                f" has{int(bool(exists_cs[_rb, _j, _s]))}"
+                                f" reach{int(bool(_rch_cs[_rb, _j, _s]))}"
+                                f" ctr{int(csc[_rb, _s])}")
                             if not bool(valid_cs[_rb, _j, _s]):
                                 continue
                             self._diff_events.setdefault(_rb, []).append(
