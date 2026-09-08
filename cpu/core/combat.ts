@@ -2400,6 +2400,8 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     outerHp: cityState.outerHp,
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
+  const _csList = seatOf(state, seat)!.cities;
+  logPopWrite(state, _csList[_csList.length - 1], 'cs');
   revealAround(state, seat, cityState.centerIndex, 3);
   raiseEmergency(state, EMERGENCY_CITY_STATE, seat, id, csPatrons(state, cityState, seat));
   addEraScore(state, seat, ERA_SCORE_CONQUER); // the CONQUEROR gained a city
@@ -2451,6 +2453,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
+  logPopWrite(state, actor.cities[actor.cities.length - 1], 'cs');
   raiseEmergency(state, EMERGENCY_CITY_STATE, actor.seat, id, csPatrons(state, cityState, actor.seat));
   addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // gained a city (actor CS conquest)
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);

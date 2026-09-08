@@ -300,6 +300,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     }
   }
   list.push(city);
+  logPopWrite(state, city, 'fd');
   addEraScore(state, seat, ERA_SCORE_FOUND);
   if (city.isCapital) {
     const owner = seatOf(state, seat);

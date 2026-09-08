@@ -64,6 +64,9 @@ export interface DriverOpts {
  *  push every other kind out, and the two engines are chatty in different
  *  proportions, so the two sides end up holding different turns and nothing
  *  pairs. Each prefix keeps its own last `keep`; the GRANT lines keep all. */
+/** the kinds whose key carries its TURN as its third field */
+const TURN_KINDS = new Set(['st', 'sp', 'xp', 'rg', 'rc', 'pop']);
+
 function trimByKind(lines: readonly string[], keep = 24): string[] {
   const by = new Map<string, string[]>();
   for (const ln of lines) {
@@ -72,15 +75,20 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
     if (g) g.push(ln);
     else by.set(k, [ln]);
   }
+  // THE TURN WINDOW IS ABSOLUTE, taken over the WHOLE log rather than per
+  // kind: a sparse kind's own "last two turns" are not the other engine's,
+  // and every line of both then prints unpaired.
+  const turnOf = (ln: string): number => Number(ln.split(':')[2]);
+  const hi = lines.reduce((m, ln) => (TURN_KINDS.has(ln.slice(0, ln.indexOf(':')))
+    ? Math.max(m, turnOf(ln)) : m), 0);
   const out: string[] = [];
   for (const [k, g] of by) {
     if (k === 'g') { out.push(...g); continue; }
     // the STEP and SPAWN lines keep the last two TURNS, not the last N: a count
     // straddles the turn boundary at a different place on each engine, and a
     // straddled window pairs the tail of one turn against the head of another.
-    if (k === 'st' || k === 'sp' || k === 'xp' || k === 'rg' || k === 'rc' || k === 'pop') {
-      const ts = [...new Set(g.map((ln) => Number(ln.split(':')[2])))].sort((x, y) => x - y).slice(-2);
-      out.push(...g.filter((ln) => ts.includes(Number(ln.split(':')[2]))));
+    if (TURN_KINDS.has(k)) {
+      out.push(...g.filter((ln) => turnOf(ln) >= hi - 1));
       continue;
     }
     out.push(...g.slice(-keep));

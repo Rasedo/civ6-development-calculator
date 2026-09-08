@@ -5,6 +5,10 @@ from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star
 from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
+# the kinds whose key carries its TURN as its third field
+_TURN_KINDS = ("st", "sp", "xp", "rg", "rc", "pop")
+
+
 def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     """The decomposition log's window, ONE PER LINE KIND.
 
@@ -20,13 +24,18 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     by: dict[str, list[str]] = {}
     for ln in lines:
         by.setdefault(ln.split(":", 1)[0], []).append(ln)
+    # THE TURN WINDOW IS ABSOLUTE, taken over the WHOLE log rather than per
+    # kind: a sparse kind's own "last two turns" are not the other engine's,
+    # and every line of both then prints unpaired. Both engines dump at the
+    # same turn, so one range keeps the same events on each side.
+    _turned = [ln for ln in lines if ln.split(":", 1)[0] in _TURN_KINDS]
+    _hi = max((int(ln.split(":")[2]) for ln in _turned), default=0)
     out: list[str] = []
     for kind, group in by.items():
         if kind == "g":
             out.extend(group)
-        elif kind in ("st", "sp", "xp", "rg", "rc", "pop"):
-            _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
-            out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
+        elif kind in _TURN_KINDS:
+            out.extend(ln for ln in group if int(ln.split(":")[2]) >= _hi - 1)
         else:
             out.extend(group[-keep:])
     return out
@@ -9038,6 +9047,7 @@ class SimSeats:
             if bool(self._row_is(dst_row, _cc, _cl)[b]):
                 _keep = max(_keep, _cp)
         self.city_pop[b, dst_row, col] = max(1, (old_pop * _keep) // 100) if conquest else old_pop
+        self._log_pop(b, dst_row, col, "tr")
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
         self.city_acquired[b, dst_row, col] = old_acq
@@ -9404,6 +9414,7 @@ class SimSeats:
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
         self.city_pop[rows, row, slot] = 1
+        self._log_pop(rows, row, slot, "fd")
         self.city_growth[rows, row, slot] = 0
         self.city_cbox[rows, row, slot] = 0
         # A NEWLY FOUNDED city starts with NO religion. `city_pressure` and

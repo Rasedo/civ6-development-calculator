@@ -1,5 +1,6 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
+import { logPopWrite } from './difflog';
 import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
@@ -1200,6 +1201,7 @@ export function transferCity(
   if (why === 'conquered' && keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
   else if (why !== 'conquered') flipped.outerHp = civCity.outerHp;
   to.cities.push(flipped);
+  logPopWrite(state, flipped, 'tr');
   if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
   // nation; it must be Liberated!" The seat that LOST it is the affected one.

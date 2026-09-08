@@ -1469,6 +1469,7 @@ class SimOrders:
                     torch.full((self.B,), new_id, dtype=torch.long, device=dev), _aff, _hot)
             self.city_center[b, row, col] = c_t
             self.city_pop[b, row, col] = pop
+            self._log_pop(b, row, col, "cs")
             self.city_hp[b, row, col] = half_hp
             self.city_loyalty[b, row, col] = 100.0
             self.centre_slot_at[b, c_t] = col
