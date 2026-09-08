@@ -27,7 +27,7 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **0** | A-1 and A-2 both CLOSED (#246l, #246s) |
+| **A. Engine vs engine** | **1** | A-1 and A-2 CLOSED (#246l, #246s); A-3 a Missionary one tile apart at seed 9287 turn 156 |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
@@ -189,6 +189,25 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - THE CLASS is `wire position vs id`: a wire field naming a roster member
     by ARRAY POSITION breaks the moment the roster can shrink. This roster
     can, and did.
+
+- **A-3. A MISSIONARY ONE TILE APART.** OPEN, and the first fire now that A-2
+  is gone — seed 9287 turn 156, eleven seeds and thirty-nine turns deeper
+  than where this round started.
+
+        unit[649]: GPU-ONLY row {seat 1, type 14, hp 100, charges 3, ...}
+        unit[645]: TS-ONLY  row {seat 1, type 14, hp 100, charges 3, ...}
+
+  - The keys decode to (tile 162, slot 1) and (tile 161, slot 1): the SAME
+    Missionary, the same stacking class, every other field identical, on
+    ADJACENT tiles. Not a key or a class question — a step.
+  - The `spread` twin did not flag, so both engines chose the same target;
+    what differs is the walk to it. Both replay the same record, and
+    `rec.units` is one entry per STEP, so one engine took a step the other
+    refused.
+  - THE NEXT MEASUREMENT, and it is the same shape as the two above: a STEP
+    half for the decomposition log — per ordered step, the unit, the tiles
+    it moved between, the outcome, and the gates that could refuse it. The
+    log already pairs by key and prints wherever the gate flags.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
