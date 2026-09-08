@@ -308,10 +308,30 @@ Nothing open.
   - The install gives the Drone and the Supply Convoy NO `Maintenance` at
     all, where this engine charges 3 and 2. Two named magnitudes for the
     sourcing pass, not changed here.
-- **B-67. THE DISTRICT PRICE PROGRESSION.** Weight 1.
-  - The install runs COST_PROGRESSION_GAME_PROGRESS for the Aqueduct, Canal,
-    Dam, Neighborhood and Mbanza and NUM_UNDER_AVG_PLUS_TECH for the rest;
-    this engine runs the tech-driven one for all. Both formulas are DLL.
+- **B-67. THE DISTRICT PRICE PROGRESSION.** Weight 1. A 2026-09-08 sourcing
+  pass found this entry half wrong: one of the two models is not DLL at all,
+  and this engine already implements it — for PROJECTS.
+  - `Districts.xml` publishes the model AND its parameter on every row.
+    `COST_PROGRESSION_GAME_PROGRESS` with `CostProgressionParam1="1000"` runs
+    on exactly six: the Aqueduct (Cost 36), the Bath (18), the Neighborhood
+    (54), the Mbanza (27), the Canal (81) and the Dam (81).
+    `COST_PROGRESSION_NUM_UNDER_AVG_PLUS_TECH` runs on every other specialty
+    district, `Param1` 40 — except the Diplomatic Quarter and the Government
+    Plaza at 25.
+  - THE 40/25 ALREADY SHIPS, under another name: it is exactly this engine's
+    `districtDiscountPct`, the under-represented discount both cost composers
+    apply. So NUM_UNDER_AVG_PLUS_TECH's parameter was never unsourced; only
+    the shape around it is a stylization.
+  - GAME_PROGRESS IS ALREADY IMPLEMENTED, in `projectCost` — the Cothon's
+    `costProgressGame` 1500 is that model, and its body is
+    `base + floor(round(Param1 x GAME_SPEED) x progress)` where progress is
+    the larger of the tech and civic shares, the same reading
+    `districtCostIn` takes. Six district rows carrying a `costProgressGame`
+    of 1000 and one branch in the two cost composers is the whole build; the
+    Bath and the Mbanza are variants and ride their base's model with their
+    own cost. BUILDABLE, and the only reason it did not land in this round's
+    batches is that it arrived after the fourth commit, with a battery
+    already running.
 - **B-D. UNSOURCED DATA VALUES.** Weight 2.
   - DEMOCRACY'S ROUTE PAYS ONLY ITS OWN CITY. SOURCED (GS): "Your Trade
     Routes to an Ally or Suzerain's city provide +4 Food and +4 Production

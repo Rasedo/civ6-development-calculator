@@ -769,6 +769,7 @@ _MUTABLE = [
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
+    "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row

@@ -658,6 +658,11 @@ const CITY: Record<string, Extractor> = {
   // so both engines canonicalise here rather than pinning the order each
   // happens to build it in (the walk sums in ITS order, and must keep it).
   workedTiles: overCities((r) => (r.city.workedTiles ?? []).slice().sort((a, b) => a - b)),
+  // the AMENITY TIER the loop-top walk ran on. It multiplies every yield the
+  // city pays, so a disagreement here is otherwise invisible until it
+  // surfaces as a fraction of a food box in whatever city straddles a
+  // threshold — which is how it was found.
+  amenityTier: overCities((r) => r.city.amenityTier ?? -1),
   foodBox: overCities((r) => r.city.foodBox),
   cultureBox: overCities((r) => r.city.cultureBox),
   tilesAcquired: overCities((r) => r.city.tilesAcquired),

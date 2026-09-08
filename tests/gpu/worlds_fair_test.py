@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
+from core import simbase  # noqa: E402
 from warmup import settle_all  # noqa: E402
 
 B0 = 0
@@ -44,7 +45,13 @@ def main() -> int:
     row = sim._comps[k]
 
     # 1 — the install's own reward columns
-    assert row["scored"] == "gpp", f"the Fair scores {row['scored']}, not gpp"
+    # the Fair's score table is the eight `WORLDS_FAIR_SCORE_GPP_*` rows,
+    # ScoreAmount 1 apiece over every Great Person class but the Prophet
+    _sc = [tuple(int(x) for x in r) for r in row["scored"]]
+    assert all(k == simbase.SCORE_GPP and a == 1 for k, a, _o in _sc), \
+        f"the Fair scores {row['scored']}, not eight GPP rows"
+    assert len(_sc) == 8, f"the Fair scores {len(_sc)} classes, wanted 8"
+    assert sim._prophet_cls not in [o for _k, _a, o in _sc], "the Prophet is scored"
     assert int(row["gold"]) == 1 and int(row["goldGpp"]) == 100, "first place pays 1 DV point + 100 GPP"
     assert int(row["silver"]) == 50 and int(row["bronze"]) == 0, "the favor tiers are 50 / 0"
     assert int(row["silverBoosts"]) == 2 and int(row["bronzeBoosts"]) == 1, "the boosts are 2 / 1"

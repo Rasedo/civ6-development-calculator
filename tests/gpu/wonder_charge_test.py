@@ -166,19 +166,29 @@ def test_refuses_a_tile_that_is_not_the_site(rules, path) -> None:
 
 
 def test_only_the_head_accrues(rules, path) -> None:
-    """A wonder sitting BEHIND the queue head takes nothing — the same rule
-    the engineer's charge and every production add already follow."""
+    """A wonder the city is NOT building takes nothing — the same rule the
+    engineer's charge and every production add already follow.
+
+    The queue is one deep now, so "behind the head" is no longer a place a
+    wonder can sit; what the rule still forbids is charging a wonder while
+    the city builds something else, and that is what this asserts."""
     sim = fresh(rules, path)
     row = 1
     inside, _out = _wonders_in_and_out(sim)
     j, at, slot = _scene(sim, row, inside, True)
-    # something else at the head, the wonder one deep
+    assert sim.city_current.shape[3] == 1, \
+        "the queue grew a second slot — this body assumed one"
+    # the positive control: with the wonder at the head the column IS offered
+    sim.city_current[B0, row, j, 0] = sim.WONDER_BASE + inside
+    sim._eff_version += 1
+    assert bool(sim._seat_unit_mask(row)[B0, slot, sim._A_WONDER_CHARGE]), \
+        "the wonder at the head was refused its own charge"
+    # ...and something else at the head takes it away again
     sim.city_current[B0, row, j, 0] = 0          # a BUILDING index
-    sim.city_current[B0, row, j, 1] = sim.WONDER_BASE + inside
     sim._eff_version += 1
     assert not bool(sim._seat_unit_mask(row)[B0, slot, sim._A_WONDER_CHARGE]), \
-        "a wonder behind the queue head was offered the column"
-    print("  6 the head OK — only the queue head takes the charge")
+        "a wonder the city is not building was offered the column"
+    print("  6 the head OK — only the wonder the city is BUILDING takes the charge")
 
 
 def test_the_charge_is_spent(rules, path) -> None:

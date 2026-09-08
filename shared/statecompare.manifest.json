@@ -1766,6 +1766,16 @@
           "note": "C-77: the tiles this city works this turn, ascending. Both engines STORE what their seat-phase walk picked, and only that walk: `computeCityStats` and `_seat_city_walk` are pure reads that the score and great-people rules call again later in the turn, so a pick recorded from those would be the post-growth one while the turn itself ran on the loop-top snapshot. The GPU keeps it in a REGISTERED CITY PLANE for the same reason TS keeps it on the City object: `_reclaim_cities` compacts city slots and derives the planes that ride the permutation from `_MUTABLE` by geometry, so a pick held anywhere else is handed to whichever city compaction moves into the slot. City-state cities are OUT of this key: `minorCity` builds a fresh `City` view per call and has nowhere to keep the pick — they are compared in the citystate group, which carries no worked-tile row."
         },
         {
+          "name": "amenityTier",
+          "compare": "exact",
+          "covers": [
+            "City.amenityTier"
+          ],
+          "planes": [
+            "city_amen_tier"
+          ]
+        },
+        {
           "name": "foodBox",
           "compare": "milli",
           "covers": [

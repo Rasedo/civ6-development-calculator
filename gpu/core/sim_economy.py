@@ -5287,6 +5287,9 @@ class SimEconomy:
         difference in the INSTRUMENT, not in the engines. `seatPhase` records
         from its loop-top snapshot for exactly the same reason."""
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
+        # the tier this walk RAN ON, kept where the census reads it — the same
+        # contract the worked-tile stash below keeps, and for the same reason.
+        self.city_amen_tier[:, row, : self.RC] = tier_idx.to(self.city_amen_tier.dtype)
         total = self._seat_city_walk(row, amen_yf=yield_f, record=True)
         housing = self._seat_housing(row)[1]
         pop = self.city_pop[:, row, : self.RC].double()

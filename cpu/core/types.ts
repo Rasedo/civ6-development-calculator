@@ -72,6 +72,11 @@ export interface City {
   /** the tiles this city's last yield walk chose to work, in the walk's
    *  own order. The pick EXPOSED — nothing reads it back into the walk. */
   workedTiles?: number[];
+  /** the AMENITY TIER this city's loop-top walk ran on, as its wire index.
+   *  Derived, like `workedTiles` — kept because it MULTIPLIES every yield the
+   *  city pays, so a disagreement about it is invisible until it shows up as
+   *  a fraction of a food box. Read it through the census, never inline. */
+  amenityTier?: number;
   cultureBox: number;
   tilesAcquired: number;
   /** The seat this city was FOUNDED as the capital of; -1 for every other

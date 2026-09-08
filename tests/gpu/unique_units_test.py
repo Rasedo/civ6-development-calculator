@@ -235,11 +235,13 @@ def main() -> int:
           "the M'banza's yields and the Dockyard's hull")
 
     # 9 — the Cothon's project, priced off the game's own progress
-    # a project row carries no id — its INDEX is its action code, so the row
-    # is read where the catalog puts it: LAST, so nothing earlier shifted.
+    # a project row carries no id — its INDEX is its action code — so the row
+    # is found by the one column only it sets, never by its slot: the catalog
+    # is append-only and later rows land behind it.
     _prows = list(rules.projects["rows"])
-    _cot = _prows[-1]
-    assert int(_cot["mc"]) == 1, "the last project moves no capital"
+    _cots = [i for i, r in enumerate(_prows) if int(r["mc"]) == 1]
+    assert len(_cots) == 1, f"the wire names {len(_cots)} capital-moving projects"
+    _cot = _prows[_cots[0]]
     assert int(_cot["pcg"]) > 0, "the project takes no game-progress curve"
     assert int(_cot["pc"]) > 0, "the project has no base price"
     assert int(_cot["cv"]) == civs.index("PHOENICIA"), "the project is not Phoenicia's"

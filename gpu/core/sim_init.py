@@ -1559,6 +1559,14 @@ class SimInit:
         self.city_worked = torch.full(
             (B, self.CITY_ROWS, self.RC, int(self._off3.shape[0])), -1,
             dtype=torch.long, device=device)
+        # THE AMENITY TIER the loop-top walk ran on, one per city slot, -1
+        # before the first walk. Derived like the pick above, and kept for the
+        # same reason: it MULTIPLIES every yield the city pays, so a
+        # disagreement about it reaches the census only as a fraction of a
+        # food box in whatever city straddles a threshold. A registered CITY
+        # plane, so it rides the compaction.
+        self.city_amen_tier = torch.full(
+            (B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)

@@ -55,14 +55,16 @@ def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
     assert len(sim._proj_seat_rows) == len(sim._proj_rows)
     # THE COTHON'S PROJECT is the one seat-gated row and the one that moves a
-    # capital, and it is the LAST in the catalog, because a project's index IS
-    # its action code.
+    # capital. The pin is its IDENTITY, not a slot: the catalog is
+    # append-only, so later rows land BEHIND it and the last index moves.
     gated = [i for i, (c, l) in enumerate(sim._proj_seat_rows) if c >= 0 or l >= 0]
-    assert gated == [len(sim._proj_rows) - 1], f"the seat-gated projects are {gated}"
+    assert len(gated) == 1, f"the seat-gated projects are {gated}"
+    assert int(sim._proj_rows[gated[0]].get("mc", 0)) == 1, \
+        "the one seat-gated project is not the capital-mover"
     # `_proj_move_cap` is a SET of project indices, not a per-row flag list
     assert sorted(sim._proj_move_cap) == gated, (
         f"the capital-moving projects are {sorted(sim._proj_move_cap)}, the gated {gated}")
-    print("  1 the wire OK — the Cothon's project alone is gated, and it is last")
+    print("  1 the wire OK — the Cothon's project alone is gated, and it moves the capital")
 
 
 def test_seat_gate(rules, path) -> None:
