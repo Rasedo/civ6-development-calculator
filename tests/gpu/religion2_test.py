@@ -485,6 +485,71 @@ def poke_presr(rules, rj, path):
     print(f"  6 ITINERANT presR OK (range {base} -> {base + 2}; base+2 in, base+3 out)")
 
 
+def poke_free_city_pressure(rules, rj, path):
+    """6b. THE FREE ROW IS IN THE WALK (C-60). `CivilizationLevels` names no
+    religion column and the spread operation carries no owner filter, so a
+    Free City takes pressure like any other city and presses back once it
+    follows. The walk covered the majors alone on both engines.
+
+    This poke also guards the axis the widening put at risk: `O` counts
+    RELIGIONS and `NSC` counts CITY ROWS, and they stopped being the same
+    number. A Free City must NOT be treated as founding religion FREE_ROW."""
+    sim = build(rules, path)
+    g = 1
+    F = sim.FREE_ROW
+    base = int(sim._pressure_range)
+    A = C = -1
+    for cand in free_tiles(sim, 600):
+        d = sim.pair_dist[cand]
+        hit = (d == max(1, base - 1)).nonzero(as_tuple=True)[0]
+        if len(hit):
+            A, C = cand, int(hit[0])
+            break
+    assert A >= 0, "no holy tile with an in-range receiver"
+
+    sim.holy_tile[0] = -1
+    sim.holy_tile[0, g] = A
+    sim.city_alive[0, g, 0] = True
+    sim.city_center[0, g, 0] = A
+    sim.city_pressure[0, g, 0] = 0
+    sim.city_pressure[0, g, 0, g] = 9000
+    sim.city_followed[0, g, 0] = g
+    # ...and the FREE CITY, on the city block's free row
+    sim.city_alive[0, F, 0] = True
+    sim.city_center[0, F, 0] = C
+    sim.city_pop[0, F, 0] = 1
+    sim.city_pressure[0, F, 0] = 0
+    sim.city_followed[0, F, 0] = -1
+
+    step = int(sim._holy_city_mult) * int(sim._pressure_per_turn)
+    sim._spread_religious_pressure()
+    got = int(sim.city_pressure[0, F, 0, g])
+    assert got == step, f"the free row took {got} pressure, expected the Holy City's {step}"
+
+    # it FOLLOWS once the majority is its...
+    sim.city_pressure[0, F, 0, g] = 9000
+    sim._spread_religious_pressure()
+    assert int(sim.city_followed[0, F, 0]) == g, "the free row never followed"
+
+    # ...and then it is a SOURCE: a second major city beside it takes the free
+    # row's own x1 step, with the Holy City silenced so nothing else can pay.
+    S2 = 1
+    sim.city_alive[0, g, S2] = True
+    sim.city_center[0, g, S2] = C
+    sim.city_pressure[0, g, S2] = 0
+    sim.city_followed[0, g, S2] = -1
+    sim.city_alive[0, g, 0] = False          # silence the Holy City
+    sim._spread_religious_pressure()
+    lone = int(sim.city_pressure[0, g, S2, g])
+    assert lone > 0, "a following Free City pressed nobody — the free row is not a SOURCE"
+
+    # THE AXIS GUARD: no religion is keyed by the free row, so nothing may
+    # have been written into a religion column that does not exist.
+    assert int(sim.holy_tile.shape[1]) == sim.n_majors, "religions are keyed by MAJOR row"
+    assert int(sim.city_pressure.shape[3]) == sim.n_majors, "the pressure plane's last axis is RELIGIONS"
+    print(f"  6b the free row takes pressure ({step}) and presses back ({lone}) OK")
+
+
 def poke_combat_cs(rules, rj, path):
     """7. Enhancer combat CS adders, probed directly on hand-set planes:
     JUST_WAR +10 near a following city (attacker AND defender), CRUSADE +10
@@ -861,6 +926,7 @@ def main() -> None:
     poke_missionary_gating(rules, rj, path)
     poke_missionary_spread(rules, rj, path)
     poke_presr(rules, rj, path)
+    poke_free_city_pressure(rules, rj, path)
     poke_combat_cs(rules, rj, path)
     poke_messenger_route(rules, rj, path)
     poke_victor_direct(rules, rj, path)

@@ -57,7 +57,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
 | C-45 queue depth five | 1 | ask |
 | C-49 named storms | 1 | the storm's walk (DLL) |
-| C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
+| C-60 the Free City's own play | 1 | two owner rulings and nothing to build: its units/walls/retaliation, its amenities |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-69 two unique rows with trait clauses | 0 | CLOSED — the Tsikhe and the Mission shipped with C-79's rows |
@@ -66,7 +66,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **40** | |
+| **OPEN, TOTAL** | **39** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -453,15 +453,14 @@ Nothing open.
   - THE WALK: `Movement 8` on every storm row is DLL logic; a storm stays on
     its centre for its three turns. How does it choose a heading and how far
     does it move per turn?
-- **C-60. THE FREE CITY'S OWN PLAY.** Weight 2.
+- **C-60. THE FREE CITY'S OWN PLAY.** Weight 1.
   The seat is in on both engines (revolt, race, join, Eleanor's skip, open
-  to attack). Each bullet is an exact question, no magnitude to invent:
+  to attack, and since #242i the religion walk). NOTHING BUILDABLE REMAINS —
+  both bullets are owner rulings, with no magnitude either engine could
+  invent:
   - ITS DEFENCE — ask 15. Today: floor-15 defence plus the walls it
     revolted with, healing 20 a turn.
   - ITS AMENITIES — ask 14.
-  - THE RELIGION WALKS skip the free row (`allCities`, the GPU's
-    `[:, :n_majors]` pressure rows): no pressure in or out, no Missionary
-    spread. The same class of widening as the loyalty walk took.
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   - Three ledger rows wait (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
     `TRAIT_COMBAT_BONUS_OTHER_RELIGION`,

@@ -51,7 +51,7 @@ import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
+import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -1962,7 +1962,19 @@ function spreadReligiousPressure(state: GameState): void {
     if (eb) range[sx.seat] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
   }
   const tiles = state.map.tiles;
-  const cities = allCities(state) as City[];
+  // CIV6: the install has ONE city rule for religion, and nothing in it
+  // excludes a Free City. `CivilizationLevels` withholds founding cities,
+  // culture and gold claims, great people, influence and wonders from the
+  // Free Cities player and names no religion column at all; the
+  // spread-religion operation row carries no owner filter; and the
+  // `RELIGION_SPREAD_*` parameters are written per CITY. So a Free City is a
+  // city here — it takes pressure, it follows what holds the majority, and
+  // once it follows it PRESSES like any other (C-60).
+  //
+  // `cityHolders` and not `allCities`: `allCities` answers a different
+  // question at four other sites (combat, capture, the trade walk), and the
+  // census already walks the majors then the free row in exactly this order.
+  const cities = cityHolders(state).flatMap((sx) => sx.cities);
   // CIV6 (GlobalParameters): every city FOLLOWING a religion presses every
   // city within range each turn — the Holy City at x4, a city with a Holy
   // Site at x2, any other at x1 — times the Bishop's doubling at the source.

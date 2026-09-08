@@ -95,7 +95,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
         "darkAge", "darkCard",
-        "freeCity", "freeLeft",
+        "freeCity", "freeLeft", "freeFollow", "freePress",
         "spy", "spyDistrict", "spyMission", "bldgPillaged") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
@@ -341,6 +341,12 @@ def main() -> None:
         free_now = sim.city_alive[:, sim.FREE_ROW].sum(dim=1)
         mark("freeCity", free_now > 0, t)
         mark("freeLeft", free_now < free_seen, t)
+        # C-60: the religion walk covers the free row. A Free City that TAKES
+        # pressure, and one that has come to FOLLOW — the second is what says
+        # the widening is exercised rather than merely present.
+        _fr = sim.city_alive[:, sim.FREE_ROW]
+        mark("freePress", (sim.city_pressure[:, sim.FREE_ROW].sum(dim=2) > 0).logical_and(_fr).any(dim=1), t)
+        mark("freeFollow", ((sim.city_followed[:, sim.FREE_ROW] >= 0) & _fr).any(dim=1), t)
         free_seen = torch.maximum(free_seen, free_now)
         mark("specPin", (sim.city_spec_pin >= 0).any(dim=3).any(dim=2).any(dim=1), t)
         mark("friendship", (sim.seat_friend_turns > 0).any(dim=2).any(dim=1), t)

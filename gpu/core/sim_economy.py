@@ -3425,6 +3425,22 @@ class SimEconomy:
             return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
         return (self._gw_obj_tourism[7] * rel.long() * self._gw_slot_mult(row)).sum(dim=2)
 
+    def _relig_rows(self, x: torch.Tensor) -> torch.Tensor:
+        """The city-block rows RELIGION walks: the majors, then the Free
+        Cities row. Two contiguous ranges concatenated rather than an
+        advanced index — the same shape `_compact_city_rows` uses, and it
+        keeps the write-back two plain `.copy_()` slices (C-60).
+
+        CITY-STATE rows are NOT here. Their pressure is a separate plane the
+        route term writes into directly, and a minor follows nothing."""
+        return torch.cat([x[:, :self.n_majors], x[:, self.FREE_ROW:self.FREE_ROW + 1]], dim=1)
+
+    def _relig_row_write(self, plane: torch.Tensor, val: torch.Tensor) -> None:
+        """...and the inverse, in place on both ranges."""
+        M = self.n_majors
+        plane[:, :M].copy_(val[:, :M])
+        plane[:, self.FREE_ROW:self.FREE_ROW + 1].copy_(val[:, M:M + 1])
+
     def _spread_religious_pressure(self) -> None:
         """The spreadReligiousPressure twin. CIV6 (GlobalParameters): every
         city FOLLOWING a religion presses every live city within range each
@@ -3448,12 +3464,25 @@ class SimEconomy:
         if self._enh_any:
             RANGE += self._enh["presR"][self.civ_enhancer[:, :O] + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
-        NSC = self.n_majors
+        # THE ROW AXIS IS NOT THE RELIGION AXIS. `O` counts RELIGIONS (each is
+        # keyed by its founder's major row); `NSC` counts the CITY ROWS this
+        # walk covers, which since C-60 is the majors PLUS the Free Cities
+        # row. They were the same number for as long as the walk was
+        # majors-only, and three sites below read one where they meant the
+        # other.
+        M = self.n_majors
+        NSC = M + 1
+        _rw = self._relig_rows
         RC = self.city_center.shape[2]
         K = NSC * RC
-        liv = self.city_alive[:, :NSC]                                   # [B, NSC, RC]
-        cen_f = self.city_center[:, :NSC].clamp(min=0).reshape(B, K)
-        fol = self.city_followed[:, :NSC].reshape(B, K)                  # [B, K] the SOURCE's religion
+        liv = _rw(self.city_alive)                                       # [B, NSC, RC]
+        cen_f = _rw(self.city_center).clamp(min=0).reshape(B, K)
+        fol = _rw(self.city_followed).reshape(B, K)                      # [B, K] the SOURCE's religion
+        # which RELIGION each walked row founds, -1 for a row that founds none
+        # (the Free Cities player) — what the two "is this the owner's own
+        # religion" tests key on, in place of an arange over rows.
+        row_rel = torch.cat([torch.arange(M, device=self.device),
+                             torch.full((1,), -1, dtype=torch.long, device=self.device)])
         emits = (fol >= 0) & liv.reshape(B, K) & founded.gather(1, fol.clamp(min=0))
         # the source's step: the Holy City x4 — CIV6 (Jerusalem's suzerain):
         # "Your cities with Holy Sites exert pressure as if they were Holy
@@ -3462,20 +3491,25 @@ class SimEconomy:
         holy = emits & (cen_f == self.holy_tile.gather(1, fol.clamp(min=0)))
         site = torch.zeros(B, NSC, RC, dtype=torch.bool, device=self.device)
         if self._hs_idx >= 0:
-            hs = self.city_dist_tile[:, :NSC, :, self._hs_idx]
+            hs = _rw(self.city_dist_tile)[..., self._hs_idx]
             hsc = hs.clamp(min=0).reshape(B, K)
             site = ((hs >= 0).reshape(B, K) & self.district_complete.gather(1, hsc)
                     & ~self.district_pillaged.gather(1, hsc)).reshape(B, NSC, RC)
             if self._suz_c_holy >= 0:
-                own_rel = fol.reshape(B, NSC, RC) == torch.arange(NSC, device=self.device).reshape(1, NSC, 1)
-                jm = torch.stack([self._suz_effect(g, self._suz_c_holy) for g in range(NSC)], dim=1)  # [B, NSC]
+                own_rel = fol.reshape(B, NSC, RC) == row_rel.reshape(1, NSC, 1)
+                # a suzerain effect is a MAJOR's; the free row claims none
+                jm = torch.cat([torch.stack([self._suz_effect(g, self._suz_c_holy) for g in range(M)], dim=1),
+                                torch.zeros(B, 1, dtype=torch.bool, device=self.device)], dim=1)  # [B, NSC]
                 holy = holy | (site & own_rel & jm.unsqueeze(2)).reshape(B, K)
         site_f = site.reshape(B, K)
         step = torch.where(holy, self._holy_city_mult, torch.where(site_f, self._holy_site_mult, 1)) * self._pressure_per_turn
         # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
         # stronger from this city" — the SOURCE city's own governor.
         if self.n_governors:
-            bishop = torch.stack([self._governor_mult(g, "pressureMult") for g in range(NSC)], dim=1).reshape(B, K)
+            # a governor is a MAJOR's; the free row's multiplier is the identity
+            bishop = torch.cat([torch.stack([self._governor_mult(g, "pressureMult") for g in range(M)], dim=1),
+                                torch.ones(B, 1, RC, dtype=torch.float64, device=self.device)],
+                               dim=1).reshape(B, K)
             step = (step.double() * bishop.double()).long()
         w = torch.where(emits, step, torch.zeros_like(step))            # [B, K]
         # every receiver against every source: within the SOURCE religion's range
@@ -3489,13 +3523,17 @@ class SimEconomy:
         # founded by the Governor's player."
         if self.n_governors:
             _own = torch.arange(O, device=self.device).reshape(1, 1, 1, O) \
-                == torch.arange(NSC, device=self.device).reshape(1, NSC, 1, 1)
-            _deaf = torch.stack([self._governor_flag(g, "ignoreForeignPressure") for g in range(NSC)], dim=1)
+                == row_rel.reshape(1, NSC, 1, 1)
+            _deaf = torch.cat([torch.stack([self._governor_flag(g, "ignoreForeignPressure") for g in range(M)], dim=1),
+                               torch.zeros(B, 1, RC, dtype=torch.bool, device=self.device)], dim=1)
             add = torch.where(_deaf.unsqueeze(3) & ~_own, torch.zeros_like(add), add)
         # CIV6 (Religious alliance 1): allies' religions exert no pressure on
         # each other's cities - zero the ally-founded column at ally-owned rows.
-        _rp = ((self.seat_alliance_type[:, :NSC, :O] == 4)
-               & (self.seat_ally_turns[:, :NSC, :O] > 0))
+        # the alliance planes are [B, n_majors, n_majors]: the Free Cities
+        # player holds no alliance row of its own, so its clause is all-False.
+        _rp = torch.cat([((self.seat_alliance_type[:, :M, :O] == 4)
+                          & (self.seat_ally_turns[:, :M, :O] > 0)),
+                         torch.zeros(B, 1, O, dtype=torch.bool, device=self.device)], dim=1)
         if bool(_rp.any()):
             add = torch.where(_rp.unsqueeze(2), torch.zeros_like(add), add)
         # CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
@@ -3513,19 +3551,21 @@ class SimEconomy:
                 for a in range(O):
                     if a == g or not bool(allies[:, a].any()):
                         continue
-                    nofol = self.city_pressure[:, :NSC, :, a] == 0
+                    nofol = _rw(self.city_pressure)[..., a] == 0
                     pct = pct + (allies[:, a].view(B, 1, 1) & nofol).long() * self._al_rel3_pressure_pct
                 add[..., g] = (add[..., g] * (100 + pct)).div(100, rounding_mode="floor")
-        self.city_pressure[:, :NSC].copy_(
-            torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
-        )
-        best = self._followed_religion(self.city_pressure[:, :NSC], self.city_pop[:, :NSC])
+        _pres0 = _rw(self.city_pressure)
+        self._relig_row_write(
+            self.city_pressure,
+            torch.where(liv.unsqueeze(3), _pres0 + add, torch.zeros_like(_pres0)))
+        best = self._followed_religion(_rw(self.city_pressure), _rw(self.city_pop))
         # EXODUS pays era score each time a city CONVERTS; compare against the
         # PRE-flip follow set, exactly like `wasFollowed`.
-        was = self.city_followed[:, :NSC].clone()
-        self.city_followed[:, :NSC].copy_(torch.where(liv, best, torch.full_like(best, -1)))
+        was = _rw(self.city_followed).clone()
+        self._relig_row_write(self.city_followed, torch.where(liv, best, torch.full_like(best, -1)))
+        _fol1 = _rw(self.city_followed)
         for _g in range(self.n_majors):
-            _conv = (self.city_followed[:, :NSC] == _g) & (was != _g) & liv
+            _conv = (_fol1 == _g) & (was != _g) & liv
             if bool(_conv.any()):
                 self._dedication_event(_g, 3, _conv.reshape(B, -1).sum(dim=1))
 
@@ -3544,10 +3584,15 @@ class SimEconomy:
         the destination and the destination's back at half strength, Dharma's
         +100% on the route OWNER's rows. Major receivers land in `add` (so the
         Citadel and alliance masks apply); a city-state destination takes the
-        pressure straight into its row and follows nothing."""
-        B, O, NSC, S = self.B, self.n_majors, self.n_majors, self.S
-        cen_f = self.city_center[:, :NSC].reshape(B, -1)
-        fol_f = self.city_followed[:, :NSC].reshape(B, -1)
+        pressure straight into its row and follows nothing.
+
+        The RECEIVER axis is the caller's row set — the majors and the Free
+        Cities row (C-60) — so a route ending at a Free City lands in `add`
+        like any other. The route OWNER loop stays over the majors: the Free
+        Cities player runs no trade route."""
+        B, O, S = self.B, self.n_majors, self.S
+        cen_f = self._relig_rows(self.city_center).reshape(B, -1)
+        fol_f = self._relig_rows(self.city_followed).reshape(B, -1)
         liv_f = liv.reshape(B, 1, -1)
         add_f = add.reshape(B, -1, O)
 
@@ -3556,7 +3601,7 @@ class SimEconomy:
             cell = hit.long().argmax(dim=2)
             return hit.any(dim=2), cell, fol_f.gather(1, cell)
 
-        for row in range(NSC):
+        for row in range(self.n_majors):
             oc, dc = self._route_centres(row)
             live = (oc >= 0) & (dc >= 0)
             if not bool(live.any()):
