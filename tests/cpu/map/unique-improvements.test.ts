@@ -51,12 +51,20 @@ describe('the unique improvement catalog', () => {
     }
   });
 
-  it('appends every id LAST, so no earlier build column moved', () => {
-    const tail = IMPROVEMENT_IDS.slice(-ROWS.length);
-    expect(tail).toEqual(ROWS.map(([id]) => id));
+  it('holds its twelve seats, so no earlier build column moved', () => {
+    // PIN THE POSITIONS, not "the last twelve". A Builder's action code IS
+    // this list's index, so what must not move is where each id SITS —
+    // slicing the tail made the pin depend on nothing ever being appended
+    // after them, and #242m appended the two governor improvements.
+    const at = ROWS.map(([id]) => IMPROVEMENT_IDS.indexOf(id));
+    expect(at).toEqual([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]);
     // and the three that shipped earlier keep the seats they already held
     expect(IMPROVEMENT_IDS.indexOf('SPHINX')).toBe(19);
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')).toBe(22);
+    // the governor rows follow, and nothing follows them yet
+    expect(IMPROVEMENT_IDS.indexOf('FISHERY')).toBe(35);
+    expect(IMPROVEMENT_IDS.indexOf('CITY_PARK')).toBe(36);
+    expect(IMPROVEMENT_IDS.length).toBe(37);
   });
 
   it('gives one civilization at most one unique improvement', () => {

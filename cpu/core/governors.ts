@@ -153,6 +153,27 @@ export function cityGovernorEffects(state: GameState, city: City): GovernorEffec
 }
 
 /**
+ * THE PROMOTIONS this city's ESTABLISHED governor holds, by catalog id.
+ *
+ * `cityGovernorEffects` merges the effect ROWS, which is what a numeric
+ * channel wants; a rule that names a promotion (the Fishery's Aquaculture,
+ * the City Park's Parks and Recreation) needs the ids themselves. Same
+ * establishment rule: a posting still establishing holds none.
+ */
+export function cityGovernorPromos(state: GameState, city: City): ReadonlySet<string> {
+  const out = new Set<string>();
+  const i = governorAt(state, city);
+  if (i < 0) return out;
+  const g = seatOf(state, city.seat)!.governors![i];
+  if ((g.establishTurns ?? 0) > 0) return out;
+  out.add(GOVERNOR_PROMOTIONS[GOVERNOR_DEFAULT_PROMOTION[i]].id);
+  for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+    if (hasPromotion(g, p)) out.add(GOVERNOR_PROMOTIONS[p].id);
+  }
+  return out;
+}
+
+/**
  * The merged effects of the governor this seat has ESTABLISHED at this minor.
  * CIV6 (Amani): she is "the only Governor who can be assigned to a
  * City-state"; the catalog's `cityStates` flag is which. A posting still

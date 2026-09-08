@@ -100,7 +100,9 @@ export type ImprovementId =
   | 'MISSION'
   | 'OPEN_AIR_MUSEUM'
   | 'POLDER'
-  | 'STEPWELL';
+  | 'STEPWELL'
+  | 'FISHERY'
+  | 'CITY_PARK';
 
 export type DistrictId =
   | 'CITY_CENTER'

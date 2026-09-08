@@ -6,7 +6,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // the twelve unique improvements APPEND LAST — a Builder's action code
   // IS this list's position, so an insert would shift every later one
   'CHATEAU', 'CHEMAMULL', 'GOLF_COURSE', 'GREAT_WALL', 'ICE_HOCKEY_RINK', 'KURGAN',
-  'MAORI_PA', 'MEKEWAP', 'MISSION', 'OPEN_AIR_MUSEUM', 'POLDER', 'STEPWELL'];
+  'MAORI_PA', 'MEKEWAP', 'MISSION', 'OPEN_AIR_MUSEUM', 'POLDER', 'STEPWELL',
+  // ...and the two GOVERNOR improvements after them, for the same reason
+  'FISHERY', 'CITY_PARK'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

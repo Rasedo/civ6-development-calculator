@@ -1853,6 +1853,9 @@ export function buildRules() {
             // Pasture), a LUXURY neighbour, or a list of terrains
             imp: r.improvement ? IMPROVEMENT_IDS.indexOf(r.improvement) : -1,
             lux: r.luxuryResource ? 1 : 0,
+            // CIV6 (AdjacentSeaResource): a WATER neighbour carrying a
+            // resource — the Fishery's own source.
+            sres: r.seaResource ? 1 : 0,
             terr: (r.terrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
             rc: r.requiresCivic ? civicIdx.get(r.requiresCivic) ?? -3 : -1,
             uc: r.upgradeCivic ? civicIdx.get(r.upgradeCivic) ?? -3 : -1,
@@ -1872,6 +1875,20 @@ export function buildRules() {
           reqFeat: def.requiresFeature ? FEAT_IDS.indexOf(def.requiresFeature) : -1,
           air: def.airSlots ?? 0,
           appeal: def.appealAdjacent ?? 0,
+          // CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION
+          // the owning city's governor must hold before the row may be laid
+          // (-1 = none), and the promotion + yields the plot is paid WHILE
+          // that governor stays — two separate columns because the build
+          // gate and the payment are two separate modifiers.
+          govPromo: def.governorPromo ? GOVERNOR_PROMOTION_INDEX[def.governorPromo] ?? -3 : -1,
+          govY: def.governorYields
+            ? {
+              promo: GOVERNOR_PROMOTION_INDEX[def.governorYields.promo] ?? -3,
+              y: YIELD_KEYS.map((k) => def.governorYields!.yields[k] ?? 0),
+            }
+            : null,
+          // amenities the row pays its city for standing beside water
+          watAmen: def.amenityAdjacentWater ?? 0,
           plun: plunRow(def.plunder),
           // THE UNIQUE ROWS' own placement and clause columns. -1 / 0 means
           // "the row names none of this".

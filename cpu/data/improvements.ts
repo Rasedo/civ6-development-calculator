@@ -32,6 +32,9 @@ export interface ImpAdjacency {
   mountain?: boolean;
   /** count a neighbour carrying THIS improvement. */
   sameImprovement?: boolean;
+  /** CIV6 (AdjacentSeaResource): count a neighbour that is WATER and
+   *  carries a resource — the Fishery's own adjacency. */
+  seaResource?: boolean;
   /** the civic the rule needs before it pays at all. */
   requiresCivic?: string;
   /** the TECH that improves the rule, beside `upgradeCivic`. */
@@ -181,6 +184,34 @@ export interface ImprovementDef {
   /** CIV6 (Golf Course, Open-Air Museum): "Tiles with <row> cannot be
    *  swapped" — recorded; this engine has no tile-swap verb (C-79). */
   noSwap?: boolean;
+  /**
+   * CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION the
+   * owning city's governor must hold before a Builder may lay this row at
+   * all — "The Fishery unique improvement can be built in the city on
+   * coastal plots", "The City Park unique improvement can be built in the
+   * city". A gate on the CITY, not on the seat, so it travels with the
+   * governor.
+   */
+  governorPromo?: string;
+  /**
+   * CIV6 (FISHERY_GOVERNOR_PRODUCTION, CITY_PARK_GOVERNOR_CULTURE, both
+   * MODIFIER_SINGLE_PLOT_ADJUST_PLOT_YIELDS behind
+   * `CITY_HAS_GOVERNOR_PROMOTION_*`): what the plot pays ON TOP of `yields`
+   * while the owning city's governor still holds the promotion.
+   *
+   * SEPARATE from `governorPromo` on purpose, and that is the whole reason
+   * the install writes it as a modifier rather than folding it into the row:
+   * the promotion gates the BUILD, and the improvement stands after the
+   * governor leaves — but this payment stops.
+   */
+  governorYields?: { promo: string; yields: Partial<Yields> };
+  /**
+   * CIV6 (CITY_PARK_WATER_AMENITY,
+   * MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
+   * ADJACENT_TO_WATER_REQUIREMENTS): amenities this row pays its CITY —
+   * per instance, not per city — when its tile touches water.
+   */
+  amenityAdjacentWater?: number;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -854,6 +885,60 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // has NO `Improvement_Adjacencies` row in the install — both halves are
     // DLL-side, so they are recorded rather than invented (C-79).
     description: '+1 food +1 housing on flat ground, never beside another Stepwell. +1 faith from Feudalism, +1 more food from Professional Sports.',
+  },
+  // ---- THE TWO GOVERNOR IMPROVEMENTS ----
+  // CIV6 (DLC/Expansion2/Data/Expansion1_Improvements.xml — Expansion2 is the
+  // LAST layer and it is the one that gives the Fishery its Housing and
+  // TilesRequired). Neither is a civilization's unique: each is unlocked by a
+  // GOVERNOR PROMOTION in the city that holds the plot, which is why both
+  // promotions have sat in `governors.ts` with empty effects (B-24r).
+  FISHERY: {
+    id: 'FISHERY',
+    name: 'Fishery',
+    code: 'Fy',
+    plunder: { kind: 'heal', amount: 50 },
+    // Improvement_YieldChanges: FOOD +1, PRODUCTION +0. The zero is carried
+    // literally: it is there so the governor modifier below has a production
+    // term to raise.
+    yields: { food: 1 },
+    // `Housing="1" TilesRequired="2"` — one Housing per two of them, which is
+    // the half this catalog stores, exactly as the Farm's does.
+    housing: 0.5,
+    resourceOnly: false,
+    waterOnly: true,
+    terrains: ['COAST'],
+    governorPromo: 'AQUACULTURE',
+    governorYields: { promo: 'AQUACULTURE', yields: { production: 1 } },
+    // Improvement_Adjacencies -> Fishery_SeaResourceAdjacency:
+    // YIELD_FOOD +1, TilesRequired 1, AdjacentSeaResource true
+    adjacency: [{ seaResource: true, per: 1, yields: { food: 1 } }],
+    description: 'Coast only, and only where the governor of the owning city holds Aquaculture. +1 food, +1 more per adjacent sea resource, +1 production while that governor stays.',
+  },
+  CITY_PARK: {
+    id: 'CITY_PARK',
+    name: 'City Park',
+    code: 'Cp',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { culture: 1 },
+    housing: 0,
+    resourceOnly: false,
+    groundOnly: true,
+    // Improvement_ValidTerrains names every LAND terrain, flat and hills
+    // alike, so the row carries no elevation clause.
+    terrains: ['DESERT', 'TUNDRA', 'PLAINS', 'GRASSLAND', 'SNOW'],
+    // `Appeal="2"`: what the row does to its NEIGHBOURS, the column every
+    // other improvement here reads that way (the Mine's -1, the camp's -1).
+    appealAdjacent: 2,
+    // `SameAdjacentValid="false"`
+    noAdjacentSame: true,
+    governorPromo: 'PARKS_AND_RECREATION',
+    governorYields: { promo: 'PARKS_AND_RECREATION', yields: { culture: 3 } },
+    // Improvement_Tourism: TOURISMSOURCE_CULTURE, PrereqTech TECH_FLIGHT,
+    // ScalingFactor 100
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    amenityAdjacentWater: 1,
+    description: 'Any land, never beside another, and only where the governor of the owning city holds Parks and Recreation. +1 culture (+3 more while that governor stays), +2 appeal to its neighbours, +1 amenity beside water, tourism from Flight.',
   },
   ZIGGURAT: {
     id: 'ZIGGURAT',

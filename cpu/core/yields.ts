@@ -55,7 +55,12 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (!!r.improvement && nb.improvement === r.improvement && !nb.pillaged) ||
         (!!r.luxuryResource && nb.resource !== null && RESOURCES[nb.resource].category === 'luxury') ||
         (!!r.terrains && r.terrains.includes(nb.terrain)) ||
-        (!!r.features && nb.feature !== null && r.features.includes(nb.feature));
+        (!!r.features && nb.feature !== null && r.features.includes(nb.feature)) ||
+        // CIV6 (Fishery_SeaResourceAdjacency, AdjacentSeaResource): a
+        // neighbour that is WATER and carries a resource. `ringTerrain`
+        // rather than the ground beneath, so a drowned tile counts as the
+        // sea it now is (C-35).
+        (!!r.seaResource && nb.resource !== null && isWater(nb));
       if (hit) n += 1;
     }
     const groups = Math.floor(n / Math.max(1, per));
@@ -168,6 +173,13 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     }
     // CIV6 (Mission): what the row pays on a tile whose continent is NOT the
     // seat's capital's.
+    // CIV6 (FISHERY_GOVERNOR_PRODUCTION, CITY_PARK_GOVERNOR_CULTURE):
+    // what the plot pays while the OWNING CITY's governor still holds the
+    // promotion — separate from the build gate, so the improvement stands
+    // and this payment stops when the governor leaves.
+    if (idef.governorYields && ctx.govPromosAt?.(tile).has(idef.governorYields.promo)) {
+      addYields(out, idef.governorYields.yields);
+    }
     if (idef.offCapitalContinentYields && ctx.offHomeContinent?.(tile)) {
       addYields(out, idef.offCapitalContinentYields);
     }

@@ -12,7 +12,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent } from './seats';
+import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -29,7 +29,7 @@ import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
 import { GP_PERM } from '../data/greatPeople';
 import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
-import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityHasGovernor } from './governors';
+import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityHasGovernor } from './governors';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 import type { AdjacencyRule } from '../data/districts';
 export interface Unlocks {
@@ -1642,7 +1642,13 @@ export interface YieldCtx {
   /** CIV6 (Open-Air Museum): the TERRAIN KINDS this seat has founded a city
    *  on — its city centres' own terrains. */
   foundedTerrains?: ReadonlySet<TerrainId>;
+  /** CIV6 (`CITY_HAS_GOVERNOR_PROMOTION_*`): the promotions held by the
+   *  governor of the city that owns this tile. Absent leaves every governor
+   *  plot clause unpaid, which is what a seatless base context wants. */
+  govPromosAt?: (t: Tile) => ReadonlySet<string>;
 }
+
+const NO_PROMOS: ReadonlySet<string> = new Set<string>();
 
 export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): YieldCtx {
   const camps = campTiles(state);
@@ -1659,6 +1665,25 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
     gpAppeal: cityAppealResolver(state),
     offHomeContinent: (t) => !onHomeContinent(state, seat, t.index),
     foundedTerrains: founded,
+    govPromosAt: cityGovernorPromoResolver(state, seat),
+  };
+}
+
+/** The per-tile governor-promotion lookup the context carries, resolved once
+ *  per CITY rather than per tile — the same shape `cityAppealResolver` uses,
+ *  and for the same reason. */
+function cityGovernorPromoResolver(state: GameState, seat: number): (t: Tile) => ReadonlySet<string> {
+  const byCity = new Map<number, ReadonlySet<string>>();
+  return (t: Tile) => {
+    if (tileSeat(t) !== seat) return NO_PROMOS;
+    const cid = tileCity(t);
+    if (cid < 0) return NO_PROMOS;
+    const hit = byCity.get(cid);
+    if (hit !== undefined) return hit;
+    const c = citiesOf(state, seat).find((x) => x.id === cid);
+    const got = c ? cityGovernorPromos(state, c) : NO_PROMOS;
+    byCity.set(cid, got);
+    return got;
   };
 }
 

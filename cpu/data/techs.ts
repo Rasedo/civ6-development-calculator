@@ -76,6 +76,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('SAILING', 'Sailing', 'Ancient', 50, [], [
       { kind: 'unlockImprovement', improvement: 'FISHING_BOATS' },
+      // CIV6 (IMPROVEMENT_FISHERY, PrereqTech): the TECH opens the row; the
+      // AQUACULTURE governor promotion opens the CITY (B-24r).
+      { kind: 'unlockImprovement', improvement: 'FISHERY' },
     ]),
     T('ARCHERY', 'Archery', 'Ancient', 50, ['ANIMAL_HUSBANDRY']),
     T('ASTROLOGY', 'Astrology', 'Ancient', 50, [], [

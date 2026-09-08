@@ -3332,6 +3332,15 @@ class SimSeats:
                     & ~self.water & self.passable)
             if _gu >= 0:
                 _gok = _gok & tk[:, _gu].unsqueeze(1)
+            # ...and the CIVIC unlock beside the tech one. A ground row whose
+            # opener is a civic (the City Park's Games and Recreation) read as
+            # unlocked from turn 1 while only `_imp_unlock` was asked — this
+            # arm is the THIRD place the ground-only clause is spelled, and it
+            # was a column behind the other two.
+            _gc = int(self._imp_unlock_civic[_g])
+            if _gc >= 0:
+                _gok = _gok & cv[:, _gc].unsqueeze(1)
+            _gok = _gok & self._imp_gov_ok(row, _g)
             ok = ok | _gok
         new_res = self.res_imp >= 3
         if bool(new_res.any()):
@@ -3349,6 +3358,23 @@ class SimSeats:
             & (self.centre_slot_at < 0)
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)
+
+    def _imp_gov_ok(self, row: int, k: int) -> torch.Tensor:
+        """[B, T] — the GOVERNOR gate (`govOk` in `validImprovementsIn`): a row
+        naming a promotion is laid only on a tile whose OWNING CITY's
+        established governor holds it. Rows that name none pass everywhere.
+
+        A city gate, not a seat gate, so it travels with the governor — and a
+        seat with no governor at all lays neither row, which is the answer to
+        "does this city hold Aquaculture", not a missing case."""
+        p = self._imp_gov_promo[k]
+        if p < 0:
+            return torch.ones(self.B, self.T, dtype=torch.bool, device=self.device)
+        if not self.n_governors or row >= self.n_majors:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        held = self._governor_mask(row)[:, :, p]                     # [B, RC]
+        sl = self.city_slot_at(row)                                  # [B, T]
+        return (sl >= 0) & torch.gather(held, 1, sl.clamp(min=0))
 
     def _imp_ground_ok(self, k: int) -> torch.Tensor:
         """[B, T] — does improvement `k`'s own catalog clause allow this tile?
@@ -3441,7 +3467,8 @@ class SimSeats:
         if not self._imp_suz[k]:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         held = (self._suzerain_mask(row) & (self.citystate_suz_imp[:, : self.S] == k)).any(dim=1)
-        return held.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
+        return (held.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
+                & self._imp_gov_ok(row, k))
 
     def _uniq_improvement_ok(self, row: int, k: int) -> torch.Tensor:
         """[B, T] — may seat `row` lay UNIQUE improvement `k` here? CIV6
@@ -3461,7 +3488,7 @@ class SimSeats:
         # on a different improvement, exactly as the Builder's water arm does
         ground = (self._builder_ground() if not self._imp_water[k]
                   else (self.water & ~self.tile_submerged & (self.res_imp < 0)))
-        out = ok.unsqueeze(1) & ground & self._imp_ground_ok(k)
+        out = ok.unsqueeze(1) & ground & self._imp_ground_ok(k) & self._imp_gov_ok(row, k)
         # CIV6 (Great Wall, `BuildOnFrontier`): the seat's own BORDER — an
         # owned tile at least one of whose neighbours it does not hold.
         if self._imp_frontier[k]:
@@ -6735,6 +6762,11 @@ class SimSeats:
                     hit |= (self.improvement[:, nbc] == _ri) & ~self.pillaged[:, nbc]
                 if int(r.get("lux", 0)):
                     hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc]
+                # CIV6 (AdjacentSeaResource, Fishery_SeaResourceAdjacency): a
+                # neighbour that is WATER and carries a resource of any kind.
+                if int(r.get("sres", 0)):
+                    hit |= ((self.res_priority[:, nbc] > 0) & ~self.res_stripped[:, nbc]
+                            & self.water[:, nbc])
                 for _rt in r.get("terr", []):
                     hit |= self.terrain[:, nbc] == int(_rt)
                 n = (hit & on).sum(dim=2)                    # [B, T]
@@ -7004,7 +7036,8 @@ class SimSeats:
         off-capital-continent half, and the Open-Air Museum's per-terrain-kind
         pay. None where this seat's rows name none of them."""
         if not (self._imp_appeal_y_any or self._imp_res_y_any
-                or self._imp_off_cont_any or self._imp_terr_kind_any):
+                or self._imp_off_cont_any or self._imp_terr_kind_any
+                or self._imp_gov_yield_any):
             return None
         B, T, dev = self.B, self.T, self.device
         out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
@@ -7036,6 +7069,25 @@ class SimSeats:
                         continue
                     _yt = torch.tensor(_y, dtype=self.dtype, device=dev)
                     out = out + (here & has.unsqueeze(1)).unsqueeze(2).to(self.dtype) * _yt.view(1, 1, 6)
+        # CIV6 (FISHERY_GOVERNOR_PRODUCTION, CITY_PARK_GOVERNOR_CULTURE):
+        # what the plot pays while the OWNING CITY's governor still holds the
+        # promotion. Separate from the build gate on purpose — the improvement
+        # stands after the governor leaves and this payment stops.
+        if self._imp_gov_yield_any and self.n_governors and row < self.n_majors:
+            _sl = self.city_slot_at(row)                              # [B, T]
+            _slc = _sl.clamp(min=0)
+            for k, gy in enumerate(self._imp_gov_yield):
+                if gy is None:
+                    continue
+                here = live & (self.improvement == k)
+                if not bool(here.any()):
+                    continue
+                _held = self._governor_mask(row)[:, :, int(gy["promo"])]   # [B, RC]
+                _on = here & (_sl >= 0) & torch.gather(_held, 1, _slc)
+                if not bool(_on.any()):
+                    continue
+                _yt = torch.tensor([float(v) for v in gy["y"]], dtype=self.dtype, device=dev)
+                out = out + _on.unsqueeze(2).to(self.dtype) * _yt.view(1, 1, 6)
         # CIV6 (Mission): the tile's continent is not the seat's capital's
         if self._imp_off_cont_any and row < self.n_majors:
             _all_t = torch.arange(self.T, device=dev).unsqueeze(0).expand(B, -1)
@@ -7748,6 +7800,34 @@ class SimSeats:
             z = z + (near & ok.unsqueeze(1)).sum(dim=2).double() * has.double()
         return z
 
+    def _improvement_water_amenities(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — `improvementWaterAmenities`: what this seat's own
+        improvements pay their city for standing beside water. CIV6
+        (CITY_PARK_WATER_AMENITY,
+        MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
+        ADJACENT_TO_WATER_REQUIREMENTS) — PER INSTANCE, so a second City
+        Park beside water pays a second amenity.
+
+        "Beside water" is the requirement set's TEST_ANY: a river edge of its
+        own, or any water neighbour. The neighbour test reads `self.water`,
+        which a drowned tile joins (C-35)."""
+        z = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        if not self._imp_water_amenity_any:
+            return z
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        wet = self.tile_river | (self.water[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
+        sl = self.city_slot_at(row)                                   # [B, T]
+        live = (self.improvement >= 0) & ~self.pillaged & (sl >= 0) & wet
+        for k, amt in enumerate(self._imp_water_amenity):
+            if amt <= 0:
+                continue
+            here = live & (self.improvement == k)
+            if not bool(here.any()):
+                continue
+            z = z.scatter_add(1, sl.clamp(min=0), here.double() * float(amt))
+        return z
+
     def _wonder_improvement_yields(self, row: int) -> torch.Tensor | None:
         """[B, cols, 6] f64 — CIV6 (Ruhr Valley): "+1 Production for each Mine
         and Quarry in this city". The improvements on the tiles the HOLDING
@@ -8438,6 +8518,7 @@ class SimSeats:
             have = have + _wregam
         have = have + self._city_wonder_flat(row, self._wond_cityamen)[:, :cols]
         have = have + self._wonder_improvement_amenities(row)
+        have = have + self._improvement_water_amenities(row)
         extra = None
         if self._seat_has_beliefs(row):
             ctr = self.city_center[:, row, :cols].clamp(min=0)

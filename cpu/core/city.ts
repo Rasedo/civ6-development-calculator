@@ -10,7 +10,7 @@ import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
 export const WONDER_TOURISM_BASE = 2;
 import { cityTradeYields } from './trade';
-import { hasRiver } from '../../world/query';
+import { hasRiver, isWater } from '../../world/query';
 import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
@@ -596,6 +596,29 @@ function wonderImprovementAmenities(state: GameState, city: City): number {
   return n;
 }
 
+/**
+ * CIV6 (CITY_PARK_WATER_AMENITY,
+ * MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
+ * ADJACENT_TO_WATER_REQUIREMENTS): what the city's own improvements pay it
+ * for standing beside water. PER INSTANCE — the modifier is
+ * SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY, one payment per improvement, so a
+ * second City Park beside water pays a second amenity.
+ *
+ * "Beside water" reads the RING, so a drowned neighbour counts as the sea it
+ * now is (C-35), and a river edge counts as well — the requirement set is a
+ * TEST_ANY over coast, river and lake.
+ */
+function improvementWaterAmenities(state: GameState, city: City): number {
+  let n = 0;
+  for (const t of state.map.tiles) {
+    if (!t.improvement || t.pillaged || !tileBelongsTo(t, city)) continue;
+    const amt = IMPROVEMENTS[t.improvement as ImprovementId]?.amenityAdjacentWater ?? 0;
+    if (!amt) continue;
+    if (hasRiver(t) || neighbors(state.map, t).some((nb) => isWater(nb))) n += amt;
+  }
+  return n;
+}
+
 function wonderRegionalAmenities(state: GameState, city: City): number {
   const center = state.map.tiles[city.centerIndex];
   let n = 0;
@@ -1106,6 +1129,7 @@ export function computeCityStats(
     wonderRegionalAmenities(state, city) +
     wonderCityFlat(state, city, 'cityAmenities') +
     wonderImprovementAmenities(state, city) +
+    improvementWaterAmenities(state, city) +
     m.amenitiesAll +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0) +

@@ -1855,6 +1855,18 @@ class SimInit:
         self._imp_ground_idx = [i for i, g in enumerate(self._imp_ground) if g]
         # a Builder row standing on WATER on its own terrain list alone
         self._imp_water = [bool(r.get("wtr", 0)) for r in imp["rows"]]
+        # CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION the
+        # owning city's governor must hold before the row may be laid (-1 =
+        # none), and the SEPARATE promotion + yields the plot is paid while
+        # that governor stays. Two columns because the install writes two
+        # modifiers: the gate is on the build, the payment on the plot.
+        self._imp_gov_promo = [int(r.get("govPromo", -1)) for r in imp["rows"]]
+        self._imp_gov_any = any(p >= 0 for p in self._imp_gov_promo)
+        self._imp_gov_yield = [r.get("govY") for r in imp["rows"]]
+        self._imp_gov_yield_any = any(g is not None for g in self._imp_gov_yield)
+        # amenities the row pays its city for standing beside water
+        self._imp_water_amenity = [int(r.get("watAmen", 0)) for r in imp["rows"]]
+        self._imp_water_amenity_any = any(a > 0 for a in self._imp_water_amenity)
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )

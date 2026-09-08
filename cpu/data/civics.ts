@@ -60,6 +60,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
 
     C('GAMES_AND_RECREATION', 'Games and Recreation', 'Classical', 110, ['STATE_WORKFORCE'], [
+      // CIV6 (IMPROVEMENT_CITY_PARK, PrereqCivic): the CIVIC opens the row;
+      // the PARKS_AND_RECREATION governor promotion opens the CITY (B-24r).
+      { kind: 'unlockImprovement', improvement: 'CITY_PARK' },
       { kind: 'unlockDistrict', district: 'ENTERTAINMENT_COMPLEX' },
       { kind: 'unlockBuilding', building: 'ARENA' },
       { kind: 'unlockPolicy', policy: 'INSULAE' },

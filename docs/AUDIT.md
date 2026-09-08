@@ -30,7 +30,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request's gold-to-rival scorer, three more scored quantities |
-| B-24r governor tails | 3 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
+| B-24r governor tails | 2 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
@@ -65,7 +65,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **38** | |
+| **OPEN, TOTAL** | **37** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -164,11 +164,15 @@ Nothing open.
     gold-to-a-rival scorer. BORDER DISPUTE, CATASTROPHE and MILITARY
     COMPETITION each want their own scored quantity.
   - THE NOBEL PRIZE competitions are Sweden-only (C-26).
-- **B-24r. GOVERNOR TAILS.** Weight 3.
+- **B-24r. GOVERNOR TAILS.** Weight 2.
   - A district PURCHASE verb (gold and faith) — Contractor and Divine
     Architect wait on it; no engine has the verb.
-  - The FISHERY and CITY PARK improvements — Aquaculture and Parks and
-    Recreation wait on the catalog rows.
+  - The FISHERY and CITY PARK SHIPPED with #242m, and with them Aquaculture
+    and Parks and Recreation, which had carried empty effects since governors
+    landed. Both are LIANG's, not Reyna's, and each promotion OPENS the row
+    in its own city rather than merely paying it — which is why the install
+    writes the plot yield as a second, separate modifier: the improvement
+    stands after the governor leaves and that payment stops.
   - Renewable Subsidizer and Industrialist wait on C-1's plants; Air
     Defense Initiative on C-34's anti-air and C-31's ICBM; Arms Race
     Proponent on C-31's armament projects.

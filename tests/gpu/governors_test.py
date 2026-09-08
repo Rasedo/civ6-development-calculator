@@ -391,6 +391,54 @@ def poke_capital_immunity(rules, path):
     print(f"  f capital immunity OK (governor-picked capitals pin at {lmax}, both engines)")
 
 
+def poke_governor_improvements(rules, path):
+    """B-24r: the FISHERY and the CITY PARK are opened by a governor promotion
+    held in the city that owns the plot (AQUACULTURE, PARKS_AND_RECREATION),
+    and the install pays a SECOND, separate plot yield while that governor
+    stays. Both engines gate the build and pay the yield off the same
+    promotion, and neither is a civilization's unique."""
+    sim = build(rules, path)
+    ids = list(sim.rules_dev.imp_ids) if hasattr(sim.rules_dev, "imp_ids") else None
+    names = ids or [r["id"] for r in sim.rules.improvements["rows"]]
+    if "CITY_PARK" not in names:
+        print("  governor improvements: no CITY_PARK row — skipped")
+        return
+    k = names.index("CITY_PARK")
+    p = sim._imp_gov_promo[k]
+    assert p >= 0, "the City Park lost its governor gate"
+    gy = sim._imp_gov_yield[k]
+    assert gy is not None and int(gy["promo"]) == p, "gate and payment name different promotions"
+    assert float(gy["y"][4]) == 3.0, f"the City Park's governor culture is {gy['y']}"
+    assert sim._imp_water_amenity[k] == 1, "the City Park lost its water amenity"
+
+    r = 0
+    # NO governor anywhere: the gate refuses every tile.
+    sim.civ_gov_appointed[:] = False
+    assert not bool(sim._imp_gov_ok(r, k).any()), "the gate opened with no governor"
+
+    # seat governor 0 in this row's first live city, established, holding the
+    # promotion — the gate opens on THAT city's tiles and nowhere else.
+    slots = sim.city_alive[0, r].nonzero(as_tuple=True)[0].tolist()
+    assert slots, "the row holds no city"
+    c = slots[0]
+    gi = 0
+    sim.civ_gov_appointed[:, r, gi] = True
+    sim.civ_gov_city[:, r, gi] = sim.city_id[:, r, c]
+    sim.civ_gov_establish[:, r, gi] = 0
+    sim.civ_gov_out[:, r, gi] = 0
+    sim.civ_gov_promos[:, r, gi] = 1 << p
+    ok = sim._imp_gov_ok(r, k)
+    sl = sim.city_slot_at(r)
+    assert bool(ok.any()), "the gate stayed shut with the promotion held"
+    assert bool((ok[0] == ((sl[0] == c))).all()), "the gate reached tiles of another city"
+
+    # a governor still ESTABLISHING holds nothing
+    sim.civ_gov_establish[:, r, gi] = 2
+    assert not bool(sim._imp_gov_ok(r, k).any()), "an establishing governor opened the gate"
+    print(f"  governor improvements OK (City Park row {k}, promo {p}, "
+          f"culture {gy['y'][4]:.0f}, water amenity {sim._imp_water_amenity[k]})")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -405,6 +453,7 @@ def main() -> None:
     poke_governor_seat0(rules, path)
     poke_seat0_golden(rules, path)
     poke_capital_immunity(rules, path)
+    poke_governor_improvements(rules, path)
     print("GOVERNORS POKES OK")
 
 

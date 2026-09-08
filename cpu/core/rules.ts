@@ -7,7 +7,7 @@ import { isExplored } from './fog';
 import { riverReach } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
-import { cityAppealResolver } from './governors';
+import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
@@ -238,6 +238,12 @@ export function validImprovementsIn(
      *  holds one of. The city walk lives with the caller, which is the only
      *  place a city is in hand; an absent set offers every row. */
     oneHeld?: ReadonlySet<ImprovementId>;
+    /** CIV6 (Aquaculture, Parks and Recreation): the promotions the governor
+     *  of the city that owns this tile holds. Like `oneHeld` the city walk
+     *  lives with the caller — but an ABSENT set REFUSES every governor-gated
+     *  row rather than offering it, because "no governor" is the answer to
+     *  "does this city hold Aquaculture", not "unknown". */
+    govPromos?: ReadonlySet<string>;
   },
 ): ImprovementId[] {
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -247,6 +253,10 @@ export function validImprovementsIn(
 
   const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
+  // the GOVERNOR gate, asked by every arm that pushes a row: a row naming a
+  // promotion is laid only where the owning city's governor holds it.
+  const govOk = (def: ImprovementDef) =>
+    !def.governorPromo || !!opts.govPromos?.has(def.governorPromo);
 
   // A MILITARY ENGINEER builds ONLY the rows the catalog marks `engineer`, and
   // never a Farm, Mine, Camp or Plantation — without the guard the best-delta
@@ -305,6 +315,9 @@ export function validImprovementsIn(
       if (!def.waterOnly || !unlocked(def.id)) continue;
       // a WATER row may be a civilization's own (the Polder)
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
+      if (!govOk(def)) continue;
+      if (def.noAdjacentSame && opts.map
+          && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.noFeature && tile.feature) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
@@ -330,6 +343,7 @@ export function validImprovementsIn(
     if (def.noAdjacentSame && opts.map
         && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
     if (!uniqueGroundOk(def, tile, opts)) continue;
+    if (!govOk(def)) continue;
     out.push(def.id);
   }
   const flat = tile.elevation === 'FLAT';
@@ -374,11 +388,14 @@ export function validImprovementsIn(
   // answered for every tile that has an opinion of its own.
   for (const def of Object.values(IMPROVEMENTS)) {
     if (!def.groundOnly || !unlocked(def.id)) continue;
+    if (!govOk(def)) continue;
     if (def.requiresFeature && tile.feature !== def.requiresFeature) continue;
     if (def.noFeature && !bareGround(tile)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
+    if (def.noAdjacentSame && opts.map
+        && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
     out.push(def.id);
   }
   return out;
@@ -403,6 +420,13 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     civ: civOf(state, seat),
     farmTerrain: getModifiers(state, seat).farmTerrain,
     civics: seatOf(state, seat)?.research.civics,
+    // the OWNING city's governor promotions, the gate the two governor
+    // improvements read. The applier computes this from the city it already
+    // holds; here the tile names it.
+    govPromos: (() => {
+      const c = cityAtTile(state, tile);
+      return c ? cityGovernorPromos(state, c) : undefined;
+    })(),
   });
 }
 

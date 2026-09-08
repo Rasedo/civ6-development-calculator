@@ -3077,13 +3077,15 @@ class SimMasks:
                     # with no resource to insist on a different improvement.
                     _ok = (here_ok & _unl & (_rq == -1)
                            & self.water.gather(1, tc) & ~self.tile_submerged.gather(1, tc)
-                           & self._imp_ground_ok(_k).gather(1, tc))
+                           & self._imp_ground_ok(_k).gather(1, tc)
+                           & self._imp_gov_ok(row, _k).gather(1, tc))
                 elif self._imp_ground[_k]:
                     # GROUND-ONLY: the row's own clause, on a plot with no
                     # resource of its own to insist on a different improvement.
                     _ok = (here_ok & _unl & (_rq == -1)
                            & ~self.water.gather(1, tc) & self.passable.gather(1, tc)
-                           & self._imp_ground_ok(_k).gather(1, tc))
+                           & self._imp_ground_ok(_k).gather(1, tc)
+                           & self._imp_gov_ok(row, _k).gather(1, tc))
                 else:
                     _ok = here_ok & (_rq == _k) & _unl
                 _res_cols.append(_ok.unsqueeze(2))

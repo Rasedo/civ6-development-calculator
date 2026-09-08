@@ -920,6 +920,7 @@ class SimOrders:
                                 & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & ~self.tile_submerged.gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & self._imp_ground_ok(_k).gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & self._imp_gov_ok(row, _k).gather(1, hc.unsqueeze(1)).squeeze(1)
                             )
                         elif self._imp_ground[_k]:
                             _valid = (
@@ -927,6 +928,7 @@ class SimOrders:
                                 & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & self._imp_ground_ok(_k).gather(1, hc.unsqueeze(1)).squeeze(1)
+                                & self._imp_gov_ok(row, _k).gather(1, hc.unsqueeze(1)).squeeze(1)
                             )
                         else:
                             _valid = (_rq == _k) & _unl
