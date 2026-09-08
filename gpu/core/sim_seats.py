@@ -8832,6 +8832,11 @@ class SimSeats:
                         f" have{float(balance[_ab, _c] + need[_ab, _c]):g}"
                         f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
                         f" tier{int(tier_idx[_ab, _c])}")
+                    # ...and the unconditional SNAPSHOT beside it
+                    _lines.append(
+                        f"pop:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                        f":{int(self.city_center[_ab, row, _c])}:sn"
+                        f" {int(self.city_pop[_ab, row, _c])}")
                 # the GRANT lines survive the window: a grant can be many
                 # turns before the walk that reads its count, and trimming it
                 # away is exactly the evidence this pair needs.
