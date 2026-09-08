@@ -384,6 +384,13 @@ def main() -> int:
 
     _serve_names: list[str] = []
     _poke_names: list[str] = []
+    # The memory report at the end reads these three. Stage 0 can BAIL before
+    # the lane block sets them (a seeder drift does exactly that), and an
+    # unbound local there turned a clean "BATTERY FAILED" into a traceback
+    # that never printed the verdict — so the run looked hung to anything
+    # waiting on the marker line.
+    _mem_free_start = 10 ** 9
+    _k = _pokes = 0
     if not failed.is_set():
         # The DECISION-SERVER gate sharded over ALL fixture seeds: per-turn
         # obs/unit-target equality and a state-digest compare. The lane's wall
