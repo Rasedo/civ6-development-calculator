@@ -204,10 +204,32 @@ the gate reaches is worth more here than one that re-reads the exporter.
     what differs is the walk to it. Both replay the same record, and
     `rec.units` is one entry per STEP, so one engine took a step the other
     refused.
-  - THE NEXT MEASUREMENT, and it is the same shape as the two above: a STEP
-    half for the decomposition log — per ordered step, the unit, the tiles
-    it moved between, the outcome, and the gates that could refuse it. The
-    log already pairs by key and prints wherever the gate flags.
+  - THE STEP HALF SHIPPED (#246u-#246x) and the pair reads. At turn 155, one
+    turn BEFORE the digest flags, seat 2 steps to different destinations from
+    the SAME origins:
+
+        D-TS   st:2:357:356 t155 moved     D-GPU  st:2:357:401 t155 blocked
+        D-TS   st:2:492:449 t155 moved     D-GPU  st:2:492:536 t155 blocked
+
+    The deltas are -1 / -43 on TS and +44 / +43 on the GPU — different
+    DIRECTIONS out of the same tile.
+  - RULED OUT: the direction decode. `phase.ts` uses `neighborTile`, the
+    slot-preserving decoder, under a comment naming this exact hazard, and
+    the GPU gathers from a `neigh` plane that keeps its -1. Neither
+    compacts.
+  - THE TWO CANDIDATES LEFT. Either the engines hold DIFFERENT UNITS at the
+    same tile — in which case the order reached different chassis and the
+    origins matching is a coincidence of position — or the replay's row-to-
+    unit alignment has slipped, which `phase.ts`' own comment already warns
+    about: "row j addresses the seat's j-th unit in SPAWN order ... this is
+    an ASSUMPTION the gate has to hold ... if it ever breaks, every seat's
+    orders land on the wrong units and the failure looks like chaos rather
+    than an ordering bug." Same origin with a different destination is what
+    that would look like.
+  - THE MEASUREMENT THAT SEPARATES THEM: put the ordered ROW and the unit's
+    TYPE in the step line. Same row and same type on both sides means the
+    alignment holds and the units are the same; a type mismatch names the
+    slip directly.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
