@@ -1462,6 +1462,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
  * are NOT replayed here yet — the ladder's peace verb never emits them, so
  * recording one would mean the policy changed and this needs extending with it.
  */
+/** the unit catalog's order, which IS the GPU's type index — the
+ *  decomposition log prints the number so the two sides compare directly. */
+const UNIT_TYPE_IDX = Object.keys(UNITS);
+
 export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][]): void {
   if (!steps || steps.length === 0) return;
   for (const step of steps) {
@@ -1645,7 +1649,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const outU = freeU ? stepUnit(state, unit, to) : 'blocked';
           const dlS = (globalThis as { __diffLog?: string[] }).__diffLog;
           if (dlS) {
+            // the ordered ROW and the unit's TYPE ride the line: same row and
+            // same type on both sides means the replay's row-to-unit
+            // alignment holds and the chassis is the same one, which is the
+            // fork this pair has to be resolved down.
             dlS.push(`st:${actor.seat}:${here.index}:${to.index} t${state.turn}`
+              + ` j${j} ty${UNIT_TYPE_IDX.indexOf(unit.type)}`
               + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);
           }
         }

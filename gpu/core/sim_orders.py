@@ -674,10 +674,14 @@ class SimOrders:
                             continue
                         # keyed on the EDGE: the GPU names a unit by merged
                         # slot and TS by id, and those two never pair.
+                        # the ordered RANK and the unit's TYPE ride the line:
+                        # same rank and same type on both sides means the
+                        # replay's row-to-unit alignment holds and the chassis
+                        # is the same one.
                         self._diff_events.setdefault(_sb, []).append(
                             f"st:{int(self._ROW_SEAT[row])}"
                             f":{int(here[_sb])}:{int(tgt[_sb])}"
-                            f" t{int(self.turn)}"
+                            f" t{int(self.turn)} j{n} ty{int(ut[_sb])}"
                             f" {'moved' if bool(_stepped[_sb]) else 'blocked'}")
 
             atk = (
