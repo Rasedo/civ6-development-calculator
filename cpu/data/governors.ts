@@ -32,6 +32,9 @@ export interface GovernorDef {
   cityStates?: boolean;
 }
 
+/** CIV6 (AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS, Amount 25). */
+export const AIR_DEFENSE_INITIATIVE_CS = 25;
+
 export const GOVERNORS: readonly GovernorDef[] = [
   { id: 'REYNA', name: 'Reyna', title: 'The Financier', establishTurns: 5 },
   { id: 'VICTOR', name: 'Victor', title: 'The Castellan', establishTurns: 3 },
@@ -90,6 +93,12 @@ export interface GovernorEffects {
   cityDefense?: number;
   /** combat strength for THIS seat's units standing in the city's territory. */
   territoryCS?: number;
+  /** CIV6 (Air Defense Initiative, AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS /
+   *  MODIFIER_CITY_ADJUST_AIR_DEFENSE_BONUS, Amount 25): "+25 Combat Strength
+   *  to anti-air support units within the city's territory when defending
+   *  against aircraft and ICBMs." The governed city's own tiles, whoever
+   *  stands on them — the same territory test Garrison Commander uses. */
+  airDefenseCS?: number;
   /** extra ranged strikes per turn (Embrasure). */
   extraStrikes?: number;
   /** a military unit trained here starts with a free promotion (Embrasure). */
@@ -208,7 +217,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { extraStrikes: 1, freePromoOnTrain: true }, ['GARRISON_COMMANDER', 'DEFENSE_LOGISTICS']),
   G('AIR_DEFENSE_INITIATIVE', 'VICTOR', 3, 'Air Defense Initiative',
     "+25 Combat Strength to anti-air support units within the city's territory when defending against aircraft and ICBMs.",
-    {}, ['EMBRASURE']),
+    { airDefenseCS: AIR_DEFENSE_INITIATIVE_CS }, ['EMBRASURE']),
   G('ARMS_RACE_PROPONENT', 'VICTOR', 3, 'Arms Race Proponent',
     '30% Production increase to all nuclear armament projects in the city.',
     {}, ['EMBRASURE']),

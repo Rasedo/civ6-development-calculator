@@ -420,13 +420,16 @@ Nothing open.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
   A 2026-09-08 sourcing pass split this entry: four of its five items are
   data and only the interception ROLL is DLL.
-  - BUILDABLE, off `UnitPromotions.xml`, with no interception model at all —
-    they are ordinary opponent-CLASS combat rows and an attack-range row:
-    DOGFIGHTING `+7` vs `PROMOTION_CLASS_AIR_FIGHTER`, INTERCEPTOR `+7` vs
-    `PROMOTION_CLASS_AIR_BOMBER` (prereq Dogfighting), DROP_TANKS
-    `MODIFIER_UNIT_ADJUST_ATTACK_RANGE +2`, and Victor's
-    `GOVERNOR_PROMOTION_AIR_DEFENSE_INITIATIVE` (Level 3, prereq Embrasure)
-    `MODIFIER_CITY_ADJUST_AIR_DEFENSE_BONUS` Amount 25.
+  - THREE OF THE FOUR ALREADY SHIPPED, and an earlier draft of this entry
+    said otherwise — the sourcing pass called them "buildable" without
+    checking the catalog. `cpu/data/promotions.ts` has carried DOGFIGHTING +7
+    vs AIR_FIGHTER, INTERCEPTOR +7 vs AIR_BOMBER and DROP_TANKS RANGE +2
+    since the air trees landed, and all three match the install exactly. Read
+    the catalog before calling a row absent.
+  - AIR DEFENSE INITIATIVE SHIPPED with #242o: Victor's, level 3 behind
+    Embrasure, +25 to an ANTI-AIR unit defending inside the governed city's
+    territory. No new machinery — the anti-air strength already answers an
+    air strike, and the territory test is Garrison Commander's.
   - INTERCEPTION BY A FIGHTER has no published strength, formula or cap on
     attempts; C-31's delivery shares the half.
   - PATROL IS NOT A DATA ROW. There is no `UNITOPERATION_PATROL`, no

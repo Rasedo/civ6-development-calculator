@@ -3053,6 +3053,8 @@ class SimSeats:
         c_seat = self.unit_seat.gather(1, cs0.unsqueeze(1)).squeeze(1)
         c_aa = self._anti_air_at(c_type, c_seat)
         c_cs = torch.where(c_aa > 0, c_aa, self._type_combat[c_type])
+        c_cs = c_cs + self._air_defense_cs(
+            c_aa, c_seat, self.unit_tile.gather(1, cs0.unsqueeze(1)).squeeze(1))
         c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1), c_type)
         c_e = c_e + self._promo_cs(
             c_type, self.unit_promos.gather(1, cs0.unsqueeze(1)).squeeze(1),
@@ -3136,6 +3138,8 @@ class SimSeats:
         d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
         aa = self._anti_air_at(d_type, d_seat)
         def_cs = torch.where(aa > 0, aa, self._type_combat[d_type])
+        def_cs = def_cs + self._air_defense_cs(
+            aa, d_seat, self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1))
         # CIV6 (Air combat): "all air attacks are ranged", so the sortie is a
         # ranged roll and both trees speak into it — the striker's class terms,
         # and the defender's own "+7 Combat Strength when defending vs. air
@@ -10799,6 +10803,34 @@ class SimSeats:
         if not bool(up.any()):
             return base
         return torch.where(up, torch.full_like(base, int(self._gdr_drone_aa)), base)
+
+    def _air_defense_cs(self, aa: torch.Tensor, seat: torch.Tensor,
+                        tile: torch.Tensor) -> torch.Tensor:
+        """long — `airDefenseOf`'s governor half. CIV6 (Air Defense
+        Initiative, AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS, Amount 25): "+25
+        Combat Strength to ANTI-AIR support units within the city's territory
+        when defending against aircraft and ICBMs."
+
+        The governed city's own tiles, whoever stands on them — the territory
+        test Garrison Commander already uses. A unit with no anti-air strength
+        of its own is not an anti-air support unit and takes nothing."""
+        z = torch.zeros_like(aa)
+        if not self.n_governors or self._gpromo.get("airDefenseCS") is None:
+            return z
+        col = self._gpromo["airDefenseCS"]
+        tl = tile.clamp(min=0)
+        owner = self.tile_seat.gather(1, tl.unsqueeze(1)).squeeze(1)
+        out = z
+        for g in range(self.n_majors):
+            here = (seat == g) & (owner == g) & (aa > 0) & (tile >= 0)
+            if not bool(here.any()):
+                continue
+            per = torch.einsum("bjn,n->bj", self._governor_mask(g).double(), col)  # [B, RC]
+            sl = self.city_slot_at(g)                                             # [B, T]
+            at = torch.gather(sl, 1, tl.unsqueeze(1)).squeeze(1)
+            got = torch.gather(per, 1, at.clamp(min=0).unsqueeze(1)).squeeze(1)
+            out = torch.where(here & (at >= 0), out + got.long(), out)
+        return out
 
     def _xp_eligible(self, utype: torch.Tensor) -> torch.Tensor:
         """`xpEligible`'s chassis half: a civilian never fights, a Spy earns its

@@ -17,6 +17,7 @@ import { hexDistance, tilesWithin } from '../../world/hex';
 import { citiesOf, isTerritorial, seatOf, tileSeat } from './seats';
 import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
+import { governorTileSum } from './governors';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
@@ -344,8 +345,20 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   return best;
 }
 
-export function airDefenseOf(state: GameState, unit: { type: string; seat: number }): number {
-  return antiAirAt(state, unit) || (UNITS[unit.type]?.combat ?? 0);
+export function airDefenseOf(
+  state: GameState, unit: { type: string; seat: number; tileIndex?: number },
+): number {
+  const base = antiAirAt(state, unit) || (UNITS[unit.type]?.combat ?? 0);
+  // CIV6 (Air Defense Initiative): "+25 Combat Strength to ANTI-AIR support
+  // units within the city's territory when defending against aircraft and
+  // ICBMs" — the governed city's own tiles, whoever stands on them, which is
+  // the territory test Garrison Commander already uses. A unit with no
+  // anti-air strength of its own is not an anti-air support unit and takes
+  // nothing.
+  if (unit.tileIndex === undefined || antiAirAt(state, unit) <= 0) return base;
+  const t = state.map.tiles[unit.tileIndex];
+  if (!t || tileSeat(t) !== unit.seat) return base;
+  return base + governorTileSum(state, t, (e) => e.airDefenseCS);
 }
 
 /** the seat's own count of based aircraft, for the training gate's message. */
