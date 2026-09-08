@@ -462,17 +462,19 @@ describe('the bomber wrecks what a tile carries', () => {
 });
 
 describe('the rows that ship inert, and say so', () => {
-  it('GROUND CREWS and BOARDING carry no effect yet', () => {
-    // Each waits on a mechanic neither engine has: a PATROL order, an air
-    // pillage, and a published magnitude for "obtain Gold from naval
-    // victories". They exist so the tree's shape and its prerequisites are
-    // the source's, not so they do anything.
-    for (const [cls, id] of [
-      ['AIR_FIGHTER', 'GROUND_CREWS'], ['NAVAL_RAIDER', 'BOARDING'],
-    ] as const) {
-      const row = promoRows(cls).find((p) => p.id === id)!;
-      expect(row.effects).toEqual([{ kind: 'NONE' }]);
-    }
+  it('GROUND CREWS carries no effect yet — and BOARDING no longer', () => {
+    // GROUND CREWS waits on a mechanic neither engine has: it heals "while
+    // patrolling or deployed", and PATROL turns out to be no data row at all
+    // (C-34) — no operation, no command, no promotion, just the UI's name for
+    // a fighter sitting ready. It exists so the tree's shape and its
+    // prerequisites are the source's.
+    const crews = promoRows('AIR_FIGHTER').find((p) => p.id === 'GROUND_CREWS')!;
+    expect(crews.effects).toEqual([{ kind: 'NONE' }]);
+    // BOARDING left this list in #242n: the magnitude the AUDIT called
+    // unpublished is BOARDING_GOLD_FROM_NAVAL_VICTORY's
+    // PercentDefeatedStrength 100.
+    const boarding = promoRows('NAVAL_RAIDER').find((p) => p.id === 'BOARDING')!;
+    expect(boarding.effects).toEqual([{ kind: 'NAVAL_KILL_GOLD', v: 100, mask: 0 }]);
     // SUPERFORTRESS left this list with the verb it waits on.
     expect(promoFlag(
       { type: BOMBER, promos: bit('AIR_BOMBER', 'SUPERFORTRESS') }, 'AIR_PILLAGE_ANY_HP',

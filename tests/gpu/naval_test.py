@@ -1075,6 +1075,48 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     assert int(sim2.civilian_at[0, bt]) < 0, "the capture left the captive on the civilian plane"
     print("  15 passenger death/capture OK (both leave and re-enter the passenger plane)")
 
+def poke_boarding(rules, path, PRIVATEER, GALLEY, WARRIOR):
+    """CIV6 (Boarding): BOARDING_GOLD_FROM_NAVAL_VICTORY,
+    MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD, PercentDefeatedStrength 100,
+    YIELD_GOLD, against an opponent of DOMAIN_SEA. The magnitude B-56r called
+    unpublished, paid by the KILLER's own promotion — so it needs the killer's
+    promo word, and a city's shot (which passes none) pays nothing."""
+    sim = build(rules, path)
+    k = sim._pk.get("NAVAL_KILL_GOLD", -1)
+    assert k >= 0, "NAVAL_KILL_GOLD is not on the promotion-kind wire"
+    B = sim.B
+    one = torch.ones(B, dtype=torch.bool, device=sim.device)
+    kt = torch.full((B,), PRIVATEER, dtype=torch.long, device=sim.device)
+
+    def pay(victim, promos):
+        sim.civ_treasury[:, 0] = 0
+        sim._unit_kill_event(
+            0, torch.full((B,), victim, dtype=torch.long, device=sim.device),
+            torch.zeros(B, dtype=torch.bool, device=sim.device), one, kt,
+            killer_promos=torch.full((B,), promos, dtype=torch.long, device=sim.device))
+        return int(sim.civ_treasury[0, 0])
+
+    # the bit indexes the killer's OWN CLASS list, as TS's `promos` does, so
+    # find the column that pays rather than assuming the catalog's order
+    bit = None
+    for cand in range(32):
+        if pay(GALLEY, 1 << cand) > 0:
+            bit = cand
+            break
+    assert bit is not None, "no promotion column paid a naval kill"
+    got = pay(GALLEY, 1 << bit)
+    want = int(sim._type_combat[GALLEY])
+    assert got == want, f"a naval victory paid {got}, expected the victim's {want}"
+    assert pay(WARRIOR, 1 << bit) == 0, "a LAND victim paid Boarding"
+    assert pay(GALLEY, 0) == 0, "an unpromoted raider was paid"
+    # a city's shot carries no killer promotions at all
+    sim.civ_treasury[:, 0] = 0
+    sim._unit_kill_event(0, torch.full((B,), GALLEY, dtype=torch.long, device=sim.device),
+                         torch.zeros(B, dtype=torch.bool, device=sim.device), one, kt)
+    assert int(sim.civ_treasury[0, 0]) == 0, "a killer with no promo word was paid"
+    print(f"  18 boarding OK (naval victim {want} gold, land victim 0, no-promo 0)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -1109,6 +1151,7 @@ def main() -> None:
     poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE)
     poke_submarine_siege(rules, path, FRIGATE, SUBMARINE)
     poke_passenger_death(rules, path, WARRIOR, BUILDER)
+    poke_boarding(rules, path, PRIVATEER, GALLEY, WARRIOR)
     poke_canal(rules, path, GALLEY, WARRIOR)
     poke_water_walk(rules, path, idx(rules, "GIANT_DEATH_ROBOT"))
     print("NAVAL POKES OK")

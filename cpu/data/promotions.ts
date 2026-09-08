@@ -103,6 +103,7 @@ export const PROMO_KINDS = [
   'HEAL_ANYWHERE',       // heals outside friendly territory
   'HEAL_AFTER_ATTACK',   // attacking does not silence this turn's heal
   'RAID_GOLD',           // +v gold on top of a coastal raid's own take
+  'NAVAL_KILL_GOLD',     // gold worth v% of a defeated NAVAL unit's strength
   'AIR_SLOTS',           // +v aircraft this hull bases
   'AIR_PILLAGE_ANY_HP',  // may air pillage at any health
   'SPY_OP_LEVEL',        // +v spy levels on the mission whose bit is in `mask`
@@ -328,7 +329,12 @@ export const PROMOTIONS: readonly PromoDef[] = [
   // The raider's tree is money first and the hunt second, which is what the
   // class is: "Obtain Gold from naval victories" beside "+50 Gold from
   // coastal raids".
-  P('BOARDING', 'NAVAL_RAIDER', 1, [], none),
+  // CIV6 (BOARDING_GOLD_FROM_NAVAL_VICTORY,
+  // MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD): PercentDefeatedStrength 100,
+  // YieldType YIELD_GOLD, against an opponent of DOMAIN_SEA. The AUDIT called
+  // this magnitude unpublished (B-56r); it is 100, and the engine already
+  // exports and reads a post-combat yield channel.
+  P('BOARDING', 'NAVAL_RAIDER', 1, [], cs('NAVAL_KILL_GOLD', 100)),
   P('LOOT', 'NAVAL_RAIDER', 1, [], cs('RAID_GOLD', 50)),
   P('HOMING_TORPEDOES', 'NAVAL_RAIDER', 2, ['BOARDING'],
     cs('CS_VS_CLASS_ANY', 10, MASK_NAVAL)),

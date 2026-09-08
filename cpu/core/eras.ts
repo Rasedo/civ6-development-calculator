@@ -6,6 +6,7 @@ import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
 import { TECHS } from '../data/techs';
+import { promoValue } from './promotions';
 import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
 import { GW_HOLDERS } from '../data/greatWorks';
@@ -143,7 +144,7 @@ export function buildingDedications(state: GameState, seat: number, buildingId: 
 export function unitKillEvent(
   state: GameState,
   killerSeat: number,
-  killer: { type: string } | undefined,
+  killer: { type: string; promos?: number } | undefined,
   victim: { type: string; seat: number; formation?: number },
 ): void {
   if (!isCiv(killerSeat)) return;
@@ -163,6 +164,18 @@ export function unitKillEvent(
       if (kd.generalPointsOnKill) {
         ks.gpp.GENERAL = (ks.gpp.GENERAL ?? 0) + kd.generalPointsOnKill;
       }
+    }
+  }
+  // CIV6 (Boarding): "Obtain Gold from naval victories" — gold worth
+  // NAVAL_KILL_GOLD% of the DEFEATED unit's strength, and only when that
+  // unit was a naval one (the install's own BOARDING_REQUIREMENTS, opponent
+  // DOMAIN_SEA). The killer's own promotion, so it reads the unit rather
+  // than the seat's modifiers.
+  if (killer && UNITS[victim.type]?.naval) {
+    const pct = promoValue(killer, 'NAVAL_KILL_GOLD');
+    if (pct > 0) {
+      const s = seatOf(state, killerSeat);
+      if (s) s.treasury += Math.floor(((UNITS[victim.type]?.combat ?? 0) * pct) / 100);
     }
   }
   const rows = getModifiers(state, killerSeat).postCombatYields;

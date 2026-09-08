@@ -3174,7 +3174,7 @@ class SimSeats:
             self._dig_at(gd, td, d_seat[gd])
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0,
-                                  vict_form=self._form_tier(ds0))
+                                  vict_form=self._form_tier(ds0), killer_promos=a_promos)
             self._gen_ver += 1
         _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died, _hp_p[:, u])
 
@@ -4585,7 +4585,8 @@ class SimSeats:
 
     def _unit_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor,
                          killed: torch.Tensor, killer_type: torch.Tensor | None = None,
-                         vict_form: torch.Tensor | None = None) -> None:
+                         vict_form: torch.Tensor | None = None,
+                         killer_promos: torch.Tensor | None = None) -> None:
         """`unitKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
         Era Score each time you kill a non-Barbarian naval unit in combat";
         (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
@@ -4615,6 +4616,26 @@ class SimSeats:
                     if self._general_cls >= 0:
                         self.civ_gpp[:, g, self._general_cls] += (
                             _m.long() * _ggp).to(self.civ_gpp.dtype)
+        # CIV6 (Boarding): "Obtain Gold from naval victories" —
+        # BOARDING_GOLD_FROM_NAVAL_VICTORY, PercentDefeatedStrength 100,
+        # YIELD_GOLD, and only against an opponent of DOMAIN_SEA. The KILLER's
+        # own promotion, so it needs the killer's promo word; a city's shot
+        # passes none, exactly as TS passes `undefined` for its killer there.
+        if killer_promos is not None and killer_type is not None:
+            _nkg = self._promo_val(killer_type.clamp(min=0, max=self.NU - 1),
+                                   killer_promos, "NAVAL_KILL_GOLD")
+            if bool((_nkg != 0).any()):
+                _vt = vict_type.clamp(min=0)
+                _sea = self.unit_naval[_vt.clamp(max=self.NU - 1)] & (vict_type >= 0)
+                _lump = torch.div(self._type_combat[_vt] * _nkg, 100, rounding_mode="floor")
+                _pay = killed & _sea & (_lump > 0)
+                if bool(_pay.any()):
+                    for g in range(self.n_majors):
+                        _m = _pay & ((killer == g) if not isinstance(killer, int)
+                                     else torch.full_like(_pay, killer == g))
+                        if not bool(_m.any()):
+                            continue
+                        self.civ_treasury[:, g] += (_m.long() * _lump).to(self.civ_treasury.dtype)
         # CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories
         # provide Culture/Faith equal to 50% of the Combat Strength of the
         # defeated unit" — a BARBARIAN victim pays too, so this stands above
@@ -9476,11 +9497,12 @@ class SimSeats:
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
                 ranged=False, a_died=atk_raw, d_died=def_dead | captured)
             self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
-                                  vict_form=self._form_tier(d_slot))
+                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
             self._disciples_spread(a_seat[:, u], a_type[:, u], a_promos, def_is_barb,
                                    tgt, def_dead)
             self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type,
-                                  vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u])
+                                  vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u],
+                                  killer_promos=d_promos)
             self._disciples_spread(d_seat_m, d_type, d_promos,
                                    a_seat[:, u] == BARB_SEAT, tgt, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
@@ -11579,7 +11601,7 @@ class SimSeats:
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
-                                  vict_form=self._form_tier(d_slot))
+                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
@@ -11808,7 +11830,7 @@ class SimSeats:
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0,
-                                  vict_form=self._form_tier(d_slot))
+                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), at0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
