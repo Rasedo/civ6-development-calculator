@@ -2,7 +2,11 @@
 import { PROMO_COLS } from '../data/promotions';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 
-export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO', 'GEOTHERMAL_PLANT', 'FISHING_BOATS', 'SPHINX', 'ZIGGURAT', 'TERRACE_FARM', 'MOUNTAIN_TUNNEL'];
+export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP', 'SOLAR_FARM', 'WIND_FARM', 'MISSILE_SILO', 'GEOTHERMAL_PLANT', 'FISHING_BOATS', 'SPHINX', 'ZIGGURAT', 'TERRACE_FARM', 'MOUNTAIN_TUNNEL',
+  // the twelve unique improvements APPEND LAST — a Builder's action code
+  // IS this list's position, so an insert would shift every later one
+  'CHATEAU', 'CHEMAMULL', 'GOLF_COURSE', 'GREAT_WALL', 'ICE_HOCKEY_RINK', 'KURGAN',
+  'MAORI_PA', 'MEKEWAP', 'MISSION', 'OPEN_AIR_MUSEUM', 'POLDER', 'STEPWELL'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

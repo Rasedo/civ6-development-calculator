@@ -16,7 +16,7 @@ import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
-import { IMPROVEMENTS } from '../data/improvements';
+import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
@@ -103,7 +103,7 @@ export function terrainDefense(tile: Tile): number {
   // water" — a NAVAL defender's terrain, since an embarked one defends at the
   // normalized CS that carries no terrain at all.
   if (tile.feature === 'REEF') d += 3;
-  if (tile.improvement === 'FORT') d += FORT_DEFENSE_CS;
+  d += improvementDefenseCS(tile);
   return d;
 }
 
@@ -644,7 +644,7 @@ export function theoStrength(state: GameState, unit: Unit): number {
  * a River". The Fort is an IMPROVEMENT, which is why it survives that.
  */
 export function theoDefenseStrength(state: GameState, defender: Unit, tile: Tile): number {
-  let bonus = tile.improvement === 'FORT' ? FORT_DEFENSE_CS : 0;
+  let bonus = improvementDefenseCS(tile);
   const g = unitReligion(state, defender);
   const holder = cityAtTile(state, tile);
   if (g < 0 || !holder) return bonus;
@@ -703,7 +703,7 @@ export function embarkedDefenseCS(state: GameState, seat: number): number {
  *  ask about themselves and two more ask about the other side. */
 export function inDistrictTile(state: GameState, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
-  return !!t && (!!t.district || t.improvement === 'FORT');
+  return !!t && (!!t.district || improvementIsCover(t));
 }
 
 /**

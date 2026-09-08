@@ -1,6 +1,7 @@
 
 import type { City, GameState, Tile } from './types';
-import type { GameMap } from '../../world/types';
+import type { GameMap, ImprovementId } from '../../world/types';
+import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
@@ -38,6 +39,9 @@ function pick<T>(state: GameState, arr: T[]): T | undefined {
 /** CIV6 (Reinforced Materials): "This city's improvements, buildings and
  *  Districts cannot be damaged by Environmental Effects." */
 function envImmune(state: GameState, tile: Tile): boolean {
+  // CIV6 (`Improvements.DisasterResistant`): the Great Wall stands through a
+  // storm or a flood on its own row, wherever it is.
+  if (tile.improvement && IMPROVEMENTS[tile.improvement as ImprovementId]?.disasterResistant) return true;
   return governorTileFlag(state, tile, (e) => e.envDamageImmune);
 }
 

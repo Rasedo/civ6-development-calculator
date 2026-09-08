@@ -486,6 +486,33 @@ export function builtLoyalty(state: GameState, city: City): number {
     if (!def || dark.has(b)) continue;
     n += def.loyalty ?? 0;
   }
+  n += improvementLoyalty(state, city);
+  return n;
+}
+
+/**
+ * CIV6: what an IMPROVEMENT pays its city in Loyalty per turn.
+ *
+ * Two shapes, and both are the install's own. The Open-Air Museum's is flat
+ * and belongs to the city whose borders hold it. The Mission's
+ * (`TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER`, Amount 2) is paid to a city
+ * whose CENTRE is adjacent to one and which is NOT on its owner's capital
+ * continent — the requirement set the modifier names, clause for clause.
+ */
+export function improvementLoyalty(state: GameState, city: City): number {
+  let n = 0;
+  for (const t of state.map.tiles) {
+    if (!t.improvement || t.pillaged || !tileBelongsTo(t, city)) continue;
+    n += IMPROVEMENTS[t.improvement as ImprovementId]?.loyalty ?? 0;
+  }
+  const centre = state.map.tiles[city.centerIndex];
+  if (!centre) return n;
+  const off = !onHomeContinent(state, city.seat, centre.index);
+  if (!off) return n;
+  for (const nb of neighbors(state.map, centre)) {
+    if (!nb.improvement || nb.pillaged) continue;
+    n += IMPROVEMENTS[nb.improvement as ImprovementId]?.loyaltyAdjacentOffContinent ?? 0;
+  }
   return n;
 }
 
@@ -1637,8 +1664,18 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             }
             return;
           }
+          // CIV6 (`OnePerCity`): what the CITY that owns this tile already
+          // holds. The city walk lives here because this is the only place a
+          // city is in hand (`uniqueGroundOk`).
+          const oneHeld = new Set<ImprovementId>();
+          const hereCity = cityAtTile(state, here);
+          if (hereCity) {
+            for (const t of state.map.tiles) {
+              if (t.improvement && tileBelongsTo(t, hereCity)) oneHeld.add(t.improvement as ImprovementId);
+            }
+          }
           if (!here.improvement
-              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics }).includes(imp)) {
+              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics, oneHeld }).includes(imp)) {
             here.improvement = imp;
             // CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
             // improvement — the same claim a district's bomb makes

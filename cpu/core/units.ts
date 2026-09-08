@@ -192,11 +192,22 @@ export function routeStepMp(state: GameState, from: Tile, to: Tile): number {
 export function moveCostInto(
   state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string },
 ): number {
-  if (isWater(tile)) return MP_SCALE;
+  // CIV6 (Polder, `MovementChange="2"`): an improvement may make its own tile
+  // dearer to enter than the flat step. Water only, so `terrainMp` — the half
+  // the fixture ships to the GPU as a STATIC plane — stays untouched.
+  if (isWater(tile)) return MP_SCALE * (improvementMoveCost(tile) ?? 1);
   // a hull in a Canal's passage pays the water step, not the ground's
   if (mover && UNITS[mover.type]?.naval && canalPassage(tile)) return MP_SCALE;
   if (roadStep(from, tile)) return routeStepMp(state, from, tile);
   return terrainMp(tile, mover);
+}
+
+/** CIV6 (`Improvements.MovementChange`): the WHOLE cost of entering a tile
+ *  this improvement stands on, in whole Movement, or undefined where the row
+ *  names none. A pillaged one charges nothing extra. */
+export function improvementMoveCost(tile: Tile): number | undefined {
+  if (!tile.improvement || tile.pillaged) return undefined;
+  return IMPROVEMENTS[tile.improvement as ImprovementId]?.movementCost;
 }
 
 /** The TERRAIN schedule alone, in MP_SCALE units — what a step costs where no
@@ -1873,8 +1884,15 @@ export function refreshUnits(state: GameState): void {
     // fortify gate below keeps the plain reading — no aircraft digs in.
     // CIV6 (Mamluk): "This unit heals every turn, even after moving or
     // combat" — the rest gate does not apply to that chassis at all.
+    // CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved or
+    // attacked" — the improvement's OWN civilization's units, so the tile's
+    // row and the unit's seat both have to agree.
+    const paHeal = !tile.pillaged && !!tile.improvement
+      && !!IMPROVEMENTS[tile.improvement as ImprovementId]?.healsAfterAction
+      && IMPROVEMENTS[tile.improvement as ImprovementId]?.uniqueTo === civOf(state, unit.seat);
     const rested = unit.movesLeft >= grantedLast
       || !!UNITS[unit.type]?.healsAlways
+      || paHeal
       || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'));
     if (rested && !starved && !healBlocked) {
       const home = ownGround;
@@ -1913,7 +1931,13 @@ export function refreshUnits(state: GameState): void {
       const dug = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
       // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
       // "automatically gains 2 turns of fortification" — a floor, not a step.
-      unit.fortifyTurns = wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : dug;
+      // CIV6 (`Improvements.GrantFortification`): the Fort, the Great Wall and
+      // the Pa say the same thing on their own rows, so the floor is the
+      // larger of the two.
+      const floor = Math.max(
+        wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : 0,
+        IMPROVEMENTS[tile.improvement as ImprovementId]?.grantsFortification ?? 0);
+      unit.fortifyTurns = Math.max(dug, Math.min(FORTIFY_MAX_TURNS, floor));
     }
     // The Great General/Admiral aura grants +1 MP alongside its
     // +5 CS (real Civ 6). Record what was granted so NEXT turn's gates above

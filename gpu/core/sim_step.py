@@ -37,6 +37,14 @@ class SimStep:
                 if _occ is not None:
                     _on = _occ.gather(1, getattr(self, f"{_pre}_unit_tile").clamp(min=0)) > 0
                     _dug = torch.where(_alive & _mil & _on, torch.full_like(_dug, 2), _dug)
+                # CIV6 (`Improvements.GrantFortification`): the Fort, the Great
+                # Wall and the Pa say the same on their own rows — the floor is
+                # the larger of the two.
+                if self._imp_fortify_any:
+                    _it = getattr(self, f"{_pre}_unit_tile").clamp(min=0)
+                    _iv = self.improvement.gather(1, _it)
+                    _gf = self._imp_fortify[_iv.clamp(min=0)] * (_iv >= 0).long()
+                    _dug = torch.where(_alive & _mil, torch.maximum(_dug, _gf.clamp(max=2)), _dug)
                 _fort.copy_(_dug)
             self._refresh_aura_mp()
             # The movesLeft/movesFull reset itself, for BOTH windows —

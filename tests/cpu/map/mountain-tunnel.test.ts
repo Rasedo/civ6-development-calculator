@@ -35,10 +35,13 @@ describe('the mountain tunnel', () => {
     expect(PORTAL_MP).toBe(2);
   });
 
-  it('appends its verbs LAST, so no earlier column moves', () => {
+  it('keeps the seat it was appended at, so no earlier column moved', () => {
     const names = unitActionNames(IMPROVEMENT_IDS);
     expect(names[names.length - 1]).toBe('PORTAL');
-    expect(IMPROVEMENT_IDS[IMPROVEMENT_IDS.length - 1]).toBe('MOUNTAIN_TUNNEL');
+    // The tunnel was the LAST improvement when it landed; the twelve unique
+    // rows appended after it, which is exactly what an append-only wire
+    // allows. What may never change is the seat it already holds.
+    expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')).toBe(22);
     // PILLAGE sits after every BUILD column, so a new improvement moves it —
     // which is why nothing may write these seats down (#78)
     expect(names.indexOf('PILLAGE')).toBeGreaterThan(names.indexOf('BUILD_MOUNTAIN_TUNNEL'));

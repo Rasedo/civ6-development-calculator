@@ -831,8 +831,11 @@ class SimMasks:
         centres live in the centre registry, which is why it is named here."""
         tc = tiles.clamp(min=0).reshape(self.B, -1)
         out = (self.district.gather(1, tc) >= 0) | (self.centre_slot_at.gather(1, tc) >= 0)
-        if self.FORT >= 0:
-            out = out | (self.improvement.gather(1, tc) == self.FORT)
+        # CIV6 (`Improvements.DefenseModifier`): "is this defensible ground" —
+        # a district, or any improvement that shelters its occupant
+        # (`improvementIsCover`).
+        out = out | (self._imp_def_cs[self.improvement.gather(1, tc).clamp(min=0)] > 0) & (
+            self.improvement.gather(1, tc) >= 0)
         return out.reshape(tiles.shape)
 
     def _promo_cs(
@@ -1679,6 +1682,14 @@ class SimMasks:
         — the caller adds the plain point itself."""
         dc = dest.clamp(min=0)
         tm = self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1)
+        # CIV6 (Polder, `MovementChange="2"`): an improvement may make its own
+        # tile dearer to enter than the step under it. `tmove` is the cost
+        # BEYOND a plain point, so the row's WHOLE cost joins the same way.
+        if self._imp_move_cost_any:
+            _mi = self.improvement.gather(1, dc.unsqueeze(1)).squeeze(1)
+            _mp = self.pillaged.gather(1, dc.unsqueeze(1)).squeeze(1)
+            _mc = self._imp_move_cost[_mi.clamp(min=0)] * ((_mi >= 0) & ~_mp).long()
+            tm = torch.where(_mc > 0, (_mc - 1) * self._mp_scale, tm)
         if utype is not None and promos is not None:
             d1 = dc.unsqueeze(1)
             # CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the

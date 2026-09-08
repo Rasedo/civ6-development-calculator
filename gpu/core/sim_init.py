@@ -1797,6 +1797,42 @@ class SimInit:
         self._imp_appeal_adj = torch.tensor(
             [int(r.get("appeal", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_any = bool((self._imp_appeal_adj != 0).any())
+        # THE UNIQUE IMPROVEMENTS' own columns (`ImprovementDef`'s second
+        # half). Every one of these is -1 or 0 on a row that names none.
+        _R = imp["rows"]
+        self._imp_one_per_city = [bool(r.get("onePerCity", 0)) for r in _R]
+        self._imp_min_appeal = [int(r.get("minAppeal", -1)) for r in _R]
+        # [(yield idx, percent)] — the Chemamull's Culture off the tile's Appeal
+        self._imp_appeal_y = [(int(r.get("appealY", [-1, 0])[0]), float(r.get("appealY", [-1, 0])[1])) for r in _R]
+        self._imp_appeal_y_any = any(y >= 0 for y, _ in self._imp_appeal_y)
+        self._imp_def_cs = torch.tensor([int(r.get("defCs", 0)) for r in _R], dtype=torch.long, device=device)
+        self._imp_fortify = torch.tensor([int(r.get("fortify", 0)) for r in _R], dtype=torch.long, device=device)
+        self._imp_fortify_any = bool((self._imp_fortify > 0).any())
+        self._imp_frontier = [bool(r.get("frontier", 0)) for r in _R]
+        self._imp_req_adj_res = [bool(r.get("reqAdjRes", 0)) for r in _R]
+        self._imp_move_cost = torch.tensor([int(r.get("moveCost", 0)) for r in _R], dtype=torch.long, device=device)
+        self._imp_move_cost_any = bool((self._imp_move_cost > 0).any())
+        self._imp_adj_land_min = [int(r.get("adjLandMin", 0)) for r in _R]
+        self._imp_built_by = [int(r.get("builtBy", -1)) for r in _R]
+        self._imp_outside = [bool(r.get("outside", 0)) for r in _R]
+        self._imp_heals_after = torch.tensor([bool(r.get("healsAfter", 0)) for r in _R], dtype=torch.bool, device=device)
+        self._imp_heals_after_any = bool(self._imp_heals_after.any())
+        self._imp_loyalty = torch.tensor([float(r.get("loyalty", 0)) for r in _R], dtype=torch.float64, device=device)
+        self._imp_loyalty_adj_off = torch.tensor(
+            [float(r.get("loyaltyAdjOff", 0)) for r in _R], dtype=torch.float64, device=device)
+        self._imp_loyalty_any = bool((self._imp_loyalty != 0).any()) or bool((self._imp_loyalty_adj_off != 0).any())
+        # "additional yields as you advance through the tree": [(tech, civic, [6])]
+        self._imp_res_y = [[(int(x["t"]), int(x["c"]), [float(v) for v in x["y"]]) for x in r.get("resY", [])] for r in _R]
+        self._imp_res_y_any = any(self._imp_res_y)
+        self._imp_off_cont_y = torch.tensor(
+            [[float(v) for v in r.get("offContY", [0.0] * 6)] for r in _R], dtype=dtype, device=device)
+        self._imp_off_cont_any = bool((self._imp_off_cont_y != 0).any())
+        # the Open-Air Museum's per-terrain-kind yields: [(terrains, [6])]
+        self._imp_terr_kind_y = [
+            (list(r["terrKindY"]["terr"]), [float(v) for v in r["terrKindY"]["y"]]) if r.get("terrKindY") else None
+            for r in _R]
+        self._imp_terr_kind_any = any(x is not None for x in self._imp_terr_kind_y)
+        self._imp_disaster_ok = [bool(r.get("disasterOk", 0)) for r in _R]
         self._imp_air_any = bool((self._imp_air_slots > 0).any())
         # CIV6 (Solar Farm, Wind Farm): what a RENEWABLE generator supplies the
         # city that owns its plot, per turn.

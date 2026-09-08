@@ -88,7 +88,19 @@ export type ImprovementId =
   | 'GEOTHERMAL_PLANT'
   | 'OFFSHORE_WIND_FARM'
   | 'TERRACE_FARM'
-  | 'MOUNTAIN_TUNNEL';
+  | 'MOUNTAIN_TUNNEL'
+  | 'CHATEAU'
+  | 'CHEMAMULL'
+  | 'GOLF_COURSE'
+  | 'GREAT_WALL'
+  | 'ICE_HOCKEY_RINK'
+  | 'KURGAN'
+  | 'MAORI_PA'
+  | 'MEKEWAP'
+  | 'MISSION'
+  | 'OPEN_AIR_MUSEUM'
+  | 'POLDER'
+  | 'STEPWELL';
 
 export type DistrictId =
   | 'CITY_CENTER'

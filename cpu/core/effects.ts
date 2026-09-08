@@ -1,5 +1,6 @@
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
+import type { TerrainId, Tile } from '../../world/types';
 import type { CivId, LeaderId } from '../data/seats';
 import { AGE_GOLDEN } from '../data/seats';
 import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type LegacyRateRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
@@ -11,7 +12,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf } from './seats';
+import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -167,6 +168,11 @@ export interface Modifiers {
   farmAdjTier: number;
   /** the civics a suzerain improvement's adjacency rule may name. */
   impUpgrades: Set<string>;
+  /** the TECHS the same rules may name (`upgradeTech`, `researchYields`).
+   *  A separate set from `impUpgrades`, which holds civics: one bag for both
+   *  is how the Terrace Farm's Replaceable Parts rung silently never fired,
+   *  while the GPU twin read the tech plane and paid it. */
+  impUpgradeTechs: Set<string>;
   /** the civilization the seat plays (`civOf`), for the unique rows' overlays */
   civ: string | null;
   /** CIV6 (REQUIREMENT_PLAYER_HAS_GOLDEN_AGE): the seat stands in a Golden
@@ -545,6 +551,7 @@ export function defaultModifiers(): Modifiers {
     districtUnits: [],
     farmAdjTier: 0,
     impUpgrades: new Set<string>(),
+    impUpgradeTechs: new Set<string>(),
     hillFarms: false,
     adjacencyMult: {},
     buildingYieldBoosts: [],
@@ -722,6 +729,7 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
   // the civics a suzerain improvement's adjacency rule may name, and the one
   // that adds a Monastery's second Housing
   for (const id of research.civics) mods.impUpgrades.add(id);
+  for (const id of research.techs) mods.impUpgradeTechs.add(id);
   for (const fx of completedEffectsIn(research)) {
     if (fx.kind === 'improvementYields') {
       const cur = (mods.improvementYields[fx.improvement] ??= {});
@@ -1627,16 +1635,30 @@ export interface YieldCtx {
   preserve?: ReadonlyMap<number, Yields>;
   /** the appeal an owner city adds to its own tiles. */
   gpAppeal?: GpAppeal;
+  /** CIV6 (Mission): is this tile on a landmass OTHER than the seat's
+   *  original capital's? Absent leaves the clause unpaid, which is what the
+   *  BASE context (nobody's seat) wants. */
+  offHomeContinent?: (t: Tile) => boolean;
+  /** CIV6 (Open-Air Museum): the TERRAIN KINDS this seat has founded a city
+   *  on — its city centres' own terrains. */
+  foundedTerrains?: ReadonlySet<TerrainId>;
 }
 
 export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): YieldCtx {
   const camps = campTiles(state);
+  const founded = new Set<TerrainId>();
+  for (const c of citiesOf(state, seat)) {
+    const t = state.map.tiles[c.centerIndex];
+    if (t) founded.add(t.terrain);
+  }
   return {
     map: state.map,
     mods: mods ?? getModifiers(state, seat),
     camps,
     preserve: preserveTileYields(state, seat, camps),
     gpAppeal: cityAppealResolver(state),
+    offHomeContinent: (t) => !onHomeContinent(state, seat, t.index),
+    foundedTerrains: founded,
   };
 }
 

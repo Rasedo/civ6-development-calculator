@@ -930,7 +930,17 @@ class SimOrders:
                             )
                         else:
                             _valid = (_rq == _k) & _unl
-                    _base = ((eng_ok | fort_ok) if _k == self.FORT else eng_ok) if self._imp_eng[_k] else here_ok
+                    # CIV6 (`Improvement_ValidBuildUnits`): a row a NAMED unit
+                    # lays rather than the Builder (the Pa's Toa) reads its own
+                    # unit's mask, and may stand on unowned ground.
+                    if self._imp_built_by[_k] >= 0:
+                        _base = (act & (utp == self._imp_built_by[_k]) & _paved
+                                 & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                                 & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1))
+                        if not self._imp_outside[_k]:
+                            _base = _base & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    else:
+                        _base = ((eng_ok | fort_ok) if _k == self.FORT else eng_ok) if self._imp_eng[_k] else here_ok
                     _ok = _base & (a == _col) & _valid
                     if bool(_ok.any()):
                         _r = _ok.nonzero(as_tuple=True)[0]

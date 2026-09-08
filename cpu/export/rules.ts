@@ -1842,6 +1842,11 @@ export function buildRules() {
             // TECH upgrade beside the civic one
             mtn: r.mountain ? 1 : 0,
             same: r.sameImprovement ? 1 : 0,
+            // a row that names SOMEBODY ELSE's improvement (the Kurgan's
+            // Pasture), a LUXURY neighbour, or a list of terrains
+            imp: r.improvement ? IMPROVEMENT_IDS.indexOf(r.improvement) : -1,
+            lux: r.luxuryResource ? 1 : 0,
+            terr: (r.terrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
             rc: r.requiresCivic ? civicIdx.get(r.requiresCivic) ?? -3 : -1,
             uc: r.upgradeCivic ? civicIdx.get(r.upgradeCivic) ?? -3 : -1,
             ut: r.upgradeTech ? techIdx.get(r.upgradeTech) ?? -3 : -1,
@@ -1861,6 +1866,34 @@ export function buildRules() {
           air: def.airSlots ?? 0,
           appeal: def.appealAdjacent ?? 0,
           plun: plunRow(def.plunder),
+          // THE UNIQUE ROWS' own placement and clause columns. -1 / 0 means
+          // "the row names none of this".
+          onePerCity: def.onePerCity ? 1 : 0,
+          minAppeal: def.minAppeal ?? -1,
+          appealY: def.appealYield
+            ? [YIELD_KEYS.indexOf(def.appealYield.yield), def.appealYield.pct] : [-1, 0],
+          defCs: def.defenseCS ?? 0,
+          fortify: def.grantsFortification ?? 0,
+          frontier: def.buildOnFrontier ? 1 : 0,
+          reqAdjRes: def.requiresAdjacentResource ? 1 : 0,
+          moveCost: def.movementCost ?? 0,
+          adjLandMin: def.adjacentLandMin ?? 0,
+          builtBy: def.builtBy ? Object.keys(UNITS).indexOf(def.builtBy) : -1,
+          outside: def.outsideTerritory ? 1 : 0,
+          healsAfter: def.healsAfterAction ? 1 : 0,
+          loyalty: def.loyalty ?? 0,
+          loyaltyAdjOff: def.loyaltyAdjacentOffContinent ?? 0,
+          resY: (def.researchYields ?? []).map((r) => ({
+            t: r.tech ? techIdx.get(r.tech) ?? -3 : -1,
+            c: r.civic ? civicIdx.get(r.civic) ?? -3 : -1,
+            y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+          })),
+          offContY: YIELD_KEYS.map((k) => def.offCapitalContinentYields?.[k] ?? 0),
+          terrKindY: def.terrainKindYields
+            ? { terr: def.terrainKindYields.terrains.map((t) => TERRAIN_IDS.indexOf(t)),
+                y: YIELD_KEYS.map((k) => def.terrainKindYields!.yields[k] ?? 0) }
+            : null,
+          disasterOk: def.disasterResistant ? 1 : 0,
         };
       }),
       luxAmenityCities: LUXURY_AMENITY_CITIES,

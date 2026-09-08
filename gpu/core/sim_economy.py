@@ -3997,8 +3997,23 @@ class SimEconomy:
         # CIV6 (Mamluk): "This unit heals every turn, even after moving or
         # combat" — the rest gate does not reach that chassis at all.
         _t = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-        return (self._spent_mp(pre) & ~self._type_heals_always[_t]
-                & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK")))
+        out = (self._spent_mp(pre) & ~self._type_heals_always[_t]
+               & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK")))
+        # CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved
+        # or attacked" — the improvement's OWN civilization's units, so the
+        # tile's row and the unit's seat both have to agree.
+        if self._imp_heals_after_any:
+            _tl = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+            _iv = self.improvement.gather(1, _tl)
+            _ok = (_iv >= 0) & ~self.pillaged.gather(1, _tl) & self._imp_heals_after[_iv.clamp(min=0)]
+            if bool(_ok.any()):
+                _sd = getattr(self, f"{pre}_unit_seat")
+                _mine = torch.zeros_like(_ok)
+                for k, u in enumerate(self._imp_uniq):
+                    if u >= 0 and bool(self._imp_heals_after[k]):
+                        _mine = _mine | ((_iv == k) & self._seat_plays_civ_idx(_sd, u))
+                out = out & ~(_ok & _mine)
+        return out
 
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
@@ -4334,6 +4349,11 @@ class SimEconomy:
         Environmental Effects." A disaster reaches every seat at once, so the
         plane is the OR over the majors — a tile belongs to at most one."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        # CIV6 (`Improvements.DisasterResistant`): the Great Wall stands
+        # through a storm or a flood on its own row, wherever it is.
+        for k, ok in enumerate(self._imp_disaster_ok):
+            if ok:
+                out = out | (self.improvement == k)
         if not self.n_governors:
             return out
         for r in range(self.n_majors):

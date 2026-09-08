@@ -42,6 +42,15 @@ export interface ImpAdjacency {
   upgradeCivic?: string;
   upgradePer?: number;
   upgradeYields?: Partial<Yields>;
+  /** count a neighbour carrying a LUXURY resource (the Chateau's Gold, the
+   *  Mekewap's late Gold). */
+  luxuryResource?: boolean;
+  /** count a neighbour standing on one of these terrains (the Ice Hockey
+   *  Rink's Tundra and Snow). */
+  terrains?: TerrainId[];
+  /** count a neighbour carrying THIS NAMED improvement — `sameImprovement`
+   *  widened to a row that names somebody else's (the Kurgan's Pasture). */
+  improvement?: ImprovementId;
 }
 
 export interface ImprovementDef {
@@ -110,6 +119,68 @@ export interface ImprovementDef {
    *  PLUNDER_NONE, and the pillage verb refuses it outright rather than
    *  wrecking it for nothing. */
   noPillage?: boolean;
+  /** CIV6 (`OnePerCity`): one city holds at most one of these. */
+  onePerCity?: boolean;
+  /** CIV6 (`MinimumAppeal`): the row refuses a tile below this Appeal (the
+   *  Chemamull's Breathtaking bar, the Seaside Resort's own constant). */
+  minAppeal?: number;
+  /** CIV6 (`YieldFromAppeal` / `YieldFromAppealPercent`): the row pays this
+   *  share of its tile's APPEAL as the named yield (the Chemamull's 75%
+   *  Culture). Floored, as every other tile yield here is. */
+  appealYield?: { yield: YieldKey; pct: number };
+  /** CIV6 (`DefenseModifier`): what a unit standing on it adds to its own
+   *  defence, and CIV6 (`GrantFortification`): the turns of fortification it
+   *  is handed for free. The Fort's own numbers, now on the data. */
+  defenseCS?: number;
+  grantsFortification?: number;
+  /** CIV6 (Great Wall, `BuildInLine` / `BuildOnFrontier`): the row may only
+   *  be laid along the seat's own BORDER, each segment beside the last. */
+  buildInLine?: boolean;
+  buildOnFrontier?: boolean;
+  /** CIV6 (PLOT_DAMAGE_TO_WALKING_INTO / PLOT_DAMAGE_TO_WALKING_ADJACENT):
+   *  what an enemy unit takes for stepping onto the tile, and for walking
+   *  beside it. RECORDED, not read: this engine has no damage-on-entry hook,
+   *  which is unit-movement machinery (C-33, C-79). */
+  damageEntering?: number;
+  damageAdjacent?: number;
+  /** CIV6 (`RequiresAdjacentBonusOrLuxury`): the row refuses a tile with no
+   *  Bonus or Luxury resource beside it (the Chateau, the Mekewap). */
+  requiresAdjacentResource?: boolean;
+  /** CIV6 (`MovementChange`): what the tile costs to enter once the row
+   *  stands on it (the Polder's 3, i.e. 2 above the flat 1). */
+  movementCost?: number;
+  /** CIV6 (`ValidAdjacentTerrainAmount`): the row needs at least this many
+   *  PASSABLE LAND neighbours (the Polder's three). */
+  adjacentLandMin?: number;
+  /** CIV6 (`Improvement_ValidBuildUnits`): the unit that lays it, where that
+   *  is neither the Builder nor the Military Engineer (the Pa's Toa). */
+  builtBy?: string;
+  /** CIV6 (`CanBuildOutsideTerritory`): the row may stand on unowned ground. */
+  outsideTerritory?: boolean;
+  /** CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved or
+   *  attacked" — the improvement's OWNER's units alone. */
+  healsAfterAction?: boolean;
+  /** CIV6 (`MODIFIER_PLAYER_CITIES_ADJUST_IDENTITY_PER_TURN`): Loyalty per
+   *  turn the row pays the city that holds it (the Open-Air Museum's). */
+  loyalty?: number;
+  /** the same, paid only to a city NOT on the seat's capital continent (the
+   *  Mission's, which reaches a city ADJACENT to the improvement). */
+  loyaltyAdjacentOffContinent?: number;
+  /** CIV6 (`Improvement_BonusYieldChanges`): what the row pays extra once the
+   *  seat holds the named tech or civic — "additional yields as you advance
+   *  through the Technology and Civics Tree". */
+  researchYields?: readonly { tech?: string; civic?: string; yields: Partial<Yields> }[];
+  /** CIV6 (Mission): what the row pays on a tile whose continent is NOT the
+   *  seat's capital's. */
+  offCapitalContinentYields?: Partial<Yields>;
+  /** CIV6 (Open-Air Museum): yields per TERRAIN KIND on which this seat has
+   *  founded at least one city — the five the row names, counted once each. */
+  terrainKindYields?: { terrains: readonly TerrainId[]; yields: Partial<Yields> };
+  /** CIV6 (`DisasterResistant`): a storm or a flood leaves it standing. */
+  disasterResistant?: boolean;
+  /** CIV6 (Golf Course, Open-Air Museum): "Tiles with <row> cannot be
+   *  swapped" — recorded; this engine has no tile-swap verb (C-79). */
+  noSwap?: boolean;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -306,6 +377,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     engineer: true,
+    // CIV6 (Improvements.xml `DefenseModifier` / `GrantFortification`): the
+    // Fort's own columns, on the data now that the Great Wall and the Pa
+    // carry the same pair.
+    defenseCS: 4,
+    grantsFortification: 2,
     // CIV6 (Fort): "can be built on any featureless land tile".
     noFeature: true,
     description: 'Military Engineer only, featureless land. Occupying unit gets +4 defense strength and 2 turns of fortification.',
@@ -446,10 +522,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     adjacency: [{ builtWonder: true, per: 1, yields: { faith: 2 } }],
     // CIV6 (SPHINX_FLOODPLAINS_CULTURE): "+1 Culture if built on Floodplains"
     featureYields: { features: ['FLOODPLAINS'], yields: { culture: 1 } },
-    appealAdjacent: 2,
+    // CIV6 (Improvements.xml, `Appeal="1"`): ONE, not the two an earlier
+    // round took off the civilopedia — the XML outranks the pedia.
+    appealAdjacent: 1,
     tourismFrom: 'culture',
     tourismTech: 'FLIGHT',
-    description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +2 appeal around. Not beside another Sphinx.',
+    description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +1 appeal around. Not beside another Sphinx.',
   },
   // CIV6 (Improvements.xml / Adjacency_YieldChanges): the Inca's Terrace
   // Farm — hills of three terrains, +1 Food and (Housing 2 in the install's
@@ -496,6 +574,287 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     noPillage: true,
     description: 'Military Engineer only, on a mountain, built from an adjacent tile. A movement portal to the next tunnel on its range, at 2 Movement. Cannot be pillaged or removed.',
   },
+  // CIV6 (Civilizations.xml): the twelve unique improvements the roster's
+  // seated civilizations still owed, each read off the install's Improvements
+  // tables. `Housing / TilesRequired` is the install's per-tile share, which
+  // is why a `Housing="2" TilesRequired="2"` row is 1 here.
+  CHATEAU: {
+    id: 'CHATEAU',
+    name: 'Chateau',
+    code: 'Ch',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { culture: 2, gold: 1 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'FRANCE',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    features: ['FLOODPLAINS'],
+    noAdjacentSame: true,
+    requiresAdjacentResource: true,
+    appealAdjacent: 1,
+    // CIV6 (Chateau_River): "+2 Gold if on a tile containing a River edge"
+    riverYields: { gold: 2 },
+    // CIV6 (Chateau_WonderEarly / _WonderLate): +1 Culture per adjacent
+    // wonder, +2 once Flight is in.
+    adjacency: [{ builtWonder: true, per: 1, yields: { culture: 1 },
+                  upgradeTech: 'FLIGHT', upgradeYields: { culture: 2 } }],
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+2 culture +1 gold, +1 culture per adjacent wonder (+2 from Flight), +2 gold on a river. Beside a resource, never beside another Chateau.',
+  },
+  CHEMAMULL: {
+    id: 'CHEMAMULL',
+    name: 'Chemamull',
+    code: 'Cm',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { production: 1 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'MAPUCHE',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    // CIV6 (`MinimumAppeal="4"`, `YieldFromAppeal` CULTURE at 75%)
+    minAppeal: 4,
+    appealYield: { yield: 'culture', pct: 75 },
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+1 production, and culture equal to 75% of the tile appeal. Breathtaking ground only.',
+  },
+  GOLF_COURSE: {
+    id: 'GOLF_COURSE',
+    name: 'Golf Course',
+    code: 'Gc',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { gold: 2 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'SCOTLAND',
+    // the install lists every terrain but the two DESERT rows
+    terrains: ['GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    onePerCity: true,
+    noSwap: true,
+    appealAdjacent: 1,
+    // CIV6 (GolfCourse_CityCenterAdjacency / _EntertainmentComplexAdjacency)
+    adjacency: [
+      { district: 'CITY_CENTER', per: 1, yields: { culture: 1 } },
+      { district: 'ENTERTAINMENT_COMPLEX', per: 1, yields: { culture: 1 } },
+    ],
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+2 gold, +1 culture beside a City Center and +1 beside an Entertainment Complex. One per city, never on desert.',
+  },
+  GREAT_WALL: {
+    id: 'GREAT_WALL',
+    name: 'Great Wall',
+    code: 'Gw',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'CHINA',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    features: ['VOLCANIC_SOIL'],
+    buildInLine: true,
+    buildOnFrontier: true,
+    defenseCS: 4,
+    grantsFortification: 2,
+    disasterResistant: true,
+    damageEntering: 10,
+    damageAdjacent: 10,
+    // CIV6 (GreatWall_Gold at Masonry, GreatWall_Culture at Castles): per
+    // adjacent SEGMENT, which is the row's own kind.
+    adjacency: [
+      { improvement: 'GREAT_WALL', per: 1, yields: { gold: 2 } },
+      { improvement: 'GREAT_WALL', requiresCivic: 'CASTLES', per: 1, yields: { culture: 2 } },
+    ],
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+4 defence and 2 turns of fortification to its occupant, 10 damage to an enemy entering or passing. +2 gold per adjacent segment, +2 culture per segment from Castles. Along the border only.',
+  },
+  ICE_HOCKEY_RINK: {
+    id: 'ICE_HOCKEY_RINK',
+    name: 'Ice Hockey Rink',
+    code: 'Hk',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'CANADA',
+    terrains: ['SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    onePerCity: true,
+    appealAdjacent: 2,
+    // CIV6 (Hockey_Snow/SnowHills/Tundra/TundraHillsAdjacency): one Culture
+    // per adjacent cold tile — four install rows, one here, because the
+    // engine's terrain and elevation are separate columns.
+    adjacency: [{ terrains: ['SNOW', 'TUNDRA'], per: 1, yields: { culture: 1 } }],
+    // CIV6 (Improvement_BonusYieldChanges 26, 27)
+    researchYields: [{ civic: 'PROFESSIONAL_SPORTS', yields: { food: 2, production: 2 } }],
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+1 culture per adjacent tundra or snow tile, +2 food and +2 production from Professional Sports. Tundra and snow only, one per city.',
+  },
+  KURGAN: {
+    id: 'KURGAN',
+    name: 'Kurgan',
+    code: 'Kg',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { faith: 1, gold: 3 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'SCYTHIA',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT'],
+    // CIV6 (Kurgan_Faith / _Faith_Stirrups): per adjacent PASTURE, doubled
+    // once Stirrups is in.
+    adjacency: [{ improvement: 'PASTURE', per: 1, yields: { faith: 1 },
+                  upgradeTech: 'STIRRUPS', upgradeYields: { faith: 2 } }],
+    tourismFrom: 'faith',
+    tourismTech: 'FLIGHT',
+    description: '+1 faith +3 gold, +1 faith per adjacent Pasture (+2 from Stirrups). Flat ground only.',
+  },
+  MAORI_PA: {
+    id: 'MAORI_PA',
+    name: 'Pa',
+    code: 'Pa',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'MAORI',
+    // the TOA lays it, not the Builder, and it may stand on unowned ground
+    builtBy: 'TOA',
+    outsideTerritory: true,
+    elevations: ['HILLS'],
+    defenseCS: 4,
+    grantsFortification: 2,
+    damageEntering: 10,
+    healsAfterAction: true,
+    noPillage: true,
+    description: 'Built by the Toa on a hill, inside or outside your borders. +4 defence and 2 turns of fortification to its occupant, and a Maori unit on one heals even after moving or attacking.',
+  },
+  MEKEWAP: {
+    id: 'MEKEWAP',
+    name: 'Mekewap',
+    code: 'Mk',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { production: 1 },
+    housing: 1,
+    resourceOnly: false,
+    uniqueTo: 'CREE',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    noAdjacentSame: true,
+    requiresAdjacentResource: true,
+    // CIV6 (Mekewap_First/Second/ThirdBonusAdjacency): one Food per TWO
+    // adjacent Bonus resources, per ONE from Conservation; +2 Gold per
+    // adjacent Luxury once Cartography is in.
+    adjacency: [
+      { bonusResource: true, per: 2, yields: { food: 1 },
+        upgradeCivic: 'CONSERVATION', upgradePer: 1 },
+      { luxuryResource: true, requiresCivic: 'CARTOGRAPHY', per: 1, yields: { gold: 2 } },
+    ],
+    // CIV6 (Improvement_BonusYieldChanges 24)
+    researchYields: [{ civic: 'CIVIL_SERVICE', yields: { production: 1 } }],
+    description: '+1 production +1 housing. +1 food per two adjacent bonus resources (per one from Conservation), +2 gold per adjacent luxury from Cartography. Beside a resource, never beside another Mekewap.',
+  },
+  MISSION: {
+    id: 'MISSION',
+    name: 'Mission',
+    code: 'Ms',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { faith: 2 },
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'SPAIN',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    // CIV6 (Mission_Science_Campus / _Science_HolySite)
+    adjacency: [
+      { district: 'CAMPUS', per: 1, yields: { science: 1 } },
+      { district: 'HOLY_SITE', per: 1, yields: { science: 1 } },
+    ],
+    // CIV6 (Improvement_BonusYieldChanges 17)
+    researchYields: [{ civic: 'CULTURAL_HERITAGE', yields: { science: 2 } }],
+    // CIV6: "+2 Faith, +1 Production, and +1 Food if on a different continent
+    // than your Capital"
+    offCapitalContinentYields: { faith: 2, production: 1, food: 1 },
+    // CIV6 (TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER, Amount 2): +2 Loyalty
+    // per turn to a city ADJACENT to one, off the capital's continent.
+    loyaltyAdjacentOffContinent: 2,
+    description: '+2 faith, +2 science from Cultural Heritage, +1 science per adjacent Campus and Holy Site. Off your capital continent it also pays +2 faith +1 production +1 food, and +2 loyalty to a city beside it.',
+  },
+  OPEN_AIR_MUSEUM: {
+    id: 'OPEN_AIR_MUSEUM',
+    name: 'Open-Air Museum',
+    code: 'Oa',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    uniqueTo: 'SWEDEN',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    onePerCity: true,
+    noSwap: true,
+    loyalty: 2,
+    // CIV6: "+2 Culture and +2 Tourism for each type of terrain (Snow,
+    // Tundra, Desert, Plains or Grassland) in which at least one Swedish city
+    // is founded." The Tourism half rides `tourismFrom`.
+    terrainKindYields: {
+      terrains: ['SNOW', 'TUNDRA', 'DESERT', 'PLAINS', 'GRASSLAND'],
+      yields: { culture: 2 },
+    },
+    tourismFrom: 'culture',
+    description: '+2 loyalty per turn, and +2 culture for each of the five terrain kinds you have founded a city on. One per city.',
+  },
+  POLDER: {
+    id: 'POLDER',
+    name: 'Polder',
+    code: 'Po',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { food: 1, production: 1 },
+    housing: 0.5,
+    resourceOnly: false,
+    uniqueTo: 'NETHERLANDS',
+    // a Builder row on WATER whose ground rule is its terrain list alone
+    waterOnly: true,
+    terrains: ['COAST', 'LAKE'],
+    adjacentLandMin: 3,
+    movementCost: 3,
+    // CIV6 (Polder_Polder_Food_Early/Late, Polder_Polder_Production)
+    adjacency: [
+      { sameImprovement: true, per: 1, yields: { food: 1 },
+        upgradeTech: 'REPLACEABLE_PARTS', upgradeYields: { food: 2, production: 1 } },
+    ],
+    // CIV6 (Improvement_BonusYieldChanges 25)
+    researchYields: [{ civic: 'CIVIL_ENGINEERING', yields: { gold: 4 } }],
+    description: '+1 food +1 production +0.5 housing on coast or lake beside three or more land tiles. +1 food per adjacent Polder, +2 food and +1 production each from Replaceable Parts, +4 gold from Civil Engineering. Costs 3 movement to enter.',
+  },
+  STEPWELL: {
+    id: 'STEPWELL',
+    name: 'Stepwell',
+    code: 'Sw',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { food: 1 },
+    housing: 1,
+    resourceOnly: false,
+    uniqueTo: 'INDIA',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT'],
+    noAdjacentSame: true,
+    // CIV6 (Improvement_BonusYieldChanges 19, 20)
+    researchYields: [
+      { civic: 'FEUDALISM', yields: { faith: 1 } },
+      { civic: 'PROFESSIONAL_SPORTS', yields: { food: 1 } },
+    ],
+    // The description's "+1 Faith beside a Holy Site, +1 Food beside a Farm"
+    // has NO `Improvement_Adjacencies` row in the install — both halves are
+    // DLL-side, so they are recorded rather than invented (C-79).
+    description: '+1 food +1 housing on flat ground, never beside another Stepwell. +1 faith from Feudalism, +1 more food from Professional Sports.',
+  },
   ZIGGURAT: {
     id: 'ZIGGURAT',
     name: 'Ziggurat',
@@ -515,3 +874,23 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     description: '+2 science, +1 culture beside a river. Flat ground, floodplains allowed.',
   },
 };
+
+/**
+ * CIV6 (`Improvements.DefenseModifier`): what an improvement adds to the
+ * Combat Strength of whoever stands on it — physical and theological alike.
+ * The Fort's own 4, and the same 4 on China's Great Wall and the Maori Pa, so
+ * the three read ONE column instead of three `=== 'FORT'` tests.
+ *
+ * A LEAF: `promotions.ts` reads it and must not import `combat.ts`, which
+ * already imports promotions.
+ */
+export function improvementDefenseCS(tile: { improvement?: string | null; pillaged?: boolean }): number {
+  if (!tile.improvement || tile.pillaged) return 0;
+  return IMPROVEMENTS[tile.improvement as ImprovementId]?.defenseCS ?? 0;
+}
+
+/** does an improvement on this tile shelter its occupant at all? The
+ *  "is this defensible ground" test a district shares. */
+export function improvementIsCover(tile: { improvement?: string | null; pillaged?: boolean } | undefined): boolean {
+  return !!tile && improvementDefenseCS(tile) > 0;
+}

@@ -60,14 +60,14 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-60 the Free City's own play | 2 | its units, walls and retaliation, its amenities, the religion walks |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
-| C-69 two unique rows with trait clauses | 1 | the Tsikhe and the Mission, both with C-79's rows |
+| C-69 two unique rows with trait clauses | 0 | CLOSED — the Tsikhe and the Mission shipped with C-79's rows |
 | C-74 per-game counts over per-object rolls | 1 | ask (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-77 the worked-tile pick is unexposed | 1 | one exposed reader per engine, compared per city |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
-| C-79 unique INFRASTRUCTURE absent | 3 | the ten DISTRICTS are built; 21 buildings and improvements are left, and the Toa's Pā waits here |
+| C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **48** | |
+| **OPEN, TOTAL** | **44** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -274,8 +274,8 @@ Nothing open.
     ceiling at Breathtaking; the middle bands are this model's own.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
-  `shipped` on 335 of 343 modifiers and `open: <item>` on 8, each under
-  C-64, C-67, C-69 or B-63r. Unique units are C-78,
+  `shipped` on 337 of 343 modifiers and `open: <item>` on 6, each under
+  C-64, C-67 or B-63r. Unique units are C-78,
   unique infrastructure C-79 and C-69.
   - THE AGENDAS — DLL-scored against an opinion scale neither engine has
     (C-76).
@@ -286,8 +286,8 @@ Nothing open.
     Bombard's strike on a city.
   - THE ROCK BAND's four venue clauses (`Expansion2_UnitPromotions.xml`:
     Arena Rock / Street Carnival, Reggae Rock / Copacabana, Glam Rock /
-    Acropolis, Surf Band / Royal Navy Dockyard) — three of the four venues
-    are now built; the promotion's own venue bit is not read yet.
+    Acropolis, Surf Band / Royal Navy Dockyard) — all four venues are built
+    now; what is left is reading the promotion's own venue bit.
   - The engine has no resource VISIBILITY, so the Stave Church counts every
     coastal resource where the install counts the visible ones.
   - The site census (`tests/cpu/seats/combat-rows.test.ts`,
@@ -368,13 +368,13 @@ Nothing open.
   - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
     `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
     preference needs a decider with alternatives — P8's, not a carrier's.
-- **C-69. TWO UNIQUE ROWS WITH TRAIT CLAUSES.** Weight 1.
-  - The three DISTRICTS are built — Kongo's M'banza (with its free Apostle),
-    England's Royal Navy Dockyard (with `bestTrainableNaval`, the strongest
-    hull the seat can train) and Phoenicia's Cothon. What is left is
-    Georgia's Tsikhe (a building, +50% production toward itself) and Spain's
-    Mission (an improvement, +2 Loyalty in a city beside one on a foreign
-    continent), both C-79's.
+- **C-69. TWO UNIQUE ROWS WITH TRAIT CLAUSES.** CLOSED.
+  - Every row is built. The three DISTRICTS — Kongo's M'banza with its free
+    Apostle, England's Royal Navy Dockyard with the strongest hull the seat
+    can train, Phoenicia's Cothon — then Georgia's Tsikhe (whose +50%
+    Production is Strength in Unity's own RENAISSANCE_WALLS row, since the
+    Tsikhe IS that building here) and Spain's Mission (+2 Loyalty to a city
+    beside one, off the capital's continent).
 - **C-74. PER-GAME COUNTS OVER PER-OBJECT ROLLS.** Weight 1.
   - `ERUPTION_CHANCE_PER_VOLCANO` is not covered by the MODERATE / 500
     ruling: the install counts eruptions per GAME, this engine rolls per
@@ -397,21 +397,35 @@ Nothing open.
     with their abilities and pins on both engines. What is left is the nine
     LEADER units (Rough Rider, Black Army, ...), the blank rows of
     `docs/ROSTER.md`.
-  - Two halves of a built row wait on another entry: the Ngao Mbeba's "can
-    see through features" needs the sight-BLOCKING this engine does not
-    model (B-56r), and the Toa's Pā improvement needs C-79's row.
-- **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 3.
-  - The ten unique DISTRICTS are built, each a `civVariants` entry on the row
-    it replaces with its own adjacency set: Acropolis, Hansa, Seowon, Suguba,
-    Lavra, Ikanda, M'banza, Royal Navy Dockyard, Cothon, Street Carnival.
-  - What is left is the BUILDINGS and IMPROVEMENTS — 16 rows with their
-    placement and yields off the install, on both engines and the exporter:
-    Film Studio, Madrasa, Copacabana, Ice Hockey Rink, Great Wall, Mekewap,
-    Château, Thermal Bath, Stepwell, Electronics Factory, Marae, Pā,
-    Chemamull, Ordu, Polder, Grand Bazaar, Golf Course, Kurgan, Open-Air
-    Museum, and C-69's Tsikhe and Mission.
-  - Two clauses wait here: the Rock Band's Reggae Rock venue (C-26, the
-    Copacabana) and the Toa's Pā (C-78).
+  - One half of a built row waits on another entry: the Ngao Mbeba's "can see
+    through features" needs the sight-BLOCKING this engine does not model
+    (B-56r). The Toa's Pā shipped with C-79.
+- **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
+  - EVERY ROW IS BUILT. Twelve DISTRICTS, each a `civVariants` entry on the
+    row it replaces with its own adjacency set and half its price (Acropolis,
+    Hansa, Seowon, Suguba, Lavra, Ikanda, M'banza, Royal Navy Dockyard,
+    Cothon, Street Carnival, Bath, Copacabana); nine BUILDINGS merged over
+    their base rows by one composer per engine (Film Studio, Madrasa,
+    Electronics Factory, Ordu, Tsikhe, Grand Bazaar, Marae, Thermal Bath,
+    Stave Church); and twelve IMPROVEMENTS with their placement columns and
+    adjacency rows (Château, Chemamull, Golf Course, Great Wall, Ice Hockey
+    Rink, Kurgan, Pā, Mekewap, Mission, Open-Air Museum, Polder, Stepwell),
+    beside the Sphinx, Terrace Farm and Ziggurat already in.
+  - FOUR CLAUSES HAVE NO CARRIER IN THIS ENGINE, and each is recorded on the
+    column that names it rather than invented:
+    - the Great Wall's and the Pā's `PLOT_DAMAGE_TO_WALKING_INTO` /
+      `_ADJACENT` (10 each) — damage on ENTERING a tile is unit-movement
+      machinery this engine does not have (C-33);
+    - the Film Studio's "+100% Tourism pressure ... towards other
+      civilizations in the Modern era" — a per-PAIR tourism pressure;
+    - the Electronics Factory's "+4 Culture after Electricity" — a
+      TECH-gated building yield the catalog has no column for, and the
+      Marae's and the Thermal Bath's per-tile Tourism thirds with it;
+    - "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) —
+      there is no tile-swap verb to refuse.
+  - The Stepwell's "+1 Faith beside a Holy Site, +1 Food beside a Farm" has
+    NO `Improvement_Adjacencies` row in the install: both halves are
+    DLL-side, so they are recorded rather than invented.
   - LEY LINE adjacency is out of scope by construction: it is a Secret
     Societies resource class this engine's map never places, so every
     `LeyLine_*` row on a unique district is unreachable.

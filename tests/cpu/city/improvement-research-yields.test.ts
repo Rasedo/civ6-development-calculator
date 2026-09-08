@@ -93,7 +93,8 @@ describe('the Lumber Mill on a river', () => {
 
   it('and no other improvement carries a river column', () => {
     const withRiver = Object.values(IMPROVEMENTS).filter((d) => d.riverYields);
-    // CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column
-    expect(withRiver.map((d) => d.id).sort()).toEqual(['LUMBER_MILL', 'ZIGGURAT']);
+    // CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column,
+    // and so does the Chateau's "+2 Gold if on a tile containing a River edge"
+    expect(withRiver.map((d) => d.id).sort()).toEqual(['CHATEAU', 'LUMBER_MILL', 'ZIGGURAT']);
   });
 });

@@ -324,6 +324,63 @@ def main() -> int:
             "the merge leaked into a game that plays no Ottoman")
     print("  12 merged columns OK — the base row everywhere, the variant on the seated game alone")
 
+    # 13 — the TWELVE unique IMPROVEMENTS: the wire's own rows, appended last
+    _iids = list(rules.improvements["ids"])
+    _irows = rules.improvements["rows"]
+    _WANT_I = ["CHATEAU", "CHEMAMULL", "GOLF_COURSE", "GREAT_WALL", "ICE_HOCKEY_RINK",
+               "KURGAN", "MAORI_PA", "MEKEWAP", "MISSION", "OPEN_AIR_MUSEUM",
+               "POLDER", "STEPWELL"]
+    assert _iids[-len(_WANT_I):] == _WANT_I, "the unique improvements are not the LAST build columns"
+    assert _iids.index("MOUNTAIN_TUNNEL") == 22, "an earlier build column moved"
+    _byid = {r["id"]: r for r in _irows}
+    for _n in _WANT_I:
+        assert int(_byid[_n]["uniq"]) >= 0, f"{_n} names no civilization"
+    # the defence column the Fort, the Great Wall and the Pa share
+    for _n in ("FORT", "GREAT_WALL", "MAORI_PA"):
+        assert int(_byid[_n]["defCs"]) == 4, f"{_n} defence"
+        assert int(_byid[_n]["fortify"]) == 2, f"{_n} fortification"
+    assert int(_byid["POLDER"]["moveCost"]) == 3, "the Polder's step"
+    assert int(_byid["POLDER"]["adjLandMin"]) == 3, "the Polder's land neighbours"
+    assert int(_byid["POLDER"]["wtr"]) == 1, "the Polder is not a water row"
+    assert int(_byid["CHEMAMULL"]["minAppeal"]) == 4, "the Chemamull's Appeal bar"
+    assert list(_byid["CHEMAMULL"]["appealY"])[1] == 75, "the Chemamull's Appeal share"
+    assert int(_byid["GOLF_COURSE"]["onePerCity"]) == 1, "the Golf Course is not one per city"
+    assert int(_byid["GREAT_WALL"]["frontier"]) == 1, "the Great Wall is not on the frontier"
+    assert int(_byid["GREAT_WALL"]["disasterOk"]) == 1, "the Great Wall burns"
+    assert int(_byid["MAORI_PA"]["healsAfter"]) == 1, "the Pa heals nobody"
+    assert int(_byid["MAORI_PA"]["outside"]) == 1, "the Pa needs borders"
+    assert int(_byid["MAORI_PA"]["builtBy"]) >= 0, "the Pa names no builder"
+    assert float(_byid["OPEN_AIR_MUSEUM"]["loyalty"]) == 2, "the Museum's loyalty"
+    assert float(_byid["MISSION"]["loyaltyAdjOff"]) == 2, "the Mission's loyalty"
+    assert [float(x) for x in _byid["MISSION"]["offContY"]] == [1.0, 1.0, 0.0, 0.0, 0.0, 2.0], (
+        f"the Mission's off-continent half {_byid['MISSION']['offContY']}")
+    assert len(_byid["STEPWELL"]["resY"]) == 2, "the Stepwell's research rungs"
+    assert _byid["OPEN_AIR_MUSEUM"]["terrKindY"] is not None, "the Museum names no terrains"
+    assert int(_byid["CHATEAU"]["reqAdjRes"]) == 1, "the Chateau needs no resource"
+    print("  13 unique improvements OK — twelve rows, appended last, every column")
+
+    # 14 — the three new ADJACENCY sources reached the wire
+    _kurgan = _byid["KURGAN"]["adj"]
+    assert len(_kurgan) == 1 and int(_kurgan[0]["imp"]) == _iids.index("PASTURE"), (
+        "the Kurgan does not name the Pasture")
+    assert int(_kurgan[0]["ut"]) >= 0, "the Kurgan's Stirrups rung is missing"
+    _mek = _byid["MEKEWAP"]["adj"]
+    assert any(int(r["lux"]) for r in _mek), "the Mekewap reads no luxury"
+    _hock = _byid["ICE_HOCKEY_RINK"]["adj"]
+    assert len(_hock) == 1 and len(_hock[0]["terr"]) == 2, "the Rink's terrain list"
+    print("  14 improvement adjacency OK — named improvement, luxury and terrain")
+
+    # 15 — the loaders bound them: the sim reads what the wire wrote
+    assert int(sim._imp_def_cs[_iids.index("GREAT_WALL")]) == 4
+    assert bool(sim._imp_fortify_any) and bool(sim._imp_move_cost_any)
+    assert bool(sim._imp_heals_after_any) and bool(sim._imp_loyalty_any)
+    assert bool(sim._imp_res_y_any) and bool(sim._imp_off_cont_any)
+    assert bool(sim._imp_terr_kind_any) and bool(sim._imp_appeal_y_any)
+    _pl = sim._improvement_loyalty(0)
+    assert _pl.shape == (sim.B, sim.RC), "the improvement-loyalty plane is the wrong shape"
+    assert float(_pl.abs().sum()) == 0.0, "nobody has laid one yet, so nobody is paid"
+    print("  15 improvement loaders OK — every clause bound, the loyalty plane empty at t0")
+
     print("UNIQUE UNITS OK")
     return 0
 

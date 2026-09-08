@@ -12,6 +12,7 @@ import {
   type PromoDef, type PromoKind,
 } from '../data/promotions';
 import { UNIT_HP, UNITS } from '../data/units';
+import { improvementIsCover } from '../data/improvements';
 import { nextRandom } from './rand';
 
 /** CIV6: "A unit will require an amount of XP equal to 15 times the level it
@@ -305,7 +306,7 @@ const TERRAIN_COVER = (t: Tile | undefined): boolean =>
   !!t && (t.elevation === 'HILLS' || t.feature === 'WOODS' || t.feature === 'RAINFOREST' || t.feature === 'MARSH');
 
 const IN_DISTRICT = (t: Tile | undefined): boolean =>
-  !!t && (t.district !== undefined && t.district !== null || t.improvement === 'FORT');
+  !!t && (t.district !== undefined && t.district !== null || improvementIsCover(t));
 
 /** the whole Combat Strength adder this unit's promotions contribute to ONE
  *  roll. An integer add, joining the assembly beside the support terms. */

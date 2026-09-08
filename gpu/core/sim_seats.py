@@ -1306,6 +1306,14 @@ class SimSeats:
         civ_at = self.row_civ.gather(1, r).reshape(seat.shape)
         return (seat >= 0) & (seat < self.n_majors) & (civ_at == i)
 
+    def _seat_plays_civ_idx(self, seat: torch.Tensor, civ: int) -> torch.Tensor:
+        """`_seat_plays` by civilization INDEX rather than by name."""
+        if civ < 0:
+            return torch.zeros_like(seat, dtype=torch.bool)
+        r = seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
+        civ_at = self.row_civ.gather(1, r).reshape(seat.shape)
+        return (seat >= 0) & (seat < self.n_majors) & (civ_at == civ)
+
     def _row_is(self, row: int, civ: int, leader: int) -> torch.Tensor:
         """[B] bool — `rowIsFor`: the seat row plays civilization `civ`, or
         roster row `leader` where the rule names a leader."""
@@ -3360,6 +3368,33 @@ class SimSeats:
             nbc = nb.clamp(min=0)
             same = ((self.improvement[:, nbc] == k) & (nb >= 0).unsqueeze(0)).any(dim=2)
             ok &= ~same
+        ok &= self._imp_unique_ground_ok(k)
+        return ok
+
+    def _imp_unique_ground_ok(self, k: int) -> torch.Tensor:
+        """[B, T] — the placement columns the install gives a UNIQUE
+        improvement beyond terrain and elevation (`uniqueGroundOk`): an Appeal
+        floor, a Bonus-or-Luxury neighbour, and a count of passable LAND
+        neighbours. `BuildInLine` is the install's line-DRAWING helper for the
+        placement UI, not a legality rule (C-79); the frontier and the
+        one-per-city clauses join at their own callers, because both need a
+        seat (`_uniq_improvement_ok`)."""
+        ok = torch.ones(self.B, self.T, dtype=torch.bool, device=self.device)
+        _ma = self._imp_min_appeal[k]
+        if _ma >= 0:
+            ok &= self._tile_appeal() >= _ma
+        if self._imp_req_adj_res[k]:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            _bl = ((self.res_priority[:, nbc] == 1) | (self.res_priority[:, nbc] == 3)) \
+                & ~self.res_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
+            ok &= _bl.any(dim=2)
+        _lm = self._imp_adj_land_min[k]
+        if _lm > 0:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            _land = (~self.water[:, nbc] & self.passable[:, nbc] & (nb >= 0).unsqueeze(0)).sum(dim=2)
+            ok &= _land >= _lm
         return ok
 
     def _feat_blocks_ground(self) -> torch.Tensor:
@@ -3402,7 +3437,27 @@ class SimSeats:
             ok = ok & self.civ_techs[:, row, ut]
         if uc >= 0:
             ok = ok & self.civ_civics[:, row, uc]
-        return ok.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
+        # a WATER row reaches a water plot with NO resource under it to insist
+        # on a different improvement, exactly as the Builder's water arm does
+        ground = (self._builder_ground() if not self._imp_water[k]
+                  else (self.water & ~self.tile_submerged & (self.res_imp < 0)))
+        out = ok.unsqueeze(1) & ground & self._imp_ground_ok(k)
+        # CIV6 (Great Wall, `BuildOnFrontier`): the seat's own BORDER — an
+        # owned tile at least one of whose neighbours it does not hold.
+        if self._imp_frontier[k]:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            mine = self.tile_seat == int(self._ROW_SEAT[row])
+            _off = (~mine[:, nbc] | (nb < 0).unsqueeze(0)).any(dim=2)
+            out = out & _off
+        # CIV6 (`OnePerCity`): the city that owns this tile already holds one.
+        if self._imp_one_per_city[k]:
+            sl = self.city_slot_at(row)
+            held = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+            here = (self.improvement == k) & (sl >= 0)
+            held.scatter_(1, sl.clamp(min=0), here)
+            out = out & ~(torch.gather(held, 1, sl.clamp(min=0)) & (sl >= 0))
+        return out
 
     def _eng_finish_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose head a charge spent at each of
@@ -3805,9 +3860,10 @@ class SimSeats:
         """
         t = tile.clamp(min=0)
         out = torch.zeros_like(t)
-        if self.FORT >= 0:
-            out = out + self._fort_def_cs * (
-                self.improvement.gather(1, t.unsqueeze(1)).squeeze(1) == self.FORT).long()
+        # CIV6 (`Improvements.DefenseModifier`): the Fort's 4, and the same 4 on
+        # the Great Wall and the Pa — one column, never a `== FORT` test
+        _iv = self.improvement.gather(1, t.unsqueeze(1)).squeeze(1)
+        out = out + self._imp_def_cs[_iv.clamp(min=0)] * (_iv >= 0).long()
         g = seat.clamp(min=0, max=self.n_majors - 1)
         has = ((seat >= 0) & (seat < self.n_majors)
                & self.civ_religion_done.gather(1, g.unsqueeze(1)).squeeze(1))
@@ -5072,6 +5128,36 @@ class SimSeats:
         if w.numel() and bool((w != 0).any()):
             stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg, self.city_bldg_pillaged[bidx, row, col])
             out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        out = out + self._improvement_loyalty(row)[bidx, col]
+        return out
+
+    def _improvement_loyalty(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — what an IMPROVEMENT pays its city in Loyalty per turn.
+
+        Two shapes, both the install's own. The Open-Air Museum's is flat and
+        belongs to the city whose BORDERS hold it. The Mission's
+        (`TRAIT_MISSION_IDENTITY_PER_TURN_MODIFIER`, Amount 2) goes to a city
+        whose CENTRE is adjacent to one and which is NOT on its owner's capital
+        continent — the requirement set the modifier names, clause for clause
+        (`improvementLoyalty`)."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        if not self._imp_loyalty_any:
+            return out
+        live = (self.improvement >= 0) & ~self.pillaged
+        if bool((self._imp_loyalty != 0).any()):
+            per = self._imp_loyalty[self.improvement.clamp(min=0)] * live.double()
+            sl = self.city_slot_at(row)
+            out.scatter_add_(1, sl.clamp(min=0), torch.where(sl >= 0, per, torch.zeros_like(per)))
+        if bool((self._imp_loyalty_adj_off != 0).any()) and row < self.n_majors:
+            ctr = self.city_center[:, row]                               # [B, RC]
+            ok = self.city_alive[:, row] & (ctr >= 0) & ~self._on_home_continent(row, ctr)
+            nb = self.neigh[ctr.clamp(min=0)]                            # [B, RC, 6]
+            nbc = nb.clamp(min=0)
+            _iv = self.improvement.unsqueeze(1).expand(-1, self.RC, -1).gather(2, nbc)
+            _pl = self.pillaged.unsqueeze(1).expand(-1, self.RC, -1).gather(2, nbc)
+            _on = (nb >= 0) & (_iv >= 0) & ~_pl
+            add = (self._imp_loyalty_adj_off[_iv.clamp(min=0)] * _on.double()).sum(dim=2)
+            out = out + torch.where(ok, add, torch.zeros_like(add))
         return out
 
     def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
@@ -6622,6 +6708,15 @@ class SimSeats:
                     hit |= self.tile_mountain[:, nbc]
                 if int(r.get("same", 0)):
                     hit |= (self.improvement[:, nbc] == k) & ~self.pillaged[:, nbc]
+                # a row that names SOMEBODY ELSE's improvement (the Kurgan's
+                # Pasture, the Great Wall's own segments)
+                _ri = int(r.get("imp", -1))
+                if _ri >= 0:
+                    hit |= (self.improvement[:, nbc] == _ri) & ~self.pillaged[:, nbc]
+                if int(r.get("lux", 0)):
+                    hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc]
+                for _rt in r.get("terr", []):
+                    hit |= self.terrain[:, nbc] == int(_rt)
                 n = (hit & on).sum(dim=2)                    # [B, T]
                 uper = int(r.get("uper", 0))
                 per = torch.where(up.unsqueeze(1) & (uper > 0),
@@ -6647,6 +6742,10 @@ class SimSeats:
             self._seat_has_beliefs(row) or self._b_appeal_rows
             or self._research_imp_y_any or self._imp_river_any
             or self._gov_has_effects or self._imp_adj_live or self._plot_rows_any
+            # the four clauses `_imp_unique_plane` carries — a gate that named
+            # none of them would silently drop the whole plane
+            or self._imp_appeal_y_any or self._imp_res_y_any
+            or self._imp_off_cont_any or self._imp_terr_kind_any
         )
 
     def _seat_tile_add(self, row: int) -> torch.Tensor:
@@ -6684,6 +6783,9 @@ class SimSeats:
             py = self._plot_yield_plane(row)
             if py is not None:
                 plane = plane + py * self._tile_add_live()
+            uq = self._imp_unique_plane(row)
+            if uq is not None:
+                plane = plane + uq * self._tile_add_live()
             mty = self._mountain_yield_plane(row)
             if mty is not None:
                 plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
@@ -6719,6 +6821,9 @@ class SimSeats:
         py = self._plot_yield_plane(row)
         if py is not None:
             plane = plane + py
+        uq = self._imp_unique_plane(row)
+        if uq is not None:
+            plane = plane + uq
         plane = plane * self._tile_add_live()
         mty = self._mountain_yield_plane(row)
         if mty is not None:
@@ -6871,6 +6976,81 @@ class SimSeats:
                     self.feat_id, torch.tensor(feats, dtype=torch.long, device=self.device))
         return (self._imp_gather(self._imp_feat_y.unsqueeze(0).expand(self.B, -1, -1))
                 * on.unsqueeze(2).to(self.dtype))
+
+    def _imp_unique_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — the four yield clauses a UNIQUE improvement carries that
+        no other column holds: the Chemamull's share of its tile's APPEAL, the
+        "additional yields as you advance through the tree" rows, the Mission's
+        off-capital-continent half, and the Open-Air Museum's per-terrain-kind
+        pay. None where this seat's rows name none of them."""
+        if not (self._imp_appeal_y_any or self._imp_res_y_any
+                or self._imp_off_cont_any or self._imp_terr_kind_any):
+            return None
+        B, T, dev = self.B, self.T, self.device
+        out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+        i0 = self.improvement.clamp(min=0)
+        live = (self.improvement >= 0) & ~self.pillaged
+        # CIV6 (`YieldFromAppeal`): floored, and never negative.
+        if self._imp_appeal_y_any:
+            ap = self._tile_appeal().clamp(min=0).double()
+            for k, (yi, pct) in enumerate(self._imp_appeal_y):
+                if yi < 0:
+                    continue
+                here = live & (self.improvement == k)
+                if not bool(here.any()):
+                    continue
+                out[:, :, yi] = out[:, :, yi] + torch.floor(ap * pct / 100.0).to(self.dtype) * here.to(self.dtype)
+        # CIV6 (`Improvement_BonusYieldChanges`)
+        if self._imp_res_y_any:
+            tv, cv = self._seat_techs(row), self._seat_civics(row)
+            for k, rows_k in enumerate(self._imp_res_y):
+                if not rows_k:
+                    continue
+                here = live & (self.improvement == k)
+                if not bool(here.any()):
+                    continue
+                for _t, _c, _y in rows_k:
+                    has = (tv[:, _t] if _t >= 0 else (cv[:, _c] if _c >= 0
+                           else torch.zeros(B, dtype=torch.bool, device=dev)))
+                    if not bool(has.any()):
+                        continue
+                    _yt = torch.tensor(_y, dtype=self.dtype, device=dev)
+                    out = out + (here & has.unsqueeze(1)).unsqueeze(2).to(self.dtype) * _yt.view(1, 1, 6)
+        # CIV6 (Mission): the tile's continent is not the seat's capital's
+        if self._imp_off_cont_any and row < self.n_majors:
+            _all_t = torch.arange(self.T, device=dev).unsqueeze(0).expand(B, -1)
+            off = ~self._on_home_continent(row, _all_t)
+            add = self._imp_off_cont_y[i0] * live.unsqueeze(2).to(self.dtype)
+            out = out + add * off.unsqueeze(2).to(self.dtype)
+        # CIV6 (Open-Air Museum): one pay per TERRAIN KIND this seat founded on
+        if self._imp_terr_kind_any:
+            kinds = self._founded_terrains(row)                       # [B, nTerr] bool
+            for k, tk in enumerate(self._imp_terr_kind_y):
+                if tk is None:
+                    continue
+                here = live & (self.improvement == k)
+                if not bool(here.any()):
+                    continue
+                terrs, y = tk
+                n = torch.zeros(B, dtype=self.dtype, device=dev)
+                for t in terrs:
+                    if 0 <= t < kinds.shape[1]:
+                        n = n + kinds[:, t].to(self.dtype)
+                _yt = torch.tensor(y, dtype=self.dtype, device=dev)
+                out = out + (here.to(self.dtype) * n.unsqueeze(1)).unsqueeze(2) * _yt.view(1, 1, 6)
+        return out
+
+    def _founded_terrains(self, row: int) -> torch.Tensor:
+        """[B, nTerrain] bool — the TERRAIN KINDS this seat has founded a city
+        on, its city centres' own terrains (`ctx.foundedTerrains`)."""
+        n_t = int(self.terrain.max().item()) + 1 if self.T else 1
+        out = torch.zeros(self.B, max(n_t, 1), dtype=torch.bool, device=self.device)
+        ctr = self.city_center[:, row]                                # [B, RC]
+        alive = self.city_alive[:, row] & (ctr >= 0)
+        tt = self.terrain.gather(1, ctr.clamp(min=0))                 # [B, RC]
+        idx = torch.where(alive, tt, torch.full_like(tt, -1))
+        out.scatter_(1, idx.clamp(min=0), idx >= 0)
+        return out
 
     def _imp_river_plane(self) -> torch.Tensor | None:
         """[B, T, 6] — what an improvement pays extra for standing on a
@@ -9385,9 +9565,8 @@ class SimSeats:
         alone, which would silently erase it.
         """
         d = self.tdef.gather(1, tiles.unsqueeze(1)).squeeze(1)
-        if self.FORT >= 0:
-            d = d + self._fort_def_cs * (
-                self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1) == self.FORT).long()
+        _iv = self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1)
+        d = d + self._imp_def_cs[_iv.clamp(min=0)] * (_iv >= 0).long()
         occ = self._occupy_def()
         if occ is not None:
             d = d + occ.gather(1, tiles.unsqueeze(1)).squeeze(1)
@@ -9395,8 +9574,8 @@ class SimSeats:
 
     def _tdef_i(self, bidx: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         d = self.tdef[bidx, tiles]
-        if self.FORT >= 0:
-            d = d + self._fort_def_cs * (self.improvement[bidx, tiles] == self.FORT).long()
+        _iv = self.improvement[bidx, tiles]
+        d = d + self._imp_def_cs[_iv.clamp(min=0)] * (_iv >= 0).long()
         occ = self._occupy_def()
         if occ is not None:
             d = d + occ[bidx, tiles]

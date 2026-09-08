@@ -38,7 +38,7 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
     // CIV6 (Terrace_MedievalAdjacency): a rule may WAIT on a civic of its own
     if (r.requiresCivic && !ctx.mods.impUpgrades.has(r.requiresCivic)) continue;
     const up = (!!r.upgradeCivic && ctx.mods.impUpgrades.has(r.upgradeCivic))
-      || (!!r.upgradeTech && ctx.mods.impUpgrades.has(r.upgradeTech));
+      || (!!r.upgradeTech && ctx.mods.impUpgradeTechs.has(r.upgradeTech));
     const per = (up && r.upgradePer) || r.per;
     const pay = (up && r.upgradeYields) || r.yields;
     let n = 0;
@@ -50,6 +50,11 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (!!r.builtWonder && nb.builtWonder !== null && nb.builtWonderComplete) ||
         (!!r.mountain && isMountain(nb)) ||
         (!!r.sameImprovement && nb.improvement === imp && !nb.pillaged) ||
+        // a row that names SOMEBODY ELSE's improvement (the Kurgan's Pasture,
+        // the Great Wall's own segments)
+        (!!r.improvement && nb.improvement === r.improvement && !nb.pillaged) ||
+        (!!r.luxuryResource && nb.resource !== null && RESOURCES[nb.resource].category === 'luxury') ||
+        (!!r.terrains && r.terrains.includes(nb.terrain)) ||
         (!!r.features && nb.feature !== null && r.features.includes(nb.feature));
       if (hit) n += 1;
     }
@@ -147,6 +152,33 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
       if (adjFarms >= 2) out.food += ctx.mods.farmAdjTier;
     }
     addYields(out, improvementAdjacency(ctx, tile, imp));
+    const idef = IMPROVEMENTS[imp];
+    // CIV6 (`YieldFromAppeal` / `YieldFromAppealPercent`): the Chemamull pays
+    // 75% of its tile's APPEAL as Culture. Floored, and never negative.
+    if (idef.appealYield) {
+      const ap = tileAppeal(ctx.map, tile, ctx.camps, ctx.gpAppeal);
+      out[idef.appealYield.yield] += Math.floor(Math.max(0, ap) * idef.appealYield.pct / 100);
+    }
+    // CIV6 (`Improvement_BonusYieldChanges`): "additional yields as you
+    // advance through the Technology and Civics Tree".
+    for (const r of idef.researchYields ?? []) {
+      const has = r.tech !== undefined ? ctx.mods.impUpgradeTechs.has(r.tech)
+        : r.civic !== undefined ? ctx.mods.impUpgrades.has(r.civic) : false;
+      if (has) addYields(out, r.yields);
+    }
+    // CIV6 (Mission): what the row pays on a tile whose continent is NOT the
+    // seat's capital's.
+    if (idef.offCapitalContinentYields && ctx.offHomeContinent?.(tile)) {
+      addYields(out, idef.offCapitalContinentYields);
+    }
+    // CIV6 (Open-Air Museum): yields per TERRAIN KIND the seat has founded a
+    // city on, counted once each.
+    const tk = idef.terrainKindYields;
+    if (tk && ctx.foundedTerrains) {
+      let kinds = 0;
+      for (const t of tk.terrains) if (ctx.foundedTerrains.has(t)) kinds += 1;
+      if (kinds) addYields(out, tk.yields, kinds);
+    }
   }
 
   for (const n of neighbors(ctx.map, tile)) {

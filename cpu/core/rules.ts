@@ -8,7 +8,7 @@ import { riverReach } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { cityAppealResolver } from './governors';
-import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
+import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -171,6 +171,53 @@ export function bareGround(tile: Tile): boolean {
   return tile.feature === null || tile.feature === 'VOLCANIC_SOIL';
 }
 
+/**
+ * The placement columns the install gives a UNIQUE improvement beyond terrain
+ * and elevation, in one predicate so all three arms of `validImprovementsIn`
+ * ask the same question: one per city, an Appeal floor, a Bonus-or-Luxury
+ * neighbour, a count of passable LAND neighbours, and the frontier.
+ *
+ * `BuildInLine` is NOT here: it is the install's line-DRAWING helper for the
+ * placement UI, not a legality rule (C-79).
+ */
+function uniqueGroundOk(
+  def: ImprovementDef,
+  tile: Tile,
+  opts: {
+    map?: GameMap; camps?: ReadonlySet<number>; gpAppeal?: GpAppeal;
+    ownsTile: (t: Tile) => boolean; oneHeld?: ReadonlySet<ImprovementId>;
+  },
+): boolean {
+  if (def.onePerCity && opts.oneHeld?.has(def.id)) return false;
+  if (def.minAppeal !== undefined) {
+    if (!opts.map) return false; // no map, no appeal — never offer it blind
+    if (tileAppeal(opts.map, tile, opts.camps, opts.gpAppeal) < def.minAppeal) return false;
+  }
+  if (def.requiresAdjacentResource) {
+    if (!opts.map) return false;
+    const ok = neighbors(opts.map, tile).some((n) => {
+      if (!n.resource) return false;
+      const c = RESOURCES[n.resource]?.category;
+      return c === 'bonus' || c === 'luxury';
+    });
+    if (!ok) return false;
+  }
+  if (def.adjacentLandMin !== undefined) {
+    if (!opts.map) return false;
+    const land = neighbors(opts.map, tile).filter((n) => !isWater(n) && !isImpassable(n)).length;
+    if (land < def.adjacentLandMin) return false;
+  }
+  if (def.buildOnFrontier) {
+    if (!opts.map) return false;
+    // the seat's own BORDER: an owned tile at least one of whose neighbours
+    // this seat does not hold (the map edge counts, since the walk drops
+    // off-map slots and a shorter list means an edge)
+    const nb = neighbors(opts.map, tile);
+    if (nb.length === 6 && nb.every((n) => opts.ownsTile(n))) return false;
+  }
+  return true;
+}
+
 export function validImprovementsIn(
   tile: Tile,
   opts: {
@@ -187,6 +234,10 @@ export function validImprovementsIn(
     /** the roster's extra Farm ground (`FARM_TERRAIN_ROWS`) and the civics that gate it */
     farmTerrain?: readonly { terrain: TerrainId; hills: boolean; civic?: string }[];
     civics?: readonly string[];
+    /** CIV6 (`OnePerCity`): the rows the CITY that owns this tile already
+     *  holds one of. The city walk lives with the caller, which is the only
+     *  place a city is in hand; an absent set offers every row. */
+    oneHeld?: ReadonlySet<ImprovementId>;
   },
 ): ImprovementId[] {
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -217,6 +268,24 @@ export function validImprovementsIn(
     }
     return out;
   }
+  // CIV6 (`Improvement_ValidBuildUnits`): a row a NAMED unit lays rather than
+  // the Builder — the Pa's Toa, which may also stand on unowned ground
+  // (`CanBuildOutsideTerritory`).
+  if (opts.builder !== undefined && opts.builder !== 'BUILDER') {
+    const out: ImprovementId[] = [];
+    for (const def of Object.values(IMPROVEMENTS)) {
+      if (def.builtBy !== opts.builder || !unlocked(def.id)) continue;
+      if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
+      if (!def.outsideTerritory && !opts.ownsTile(tile)) continue;
+      if (tile.improvement) continue;
+      if (def.noFeature && !bareGround(tile)) continue;
+      if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
+      if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
+      if (!uniqueGroundOk(def, tile, opts)) continue;
+      out.push(def.id);
+    }
+    if (out.length) return out;
+  }
   if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   // CIV6: every other improvement is the BUILDER's alone. A charge-carrying
   // Missionary/Apostle must refuse here exactly as the GPU improvement arm
@@ -234,8 +303,11 @@ export function validImprovementsIn(
     if (tile.submerged) return out;
     for (const def of Object.values(IMPROVEMENTS)) {
       if (!def.waterOnly || !unlocked(def.id)) continue;
+      // a WATER row may be a civilization's own (the Polder)
+      if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.noFeature && tile.feature) continue;
+      if (!uniqueGroundOk(def, tile, opts)) continue;
       out.push(def.id);
     }
     return out;
@@ -249,12 +321,15 @@ export function validImprovementsIn(
     if (!def.suzerainOf && !def.uniqueTo) continue;
     if (def.suzerainOf && !opts.suzerain?.has(def.suzerainOf)) continue;
     if (def.uniqueTo && (def.uniqueTo !== opts.civ || !unlocked(def.id))) continue;
+    // a row the BUILDER does not lay (the Pa's Toa) has its own arm above
+    if (def.builtBy || def.waterOnly) continue;
     if (def.features && tile.feature !== null && !def.features.includes(tile.feature)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
     if (def.noAdjacentSame && opts.map
         && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
+    if (!uniqueGroundOk(def, tile, opts)) continue;
     out.push(def.id);
   }
   const flat = tile.elevation === 'FLAT';
