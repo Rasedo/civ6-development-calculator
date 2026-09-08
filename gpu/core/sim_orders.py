@@ -18,7 +18,8 @@ class SimOrders:
             self.unit_alive[d, sc[d]] = False
             self._occ_clear(d, hc[d], sc[d])
 
-    def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor) -> None:
+    def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor,
+                                 seq_k: int = 0) -> None:
         B, dev = self.B, self.device
         smap = self._seat_slot_map(row)
         ctl = self.seat_ext[:, row]
@@ -685,7 +686,8 @@ class SimOrders:
                         # as two unpaired lines, which reads exactly like a
                         # pair and is not one.
                         self._diff_events.setdefault(_sb, []).append(
-                            f"st:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{n}"
+                            f"st:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                            f":{seq_k}:{n}"
                             f" ty{int(ut[_sb])} a{int(a[_sb])}"
                             f" at{int(here[_sb])} to{int(tgt[_sb])} mp{int(mp[_sb])}"
                             f" {'moved' if bool(_stepped[_sb]) else 'blocked'}")

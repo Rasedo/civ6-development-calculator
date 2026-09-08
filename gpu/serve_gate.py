@@ -87,16 +87,33 @@ def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
             out[ln.split(" ", 1)[0]] = ln
         return out
 
+    def order(k: str) -> tuple:
+        # FIELD BY FIELD AND NUMERICALLY. A string sort puts rank 10 before
+        # rank 2, and for the step log the FIRST disagreement is the cause
+        # while every later one is its consequence.
+        parts = k.split(":")
+        return (parts[0], tuple(int(p) if p.lstrip("-").isdigit() else 0
+                                for p in parts[1:]))
+
     g, t = by_city(gpu_lines), by_city(ts_lines)
     reps: list[str] = []
-    for c in sorted(set(g) | set(t)):
+    seen: dict[str, int] = {}
+    dropped: dict[str, int] = {}
+    for c in sorted(set(g) | set(t), key=order):
         gl, tl = g.get(c), t.get(c)
         if gl == tl:
             continue
+        kind = c.split(":", 1)[0]
+        seen[kind] = seen.get(kind, 0) + 1
+        if seen[kind] > 10:
+            dropped[kind] = dropped.get(kind, 0) + 1
+            continue
         reps.append(f"  D-GPU  {gl if gl is not None else '(no line)'}")
         reps.append(f"  D-TS   {tl if tl is not None else '(no line)'}")
+    for kind, n in sorted(dropped.items()):
+        reps.append(f"  D      ...and {n} more `{kind}:` disagreements after the first ten")
     if not reps:
-        reps.append(f"  AM     {len(g)} cities agree term for term")
+        reps.append(f"  D      {len(g)} keys agree term for term")
     return reps
 
 

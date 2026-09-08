@@ -1468,7 +1468,12 @@ const UNIT_TYPE_IDX = Object.keys(UNITS);
 
 export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][]): void {
   if (!steps || steps.length === 0) return;
+  // WHICH ROW OF THE TURN'S RECORD. A turn carries K order rows and the
+  // step log's key has to name the one it came from: without it every row
+  // of a turn collides on one key and a pair is two different events.
+  let seqRow = -1;
   for (const step of steps) {
+    seqRow += 1;
     const row = Array.isArray(step[0]) ? (step[0] as unknown as number[]) : step;
     const units = unitsOf(state, actor.seat);
     units.forEach((unit, j) => {
@@ -1478,7 +1483,23 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       // its verbs cost none — the GPU's applier gates on `present` alone, so
       // the spent gate must not silence the one chassis that never moves.
       if (!state.units.includes(unit)) return;
-      if (unit.movesLeft <= 0 && !isSpy(unit.type)) return;
+      if (unit.movesLeft <= 0 && !isSpy(unit.type)) {
+        // A SPENT UNIT PRINTS ITS REFUSAL. The GPU has no gate here at all:
+        // its move arm carries `mp > 0` as a term of `ok`, so it logs a
+        // blocked step where this engine simply returns. One-sided output
+        // from a two-sided log is the one thing it must never produce.
+        const dl0 = (globalThis as { __diffLog?: string[] }).__diffLog;
+        if (dl0 && a < 6) {
+          const h0 = state.map.tiles[unit.tileIndex];
+          const t0 = h0 ? neighborTile(state.map, h0, a) : null;
+          if (h0 && t0) {
+            dl0.push(`st:${actor.seat}:${state.turn}:${seqRow}:${j}`
+              + ` ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
+              + ` at${h0.index} to${t0.index} mp${unit.movesLeft} blocked`);
+          }
+        }
+        return;
+      }
       const here = state.map.tiles[unit.tileIndex];
       if (a === A_FOUND_CITY) {
         if (unit.type !== 'SETTLER') return;
@@ -1663,7 +1684,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             // difference is invisible at a turn boundary because
             // `refreshUnits` resets the pool, so the census can compare
             // `movesLeft` every turn and still never see it.
-            dlS.push(`st:${actor.seat}:${state.turn}:${j}`
+            dlS.push(`st:${actor.seat}:${state.turn}:${seqRow}:${j}`
               + ` ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
               + ` at${here.index} to${to.index} mp${mpBefore}`
               + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);

@@ -3886,4 +3886,4 @@ class SimMasks:
                 a_k = torch.where(a_k < 6, a_k, torch.full_like(a_k, -1))
             if not bool((a_k >= 0).any()):
                 return
-            self._apply_seat_unit_actions(row, a_k)
+            self._apply_seat_unit_actions(row, a_k, seq_k=k)

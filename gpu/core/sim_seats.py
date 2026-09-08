@@ -12,14 +12,22 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     out, and the two engines are chatty in different proportions — so the two
     sides end up holding different turns and nothing pairs. Each prefix keeps
     its own last `keep`; the GRANT lines keep all, because a grant can sit
-    many turns before the walk that reads its count.
+    many turns before the walk that reads its count; and the STEP lines keep
+    the last two TURNS, because a line count straddles the turn boundary at a
+    different place on each engine and a straddled window pairs nothing.
     """
     by: dict[str, list[str]] = {}
     for ln in lines:
         by.setdefault(ln.split(":", 1)[0], []).append(ln)
     out: list[str] = []
     for kind, group in by.items():
-        out.extend(group if kind == "g" else group[-keep:])
+        if kind == "g":
+            out.extend(group)
+        elif kind == "st":
+            _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
+            out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
+        else:
+            out.extend(group[-keep:])
     return out
 
 

@@ -280,6 +280,44 @@ the gate reaches is worth more here than one that re-reads the exporter.
     sides show different subsets of the same walk. Only the pairs that SHARE
     an origin are evidence. Widening that window, or keying the line by step
     index, is the next thing the instrument needs.
+  - **THE READING ABOVE WAS THE INSTRUMENT, NOT THE ENGINES.** Adding the
+    pre-step MP to the line was supposed to settle "who had the movement";
+    what it actually exposed is that the pairs were never pairs. A turn's
+    unit record is K ROWS, not one — `applySeatUnitOrders` walks
+    `for (const step of steps)` and `apply_seat_unit_sequence` walks
+    `for k in range(seq.shape[2])` — and the key named (seat, turn, rank)
+    only. Every row of a turn therefore collided on one key, and the pairing
+    keeps the LAST line per key, so a GPU line from row 2 printed against a
+    TS line from row 0. "The GPU is one step ahead" was exactly that: the
+    GPU's later row against TS's earlier one.
+  - THE SECOND HALF OF THE SAME DEFECT: TS refuses a spent unit at a gate
+    ABOVE the log site (`movesLeft <= 0` returns before the movement arm),
+    while the GPU carries `mp > 0` as a term of `ok` and logs the refusal.
+    So a spent unit printed one-sided, which reads as the GPU attempting a
+    hop the oracle never tried. It never tried it either; it just did not
+    say so. Both engines now print the refusal.
+  - WHAT THE INSTRUMENT LOOKS LIKE NOW, and it is the shape the next hunt
+    reads: the key is `st:<seat>:<turn>:<k>:<rank>`; the step window is the
+    last two TURNS on both engines rather than the last N lines, because a
+    line count straddles the turn boundary at a different place on each
+    side; the pairing sorts keys FIELD BY FIELD AND NUMERICALLY (a string
+    sort put rank 10 before rank 2, so "the first disagreement" was not the
+    first line printed) and caps each kind at ten pairs, since once a unit
+    stands on the wrong tile every later step of the turn disagrees as a
+    consequence.
+  - STILL OPEN, and no longer claimed to be movement points: the seed 9287
+    turn 156 unit divergence. The two ruled-out causes survive — the
+    row-to-unit alignment holds and the direction tables agree — and
+    `movesLeft` remains uncomparable once the tiles differ, for the reason
+    given above. Everything between those two facts is unmeasured again.
+  - ONE ASYMMETRY FOUND WHILE READING THE APPLIERS, recorded rather than
+    fixed because nothing has shown it firing: TS refuses EVERY verb from a
+    unit with `movesLeft <= 0` (spies excepted), while the GPU has no such
+    global gate — only individual arms carry one. It is unreachable from
+    today's driver, whose follow-on rows are movement-only by construction
+    (`best = key.argmin(dim=1)` is a direction, 0..5) and whose row 0 runs
+    on a refreshed pool. A driver that ever emitted a verb after a spend
+    would split the two engines here.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
