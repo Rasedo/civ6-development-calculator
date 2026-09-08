@@ -5289,7 +5289,17 @@ class SimEconomy:
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
         # the tier this walk RAN ON, kept where the census reads it — the same
         # contract the worked-tile stash below keeps, and for the same reason.
-        self.city_amen_tier[:, row, : self.RC] = tier_idx.to(self.city_amen_tier.dtype)
+        #
+        # ONLY where a city was ALIVE at the walk. TS records from
+        # `computeCityStats(record)`, which runs over the loop-top snapshot of
+        # the seat's cities, so a slot with no city — or one a founding later
+        # this turn is about to fill — carries the -1 the plane was born with.
+        # Writing the whole row instead handed a newborn the tier of the walk
+        # that never saw it, and the census read that as a divergence.
+        _alive_t = self.city_alive[:, row, : self.RC]
+        self.city_amen_tier[:, row, : self.RC] = torch.where(
+            _alive_t, tier_idx.to(self.city_amen_tier.dtype),
+            torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
         total = self._seat_city_walk(row, amen_yf=yield_f, record=True)
         housing = self._seat_housing(row)[1]
         pop = self.city_pop[:, row, : self.RC].double()

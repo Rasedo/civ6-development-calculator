@@ -432,6 +432,13 @@ Nothing open.
     56/35/20/10, and which is the counterspy's catch?
     `SPY_SUCCESS_PER_LEVEL_PCT`, `SPY_CAPTURE_PCT` and `SPY_ESCAPE_ROUTES`'
     base rates are the model values a published composition replaces.
+  - ONE ROW BREAKS THE PATTERN, and a 2026-09-08 re-read of the table found
+    it: FABRICATE_SCANDAL carries `BaseProbability` and `LevelProbChange`
+    and NO counterspy columns at all — no `EnemyProbChange`, no
+    `EnemyLevelProbChange` — and runs 16 turns where every other offensive
+    mission runs 8. Whatever the DLL's composition is, the enemy terms do
+    not enter that mission's, which is a real constraint on any guess: a
+    composition that always subtracts them cannot be right.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
     a spy's ground, and the install carries no data gate to say whether that
     is right — ask 11.
