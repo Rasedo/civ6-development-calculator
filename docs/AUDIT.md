@@ -226,10 +226,29 @@ the gate reaches is worth more here than one that re-reads the exporter.
     orders land on the wrong units and the failure looks like chaos rather
     than an ordering bug." Same origin with a different destination is what
     that would look like.
-  - THE MEASUREMENT THAT SEPARATES THEM: put the ordered ROW and the unit's
-    TYPE in the step line. Same row and same type on both sides means the
-    alignment holds and the units are the same; a type mismatch names the
-    slip directly.
+  - THE ALIGNMENT HOLDS, and that fork is closed (#246z). With the rank and
+    the type on the line:
+
+        D-TS   st:2:357:356 t155 j3 ty20 moved
+        D-GPU  st:2:357:401 t155 j3 ty20 blocked
+        D-TS   st:2:492:449 t155 j9 ty14 moved
+        D-GPU  st:2:492:536 t155 j9 ty14 blocked
+
+    Same rank, same type, same origin, different destination. The order
+    reached the SAME chassis on both engines, so this is not the row-to-unit
+    slip `phase.ts` warns about, and it is not two units sharing a tile.
+  - WHAT IS LEFT is the direction itself: one action number out of one tile
+    resolving to different neighbours. `neighborTile` and the `neigh` plane
+    both keep their -1 slots, so it is not the compaction — it is either the
+    two engines' direction ORDER differing for some row parity, or the action
+    number reaching them differently.
+  - ONE CAVEAT ON THE EVIDENCE, because it would mislead a reader who did not
+    run it: the OTHER step pairs in that dump show different ORIGINS (TS
+    402->447 against GPU 447->490). That is a window artifact — the log keeps
+    24 lines per kind and a turn's steps for one seat exceed it, so the two
+    sides show different subsets of the same walk. Only the pairs that SHARE
+    an origin are evidence. Widening that window, or keying the line by step
+    index, is the next thing the instrument needs.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
