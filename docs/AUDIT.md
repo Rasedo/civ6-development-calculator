@@ -35,7 +35,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
-| B-56r inert promotions | 1 | Sentry needs sight-blocking (the Ngao Mbeba's see-through half waits with it); Ground Crews needs PATROL (C-34); Boarding has no magnitude |
+| B-56r inert promotions | 1 | all three are sourced: the sight table needs a WALK ruling (ask 16), Ground Crews heals after acting, Boarding is a POST_COMBAT_YIELD row |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 1 | unsourced either way |
 | B-63r gang-up bar | 1 | ask; Enkidu's allied-war discount waits on it |
@@ -113,6 +113,12 @@ the entry and the line leaves.
     else, and no requirement set anywhere keys on `CivilizationLevels`.
     Which cities a spy may travel to is DLL. Both engines walk the major
     rows today. Open the Free City to spies, or leave it closed?
+16. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
+    Rainforest, Hills 1; Mountains and the great natural wonders 2) and
+    `SightModifier` (Hills +1, Mountains +2) are published; the WALK is not.
+    Two readings fit the columns: a sight BUDGET spent along the hex path, or
+    a radius with tiles occluded BEHIND a blocker. They differ on every map
+    with a ridge, so neither engine ships one until this is ruled.
 14. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
     the seat's luxuries and policies, and the Free Cities player has none —
     so every Free City sits at the bottom band forever. `CivilizationLevels`
@@ -178,11 +184,25 @@ Nothing open.
   - Zulu's Impi and Macedon's Hypaspist raise flanking or support for
     themselves alone — after C-78 seats the chassis.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
-  Three of 107 rows in `cpu/data/promotions.ts` carry `none`:
-  - SENTRY ("see through Woods and Rainforest") — `revealAround` /
-    `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - GROUND_CREWS ("heal while patrolling or deployed") — PATROL is C-34's.
-  - BOARDING ("Gold from naval victories") — no published magnitude.
+  Three of 107 rows in `cpu/data/promotions.ts` carry `none`. A 2026-09-08
+  sourcing pass found a published rule behind all three:
+  - SENTRY — `SENTRY_SEE_THROUGH_FEATURES`,
+    `MODIFIER_PLAYER_UNIT_ADJUST_SEE_THROUGH_FEATURES`, `CanSee = true`. A
+    BOOLEAN over a published table: `SightThroughModifier` costs 1 more per
+    Woods, Rainforest or Hill and 2 per Mountain or great natural wonder,
+    and `SightModifier` pays +1 standing on Hills, +2 on a Mountain. Both
+    engines reveal a flat radius today. The TABLE is data; what the install
+    does not publish is the WALK — a sight BUDGET spent along the path, or a
+    radius with occlusion behind a blocker. Ask 16.
+  - GROUND_CREWS — `GROUND_CREWS_BONUS_HEALTH`,
+    `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION`, and NO amount: the
+    modifier type is the whole rule, so the engine's own healing supplies the
+    number. PATROL turns out to be no data row at all (C-34).
+  - BOARDING — `BOARDING_GOLD_FROM_NAVAL_VICTORY`,
+    `MODIFIER_UNIT_ADJUST_POST_COMBAT_YIELD`, `PercentDefeatedStrength 100`,
+    `YieldType YIELD_GOLD`, against an opponent of `DOMAIN_SEA`. It has a
+    magnitude, and this engine already exports and reads
+    `POST_COMBAT_YIELD_ROWS` — a missing ROW, not a missing mechanic.
 - **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
   - Ten `open: B-61r` rows in `docs/roster_ledger.json`: tourism x4,
     regional range x2, city-state absorption, barbarian conversion, ocean
@@ -290,6 +310,13 @@ Nothing open.
 - **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.
   - `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; the middle bands are this model's own.
+  - UNREACHABLE FROM THE OWNER'S INSTALL, which is Gathering Storm: the
+    Preserve is a New Frontier Pass district and no `PRESERVE` row exists in
+    Base, Expansion1 or Expansion2. This is not "unpublished" — it is a row
+    the primary source does not contain, which no further sourcing can fix.
+    The same is true of the Ngao Mbeba (no `MBEBA` anywhere in the install),
+    so a sweep of which roster members this install cannot source belongs
+    with the hygiene pass.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/ROSTER.md`; the ledger `docs/roster_ledger.json` reads
   `shipped` on 337 of 343 modifiers and `open: <item>` on 6, each under
@@ -332,10 +359,25 @@ Nothing open.
   - The five-hex Range is a verb the action space lacks; no direction
     encoding reaches five hexes.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
+  A 2026-09-08 sourcing pass split this entry: four of its five items are
+  data and only the interception ROLL is DLL.
+  - BUILDABLE, off `UnitPromotions.xml`, with no interception model at all —
+    they are ordinary opponent-CLASS combat rows and an attack-range row:
+    DOGFIGHTING `+7` vs `PROMOTION_CLASS_AIR_FIGHTER`, INTERCEPTOR `+7` vs
+    `PROMOTION_CLASS_AIR_BOMBER` (prereq Dogfighting), DROP_TANKS
+    `MODIFIER_UNIT_ADJUST_ATTACK_RANGE +2`, and Victor's
+    `GOVERNOR_PROMOTION_AIR_DEFENSE_INITIATIVE` (Level 3, prereq Embrasure)
+    `MODIFIER_CITY_ADJUST_AIR_DEFENSE_BONUS` Amount 25.
   - INTERCEPTION BY A FIGHTER has no published strength, formula or cap on
-    attempts; PATROL waits on it; C-31's delivery shares the half.
+    attempts; C-31's delivery shares the half.
+  - PATROL IS NOT A DATA ROW. There is no `UNITOPERATION_PATROL`, no
+    `UNITCOMMAND_PATROL` and no promotion named for it; the air operations
+    are `AIR_ATTACK`, `REBASE` and the repair family. It is the UI's name for
+    a fighter sitting ready, so the verb an engine would need is an INTERCEPT
+    STANCE whose whole behaviour is the unpublished roll above.
   - PRIORITY TARGET (the Jet Bomber's reach to the support unit under a
-    stack) — unsourced magnitude.
+    stack) — no such promotion exists in this install either; the row came
+    from elsewhere, like the Preserve and the Ngao Mbeba (C-22).
 - **C-35. THE DROWNED GROUND IS COAST.** CLOSED.
   - SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
     coastal water tiles". Both engines keep terrain, feature and river edges
