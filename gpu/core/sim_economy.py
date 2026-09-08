@@ -77,7 +77,14 @@ class SimEconomy:
             if bool(_ba.any()):
                 _nres = int(self.res_id.max().item()) + 1
                 if _nres > 0:
-                    _mine = (self.res_id >= 0) & (self.res_priority == 1)                         & (self.tile_seat == int(self._ROW_SEAT[row]))
+                    # ...and the resource must still BE there. TS reads
+                    # `t.resource`, which it NULLS the moment a bonus copy is
+                    # harvested or paved under a district; the GPU keeps
+                    # `res_id` and marks `res_stripped` at those same two
+                    # sites, so a reader that forgets the mark counts
+                    # resources that no longer exist — two of them, by turn
+                    # 99, each worth a full amenity round.
+                    _mine = (self.res_id >= 0) & (self.res_priority == 1)                         & ~self.res_stripped                         & (self.tile_seat == int(self._ROW_SEAT[row]))
                     _bc = torch.zeros(B, _nres, dtype=torch.long, device=self.device)
                     _bc.scatter_add_(1, self.res_id.clamp(min=0), _mine.long())
                     bonus_n = (_bc > 0).long().sum(dim=1) * _ba.long()

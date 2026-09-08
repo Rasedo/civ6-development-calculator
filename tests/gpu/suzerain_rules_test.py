@@ -287,6 +287,33 @@ def main() -> None:
     assert sim._suz_buy_bldg.shape[0] == 3, "Ngazargamu has three building rows"
     print("suzerain magnitudes ok — nine rules, every code resolved")
 
+    # --- Buenos Aires counts resources that STILL EXIST --------------------
+    # CIV6: "Your bonus resources behave like luxury resources, providing +1
+    # Amenity per resource". TS reads `t.resource`, which it NULLS when a
+    # bonus copy is harvested or paved under a district; the GPU keeps
+    # `res_id` and marks `res_stripped` at those same two sites, so the count
+    # has to ask the mark. It did not, and each dead copy was paying a full
+    # amenity round — found at seed 9027 turn 99, two cities a tier high.
+    _bs = build()
+    _row = 0
+    hold(_bs, _row, _bs._suz_c_bonus_amen)
+    _own = ((_bs.res_id >= 0) & (_bs.res_priority == 1)
+            & (_bs.tile_seat == int(_bs._ROW_SEAT[_row])) & ~_bs.res_stripped)[0]
+    assert bool(_own.any()), "the scene owns no unstripped bonus resource"
+    _have = torch.zeros(_bs.B, _bs.RC, dtype=torch.float64, device=_bs.device)
+    _need = torch.full((_bs.B, _bs.RC), 9.0, dtype=torch.float64, device=_bs.device)
+    _before = float(_bs._luxury_amenities(_row, _have, _need)[0].sum())
+    assert _before > 0, "Buenos Aires paid nothing at all — the scene proves nothing"
+    # strip ONE owned bonus copy. TS would have DELETED the resource at that
+    # same moment, so the round it paid must go with it.
+    _t = int(_own.long().argmax())
+    _bs.res_stripped[0, _t] = True
+    _bs._eff_version += 1
+    _after = float(_bs._luxury_amenities(_row, _have, _need)[0].sum())
+    assert _after < _before, (
+        f"a STRIPPED bonus resource still paid its Buenos Aires round ({_before} -> {_after})")
+    print("  buenos aires ok — a stripped bonus resource pays no amenity round")
+
     # shallow water reads the TILE or a NEIGHBOUR, and nothing else
     _sw = sim.shallow_water[0]
     _sa = sim.shallow_adj[0]
