@@ -48,10 +48,55 @@ def post(sim, row: int, g: int, s: int, promos: int = 0) -> None:
     sim.civ_gov_promos[0, row, g] = promos
 
 
+
+
+def poke_tie_is_the_id(rules, path) -> None:
+    """CIV6 (`luxuryAmenities`): each luxury's reach goes to the NEEDIEST
+    cities, and TS breaks a tie with `a.id - b.id` — the CITY ID.
+
+    The GPU ranked on the SLOT, which is a storage address the compaction
+    reorders, so the two engines handed a tied luxury to different cities the
+    moment a seat's slot order stopped matching its id order. The scene below
+    is that exact shape: two equally needy cities whose ids run OPPOSITE to
+    their slots.
+    """
+    sim = fresh(rules, path)
+    row, ca, cb = 1, 0, 1
+    # the scene is built, not found: two live city slots, and ONE invented
+    # luxury whose whole reach is a single city, so the two tie and exactly
+    # one of them can win.
+    sim.city_alive[0, row, ca] = True
+    sim.city_alive[0, row, cb] = True
+    sim.civ_gp_lux_n[0, row] = 1
+    sim.civ_gp_lux[0, row, 0] = 1
+    have = torch.zeros(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
+    need = torch.zeros(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
+    need[0, ca] = need[0, cb] = 5.0
+    # the ids run OPPOSITE to the slots: the LOWER slot carries the HIGHER id,
+    # so a slot tie-break and an id tie-break name different cities
+    sim.city_id[0, row, ca] = 900
+    sim.city_id[0, row, cb] = 100
+    got = sim._luxury_amenities(row, have, need)[0]
+    assert float(got[ca] + got[cb]) == 1.0, (
+        f"the scene handed out {float(got[ca] + got[cb])} amenities, wanted exactly 1")
+    assert float(got[cb]) > float(got[ca]), (
+        f"the tie went to slot {ca} (id 900) over slot {cb} (id 100) — "
+        "the ranking is still keyed on the SLOT")
+    # ...and it FOLLOWS the ids when they swap, which is what makes the
+    # assertion above about the id rather than about the slot order
+    sim.city_id[0, row, ca] = 100
+    sim.city_id[0, row, cb] = 900
+    got2 = sim._luxury_amenities(row, have, need)[0]
+    assert float(got2[ca]) > float(got2[cb]), (
+        "the tie did not follow the ids when they swapped")
+    print("  tie-break OK — the luxury ranking ties on the CITY ID, not the slot")
+
+
 def main() -> int:
     rules = load_rules()
     paths = fixture_paths()
     b, row, foe = 0, 0, 1
+    poke_tie_is_the_id(rules, paths[0])
 
     sim = fresh(rules, paths[0])
     assert sim.S >= 2, "the checks below need two minors"

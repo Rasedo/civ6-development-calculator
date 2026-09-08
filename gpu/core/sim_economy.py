@@ -11,6 +11,10 @@ _LOCK_KEY_BASE = 1e12
 
 
 class SimEconomy:
+    #: the luxury ranking packs (need descending, city id ascending) into one
+    #: key; this is the need multiplier, wide enough to clear any city id.
+    _LUX_KEY_SCALE = float(1 << 20)
+
     def _luxury_amenities(self, row: int, amen_have: torch.Tensor, amen_need: torch.Tensor) -> torch.Tensor:
         B = self.B
         cols = self.RC
@@ -81,7 +85,15 @@ class SimEconomy:
         mx = int(total.max().item())
         if mx == 0:
             return out
-        seq = torch.arange(cols, device=self.device, dtype=dt)
+        # THE TIE-BREAK IS THE CITY ID, not the slot. `luxuryAmenities` ranks
+        # `needB - needA || a.id - b.id`, and a slot is a storage address the
+        # compaction reorders while an id is fixed for the city's life — two
+        # equally needy cities went to different engines the moment those two
+        # orders parted. The key packs (need desc, id asc) into one number, so
+        # the multiplier has to clear any id this engine can mint: need is
+        # tens at most and halves at worst, so 2**20 leaves a 2**19 gap
+        # between adjacent need levels and stays exact in f64.
+        seq = self.city_id[:, row, :cols].to(dt)
         kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)
         if bool((spice_n > 0).any()):
             kmax = max(kmax, self._suz_spice_amen)
@@ -105,7 +117,7 @@ class SimEconomy:
                                 torch.full_like(rounds, self._suz_spice_amen),
                                 torch.full_like(rounds, self._suz_bonus_amen))))
             need = amen_need - (amen_have + out)
-            key = torch.where(alive, need * 64 - seq, torch.full_like(need, -1e9))
+            key = torch.where(alive, need * self._LUX_KEY_SCALE - seq, torch.full_like(need, -1e9))
             top_v, top_i = key.topk(k, dim=1)
             grant = (top_v > -1e8) & act.unsqueeze(1) & (krank < reach.unsqueeze(1))
             out.scatter_add_(1, top_i, grant.to(dt))
