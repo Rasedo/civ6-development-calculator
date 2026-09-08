@@ -59,6 +59,24 @@ export interface DriverOpts {
  * strictly-greater beats, so ties keep the first pair in that scan order.
  * [origin CENTRE, dest code (CENTRE or -(2 + city-state ID))], [-1,-1] = none.
  * Gated on capacity AND a free Trader — the unit the verb spends. */
+/** The decomposition log's window, ONE PER LINE KIND — the GPU's
+ *  `_trim_by_kind` twin. A flat window lets whichever emitter is chattiest
+ *  push every other kind out, and the two engines are chatty in different
+ *  proportions, so the two sides end up holding different turns and nothing
+ *  pairs. Each prefix keeps its own last `keep`; the GRANT lines keep all. */
+function trimByKind(lines: readonly string[], keep = 24): string[] {
+  const by = new Map<string, string[]>();
+  for (const ln of lines) {
+    const k = ln.slice(0, ln.indexOf(':'));
+    const g = by.get(k);
+    if (g) g.push(ln);
+    else by.set(k, [ln]);
+  }
+  const out: string[] = [];
+  for (const [k, g] of by) out.push(...(k === 'g' ? g : g.slice(-keep)));
+  return out;
+}
+
 export function routeCandidateRow(state: GameState, actor: Seat): number[] {
   const routes = actor.tradeRoutes ?? [];
   if (actor.cities.length < 1) return [-1, -1];
@@ -372,7 +390,7 @@ for (let t = 0; t < N_TURNS; t++) {
     const dlT = (globalThis as { __diffLog?: string[] }).__diffLog;
     o.send({
       t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg,
-      ...(dlT ? { dl: dlT.slice(-96) } : {}),
+      ...(dlT ? { dl: trimByKind(dlT) } : {}),
     });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
@@ -420,7 +438,7 @@ for (let t = 0; t < N_TURNS; t++) {
     const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
     const out: Record<string, unknown> = { dumps };
     if (cb) out.cb = cb.slice(-16);
-    if (dl) out.dl = dl.slice(-96);
+    if (dl) out.dl = trimByKind(dl);
     o.send(out);
   }
 }

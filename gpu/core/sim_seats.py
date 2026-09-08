@@ -5,6 +5,24 @@ from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star
 from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
+def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
+    """The decomposition log's window, ONE PER LINE KIND.
+
+    A flat window lets whichever emitter is chattiest push every other kind
+    out, and the two engines are chatty in different proportions — so the two
+    sides end up holding different turns and nothing pairs. Each prefix keeps
+    its own last `keep`; the GRANT lines keep all, because a grant can sit
+    many turns before the walk that reads its count.
+    """
+    by: dict[str, list[str]] = {}
+    for ln in lines:
+        by.setdefault(ln.split(":", 1)[0], []).append(ln)
+    out: list[str] = []
+    for kind, group in by.items():
+        out.extend(group if kind == "g" else group[-keep:])
+    return out
+
+
 class SimSeats:
     # ---------------------------------------------------------- the queue
     def _q_head(self, row: int) -> torch.Tensor:
@@ -8771,14 +8789,12 @@ class SimSeats:
                 # the GRANT lines survive the window: a grant can be many
                 # turns before the walk that reads its count, and trimming it
                 # away is exactly the evidence this pair needs.
-                _keep = [x for x in _lines if x.startswith("g:")]
-                # wide enough to hold a turn's whole decomposition — the city
-                # lines, the seat's reach and every route candidate — because
-                # a window that drops half of one is a pair that cannot be read.
-                del _lines[:-96]
-                for _g in _keep:
-                    if _g not in _lines:
-                        _lines.insert(0, _g)
+                # ONE WINDOW PER LINE KIND. A flat window lets whichever
+                # emitter is chattiest push every other kind out, and the two
+                # engines are chatty in different proportions — so the pair
+                # ends up holding different turns and nothing lines up. Each
+                # prefix keeps its own last 24; the grant lines keep all.
+                self._diff_events[_ab] = _trim_by_kind(_lines)
         return tier_idx, growth_f.double(), yield_f.double(), lux_add
 
     def _clear_city_slot(self, b: int, row: int, col: int) -> None:
