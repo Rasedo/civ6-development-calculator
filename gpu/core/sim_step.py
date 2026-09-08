@@ -203,8 +203,14 @@ class SimStep:
                     for _c in range(self.RC):
                         if not bool(self.city_alive[_b, _r, _c]):
                             continue
+                        # THE TURN JUST PLAYED. `self.turn` was advanced at
+                        # the top of this same `step()`, and every other
+                        # emitter on this engine stamps from inside the turn —
+                        # so a snapshot taken here has to step back one, or it
+                        # pairs against the OTHER engine's next turn and reads
+                        # every ordinary growth as a divergence.
                         _ev.append(
-                            f"pop:{int(self._ROW_SEAT[_r])}:{int(self.turn)}"
+                            f"pop:{int(self._ROW_SEAT[_r])}:{int(self.turn) - 1}"
                             f":{int(self.city_center[_b, _r, _c])}:sn"
                             f" {int(self.city_pop[_b, _r, _c])}")
 

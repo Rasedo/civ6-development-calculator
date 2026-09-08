@@ -95,17 +95,23 @@ def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
         return (parts[0], tuple(int(p) if p.lstrip("-").isdigit() else 0
                                 for p in parts[1:]))
 
+    # CIV6_DIFFLOG_ALL prints EVERY key from both sides, agreeing or not. The
+    # pairing exists to hide the noise, and hiding it is exactly wrong once a
+    # divergence is localised: what a row DID on the turns around the one that
+    # differs is the next question, and it is a question about the lines the
+    # filter throws away.
+    _all = bool(os.environ.get("CIV6_DIFFLOG_ALL"))
     g, t = by_city(gpu_lines), by_city(ts_lines)
     reps: list[str] = []
     seen: dict[str, int] = {}
     dropped: dict[str, int] = {}
     for c in sorted(set(g) | set(t), key=order):
         gl, tl = g.get(c), t.get(c)
-        if gl == tl:
+        if gl == tl and not _all:
             continue
         kind = c.split(":", 1)[0]
         seen[kind] = seen.get(kind, 0) + 1
-        if seen[kind] > 10:
+        if seen[kind] > 10 and not _all:
             dropped[kind] = dropped.get(kind, 0) + 1
             continue
         reps.append(f"  D-GPU  {gl if gl is not None else '(no line)'}")
