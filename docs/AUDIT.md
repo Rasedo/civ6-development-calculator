@@ -182,6 +182,18 @@ the gate reaches is worth more here than one that re-reads the exporter.
     itself disagrees, so the candidate scan and its TS mirror have parted,
     which is the class `driver twin mirrors mask` records and which two
     batteries have already paid for once each.
+  - WHAT A FIRST READ ALREADY RULES OUT. The two keys have the same SHAPE:
+    `cityStateRouteYields` adds `CITY_STATE_ROUTE_GOLD` to gold and
+    `CITY_STATE_ROUTE_SPEC` to the type's own yield, and TS sums all six, so
+    its per-city-state total is the same constant the GPU's `ysum_cs` uses.
+    Both scans take strictly-greater, so both should keep the FIRST tied
+    candidate — and the first is the lower CS index, which is TS's answer.
+    So the difference is NOT the magnitude: it is either `routePostGold` /
+    `_route_post_gold` disagreeing at those two destinations, or one engine
+    holding a candidate VALID that the other refuses (met, reach, or the
+    already-connected test). Print both keys and all three gates per
+    candidate before changing anything — the amenity hunt above cost three
+    wrong hypotheses to exactly this kind of shortcut.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
