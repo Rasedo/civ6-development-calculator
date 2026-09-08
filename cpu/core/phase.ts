@@ -1653,8 +1653,14 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             // same type on both sides means the replay's row-to-unit
             // alignment holds and the chassis is the same one, which is the
             // fork this pair has to be resolved down.
-            dlS.push(`st:${actor.seat}:${here.index}:${to.index} t${state.turn}`
-              + ` j${j} ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
+            // keyed on the ORDER — seat, turn, rank — not on the edge. An
+            // edge key cannot pair the very case the log exists for: two
+            // engines sending one unit to DIFFERENT tiles produce two
+            // different keys and print as two unpaired lines, which reads
+            // exactly like a pair and is not one.
+            dlS.push(`st:${actor.seat}:${state.turn}:${j}`
+              + ` ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
+              + ` at${here.index} to${to.index}`
               + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);
           }
         }

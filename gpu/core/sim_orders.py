@@ -678,10 +678,16 @@ class SimOrders:
                         # same rank and same type on both sides means the
                         # replay's row-to-unit alignment holds and the chassis
                         # is the same one.
+                        # keyed on the ORDER — seat, turn, rank — not on the
+                        # edge. An edge key cannot pair the very case the log
+                        # exists for: two engines sending one unit to
+                        # DIFFERENT tiles produce two different keys and print
+                        # as two unpaired lines, which reads exactly like a
+                        # pair and is not one.
                         self._diff_events.setdefault(_sb, []).append(
-                            f"st:{int(self._ROW_SEAT[row])}"
-                            f":{int(here[_sb])}:{int(tgt[_sb])}"
-                            f" t{int(self.turn)} j{n} ty{int(ut[_sb])} a{int(a[_sb])}"
+                            f"st:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{n}"
+                            f" ty{int(ut[_sb])} a{int(a[_sb])}"
+                            f" at{int(here[_sb])} to{int(tgt[_sb])}"
                             f" {'moved' if bool(_stepped[_sb]) else 'blocked'}")
 
             atk = (

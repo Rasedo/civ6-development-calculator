@@ -226,6 +226,13 @@ the gate reaches is worth more here than one that re-reads the exporter.
     orders land on the wrong units and the failure looks like chaos rather
     than an ordering bug." Same origin with a different destination is what
     that would look like.
+  - A CORRECTION TO THIS ENTRY. #246A read two ADJACENT lines as a matched
+    pair; they were two UNPAIRED lines, because the pairs print (GPU, TS) and
+    an edge key cannot pair a step whose destinations differ. The conclusion
+    below still holds — both engines independently log rank j3, type 20, out
+    of tile 357 — but it rests on the FIELDS, not on the display, and the key
+    is now the ORDER (seat, turn, rank) so the case the log exists for can
+    actually pair.
   - THE ALIGNMENT HOLDS, and that fork is closed (#246z). With the rank and
     the type on the line:
 
@@ -243,13 +250,15 @@ the gate reaches is worth more here than one that re-reads the exporter.
     [(1,0), (1,-1), (0,-1), (-1,0), (0,1), (1,1)] — element for element the
     GPU's `even` and `odd` lists in `simbase`. Both keep their -1 slots, so
     the compaction is out too.
-  - SO THE ACTION NUMBER ITSELF IS WHAT DIFFERS. Same unit, same tile, same
-    direction table, different neighbour leaves only one thing: the two
-    engines are acting on different `a` for that rank. The GPU logs the
-    action it APPLIES from its own driver while TS logs the one it REPLAYS
-    from the record, so the next measurement is the action number on the
-    line, and the question is whether `_extract_record` wrote the rank the
-    applier used.
+  - AND THE ACTION NUMBER IS INDEED WHAT DIFFERS (#246C). At t155, seat 2,
+    rank j3, type 20, out of tile 357: TS replays `a3` and moves west; the
+    GPU applies `a5` and tries south-east. Rank j9 type 14 out of 492 is the
+    same story, `a1` against `a4`.
+  - THE REMAINING QUESTION is therefore not movement at all: it is whether
+    the record TS replays is the one the GPU applied. `_extract_record` reads
+    `sim._driven_useq[row]`, the multi-rank sequence, and the GPU applies the
+    same tensor — so either the sequence is re-decided between the apply and
+    the extract, or the two are indexing its ranks differently.
   - ONE CAVEAT ON THE EVIDENCE, because it would mislead a reader who did not
     run it: the OTHER step pairs in that dump show different ORIGINS (TS
     402->447 against GPU 447->490). That is a window artifact — the log keeps
