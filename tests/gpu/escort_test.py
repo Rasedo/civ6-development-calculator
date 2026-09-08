@@ -358,6 +358,41 @@ def poke_support_slot(rules, path) -> None:
     print("  9 support slot OK — three classes to a plot, and a second of any one refused")
 
 
+# ----------------------------------------- 10 THE WHOLE FORMATION STEPS
+def poke_three_drag(rules, path) -> None:
+    """CIV6 (Formations): a military unit forms with "a support or civilian
+    unit", and a tile holding all three carries all three — so ONE step moves
+    all of them. `stepUnit` walks `escortRiders`' whole list twice, once to
+    refuse the step and once to move it; a GPU that read only the first plane
+    to answer left the other rider standing, and no step log can show that
+    because the MOVER's own step agrees term for term."""
+    if "BATTERING_RAM" not in UNI:
+        print("  10 three-member drag SKIPPED — no support chassis in this catalog")
+        return
+    sim = fresh(rules, path)
+    a_t, b_t = free_pair(sim)
+    bld = put(sim, ROW, a_t, "BUILDER")
+    ram = put(sim, ROW, a_t, "BATTERING_RAM")
+    war = put(sim, ROW, a_t, "WARRIOR")
+    order(sim, ROW, bld, sim._A_ESCORT)
+    order(sim, ROW, ram, sim._A_ESCORT)
+    assert bool(sim.unit_escorted[0, bld]) and bool(sim.unit_escorted[0, ram]), \
+        "the scene did not form a three-member formation"
+    mp_b, mp_r = int(sim.unit_mp[0, bld]), int(sim.unit_mp[0, ram])
+
+    order(sim, ROW, war, _dir_of(sim, a_t, b_t))
+    assert int(sim.unit_tile[0, war]) == b_t, "the escort did not step"
+    assert int(sim.unit_tile[0, bld]) == b_t, "the CIVILIAN rider was left behind"
+    assert int(sim.unit_tile[0, ram]) == b_t, "the SUPPORT rider was left behind"
+    assert int(sim.civilian_at[0, b_t]) == bld, "the civilian's occupancy did not follow it"
+    assert int(sim.support_at[0, b_t]) == ram, "the support rider's occupancy did not follow it"
+    assert int(sim.civilian_at[0, a_t]) < 0 and int(sim.support_at[0, a_t]) < 0, \
+        "a rider still holds the tile the formation left"
+    assert int(sim.unit_mp[0, bld]) < mp_b and int(sim.unit_mp[0, ram]) < mp_r, \
+        "a rider paid nothing for the step"
+    print("  10 three-member drag OK — civilian AND support ride with the escort")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -373,6 +408,7 @@ def main() -> None:
     poke_convoy(rules, p)
     poke_rider_sight(rules, p)
     poke_support_slot(rules, p)
+    poke_three_drag(rules, p)
     print("ESCORT POKES OK")
 
 

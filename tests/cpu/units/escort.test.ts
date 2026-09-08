@@ -275,4 +275,23 @@ describe('the support stacking class', () => {
     expect(inEscort(state, bld)).toBe(true);
     expect(inEscort(state, ram)).toBe(true);
   });
+
+  it('drags BOTH riders when the escort steps', () => {
+    const state = makeState(makeMap(10, 10));
+    const [a, b] = twoAdjacent(state);
+    const war = put(state, a, 'WARRIOR');
+    const bld = put(state, a, 'BUILDER');
+    const ram = put(state, a, 'BATTERING_RAM');
+    expect(escortUnit(state, bld).ok).toBe(true);
+    expect(escortUnit(state, ram).ok).toBe(true);
+    const mpB = bld.movesLeft;
+    const mpR = ram.movesLeft;
+    expect(stepUnit(state, war, state.map.tiles[b])).not.toBe('blocked');
+    // the whole formation lands together, and every member pays for it
+    expect(war.tileIndex).toBe(b);
+    expect(bld.tileIndex).toBe(b);
+    expect(ram.tileIndex).toBe(b);
+    expect(bld.movesLeft).toBeLessThan(mpB);
+    expect(ram.movesLeft).toBeLessThan(mpR);
+  });
 });

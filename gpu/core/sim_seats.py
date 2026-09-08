@@ -3026,8 +3026,8 @@ class SimSeats:
 
     def _escort_rider(self, gslot: torch.Tensor, here: torch.Tensor, dest: torch.Tensor,
                       u_type: torch.Tensor, u_promos: torch.Tensor, cost: torch.Tensor):
-        """(rider slot, dragged free, the pair may go) — `escortRiders` plus
-        the two clauses `stepUnit` puts in front of its own write.
+        """(rider slots [B, 3], dragged free, the pair may go) — `escortRiders`
+        plus the two clauses `stepUnit` puts in front of its own write.
 
         CIV6 (Formations): a formation's Movement "is equal to that of the
         slowest unit that belongs to it", so a rider that cannot afford the
@@ -3038,15 +3038,19 @@ class SimSeats:
         sea, which is the naval half of "may also create a formation with
         embarked land units"."""
         none = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        none3 = torch.full((self.B, 3), -1, dtype=torch.long, device=self.device)
         no_free = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         all_ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
         if not bool(self.unit_escorted.any()):
-            return none, no_free, all_ok
+            return none3, no_free, all_ok
         hc = here.clamp(min=0)
         dc = dest.clamp(min=0)
         ut = u_type.clamp(min=0, max=self.NU - 1)
         seat = self.unit_seat.gather(1, gslot.unsqueeze(1)).squeeze(1)
+        # `unitDomain(unit.type) === 'military' && !unit.embarked` — and a
+        # support chassis is its OWN domain, so it rides, it does not carry.
         carrier = (~self._type_civilian[u_type.clamp(min=0)]
+                   & ~self._type_support[u_type.clamp(min=0)]
                    & ~self.unit_emb.gather(1, gslot.unsqueeze(1)).squeeze(1))
 
         def _pick(plane: torch.Tensor) -> torch.Tensor:
@@ -3059,48 +3063,60 @@ class SimSeats:
 
         # CIV6 (Formations): "a military unit can create a formation with a
         # support or civilian unit", and a tile holding all three carries all
-        # three. The GPU drags ONE rider per step, and takes them in TS's own
-        # `escortRiders` order — the civilian slot, then support, then a
-        # passenger at sea.
-        cand = _pick(self.civilian_at)
-        cand = torch.where(cand >= 0, cand, _pick(self.support_at))
-        cand = torch.where(cand >= 0, cand, _pick(self.embarked_at))
-        cc = cand.clamp(min=0)
-        live = (cand >= 0) & (here >= 0) & (dest >= 0)
-        if not bool(live.any()):
-            return none, no_free, all_ok
+        # three — so the escort drags EVERY rider standing with it, not the
+        # first plane to answer. `stepUnit` takes the whole `escortRiders`
+        # list and walks it twice, once to refuse the step and once to move
+        # them; reading only the head left the second rider one tile from
+        # where the oracle put it, with every ordered step agreeing.
+        # The planes are TS's own order: the civilian slot, then support,
+        # then a passenger at sea.
         # CIV6 (Keshig): "Can escort moving civilian and support units at their
-        # higher Movement speed" — Escort Mobility's clause, on the chassis.
-        free = live & (self._promo_flag(ut, u_promos, "ESCORT_SPEED")
-                       | self._type_escort_speed[ut.clamp(min=0, max=self.NU - 1)])
-        r_mp = self.unit_mp.gather(1, cc.unsqueeze(1)).squeeze(1)
-        r_full = self.unit_mp_full.gather(1, cc.unsqueeze(1)).squeeze(1)
-        rt = self.unit_type.gather(1, cc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        r_naval = self.unit_naval[rt]
+        # higher Movement speed" — Escort Mobility's clause, on the chassis,
+        # so it is one fact about the MOVER and every rider rides on it.
+        free = (self._promo_flag(ut, u_promos, "ESCORT_SPEED")
+                | self._type_escort_speed[ut.clamp(min=0, max=self.NU - 1)])
         wet = self.water.gather(1, dc.unsqueeze(1)).squeeze(1)
-        wet_ok = (
-            self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1)
-            & (~self.ocean_tile.gather(1, dc.unsqueeze(1)).squeeze(1)
-               | self._ocean_open(seat))
-            & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
-        )
-        # a hull comes ashore only in a Canal's passage, and a water-walking
-        # chassis takes both planes at once
-        dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & (
-            ~r_naval | self._canal_pass().gather(1, dc.unsqueeze(1)).squeeze(1))
-        _rwalk = self.unit_water_walk[rt]
-        if bool(_rwalk.any()):
-            wet_ok = wet_ok | (_rwalk & self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1))
-            dry_ok = dry_ok | (_rwalk & self.passable.gather(1, dc.unsqueeze(1)).squeeze(1))
-        # the class the rider will STAND in at the destination, which is what
-        # `_blocked_for` asks: a civilian ashore, a passenger on water.
-        stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
-            dc.unsqueeze(1), seat.unsqueeze(1),
-            is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1),
-            is_support=(self._type_support[rt] & ~wet).unsqueeze(1)).squeeze(1)
-        may = free | (r_mp >= cost) | (r_mp >= r_full)
-        okm = ~live | (stand & may)
-        return torch.where(live, cand, none), free, okm
+        picks: list[torch.Tensor] = []
+        okm = all_ok
+        anylive = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for _plane in (self.civilian_at, self.support_at, self.embarked_at):
+            cand = _pick(_plane)
+            # a slot an earlier plane already claimed is not a second rider
+            for _prev in picks:
+                cand = torch.where((cand >= 0) & (cand == _prev), none, cand)
+            live = (cand >= 0) & (here >= 0) & (dest >= 0)
+            picks.append(torch.where(live, cand, none))
+            if not bool(live.any()):
+                continue
+            anylive = anylive | live
+            cc = cand.clamp(min=0)
+            r_mp = self.unit_mp.gather(1, cc.unsqueeze(1)).squeeze(1)
+            r_full = self.unit_mp_full.gather(1, cc.unsqueeze(1)).squeeze(1)
+            rt = self.unit_type.gather(1, cc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            r_naval = self.unit_naval[rt]
+            wet_ok = (
+                self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1)
+                & (~self.ocean_tile.gather(1, dc.unsqueeze(1)).squeeze(1)
+                   | self._ocean_open(seat))
+                & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
+            )
+            # a hull comes ashore only in a Canal's passage, and a water-walking
+            # chassis takes both planes at once
+            dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & (
+                ~r_naval | self._canal_pass().gather(1, dc.unsqueeze(1)).squeeze(1))
+            _rwalk = self.unit_water_walk[rt]
+            if bool(_rwalk.any()):
+                wet_ok = wet_ok | (_rwalk & self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1))
+                dry_ok = dry_ok | (_rwalk & self.passable.gather(1, dc.unsqueeze(1)).squeeze(1))
+            # the class the rider will STAND in at the destination, which is what
+            # `_blocked_for` asks: a civilian ashore, a passenger on water.
+            stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
+                dc.unsqueeze(1), seat.unsqueeze(1),
+                is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1),
+                is_support=(self._type_support[rt] & ~wet).unsqueeze(1)).squeeze(1)
+            may = free | (r_mp >= cost) | (r_mp >= r_full)
+            okm = okm & (~live | (stand & may))
+        return torch.stack(picks, dim=1), free & anylive, okm
 
     def _escort_carry_with(self, moved: torch.Tensor, rider: torch.Tensor,
                            free: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor,
@@ -10436,7 +10452,8 @@ class SimSeats:
         self._occ_clear(rows, here[rows], gs)
         self.unit_tile[rows, gs] = dest[rows]
         self._air_carry_with(moved, gslot, here, dest)
-        self._escort_carry_with(moved, rider, rider_free, here, dest, cost)
+        for _ri in range(rider.shape[1]):
+            self._escort_carry_with(moved, rider[:, _ri], rider_free, here, dest, cost)
         # stepUnit's revealAround: EVERY hop lifts the mover's fog, at
         # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range".
         # Major seats only — revealAround gates to isCiv on TS the same way,
@@ -10453,11 +10470,13 @@ class SimSeats:
             # carries an Observation Balloon or a Drone precisely because it
             # sees further than the chassis dragging it, so the circle is the
             # WIDEST of the formation's members.
-            _rc = rider.clamp(min=0)
-            _rs = self._unit_sight(
-                self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
-                self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1))
-            sight = torch.where(rider >= 0, torch.maximum(sight, _rs), sight)
+            for _ri in range(rider.shape[1]):
+                _rr = rider[:, _ri]
+                _rc = _rr.clamp(min=0)
+                _rs = self._unit_sight(
+                    self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
+                    self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1))
+                sight = torch.where(_rr >= 0, torch.maximum(sight, _rs), sight)
             self._reveal_around(rows[major], srow[major], dest[rows][major], sight[rows][major])
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."

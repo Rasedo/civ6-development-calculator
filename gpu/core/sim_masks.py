@@ -2944,15 +2944,18 @@ class SimMasks:
             torch.full_like(_mil_here, -1)) == row)).unsqueeze(2)
         _u_esc = self.unit_escorted.gather(1, sc).unsqueeze(2)
         in_esc = _u_esc & _esc_here
-        # ONE rider to an escort — a second flag on the tile would be a
-        # formation nothing moves.
-        _rider_here = torch.zeros(B, N, dtype=torch.bool, device=dev)
-        for _pl in (self.civilian_at, self.embarked_at):
-            _r = _pl.gather(1, tc)
-            _rc = _r.clamp(min=0)
-            _rider_here = _rider_here | (
-                (_r >= 0) & (_r != smap) & self.unit_escorted.gather(1, _rc)
-                & (self.unit_seat.gather(1, _rc) == row))
+        # ONE RIDER PER STACKING CLASS — `escortUnit`'s own guard. A tile
+        # holding a military unit, a civilian AND a support chassis carries
+        # all three, so only a SECOND of one class is turned away, and the
+        # class the joiner would stand in decides which plane is asked.
+        _jsup = is_sup.squeeze(2) & ~u_emb
+        _jown = torch.where(
+            u_emb, self.embarked_at.gather(1, tc),
+            torch.where(_jsup, self.support_at.gather(1, tc), self.civilian_at.gather(1, tc)))
+        _jc = _jown.clamp(min=0)
+        _rider_here = ((_jown >= 0) & (_jown != smap)
+                       & self.unit_escorted.gather(1, _jc)
+                       & (self.unit_seat.gather(1, _jc) == row))
         move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut & ~in_esc
 
         # ---- ATTACK 6-11 -----------------------------------------------------
@@ -3257,7 +3260,9 @@ class SimMasks:
 
         _ec: list[torch.Tensor] = []
         if getattr(self, "_A_ESCORT", -1) >= 0:
-            _ec = [alive & (is_civ | u_emb.unsqueeze(2)) & (tile >= 0).unsqueeze(2)
+            # `escortable`: a passenger at sea, or `unitIsNoncombat` — which
+            # is the civilian AND the support class, not the civilian alone.
+            _ec = [alive & (is_civ | is_sup | u_emb.unsqueeze(2)) & (tile >= 0).unsqueeze(2)
                    & ~_u_esc & _esc_here & ~_rider_here.unsqueeze(2)]
 
         _ue: list[torch.Tensor] = []

@@ -232,9 +232,12 @@ class SimOrders:
                             self.unit_xp[pr, ps])
 
             if _rk_escort[n] and _ecc >= 0:
-                # CIV6 (Formations): the civilian joins the military unit
-                # already standing with it, and the pair moves as one.
-                _em = act & (a == _ecc) & (is_civ | u_emb) & (here >= 0)
+                # CIV6 (Formations): the rider joins the military unit already
+                # standing with it, and the pair moves as one. `escortable`
+                # is a passenger at sea or `unitIsNoncombat` — the civilian
+                # class AND the support one.
+                _is_sup = self._type_support[utp.clamp(min=0)]
+                _em = act & (a == _ecc) & (is_civ | _is_sup | u_emb) & (here >= 0)
                 if bool(_em.any()):
                     _mh = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
                     _ms = torch.where(
@@ -242,12 +245,19 @@ class SimOrders:
                         self.unit_seat.gather(1, _mh.clamp(min=0).unsqueeze(1)).squeeze(1),
                         torch.full_like(_mh, -1))
                     _em = _em & (_mh >= 0) & (_ms == row)
-                    for _pl in (self.civilian_at, self.embarked_at):
-                        _r = _pl.gather(1, hc.unsqueeze(1)).squeeze(1)
-                        _rc = _r.clamp(min=0).unsqueeze(1)
-                        _em = _em & ~((_r >= 0) & (_r != slot)
-                                      & self.unit_escorted.gather(1, _rc).squeeze(1)
-                                      & (self.unit_seat.gather(1, _rc).squeeze(1) == row))
+                    # ONE RIDER PER STACKING CLASS: a second of the joiner's
+                    # OWN class is refused, a first of another is not — the
+                    # tile carries all three.
+                    _jsup = _is_sup & ~u_emb
+                    _jown = torch.where(
+                        u_emb, self.embarked_at.gather(1, hc.unsqueeze(1)).squeeze(1),
+                        torch.where(_jsup,
+                                    self.support_at.gather(1, hc.unsqueeze(1)).squeeze(1),
+                                    self.civilian_at.gather(1, hc.unsqueeze(1)).squeeze(1)))
+                    _jc = _jown.clamp(min=0).unsqueeze(1)
+                    _em = _em & ~((_jown >= 0) & (_jown != slot)
+                                  & self.unit_escorted.gather(1, _jc).squeeze(1)
+                                  & (self.unit_seat.gather(1, _jc).squeeze(1) == row))
                     if bool(_em.any()):
                         _r = _em.nonzero(as_tuple=True)[0]
                         self.unit_escorted[_r, sc[_r]] = True

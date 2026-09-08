@@ -310,6 +310,48 @@ the gate reaches is worth more here than one that re-reads the exporter.
     row-to-unit alignment holds and the direction tables agree — and
     `movesLeft` remains uncomparable once the tiles differ, for the reason
     given above. Everything between those two facts is unmeasured again.
+  - **AND THE FIXED INSTRUMENT NAMED IT: NOT ONE ORDERED STEP DISAGREES.**
+    With the sequence row in the key and TS printing its refusals, the seed
+    9287 turn 156 dump carries ZERO `st:` disagreements — every ordered step
+    of turns 155 and 156 pairs term for term on both engines — while the unit
+    census still holds one seat-1 Builder at tile 162 on the GPU and 161 on
+    TS. A unit that ends the turn somewhere else than the oracle put it, with
+    every step it was ordered to take agreeing, is not moving by its own
+    order. It is being CARRIED.
+  - **THE ESCORT DRAGGED ONE RIDER WHERE TS DRAGS THE LIST.** `stepUnit`
+    takes `escortRiders`' whole list and walks it twice — once to refuse the
+    step if a rider cannot stand at the destination or afford the cost, once
+    to move them all. `_escort_rider` returned ONE candidate, the first of
+    the civilian, support and embarked planes to answer, and `_step_verb`
+    carried that one. While the two non-military stacking classes were ONE
+    class the two rules were the same rule; the SUPPORT split made a
+    three-member formation reachable, and from that commit the GPU left the
+    second rider standing. Nothing in the step log could show it: the
+    MOVER's step agrees, and the rider is carried inside the verb.
+  - TWO MORE OF THE SAME ROOT, found by writing the poke that reproduces it —
+    and the poke could not even build the scene until both were fixed:
+    - the GPU's escort GATE read `is_civ | u_emb`, and a Battering Ram is
+      not `civilian` on the wire (it carries no build charges), so nine
+      chassis could never join a formation at all. TS's `escortable` is a
+      passenger at sea or `unitIsNoncombat` — the civilian class AND the
+      support one.
+    - the GPU's refusal walked the civilian and embarked planes and turned
+      away ANY escorted rider standing there, whatever its class, where
+      `escortUnit` refuses only a second rider of the SAME class. Even with
+      the gate widened, the Builder beside the Ram would have refused it.
+    - and `_escort_rider`'s `carrier` asked "not civilian, not embarked"
+      where TS asks `unitDomain(...) === 'military'`, so a support chassis
+      counted as an ESCORT on the GPU and could drag a rider of its own.
+    All three are one sentence read wrong: `_type_civilian` is the CLASS, and
+    what these rules wanted was `unitIsNoncombat`. This is the
+    new-class-invariant sweep the SUPPORT split owed and did not pay.
+  - THE REVEAL FOLLOWED THE LIST TOO: `stepUnit` lights the circle at the
+    WIDEST sight in the formation, which is the whole reason a formation
+    carries an Observation Balloon or a Drone. Reading one rider revealed a
+    three-member formation at the wrong radius.
+  - PINNED ON BOTH ENGINES: `escort_test`'s section 10 (a Warrior with a
+    Builder and a Battering Ram steps, and all three land, all three pay)
+    and `escort.test.ts`'s "drags BOTH riders when the escort steps".
   - ONE ASYMMETRY FOUND WHILE READING THE APPLIERS, recorded rather than
     fixed because nothing has shown it firing: TS refuses EVERY verb from a
     unit with `movesLeft <= 0` (spies excepted), while the GPU has no such
