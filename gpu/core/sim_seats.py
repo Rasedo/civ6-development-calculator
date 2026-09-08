@@ -10402,24 +10402,6 @@ class SimSeats:
         rider, rider_free, rider_ok = self._escort_rider(
             gslot, here, dest, u_type, u_promos, cost)
         moved = ok & ((mp >= cost) | (mp >= full)) & rider_ok
-        # the STEP half of the decomposition log, `stepUnit`'s twin: one line
-        # per ordered step, the tiles it moved between and what came of it.
-        if getattr(self, "_log_diff", False):
-            # gated on the ACTING mask. `dest >= 0` is true in every game
-            # whose tensors merely carry a stale destination, and printing
-            # those buried the real steps under a wall of refusals nobody
-            # ordered — a probe that prints where nothing acted is noise.
-            _act_st = ok | moved
-            for _sb in range(self.B):
-                if not bool(_act_st[_sb]) or int(dest[_sb]) < 0 or int(here[_sb]) < 0:
-                    continue
-                # keyed on the EDGE, not the unit: the GPU names a unit by
-                # merged slot and TS by id, and those two never pair. An edge
-                # one engine walked and the other refused is the question.
-                self._diff_events.setdefault(_sb, []).append(
-                    f"st:{int(self.unit_seat[_sb, gslot[_sb]])}"
-                    f":{int(here[_sb])}:{int(dest[_sb])}"
-                    f" t{int(self.turn)} {'moved' if bool(moved[_sb]) else 'blocked'}")
         if not bool(moved.any()):
             return moved
         rows = moved.nonzero(as_tuple=True)[0]

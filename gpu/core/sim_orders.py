@@ -661,8 +661,24 @@ class SimOrders:
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 shut = self._border_closed(tgt.unsqueeze(1), row, ut.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & ~shut & (mp > 0)
-                if bool(ok.any()):
-                    self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)
+                _stepped = (self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)
+                            if bool(ok.any()) else torch.zeros_like(ok))
+                # the STEP half of the decomposition log, and it belongs HERE
+                # rather than inside `_step_verb`: a REFUSED step never enters
+                # that body at all, so a log inside it can only ever print the
+                # steps that succeeded. This is where `ok` is decided, and it
+                # is the twin of the `tileFreeForUnit` gate TS logs at.
+                if getattr(self, "_log_diff", False):
+                    for _sb in range(self.B):
+                        if not bool(mv[_sb]) or int(tgt[_sb]) < 0 or int(here[_sb]) < 0:
+                            continue
+                        # keyed on the EDGE: the GPU names a unit by merged
+                        # slot and TS by id, and those two never pair.
+                        self._diff_events.setdefault(_sb, []).append(
+                            f"st:{int(self._ROW_SEAT[row])}"
+                            f":{int(here[_sb])}:{int(tgt[_sb])}"
+                            f" t{int(self.turn)}"
+                            f" {'moved' if bool(_stepped[_sb]) else 'blocked'}")
 
             atk = (
                 act & (a >= 6) & (a < 12)
