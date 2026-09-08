@@ -1452,6 +1452,12 @@ class SimInit:
             B, self.n_majors, max(1, len(self._gp_perm_names)), dtype=dtype, device=device)
         self.civ_gp_lux = torch.zeros(B, self.n_majors, simbase.GP_LUX_MAX, dtype=torch.long, device=device)
         self.civ_gp_lux_n = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # ...and the count as the TURN OPENED, which is what the amenity walk
+        # reads. `seatPhase` freezes `luxuryAmenities` before it applies the
+        # turn's unit orders, so a Great Merchant activated this turn pays
+        # from the next walk; the GPU applies orders before `step()` runs at
+        # all, and without this snapshot its walk saw the grant a turn early.
+        self.civ_gp_lux_n_open = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self._alloc_civ_pairs(B, self.n_majors, dtype, device)
         # GREAT WORKS. A claimed WRITER / ARTIST / MUSICIAN (gwClsByKind)
         # makes gwWorksByKind works, each seeking an open slot that takes it

@@ -2870,6 +2870,10 @@
       }
     ],
     "gpu": [
+        {
+          "plane": "civ_gp_lux_n_open",
+          "why": "the invented-luxury count as the TURN OPENED. `seatPhase` freezes `luxuryAmenities` before it applies the turn's unit orders, so a Great Merchant activated this turn pays its luxury from the NEXT walk; the GPU applies orders before `step()` runs at all, so the walk needs the opening count rather than the live one. There is no TS field to compare — TS gets the same effect from the ORDER of its own phases, and `civ_gp_lux_n` itself is compared."
+        },
       {
         "plane": "aqsrc",
         "why": "the Aqueduct's water source: 'this tile has an adjacent river, lake, oasis or mountain'. TS recomputes it on every read (`requiresWaterSourceOrMountain`), so there is no TS field to compare; the GPU keeps it as a plane and rebuilds it over the ring whenever `aq_own` moves. Its INPUTS are all compared (Tile.submerged, terrain, feature, riverMask), so the two engines agree by construction, and the climate poke pins the rebuild."
