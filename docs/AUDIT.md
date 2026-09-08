@@ -237,11 +237,19 @@ the gate reaches is worth more here than one that re-reads the exporter.
     Same rank, same type, same origin, different destination. The order
     reached the SAME chassis on both engines, so this is not the row-to-unit
     slip `phase.ts` warns about, and it is not two units sharing a tile.
-  - WHAT IS LEFT is the direction itself: one action number out of one tile
-    resolving to different neighbours. `neighborTile` and the `neigh` plane
-    both keep their -1 slots, so it is not the compaction — it is either the
-    two engines' direction ORDER differing for some row parity, or the action
-    number reaching them differently.
+  - THE DIRECTION TABLES AGREE, checked by hand rather than assumed. TS's
+    `AXIAL_DIRS` through `offsetToAxial`/`axialToOffset` yields, for an EVEN
+    row, [(1,0), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)], and for an ODD row
+    [(1,0), (1,-1), (0,-1), (-1,0), (0,1), (1,1)] — element for element the
+    GPU's `even` and `odd` lists in `simbase`. Both keep their -1 slots, so
+    the compaction is out too.
+  - SO THE ACTION NUMBER ITSELF IS WHAT DIFFERS. Same unit, same tile, same
+    direction table, different neighbour leaves only one thing: the two
+    engines are acting on different `a` for that rank. The GPU logs the
+    action it APPLIES from its own driver while TS logs the one it REPLAYS
+    from the record, so the next measurement is the action number on the
+    line, and the question is whether `_extract_record` wrote the rank the
+    applier used.
   - ONE CAVEAT ON THE EVIDENCE, because it would mislead a reader who did not
     run it: the OTHER step pairs in that dump show different ORIGINS (TS
     402->447 against GPU 447->490). That is a window artifact — the log keeps
