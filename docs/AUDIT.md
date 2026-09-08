@@ -31,20 +31,20 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
-| B-31r trade-route tails | 1 | plunder PERCENTAGES sourced and shipped, the base is DLL; chain depth is ask 2; the per-district gold shape is ask 16; free-choice destination head is P8 |
+| B-31r trade-route tails | 1 | plunder PERCENTAGES sourced and shipped, the base is DLL; chain depth RULED (6 stands); the per-district gold shape is ask 15; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
 | B-54r unique-unit flank/support stacks | 1 | Impi and Hypaspist, once C-78 seats them |
-| B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 12); Ground Crews waits on a PATROL that is no data row at all |
+| B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 11); Ground Crews waits on a PATROL that is no data row at all |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 0 | CLOSED — no improvement in the install is buildable on a natural wonder plot, so the add is unreachable |
 | B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
 | **B. Fidelity vs real Civ 6** | **16** | |
-| C-1 power | 1 | accident roll and damage tables (sourced, on ask 5), a minor's grid when C-38 gives one a load |
+| C-1 power | 1 | accident roll and damage tables (sourced, on ask 4), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
-| C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 15); a Free City as spy ground |
+| C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 14); a Free City as spy ground |
 | C-20 Mountain Tunnel's route multiplier | 1 | the ONE modifier the row names carries no arguments at all — the magnitude is wholly DLL |
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
@@ -52,9 +52,9 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-33 Giant Death Robot's Range | 0 | CLOSED — the install says Range 3, this engine has 3, and the five-hex row is scenario-only |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll); Priority Target carries NO data at all — a command row, an icon and an interface mode |
 | C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
-| C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 10 |
+| C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 9 |
 | C-41 Volcanic Soil | 1 | where an eruption lays it is an ask |
-| C-49 named storms | 1 | the HEADING is sourced (`PrevailingWinds`); what `Movement 8` counts is ask 17 |
+| C-49 named storms | 1 | the HEADING is sourced (`PrevailingWinds`); what `Movement 8` counts is ask 16 |
 | C-60 the Free City's own play | 1 | two owner rulings and nothing to build: its units/walls/retaliation, its amenities |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is an ask |
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
@@ -76,22 +76,20 @@ the entry and the line leaves.
    and whether an already-improved tile takes it — DLL.
 
 
-2. **B-31r — the course's depth.** `ROUTE_CHAIN_MAX` 6, the same shape.
-
-3. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
+2. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
    zeroes; the district's own pool rides through. No rule reached.
 
-4. **C-64 — the majority-religion tie.** Two religions in equal cities; no
+3. **C-64 — the majority-religion tie.** Two religions in equal cities; no
    source names the winner.
 
-5. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
+4. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
    counts eruptions and reactor accidents per game; this engine rolls per
    volcano and would roll per reactor. PROPOSAL: divide the per-turn rate
    by the map's count of objects at risk.
 
-6. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
+5. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
 
-7. **C-76 — the opinion deltas.** The install names every
+6. **C-76 — the opinion deltas.** The install names every
    `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
    nothing. The ANCHORS are fully sourced (100 / 83 / 66 / 50 / 33 / 16 / 0,
    with a `DiplomaticYieldBonus` beside each); what no source gives is what
@@ -99,49 +97,49 @@ the entry and the line leaves.
    — a carrier without deltas is a constant, so neither half can ship
    alone.
 
-8. **C-2 — what a mid-build gold purchase does to the hammers.** One
+7. **C-2 — what a mid-build gold purchase does to the hammers.** One
     tested report says a UNIT keeps its progress and a BUILDING's is wasted;
     this engine banks both, on the standing rule that hammers never burn.
     One forum post against a principle — the owner's call.
 
-9. **Two city-state names this roster invented.** "Venice" and "Bandar
+8. **Two city-state names this roster invented.** "Venice" and "Bandar
     Brunei" are not Civ 6 city-states. Their bonuses are AMSTERDAM's (base;
     Antioch carries the same text in Expansion1) and JAKARTA's. Both
     MECHANICS are built and sourced; only the names are wrong. Renaming
     them touches `seeder/place.ts`, which is hashed into `genStamp`, so the
     fix costs a reseed and a fresh `worlds.lock`. Rename, or keep the names?
 
-10. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
+9. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
     nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs
     and all five are placement; no XML row anywhere names a city-state
     purchase, build weight or reserve. Leave them banking, or name a rule?
 
-11. **C-16 — a Free City as spy ground.** The install carries NO data gate:
+10. **C-16 — a Free City as spy ground.** The install carries NO data gate:
     the ten `UnitOperations` spy rows name a `TargetDistrict` and nothing
     else, and no requirement set anywhere keys on `CivilizationLevels`.
     Which cities a spy may travel to is DLL. Both engines walk the major
     rows today. Open the Free City to spies, or leave it closed?
 
-12. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
+11. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
     Rainforest, Hills 1; Mountains and the great natural wonders 2) and
     `SightModifier` (Hills +1, Mountains +2) are published; the WALK is not.
     Two readings fit the columns: a sight BUDGET spent along the hex path, or
     a radius with tiles occluded BEHIND a blocker. They differ on every map
     with a ridge, so neither engine ships one until this is ruled.
 
-13. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
+12. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
     the seat's luxuries and policies, and the Free Cities player has none —
     so every Free City sits at the bottom band forever. `CivilizationLevels`
     has no amenity column and no XML row names one. Give the free row a
     fixed tier, or let the bottom band stand?
 
-14. **C-60 — a Free City's defence.** "Will repair pillaged improvements
+13. **C-60 — a Free City's defence.** "Will repair pillaged improvements
     and spawn units to defend itself, and may build walls", "will try to
     retaliate". No XML row names the unit, the cadence or the walls, and
     its strike needs a target rule. Name them, or leave the floor-15
     defence and the walls it revolted with?
 
-15. **C-16 — what the spy's escape chance is a chance OUT OF.** The install
+14. **C-16 — what the spy's escape chance is a chance OUT OF.** The install
     publishes the whole term list and every term is a LEVEL:
     `ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1 per spy level,
     `_COUNTERSPY_LEVEL_MODIFIER` -1 per counterspy level,
@@ -153,7 +151,7 @@ the entry and the line leaves.
     Foot 70) and the install has one base and no route term. Name the scale,
     or keep the per-route table?
 
-16. **B-31r — what a trade route pays per district.** `GlobalParameters`
+15. **B-31r — what a trade route pays per district.** `GlobalParameters`
     carries `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and
     `_PER_DESTINATION_DISTRICT` 2, unmodified by either expansion. This
     engine pays a flat 3 plus ONE gold per destination SPECIALTY district and
@@ -163,7 +161,7 @@ the entry and the line leaves.
     a mature pair of cities pays more than any observed route. Take the two
     rows literally, or keep the flat head?
 
-17. **C-49 — what `Movement 8` counts on a storm.** The HEADING is not DLL
+16. **C-49 — what `Movement 8` counts on a storm.** The HEADING is not DLL
     after all: `Expansion2_RandomEvents.xml` publishes `<PrevailingWinds>`,
     22 weighted direction rows banded by latitude, and this map already
     carries the latitude they key on. Every storm row also carries
@@ -350,7 +348,12 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - Who to hire and where to seat him is a heuristic (catalog order,
     lowest-loyalty city) — a decision for P8's surface.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
-  - `ROUTE_CHAIN_MAX` 6 is a capacity choice — ask 2.
+  - THE COURSE'S DEPTH IS RULED (owner, 2026-09-08): `ROUTE_CHAIN_MAX` 6
+    stands. It was filed as a capacity choice rather than a sourced
+    figure, and it stays one — the owner's call is that the current limit
+    is right. Nothing moves for it: the constant lives in `trade.ts`,
+    ships as `routeChainMax`, and the GPU reads it off the wire, so both
+    engines already hold the ruled value.
   - `PLUNDER_ROUTE_GOLD` 50 is a MODEL NUMBER, and a 2026-09-08 pass of the
     install says it will stay one: `GlobalParameters.xml` carries no plunder
     amount of any kind, and the only trade-route plunder rows anywhere are
@@ -369,7 +372,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `LETTEROFMARQUE_PLUNDER_BONUS` Amount 100, which is the naval raider
     card's doubling. So the shape around the base is sourced even where the
     base is not.
-  - A NEW ASK OFF THE SAME PASS (ask 16): `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT`
+  - A NEW ASK OFF THE SAME PASS (ask 15): `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT`
     2 and `_PER_DESTINATION_DISTRICT` 2 are in Base `GlobalParameters` and
     neither expansion touches them, while this engine pays a flat 3 plus one
     gold per destination SPECIALTY district and nothing for the origin's.
@@ -549,7 +552,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     pillaged 100%, buildings DESTROYED 100%, district pillaged 100%,
     population -80%, radiation 20 turns, units 100% @ 20-50, garrison 100%
     @ 20-50, civilians 100%. The age SCALING is DLL. The clock ships
-    (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 5.
+    (`City.reactorAge` / `city_reactor_age`); the roll waits on ask 4.
   - A CITY-STATE'S CITIES ARE NEVER POWERED: `resolveSeatPower` /
     `_resolve_seat_power` run for majors only. Vacuous today (nothing in
     `minorLadder` draws or supplies Power, pinned by
@@ -634,7 +637,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     base and no route term at all. Ask 15.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
     a spy's ground, and the install carries no data gate to say whether that
-    is right — ask 11.
+    is right — ask 10.
 - **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1. A 2026-09-08
   pass says this one will stay unsourced, and says so from the row rather
   than from an absence of searching.
@@ -696,9 +699,9 @@ the gate reaches is worth more here than one that re-reads the exporter.
     page's list answers every delivery alike.
   - THE CITIZENS A BLAST KILLS: buildable — C-77 exposed the pick, so
     `city.workedTiles` / `_worked_tiles(row)` now name who is standing in
-    the blast. What is unsourced is HOW MANY die per ring, which is ask 6's
+    the blast. What is unsourced is HOW MANY die per ring, which is ask 5's
     neighbour.
-  - A WONDER IN THE BLAST — ask 6.
+  - A WONDER IN THE BLAST — ask 5.
 - **C-33. THE GIANT DEATH ROBOT'S RANGE.** CLOSED 2026-09-08 — the entry was
   false twice over, and the install says so in one row.
   - `UNIT_GIANT_DEATH_ROBOT` carries `Range="3"`, not five, and this engine
@@ -770,7 +773,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `GlobalParameters.xml` holds five MINOR knobs and every one is PLACEMENT
     (`START_DISTANCE_*`, `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER`); there is no
     city-state economy parameter of any kind, so what it spends them on is
-    DLL AI with no data behind it — ask 10.
+    DLL AI with no data behind it — ask 9.
   - POWER: C-1's minor arm, due when the ladder reaches a load.
   - Foreign Investor and Affluence (B-24r) wait on a minor that improves and
     accumulates.
@@ -805,7 +808,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - WHAT IS STILL UNSOURCED is the SPEED. Every storm row carries
     `Movement="8" Duration="3" Spacing="15"` beside its `Hexes` footprint
     (1, 3, 7, 19 — the centred hex counts), and nothing says what 8 counts.
-    That is ask 17, and it is the whole of what stands between this row and
+    That is ask 16, and it is the whole of what stands between this row and
     a built walk.
   - A SEQUENCING NOTE, not a reason to defer indefinitely: a weighted
     direction draw per storm per turn is a NEW RNG CONSUMER, which reds
@@ -817,15 +820,15 @@ the gate reaches is worth more here than one that re-reads the exporter.
   to attack, and since #242i the religion walk). NOTHING BUILDABLE REMAINS —
   both bullets are owner rulings, with no magnitude either engine could
   invent:
-  - ITS DEFENCE — ask 14. Today: floor-15 defence plus the walls it
+  - ITS DEFENCE — ask 13. Today: floor-15 defence plus the walls it
     revolted with, healing 20 a turn.
-  - ITS AMENITIES — ask 13.
+  - ITS AMENITIES — ask 12.
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   - Three ledger rows wait (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`,
     `TRAIT_COMBAT_BONUS_OTHER_RELIGION`,
     `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`). The carrier is a
     per-seat majority over its cities' followed religions on both engines;
-    the tie rule is ask 4.
+    the tie rule is ask 3.
 - **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
   - `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and
     `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a
@@ -863,7 +866,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     opinion built now would be initialised at NEUTRAL 50 and never move, so
     it would be a compared plane holding a constant and three unreachable
     bands — dead state, not a carrier. Both halves land together or neither
-    does, so C-76 is BLOCKED on ask 7 rather than half-buildable.
+    does, so C-76 is BLOCKED on ask 6 rather than half-buildable.
   - What `DiplomaticYieldBonus` is paid IN is not published either; the
     column sits on the state row and the leaders' own
     `MODIFIER_PLAYER_ADD_DIPLOMATIC_YIELD_MODIFIER` is a separate channel.
