@@ -130,11 +130,15 @@ describe('the site census', () => {
     const missing = bodies
       .filter((b) => b.includes('congressUnitCS(') && !b.includes('rosterCS('))
       .map((b) => b.slice(0, b.indexOf('(')));
-    // `cityStrikeStrength` is the CITY's own shot: its defender composition
-    // carries no roster row on either engine (recorded under C-26)
-    // `congressUnitCS` is the adder's OWN body; the city-strike composition
-    // (phase.ts) carries no roster row on either engine — recorded under C-26
-    expect(missing.filter((n) => n !== 'congressUnitCS')).toEqual([]);
+    // TWO allowed names, each for its own reason:
+    //  - `congressUnitCS` is the adder's OWN body.
+    //  - `cityStrikeDefenderCS` is what a CITY's shot is shooting at, and
+    //    neither engine pays a roster row there (the GPU's
+    //    `_seat_city_strike` defence carries none either) — recorded under
+    //    C-26. It moved into this file when the two strike keys stopped
+    //    assembling it inline; the exemption came with it.
+    const allowed = new Set(['congressUnitCS', 'cityStrikeDefenderCS']);
+    expect(missing.filter((n) => !allowed.has(n))).toEqual([]);
   });
 });
 

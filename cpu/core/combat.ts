@@ -1005,6 +1005,34 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
  *  A): "this outcome also gives Warrior Monks +10 Combat Strength", where the
  *  monk's religion is the one its owner founded. Air units carry no promotion
  *  class, so no air roll can see the advisory half. */
+/**
+ * THE DEFENDER'S STRENGTH UNDER A CITY'S SHOT — ONE composer for both keys,
+ * the centre's `cstk` and the Encampment's `estk`.
+ *
+ * It is NOT `defenderCS`: that body assembles a unit-vs-unit fight and a
+ * dozen of its adders need an attacking UNIT to be defined at all. What the
+ * two bodies must share is the unit's OWN strength, and a FORMATION is part
+ * of that — CIV6 (GlobalParameters): COMBAT_CORPS_STRENGTH_MODIFIER 10 and
+ * COMBAT_ARMY_STRENGTH_MODIFIER 17 are flat strength on the unit, paid
+ * wherever it fights, a city's shot included.
+ *
+ * A city strike is a RANGED attack, so Support is ignored and the promotions
+ * are read with `ranged` and `vsCity`. An EMBARKED target takes the era's
+ * flat override instead of everything above it, formation included.
+ */
+export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Tile): number {
+  const base = defender.embarked
+    ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
+    : (UNITS[defender.type]?.combat ?? 0) + formationCS(defender) + terrainDefense(tile)
+      - woundPenalty(defender)
+      + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile });
+  // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is the
+  // unit's own strength wherever it fights, a city's shot included.
+  return base + generalAuraCS(state, defender, tile.index)
+    + gdrBeamCS(state, defender) // the beam "applies ... when defending"
+    + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
+}
+
 export function congressUnitCS(state: GameState, unit: { type: string; seat: number }): number {
   const monk = unit.type === 'WARRIOR_MONK' ? congressReligiousCs(state, unitSeat(unit)) : 0;
   return congressPromoClassCs(state, UNIT_PROMO_CLASS[unit.type]) + monk;

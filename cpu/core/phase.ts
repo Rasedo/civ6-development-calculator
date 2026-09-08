@@ -12,17 +12,17 @@ import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, H
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest } from './units';
-import { cityStrikeStrength, gdrBeamCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
+import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
-import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, generalAuraCS, congressUnitCS, encircled, stackDefender, unitAttackRange } from './combat';
-import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
+import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
+import { promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, getModifiers, governmentIndex, governmentUnitCS, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, getModifiers, governmentIndex, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -2572,16 +2572,7 @@ export function seatPhase(state: GameState): void {
           const hostiles = visibleHostilesAt(state, bestTile, actor);
           const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
           const tt = state.map.tiles[bestTile];
-          const defCS = defender.embarked
-            ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
-              + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt }); // the promotions it chose (embarked → flat override, none)
-          // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder
-          // is the unit's own strength wherever it fights, a city's shot
-          // included.
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile)
-            + gdrBeamCS(state, defender) // the beam "applies ... when defending"
-            + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
+          const defCSa = cityStrikeDefenderCS(state, defender, tt);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
           const atkCS = cityStrikeStrength(state, civCity)
@@ -2628,13 +2619,7 @@ export function seatPhase(state: GameState): void {
           const hostiles = visibleHostilesAt(state, bestTile, actor);
           const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
           const tt = state.map.tiles[bestTile];
-          const defCS = defender.embarked
-            ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
-              + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt });
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile)
-            + gdrBeamCS(state, defender)
-            + congressUnitCS(state, defender) + governmentUnitCS(state, defender); // the cstk mirror
+          const defCSa = cityStrikeDefenderCS(state, defender, tt); // the cstk composer
           // CIV6 (Expansion1_Emergencies.xml): the target's City Strike reward
           // is gated on COMBAT_DISTRICT_VS_UNIT — the Encampment's shot is a
           // district's too, so it pays the same +2 the centre's does.
