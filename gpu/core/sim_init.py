@@ -737,6 +737,7 @@ class SimInit:
                        "settlerFreePop", "harvestMult", "cityDefense", "territoryCS",
                        "extraStrikes", "freePromoOnTrain", "theologyCS", "fullHeal",
                        "ignoreForeignPressure", "faithOnBuildPct", "waterWorks",
+                       "airDefenseCS", "districtGoldBuy", "districtFaithBuy",
                        "spyLevelPenalty", "noSiege", "stockpilePerTurn", "resourceDiscountPct",
                        "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries",
                        "routeStartFood", "industryAllSources", "envDamageImmune",
@@ -3544,6 +3545,7 @@ class SimInit:
         self._driven_buy_ucls: dict = {}
         self._driven_buy_pat: dict = {}
         self._driven_buy_band: dict = {}
+        self._driven_buy_dist: dict = {}
         self._driven_tech: dict = {}
         self._driven_policies: dict[int, torch.Tensor] = {}
         self._driven_civic: dict = {}

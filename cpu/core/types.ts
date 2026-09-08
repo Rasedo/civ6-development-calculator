@@ -192,11 +192,16 @@ export interface SeatActionRecord {
   units: number[][];
   /** the ONE gold purchase: [kind, a, b]. Kind 0 building (a=centre,
    *  b=layout idx), 1 settler, 2 unit, 3 tile (a=tile, b=centre),
-   *  4 Great Person patronage (a=class index). */
+   *  4 Great Person patronage (a=class index), 5 DISTRICT (a=SITE tile,
+   *  b=scaffold idx — the site names the city, as kind 3's does, and the
+   *  governor holding Contractor is the permission). */
   buy?: [number, number, number] | null;
   /** [kind, city CENTRE tile] per faith purchase; kind 12 (a Valletta-class
    *  building) carries a third slot naming the building's prodLayout index;
-   *  kind 15 (patronage) carries the GP class there and no city. */
+   *  kind 15 (patronage) carries the GP class there and no city; kind 17 is a
+   *  DISTRICT bought with faith — [17, SITE tile, scaffold idx], the Divine
+   *  Architect twin of gold's kind 5. The two lists number independently:
+   *  faith's 16 is the Rock Band, gold's 5 is this district. */
   buyFaith?: ([number, number] | [number, number, number])[];
   /** The city-state LEVY: the CS index to levy, or null/absent.
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy

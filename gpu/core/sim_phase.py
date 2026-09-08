@@ -929,14 +929,9 @@ class SimPhase:
         # CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction
         # cost when finishing buildings." Districts are construction too and
         # the page groups them with the buildings; wonders are not.
-        if self.n_governors:
-            _bd = done & (((cur >= 0) & (cur < self.NB))
-                          | ((cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)))
-            if bool(_bd.any()):
-                _pct = self._governor_sum(row, "faithOnBuildPct")[bidx, col]
-                _pay = torch.floor(cost.double() * _pct / 100.0) * _bd.double()
-                self.civ_faith[:, row] = self.civ_faith[:, row] + torch.zeros_like(
-                    self.civ_faith[:, row]).index_add_(0, bidx, _pay.to(self.civ_faith.dtype))
+        self._construction_faith(row, col, cost,
+                                 done & (((cur >= 0) & (cur < self.NB))
+                                         | ((cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE))))
 
         made_s = done & (cur == self.SETTLER)
         if bool(made_s.any()):
@@ -1009,89 +1004,7 @@ class SimPhase:
 
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
         if bool(made_d.any()):
-            dr = made_d.nonzero(as_tuple=True)[0]
-            dt = qt0[dr].clamp(min=0)
-            self.district_complete[dr, dt] = True
-            # The registry holds ONE tile per type; TS walks every instance. So
-            # for a type a city may hold SEVERAL of, point the entry at the one
-            # that just finished — then "the registry names a complete tile"
-            # holds exactly when TS's `some(complete)` does.
-            _rep = self._is_repeatable[self.district[dr, dt].clamp(min=0)]
-            if bool(_rep.any()):
-                _rr = dr[_rep]
-                self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
-            # CIV6 (Religious Convert): "Receives an Apostle each time he
-            # finishes a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
-            for _dc, _dl, _dd, _du in self._district_unit_rows:
-                if _du < 0 or _dd < 0:
-                    continue
-                _dw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                _dw[dr] = self.district[dr, dt] == _dd
-                _dw = _dw & self._row_is(row, _dc, _dl)
-                if bool(_dw.any()):
-                    _dat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-                    _dat[dr] = dt
-                    self._spawn_unit(row, _dw, _dat, _du)
-            # CIV6 (M'banza): a free Apostle when it finishes; (Royal Navy
-            # Dockyard): a naval unit the install does not name, so the
-            # strongest hull this seat can train. The VARIANT's own clause,
-            # so a seat that does not play the civilization sees nothing.
-            for _vdi, _vcivs in self._d_variant_grant.items():
-                for _vciv, (_vu, _vnav) in _vcivs.items():
-                    _vw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                    _vw[dr] = self.district[dr, dt] == _vdi
-                    _vw = _vw & self._row_plays_idx(row, _vciv)
-                    if not bool(_vw.any()):
-                        continue
-                    _vat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-                    _vat[dr] = dt
-                    if _vu >= 0:
-                        self._spawn_unit(row, _vw, _vat, _vu)
-                    if _vnav:
-                        _hull = self._best_trainable_naval(row)
-                        self._spawn_unit(row, _vw & (_hull >= 0), _vat, _hull.clamp(min=0))
-            # MONUMENTALITY pays era score per SPECIALTY district completed
-            # (a city centre is never queued here).
-            mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            mon[dr] = True
-            self._dedication_event(row, 0, mon)
-            enc = self.district[dr, dt] == self._encamp_didx
-            self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
-            # its OWN perimeter arrives at whatever tier the city's walls
-            # already supply — 0 where none stand yet (`fitEncampOuter`)
-            _ewf = self._walls_max_at(torch.full_like(col, row), col)[dr]
-            self.encamp_outer_hp[dr, dt] = torch.where(enc, _ewf, self.encamp_outer_hp[dr, dt])
-            # BORDER CONTROL outcome A: this row's new districts are bombs —
-            # and it takes FOREIGN tiles too, so it subsumes the Preserve's own
-            # and only one of the two ever runs.
-            bomb = self._congress_culture_bomb_seat()[dr] == row
-            if bool(bomb.any()):
-                br2 = dr[bomb]
-                self._culture_bomb(row, br2, dt[bomb], col[br2])
-            own_bomb = ~bomb & self._d_bomb_unowned[self.district[dr, dt].clamp(min=0)]
-            if bool(own_bomb.any()):
-                br3 = dr[own_bomb]
-                self._culture_bomb(row, br3, dt[own_bomb], col[br3], unowned_only=True)
-            # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
-            # completing a Harbor" — the roster's own carrier, a FULL bomb
-            # like the Congress's (`CULTURE_BOMB_ROWS`)
-            for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
-                if _bd < 0:
-                    continue
-                _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
-                if bool(_bw.any()):
-                    _br = dr[_bw]
-                    self._culture_bomb(row, _br, dt[_bw], col[_br])
-            # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
-            # Center."
-            env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]
-            if bool((env > 0).any()):
-                _ctr = self.city_center[bidx, row, col][dr].clamp(min=0)
-                _touch = (self.neigh[dt] == _ctr.unsqueeze(1)).any(dim=1)
-                _add = torch.zeros(self.B, dtype=torch.long, device=self.device)
-                _add.index_add_(0, dr, env * _touch.long())
-                self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + _add
-            self._eff_version += 1
+            self._district_completed(row, col, qt0, made_d)
 
         made_b2 = done & (cur >= 0) & (cur < self.NB)
         if bool(made_b2.any()):
@@ -1315,6 +1228,115 @@ class SimPhase:
                             # CIV6: completing the Exoplanet Expedition LAUNCHES
                             # the craft; the win fires on ARRIVAL, in step().
                             self.space_ly[hit, row] = 0
+
+
+    def _construction_faith(self, row: int, col: torch.Tensor,
+                            cost: torch.Tensor, mask: torch.Tensor) -> None:
+        """CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction
+        cost when finishing buildings." Districts are construction too and the
+        page groups them with the buildings; wonders are not. ONE body, so a
+        district BOUGHT pays the governor exactly as one BUILT does."""
+        if not self.n_governors or not bool(mask.any()):
+            return
+        bidx = torch.arange(self.B, device=self.device)
+        _pct = self._governor_sum(row, "faithOnBuildPct")[bidx, col]
+        _pay = torch.floor(cost.double() * _pct / 100.0) * mask.double()
+        self.civ_faith[:, row] = self.civ_faith[:, row] + torch.zeros_like(
+            self.civ_faith[:, row]).index_add_(0, bidx, _pay.to(self.civ_faith.dtype))
+
+    def _district_completed(self, row: int, col: torch.Tensor,
+                            dtile: torch.Tensor, made_d: torch.Tensor) -> None:
+        """EVERYTHING A FINISHED DISTRICT PAYS — the completion flag, the
+        registry entry, the district-unit grants, Monumentality's era score,
+        the Encampment's walls, the culture bombs and the Diplomatic
+        Quarter's envoy. ONE body, because a district BOUGHT finishes
+        exactly as a district BUILT does; `dtile` [B] names the plot and
+        `col` [B] the city, both read only where `made_d` is set.
+        """
+        bidx = torch.arange(self.B, device=self.device)
+        dr = made_d.nonzero(as_tuple=True)[0]
+        dt = dtile[dr].clamp(min=0)
+        self.district_complete[dr, dt] = True
+        # The registry holds ONE tile per type; TS walks every instance. So
+        # for a type a city may hold SEVERAL of, point the entry at the one
+        # that just finished — then "the registry names a complete tile"
+        # holds exactly when TS's `some(complete)` does.
+        _rep = self._is_repeatable[self.district[dr, dt].clamp(min=0)]
+        if bool(_rep.any()):
+            _rr = dr[_rep]
+            self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
+        # CIV6 (Religious Convert): "Receives an Apostle each time he
+        # finishes a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
+        for _dc, _dl, _dd, _du in self._district_unit_rows:
+            if _du < 0 or _dd < 0:
+                continue
+            _dw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            _dw[dr] = self.district[dr, dt] == _dd
+            _dw = _dw & self._row_is(row, _dc, _dl)
+            if bool(_dw.any()):
+                _dat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                _dat[dr] = dt
+                self._spawn_unit(row, _dw, _dat, _du)
+        # CIV6 (M'banza): a free Apostle when it finishes; (Royal Navy
+        # Dockyard): a naval unit the install does not name, so the
+        # strongest hull this seat can train. The VARIANT's own clause,
+        # so a seat that does not play the civilization sees nothing.
+        for _vdi, _vcivs in self._d_variant_grant.items():
+            for _vciv, (_vu, _vnav) in _vcivs.items():
+                _vw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _vw[dr] = self.district[dr, dt] == _vdi
+                _vw = _vw & self._row_plays_idx(row, _vciv)
+                if not bool(_vw.any()):
+                    continue
+                _vat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                _vat[dr] = dt
+                if _vu >= 0:
+                    self._spawn_unit(row, _vw, _vat, _vu)
+                if _vnav:
+                    _hull = self._best_trainable_naval(row)
+                    self._spawn_unit(row, _vw & (_hull >= 0), _vat, _hull.clamp(min=0))
+        # MONUMENTALITY pays era score per SPECIALTY district completed
+        # (a city centre is never queued here).
+        mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        mon[dr] = True
+        self._dedication_event(row, 0, mon)
+        enc = self.district[dr, dt] == self._encamp_didx
+        self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
+        # its OWN perimeter arrives at whatever tier the city's walls
+        # already supply — 0 where none stand yet (`fitEncampOuter`)
+        _ewf = self._walls_max_at(torch.full_like(col, row), col)[dr]
+        self.encamp_outer_hp[dr, dt] = torch.where(enc, _ewf, self.encamp_outer_hp[dr, dt])
+        # BORDER CONTROL outcome A: this row's new districts are bombs —
+        # and it takes FOREIGN tiles too, so it subsumes the Preserve's own
+        # and only one of the two ever runs.
+        bomb = self._congress_culture_bomb_seat()[dr] == row
+        if bool(bomb.any()):
+            br2 = dr[bomb]
+            self._culture_bomb(row, br2, dt[bomb], col[br2])
+        own_bomb = ~bomb & self._d_bomb_unowned[self.district[dr, dt].clamp(min=0)]
+        if bool(own_bomb.any()):
+            br3 = dr[own_bomb]
+            self._culture_bomb(row, br3, dt[own_bomb], col[br3], unowned_only=True)
+        # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
+        # completing a Harbor" — the roster's own carrier, a FULL bomb
+        # like the Congress's (`CULTURE_BOMB_ROWS`)
+        for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
+            if _bd < 0:
+                continue
+            _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
+            if bool(_bw.any()):
+                _br = dr[_bw]
+                self._culture_bomb(row, _br, dt[_bw], col[_br])
+        # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
+        # Center."
+        env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]
+        if bool((env > 0).any()):
+            _ctr = self.city_center[bidx, row, col][dr].clamp(min=0)
+            _touch = (self.neigh[dt] == _ctr.unsqueeze(1)).any(dim=1)
+            _add = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            _add.index_add_(0, dr, env * _touch.long())
+            self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + _add
+        self._eff_version += 1
 
     def _city_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> torch.Tensor:
         """A city's unbesieged HEAL for whichever row holds it — the majors'

@@ -18,7 +18,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -42,7 +42,7 @@ import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_T
 import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
-import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost } from '../data/constants';
+import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT } from '../data/constants';
 import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
@@ -752,9 +752,33 @@ export function placeSeatDistrict(
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   if (!tile) return false;
+  if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
+  const cost = districtSiteCost(state, actor, id, unlocks);
+  paveDistrictTile(state, civCity, id, tileIndex);
+  commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost });
+  return true;
+}
+
+/** IS THIS SITE LEGAL for this district, for this city, right now? One
+ * predicate, so the BUILD verb and the PURCHASE verb refuse on the same
+ * clauses rather than on two spellings of them. */
+function districtSiteLegal(
+  state: GameState, civCity: City, id: DistrictId, unlocks: Unlocks, tileIndex: number,
+): boolean {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return false;
   const owns = (t: Tile) => tileBelongsTo(t, civCity);
   if (tile.improvement) return false;
-  if (!canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok) return false;
+  return canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok;
+}
+
+/** WHAT THIS DISTRICT COSTS this seat right now — the research scaling, the
+ * one-of-a-kind discount and the civilization's variant, in that order. The
+ * PURCHASE verb prices off this same number, so a discount can never be worth
+ * a different amount to a buyer than to a builder. */
+export function districtSiteCost(
+  state: GameState, actor: Seat, id: DistrictId, unlocks: Unlocks,
+): number {
   // CIV6: the Spaceport's cost is FLAT — no research scaling, no discount.
   const base = districtCostIn(actor.research, DISTRICTS[id]?.cost ?? DISTRICT_SPECIALTY_COST);
   const cost0 = DISTRICTS[id]?.fixedCost
@@ -762,7 +786,13 @@ export function placeSeatDistrict(
     : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
       ? Math.floor(base * districtDiscountMult(id))
       : base;
-  const cost = districtVariantCost(state, actor.seat, id, cost0);
+  return districtVariantCost(state, actor.seat, id, cost0);
+}
+
+/** The GROUND a district takes when it is placed — the same writes whether the
+ * city is going to build it over ten turns or bought it outright. */
+function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number): void {
+  const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
   tile.improvement = null;
@@ -774,8 +804,6 @@ export function placeSeatDistrict(
   // already refused luxury/strategic).
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
   civCity.districts.push({ type: id, tileIndex });
-  commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost });
-  return true;
 }
 
 
@@ -787,6 +815,55 @@ export function placeSeatDistrict(
  * time — the replay refuses rather than double-building. The capital gate
  * stays OUT: it is the scripted picker's heuristic,
  * and real Civ 6 lets any city raise any unlocked wonder. */
+/**
+ * BUY A DISTRICT OUTRIGHT (B-24r).
+ *
+ * CIV6 (Contractor): "Allows city to purchase Districts with Gold"; (Divine
+ * Architect): the same in Faith. Both are pure permissions — CanPurchase
+ * booleans on the governor promotion — so the PRICE is the engine's own, the
+ * production cost times the purchase multiplier a building already pays.
+ *
+ * The site names the city, exactly as the tile-purchase verb's does. Placement
+ * re-validates through `placeSeatDistrict`'s own body, and the district is then
+ * finished by `completeQueueItem` rather than by a second completion written
+ * here: the Encampment's walls, the dedication, the district-unit grants and
+ * the M'banza's Apostle all live in that one composer, and a purchase that
+ * spelled its own completion would quietly miss whichever clause landed next.
+ */
+export function purchaseSeatDistrict(
+  state: GameState,
+  actor: Seat,
+  tileIndex: number,
+  id: DistrictId,
+  viaFaith: boolean,
+): boolean {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return false;
+  const civCity = actor.cities.find((c) => tileBelongsTo(tile, c));
+  if (!civCity) return false;
+  const gate = viaFaith
+    ? governorFlag(state, civCity, (e) => e.districtFaithBuy)
+    : governorFlag(state, civCity, (e) => e.districtGoldBuy);
+  if (!gate) return false;
+  const unlocks = computeUnlocks(state, actor.seat);
+  if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
+  // Priced off the BUILDER's number, so a variant or a discount is worth the
+  // same to a buyer. Nothing is written until the purse has paid: a purchase
+  // never touches the city's QUEUE or its production bank — the hammers a
+  // city has saved are not spent by a cheque.
+  const cost = districtSiteCost(state, actor, id, unlocks);
+  const price = viaFaith
+    ? faithPrice(state, actor.seat, Math.round(cost * FAITH_PURCHASE_MULT))
+    : goldPrice(state, actor.seat, Math.round(cost * GOLD_PURCHASE_MULT));
+  const purse = viaFaith ? (actor.faith ?? 0) : (actor.treasury ?? 0);
+  if (!goldAffordable(purse, price)) return false;
+  if (viaFaith) actor.faith = (actor.faith ?? 0) - price;
+  else actor.treasury = (actor.treasury ?? 0) - price;
+  paveDistrictTile(state, civCity, id, tileIndex);
+  completeQueueItem(state, civCity, { kind: 'district', district: id, tileIndex, progress: cost, cost }, cost);
+  return true;
+}
+
 export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
   const civ = actor.seat;
   const center = state.map.tiles[civCity.centerIndex];
@@ -2131,6 +2208,14 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
+      // KIND 5 — a DISTRICT bought with gold (the Contractor's promotion).
+      // The site names the city, as kind 3's tile does, and
+      // `purchaseSeatDistrict` re-validates the permission, the placement and
+      // the purse before anything is spent.
+      if (!bought && rec?.buy?.[0] === 5) {
+        const d = SCAFFOLD_DISTRICTS[rec.buy[2]];
+        if (d) bought = purchaseSeatDistrict(state, actor, rec.buy[1], d.id, false);
+      }
       const wantSettler = rec?.buy?.[0] === 1;
       if (wantSettler && !bought && actor.cities.length > 0) {
         const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
@@ -2192,12 +2277,23 @@ export function seatPhase(state: GameState): void {
       let boughtLandUnit = false;
       let boughtPatron = false;
       let boughtBand = false;
+      let boughtDistrict = false;
       for (const ent of rec?.buyFaith ?? []) {
         const [fk, centre] = ent;
         if (fk === 15) {
           // kind 15 — FAITH patronage; no city involved, the class rides
           // the third slot.
           if (!boughtPatron) boughtPatron = patronizeGreatPerson(state, actor.seat, ent[2] ?? -1, 'faith').ok;
+          continue;
+        }
+        if (fk === 17) {
+          // kind 17 — a DISTRICT bought with FAITH (the Divine Architect's
+          // promotion). Its `a` is the SITE tile, as gold's kind 5 is, so the
+          // city is found from the site rather than named directly.
+          if (!boughtDistrict) {
+            const d = SCAFFOLD_DISTRICTS[ent[2] ?? -1];
+            if (d) boughtDistrict = purchaseSeatDistrict(state, actor, centre, d.id, true);
+          }
           continue;
         }
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);

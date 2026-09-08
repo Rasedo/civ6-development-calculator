@@ -245,10 +245,76 @@ def main() -> None:
     assert c >= 0, "the control district did not go down even once"
     assert d2 < 0, f"a NON-repeatable district went down twice (tiles {c}, {d2})"
 
+    # --- 8) BUYING one outright: the permission, the price, the completion --
+    #   The governor promotion is the whole permission, so the interesting
+    #   claims are that the gate is read on the SITE's city, that the price is
+    #   the builder's cost through the purchase multiplier, and that a refusal
+    #   writes nothing at all.
+    def _promo_col(name: str) -> int:
+        col = _buy._gpromo.get(name)
+        assert col is not None, f"{name} is not a loaded governor channel"
+        hits = (col > 0).nonzero(as_tuple=True)[0].tolist()
+        assert hits, f"no promotion in the catalog carries {name}"
+        return int(hits[0])
+
+    for _faith in (False, True):
+        _buy = build(rules, path)
+        _buy.seat_ext[0, row] = True
+        _chan = "districtFaithBuy" if _faith else "districtGoldBuy"
+        _p = _promo_col(_chan)
+        # no governor: the verb refuses and the purse is untouched
+        _buy.civ_gov_appointed[:] = False
+        _buy.civ_treasury[0, row] = 1e6
+        _buy.civ_faith[0, row] = 1e6
+        _elig = _buy._district_elig(row, j, di, plc)
+        _t = int(ladder.pick_district_tile(_elig, _buy.district_rank_adj(di, plc))[0])
+        assert _t >= 0, "the scene offers no eligible plot to buy"
+        _want = torch.ones(1, dtype=torch.bool)
+        _tt = torch.full((1,), _t, dtype=torch.long)
+        _ss = torch.full((1,), si, dtype=torch.long)
+        assert not bool(_buy._purchase_district(row, _want, _tt, _ss, _faith).any()),             f"{_chan}: the verb fired with no governor holding the promotion"
+        assert int(_buy.district[0, _t]) != di, "a refused purchase paved the plot"
+
+        # ...and with the promotion held in the SITE's city it lands, at the
+        # builder's cost through the purchase multiplier
+        _gi = int(_buy._gpromo_gov[_p])
+        _buy.civ_gov_appointed[:, row, _gi] = True
+        _buy.civ_gov_city[:, row, _gi] = _buy.city_id[:, row, j]
+        _buy.civ_gov_establish[:, row, _gi] = 0
+        _buy.civ_gov_out[:, row, _gi] = 0
+        _buy.civ_gov_promos[:, row, _gi] = (1 << _p) | (1 << int(_buy._gov_base_promo[_gi]))
+        _mult = _buy.rules.faith_purchase_mult if _faith else _buy.rules.gold_purchase_mult
+        _cost = float(_buy._district_cost_si(row, si)[0])
+        _purse0 = float(_buy.civ_faith[0, row] if _faith else _buy.civ_treasury[0, row])
+        assert bool(_buy._purchase_district(row, _want, _tt, _ss, _faith)[0]),             f"{_chan}: the verb refused with the promotion held"
+        _purse1 = float(_buy.civ_faith[0, row] if _faith else _buy.civ_treasury[0, row])
+        assert abs((_purse0 - _purse1) - round(_cost * _mult)) < 1e-6,             f"{_chan}: paid {_purse0 - _purse1}, the builder's cost times {_mult} is {round(_cost * _mult)}"
+        assert int(_buy.district[0, _t]) == di and bool(_buy.district_complete[0, _t]),             f"{_chan}: the bought district is not standing complete"
+        assert int(_buy.city_dist_tile[0, row, j, di]) == _t, f"{_chan}: the registry missed it"
+        assert int(_buy.city_current[0, row, j, 0]) == -1,             f"{_chan}: a cheque disturbed the city's QUEUE"
+        _other = float(_buy.civ_treasury[0, row] if _faith else _buy.civ_faith[0, row])
+        assert abs(_other - 1e6) < 1e-6, f"{_chan}: the other purse was charged"
+
+        # an empty purse writes nothing
+        _poor = build(rules, path)
+        _poor.seat_ext[0, row] = True
+        _poor.civ_gov_appointed[:, row, _gi] = True
+        _poor.civ_gov_city[:, row, _gi] = _poor.city_id[:, row, j]
+        _poor.civ_gov_establish[:, row, _gi] = 0
+        _poor.civ_gov_out[:, row, _gi] = 0
+        _poor.civ_gov_promos[:, row, _gi] = (1 << _p) | (1 << int(_poor._gov_base_promo[_gi]))
+        _poor.civ_treasury[0, row] = 1.0
+        _poor.civ_faith[0, row] = 1.0
+        assert not bool(_poor._purchase_district(row, _want, _tt, _ss, _faith).any()),             f"{_chan}: an unaffordable purchase went through"
+        assert int(_poor.district[0, _t]) != di, f"{_chan}: a refused purchase paved the plot"
+        assert abs(float(_poor.civ_treasury[0, row]) - 1.0) < 1e-6             and abs(float(_poor.civ_faith[0, row]) - 1.0) < 1e-6,             f"{_chan}: a refused purchase moved a purse"
+    print("  8 district PURCHASE OK — the promotion is the whole permission, the price is "
+          "the builder's cost through the multiplier, and a refusal writes nothing")
+
     print("district_wire_test OK — the ladder key, no tile places nothing, "
           "an ineligible tile is refused, a suboptimal one is honoured, the feature-tech gate "
           "holds, the tile round-trips through the record, and a repeatable district goes down "
-          "twice where a plain one is refused")
+          "twice where a plain one is refused, and a governor can buy one outright")
 
 
 if __name__ == "__main__":

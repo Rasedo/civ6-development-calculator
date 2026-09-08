@@ -122,6 +122,9 @@ const governorEffectRow = (fx: GovernorEffects) => ({
   fullHeal: fx.fullHeal ? 1 : 0,
   ignoreForeignPressure: fx.ignoreForeignPressure ? 1 : 0,
   faithOnBuildPct: fx.faithOnBuildPct ?? 0,
+  airDefenseCS: fx.airDefenseCS ?? 0,
+  districtGoldBuy: fx.districtGoldBuy ? 1 : 0,
+  districtFaithBuy: fx.districtFaithBuy ? 1 : 0,
   waterWorks: fx.waterWorks ? 1 : 0,
   // [range, loyalty] per turn onto this seat's OTHER cities / onto foreign ones
   loyaltyToOwn: fx.loyaltyToOwn ? [fx.loyaltyToOwn.range, fx.loyaltyToOwn.loyalty] : [0, 0],

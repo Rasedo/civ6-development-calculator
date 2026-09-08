@@ -393,6 +393,7 @@ class SimSeats:
         ucls: tuple | None = None,  # kind 13: (slot [B], unit [B]) — the land combat unit faith buys
         pat: torch.Tensor | None = None,  # kind 15: [B] class of the FAITH patronage claim (-1 = none)
         band: torch.Tensor | None = None,  # kind 16: [B] city slot buying a ROCK BAND (-1 = none)
+        dist: tuple | None = None,  # faith kind 17: (site tile [B], scaffold row [B]) — a DISTRICT bought with faith; -1 = none
         route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
@@ -426,7 +427,7 @@ class SimSeats:
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war, war_kind=war_kind,
                            production=production, pref=production_pref, dtile=production_tile,
                            policies=policies)
-        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, dist=dist)
         if route is not None:
             self._driven_route[row] = route
         if nuke is not None:
@@ -1083,9 +1084,11 @@ class SimSeats:
                     self.tile_locked[rows, tc[rows]] = ~self.tile_locked[rows, tc[rows]]
                     self._eff_version += 1
 
-    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None) -> None:
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None, dist=None) -> None:
         if buy is not None:
             self._driven_buy[row] = buy
+        if dist is not None:
+            self._driven_buy_dist[row] = dist
         if worship is not None:
             self._driven_buy_worship[row] = worship
         if relig is not None:
@@ -1398,6 +1401,51 @@ class SimSeats:
                      else self.civ_civics[:, row, _pv])
             base = torch.where(_w, _open, base)
         return base
+
+    def _district_research_fac(self, row: int) -> torch.Tensor:
+        """[B] f64 — the RESEARCH factor every district's base is scaled by:
+        the seat's technologies or its civics, whichever fraction is larger.
+        The factor is the SEAT's; the base is the row's own."""
+        dcp = self.rules.district_cost
+        rdv = self.rules_dev
+        t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
+        c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
+        return 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
+
+    def _district_cost_si(self, row: int, si: int,
+                          d_fac: torch.Tensor | None = None) -> torch.Tensor:
+        """[B] — what scaffold row `si` costs seat row `row` RIGHT NOW: the
+        row's own base against the research factor, the under-represented
+        discount, and the civilization's variant multiplier. ONE composer, so
+        a district BOUGHT is priced off the same number a district BUILT is —
+        a discount cannot be worth a different amount to a buyer.
+
+        `d_fac` is the caller's already-computed research factor where it has
+        one (the queue walk computes it once for every scaffold row)."""
+        dcp = self.rules.district_cost
+        di, _utech, _uciv, _plc, fc = self._scaffold[si]
+        d_per = dcp.get("perDistrict") or []
+        d_disc = dcp.get("discountPct") or []
+        if d_fac is None:
+            d_fac = self._district_research_fac(row)
+        # this row's OWN base (`Districts.Cost`) against the seat's research
+        # factor — a shared 54 priced an Aqueduct as a Campus
+        _b_si = float(d_per[di]) if di < len(d_per) else float(dcp.get("base", 32))
+        d_cost = torch.floor(_b_si * d_fac).to(self.dtype)
+        if fc >= 0:
+            # A FLAT-priced district (the Spaceport): no research scaling, no
+            # under-represented discount.
+            return torch.full_like(d_cost, float(fc))
+        disc = self._district_discounted(row, di)
+        # ...and the row's OWN discount: 40 everywhere the install writes it,
+        # 25 for the two plaza rows
+        _p_si = float(d_disc[di]) if di < len(d_disc) else 40.0
+        out = torch.where(disc, torch.floor(d_cost * (1.0 - _p_si / 100.0)), d_cost)
+        # CIV6 (Bath): the unique district is "cheaper to build"
+        for _v in self._d_variants.get(di, []):
+            _pm = self._row_plays_idx(row, int(_v["civ"]))
+            out = torch.where(_pm, torch.floor(out * float(_v["costMult"])), out)
+        return out
 
     def _district_cap(self, row: int, j: int) -> torch.Tensor:
         """[B] long — how many SPECIALTY districts city slot `j` may hold:
@@ -2077,6 +2125,124 @@ class SimSeats:
             done = done | ok
         return done
 
+    def _seat_district_buy_candidate(self, row: int, active: torch.Tensor, via_faith: bool):
+        """(ok [B], tile [B], si [B]) — a district this seat COULD buy outright
+        right now: the first scaffold row it can afford, on the lowest eligible
+        plot of the lowest city whose governor carries the promotion.
+
+        ONE body, so the driver's candidate row and the applier's
+        re-validation cannot drift from each other. The scan is behind the
+        promotion: a seat with no Contractor and no Divine Architect pays one
+        governor read and leaves.
+        """
+        none_t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        no = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if not self.districts_on or not self._scaffold or not self.n_governors:
+            return no, none_t, none_t
+        chan = "districtFaithBuy" if via_faith else "districtGoldBuy"
+        promo = self._gpromo.get(chan)
+        if promo is None or float(promo.abs().sum()) == 0:
+            return no, none_t, none_t
+        gate = self._governor_flag(row, chan)  # [B, RC]
+        if not bool(gate.any()):
+            return no, none_t, none_t
+        d_fac = self._district_research_fac(row)
+        mult = self.rules.faith_purchase_mult if via_faith else self.rules.gold_purchase_mult
+        purse = self.civ_faith[:, row] if via_faith else self.civ_treasury[:, row]
+        ok, tile, si_out = no.clone(), none_t.clone(), none_t.clone()
+        for si, (di, _utech, _uciv, plc, _fc) in enumerate(self._scaffold):
+            unl = active & ~ok & self._district_unlocked(row, si)
+            if not bool(unl.any()):
+                continue
+            cost = self._district_cost_si(row, si, d_fac)
+            base = js_round(cost.double() * mult)
+            price = self._faith_price(row, base) if via_faith else self._gold_price(row, base)
+            unl = unl & self._afford(purse, price)
+            if not bool(unl.any()):
+                continue
+            spec_si = bool(self._is_specialty[di])
+            for j in range(self.RC):
+                want = unl & ~ok & gate[:, j] & self.city_alive[:, row, j]                     & self._district_slot_free(row, j, di)
+                if spec_si:
+                    cnt = ((self.city_dist_tile[:, row, j] >= 0)
+                           & self._is_specialty.reshape(1, -1)).sum(dim=1)
+                    want = want & (cnt < self._district_cap(row, j))
+                if not bool(want.any()):
+                    continue
+                elig = self._district_elig(row, j, di, plc)  # [B, T]
+                take = want & elig.any(dim=1)
+                if not bool(take.any()):
+                    continue
+                ok = ok | take
+                tile = torch.where(take, elig.long().argmax(dim=1), tile)
+                si_out = torch.where(take, torch.full_like(si_out, si), si_out)
+        return ok, tile, si_out
+
+    def _purchase_district(self, row: int, want: torch.Tensor, tile: torch.Tensor,
+                           si_code: torch.Tensor, via_faith: bool) -> torch.Tensor:
+        """[B] bool — the games where seat row `row` BOUGHT a district outright.
+
+        CIV6 (Contractor): "Allows city to purchase Districts with Gold";
+        (Divine Architect): the same in Faith. Both are pure permissions, so
+        the price is the engine's own — the production cost the BUILDER would
+        pay, through the same purchase multiplier a building pays.
+
+        The SITE names the city, as the tile-purchase verb's does. Nothing is
+        written until the purse has paid, and a purchase never touches the
+        city's QUEUE or its production bank: the hammers a city has saved are
+        not spent by a cheque.
+        """
+        none = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if not self.districts_on or not self._scaffold or not self.n_governors:
+            return none
+        chan = "districtFaithBuy" if via_faith else "districtGoldBuy"
+        tc = tile.clamp(min=0, max=self.T - 1)
+        # the governor holding the promotion is the one in the city that owns
+        # the SITE, so the flag is read on the TILE plane — the same lookup
+        # TS's `tileBelongsTo` scan makes.
+        gate = self._governor_tile_flag(row, chan).gather(1, tc.unsqueeze(1)).squeeze(1)
+        slot = self.city_slot_at(row).gather(1, tc.unsqueeze(1)).squeeze(1)
+        want = want & (tile >= 0) & (tile < self.T) & gate & (slot >= 0)
+        if not bool(want.any()):
+            return none
+        d_fac = self._district_research_fac(row)
+        mult = self.rules.faith_purchase_mult if via_faith else self.rules.gold_purchase_mult
+        out = none.clone()
+        for si, (di, _utech, _uciv, plc, _fc) in enumerate(self._scaffold):
+            want_si = want & (si_code == si) & self._district_unlocked(row, si)
+            if not bool(want_si.any()):
+                continue
+            cost = self._district_cost_si(row, si, d_fac)
+            base = js_round(cost.double() * mult)
+            price = self._faith_price(row, base) if via_faith else self._gold_price(row, base)
+            purse = self.civ_faith[:, row] if via_faith else self.civ_treasury[:, row]
+            want_si = want_si & self._afford(purse, price)
+            if not bool(want_si.any()):
+                continue
+            spec_si = bool(self._is_specialty[di])
+            for j in range(self.RC):
+                want_j = want_si & (slot == j) & self._district_slot_free(row, j, di)
+                if spec_si:
+                    spec_cnt = ((self.city_dist_tile[:, row, j] >= 0)
+                                & self._is_specialty.reshape(1, -1)).sum(dim=1)
+                    want_j = want_j & (spec_cnt < self._district_cap(row, j))
+                if not bool(want_j.any()):
+                    continue
+                placed = self._place_district(row, j, di, want_j, plc, tile)
+                if not bool(placed.any()):
+                    continue
+                col = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+                if via_faith:
+                    self.civ_faith[:, row] = self.civ_faith[:, row] - (
+                        price * placed).to(self.civ_faith.dtype)
+                else:
+                    self.civ_treasury[:, row] = self.civ_treasury[:, row] - (
+                        price * placed).to(self.civ_treasury.dtype)
+                self._construction_faith(row, col, cost, placed)
+                self._district_completed(row, col, tile, placed)
+                out = out | placed
+        return out
+
     def _seat_buy_ladder(self, row: int, active: torch.Tensor, army0: torch.Tensor) -> None:
         """THE gold/faith spending block for seat row `row`, at the seatPhase
         position (after the production picks, before the trade block) — ONE
@@ -2184,6 +2350,11 @@ class SimSeats:
             want_p = active & ext & ~bought & (kind == 4) & (jjw >= 0)
             if bool(want_p.any()):
                 bought = bought | self._patronize(row, want_p, jjw, gold=True)
+            # kind 5 — a DISTRICT bought with GOLD (the Contractor's
+            # promotion). `jjw` is the SITE tile, `bbw` the scaffold row.
+            want_d = active & ext & ~bought & (kind == 5) & (jjw >= 0) & (bbw >= 0)
+            if bool(want_d.any()):
+                bought = bought | self._purchase_district(row, want_d, jjw, bbw, False)
         if row in self._driven_buy_worship:
             wj = self._driven_buy_worship.pop(row)
             wb = self._worship_bidx_of(row)
@@ -2294,6 +2465,12 @@ class SimSeats:
             if bool(buy_n.any()):
                 landed_n = self._spawn_unit(row, buy_n, at_n, self._naturalist_idx)
                 self.civ_faith[:, row] = torch.where(landed_n, self.civ_faith[:, row] - n_price, self.civ_faith[:, row])
+        if row in self._driven_buy_dist:
+            # kind 17 — a DISTRICT bought with FAITH (the Divine Architect's
+            # promotion), the twin of gold's kind 5 and its own slot: faith
+            # buys ride BESIDE the one gold purchase, never inside it.
+            _dt, _dsi = self._driven_buy_dist.pop(row)
+            self._purchase_district(row, active & ext & (_dt >= 0) & (_dsi >= 0), _dt, _dsi, True)
         if row in self._driven_buy_band and getattr(self, "_band_idx", -1) >= 0:
             b_j = self._driven_buy_band.pop(row)
             # CIV6 (Rock Band): FAITH only, behind the Cold War civic, at a
@@ -2537,15 +2714,7 @@ class SimSeats:
             is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
             if bool(is_d.any()) and self.districts_on and self._scaffold \
                     and dtile is not None and j < int(dtile.shape[1]):
-                dcp = rls.district_cost
-                t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
-                c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
-                # the research factor is the seat's; the BASE is the row's own
-                # (`Districts.Cost`) — a shared 54 priced an Aqueduct as a
-                # Campus
-                d_fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
-                d_per = dcp.get("perDistrict") or []
-                d_disc = dcp.get("discountPct") or []
+                d_fac = self._district_research_fac(row)
                 reg_j = self.city_dist_tile[:, row, j]  # [B, nD] THIS city's registry — the list TS counts
                 spec_cnt = ((reg_j >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
                 cap_j = self._district_cap(row, j)
@@ -2559,26 +2728,7 @@ class SimSeats:
                     want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
                     if not bool(want_d.any()):
                         continue
-                    # this row's OWN base (`Districts.Cost`) against the seat's
-                    # research factor — a shared 54 priced an Aqueduct as a
-                    # Campus
-                    _b_si = float(d_per[di]) if di < len(d_per) else float(dcp.get("base", 32))
-                    d_cost = torch.floor(_b_si * d_fac).to(self.dtype)
-                    if fc >= 0:
-                        # A FLAT-priced district (the Spaceport): no research
-                        # scaling, no under-represented discount.
-                        d_cost_si = torch.full_like(d_cost, float(fc))
-                    else:
-                        disc = self._district_discounted(row, di)
-                        # ...and the row's OWN discount: 40 everywhere the
-                        # install writes it, 25 for the two plaza rows
-                        _p_si = float(d_disc[di]) if di < len(d_disc) else 40.0
-                        d_cost_si = torch.where(
-                            disc, torch.floor(d_cost * (1.0 - _p_si / 100.0)), d_cost)
-                        # CIV6 (Bath): the unique district is "cheaper to build"
-                        for _v in self._d_variants.get(di, []):
-                            _pm = self._row_plays_idx(row, int(_v["civ"]))
-                            d_cost_si = torch.where(_pm, torch.floor(d_cost_si * float(_v["costMult"])), d_cost_si)
+                    d_cost_si = self._district_cost_si(row, si, d_fac)
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self._q_push(row, j, placed,

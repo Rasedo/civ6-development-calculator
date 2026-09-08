@@ -30,7 +30,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | **A. Engine vs engine** | **0** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request's gold-to-rival scorer, three more scored quantities |
-| B-24r governor tails | 2 | a district PURCHASE verb, the Fishery and City Park improvements, a fourth card style, Foreign Investor and Affluence on C-38, five clauses on C-1/C-31/C-34 |
+| B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
 | B-31r trade-route tails | 1 | plunder gold unsourced; chain depth is an ask; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
@@ -162,16 +162,28 @@ Nothing open.
     COMPETITION each want their own scored quantity.
   - THE NOBEL PRIZE competitions are Sweden-only (C-26).
 - **B-24r. GOVERNOR TAILS.** Weight 2.
-  - A district PURCHASE verb (gold and faith) — Contractor and Divine
-    Architect wait on it; no engine has the verb.
+  - The district PURCHASE verb SHIPPED with #244p, gold and faith both, and
+    with it CONTRACTOR and DIVINE ARCHITECT, which had carried empty effects
+    since governors landed. Both promotions are pure permissions
+    (`CanPurchase` booleans with no price of their own), so the price is the
+    engine's: the production cost a builder would pay, through the purchase
+    multiplier a building already pays. Two composers came out of the build —
+    one district COST and one district COMPLETION per engine — so a discount
+    is worth the same to a buyer as to a builder, and a bought Encampment
+    gets its walls. A purchase touches neither the city's queue nor its
+    production bank: hammers are not spent by a cheque.
+  - AIR DEFENSE INITIATIVE was shipped in #245 with no exporter column: the
+    GPU asked `_gpromo` for a channel the loader never loaded, got `None`,
+    and paid every seat zero while TS paid the promotion. Fixed with the
+    column, and `seat_symmetry_check` now fails on any governor channel read
+    by a string the loader does not carry.
   - The FISHERY and CITY PARK SHIPPED with #242m, and with them Aquaculture
     and Parks and Recreation, which had carried empty effects since governors
     landed. Both are LIANG's, not Reyna's, and each promotion OPENS the row
     in its own city rather than merely paying it — which is why the install
     writes the plot yield as a second, separate modifier: the improvement
     stands after the governor leaves and that payment stops.
-  - Renewable Subsidizer and Industrialist wait on C-1's plants; Air
-    Defense Initiative on C-34's anti-air and C-31's ICBM; Arms Race
+  - Renewable Subsidizer and Industrialist wait on C-1's plants; Arms Race
     Proponent on C-31's armament projects.
   - FOREIGN INVESTOR needs a minor that accumulates strategic resources
     (C-38); AFFLUENCE copies the ground's luxuries because a minor improves

@@ -99,6 +99,16 @@ export interface GovernorEffects {
    *  against aircraft and ICBMs." The governed city's own tiles, whoever
    *  stands on them — the same territory test Garrison Commander uses. */
   airDefenseCS?: number;
+  /** CIV6 (Contractor, CONTRACTOR_ENABLE_DISTRICT_PURCHASE /
+   *  MODIFIER_CITY_ADJUST_CAN_PURCHASE_DISTRICTS, CanPurchase true): "Allows
+   *  city to purchase Districts with Gold." A pure permission — the price is
+   *  the engine's own, GOLD_PURCHASE_MULT off the district's production cost,
+   *  exactly as a building's purchase is priced. */
+  districtGoldBuy?: boolean;
+  /** CIV6 (Divine Architect, CARDINAL_FAITH_PURCHASE_DISTRICT /
+   *  MODIFIER_GOVERNOR_ADJUST_CAN_FAITH_PURCHASE_DISTRICTS): the same
+   *  permission in FAITH, at FAITH_PURCHASE_MULT. */
+  districtFaithBuy?: boolean;
   /** extra ranged strikes per turn (Embrasure). */
   extraStrikes?: number;
   /** a military unit trained here starts with a free promotion (Embrasure). */
@@ -197,7 +207,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { perCitizen: { gold: 2 } }, ['HARBORMASTER', 'FORESTRY_MANAGEMENT']),
   G('CONTRACTOR', 'REYNA', 3, 'Contractor',
     'Allows city to purchase Districts with Gold.',
-    {}, ['TAX_COLLECTOR']),
+    { districtGoldBuy: true }, ['TAX_COLLECTOR']),
   G('RENEWABLE_SUBSIDIZER', 'REYNA', 3, 'Renewable Subsidizer',
     'All Offshore Wind Farms, Solar Farms, Wind Farms, Geothermal Plants and Hydroelectric Dams in this city receive +2 Power and +2 Gold.',
     {}, ['TAX_COLLECTOR']),
@@ -280,7 +290,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { firstPromoBonus: 1 }, ['CITADEL_OF_GOD']),
   G('DIVINE_ARCHITECT', 'MOKSHA', 3, 'Divine Architect',
     'Allows city to purchase Districts with Faith.',
-    {}, ['CITADEL_OF_GOD']),
+    { districtFaithBuy: true }, ['CITADEL_OF_GOD']),
 
   // ---- LIANG, the Surveyor ----
   G('GUILDMASTER', 'LIANG', 0, 'Guildmaster',

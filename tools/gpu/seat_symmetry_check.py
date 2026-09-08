@@ -643,6 +643,71 @@ def bad_rules_reads(fields: set[str]) -> list[tuple[str, int, str]]:
 
 
 # ---------------------------------------------------------------------------
+# A GOVERNOR CHANNEL THE EXPORTER NEVER SENDS IS A SILENT ZERO.
+#
+# `_gpromo` is a dict built from ONE tuple of channel names in the fixture loader, and
+# every reader asks for its channel BY STRING. A reader whose channel is not in
+# that tuple gets `None` back and every `_governor_*` helper answers its
+# identity — zero, one, False — for every seat, in every game, forever. Nothing
+# raises, nothing diverges at compile time, and the TS side pays the promotion
+# happily. This is `rows-behind-an-early-return` with a string key instead of a
+# mask, and it has already shipped once.
+# ---------------------------------------------------------------------------
+
+_GOV_HELPERS = ("_governor_sum", "_governor_mult", "_governor_flag", "_governor_vec",
+                "_governor_vec_mult", "_governor_tile_sum", "_governor_tile_mult",
+                "_governor_tile_flag")
+
+
+def gpromo_channels() -> set[str]:
+    """The channel names the fixture loader actually puts in `_gpromo`."""
+    tree = ast.parse((CORE / "sim_init.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.For) or not isinstance(node.target, ast.Name):
+            continue
+        if not isinstance(node.iter, ast.Tuple):
+            continue
+        # the ONE loop that writes the dict — `_k` is a common enough loop
+        # variable in that file that the name alone picks the wrong tuple
+        writes = any(isinstance(t, ast.Attribute) and t.attr == "_gpromo"
+                     for st in ast.walk(node) if isinstance(st, ast.Subscript)
+                     for t in [st.value])
+        if not writes:
+            continue
+        names = {e.value for e in node.iter.elts
+                 if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+        if names:
+            return names
+    return set()
+
+
+def bad_gpromo_reads(channels: set[str]) -> list[tuple[str, int, str]]:
+    bad: list[tuple[str, int, str]] = []
+    for path in _reader_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            want = None
+            if isinstance(node, ast.Call):
+                callee = _callee(node)
+                if callee in _GOV_HELPERS and len(node.args) >= 2:
+                    arg = node.args[1]
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        want = arg.value
+                elif callee == "get" and isinstance(node.func, ast.Attribute)                         and isinstance(node.func.value, ast.Attribute)                         and node.func.value.attr == "_gpromo" and node.args:
+                    arg = node.args[0]
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        want = arg.value
+            elif isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute)                     and node.value.attr == "_gpromo"                     and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                want = node.slice.value
+            if want is not None and want not in channels:
+                bad.append((str(path.relative_to(ROOT)), node.lineno, f"_gpromo[{want!r}]"))
+    return sorted(set(bad))
+
+
+# ---------------------------------------------------------------------------
 # COMMENTS NAME SYMBOLS, AND A NAME IS A CLAIM.
 #
 # A comment is the only assertion in this repo with no instrument behind it,
@@ -936,6 +1001,14 @@ def main(census_only: bool = False) -> int:
         for f, ln, what in rbad:
             print(f"  {f}:{ln}  {what}")
 
+    channels = gpromo_channels()
+    gbad = bad_gpromo_reads(channels)
+    if gbad:
+        fails += 1
+        print("UNLOADED GOVERNOR CHANNEL — read by string, never loaded, silently zero:")
+        for f, ln, what in gbad:
+            print(f"  {f}:{ln}  {what}")
+
     collapsed = collapsed_roster_masks()
     if collapsed:
         fails += 1
@@ -972,7 +1045,8 @@ def main(census_only: bool = False) -> int:
         return 1
     print(f"seat-symmetry check OK — {len(known)} bound attributes, "
           f"{sum(1 for s in sigs.values() if s is not None)} method signatures, "
-          f"{len(fields)} rules fields, {len(aliases)} aliases, "
+          f"{len(fields)} rules fields, {len(channels)} governor channels, "
+          f"{len(aliases)} aliases, "
           f"{len(FORK_ALLOW)} allowed GPU forks, {len(TS_FORK_ALLOW)} allowed TS forks, "
           f"{_checked_refs} comment refs resolve")
     return 0
