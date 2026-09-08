@@ -36,7 +36,7 @@ import { gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { OPEN_TERRAINS, civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
+import { OPEN_TERRAINS, civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
   BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
@@ -44,6 +44,7 @@ import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
   promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
+  logXpWrite,
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
@@ -1705,10 +1706,6 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
   return best;
 }
 
-/** the catalog's order, which is how both engines name a chassis on the
- *  wire and in the decomposition log. */
-export const UNIT_TYPE_IDX = Object.keys(UNITS);
-
 export function spawnUnit(
   state: GameState,
   unitType: string,
@@ -1771,6 +1768,7 @@ export function spawnUnit(
     let owed = 0;
     for (let l = 1; l <= freeP; l++) owed += XP_PER_LEVEL * l;
     unit.xp = owed;
+    logXpWrite(state, unit, 'fp');
   }
   state.units.push(unit);
   revealAround(state, seat, unit.tileIndex, unitSight(unit));
@@ -2269,6 +2267,7 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
     }
     case 'experience':
       unit.xp = (unit.xp ?? 0) + p.amount;
+      logXpWrite(state, unit, 'gh');
       break;
     case 'heal':
       unit.hp = Math.min(UNIT_HP, unit.hp + p.amount);

@@ -11,7 +11,7 @@ import {
   PROMOTIONS, PROMO_INDEX, PROMO_OFFER_DRAW, UNIT_PROMO_CLASS, classBitOf, promoRows,
   type PromoDef, type PromoKind,
 } from '../data/promotions';
-import { UNIT_HP, UNITS } from '../data/units';
+import { UNIT_HP, UNITS, UNIT_TYPE_IDX } from '../data/units';
 import { improvementIsCover } from '../data/improvements';
 import { nextRandom } from './rand';
 
@@ -191,6 +191,18 @@ export function promoCount(unit: { promos?: number }): number {
  *  class list, drawn without replacement, so the stream is exactly that many
  *  numbers however the picks land. The offer IS a level to spend, so the
  *  unit leaves armed with its next level's XP. */
+/** THE XP HALF OF THE DECOMPOSITION LOG. Seven writers move a unit's pool
+ *  and only one of them clamps, so a disagreement in the TOTAL says nothing
+ *  about which of them ran; the two-letter tag does. Keyed on (seat, turn,
+ *  tile, chassis) — never on a slot, which the two engines number
+ *  differently. */
+export function logXpWrite(state: GameState, unit: Unit, tag: string): void {
+  const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (!dl) return;
+  dl.push(`xp:${unit.seat}:${state.turn}:${unit.tileIndex}`
+    + `:${UNIT_TYPE_IDX.indexOf(unit.type)} ${tag}${unit.xp ?? 0}`);
+}
+
 export function drawPromoOffer(state: GameState, unit: Unit): void {
   const rows = unitPromoRows(unit);
   const held = unit.promos ?? 0;
@@ -206,6 +218,7 @@ export function drawPromoOffer(state: GameState, unit: Unit): void {
   }
   unit.promoOffer = offer;
   unit.xp = xpToNextLevel(unit);
+  logXpWrite(state, unit, 'of');
 }
 
 /** every effect the unit's held promotions carry. */

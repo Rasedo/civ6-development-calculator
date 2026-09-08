@@ -78,7 +78,7 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
     // the STEP and SPAWN lines keep the last two TURNS, not the last N: a count
     // straddles the turn boundary at a different place on each engine, and a
     // straddled window pairs the tail of one turn against the head of another.
-    if (k === 'st' || k === 'sp') {
+    if (k === 'st' || k === 'sp' || k === 'xp') {
       const ts = [...new Set(g.map((ln) => Number(ln.split(':')[2])))].sort((x, y) => x - y).slice(-2);
       out.push(...g.filter((ln) => ts.includes(Number(ln.split(':')[2]))));
       continue;

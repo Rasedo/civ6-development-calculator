@@ -16,7 +16,7 @@ import { computeUnlocks, getModifiers, availableTechs, availableCivics, governme
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
-import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
+import { drawPromoOffer, logXpWrite, promoFlag, unitPromoRows } from './promotions';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -960,6 +960,7 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   host.formation = tier;
   host.level = vet.level;
   host.xp = vet.xp;
+  logXpWrite(state, host, 'vt');
   host.xpPct = vet.xpPct;
   host.mpBonus = vet.mpBonus;
   host.promos = vet.promos;

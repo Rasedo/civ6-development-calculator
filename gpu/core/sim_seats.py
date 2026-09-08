@@ -24,7 +24,7 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     for kind, group in by.items():
         if kind == "g":
             out.extend(group)
-        elif kind in ("st", "sp"):
+        elif kind in ("st", "sp", "xp"):
             _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
             out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
         else:
@@ -1586,6 +1586,7 @@ class SimSeats:
         if gr.numel() == 0:
             return
         self.unit_xp[gr, gu] = self._bank_xp(self.unit_xp[gr, gu], self.unit_level[gr, gu], gain[gr])
+        self._log_xp(gr, gu, "ej")
 
     def _levy_cost(self, row: int) -> torch.Tensor:
         """[B] f64 `levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
@@ -3908,6 +3909,7 @@ class SimSeats:
         rows = landed.nonzero(as_tuple=True)[0]
         self.unit_promo_offer[rows, sl[rows]] = offer[rows]
         self.unit_xp[rows, sl[rows]] = self._xp_to_next(self.unit_level[rows, sl[rows]])
+        self._log_xp(rows, sl[rows], "of")
 
     def _offer_apostle_promos(self, row: int, landed: torch.Tensor) -> None:
         """`offerApostlePromotions` — CIV6 (Apostle): "Acquire 1 Religious
@@ -5669,6 +5671,7 @@ class SimSeats:
             gs = self._goody_unit_slot(b, t, slot)
             if gs >= 0:
                 self.unit_xp[b, gs] += amt
+                self._log_xp(torch.tensor([b]), torch.tensor([gs]), "gh")
         elif pay == ch["heal"]:
             gs = self._goody_unit_slot(b, t, slot)
             if gs >= 0:
@@ -11017,6 +11020,24 @@ class SimSeats:
         cur[rows] += 1
         self._gen_ver += 1
 
+    def _log_xp(self, rows, slots, tag: str) -> None:
+        """`logXpWrite`'s twin — WHICH writer moved this pool, keyed on (seat,
+        turn, tile, chassis) so the two engines pair on the unit rather than on
+        a slot they number differently. `slots` are MERGED slots."""
+        if not getattr(self, "_log_diff", False):
+            return
+        _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else [int(rows)]
+        _s = slots.reshape(-1).tolist() if torch.is_tensor(slots) else [int(slots)]
+        if len(_s) == 1 and len(_r) > 1:
+            _s = _s * len(_r)
+        for _b, _u in zip(_r, _s):
+            if _u < 0 or _u >= self.unit_xp.shape[1]:
+                continue
+            self._diff_events.setdefault(int(_b), []).append(
+                f"xp:{int(self.unit_seat[_b, _u])}:{int(self.turn)}"
+                f":{int(self.unit_tile[_b, _u])}:{int(self.unit_type[_b, _u])}"
+                f" {tag}{int(self.unit_xp[_b, _u])}")
+
     def _pool_of(self, atk_kind: str):
         return tuple(getattr(self, f"{atk_kind}_unit_{f}")
                      for f in ("hp", "tile", "type", "xp", "emb", "alive", "seat"))
@@ -11148,6 +11169,7 @@ class SimSeats:
             a_xp_p = self._pool_of(a_kind)[3]
             a_xp_p[:, u] = torch.where(
                 ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
+            self._log_xp(ok.nonzero(as_tuple=True)[0], u + self.POOL_LO[POOL_CLASS[a_kind]], "bx")
             _dsc = d_slot.clamp(min=0)
             self._share_joint_xp(ok & (d_slot >= 0), getattr(self, f"{a_kind}_unit_tile")[:, u], a_seat,
                                  self.unit_seat[self._bidx, _dsc], gain)
@@ -11167,6 +11189,7 @@ class SimSeats:
             rows=rows)
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gd)
+        self._log_xp(rows, ds, "bx")
         _gd = torch.zeros(self.B, dtype=gd.dtype, device=self.device)
         _gd[rows] = gd
         _dsc = d_slot.clamp(min=0)
@@ -11187,6 +11210,7 @@ class SimSeats:
         a_xp_p = self._pool_of(a_kind)[3]
         a_xp_p[:, u] = torch.where(
             ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
+        self._log_xp(ok.nonzero(as_tuple=True)[0], u + self.POOL_LO[POOL_CLASS[a_kind]], "cx")
 
     def _award_defense_xp(self, live: torch.Tensor, d_slot: torch.Tensor) -> None:
         """`awardDefenseXp` — the defender of a CITY strike banks the flat 2."""
@@ -11205,6 +11229,7 @@ class SimSeats:
         gain = torch.where(self._xp_eligible(types), gain, torch.zeros_like(gain))
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gain)
+        self._log_xp(rows, ds, "dx")
 
     def _hold_the_line(self, seat: torch.Tensor, tile: torch.Tensor,
                        foe_type: torch.Tensor, own_type: torch.Tensor) -> torch.Tensor:

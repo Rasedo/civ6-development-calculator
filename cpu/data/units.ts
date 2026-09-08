@@ -2372,3 +2372,8 @@ export const GDR_ARMOR_PLATING_CS = 10;
  *  district half of the same clause is `RANGED_CITY_PENALTY`, which every land
  *  ranged unit already pays. */
 export const GDR_NAVAL_PENALTY = 17;
+
+/** the catalog's order — how both engines name a chassis on the wire and in
+ *  the decomposition log. It lives HERE rather than in a core module because
+ *  two of that log's emitters sit on opposite sides of an import edge. */
+export const UNIT_TYPE_IDX = Object.keys(UNITS);

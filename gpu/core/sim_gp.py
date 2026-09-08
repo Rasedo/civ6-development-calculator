@@ -582,6 +582,7 @@ class SimGp:
         t = tgt[r]
         need = self._xp_to_next(self.unit_level[r, t])
         self.unit_xp[r, t] = torch.where(lvl[r] > 0, need, self.unit_xp[r, t])
+        self._log_xp(r, t, "gp")
         self.unit_xp_pct[r, t] = self.unit_xp_pct[r, t] + pct[r]
 
     def _gp_form_up(self, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
@@ -610,4 +611,5 @@ class SimGp:
         r = m.nonzero(as_tuple=True)[0]
         slot = getattr(self, self.POOL_NEXT["major"])[r] - 1
         self.unit_xp[r, slot] = self._xp_to_next(self.unit_level[r, slot])
+        self._log_xp(r, slot, "gf")
 

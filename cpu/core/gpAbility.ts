@@ -33,7 +33,7 @@ import { grantStockpile } from './stockpile';
 import { repairDrip, urbanDefensesFit } from './rules';
 import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH } from '../data/units';
-import { xpToNextLevel } from './promotions';
+import { logXpWrite, xpToNextLevel } from './promotions';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
 export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
@@ -318,7 +318,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // already standing here.
   if (fx.unit && UNITS[fx.unit]) {
     const made = spawnUnit(state, fx.unit, unit.tileIndex, unit.seat);
-    if (made && fx.unitPromotions) made.xp = xpToNextLevel(made);
+    if (made && fx.unitPromotions) {
+      made.xp = xpToNextLevel(made);
+      logXpWrite(state, made, 'gf');
+    }
   }
   // CIV6 (El Cid): "Forms a Corps out of a military land unit" — the tier is
   // handed over outright, no second unit and no civic.
@@ -336,7 +339,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       (u) => u.seat === unit.seat && u.tileIndex === unit.tileIndex && (UNITS[u.type]?.combat ?? 0) > 0,
     );
     if (target) {
-      if (fx.promotionLevels) target.xp = xpToNextLevel(target);
+      if (fx.promotionLevels) {
+        target.xp = xpToNextLevel(target);
+        logXpWrite(state, target, 'gp');
+      }
       if (fx.xpPct) target.xpPct = (target.xpPct ?? 0) + fx.xpPct;
     }
   }

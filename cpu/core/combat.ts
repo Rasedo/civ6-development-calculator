@@ -41,6 +41,7 @@ import {
   bankXp, battleXp, cityXp, holdTheLineCS, promoCS, promoFlag,
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
   promoClassOf,
+  logXpWrite,
 } from './promotions';
 import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
@@ -358,6 +359,7 @@ export function awardBattleXp(
         pct: seatXpPct(state, self), mult: xpMult(state, self, initiated),
       });
     bankXp(self, gain);
+    logXpWrite(state, self, 'bx');
     shareJointWarXp(state, self, foe.seat, gain);
   }
 }
@@ -372,7 +374,10 @@ function shareJointWarXp(state: GameState, earner: Unit, foe: number, gain: numb
     for (const u of unitsOf(state, o)) {
       if (u.hp <= 0 || !xpEligible(u)) continue;
       const ut = state.map.tiles[u.tileIndex];
-      if (hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE) bankXp(u, gain);
+      if (hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE) {
+        bankXp(u, gain);
+        logXpWrite(state, u, 'ej');
+      }
     }
   }
 }
@@ -383,6 +388,7 @@ function shareJointWarXp(state: GameState, earner: Unit, foe: number, gain: numb
 export function awardCityXp(state: GameState, unit: Unit, base: number): void {
   if (unit.hp <= 0 || !xpEligible(unit)) return;
   bankXp(unit, cityXp(base, seatXpPct(state, unit), xpMult(state, unit, true)));
+  logXpWrite(state, unit, 'cx');
 }
 
 /** the defender of a CITY strike: "Base XP gained from defending against city
@@ -390,6 +396,7 @@ export function awardCityXp(state: GameState, unit: Unit, base: number): void {
 export function awardDefenseXp(state: GameState, defender: Unit): void {
   if (defender.hp <= 0 || !xpEligible(defender)) return;
   bankXp(defender, cityXp(XP_CITY_DEFEND, seatXpPct(state, defender), xpMult(state, defender, false)));
+  logXpWrite(state, defender, 'dx');
 }
 
 /**
