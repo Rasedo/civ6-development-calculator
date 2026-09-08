@@ -49,7 +49,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed, wonder in the blast (ask) |
-| C-33 Giant Death Robot's Range | 1 | a five-hex verb the action space lacks |
+| C-33 Giant Death Robot's Range | 0 | CLOSED — the install says Range 3, this engine has 3, and the five-hex row is scenario-only |
 | C-34 air combat's second half | 2 | fighter interception and Patrol (unsourced roll), Priority Target |
 | C-35 drowned ground is COAST | 0 | CLOSED — every ring fact reads a submerged tile as coast on both engines |
 | C-38 a city-state's city | 1 | growth and border are in; what it SPENDS gold and faith on is ask 10 |
@@ -300,8 +300,14 @@ Nothing open.
   - AN ESCORT FORMATION IS A PAIR; real Civ 6 links military, civilian and
     support. Needs a support stacking class and a two-rider drag on both
     engines (`escortUnit` / `_escort_rider`).
-  - A DRAGGED RIDER LIFTS NO FOG: `stepUnit` / `_step_verb` reveal around
-    the mover only.
+  - THE RIDER'S FOG SHIPPED with #246a. Sight belongs to a UNIT and a
+    formation's members stand on one tile, so the circle both engines draw is
+    the WIDEST member's — which is the whole reason a formation carries an
+    Observation Balloon or a Drone. Both chassis had sat at the default sight
+    of 2; the install gives them `BaseSightRange` 3 and 5.
+  - The install gives the Drone and the Supply Convoy NO `Maintenance` at
+    all, where this engine charges 3 and 2. Two named magnitudes for the
+    sourcing pass, not changed here.
 - **B-67. THE DISTRICT PRICE PROGRESSION.** Weight 1.
   - The install runs COST_PROGRESSION_GAME_PROGRESS for the Aqueduct, Canal,
     Dam, Neighborhood and Mbanza and NUM_UNDER_AVG_PLUS_TECH for the rest;
@@ -460,9 +466,20 @@ Nothing open.
     the blast. What is unsourced is HOW MANY die per ring, which is ask 6's
     neighbour.
   - A WONDER IN THE BLAST — ask 6.
-- **C-33. THE GIANT DEATH ROBOT'S RANGE.** Weight 1.
-  - The five-hex Range is a verb the action space lacks; no direction
-    encoding reaches five hexes.
+- **C-33. THE GIANT DEATH ROBOT'S RANGE.** CLOSED 2026-09-08 — the entry was
+  false twice over, and the install says so in one row.
+  - `UNIT_GIANT_DEATH_ROBOT` carries `Range="3"`, not five, and this engine
+    has carried 3 since the chassis landed. The only five-hex GDR range
+    anywhere in the install is `PROMOTION_GDR_ATTACK_RANGE`, which exists in
+    exactly one place: `DLC/CivRoyaleScenario/`. Scenario paths are excluded
+    from sourcing by standing rule, so it was never a row this engine owed.
+  - Nor is range 3 out of the action space's reach: the Bombard, the Rocket
+    Artillery, the Machine Gun and the GDR itself all fire at 3 today, and
+    the attack verb names a TILE rather than a direction, so the reach is the
+    range and nothing about the encoding bounds it.
+  - The lesson is the one this round has now paid for four times: a
+    self-declared gap is a claim like any other, and this one had never been
+    checked against a row.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
   A 2026-09-08 sourcing pass split this entry: four of its five items are
   data and only the interception ROLL is DLL.
@@ -619,7 +636,7 @@ Nothing open.
     column that names it rather than invented:
     - the Great Wall's and the Pā's `PLOT_DAMAGE_TO_WALKING_INTO` /
       `_ADJACENT` (10 each) — damage on ENTERING a tile is unit-movement
-      machinery this engine does not have (C-33);
+      machinery this engine does not have, and no chapter owns it yet;
     - the Film Studio's "+100% Tourism pressure ... towards other
       civilizations in the Modern era" — a per-PAIR tourism pressure;
     - the Electronics Factory's "+4 Culture after Electricity" — a

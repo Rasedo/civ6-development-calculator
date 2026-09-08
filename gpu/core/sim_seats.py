@@ -10376,6 +10376,15 @@ class SimSeats:
             # its own Sight (the Destroyer's 3, the Varu's 3, the Mountie's 4)
             # would otherwise walk half-blind here alone.
             sight = self._unit_sight(u_type, u_promos)
+            # ...and the RIDER's own sight from the same tile: a formation
+            # carries an Observation Balloon or a Drone precisely because it
+            # sees further than the chassis dragging it, so the circle is the
+            # WIDEST of the formation's members.
+            _rc = rider.clamp(min=0)
+            _rs = self._unit_sight(
+                self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
+                self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1))
+            sight = torch.where(rider >= 0, torch.maximum(sight, _rs), sight)
             self._reveal_around(rows[major], srow[major], dest[rows][major], sight[rows][major])
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."

@@ -17,7 +17,8 @@ import { makeMap, makeState } from '../helpers';
 import { spawnUnit, stepUnit, escortUnit, breakEscort, inEscort } from '../../../cpu/core/units';
 import { convoyCS } from '../../../cpu/core/combat';
 import { promoRows } from '../../../cpu/data/promotions';
-import { neighbors } from '../../../world/hex';
+import { UNITS } from '../../../cpu/data/units';
+import { neighbors, tilesWithin, hexDistance } from '../../../world/hex';
 import { isWater, isImpassable } from '../../../world/query';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
@@ -162,5 +163,63 @@ describe('the escort formation', () => {
     expect(inEscort(state, bld)).toBe(false);
     expect(stepUnit(state, bld, state.map.tiles[b])).not.toBe('blocked');
     expect(bld.tileIndex).toBe(b);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A DRAGGED RIDER LIFTS ITS OWN FOG.
+//
+// CIV6: sight belongs to a UNIT, and a formation's members all stand on the
+// same tile — so a Drone (BaseSightRange 5) escorted by a Warrior (2) sees
+// five tiles out from wherever the Warrior walks. The engine used to reveal at
+// the MOVER's sight alone, which threw the Drone's whole purpose away.
+// ---------------------------------------------------------------------------
+describe('the rider\u2019s sight', () => {
+  const seen = (state: GameState, tile: number): boolean =>
+    (state.seats[SEAT].explored ?? [])[tile] === 1;
+
+  function ridingScene(riderType: string): { state: GameState; from: number; to: number } {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.fogOfWar = true;
+    for (const sx of state.seats) sx.explored = state.map.tiles.map(() => 0);
+    const [from, to] = twoAdjacent(state);
+    put(state, from, 'WARRIOR');
+    const rider = put(state, from, riderType);
+    expect(escortUnit(state, rider).ok).toBe(true);
+    // spawning already lit the Drone's own circle, and `from` is adjacent to
+    // `to` — so the map goes dark again and only the STEP may light it.
+    for (const sx of state.seats) sx.explored = state.map.tiles.map(() => 0);
+    return { state, from, to };
+  }
+
+  it('carries the DRONE\u2019s five tiles, not the Warrior\u2019s two', () => {
+    // the chassis columns are the install's, and they are what makes the
+    // difference visible at all
+    expect(UNITS.DRONE.sight).toBe(5);
+    expect(UNITS.OBSERVATION_BALLOON.sight).toBe(3);
+
+    const { state, to } = ridingScene('DRONE');
+    const mover = state.units.find((u) => u.type === 'WARRIOR')!;
+    const centre = state.map.tiles[to];
+    const ring = (n: number) => tilesWithin(state.map, centre.col, centre.row, n)
+      .filter((t) => hexDistance(t.col, t.row, centre.col, centre.row) === n);
+    const far = ring(4);
+    expect(far.length).toBeGreaterThan(0);
+    // dark BEFORE the step — otherwise the assertion below proves nothing
+    expect(far.every((t) => !seen(state, t.index))).toBe(true);
+    expect(stepUnit(state, mover, state.map.tiles[to])).not.toBe('blocked');
+    expect(far.some((t) => seen(state, t.index))).toBe(true);
+  });
+
+  it('reveals only the Warrior\u2019s own circle with a Builder aboard', () => {
+    const { state, to } = ridingScene('BUILDER');
+    const mover = state.units.find((u) => u.type === 'WARRIOR')!;
+    expect(stepUnit(state, mover, state.map.tiles[to])).not.toBe('blocked');
+    const centre = state.map.tiles[to];
+    const far = tilesWithin(state.map, centre.col, centre.row, 4)
+      .filter((t) => hexDistance(t.col, t.row, centre.col, centre.row) === 3);
+    // a Builder sees no further than its escort, so the third ring stays dark
+    expect(far.some((t) => seen(state, t.index))).toBe(false);
   });
 });

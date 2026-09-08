@@ -1046,6 +1046,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 2,
       combat: 0,
       charges: 0,
+      // CIV6 (Units.xml): BaseSightRange 3 — a support chassis whose whole
+      // point is that it SEES, which is why the escort drag has to lift its
+      // fog and not only its carrier's.
+      sight: 3,
       requiresTech: 'FLIGHT',
       upgradesTo: 'DRONE',
       description: 'Modern support chassis.',
@@ -1133,6 +1137,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 3,
       combat: 0,
       charges: 0,
+      // CIV6 (Units.xml): BaseSightRange 5, the longest sight of any land
+      // chassis in the game.
+      sight: 5,
       requiresTech: 'COMPUTERS',
       description: 'Atomic support chassis.',
     }),

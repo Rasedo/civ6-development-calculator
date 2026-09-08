@@ -24,6 +24,7 @@ Covered here:
   5. Escort Mobility: the rider rides free and stops nothing.
   6. a flag with no escort beside it is no formation.
   7. a naval hull forms with its PASSENGER, and CONVOY pays the escort +10.
+  8. a dragged rider lifts its OWN fog: the circle is the widest member's.
 """
 
 from __future__ import annotations
@@ -288,6 +289,43 @@ def poke_convoy(rules, path):
     print("  7 convoy OK — a hull forms with its passenger, and the escort is paid 10")
 
 
+
+# ------------------------------------------------------------ 8 the rider SEES
+def poke_rider_sight(rules, path):
+    """CIV6: sight belongs to a UNIT, and a formation's members stand on the
+    same tile — so a DRONE (BaseSightRange 5) dragged by a Warrior (2) lifts
+    five tiles of fog from wherever the Warrior walks. The circle is the
+    WIDEST of the formation's members, `stepUnit`'s twin."""
+    if "DRONE" not in UNI:
+        print("  8 rider sight SKIPPED — no DRONE in this catalog")
+        return
+    sim = fresh(rules, path)
+    a_t, b_t = free_pair(sim)
+    drone = put(sim, ROW, a_t, "DRONE")
+    war = put(sim, ROW, a_t, "WARRIOR")
+    order(sim, ROW, drone, sim._A_ESCORT)
+    assert bool(sim.unit_escorted[0, drone]), "the Drone did not form up"
+
+    # the chassis column is the install's, and it is what makes the difference
+    # visible at all
+    assert int(sim._type_sight[UNI.index("DRONE")]) == 5, (
+        f"the Drone's sight is {int(sim._type_sight[UNI.index('DRONE')])}, the install says 5")
+
+    # spawning already lit the Drone's own circle, and the two tiles touch —
+    # so the map goes dark again and only the STEP may light it
+    sim.seat_explored[:] = False
+    ring = [t for t in range(sim.T) if int(sim.pair_dist[b_t, t]) == 4]
+    assert ring, "the scene offers no fourth ring around the destination"
+    assert not any(bool(sim.seat_explored[0, ROW, t]) for t in ring), \
+        "the fourth ring was already lit — the assertion below would prove nothing"
+
+    order(sim, ROW, war, _dir_of(sim, a_t, b_t))
+    assert int(sim.unit_tile[0, war]) == b_t, "the escort did not step"
+    assert any(bool(sim.seat_explored[0, ROW, t]) for t in ring), \
+        "the Drone lifted no fog of its own — the step revealed at the Warrior's sight"
+    print("  8 rider sight OK — the formation reveals at the WIDEST member's sight")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -301,6 +339,7 @@ def main() -> None:
     poke_mobility(rules, p)
     poke_orphan(rules, p)
     poke_convoy(rules, p)
+    poke_rider_sight(rules, p)
     print("ESCORT POKES OK")
 
 

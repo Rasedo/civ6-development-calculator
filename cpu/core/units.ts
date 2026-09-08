@@ -1066,7 +1066,13 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     if (side !== null && unitsHostile(state, unit, side)) conquerEncampment(state, to, unit);
   }
   if (unit.seat === seat) {
-    revealAround(state, unit.seat, to.index, unitSight(unit));
+    // stepUnit's revealAround. Sight belongs to a UNIT, and a dragged rider
+    // stands exactly where its escort does, so the circle is the WIDEST of
+    // the formation's members — which is the whole reason a formation carries
+    // an Observation Balloon or a Drone.
+    let sight = unitSight(unit);
+    for (const rider of riders) sight = Math.max(sight, unitSight(rider));
+    revealAround(state, unit.seat, to.index, sight);
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
     // wonder for the first time."
     if (neighbors(state.map, to).some((t) => naturalWonderAt(t) !== null)) {
