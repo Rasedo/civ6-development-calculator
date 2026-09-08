@@ -27,7 +27,7 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **0** | |
+| **A. Engine vs engine** | **2** | A-1: the invented-luxury count the city walk reads (localised, battery RED at seed 9027 turn 99) |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
@@ -146,7 +146,35 @@ the entry and the line leaves.
 The digest is the only instrument for this class; a round that widens what
 the gate reaches is worth more here than one that re-reads the exporter.
 
-Nothing open.
+- **A-1. THE INVENTED-LUXURY COUNT AT THE CITY WALK.** OPEN, localised, not
+  fixed. The battery is RED at seed 9027 turn 99.
+  - THE SYMPTOM: two cities of seat 0 pay a tier more yield on the GPU, every
+    delta exactly `0.05 x yield` or `0.10 x food surplus` — the step from the
+    Happy tier's (1.05, 1.10) to Content's (1.00, 1.00).
+  - THE TERM, from the amenity log (`CIV6_AMLOG=1 python gpu/battery.py`):
+
+        AM-GPU r:0 t99 lux0 dup0 reach[1,1,1,1,1]
+        AM-TS  r:0 t99 lux0 dup0 reach[1,1,1]
+
+    Neither seat works a luxury; the rounds are INVENTED ones (Great Merchant
+    products, reach 1 apiece). The GPU's walk runs on five where TS's runs on
+    three, at the same turn.
+  - RULED OUT, each by its own battery run rather than by argument: the
+    missing `max(0, ...)` on the GPU war-weariness penalty (the plane is
+    clamped at both decay sites); the luxury ranking's tie-break (fixed
+    anyway in #246d, the re-run byte-identical); the within-turn phase order
+    (fixed anyway in #246h, and the frozen end-of-turn-98 count is already
+    five).
+  - WHAT THE NUMBERS DEMAND: `gpLuxuries` is a compared seat field and does
+    NOT appear in the keyed diff, so the counts AGREE at the dump, while the
+    GPU's end-of-98 count is five. TS therefore reaches five during turn 99
+    after its walk — a whole-turn offset in when the Great Person's verb
+    lands, or a double grant on one side. `gp_earned`, `gp_claimed` and
+    `civ_gp_used` all compare clean.
+  - THE NEXT MEASUREMENT: stamp the GRANT. One line from each engine when the
+    invented luxury is minted — turn, seat, unit, resulting count — from
+    `_gp_luxuries` and from the `fx.luxuryCopies` block. That separates the
+    two survivors in one run, and the log plumbing already pairs it.
 
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
