@@ -681,7 +681,7 @@ class SimOrders:
                         self._diff_events.setdefault(_sb, []).append(
                             f"st:{int(self._ROW_SEAT[row])}"
                             f":{int(here[_sb])}:{int(tgt[_sb])}"
-                            f" t{int(self.turn)} j{n} ty{int(ut[_sb])}"
+                            f" t{int(self.turn)} j{n} ty{int(ut[_sb])} a{int(a[_sb])}"
                             f" {'moved' if bool(_stepped[_sb]) else 'blocked'}")
 
             atk = (

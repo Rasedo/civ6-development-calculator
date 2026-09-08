@@ -1654,7 +1654,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             // alignment holds and the chassis is the same one, which is the
             // fork this pair has to be resolved down.
             dlS.push(`st:${actor.seat}:${here.index}:${to.index} t${state.turn}`
-              + ` j${j} ty${UNIT_TYPE_IDX.indexOf(unit.type)}`
+              + ` j${j} ty${UNIT_TYPE_IDX.indexOf(unit.type)} a${a}`
               + ` ${outU === 'moved' || outU === 'halted' ? 'moved' : 'blocked'}`);
           }
         }
