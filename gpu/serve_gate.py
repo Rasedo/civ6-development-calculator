@@ -112,8 +112,19 @@ def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
         reps.append(f"  D-TS   {tl if tl is not None else '(no line)'}")
     for kind, n in sorted(dropped.items()):
         reps.append(f"  D      ...and {n} more `{kind}:` disagreements after the first ten")
+    # ...and EVERY kind reports, agreeing or not. A kind that is silent
+    # because it never fired and one that is silent because it agreed are
+    # different facts, and reading the first as the second cost this hunt a
+    # battery run.
+    _kinds: dict[str, int] = {}
+    for c in set(g) | set(t):
+        _k = c.split(":", 1)[0]
+        _kinds[_k] = _kinds.get(_k, 0) + 1
+    for kind in sorted(_kinds):
+        if kind not in seen:
+            reps.append(f"  D      {_kinds[kind]} `{kind}:` keys agree term for term")
     if not reps:
-        reps.append(f"  D      {len(g)} keys agree term for term")
+        reps.append("  D      the decomposition log is EMPTY — no kind fired at all")
     return reps
 
 
