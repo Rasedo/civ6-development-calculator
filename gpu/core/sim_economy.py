@@ -100,7 +100,8 @@ class SimEconomy:
                 _rr += [self._suz_spice_amen] * int(spice_n[_rb])
                 _rr += [self._suz_bonus_amen] * int(bonus_n[_rb])
                 self._amen_events.setdefault(_rb, []).append(
-                    f"r:{int(self._ROW_SEAT[row])} lux{int((counts > 0).long().sum(dim=1)[_rb])}"
+                    f"r:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
+                    f" lux{int((counts > 0).long().sum(dim=1)[_rb])}"
                     f" dup{int(dup[_rb])} reach[{','.join(str(x) for x in _rr)}]")
         seq = self.city_id[:, row, :cols].to(dt)
         kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)

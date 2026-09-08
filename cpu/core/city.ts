@@ -501,7 +501,7 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     ...new Array<number>(bonusLux.size).fill(BUENOS_AIRES_AMENITIES),
   ];
   const amR = (globalThis as { __amLog?: string[] }).__amLog;
-  if (amR) amR.push(`r:${seat} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
+  if (amR) amR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
   for (const n of reach) {
     const ranked = [...cities].sort((a, b) => {
       const needA = amenitiesNeeded(a.population) - (baseHave.get(a.id)! + result.get(a.id)!);
