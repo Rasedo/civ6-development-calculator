@@ -160,11 +160,14 @@ def test_river_column(rules, path) -> None:
     sim = fresh(rules, path)
     lm = IMPS.index("LUMBER_MILL")
     assert sim._imp_river_any
-    # CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column
+    # CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column,
+    # and so does the Chateau's "+2 Gold if on a tile containing a River edge"
     zg = IMPS.index("ZIGGURAT")
+    ch = IMPS.index("CHATEAU")
     nz = sorted(sim._imp_river_y.nonzero().tolist())
-    assert nz == sorted([[lm, 1], [zg, 4]]) and float(sim._imp_river_y[lm, 1]) == 1.0 \
-        and float(sim._imp_river_y[zg, 4]) == 1.0, f"the river column reads {nz}"
+    assert nz == sorted([[lm, 1], [zg, 4], [ch, 2]]), f"the river column reads {nz}"
+    assert float(sim._imp_river_y[lm, 1]) == 1.0 and float(sim._imp_river_y[zg, 4]) == 1.0 \
+        and float(sim._imp_river_y[ch, 2]) == 2.0, "a river amount moved"
     wet = int((sim.tile_river[B0] & ~sim.water[B0] & (sim.district[B0] < 0)
                & (sim.centre_slot_at[B0] < 0)).nonzero()[0])
     dry = dry_land(sim)
