@@ -45,7 +45,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 5), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose; a Free City as spy ground |
-| C-20 Mountain Tunnel's route multiplier | 1 | DLL-side magnitude |
+| C-20 Mountain Tunnel's route multiplier | 1 | the ONE modifier the row names carries no arguments at all — the magnitude is wholly DLL |
 | C-22 Preserve housing table | 1 | middle bands stylized |
 | C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits (C-79) |
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's 50%-HP threshold (both on C-34's unpublished damage), citizens killed, wonder in the blast (ask) |
@@ -435,9 +435,22 @@ Nothing open.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
     a spy's ground, and the install carries no data gate to say whether that
     is right — ask 11.
-- **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1.
-  - "Trade Routes traveling through it can multiply the Gold they get from
-    districts at their destination" — no published magnitude, DLL-side.
+- **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1. A 2026-09-08
+  pass says this one will stay unsourced, and says so from the row rather
+  than from an absence of searching.
+  - The pedia's "Trade Routes traveling through it can multiply the Gold they
+    get from districts at their destination" has exactly one XML carrier:
+    `IMPROVEMENT_MOUNTAIN_TUNNEL` names ONE modifier, `MOUNTAIN_PORTAL`, of
+    type `MODIFIER_MOUNTAIN_PORTAL` — and that modifier row has NO ARGUMENTS
+    AT ALL. There is no `Amount` to read, in any layer. The multiplier lives
+    wholly inside the DLL's handler for that modifier type.
+  - Not "unpublished pending a look": looked at, and the row carries no
+    number to find. The same finding shape as `PLUNDER_ROUTE_GOLD`.
+  - The tunnel's OTHER columns are all published and worth checking against
+    the catalog separately: `AllowImpassableMovement`, `BuildOnAdjacentPlot`,
+    `DisasterResistant`, `CanBuildOutsideTerritory`, `PrereqTech`
+    TECH_CHEMISTRY, and a build unit of UNIT_MILITARY_ENGINEER rather than
+    the Builder.
 - **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.
   - `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; the middle bands are this model's own.
