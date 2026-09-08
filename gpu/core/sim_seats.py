@@ -11036,7 +11036,7 @@ class SimSeats:
             self._diff_events.setdefault(int(_b), []).append(
                 f"xp:{int(self.unit_seat[_b, _u])}:{int(self.turn)}"
                 f":{int(self.unit_tile[_b, _u])}:{int(self.unit_type[_b, _u])}"
-                f" {tag}{int(self.unit_xp[_b, _u])}")
+                f":{tag} {int(self.unit_xp[_b, _u])}")
 
     def _pool_of(self, atk_kind: str):
         return tuple(getattr(self, f"{atk_kind}_unit_{f}")

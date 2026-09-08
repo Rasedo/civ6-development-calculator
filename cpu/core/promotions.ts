@@ -199,8 +199,11 @@ export function promoCount(unit: { promos?: number }): number {
 export function logXpWrite(state: GameState, unit: Unit, tag: string): void {
   const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (!dl) return;
+  // the TAG is part of the KEY, not of the value: a turn can move one pool
+  // twice, and with the writer outside the key the pairing's last-wins hid
+  // whichever wrote first — which is exactly where a divergence starts.
   dl.push(`xp:${unit.seat}:${state.turn}:${unit.tileIndex}`
-    + `:${UNIT_TYPE_IDX.indexOf(unit.type)} ${tag}${unit.xp ?? 0}`);
+    + `:${UNIT_TYPE_IDX.indexOf(unit.type)}:${tag} ${unit.xp ?? 0}`);
 }
 
 export function drawPromoOffer(state: GameState, unit: Unit): void {
