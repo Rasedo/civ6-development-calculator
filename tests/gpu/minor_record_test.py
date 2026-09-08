@@ -96,6 +96,44 @@ def test_minor_research(rules) -> None:
     print(f"  minor research OK: {sci}/turn, cheapest row {cheapest} at cost {float(cost[cheapest]):.0f}")
 
 
+def test_civ_levels(rules) -> None:
+    """CIV6 (`CivilizationLevels`): ten permissions per class of player, and
+    the one that forks a live rule is `CanAnnexTilesWithCulture` — TRUE for a
+    full civ, FALSE for a city-state, the Free Cities player and a barbarian
+    tribe alike. Their culture box still FILLS; nothing is bought (C-60)."""
+    sim = build(rules)
+    lvl = {d["level"]: d for d in sim.rules.civ_levels}
+    assert set(lvl) == {"TRIBE", "CITY_STATE", "FULL_CIV", "FREE_CITIES"}, lvl.keys()
+    assert lvl["FULL_CIV"]["canAnnexTilesWithCulture"] is True
+    assert lvl["CITY_STATE"]["canAnnexTilesWithCulture"] is False
+    assert lvl["CITY_STATE"]["startingTilesForCity"] == 5
+    assert lvl["FULL_CIV"]["startingTilesForCity"] == 6
+    # EVERY row of the engine's four spaces classes onto the install's table
+    for r in range(sim.NS):
+        want = ("FULL_CIV" if r < sim.n_majors
+                else "TRIBE" if r == sim.BARB_ROW
+                else "FREE_CITIES" if r == sim.FREE_ROW
+                else "CITY_STATE")
+        assert sim._row_level[r] == want, (r, sim._row_level[r], want)
+        assert bool(sim._row_annex_culture[r]) is bool(
+            lvl[want]["canAnnexTilesWithCulture"]), r
+    # and the SPEND refuses: a minor row with a box past any price claims none
+    row = sim.n_majors
+    col = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+    live = sim.city_alive[:, row, 0].clone()
+    if bool(live.any()):
+        sim.city_cbox[:, row, 0] = 10_000
+        got0 = sim.city_acquired[:, row, 0].clone()
+        sim._seat_border_growth(row, col, live,
+                                torch.zeros(sim.B, dtype=torch.float64, device=sim.device))
+        assert bool((sim.city_acquired[:, row, 0] == got0).all()), (
+            "a city-state bought ground with culture")
+        assert bool((sim.city_cbox[:, row, 0] >= 10_000).all()), (
+            "the box did not keep what it banked")
+    print(f"  civ levels OK: {sim.NS} rows class onto 4 install rows, "
+          f"{int(sim._row_annex_culture.sum())} may annex with culture")
+
+
 def test_minor_border(rules) -> None:
     """CIV6 (Borders): a city-state's ground closes on ITS Early Empire, and
     "Open Borders is granted to players that have reached Suzerain status"."""
@@ -171,6 +209,7 @@ def main() -> None:
     print(f"minor_record_test on {fixture_paths()[0].name}:")
     test_resolved_suzerain(rules)
     test_minor_research(rules)
+    test_civ_levels(rules)
     test_minor_border(rules)
     test_containment(rules)
     test_minor_conversion(rules)

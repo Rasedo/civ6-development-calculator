@@ -108,6 +108,21 @@ the entry and the line leaves.
     nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs
     and all five are placement; no XML row anywhere names a city-state
     purchase, build weight or reserve. Leave them banking, or name a rule?
+13. **C-16 — a Free City as spy ground.** The install carries NO data gate:
+    the ten `UnitOperations` spy rows name a `TargetDistrict` and nothing
+    else, and no requirement set anywhere keys on `CivilizationLevels`.
+    Which cities a spy may travel to is DLL. Both engines walk the major
+    rows today. Open the Free City to spies, or leave it closed?
+14. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
+    the seat's luxuries and policies, and the Free Cities player has none —
+    so every Free City sits at the bottom band forever. `CivilizationLevels`
+    has no amenity column and no XML row names one. Give the free row a
+    fixed tier, or let the bottom band stand?
+15. **C-60 — a Free City's defence.** "Will repair pillaged improvements
+    and spawn units to defend itself, and may build walls", "will try to
+    retaliate". No XML row names the unit, the cadence or the walls, and
+    its strike needs a target rule. Name them, or leave the floor-15
+    defence and the walls it revolted with?
 
 ## A. Engine vs engine
 
@@ -267,8 +282,8 @@ Nothing open.
     `SPY_SUCCESS_PER_LEVEL_PCT`, `SPY_CAPTURE_PCT` and `SPY_ESCAPE_ROUTES`'
     base rates are the model values a published composition replaces.
   - A FREE CITY IS NOBODY'S TO SPY ON: both engines walk the major rows for
-    a spy's ground. Does the install let a spy operate in a Free City
-    (C-60)?
+    a spy's ground, and the install carries no data gate to say whether that
+    is right — ask 13.
 - **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1.
   - "Trade Routes traveling through it can multiply the Gold they get from
     districts at their destination" — no published magnitude, DLL-side.
@@ -365,14 +380,9 @@ Nothing open.
 - **C-60. THE FREE CITY'S OWN PLAY.** Weight 2.
   The seat is in on both engines (revolt, race, join, Eleanor's skip, open
   to attack). Each bullet is an exact question, no magnitude to invent:
-  - ITS DEFENCE: the pedia says it "will repair pillaged improvements and
-    spawn units to defend itself, and may build walls" and "will try to
-    retaliate". No XML row names the unit, the cadence or the walls; its
-    strike needs a target rule. Today: floor-15 defence plus the walls it
+  - ITS DEFENCE — ask 15. Today: floor-15 defence plus the walls it
     revolted with, healing 20 a turn.
-  - ITS AMENITIES: the tier is computed per OWNER (`computeCityStats` with
-    the seat's luxuries and policies) and the Free Cities player has none.
-    What does the install give a Free City?
+  - ITS AMENITIES — ask 14.
   - THE RELIGION WALKS skip the free row (`allCities`, the GPU's
     `[:, :n_majors]` pressure rows): no pressure in or out, no Missionary
     spread. The same class of widening as the loyalty walk took.

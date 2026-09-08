@@ -12,6 +12,7 @@ import { RESOURCES } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENT_LIST } from '../data/policies';
+import { CIV_LEVELS, type CivLevelDef, type CivLevelId } from '../data/civLevels';
 
 import { NO_SEAT } from './types';
 export { NO_SEAT };
@@ -234,6 +235,23 @@ export const isFreeSeat = (seat: number): boolean => seat === FREE_SEAT;
 
 /** Is this a city-state? They hold territory and act, but are never civs. */
 export const isCityStateSeat = (seat: number): boolean => seat >= CITY_STATE_SEAT_BASE && seat < BARB_SEAT;
+
+/**
+ * WHICH `CivilizationLevels` ROW THIS SEAT PLAYS.
+ *
+ * The install classes a player once and every permission hangs off that row —
+ * so this is the ONE place the four seat id spaces become a capability, and a
+ * rule asks the row's own permission column rather than re-deriving "is
+ * this a minor".
+ */
+export function civLevelIdOf(seat: number): CivLevelId {
+  if (isBarbSeat(seat)) return 'TRIBE';
+  if (isFreeSeat(seat)) return 'FREE_CITIES';
+  if (isCityStateSeat(seat)) return 'CITY_STATE';
+  return 'FULL_CIV';
+}
+
+export const civLevelOf = (seat: number): CivLevelDef => CIV_LEVELS[civLevelIdOf(seat)];
 
 export function seatClass(seat: number): SeatClass {
   if (isBarbSeat(seat)) return 'hostile';

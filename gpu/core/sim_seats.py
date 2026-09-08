@@ -8895,7 +8895,13 @@ class SimSeats:
             return js_round(eff).to(base.dtype)
 
         # BORDER CONTROL outcome B: the box still fills, nothing is bought.
+        # CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE only
+        # for a full civ, so a city-state, the Free Cities player and a
+        # barbarian tribe all bank the culture and buy nothing — the same
+        # shape, at the same spend (C-60).
         act = act & ~self._congress_border_frozen(row)
+        if not bool(self._row_annex_culture[row]):
+            return
         if not bool((act & (self.city_cbox[bidx, row, col] >= _cost())).any()):
             return
         tiles, tc, nbs, key0 = self._seat_border_key(row, center)

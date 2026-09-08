@@ -103,7 +103,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum } from './governors';
-import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders } from './seats';
+import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -487,7 +487,12 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  */
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
   city.cultureBox += culture;
-  const frozen = congressBorderFrozen(state, seat);
+  // CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE for a
+  // full civ and FALSE for every other class of player — a city-state, the
+  // Free Cities player and a barbarian tribe all bank the culture and buy
+  // nothing with it. A minor takes ground through the ENVOY channel instead
+  // (`CanAnnexTilesWithReceivedInfluence`), which is a different rule.
+  const frozen = congressBorderFrozen(state, seat) || !civLevelOf(seat).canAnnexTilesWithCulture;
   const cost = () =>
     Math.round(
       (borderGrowthCost(city.tilesAcquired) * getModifiers(state, seat).borderCostMult * 100) /

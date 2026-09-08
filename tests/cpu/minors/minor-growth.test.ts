@@ -77,20 +77,27 @@ describe("a minor's city keeps a real food box", () => {
   });
 });
 
-describe("a minor's border takes ground", () => {
-  it('claims a tile once its culture box covers the price, and spends it', () => {
-    const { state, cs } = scene({ cultureBox: 10_000 });
-    const before = cs.tilesAcquired ?? 0;
-    const owned0 = state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length;
+describe("a minor's culture box banks and buys nothing", () => {
+  // CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is FALSE for
+  // CITY_STATE. The box still fills off the same walk a major's does — the
+  // rule is at the SPEND, exactly where the Border Control Treaty puts it.
+  it('fills the box from its own culture', () => {
+    const { state, cs } = scene();
+    expect(cs.cultureBox ?? 0).toBe(0);
     minorPhase(state);
-    expect(cs.tilesAcquired ?? 0).toBeGreaterThan(before);
-    expect(cs.cultureBox ?? 0).toBeLessThan(10_000);
-    // the ground it took reads back as the MINOR's, by ABSOLUTE seat
-    const owned1 = state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length;
-    expect(owned1).toBeGreaterThan(owned0);
+    expect(cs.cultureBox ?? 0).toBeGreaterThan(0);
   });
 
-  it('claims nothing on an empty box', () => {
+  it('claims no ground however full the box is', () => {
+    const { state, cs } = scene({ cultureBox: 10_000 });
+    const owned0 = state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length;
+    minorPhase(state);
+    expect(cs.tilesAcquired ?? 0).toBe(0);
+    expect(cs.cultureBox ?? 0).toBeGreaterThanOrEqual(10_000);
+    expect(state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length).toBe(owned0);
+  });
+
+  it('claims nothing on an empty box either', () => {
     const { state, cs } = scene();
     const owned0 = state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length;
     minorPhase(state);

@@ -3732,6 +3732,23 @@ class SimInit:
         _rs[self.BARB_ROW] = BARB_SEAT
         _rs[self.FREE_ROW] = FREE_SEAT
         self._ROW_SEAT = _rs
+        # THE INSTALL'S `CivilizationLevels` TABLE, per ROW (C-60). A rule that
+        # forks on the class of player reads this vector instead of spelling
+        # "row < n_majors" again — the classes are the install's, and the
+        # engine's four row spaces map onto them one for one.
+        _lvl = {d["level"]: d for d in self.rules.civ_levels}
+        _row_level = ["FULL_CIV"] * self.NS
+        for _c in range(s_pad):
+            _row_level[n_majors + _c] = "CITY_STATE"
+        _row_level[self.FREE_ROW] = "FREE_CITIES"
+        _row_level[self.BARB_ROW] = "TRIBE"
+        self._row_level = _row_level
+        # the one column that forks a live rule: a full civ's culture box buys
+        # ground and nobody else's does.
+        self._row_annex_culture = torch.tensor(
+            [bool(_lvl[x]["canAnnexTilesWithCulture"]) for x in _row_level],
+            dtype=torch.bool, device=device,
+        )
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
         self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self._ww_opened = torch.zeros(B, dtype=torch.long, device=device)
