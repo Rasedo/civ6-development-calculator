@@ -26,6 +26,12 @@
       "Bash(npm run gpu:replay)",
       "Bash(npm run gpu:export)",
       "Bash(tasklist *)"
+    ],
+    "deny": [
+      "Bash(sleep:*)",
+      "Bash(*sleep *)",
+      "Bash(*Start-Sleep*)",
+      "PowerShell(*Start-Sleep*)"
     ]
   }
 }

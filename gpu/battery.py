@@ -27,6 +27,7 @@ table at the end gives per-step wall time and status.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -36,6 +37,54 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv
+
+
+def _argval(flag: str) -> str | None:
+    """the value after `flag`, or None if it is absent or trailing."""
+    try:
+        i = sys.argv.index(flag)
+    except ValueError:
+        return None
+    return sys.argv[i + 1] if i + 1 < len(sys.argv) else None
+
+
+# ------------------------------------------------------------ hunt mode --
+# A HUNT is a probe of ONE seed at ONE turn, not a verdict. The serve gate
+# may not be run on its own, so this is how a narrow question runs inside the
+# battery: the serve lane takes the named seeds and the gate's own
+# checkpoint/resume flags, and every lane that has nothing to do with a seed
+# — vitest and the whole poke pool — sits it out.
+#
+# It records NOTHING. A hunt neither claims a green nor spends the
+# four-commit clock, and the cadence rule does not gate it: refusing a probe
+# because the clock has not run is what makes a hunt re-run the whole fleet.
+HUNT_SEEDS = _argval("--seeds")
+HUNT = HUNT_SEEDS is not None
+HUNT_RESUME = _argval("--resume")
+HUNT_CKPT_EVERY = _argval("--ckpt-every")
+HUNT_CKPT_DIR = _argval("--ckpt-dir") or ".claude/scratchpad/hunt"
+# the (seed, turn) a red serve lane named, so the reminder can fill itself in
+_hunt_hint: list[tuple[str, str]] = []
+
+
+def print_hunt_reminder() -> None:
+    """THE REMINDER, printed on every run because that is the only placement
+    that cannot be missed — and with the numbers filled in when a lane has
+    just gone red, because a reminder you have to translate is one you skip.
+    """
+    if HUNT:
+        return
+    if _hunt_hint:
+        s, t = _hunt_hint[0]
+        back = max(0, (int(t) // 20) * 20 - 20)
+        print("HUNT MODE — do NOT re-run the fleet to ask about one seed:")
+        print(f"  python gpu/battery.py --seeds {s} --ckpt-every 20"
+              f"              # once, to lay checkpoints")
+        print(f"  python gpu/battery.py --seeds {s} --resume {back} --ckpt-every 20"
+              f"   # then each probe is O(1)")
+    else:
+        print("HUNT MODE — when a serve lane reds, probe ONE seed, not the fleet:")
+        print("  python gpu/battery.py --seeds <seed> --ckpt-every 20 [--resume <turn>]")
 
 # Poke pool: 9 workers x OMP 1 = 9 threads beside the serve shards' 1 each,
 # sized so the pool's total/workers lands beside the serve lane rather than
@@ -288,6 +337,11 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
             # prints half a comparison reads as a silent half.
             tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-40:]
             print("    | " + "\n    | ".join(tail), flush=True)
+            # ...and the seed/turn the gate named, so the hunt reminder can
+            # print the exact command instead of a shape to fill in.
+            _m = re.search(r"first: seed (\d+) turn (\d+)", p.stdout + p.stderr)
+            if _m:
+                _hunt_hint.append((_m.group(1), _m.group(2)))
 
 
 def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads: int) -> None:
@@ -337,7 +391,7 @@ def main() -> int:
     # green does), so the closing re-run of a hunt is always allowed.
     # CIV6_BATTERY_OWNER=1 is the owner's own door, nobody else's.
     since = _stats._last_pass_head(_stats._rows())
-    if since and os.environ.get("CIV6_BATTERY_OWNER") != "1":
+    if since and not HUNT and os.environ.get("CIV6_BATTERY_OWNER") != "1":
         try:
             n = int(_stats._git("rev-list", "--count", f"{since}..HEAD"))
         except ValueError:
@@ -405,24 +459,43 @@ def main() -> int:
         # spend total CPU to buy wall — the trade this box has cores for.
         _seeds = sorted(int(q.stem[4:]) for q in (ROOT / "seeder" / "worlds").glob("seed*.json")
                         if q.stem[4:].isdigit())
+        if HUNT:
+            _want = [int(x) for x in str(HUNT_SEEDS).split(",") if x.strip()]
+            _gone = [s for s in _want if s not in _seeds]
+            assert not _gone, f"--seeds names no fixture: {_gone}; have {_seeds}"
+            _seeds = _want
         # #230: how wide this run may fan out, given the memory this box
         # actually has free right now. Never a refusal — a narrower run, which
         # is a LONGER run.
         _k, _pokes, _why = plan_pool(min(8, len(_seeds)))
+        if HUNT:
+            # one seed, one shard, and nothing else running beside it
+            _k, _pokes, _why = 1, 0, "hunt mode: one serve shard, no poke pool"
         print(f"memory: {_why}", flush=True)
         if (_k, _pokes) != (min(8, len(_seeds)), POKE_WORKERS):
             print(f"        {_k} serve shard(s) and {_pokes} poke worker(s) "
                   f"instead of {min(8, len(_seeds))} and {POKE_WORKERS}", flush=True)
+        print_hunt_reminder()
         mem_min_free[0] = free_mb() or 10 ** 9
         _mem_free_start = mem_min_free[0]
         threading.Thread(target=mem_watch, daemon=True).start()
         _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
-        serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
+        serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250"]
+        if HUNT and (HUNT_RESUME or HUNT_CKPT_EVERY):
+            serve_cmd += ["--ckpt-dir", HUNT_CKPT_DIR]
+            if HUNT_CKPT_EVERY:
+                serve_cmd += ["--ckpt-every", HUNT_CKPT_EVERY]
+            if HUNT_RESUME:
+                serve_cmd += ["--resume", HUNT_RESUME]
+        serve_cmd += ["--seeds"]
         _shards = [("serve_" + "abcdefgh"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
         _serve_names = [s[0] for s in _shards]
-        print("lanes (parallel): vitest+" + _shards[0][0] + " | "
-              + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
+        if HUNT:
+            print(f"lanes: {_shards[0][0]} alone (hunt: no vitest, no pokes)", flush=True)
+        else:
+            print("lanes (parallel): vitest+" + _shards[0][0] + " | "
+                  + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
         lanes = [
             [("vitest", vitest, 8), _shards[0]],
             *[[sh] for sh in _shards[1:]],
@@ -600,6 +673,11 @@ def main() -> int:
         if _missing or _loose:
             print(f"BATTERY LANE DRIFT — missing: {_missing or 'none'}; unregistered: {_loose or 'none'}")
             return 1
+        # A HUNT RUNS THE SERVE SHARD AND NOTHING ELSE. The drift check above
+        # still sees the WHOLE lane list, so a narrowed run can never be
+        # mistaken for a complete one.
+        if HUNT:
+            lanes = [[_shards[0]]]
         _cost = lane_cost()
         for L in lanes:
             if len(L) > 5:
@@ -658,6 +736,14 @@ def main() -> int:
             "lane_mb_budget": round(lane_mb(), 1)}
     print(f"memory: peak {_peak:.0f}MB over {_k + _pokes} lanes "
           f"({_peak / max(1, _k + _pokes):.0f}MB/lane), floor {mem_min_free[0]:.0f}MB free")
+    if HUNT:
+        # a probe is not a verdict: it records nothing, so it can neither
+        # claim a green nor spend the cadence clock.
+        print("HUNT " + ("RED" if failed.is_set() else "clean")
+              + f" — seeds {HUNT_SEEDS}"
+              + (f", resumed at {HUNT_RESUME}" if HUNT_RESUME else "")
+              + " (a probe, not a battery verdict — nothing recorded)")
+        return 1 if failed.is_set() else 0
     _stats.record(results, wall, not failed.is_set() and not oom.is_set(), mem=_mem,
                   oom=oom.is_set())
     if oom.is_set() and not failed.is_set():
@@ -668,6 +754,7 @@ def main() -> int:
         return 3
     if failed.is_set():
         print("BATTERY FAILED")
+        print_hunt_reminder()
         return 1
     print("BATTERY OK")
     return 0
