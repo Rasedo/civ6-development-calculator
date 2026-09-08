@@ -400,6 +400,15 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         gr_b = [int(gr_f[b]), int(gr_d[b])]
                         if tr and gr_b != tr:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}")
+                            # the DECOMPOSITION belongs to whatever flagged,
+                            # not to the keyed diff alone: a driver-twin
+                            # failure never reaches a group dump, and printing
+                            # nothing there is how the route pair went three
+                            # runs without its own evidence.
+                            if sim._log_diff:
+                                for _ln in diff_pairs(sim._diff_events.get(b, []),
+                                                      msg.get("dl", [])):
+                                    print(_ln)
             prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break

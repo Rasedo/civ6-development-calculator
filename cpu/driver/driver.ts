@@ -356,7 +356,14 @@ for (let t = 0; t < N_TURNS; t++) {
       jobsMsg[String(seat)] = jr;   // seat-keyed wire
       spreadsMsg[String(seat)] = sr;
     }
-    o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg });
+    // the DECOMPOSITION rides this message too, not the dump alone: a
+    // driver-twin check fires HERE, and evidence that arrives one message
+    // later is evidence the failing comparison never sees.
+    const dlT = (globalThis as { __diffLog?: string[] }).__diffLog;
+    o.send({
+      t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg,
+      ...(dlT ? { dl: dlT.slice(-96) } : {}),
+    });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
       const bySeat: Record<number, unknown> = {};
