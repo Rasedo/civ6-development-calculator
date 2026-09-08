@@ -24,7 +24,7 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
     for kind, group in by.items():
         if kind == "g":
             out.extend(group)
-        elif kind in ("st", "sp", "xp"):
+        elif kind in ("st", "sp", "xp", "rg", "rc"):
             _t = sorted({int(ln.split(":")[2]) for ln in group})[-2:]
             out.extend(ln for ln in group if int(ln.split(":")[2]) in _t)
         else:
@@ -8796,7 +8796,10 @@ class SimSeats:
         # `base` is a different sum; in `lux` alone, a different allocation of
         # the same one; in `have` with both of those equal, one of the terms
         # that join after the ranking.
-        if getattr(self, "_log_diff", False):
+        # ...and the MINOR section is out: its cities carry id -1 by
+        # construction and `computeCityStats` never walks them, so a line
+        # from here can only print against `(no line)`.
+        if getattr(self, "_log_diff", False) and row < self.n_majors:
             _wwv = self._ww_penalty(row, torch.float64)
             for _ab in range(self.B):
                 _ww1 = float(_wwv[_ab])
@@ -8804,10 +8807,17 @@ class SimSeats:
                 for _c in range(cols):
                     if not bool(alive[_ab, _c]):
                         continue
+                    # THE SEAT IS PART OF THE KEY: `city.id` is a per-seat
+                    # counter, so two seats' first cities are both `c:0` and
+                    # collided on one key. And `have` is printed NET of war
+                    # weariness, which is what `computeCityStats` prints —
+                    # the reconstruction used to add the penalty back and
+                    # showed a disagreement in a term that agrees.
                     _lines.append(
-                        f"c:{int(self.city_id[_ab, row, _c])} base{float(_amen_base[_ab, _c]):g}"
+                        f"c:{int(self._ROW_SEAT[row])}:{int(self.city_id[_ab, row, _c])}"
+                        f" base{float(_amen_base[_ab, _c]):g}"
                         f" lux{float(lux_add[_ab, _c]):g} ww{_ww1:g}"
-                        f" have{float(balance[_ab, _c] + need[_ab, _c] + _ww1):g}"
+                        f" have{float(balance[_ab, _c] + need[_ab, _c]):g}"
                         f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
                         f" tier{int(tier_idx[_ab, _c])}")
                 # the GRANT lines survive the window: a grant can be many
@@ -13067,7 +13077,7 @@ class SimSeats:
                             # engine holds and the other refuses is the whole
                             # question, and only the gates answer it.
                             self._diff_events.setdefault(_rb, []).append(
-                                f"rg:{int(self._ROW_SEAT[row])}:{-(2 + _s)}"
+                                f"rg:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{-(2 + _s)}"
                                 f" f{int(centers[_rb, _j])} met{int(bool(_met_cs[_rb, _s]))}"
                                 f" has{int(bool(exists_cs[_rb, _j, _s]))}"
                                 f" reach{int(bool(_rch_cs[_rb, _j, _s]))}"
@@ -13075,7 +13085,7 @@ class SimSeats:
                             if not bool(valid_cs[_rb, _j, _s]):
                                 continue
                             self._diff_events.setdefault(_rb, []).append(
-                                f"rc:{int(self._ROW_SEAT[row])}:{-(2 + _s)}"
+                                f"rc:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{-(2 + _s)}"
                                 f" f{int(centers[_rb, _j])} y{ysum_cs}"
                                 f" post{int(_post_cs[_rb, _s])}"
                                 f" key{int(key_cs[_rb, _j, _s])}")

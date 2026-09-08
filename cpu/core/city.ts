@@ -1165,7 +1165,7 @@ export function computeCityStats(
   const tier = amenityTier(balance);
   const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (dl && record) {
-    dl.push(`c:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
+    dl.push(`c:${city.seat}:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
       + ` ww${warWearinessPenalty(wwMax(seatOf(state, city.seat)))} have${have} need${needed} bal${balance}`
       + ` tier${amenityTierIndex(tier.name)}`);
   }

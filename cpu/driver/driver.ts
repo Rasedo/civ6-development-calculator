@@ -78,7 +78,7 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
     // the STEP and SPAWN lines keep the last two TURNS, not the last N: a count
     // straddles the turn boundary at a different place on each engine, and a
     // straddled window pairs the tail of one turn against the head of another.
-    if (k === 'st' || k === 'sp' || k === 'xp') {
+    if (k === 'st' || k === 'sp' || k === 'xp' || k === 'rg' || k === 'rc') {
       const ts = [...new Set(g.map((ln) => Number(ln.split(':')[2])))].sort((x, y) => x - y).slice(-2);
       out.push(...g.filter((ln) => ts.includes(Number(ln.split(':')[2]))));
       continue;
@@ -116,7 +116,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       // EVERY city-state, gate by gate — a candidate one engine holds and the
       // other refuses is the whole question, and only the gates answer it.
       const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
-      if (dlG) dlG.push(`rg:${actor.seat}:${-(2 + ci)} f${from.centerIndex} met${gMet ? 1 : 0} has${gHas ? 1 : 0} reach${gRch ? 1 : 0} ctr${cityState.centerIndex}`);
+      if (dlG) dlG.push(`rg:${actor.seat}:${state.turn}:${-(2 + ci)} f${from.centerIndex} met${gMet ? 1 : 0} has${gHas ? 1 : 0} reach${gRch ? 1 : 0} ctr${cityState.centerIndex}`);
       if (!gMet || gHas || !gRch) continue;
       const cy = cityStateRouteYields(cityState);
       const post = routePostGold(state, actor.seat, cityState.centerIndex);
@@ -127,7 +127,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       // itself the evidence when one engine prints a line and the other does
       // not.
       const dlC = (globalThis as { __diffLog?: string[] }).__diffLog;
-      if (dlC) dlC.push(`rc:${actor.seat}:${-(2 + ci)} f${from.centerIndex} y${ySum - post} post${post} key${ySum}`);
+      if (dlC) dlC.push(`rc:${actor.seat}:${state.turn}:${-(2 + ci)} f${from.centerIndex} y${ySum - post} post${post} key${ySum}`);
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
     }
     // An INTERNATIONAL destination competes on the same total-yield key as a
