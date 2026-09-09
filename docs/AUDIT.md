@@ -76,12 +76,29 @@ A question the SOURCE under-determines; neither engine ships a branch until
 the owner rules or a primary source is reached. The ruling is written into
 the entry and the line leaves.
 
-RE-SOURCED 2026-09-09 against the install. Ask 16 gained real evidence and is
-now ONE SCALAR wide (see C-49: the three stages, the per-turn direction
-notification, `Hexes` as the footprint, and nothing anywhere for the
-distance). Asks 3 and 5 were re-checked and stay unsourced: there is no
-religion-majority tiebreak parameter and there are no NUKE globals or
-wonder-in-blast column of any kind. Do not re-run those two greps.
+RE-SOURCED 2026-09-09 against the install — TWELVE of the sixteen, so that
+nobody repeats a grep that came back empty. THE SOURCING IS DONE; what is left
+on these lines is a RULING, not research.
+
+| ask | re-source result |
+|---|---|
+| 1 Volcanic Soil | NARROWED. The volcano rows carry no `Hexes` at all, unlike every storm row, so the affected SET is unpublished — but the severities split `PROP_DAMAGE_FERTILITY` (gentle) against `ALL_DAMAGE_FERTILITY` (catastrophic, megacolossal), and `FEATURE_VOLCANIC_SOIL` is `ValidForReplacement="true"`, so the soil replaces a standing FEATURE. Radius and improvement survival still open. |
+| 2 Encampment pool | empty — no encampment-on-capture parameter anywhere |
+| 3 religion tie | empty — no majority tiebreak parameter |
+| 5 wonder in a blast | empty — no NUKE globals, no wonder-in-blast column |
+| 6 opinion deltas | empty — the `LOC_DIPLO_MODIFIER_*` rows are TEXT TAGS with no amount attached |
+| 9 city-state spending | empty — no `MINOR_CIV_*` spending knob exists |
+| 10 Free City as spy ground | empty — `CivilizationLevels` carries nothing spy-related |
+| 11 how sight is spent | empty — the column sits beside DefenseModifier/MovementChange/Appeal and states no semantics |
+| 12 Free City amenities | empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
+| 13 Free City defence | empty of a defence column, but ONE constraint found: that row carries `IgnoresUnitStrategicResourceRequirements="false"`, where TRIBE and CITY_STATE carry true — so whatever a Free City spawns must respect strategic resources |
+| 15 trade-route district gold | confirmed `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and `_PER_DESTINATION_DISTRICT` 2; the COMPOSITION is what no row states |
+| 16 storm `Movement 8` | NARROWED TO ONE SCALAR — see C-49 |
+
+Not re-swept, and deliberately: ask 4 (a per-game/per-object modelling
+choice), ask 7 (one forum report against this engine's standing principle),
+ask 8 (a rename decision, not a fact), ask 14 (the whole term list is already
+in the entry).
 
 1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
