@@ -2815,7 +2815,16 @@ class SimEconomy:
         d = self._dadj_cache[1]
         v = d.get(di)
         if v is None:
-            v = torch.floor(self._district_adj_raw(di, self._adj_district_count().to(self.dtype)))
+            _cnt = self._adj_district_count()
+            v = torch.floor(self._district_adj_raw(di, _cnt.to(self.dtype)))
+            if getattr(self, "_log_diff", False):
+                _nm = self.districts_cat[di].get('id')
+                for _b in range(self.B):
+                    for _t in (self.district[_b] == di).nonzero().flatten().tolist():
+                        self._diff_events.setdefault(_b, []).append(
+                            f"da:{_t}:{_nm}"
+                            f" raw{float(self._district_adj_raw(di, _cnt.to(self.dtype))[_b, _t]):.3f}"
+                            f" n{int(_cnt[_b, _t])}")
             d[di] = v
         return v
 
@@ -5189,6 +5198,15 @@ class SimEconomy:
                 else torch.zeros(B, 6, dtype=F64, device=dev)
             _spec = self._district_counts(row)[1] if self.districts_on \
                 else torch.zeros(B, self.RC, dtype=torch.long, device=dev)
+            if getattr(self, "_log_diff", False):
+                for _b in range(B):
+                    for _j in range(cols):
+                        if not bool(self.city_alive[_b, row, _j]):
+                            continue
+                        self._diff_events.setdefault(_b, []).append(
+                            f"sp2:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                            f":{int(self.city_center[_b, row, _j])}"
+                            f" spec{int(_spec[_b, _j])}")
             bon = bon + self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
 

@@ -1167,7 +1167,11 @@ export function computeCityStats(
   if (dl && record) {
     dl.push(`c:${city.seat}:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
       + ` ww${warWearinessPenalty(wwMax(seatOf(state, city.seat)))} have${have} need${needed} bal${balance}`
-      + ` tier${amenityTierIndex(tier.name)}`);
+      + ` tier${amenityTierIndex(tier.name)}`
+      // the COMPLETE specialty count this city carries: a governor's
+      // `faithPerSpecialty` pays one faith a turn off it, so a count one
+      // apart is an exact one-faith drift with no other symptom.
+      + ` spec${completedDistrictCount(state, city, true)}`);
   }
   // the tier this walk RAN ON, kept where the census can read it — never a
   // recomputation, for the same reason `workedTiles` is not one: the walk is

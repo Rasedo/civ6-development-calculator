@@ -243,6 +243,17 @@ class SimMinors:
                     _g_dv = float(_d_pg[dv]) if dv < len(_d_pg) else 0.0
                     d_cost = (torch.full_like(d_fac, _b_dv) + torch.floor(_g_dv * _mprog)
                               if _g_dv > 0 else torch.floor(_b_dv * d_fac))
+                    if getattr(self, "_log_diff", False):
+                        _nm = self.districts_cat[dv].get('id')
+                        for _b in range(self.B):
+                            if not bool(avail[_b]):
+                                continue
+                            _t = float(d_cost[_b])
+                            _g = float(torch.floor(_g_dv * _mprog[_b])) if _g_dv > 0 else 0.0
+                            self._diff_events.setdefault(_b, []).append(
+                                f"dm:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{_nm}"
+                                f" b{int(_t - _g)} g{int(_g)} t{int(_t)}"
+                                f" pot{int(float(self.citystate_prod[_b, s]))}")
                     pay = avail & (self.citystate_prod[:, s] >= d_cost)
                     if bool(pay.any()):
                         rr = pay.nonzero(as_tuple=True)[0]

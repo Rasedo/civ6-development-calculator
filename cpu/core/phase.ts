@@ -44,7 +44,7 @@ import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasabl
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT } from '../data/constants';
-import { cityDistrictSum, darkBuildings } from './yields';
+import { cityDistrictSum, completedDistrictCount, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
@@ -53,6 +53,7 @@ import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
+import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, tunnelTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -787,8 +788,10 @@ export function districtSiteCost(
     : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
       ? Math.floor(base * districtDiscountMult(id))
       : base;
-  return districtVariantCost(state, actor.seat, id, cost0)
-    + districtProgressAdd(actor.research, id);
+  const varied = districtVariantCost(state, actor.seat, id, cost0);
+  const add = districtProgressAdd(actor.research, id);
+  logDistrictCost(state.turn, actor.seat, id, base, cost0, varied, add);
+  return varied + add;
 }
 
 /** The GROUND a district takes when it is placed — the same writes whether the
@@ -2557,6 +2560,13 @@ export function seatPhase(state: GameState): void {
       // subtracts it — so this must not charge it a second time.
       goldSum += y.gold;
       faithSum += y.faith; // the faith yield gains its consumer
+      // WHICH city's faith yield: the loop-top snapshot, per city, keyed
+      // on the CENTRE tile — the one name both engines give a city.
+      const _dlcy = (globalThis as { __diffLog?: string[] }).__diffLog;
+      if (_dlcy) _dlcy.push(`cy:${actor.seat}:${state.turn}:${civCity.centerIndex}`
+        + ` f${y.faith.toFixed(6)}`);
+      if (_dlcy) _dlcy.push(`sp2:${actor.seat}:${state.turn}:${civCity.centerIndex}`
+        + ` spec${completedDistrictCount(state, civCity, true)}`);
       const production = y.production;
       sciSum += y.science;
       const culC = y.culture;
@@ -2816,6 +2826,7 @@ export function seatPhase(state: GameState): void {
     for (const civCity of civCityDefectors) flipCity(state, civCity);
 
     const rsr = actor.research;
+    const _fBase = faithSum;
     // CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
     // receiver half of the typed route bonus - empire-level, per route.
     for (const o of state.seats) {
@@ -2837,6 +2848,7 @@ export function seatPhase(state: GameState): void {
         }
       }
     }
+    const _fAll = faithSum;
     // CIV6 (The Last Prophet): "+1 Science for each foreign city following
     // Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
     const foreignRows = getModifiers(state, actor.seat).foreignFollowerYields;
@@ -2850,6 +2862,7 @@ export function seatPhase(state: GameState): void {
         else if (r.yield === 'faith') faithSum += amt;
       }
     }
+    const _fFor = faithSum;
     // the seat's OUTPUT this turn, stored for allies' percentage reads -
     // written before those reads, so the terms never compound
     actor.sciRate = sciSum;
@@ -2914,6 +2927,13 @@ export function seatPhase(state: GameState): void {
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     actor.treasury = (actor.treasury ?? 0) + goldSum;
     faithSum += peacefulFounderFaith(state, actor.seat);
+    // THE TURN'S FAITH INCOME, before it lands. One number per seat per
+    // turn: it splits an income disagreement from a SPEND disagreement,
+    // which is two halves of the search space in one line.
+    const _dlfi = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dlfi) _dlfi.push(`fi:${actor.seat}:${state.turn}`
+      + ` sum${faithSum.toFixed(6)} was${(actor.faith ?? 0).toFixed(6)}`
+      + ` base${_fBase.toFixed(6)} all${_fAll.toFixed(6)} for${_fFor.toFixed(6)}`);
     actor.faith = (actor.faith ?? 0) + faithSum;
     seatAccumulators(state, actor.seat, rGovIds);
     actor.treasury -= state.units.reduce(

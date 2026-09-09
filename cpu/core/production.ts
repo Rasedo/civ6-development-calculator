@@ -240,6 +240,13 @@ export function completeQueueItem(
   if (item.kind === 'building' || item.kind === 'district') {
     const pct = governorSum(state, city, (e) => e.faithOnBuildPct);
     if (pct) owner.faith = (owner.faith ?? 0) + Math.floor((cost * pct) / 100);
+    // 25% of the construction cost is `floor(cost / 4)`: a cost FOUR apart
+    // pays one faith apart, and a district's cost now climbs ~8 a tech.
+    const _dlc = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dlc) _dlc.push(`cf:${city.seat}:${state.turn}:${city.centerIndex}`
+      + ` cost${cost} pct${pct} pay${pct ? Math.floor((cost * pct) / 100) : 0}`
+      // an annotation, after ` #`: printed, never compared
+      + ` #${item.kind}`);
   }
   switch (item.kind) {
     case 'district': {

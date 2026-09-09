@@ -1491,12 +1491,30 @@ class SimSeats:
         _p_si = float(d_disc[di]) if di < len(d_disc) else 40.0
         out = torch.where(disc, torch.floor(d_cost * (1.0 - _p_si / 100.0)), d_cost)
         # CIV6 (Bath): the unique district is "cheaper to build"
+        _after_disc = out
         for _v in self._d_variants.get(di, []):
             _pm = self._row_plays_idx(row, int(_v["civ"]))
             out = torch.where(_pm, torch.floor(out * float(_v["costMult"])), out)
-        if _g_si > 0:
-            out = out + torch.floor(_g_si * self._district_progress(row)).to(self.dtype)
-        return out
+        add = (torch.floor(_g_si * self._district_progress(row)).to(self.dtype)
+               if _g_si > 0 else torch.zeros_like(out))
+        self._log_dcost(row, di, d_cost, _after_disc, out, add)
+        return out + add
+
+    def _log_dcost(self, row: int, di: int, base, disc, varied, add) -> None:
+        """`logDistrictCost`'s twin. The price is COMPOSED — base, discount,
+        variant, the GAME_PROGRESS add — and a total that agrees while a part
+        does not is exactly what one number hides. `disc` is post-DISCOUNT and
+        pre-VARIANT on BOTH engines: a printed term the two sides spell
+        differently shows a disagreement neither of them has."""
+        if not getattr(self, "_log_diff", False):
+            return
+        for _b in range(self.B):
+            _d, _v, _a = float(disc[_b]), float(varied[_b]), float(add[_b])
+            self._diff_events.setdefault(_b, []).append(
+                f"dc:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                f":{self.districts_cat[di].get('id')}"
+                f" b{int(float(base[_b]))} d{int(_d)} v{int(_v)}"
+                f" g{int(_a)} t{int(_v + _a)}")
 
     def _district_cap(self, row: int, j: int) -> torch.Tensor:
         """[B] long — how many SPECIALTY districts city slot `j` may hold:
@@ -8831,6 +8849,13 @@ class SimSeats:
             for _ab in range(self.B):
                 _ww1 = float(_wwv[_ab])
                 _lines = self._diff_events.setdefault(_ab, [])
+                def _spec_n(_b: int, _cc: int) -> int:
+                    """`completedDistrictCount(state, city, true)`'s twin —
+                    the COMPLETE specialty districts this city holds."""
+                    _dt = self.city_dist_tile[_b, row, _cc]
+                    return int(((_dt >= 0) & self._is_specialty
+                                & self.district_complete[_b, _dt.clamp(min=0)]).sum())
+
                 for _c in range(cols):
                     if not bool(alive[_ab, _c]):
                         continue
@@ -8846,7 +8871,8 @@ class SimSeats:
                         f" lux{float(lux_add[_ab, _c]):g} ww{_ww1:g}"
                         f" have{float(balance[_ab, _c] + need[_ab, _c]):g}"
                         f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
-                        f" tier{int(tier_idx[_ab, _c])}")
+                        f" tier{int(tier_idx[_ab, _c])}"
+                        f" spec{_spec_n(_ab, _c)}")
                 # the GRANT lines survive the window: a grant can be many
                 # turns before the walk that reads its count, and trimming it
                 # away is exactly the evidence this pair needs.

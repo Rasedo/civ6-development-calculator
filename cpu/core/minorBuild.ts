@@ -179,6 +179,14 @@ function minorBuild(state: GameState, cityState: CityState): void {
     // districts too and the install prices an Aqueduct at 36
     const cost = districtScaledBase(cityState.research, item.district)
       + districtProgressAdd(cityState.research, item.district);
+    // the MINOR's own price and the pool it is judged against. A minor's
+    // district feeds its suzerain's yields, so a build one turn apart is a
+    // small, permanent drift in a MAJOR's purse with no other symptom.
+    const _dl = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dl) _dl.push(`dm:${cityState.seat}:${state.turn}:${item.district}`
+      + ` b${districtScaledBase(cityState.research, item.district)}`
+      + ` g${districtProgressAdd(cityState.research, item.district)}`
+      + ` t${cost} pot${Math.floor(pot)}`);
     if (pot < cost) return;
     cityState.prodProgress = pot - cost;
     const t = state.map.tiles[site];

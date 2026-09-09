@@ -236,6 +236,14 @@ class SimPhase:
             # phase.ts adds stats.total.gold straight in.
             gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
             faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
+            if getattr(self, "_log_diff", False):
+                for _b in range(B):
+                    if not bool(cact[_b]):
+                        continue
+                    self._diff_events.setdefault(_b, []).append(
+                        f"cy:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                        f":{int(self.city_center[_b, row, j])}"
+                        f" f{float(total[_b, j, 5]):.6f}")
             sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
@@ -1251,6 +1259,15 @@ class SimPhase:
         bidx = torch.arange(self.B, device=self.device)
         _pct = self._governor_sum(row, "faithOnBuildPct")[bidx, col]
         _pay = torch.floor(cost.double() * _pct / 100.0) * mask.double()
+        if getattr(self, "_log_diff", False):
+            for _b in range(self.B):
+                if not bool(mask[_b]):
+                    continue
+                self._diff_events.setdefault(_b, []).append(
+                    f"cf:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f":{int(self.city_center[_b, row, int(col[_b])])}"
+                    f" cost{int(float(cost[_b]))} pct{int(float(_pct[_b]))}"
+                    f" pay{int(float(_pay[_b]))}")
         self.civ_faith[:, row] = self.civ_faith[:, row] + torch.zeros_like(
             self.civ_faith[:, row]).index_add_(0, bidx, _pay.to(self.civ_faith.dtype))
 
@@ -1490,6 +1507,7 @@ class SimPhase:
     def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
                             cul_sum: torch.Tensor, gold_sum: torch.Tensor,
                             faith_sum: torch.Tensor, gov: torch.Tensor) -> None:
+        _f_base = faith_sum.clone()
         """The seat block's TAIL, for seat row `row` — ONE body every seat runs.
 
         In seatPhase order: bank this turn's city sums (science, gold, faith),
@@ -1535,6 +1553,7 @@ class SimPhase:
                 _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
                 faith_sum = faith_sum + (_r3.double() * self._al_rel3_faith_pop
                                          * (_fol * self.city_pop[:, row].double()).sum(dim=1))
+        _f_all = faith_sum.clone()
         # CIV6 (The Last Prophet): "+1 Science for each foreign city following
         # Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
         for _fc, _fl, _fy, _fa, _fp in self._foreign_follower_yield_rows:
@@ -1551,6 +1570,7 @@ class SimPhase:
                 gold_sum = gold_sum + _amt
             elif _fy == 5:
                 faith_sum = faith_sum + _amt
+        _f_for = faith_sum.clone()
         # the seat's OUTPUT this turn, stored for allies' percentage reads -
         # written before those reads, so the terms never compound
         self.civ_sci_rate[:, row] = torch.where(active, sci_sum, self.civ_sci_rate[:, row])
@@ -1593,6 +1613,14 @@ class SimPhase:
                     _ok = _ok & ~self.war[:, row, _o]
                 _n = _n + _ok.double()
             faith_sum = faith_sum + _pw.double() * _n * _pa
+        if getattr(self, "_log_diff", False):
+            for _b in range(self.B):
+                self._diff_events.setdefault(_b, []).append(
+                    f"fi:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f" sum{float(faith_sum[_b]):.6f}"
+                    f" was{float(self.civ_faith[_b, row]):.6f}"
+                    f" base{float(_f_base[_b]):.6f} all{float(_f_all[_b]):.6f}"
+                    f" for{float(_f_for[_b]):.6f}")
         bank(self.civ_faith, faith_sum)
         self._seat_upkeep_and_bankruptcy(row, active)
         for _ in range(RESEARCH_LOOPS):

@@ -20,12 +20,27 @@
  * The gate pairs by key, keeps the LAST line per key, and prints only the
  * keys whose lines differ.
  */
-import type { City, GameState, Unit } from './types';
+import type { City, DistrictId, GameState, Unit } from './types';
 import { UNIT_TYPE_IDX } from '../data/units';
 
 function push(line: string): void {
   const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (dl) dl.push(line);
+}
+
+/** THE DISTRICT PRICE, in PARTS. `Districts.CostProgressionModel` gives two
+ *  models and the engine composes base -> discount -> variant -> the
+ *  GAME_PROGRESS add; a single total hides which of the four moved. Keyed on
+ *  the district's ID STRING: the two engines index their district catalogues
+ *  differently (the exporter drops a leading row, so every TS position is one
+ *  higher), and an index space they do not share files the two sides as two
+ *  unrelated lines that never pair. */
+export function logDistrictCost(
+  turn: number, seat: number, id: DistrictId,
+  base: number, disc: number, varied: number, add: number,
+): void {
+  push(`dc:${seat}:${turn}:${id}`
+    + ` b${base} d${disc} v${varied} g${add} t${varied + add}`);
 }
 
 /** WHICH writer last moved a unit's experience pool. Seven of them can, and

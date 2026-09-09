@@ -303,6 +303,12 @@ export function districtAdjacency(
       if (matchesAdjacency(rule, n)) sum += rule.amount;
     }
   }
+  // the RAW adjacency before the floor, at the tile both engines name the
+  // same way. A 0.5-per-district source floors to 0 at one neighbour and
+  // to 1 at two, so a count one apart is a whole yield apart.
+  const _dla = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (_dla) _dla.push(`da:${tile.index}:${type} raw${sum.toFixed(3)}`
+    + ` n${around.filter((n) => n.district !== null && n.districtComplete).length}`);
   return Math.floor(sum);
 }
 
