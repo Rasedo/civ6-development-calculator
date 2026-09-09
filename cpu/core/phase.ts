@@ -2567,6 +2567,11 @@ export function seatPhase(state: GameState): void {
         + ` f${y.faith.toFixed(6)}`);
       if (_dlcy) _dlcy.push(`sp2:${actor.seat}:${state.turn}:${civCity.centerIndex}`
         + ` spec${completedDistrictCount(state, civCity, true)}`);
+      if (_dlcy) { const _bk = stats.breakdown;
+        _dlcy.push(`bk:${actor.seat}:${state.turn}:${civCity.centerIndex}`
+          + ` t${(_bk.tiles.faith ?? 0).toFixed(3)} d${(_bk.districts.faith ?? 0).toFixed(3)}`
+          + ` b${(_bk.buildings.faith ?? 0).toFixed(3)} z${(_bk.citizens.faith ?? 0).toFixed(3)}`
+          + ` n${(_bk.bonuses.faith ?? 0).toFixed(3)} r${(_bk.trade.faith ?? 0).toFixed(3)}`); }
       if (_dlcy) _dlcy.push(`gb:${actor.seat}:${state.turn}:${civCity.centerIndex}`
         + ` gfaith${((seatMods.faithPerSpecialty ?? 0)
           * completedDistrictCount(state, civCity, true)).toFixed(3)}`);

@@ -2817,15 +2817,19 @@ class SimEconomy:
         if v is None:
             _cnt = self._adj_district_count()
             v = torch.floor(self._district_adj_raw(di, _cnt.to(self.dtype)))
-            if getattr(self, "_log_diff", False):
-                _nm = self.districts_cat[di].get('id')
-                for _b in range(self.B):
-                    for _t in (self.district[_b] == di).nonzero().flatten().tolist():
-                        self._diff_events.setdefault(_b, []).append(
-                            f"da:{_t}:{_nm}"
-                            f" raw{float(self._district_adj_raw(di, _cnt.to(self.dtype))[_b, _t]):.3f}"
-                            f" n{int(_cnt[_b, _t])}")
             d[di] = v
+        # LOG ON EVERY CALL, not only on a cache MISS: a miss-only log covers
+        # whichever tiles happened to exist at the miss, which is a different
+        # tile set from the one TS walks — the sides then never pair.
+        if getattr(self, "_log_diff", False):
+            _cnt2 = self._adj_district_count()
+            _raw2 = self._district_adj_raw(di, _cnt2.to(self.dtype))
+            _nm = self.districts_cat[di].get('id')
+            for _b in range(self.B):
+                for _t in (self.district[_b] == di).nonzero().flatten().tolist():
+                    self._diff_events.setdefault(_b, []).append(
+                        f"da:{_t}:{_nm} raw{float(_raw2[_b, _t]):.3f}"
+                        f" n{int(_cnt2[_b, _t])}")
         return v
 
     def _district_adj_belief_floor(self, row: int, di: int) -> torch.Tensor:
@@ -5226,6 +5230,20 @@ class SimEconomy:
             trade = _rt[:, sl] * alivef.unsqueeze(2)
 
         total = tiles_y + dist_y + bld_y + citz + bon + trade
+        if getattr(self, "_log_diff", False):
+            for _b in range(B):
+                for _j in range(cols):
+                    if not bool(self.city_alive[_b, row, _j]):
+                        continue
+                    self._diff_events.setdefault(_b, []).append(
+                        f"bk:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                        f":{int(self.city_center[_b, row, _j])}"
+                        f" t{float(tiles_y[_b, _j, 5]):.3f}"
+                        f" d{float(dist_y[_b, _j, 5]):.3f}"
+                        f" b{float(bld_y[_b, _j, 5]):.3f}"
+                        f" z{float(citz[_b, _j, 5]):.3f}"
+                        f" n{float(bon[_b, _j, 5]):.3f}"
+                        f" r{float(trade[_b, _j, 5]):.3f}")
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
         # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the
