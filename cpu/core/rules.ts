@@ -97,6 +97,24 @@ export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): bool
 }
 
 /**
+ * CIV6 (`Improvements.CanBuildOutsideTerritory`): may THIS ROW stand here?
+ *
+ * The column is per-improvement, not per-builder: the Fort, the Airstrip, the
+ * Pa and the Mountain Tunnel carry it, and the Missile Silo carries it
+ * written out FALSE — so "the Military Engineer works neutral ground" is a
+ * sentence about four of its five rows, not about the chassis.
+ *
+ * Outside means UNOWNED. A tile inside another seat's borders is nobody's to
+ * improve, which is why the flag widens to `tileSeat < 0` rather than to
+ * "not mine".
+ */
+export function territoryOk(
+  def: ImprovementDef, tile: Tile, ownsTile: (t: Tile) => boolean,
+): boolean {
+  return ownsTile(tile) || (!!def.outsideTerritory && tileSeat(tile) < 0);
+}
+
+/**
  * CIV6 (Mountain Tunnel): "Can only be built on an adjacent Mountain tile."
  *
  * The engineer stands OFF the mountain and builds onto it — the only
@@ -136,10 +154,16 @@ export function portalExit(map: GameMap, tile: Tile): number {
   return first;
 }
 
-export function tunnelTarget(map: GameMap, tile: Tile): number {
+export function tunnelTarget(
+  map: GameMap, tile: Tile, ownsTile: (t: Tile) => boolean,
+): number {
   let best = -1;
   for (const n of neighbors(map, tile)) {
     if (!isMountain(n) || n.improvement) continue;
+    // the TARGET answers the territory column, not the tile the engineer
+    // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
+    // stops at another seat's border like every other row.
+    if (!territoryOk(IMPROVEMENTS.MOUNTAIN_TUNNEL, n, ownsTile)) continue;
     if (best < 0 || n.index < best) best = n.index;
   }
   return best;
@@ -261,8 +285,8 @@ export function validImprovementsIn(
   // A MILITARY ENGINEER builds ONLY the rows the catalog marks `engineer`, and
   // never a Farm, Mine, Camp or Plantation — without the guard the best-delta
   // chooser would take the Farm every time, since a Fort yields nothing. Its
-  // rows sit ABOVE the ownership gate and the resource early return, because
-  // both of the Civ 6 pages read "in your own or neutral territory".
+  // rows sit ABOVE the Builder's ownership gate and the resource early return,
+  // and each then answers the TERRITORY column for itself.
   const fortBuilder = opts.builder !== undefined && opts.builder !== 'MILITARY_ENGINEER' && !!UNITS[opts.builder]?.fortBuilder;
   if (opts.builder === 'MILITARY_ENGINEER' || fortBuilder) {
     if (!engineerTileOk(tile, opts.ownsTile) || tile.improvement) return [];
@@ -270,6 +294,7 @@ export function validImprovementsIn(
     for (const def of Object.values(IMPROVEMENTS)) {
       // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech.
       if (fortBuilder ? def.id !== 'FORT' : (!def.engineer || !unlocked(def.id))) continue;
+      if (!territoryOk(def, tile, opts.ownsTile)) continue;
       if (def.noFeature && !bareGround(tile)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.excludeTerrains?.includes(tile.terrain)) continue;
@@ -286,7 +311,7 @@ export function validImprovementsIn(
     for (const def of Object.values(IMPROVEMENTS)) {
       if (def.builtBy !== opts.builder || !unlocked(def.id)) continue;
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
-      if (!def.outsideTerritory && !opts.ownsTile(tile)) continue;
+      if (!territoryOk(def, tile, opts.ownsTile)) continue;
       if (tile.improvement) continue;
       if (def.noFeature && !bareGround(tile)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;

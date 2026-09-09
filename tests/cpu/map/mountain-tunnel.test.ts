@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { emptySeat } from '../../../cpu/core/seats';
+import { emptySeat, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { deriveMountainRanges } from '../../../world/query';
 import { tunnelTarget, portalExit, PORTAL_MP } from '../../../cpu/core/rules';
 import { tunnelAt } from '../../../cpu/core/units';
@@ -18,6 +18,9 @@ import type { GameState } from '../../../cpu/core/types';
  *
  * The GPU twin is tests/gpu/mountain_tunnel_test.py.
  */
+/** seat 0's own ground — the closure every `tunnelTarget` caller passes. */
+const mine = (t: { ownerSeat: number }) => tileSeat(t as never) === 0;
+
 function ridge(cols: number[]): GameState {
   const state = makeState(makeMap(16, 16, 'GRASSLAND'));
   state.seats.push(emptySeat(1));
@@ -32,6 +35,14 @@ describe('the mountain tunnel', () => {
     expect(d.engineer).toBe(true);
     expect(d.elevations).toEqual(['MOUNTAIN']);
     expect(d.noPillage).toBe(true);
+    // `Improvements_XP2`: DisasterResistant, beside AllowImpassableMovement
+    // and BuildOnAdjacentPlot. It is a SECOND caller from `noPillage` — the
+    // pillage verb and the disaster walk ask different questions.
+    expect(d.disasterResistant).toBe(true);
+    // `Improvements.CanBuildOutsideTerritory="true"` — and per ROW, which is
+    // what the Missile Silo's written-out `false` settles.
+    expect(d.outsideTerritory).toBe(true);
+    expect(IMPROVEMENTS.MISSILE_SILO.outsideTerritory).toBeUndefined();
     expect(PORTAL_MP).toBe(2);
   });
 
@@ -64,7 +75,7 @@ describe('the mountain tunnel', () => {
     const s = ridge([3, 4, 5]);
     // a tile beside the ridge — its own tile is not a mountain
     const stand = tileAtCoords(s.map, 4, 6);
-    const t = tunnelTarget(s.map, stand);
+    const t = tunnelTarget(s.map, stand, mine);
     expect(t).toBeGreaterThanOrEqual(0);
     expect(s.map.tiles[t].elevation).toBe('MOUNTAIN');
     // ...the LOWEST index of the bare adjacent mountains, deterministically
@@ -73,7 +84,22 @@ describe('the mountain tunnel', () => {
     expect(t).toBe(Math.min(...adj));
     // once built there, it is no longer a candidate
     s.map.tiles[t].improvement = 'MOUNTAIN_TUNNEL';
-    expect(tunnelTarget(s.map, stand)).not.toBe(t);
+    expect(tunnelTarget(s.map, stand, mine)).not.toBe(t);
+  });
+
+  it('refuses a mountain inside ANOTHER seat\'s borders', () => {
+    // CIV6 (`CanBuildOutsideTerritory`): outside means UNOWNED. A tile inside
+    // another seat's borders is nobody's to improve, so the widening the flag
+    // buys stops at a foreign border rather than at "not mine".
+    const s = ridge([3, 4, 5]);
+    const stand = tileAtCoords(s.map, 4, 6);
+    const free = tunnelTarget(s.map, stand, mine);
+    expect(free).toBeGreaterThanOrEqual(0);       // neutral ground is offered
+    for (const c of [3, 4, 5]) setTileOwner(tileAtCoords(s.map, c, 5), 1);
+    expect(tunnelTarget(s.map, stand, mine)).toBe(-1);
+    // ...and the seat's OWN mountain is offered again
+    setTileOwner(tileAtCoords(s.map, 4, 5), 0);
+    expect(tunnelTarget(s.map, stand, mine)).toBe(tileAtCoords(s.map, 4, 5).index);
   });
 
   it('makes its own mountain ENTERABLE and nothing else', () => {

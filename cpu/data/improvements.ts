@@ -408,6 +408,10 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     engineer: true,
+    // CIV6 (`Improvements.CanBuildOutsideTerritory`): true on this row. It is
+    // a PER-ROW column, not a property of the Engineer — the Missile Silo
+    // carries it explicitly FALSE and stays inside its owner's borders.
+    outsideTerritory: true,
     // CIV6 (Improvements.xml `DefenseModifier` / `GrantFortification`): the
     // Fort's own columns, on the data now that the Great Wall and the Pa
     // carry the same pair.
@@ -428,6 +432,10 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     engineer: true,
+    // CIV6 (`Improvements.CanBuildOutsideTerritory`): true on this row. It is
+    // a PER-ROW column, not a property of the Engineer — the Missile Silo
+    // carries it explicitly FALSE and stays inside its owner's borders.
+    outsideTerritory: true,
     elevations: ['FLAT'],
     appealAdjacent: -1,
     airSlots: 3,
@@ -435,7 +443,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   },
   // CIV6 (Missile Silo): "Base for launching nukes", built by the Military
   // Engineer, unlocked by Rocketry, and its terrain list is the five FLAT
-  // land terrains this map carries. Plunder: None.
+  // land terrains this map carries. Plunder: None. It is the one Engineer
+  // row with `CanBuildOutsideTerritory="false"` written out, so it alone
+  // needs its owner's borders — which is why that column is per-row here.
   MISSILE_SILO: {
     id: 'MISSILE_SILO',
     name: 'Missile Silo',
@@ -599,10 +609,18 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     engineer: true,
+    // CIV6 (`Improvements.CanBuildOutsideTerritory`): true on this row. It is
+    // a PER-ROW column, not a property of the Engineer — the Missile Silo
+    // carries it explicitly FALSE and stays inside its owner's borders.
+    outsideTerritory: true,
     elevations: ['MOUNTAIN'],
     // it is the ONE improvement that stands on impassable ground, and the one
     // a unit may enter without being able to work
     noPillage: true,
+    // CIV6 (`Improvements_XP2.DisasterResistant` = true): a flood or
+    // a storm passes over it. `noPillage` answers the PILLAGE verb; this
+    // answers the disaster walk, and they are two different callers.
+    disasterResistant: true,
     description: 'Military Engineer only, on a mountain, built from an adjacent tile. A movement portal to the next tunnel on its range, at 2 Movement. Cannot be pillaged or removed.',
   },
   // CIV6 (Civilizations.xml): the twelve unique improvements the roster's

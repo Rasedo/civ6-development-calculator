@@ -903,6 +903,8 @@ class SimOrders:
                 )
                 # the MILITARY ENGINEER's rows reach neutral ground too
                 # (`engineerTileOk`), so its base differs from the Builder's.
+                # WHICH of them reach that far is the per-row
+                # `CanBuildOutsideTerritory`, ANDed back in below.
                 eng_ok = (
                     act & (utp == self._eng_idx) & (u_charges > 0)
                     & (own_tile | (self.tile_seat < 0)).gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -978,6 +980,9 @@ class SimOrders:
                             _base = _base & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
                     else:
                         _base = ((eng_ok | fort_ok) if _k == self.FORT else eng_ok) if self._imp_eng[_k] else here_ok
+                        if self._imp_eng[_k] and not self._imp_outside[_k]:
+                            _base = _base & own_tile.gather(
+                                1, hc.unsqueeze(1)).squeeze(1)
                     _ok = _base & (a == _col) & _valid
                     if bool(_ok.any()):
                         _r = _ok.nonzero(as_tuple=True)[0]
@@ -994,8 +999,12 @@ class SimOrders:
                     _tcol = self._A_IMP[self.TUNNEL]
                     _tnb = self.neigh[hc]                                   # [B, 6]
                     _tnc = _tnb.clamp(min=0)
+                    # the TARGET answers the territory column (`territoryOk`)
+                    _tterr = own_tile.gather(1, _tnc)
+                    if self._imp_outside[self.TUNNEL]:
+                        _tterr = _tterr | (self.tile_seat.gather(1, _tnc) < 0)
                     _tok = ((_tnb >= 0) & self.tile_mountain.gather(1, _tnc)
-                            & (self.improvement.gather(1, _tnc) < 0))
+                            & (self.improvement.gather(1, _tnc) < 0) & _tterr)
                     _tkey = torch.where(_tok, _tnb, torch.full_like(_tnb, 2 ** 30))
                     _tt = _tkey.min(dim=1).values
                     _tt = torch.where(_tt < 2 ** 30, _tt, torch.full_like(_tt, -1))

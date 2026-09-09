@@ -11,9 +11,10 @@ Missile Silo waits on nuclear devices and the Mountain Tunnel on a passability
 bit that can move; the Fort, the Airstrip, both routes and the 20% charge all
 ship.
 
-Both engineer improvements go "in your own or NEUTRAL territory", which is the
-one place a build reaches outside its own borders — the Builder's whole
-improvement ladder refuses there. Every rule below is poked straight into
+`CanBuildOutsideTerritory` is what reaches outside its own borders, and it is
+a PER-ROW column, not a property of the chassis: the Fort, the Airstrip and
+the Mountain Tunnel carry it, the Missile Silo carries it written out FALSE.
+The Builder's whole improvement ladder refuses there. Every rule below is poked straight into
 `_seat_unit_mask` / `_apply_seat_unit_actions`, the entry points
 `policy/drive.py` uses.
 """
@@ -160,7 +161,33 @@ def main() -> None:
     sim._gen_ver += 1
     um = mask_of(sim, row, v)
     assert bool(um[c_air]), (
-        "CIV6 (Airstrip): 'in your own or neutral territory' — the mask refused neutral ground")
+        "CIV6 (Airstrip, CanBuildOutsideTerritory): the mask refused neutral ground")
+    # ...and the row WITHOUT the column stays inside its owner's borders. The
+    # Missile Silo is the one Engineer row the install writes
+    # `CanBuildOutsideTerritory="false"` on, which is what makes the column
+    # per-row rather than a sentence about the chassis.
+    _silo = (sim._imp_ids.index("MISSILE_SILO")
+             if "MISSILE_SILO" in sim._imp_ids else -1)
+    assert _silo >= 0, "the catalog lost the Missile Silo"
+    assert sim._imp_outside[FORT] and sim._imp_outside[AIR], \
+        "the Fort and the Airstrip carry the column"
+    assert not sim._imp_outside[_silo], \
+        "the Missile Silo must NOT carry CanBuildOutsideTerritory"
+    _su = int(sim._imp_unlock[_silo])
+    if _su >= 0:
+        sim.civ_techs[0, row, _su] = True
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    _c_silo = sim._A_IMP[_silo]
+    if _c_silo >= 0:
+        assert not bool(mask_of(sim, row, v)[_c_silo]), \
+            "a Missile Silo on NEUTRAL ground: the column says false"
+        sim.major_unit_tile[0, v] = t_flat
+        sim._gen_ver += 1
+        assert bool(mask_of(sim, row, v)[_c_silo]), \
+            "...and its owner's own flat ground must still offer it"
+        sim.major_unit_tile[0, v] = t_neu
+        sim._gen_ver += 1
 
     # a BUILDER on the same ground gets neither
     if sim._builder_idx >= 0:
@@ -171,7 +198,7 @@ def main() -> None:
             "the Fort and the Airstrip are the ENGINEER's alone")
         sim.major_unit_type[0, v] = ENG
         sim._gen_ver += 1
-    print("  3 mask OK (own + neutral ground, engineer only, no Farm)")
+    print("  3 mask OK (the territory column per ROW, engineer only, no Farm)")
 
     # -- 4: the APPLY places it, spends a charge, and the last one disbands -
     sim.major_unit_charges[0, v] = 2
@@ -366,7 +393,7 @@ def main() -> None:
     print("  11 route step OK (the four tiers, the railroad's quarter, and the bridge)")
 
     print("engineer_test OK — fort, airstrip, both routes and the 20% charge, "
-          "on own and neutral ground")
+          "and the territory column per row")
 
 
 if __name__ == "__main__":

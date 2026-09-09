@@ -3079,10 +3079,12 @@ class SimMasks:
             & own_tile.gather(1, tc)
             & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
         ).unsqueeze(2)
-        # THE MILITARY ENGINEER'S GROUND (`engineerTileOk`): its rows go "in
-        # your own or neutral territory", so the ownership term is wider than
-        # the Builder's, and its improvement columns carry their own catalog
-        # clauses rather than a resource match.
+        # THE MILITARY ENGINEER'S GROUND (`engineerTileOk`): the WIDEST its
+        # rows reach is "your own or neutral territory", so the ownership term
+        # is wider than the Builder's — but which rows actually reach that far
+        # is `CanBuildOutsideTerritory`, a per-ROW column narrowed below, and
+        # its improvement columns carry their own catalog clauses rather than
+        # a resource match.
         eng_ground = (
             present
             & ((utype == self._eng_idx) if self._eng_idx >= 0 else torch.zeros_like(present))
@@ -3106,6 +3108,16 @@ class SimMasks:
             & (self.district.gather(1, tc) < 0)
             & (self.built_wonder.gather(1, tc) < 0)
         )
+        # CIV6 (`Improvements.CanBuildOutsideTerritory`, `territoryOk`): a row
+        # WITHOUT the column needs its owner's borders even under an Engineer
+        # — the Missile Silo is the one that writes the false out loud.
+        _own_here = own_tile.gather(1, tc)
+        _paved_here = (
+            (self.centre_slot_at.gather(1, tc) < 0)
+            & (self.improvement.gather(1, tc) < 0)
+            & (self.district.gather(1, tc) < 0)
+            & (self.built_wonder.gather(1, tc) < 0)
+        )
         _res_cols: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
             _rq = self.res_imp.gather(1, tc)
@@ -3115,6 +3127,25 @@ class SimMasks:
                         else torch.ones(B, 1, dtype=torch.bool, device=dev))
                 if self.SEASIDE >= 0 and _k == self.SEASIDE:
                     _ok = here_ok & self._seaside_ok().gather(1, tc) & _unl
+                elif self._imp_built_by[_k] >= 0:
+                    # CIV6 (`Improvement_ValidBuildUnits`): a row a NAMED unit
+                    # lays rather than the Builder (the Pa's Toa). It runs
+                    # BEFORE the suzerain/unique walk, exactly as
+                    # `validImprovementsIn` does, because that walk skips a
+                    # `builtBy` row outright — offering it to the Builder is
+                    # offering a column its own applier refuses.
+                    _bterr = _own_here
+                    if self._imp_outside[_k]:
+                        _bterr = _bterr | (self.tile_seat < 0).gather(1, tc)
+                    _ok = (
+                        present & (utype == self._imp_built_by[_k]) & _unl
+                        & _paved_here & _bterr
+                        & self.passable.gather(1, tc)
+                        & ~self.water.gather(1, tc)
+                        & (self._uniq_improvement_ok(row, _k)
+                           if self._imp_uniq[_k] >= 0
+                           else self._imp_ground_ok(_k)).gather(1, tc)
+                    )
                 elif self._imp_suz[_k]:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_uniq[_k] >= 0:
@@ -3128,8 +3159,16 @@ class SimMasks:
                     _tnb = self.neigh[tc.reshape(-1)].reshape(tc.shape + (6,))
                     _tnc = _tnb.clamp(min=0)
                     _tflat = _tnc.reshape(B, -1)
+                    # the TARGET carries the territory column, not the tile
+                    # the engineer stands on: `outside` reaches UNOWNED
+                    # mountains and stops at another seat's border.
+                    _tterr = own_tile.gather(1, _tflat).reshape(_tnb.shape)
+                    if self._imp_outside[_k]:
+                        _tterr = _tterr | (
+                            self.tile_seat.gather(1, _tflat).reshape(_tnb.shape) < 0)
                     _tmt = (self.tile_mountain.gather(1, _tflat).reshape(_tnb.shape)
                             & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
+                            & _tterr
                             & (_tnb >= 0))
                     _ok = (present & (utype == self._eng_idx) & (u_charges > 0)
                            & _unl & _tmt.any(dim=-1))
@@ -3138,6 +3177,8 @@ class SimMasks:
                     if _k == self.FORT:
                         _who = _who | fort_ground
                     _ok = eng_here & _who & self._imp_ground_ok(_k).gather(1, tc)
+                    if not self._imp_outside[_k]:
+                        _ok = _ok & _own_here
                 elif self._imp_water[_k]:
                     # WATER-ONLY (the Offshore Wind Farm): the row's own
                     # terrain list is the whole ground rule, on a water plot

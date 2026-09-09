@@ -1813,7 +1813,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // Mountain tile". The engineer stands off the mountain, so the
           // legality and the write both move to `tunnelTarget`.
           if (imp === 'MOUNTAIN_TUNNEL') {
-            const tt = tunnelTarget(state.map, here);
+            const tt = tunnelTarget(state.map, here, (t: Tile) => tileOwnedByCiv(t, actor.seat));
             const unl = computeUnlocks(state, actor.seat);
             if (tt >= 0 && unl.improvements.has('MOUNTAIN_TUNNEL')
                 && unit.type === 'MILITARY_ENGINEER' && (unit.charges ?? 0) > 0) {

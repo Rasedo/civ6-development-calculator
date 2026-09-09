@@ -39,9 +39,9 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 0 | CLOSED — no improvement in the install is buildable on a natural wonder plot, so the add is unreachable |
 | B-66 formations | 0 | CLOSED — the three-member escort and the rider's own reveal shipped with #246H, pinned on both engines |
-| B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
+| B-67 district price progression | 0 | CLOSED — the six GAME_PROGRESS rows take their own curve on both engines, and both pins now research before they read |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **15** | |
+| **B. Fidelity vs real Civ 6** | **14** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 4), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 14); a Free City as spy ground |
@@ -64,7 +64,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **33** | |
+| **OPEN, TOTAL** | **32** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -574,9 +574,10 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - The install gives the Drone and the Supply Convoy NO `Maintenance` at
     all, where this engine charges 3 and 2. Two named magnitudes for the
     sourcing pass, not changed here.
-- **B-67. THE DISTRICT PRICE PROGRESSION.** Weight 1. A 2026-09-08 sourcing
-  pass found this entry half wrong: one of the two models is not DLL at all,
-  and this engine already implements it — for PROJECTS.
+- **B-67. THE DISTRICT PRICE PROGRESSION.** CLOSED 2026-09-09 with #248's
+  B-67 commit. A 2026-09-08 sourcing pass found this entry half wrong: one of
+  the two models is not DLL at all, and this engine already implemented it —
+  for PROJECTS.
   - `Districts.xml` publishes the model AND its parameter on every row.
     `COST_PROGRESSION_GAME_PROGRESS` with `CostProgressionParam1="1000"` runs
     on exactly six: the Aqueduct (Cost 36), the Bath (18), the Neighborhood
@@ -595,9 +596,17 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `districtCostIn` takes. Six district rows carrying a `costProgressGame`
     of 1000 and one branch in the two cost composers is the whole build; the
     Bath and the Mbanza are variants and ride their base's model with their
-    own cost. BUILDABLE, and the only reason it did not land in this round's
-    batches is that it arrived after the fourth commit, with a battery
-    already running.
+    own cost.
+  - SHIPPED: `districtScaledBase` and `districtProgressAdd` split the two
+    halves so the price and both site-cost readers (`districtSiteCost`,
+    `minorBuild`) take one fork, and the GPU twin does the same in
+    `_district_cost_si` and `sim_minors`. The add lands AFTER the civVariant
+    ratio, because a variant carries its own base and the same parameter.
+  - WHY THE PINS DID NOT CATCH IT: at zero research the two models are the
+    same number — the specialty curve is `base x (1 + 9p)` and this one
+    `base + floor(round(param x speed) x p)`, and both are `base` at p = 0.
+    Both engines' price pins now advance research before they read, and each
+    asserts that the two curves PART.
 - **B-D. UNSOURCED DATA VALUES.** Weight 2.
   - DEMOCRACY'S ROUTE PAYS ONLY ITS OWN CITY. SOURCED (GS): "Your Trade
     Routes to an Ally or Suzerain's city provide +4 Food and +4 Production
@@ -733,11 +742,27 @@ the gate reaches is worth more here than one that re-reads the exporter.
     wholly inside the DLL's handler for that modifier type.
   - Not "unpublished pending a look": looked at, and the row carries no
     number to find. The same finding shape as `PLUNDER_ROUTE_GOLD`.
-  - The tunnel's OTHER columns are all published and worth checking against
-    the catalog separately: `AllowImpassableMovement`, `BuildOnAdjacentPlot`,
-    `DisasterResistant`, `CanBuildOutsideTerritory`, `PrereqTech`
-    TECH_CHEMISTRY, and a build unit of UNIT_MILITARY_ENGINEER rather than
-    the Builder.
+  - THE OTHER COLUMNS WERE CHECKED, 2026-09-09, and two of the six were not
+    in the engine at all. `AllowImpassableMovement` is the portal and
+    `BuildOnAdjacentPlot` the adjacent target, both already built; PrereqTech
+    TECH_CHEMISTRY and UNIT_MILITARY_ENGINEER were already on the row.
+    - `DisasterResistant` was MISSING. The engine had `noPillage`, and the
+      two are different callers: one answers the pillage verb, the other the
+      disaster walk. The column already existed (`disasterOk`, the Great
+      Wall's), so this was one flag on one row.
+    - `CanBuildOutsideTerritory` was spelled on the CHASSIS. Both engines
+      said "the Military Engineer works its own or neutral ground" and
+      applied it to all four of its rows — but `IMPROVEMENT_MISSILE_SILO`
+      writes `CanBuildOutsideTerritory="false"` out loud, and the tunnel's
+      TARGET (a tile of its own) answered nothing at all, so a seat could
+      tunnel a mountain in the middle of another seat's borders. Now one
+      predicate, `territoryOk`, over the per-row column, and `outside` means
+      UNOWNED rather than "not mine".
+    - Found alongside: the `Improvement_ValidBuildUnits` row (the Pa's Toa)
+      had its arm in the TS validator and the GPU APPLIER but not the GPU
+      MASK, where it fell into the `uniqueTo` arm — so the column was
+      offered to the Builder, which may not lay it, and withheld from the
+      Toa, which may, and the applier's arm was unreachable.
 - **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.
   - `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; the middle bands are this model's own.
