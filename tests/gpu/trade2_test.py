@@ -130,9 +130,13 @@ def main() -> None:
     s.seat_routes[0, 1, 1, 1] = int(s.city_id[0, 1, 0])
     s.seat_route_exp[0, 1, 1] = int(s.turn) + 5  # future
     s._expire_seat_routes(1)
-    assert int(s.seat_routes[0, 1, 0, 0]) == -1, "a due route (exp <= turn) must be dropped"
-    assert int(s.seat_route_exp[0, 1, 0]) == -1, "dropped slot's exp must reset"
-    assert int(s.seat_routes[0, 1, 1, 0]) == fid, "a future route must survive expiry"
+    # THE SURVIVOR MOVES DOWN. TS rebuilds a compacted array, so a dropped
+    # route leaves no hole and the slot order stays creation order — which is
+    # what fixes the sequence a cancel hands Traders back in, and so the RANK
+    # every recorded order is indexed by.
+    assert int(s.seat_routes[0, 1, 0, 0]) == fid, "the survivor must compact down to slot 0"
+    assert int(s.seat_route_exp[0, 1, 0]) == int(s.turn) + 5, "it must carry its OWN expiry down"
+    assert int(s.seat_routes[0, 1, 1, 0]) == -1, "no live route may sit behind the survivor"
 
     # --- 4) dest-gone: the (seat, city id) pair must still resolve ---------
     s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -145,8 +149,35 @@ def main() -> None:
         s2.seat_route_dcity[0, 1, slot] = cid
         s2.seat_route_exp[0, 1, slot] = int(s2.turn) + s2._trade_duration  # not yet expired
     s2._expire_seat_routes(1)
-    assert int(s2.seat_routes[0, 1, 0, 0]) == -1, "an intl route to an id that seat does not hold must be dropped"
-    assert int(s2.seat_routes[0, 1, 1, 0]) >= 0, "an intl route to a LIVE (seat, city) pair must survive"
+    assert int(s2.seat_routes[0, 1, 0, 0]) >= 0, "the LIVE-pair route must survive and compact down"
+    assert int(s2.seat_route_dcity[0, 1, 0]) == live_cid, "and it must be the live one that survived"
+    assert int(s2.seat_routes[0, 1, 1, 0]) == -1, "the dropped route must leave no live slot behind"
+
+    # --- 4b) a MIDDLE route drops and the rest keep their ORDER -----------
+    #   The case that bit (seed 9235 t246): four Traders handed back by one
+    #   war's cancel, same anchors and same spots on both engines, in a
+    #   different SEQUENCE — because TS filtered a compacted array while the
+    #   GPU refilled the first hole. A permuted spawn order permutes the RANK
+    #   every recorded order is indexed by, and the Traders walk apart.
+    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    _cid = int(s3.city_id[0, 1, 0])
+    for _k in range(3):
+        s3.seat_routes[0, 1, _k, 0] = _cid
+        s3.seat_routes[0, 1, _k, 1] = -1
+        s3.seat_route_dseat[0, 1, _k] = 0
+        s3.seat_route_dcity[0, 1, _k] = int(s3.city_id[0, 0, 0])
+        s3.seat_route_exp[0, 1, _k] = int(s3.turn) + 5
+        # a per-route mark that must travel with its own route, and the CHAIN
+        # with it — the clearing sites never wipe the chain, so a compaction
+        # that left it behind would hand a survivor its neighbour's course.
+        s3.seat_route_born[0, 1, _k] = 100 + _k
+        s3.seat_route_chain[0, 1, _k, 0] = 500 + _k
+    s3.seat_route_exp[0, 1, 1] = int(s3.turn)          # the MIDDLE one is due
+    s3._expire_seat_routes(1)
+    assert [int(s3.seat_route_born[0, 1, _k]) for _k in range(3)] == [100, 102, -1], \
+        "the survivors must close up IN ORDER, the middle one gone"
+    assert [int(s3.seat_route_chain[0, 1, _k, 0]) for _k in range(3)] == [500, 502, 501], \
+        "each survivor's CHAIN travels down with it (the dead slot keeps the dropped route's stale course, wiped at its next commit)"
 
     # --- 5) a CAPTURED destination drops the route -------------------------
     #   The case a dest TILE could not see: transferCity re-mints the flipped

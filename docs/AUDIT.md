@@ -292,7 +292,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     no Harbor — and wrong for a grant made BY a coastal district.
     `bestTrainableNaval` was called from the Dockyard's own completion with
     that city in scope and threw it away.
-  - **LAYER 6 — seed 9235 turn 247. OPEN, and fully localised.** Four Traders
+  - **LAYER 6 — seed 9235 turn 247. CLOSED (#246Z).** Four Traders
     handed back by a war's route cancel at turn 246, to the SAME four spots
     from the SAME four anchors on both engines — in a different SEQUENCE:
 
@@ -310,13 +310,21 @@ the gate reaches is worth more here than one that re-reads the exporter.
     while the GPU blanks slots in place and `_free_route_slot` refills the
     FIRST HOLE. One cancellation parts the two orders for good, and every
     later cancel hands its traders back in a different sequence.
-  - THE FIX IS TO COMPACT THE GPU'S ROUTE SLOTS, so slot order is creation
-    order on both engines. Five sites clear a route (`sim_seats` 8981, 12842,
-    12989, 13009, 13265) and seven parallel planes ride along
-    (`seat_routes`, `_dseat`, `_dcity`, `_exp`, `_born`, `_walk`, `_leg`), so
-    it wants one stable per-row compaction helper, every site calling it, and
-    a poke that cancels a middle route and pins the surviving ORDER. Not a
-    line to squeeze into another commit.
+  - FIXED BY COMPACTING THE GPU'S ROUTE SLOTS, so slot order is creation order
+    on both engines. `_compact_routes` is a stable partition — the live slots
+    first in their own order — and all five clearing sites call it.
+  - EIGHT PLANES RIDE ALONG, NOT SEVEN. The five sites blank
+    `seat_routes`, `_dseat`, `_dcity`, `_exp`, `_born`, `_walk` and `_leg`,
+    and leave `seat_route_chain` alone ON PURPOSE (a freed slot is wiped at
+    its next commit). Compacting the seven without the chain would have handed
+    a live route the course of whoever used to hold its slot — the same class
+    of fault one layer down, and invisible until a pass-through payment read
+    it. The plane list came from the ALLOCATOR, not from the clearing sites.
+  - AND TWO POKES PINNED THE HOLE. `trade2_test` asserted that a dropped route
+    leaves its slot empty and the survivor stays put — the defect, written
+    down as an expectation. Both now assert the compaction, and a third case
+    drops a MIDDLE route and checks the survivors' identities IN ORDER, chain
+    included.
 
   **THE INSTRUMENT, which is this round's most reusable product.** The
   decomposition log now carries five kinds and the rules that make them pair:

@@ -8984,6 +8984,7 @@ class SimSeats:
         self.seat_route_born[b, src_row][kill] = -1
         self.seat_route_walk[b, src_row][kill] = -1
         self.seat_route_leg[b, src_row][kill] = -1
+        self._compact_routes(src_row)
         # a row's tiles carry its SEAT id (the row itself for a major)
         src_seat, dst_seat = int(self._ROW_SEAT[src_row]), int(self._ROW_SEAT[dst_row])
         owned = (self.tile_seat[b] == src_seat) & (self.tile_city[b] == cid)
@@ -12845,6 +12846,32 @@ class SimSeats:
         self.seat_route_born[hb, row, hk] = -1
         self.seat_route_walk[hb, row, hk] = -1
         self.seat_route_leg[hb, row, hk] = -1
+        self._compact_routes(row)
+
+    def _compact_routes(self, row: int) -> None:
+        """Close the holes in one seat row's route slots, live routes keeping
+        their own order — `cancelRoutes`' `filter` rebuild, which is what
+        makes slot order creation order on BOTH engines.
+
+        The order decides the sequence a cancel hands Traders back in, and
+        that sequence fixes each new unit's RANK in the order replay. A
+        permuted rank puts every recorded order on the wrong unit.
+
+        Every per-route plane moves together, `seat_route_chain` included:
+        the clearing sites leave it stale on purpose (a freed slot is wiped at
+        its next commit), so moving the others without it would hand a live
+        route the course of whichever route used to sit in its slot.
+        """
+        live = self.seat_routes[:, row, :, 0] >= 0
+        # a STABLE partition — the live slots first in their own order, the
+        # dead behind them. Idempotent where a row already has no holes.
+        idx = torch.argsort((~live).long(), dim=1, stable=True)
+        for _p in (self.seat_route_dseat, self.seat_route_dcity, self.seat_route_exp,
+                   self.seat_route_born, self.seat_route_walk, self.seat_route_leg):
+            _p[:, row] = _p[:, row].gather(1, idx)
+        for _w in (self.seat_routes, self.seat_route_chain):
+            _w[:, row] = _w[:, row].gather(
+                1, idx.unsqueeze(-1).expand(-1, -1, _w.shape[-1]))
 
     def _free_route_slot(self, rws: torch.Tensor, row: int) -> torch.Tensor:
         K = self.seat_routes.shape[2]
@@ -12992,6 +13019,7 @@ class SimSeats:
             self.seat_route_born[:, a][kill] = -1
             self.seat_route_walk[:, a][kill] = -1
             self.seat_route_leg[:, a][kill] = -1
+            self._compact_routes(a)
 
     def _cancel_intl_routes(self, row: int, mask: torch.Tensor) -> None:
         """Drop every INTERNATIONAL leg this row sends, where `mask` holds —
@@ -13012,6 +13040,7 @@ class SimSeats:
         self.seat_route_born[:, row][kill] = -1
         self.seat_route_walk[:, row][kill] = -1
         self.seat_route_leg[:, row][kill] = -1
+        self._compact_routes(row)
 
     def _congress_cancel_banned_intl(self) -> None:
         """TRADE POLICY outcome B ends the routes it forbids the moment it
@@ -13268,6 +13297,7 @@ class SimSeats:
             self.seat_route_born[:, row][drop] = -1
             self.seat_route_walk[:, row][drop] = -1
             self.seat_route_leg[:, row][drop] = -1
+            self._compact_routes(row)
 
     def _route_dest_alive(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """For each of seat row `row`'s route slots: does its INTERNATIONAL
