@@ -2564,7 +2564,7 @@ export function seatPhase(state: GameState): void {
       // on the CENTRE tile — the one name both engines give a city.
       const _dlcy = (globalThis as { __diffLog?: string[] }).__diffLog;
       if (_dlcy) _dlcy.push(`cy:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-        + ` f${y.faith.toFixed(6)}`);
+        + ` f${y.faith.toFixed(6)} g${y.gold.toFixed(6)}`);
       if (_dlcy) _dlcy.push(`sp2:${actor.seat}:${state.turn}:${civCity.centerIndex}`
         + ` spec${completedDistrictCount(state, civCity, true)}`);
       if (_dlcy) { const _bk = stats.breakdown;
@@ -2941,13 +2941,27 @@ export function seatPhase(state: GameState): void {
     const _dlfi = (globalThis as { __diffLog?: string[] }).__diffLog;
     if (_dlfi) _dlfi.push(`fi:${actor.seat}:${state.turn}`
       + ` sum${faithSum.toFixed(6)} was${(actor.faith ?? 0).toFixed(6)}`
-      + ` base${_fBase.toFixed(6)} all${_fAll.toFixed(6)} for${_fFor.toFixed(6)}`);
+      + ` base${_fBase.toFixed(6)} all${_fAll.toFixed(6)} for${_fFor.toFixed(6)}`
+      + ` gold${goldSum.toFixed(6)} purse${(actor.treasury ?? 0).toFixed(6)}`);
     actor.faith = (actor.faith ?? 0) + faithSum;
     seatAccumulators(state, actor.seat, rGovIds);
-    actor.treasury -= state.units.reduce(
+    const _upk = state.units.reduce(
       (s, u) => s + (u.seat === actor.seat ? unitUpkeep(seatMods, u.type) : 0),
       0,
     );
+    // WHAT the seat is charged and for HOW MANY units, before the charge
+    // lands: a rate difference and a roster difference look identical in the
+    // purse and are two different bugs.
+    const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dlu) for (const u of state.units) {
+      if (u.seat !== actor.seat) continue;
+      _dlu.push(`u1:${actor.seat}:${state.turn}:${u.tileIndex}`
+        + `:${UNIT_TYPE_IDX.indexOf(u.type)} m${unitUpkeep(seatMods, u.type)}`);
+    }
+    if (_dlu) _dlu.push(`up:${actor.seat}:${state.turn}`
+      + ` n${state.units.filter((u) => u.seat === actor.seat).length}`
+      + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
+    actor.treasury -= _upk;
     actor.treasury -= wmdUpkeep(state, actor.seat);
     if (Math.round(actor.treasury * 1000) < 0) {
       // The priciest unit goes; a TIE goes to the EARLIEST in `state.units`,

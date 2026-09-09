@@ -243,7 +243,8 @@ class SimPhase:
                     self._diff_events.setdefault(_b, []).append(
                         f"cy:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                         f":{int(self.city_center[_b, row, j])}"
-                        f" f{float(total[_b, j, 5]):.6f}")
+                        f" f{float(total[_b, j, 5]):.6f}"
+                        f" g{float(total[_b, j, 2]):.6f}")
             sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
@@ -1620,7 +1621,9 @@ class SimPhase:
                     f" sum{float(faith_sum[_b]):.6f}"
                     f" was{float(self.civ_faith[_b, row]):.6f}"
                     f" base{float(_f_base[_b]):.6f} all{float(_f_all[_b]):.6f}"
-                    f" for{float(_f_for[_b]):.6f}")
+                    f" for{float(_f_for[_b]):.6f}"
+                    f" gold{float(gold_sum[_b]):.6f}"
+                    f" purse{float(self.civ_treasury[_b, row]):.6f}")
         bank(self.civ_faith, faith_sum)
         self._seat_upkeep_and_bankruptcy(row, active)
         for _ in range(RESEARCH_LOOPS):

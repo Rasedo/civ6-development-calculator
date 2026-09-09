@@ -1585,6 +1585,21 @@ class SimOrders:
         mine = self.unit_alive & (self.unit_seat == row)
         upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
         upkeep = upkeep + self._wmd_upkeep(row)
+        if getattr(self, "_log_diff", False):
+            _pu = self._unit_upkeep(row, self.unit_type)
+            for _b in range(self.B):
+                for _s in mine[_b].nonzero().flatten().tolist():
+                    self._diff_events.setdefault(_b, []).append(
+                        f"u1:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                        f":{int(self.unit_tile[_b, _s])}"
+                        f":{int(self.unit_type[_b, _s])}"
+                        f" m{float(_pu[_b, _s]):g}")
+            for _b in range(self.B):
+                self._diff_events.setdefault(_b, []).append(
+                    f"up:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f" n{int(mine[_b].sum())}"
+                    f" cost{float(upkeep[_b]):.3f}"
+                    f" purse{float(self.civ_treasury[_b, row]):.3f}")
         tre = self.civ_treasury[:, row]
         self.civ_treasury[:, row] = torch.where(active, tre - upkeep, tre)
         self._bankrupt_disband(row, active)

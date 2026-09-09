@@ -1686,17 +1686,26 @@ class SimSeats:
         return torch.where(any_ok, pick, torch.full_like(pick, -1))
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
-        """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
-        -1 = ungated) AND strategic-resource access in ITS territory, minus the
-        chassis `trainableUnits` refuses on every path — faith-only (CIV6
+        """[B, NU] the SEAT-level trainable set: unlocked by its TECH **and by
+        its CIVIC** (either -1 = ungated) AND strategic-resource access in ITS
+        territory, minus the chassis `trainableUnits` refuses on every path — faith-only (CIV6
         Warrior Monk: "can only be purchased with Faith"), spawn-only and the
         Settler's own column. The city-free half of `trainableUnits` — the gold
         UNIT rung spawns at the capital and TS's arm asks no city question
-        either."""
+        either.
+
+        THE CIVIC GATE WAS MISSING, and the docstring said so: it named the
+        tech alone and the code matched the sentence. Only a chassis gated by
+        a civic ALONE is affected, which is why every tech-gated unit stayed
+        in parity and this waited for a Sea Dog."""
         B = self.B
         return (
             (self._type_tech.unsqueeze(0) < 0)
             | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+        ) & (
+            (self._type_civic.unsqueeze(0) < 0)
+            | self.civ_civics[:, row].gather(
+                1, self._type_civic.clamp(min=0).unsqueeze(0).expand(B, -1))
         ) & self._res_avail_mask(self.tile_seat == row, row) \
             & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0) \
             & self._civ_unit_ok(row)
