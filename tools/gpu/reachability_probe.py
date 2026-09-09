@@ -166,6 +166,7 @@ def main() -> None:
                 seeds_hit[key].add(seeds[b])
                 first_turn.setdefault(key, turn + 1)
 
+    _F = {n: i for i, n in enumerate(drive.DECIDE_FIELDS)}
     gw_before = None
     for t in range(args.turns):
         # The DIPLOMATIC verbs are decided outside `_decide_turn`, so a probe
@@ -174,14 +175,17 @@ def main() -> None:
         gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
             rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
-            # `_decide_turn`'s record, by position: prod, dtile, tech, civic,
-            # war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat,
-            # cls, ucls, pat, band, route, nuke, spec, lock, vote, gp_pass,
-            # policies — a new column shifts everything after it
-            relig = rec[10]
+            # `_decide_turn`'s record, BY NAME. It used to be read by position
+            # under a comment warning that a new column shifts everything
+            # after it; one did, and this probe raised IndexError for as long
+            # as that took to notice.
+            assert len(rec) == len(drive.DECIDE_FIELDS), (
+                f"the record is {len(rec)} long, DECIDE_FIELDS names "
+                f"{len(drive.DECIDE_FIELDS)}")
+            relig = rec[_F["relig"]]
             if isinstance(relig, tuple) and len(relig) == 2 and relig[0] is not None:
                 mark("apostleBuy", (relig[0] == 6), t)
-            vote = rec[22]
+            vote = rec[_F["vote"]]
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()

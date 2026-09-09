@@ -628,6 +628,7 @@ def main() -> int:
                 ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures
                 ("seat_symmetry", [py, "tools/gpu/seat_symmetry_check.py"], 1),  # static — dangling attrs, the alias/_MUTABLE contract, the seat-fork allowlist
                 ("gather_batch", [py, "tools/gpu/gather_batch_check.py"], 1),  # static — a gather whose index is already narrowed reads the wrong game's row
+                ("audit_totals", [py, "tools/audit_totals_check.py"], 1),  # static — docs/AUDIT.md's subtotals must equal its own rows
                 ("fort", [py, "tests/gpu/fort_test.py"], 4),  # Fort +4 defence — the serve gate never reaches it, so this lane is the only proof
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
                 ("food_order", [py, "tests/gpu/food_order_test.py"], 1),  # the farm-adjacency tier sits before the drought floor

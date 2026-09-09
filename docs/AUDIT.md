@@ -25,6 +25,10 @@ Hand-weighted 1–8 by the size of what is LEFT to build, not by what the
 mechanic was worth when the entry opened. One row per entry, no row
 without an entry. No percentage: closed weight is deleted by design.
 
+THE ROWS ARE THE SOURCE OF TRUTH; the three bold subtotals are a sum of
+them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
+`python tools/audit_totals_check.py` re-adds them, and the battery runs it.
+
 | Open item | Weight | What is left |
 |---|---|---|
 | **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at f7c918d3, 24 seeds to turn 250. A-3's ladder ran six layers deep and every one was a real defect |
@@ -41,7 +45,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-66 formations | 0 | CLOSED — the three-member escort and the rider's own reveal shipped with #246H, pinned on both engines |
 | B-67 district price progression | 0 | CLOSED — the six GAME_PROGRESS rows take their own curve on both engines, and both pins now research before they read |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **14** | |
+| **B. Fidelity vs real Civ 6** | **12** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 4), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 14); a Free City as spy ground |
@@ -63,8 +67,8 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
-| **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **32** | |
+| **C. Absent systems** | **21** | |
+| **OPEN, TOTAL** | **33** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -74,7 +78,6 @@ the entry and the line leaves.
 
 1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
-
 
 2. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
    zeroes; the district's own pool rides through. No rule reached.

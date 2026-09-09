@@ -1159,6 +1159,18 @@ def _decide_gp_pass(sim, row: int, seeds, turn) -> torch.Tensor | None:
     return torch.where(hit, pick, torch.full_like(pick, -1))
 
 
+# The positional record `_decide_turn` answers with. A reader that hard-codes
+# a slot rots the moment a column is INSERTED, and silently: `dist` landed
+# between `band` and `route` and every later index moved by one. Read by name
+# (`DECIDE_FIELDS.index(...)`) and assert the length.
+DECIDE_FIELDS = (
+    "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
+    "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
+    "band", "dist", "route", "nuke", "spec", "lock", "vote", "gp_pass",
+    "policies",
+)
+
+
 def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None, pre: dict | None = None):
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
@@ -1290,6 +1302,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
+    # in DECIDE_FIELDS order, which is the only contract a positional record has
     return prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, vote, gp_pass, policies
 
 
