@@ -27,7 +27,7 @@ without an entry. No percentage: closed weight is deleted by design.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **1** | A-1 and A-2 CLOSED; A-3 is a first-fire LADDER — three layers closed (the SUPPORT plane at spawn, the `unitDomain` sweep, the over-threshold xp clamp), the gate re-runs |
+| **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at f7c918d3, 24 seeds to turn 250. A-3's ladder ran six layers deep and every one was a real defect |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
@@ -38,10 +38,10 @@ without an entry. No percentage: closed weight is deleted by design.
 | B-56r inert promotions | 1 | Boarding SHIPPED; the sight table needs a WALK ruling (ask 11); Ground Crews waits on a PATROL that is no data row at all |
 | B-61r Great Person clauses with no carrier | 2 | ten `open: B-61r` ledger rows |
 | B-62r suzerain adjacency at a wonder tile | 0 | CLOSED — no improvement in the install is buildable on a natural wonder plot, so the add is unreachable |
-| B-66 formations | 1 | a THREE-member escort, the rider's own reveal |
+| B-66 formations | 0 | CLOSED — the three-member escort and the rider's own reveal shipped with #246H, pinned on both engines |
 | B-67 district price progression | 1 | GAME_PROGRESS curve for five districts, DLL-side |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **16** | |
+| **B. Fidelity vs real Civ 6** | **15** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 4), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 14); a Free City as spy ground |
@@ -64,7 +64,7 @@ without an entry. No percentage: closed weight is deleted by design.
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **31** | |
-| **OPEN, TOTAL** | **35** | |
+| **OPEN, TOTAL** | **33** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -218,10 +218,18 @@ the gate reaches is worth more here than one that re-reads the exporter.
     by ARRAY POSITION breaks the moment the roster can shrink. This roster
     can, and did.
 
-- **A-3. THE FIRST-FIRE LADDER.** OPEN. Three layers reached and closed so
-  far, each one a real defect the layer above it was hiding. The narrative of
-  how each was first misread is deleted; what the wrong readings left behind
-  is kept below as rules, because those are the reusable part.
+- **A-3. THE FIRST-FIRE LADDER.** CLOSED 2026-09-09 — BATTERY OK at
+  f7c918d3, 24 seeds to turn 250, 155 lanes, none failed. Six layers reached
+  and closed, each one a real defect the layer above it was hiding, and the
+  gate advanced t99 -> t156 -> t165 -> t204 -> t232 -> t247 -> green. The
+  narrative of how each was first misread is deleted; what the wrong readings
+  left behind is kept below as rules, because those are the reusable part.
+
+  FIVE OF THE SIX WERE A STALE SENTENCE, not a wrong calculation: "only a
+  major keeps a city list", "`_type_civilian` is the noncombat set", a clamp
+  folded into one expression, a city dropped at a call, an array position
+  standing in for an identity. Each was true when written. The engine grew a
+  class, a row, a plane, and none of them was re-read.
 
   - **LAYER 1 — seed 9287 turn 156. CLOSED (#246J).** A seat-1 Builder stood
     one tile from where TS put it, with every ordered step of the turn
