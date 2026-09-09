@@ -86,6 +86,19 @@ wonder-in-blast column of any kind. Do not re-run those two greps.
 1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
 
+   RE-SOURCED 2026-09-09, and it narrowed on one side. The volcano rows in
+   `Expansion2_RandomEvents.xml` carry NO `Hexes` column at all, unlike every
+   storm row — so the affected SET is genuinely unpublished. What the rows DO
+   split is the severity: `RANDOM_EVENT_VOLCANO_GENTLE` (Severity 0) takes
+   `LOC_RANDOM_EVENT_PROP_DAMAGE_FERTILITY` while CATASTROPHIC (1) and
+   MEGACOLOSSAL (2) take `..._ALL_DAMAGE_FERTILITY` — a PROPORTION of the
+   affected tiles against ALL of them, the same PROP/ALL pair the storm rows
+   use. And `FEATURE_VOLCANIC_SOIL` carries `Eruptable="true"
+   ValidWonderPlacement="true" ValidDistrictPlacement="true"
+   ValidForReplacement="true"`, so the soil may REPLACE a standing feature and
+   a district or wonder may later be placed on it. Still unsourced: the RADIUS
+   and whether an IMPROVEMENT survives.
+
 2. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
    zeroes; the district's own pool rides through. No rule reached.
 
@@ -136,6 +149,11 @@ wonder-in-blast column of any kind. Do not re-run those two greps.
     Two readings fit the columns: a sight BUDGET spent along the hex path, or
     a radius with tiles occluded BEHIND a blocker. They differ on every map
     with a ridge, so neither engine ships one until this is ruled.
+
+    RE-CHECKED 2026-09-09: still unsourced. The column sits on FEATURES and
+    TERRAIN rows beside `DefenseModifier`/`MovementChange`/`Appeal`, and
+    nothing anywhere states whether it is subtracted from a budget or marks a
+    blocker. Do not re-run this grep.
 
 12. **C-60 — a Free City's amenities.** The tier is computed per OWNER, off
     the seat's luxuries and policies, and the Free Cities player has none —
