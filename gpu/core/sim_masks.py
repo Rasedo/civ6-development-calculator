@@ -2279,7 +2279,7 @@ class SimMasks:
             for _sb in (mask & ~found).nonzero(as_tuple=True)[0].tolist():
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                    f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none {_why}")
+                    f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none #{_why}")
         if not bool(can.any()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
@@ -2288,7 +2288,7 @@ class SimMasks:
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])}"
-                    f" at{int(spot[_sb])} {_why}")
+                    f" at{int(spot[_sb])} #{_why}")
         nxt = getattr(self, self.POOL_NEXT[pre])
         slot = nxt[rows]
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"

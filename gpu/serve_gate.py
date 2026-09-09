@@ -81,6 +81,16 @@ def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
     differ, and nothing else — the same reason the combat log prints at the
     first diff rather than the whole stream.
     """
+    def bare(ln: str | None) -> str | None:
+        """the line without its ANNOTATION — everything after ` #`.
+
+        One engine can name the rule that spawned a unit by reading its own
+        frame; the other cannot. Context only one side can produce must not
+        decide whether the two AGREE, or it reports a disagreement in a field
+        that does not exist on the other engine at all.
+        """
+        return ln.split(" #", 1)[0] if ln is not None else None
+
     def by_city(lines: list[str]) -> dict[str, str]:
         out: dict[str, str] = {}
         for ln in lines:
@@ -107,7 +117,7 @@ def diff_pairs(gpu_lines: list[str], ts_lines: list[str]) -> list[str]:
     dropped: dict[str, int] = {}
     for c in sorted(set(g) | set(t), key=order):
         gl, tl = g.get(c), t.get(c)
-        if gl == tl and not _all:
+        if bare(gl) == bare(tl) and not _all:
             continue
         kind = c.split(":", 1)[0]
         seen[kind] = seen.get(kind, 0) + 1
