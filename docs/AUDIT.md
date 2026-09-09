@@ -76,6 +76,13 @@ A question the SOURCE under-determines; neither engine ships a branch until
 the owner rules or a primary source is reached. The ruling is written into
 the entry and the line leaves.
 
+RE-SOURCED 2026-09-09 against the install. Ask 16 gained real evidence and is
+now ONE SCALAR wide (see C-49: the three stages, the per-turn direction
+notification, `Hexes` as the footprint, and nothing anywhere for the
+distance). Asks 3 and 5 were re-checked and stay unsourced: there is no
+religion-majority tiebreak parameter and there are no NUKE globals or
+wonder-in-blast column of any kind. Do not re-run those two greps.
+
 1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
 
@@ -171,6 +178,31 @@ the entry and the line leaves.
     `Movement="8" Duration="3" Spacing="15"`. What the data never says is
     the unit of 8 — hexes per turn, or a movement pool a hex spends from.
     Name the per-turn hex count and the walk is buildable in full.
+
+    A 2026-09-09 pass pinned down everything AROUND the number, so the ask is
+    now one scalar wide:
+      - `Expansion2_Civilopedia_Text.xml:222` — "Storms ... will persist for
+        3 turns. The stages of storms are Entry, Movement, and Dissipation."
+      - `Expansion2_Notifications.xml:54` defines NOTIFICATION_STORM_MOVED
+        with `ExpiresEndOfTurn="True"`, and its text
+        (`Expansion2_Notifications_Text.xml:73`) reads "continues its movement
+        and is now headed to the {3_Direction}. (During this turn there were
+        {4_Tiles} tiles damaged ...)". ONE direction, reported PER TURN.
+      - `Hexes` (1/3/7/19) is the per-turn FOOTPRINT, not the travel: the
+        wiki's "category four covers about seven tiles, category five 17"
+        matches those rows.
+      - NOTHING states the distance. No storm-speed row, no movement-scale
+        GlobalParameter, nothing in the pedia. That half is DLL.
+      - The only quantitative handle is off-install and soft: the wiki's "a
+        single storm may affect over 80 tiles". A 19-hex blob sweeping `d`
+        hexes on each of two moves touches roughly `19 + 10d` — ~29 at d=1,
+        ~39 at d=2, ~99 at d=8 — so the 80 figure fits d around 6-8 and rules
+        out a one-hex crawl.
+      - IN TENSION, and left in tension rather than resolved: the pedia's
+        three stages read as ONE movement stage, while the wiki and Arioch's
+        analyst both say storms "move across the map for two more turns"
+        after spawning. The per-turn notification with a fresh direction each
+        time leans to TWO moves.
 
 ## A. Engine vs engine
 
