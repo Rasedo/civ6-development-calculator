@@ -5207,8 +5207,18 @@ class SimEconomy:
                             f"sp2:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                             f":{int(self.city_center[_b, row, _j])}"
                             f" spec{int(_spec[_b, _j])}")
-            bon = bon + self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
+            _gb = self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
+            if getattr(self, "_log_diff", False):
+                for _b in range(B):
+                    for _j in range(cols):
+                        if not bool(self.city_alive[_b, row, _j]):
+                            continue
+                        self._diff_events.setdefault(_b, []).append(
+                            f"gb:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                            f":{int(self.city_center[_b, row, _j])}"
+                            f" gfaith{float(_gb[_b, _j, 5]):.3f}")
+            bon = bon + _gb
 
         trade = zeros6
         _rt = self._seat_route_income(row)

@@ -2567,6 +2567,9 @@ export function seatPhase(state: GameState): void {
         + ` f${y.faith.toFixed(6)}`);
       if (_dlcy) _dlcy.push(`sp2:${actor.seat}:${state.turn}:${civCity.centerIndex}`
         + ` spec${completedDistrictCount(state, civCity, true)}`);
+      if (_dlcy) _dlcy.push(`gb:${actor.seat}:${state.turn}:${civCity.centerIndex}`
+        + ` gfaith${((seatMods.faithPerSpecialty ?? 0)
+          * completedDistrictCount(state, civCity, true)).toFixed(3)}`);
       const production = y.production;
       sciSum += y.science;
       const culC = y.culture;
