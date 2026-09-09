@@ -31,7 +31,7 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at f7c918d3, 24 seeds to turn 250. A-3's ladder ran six layers deep and every one was a real defect |
+| **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at 7bf089b2, 24 seeds to turn 250. A-3 ran six layers; A-4 ran three more, opened by B-67 changing WHICH TURN a district completes |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 1 | the fourth card style SHIPPED and is measured; Foreign Investor and Affluence wait on C-38, four clauses on C-1/C-31 |
@@ -220,6 +220,35 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - THE CLASS is `wire position vs id`: a wire field naming a roster member
     by ARRAY POSITION breaks the moment the roster can shrink. This roster
     can, and did.
+
+- **A-4. THE SECOND LADDER.** CLOSED 2026-09-09 — BATTERY OK at 7bf089b2,
+  157 steps, 24 seeds to turn 250, no failed or out-of-memory lane. Opened by
+  B-67, which is NOT a defect: its cost arithmetic agrees on both engines in
+  every part (`dc:` pairs base, discount, variant, add and total). What it
+  changed is WHICH TURN a district completes, and that walked the rollout into
+  three latent defects the gate had never reached.
+
+  ALL THREE WERE A READER FALLING BEHIND THE DATA — the state was right and
+  something that consumed it asked one question too few:
+  - A CAPTURED CITY'S CENTRE was flagged `CITY_CENTER` and never
+    `districtComplete`. Every adjacency source pairs the two, so the centre
+    read as OPEN GROUND to its neighbours and a Holy Site beside it lost the
+    half-point a centre owes it. `markCityCentre` is the one writer now.
+  - `_seat_trainable_units` asked the TECH and not the CIVIC, and its own
+    docstring named the tech alone. `_type_civic` was on the wire, loaded, and
+    read by the production mask and both buy paths — only this set skipped it,
+    so a civic-only chassis (the Sea Dog) was trainable from turn 1.
+  - A PAVED-OVER bonus resource kept paying its neighbours adjacency. The GPU
+    marks `res_stripped` correctly at every pave; the two ADJACENCY arms were
+    the only readers of that plane that never asked.
+
+  THE INSTRUMENT COST MORE THAN THE BUGS. Five decomposition lines were built
+  and each named a key both engines print, yet five of them first measured
+  DIFFERENT QUANTITIES on the two sides — a catalog position against a `di`,
+  a base walk against a variant walk, a pre-factor total against a post-factor
+  one. One produced a FALSE ELIMINATION that had to be withdrawn. The line
+  that finally cracked it (`ds:`) prints each adjacency SOURCE and its count
+  rather than one composed number, which is the shape to reach for first.
 
 - **A-3. THE FIRST-FIRE LADDER.** CLOSED 2026-09-09 — BATTERY OK at
   f7c918d3, 24 seeds to turn 250, 155 lanes, none failed. Six layers reached
