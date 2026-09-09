@@ -284,6 +284,40 @@ the gate reaches is worth more here than one that re-reads the exporter.
     KEY. Both times the key was right and the value in it came from after the
     event.
 
+  - **LAYER 5 — seed 9235 turn 232. CLOSED (#246X).** England's Royal Navy
+    Dockyard granted nothing on TS and a Caravel on the GPU. The grant fired
+    on both (`nv:0:232:906` on each side), so the fork was entirely the hull
+    pick: `trainableUnits` refuses every naval chassis handed no city, which
+    is right for the gold rung — its unit spawns at the capital and can name
+    no Harbor — and wrong for a grant made BY a coastal district.
+    `bestTrainableNaval` was called from the Dockyard's own completion with
+    that city in scope and threw it away.
+  - **LAYER 6 — seed 9235 turn 247. OPEN, and fully localised.** Four Traders
+    handed back by a war's route cancel at turn 246, to the SAME four spots
+    from the SAME four anchors on both engines — in a different SEQUENCE:
+
+        route origin   GPU rank   TS rank
+        204 -> 205       n16        n15
+        342 -> 343       n17        n16
+        295 -> 295       n18        n17
+        380 -> 380       n15        n18
+
+    TS hands them back in creation order; the GPU puts 380 FIRST. A recorded
+    order is indexed by RANK, so permuted ranks put every order on the wrong
+    trader, and the three walk apart on the turn after.
+  - THE CAUSE IS THE ROUTE STORAGE ORDER, and it is A-2's family: `cancelRoutes`
+    filters a COMPACTED array (`s.tradeRoutes = s.tradeRoutes.filter(...)`),
+    while the GPU blanks slots in place and `_free_route_slot` refills the
+    FIRST HOLE. One cancellation parts the two orders for good, and every
+    later cancel hands its traders back in a different sequence.
+  - THE FIX IS TO COMPACT THE GPU'S ROUTE SLOTS, so slot order is creation
+    order on both engines. Five sites clear a route (`sim_seats` 8981, 12842,
+    12989, 13009, 13265) and seven parallel planes ride along
+    (`seat_routes`, `_dseat`, `_dcity`, `_exp`, `_born`, `_walk`, `_leg`), so
+    it wants one stable per-row compaction helper, every site calling it, and
+    a poke that cancels a middle route and pins the surviving ORDER. Not a
+    line to squeeze into another commit.
+
   **THE INSTRUMENT, which is this round's most reusable product.** The
   decomposition log now carries five kinds and the rules that make them pair:
 

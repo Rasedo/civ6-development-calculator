@@ -63,7 +63,12 @@ HUNT_SEEDS = _argval("--seeds")
 HUNT = HUNT_SEEDS is not None
 HUNT_RESUME = _argval("--resume")
 HUNT_CKPT_EVERY = _argval("--ckpt-every")
-HUNT_CKPT_DIR = _argval("--ckpt-dir") or ".claude/scratchpad/hunt"
+# SCOPED TO THE SEEDS. The TS checkpoint names its seed and the GPU snapshot
+# does not, so one directory holds one seed's GPU state — hunting a second
+# would overwrite the first, and the gate's seed assert would be the only
+# thing standing between that and a silently wrong resume.
+HUNT_CKPT_DIR = (_argval("--ckpt-dir")
+                 or f".claude/scratchpad/hunt/{str(HUNT_SEEDS).replace(',', '_')}")
 # the (seed, turn) a red serve lane named, so the reminder can fill itself in
 _hunt_hint: list[tuple[str, str]] = []
 

@@ -1776,8 +1776,13 @@ export function spawnUnit(
   // sides as two unrelated lines instead of a pair.
   const dlSp = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (dlSp) {
+    // ...and the RANK it will hold. A recorded order is indexed by rank, so
+    // two engines that create the same units in a different SEQUENCE put
+    // every order on the wrong unit — and nothing else in the line can show
+    // it, because the tiles and the chassis all match.
+    const rank = state.units.filter((u) => u.seat === seat).length;
     dlSp.push(`sp:${seat}:${state.turn}:${nearIndex}:${UNIT_TYPE_IDX.indexOf(unitType)}`
-      + ` at${spot.index}`);
+      + ` at${spot.index} n${rank}`);
   }
   // FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
