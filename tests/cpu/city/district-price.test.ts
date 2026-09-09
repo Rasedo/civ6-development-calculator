@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat } from '../../../cpu/core/seats';
-import { districtCostIn, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { districtCostIn, districtScaledBase, districtProgressAdd, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { GAME_SPEED } from '../../../cpu/data/constants';
+import { TECHS } from '../../../cpu/data/techs';
+import { CIVICS } from '../../../cpu/data/civics';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
@@ -33,19 +35,50 @@ describe('a district is priced off its own row', () => {
     expect(DISTRICTS.CAMPUS.cost).toBe(DISTRICT_SPECIALTY_COST);
   });
 
-  it('scales each base by the SAME research factor', () => {
+  it('starts every row at its own base, whichever model it is on', () => {
     const state = scene();
     const rs = state.seats[0].research;
-    const campus = districtCostIn(rs, DISTRICTS.CAMPUS.cost);
-    const aqueduct = districtCostIn(rs, DISTRICTS.AQUEDUCT.cost);
-    const canal = districtCostIn(rs, DISTRICTS.CANAL.cost);
+    const campus = districtScaledBase(rs, 'CAMPUS');
+    const aqueduct = districtScaledBase(rs, 'AQUEDUCT');
+    const canal = districtScaledBase(rs, 'CANAL');
     // an Aqueduct is CHEAPER than a Campus and a Canal dearer — the whole
     // point of the per-row base
     expect(aqueduct).toBeLessThan(campus);
     expect(canal).toBeGreaterThan(campus);
-    // and each is its own base through the one curve
+    // at zero research the two models AGREE, which is exactly why this test
+    // could not tell them apart before: the specialty curve is
+    // base x (1 + 9p) and the GAME_PROGRESS one base + floor(param x p),
+    // and both are `base` at p = 0.
     for (const [base, got] of [[36, aqueduct], [54, campus], [81, canal]] as const) {
-      expect(got).toBe(Math.floor(Math.round(base * GAME_SPEED) * 1));  // no research yet
+      expect(got).toBe(Math.round(base * GAME_SPEED));
+      expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
+    }
+  });
+
+  it('parts the two models the moment research lands', () => {
+    // CIV6 (`Districts.CostProgressionModel`): six rows take
+    // COST_PROGRESSION_GAME_PROGRESS with Param1 1000 — the Aqueduct, Bath,
+    // Neighborhood, Mbanza, Canal and Dam — and every other specialty row
+    // takes NUM_UNDER_AVG_PLUS_TECH. The first climbs by a FLAT add on the
+    // game's own progress; the second multiplies its base.
+    const state = scene();
+    const rs = state.seats[0].research;
+    rs.techs.push(...Object.keys(TECHS).slice(0, Math.ceil(Object.keys(TECHS).length / 2)));
+    const p = Math.max(rs.techs.length / Object.keys(TECHS).length,
+      rs.civics.length / Object.keys(CIVICS).length);
+    expect(p).toBeGreaterThan(0);
+
+    // the specialty row MULTIPLIES
+    expect(districtScaledBase(rs, 'CAMPUS'))
+      .toBe(Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * p)));
+    expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
+
+    // ...and a GAME_PROGRESS row keeps its flat base and ADDS
+    for (const [id, base] of [['AQUEDUCT', 36], ['CANAL', 81], ['DAM', 81],
+      ['NEIGHBORHOOD', 54]] as const) {
+      expect(districtScaledBase(rs, id)).toBe(Math.round(base * GAME_SPEED));
+      expect(districtProgressAdd(rs, id))
+        .toBe(Math.floor(Math.round(1000 * GAME_SPEED) * p));
     }
   });
 

@@ -106,6 +106,14 @@ export interface DistrictDef {
    *  every other row.
    */
   discountPct?: number;
+  /** CIV6 (`Districts.CostProgressionModel` = GAME_PROGRESS, with
+   *  `Districts.CostProgressionParam1`): this
+   *  row's price climbs with the GAME's own progress rather than with the
+   *  specialty curve — `base + floor(round(param x speed) x progress)`, the
+   *  model `projectCost` already runs for the Cothon. The install writes it
+   *  on six rows at 1000; a civVariant carries its own base and the SAME
+   *  parameter, which is why the term is added after the variant ratio. */
+  costProgressGame?: number;
   countsTowardLimit: boolean;
   /** A city may hold SEVERAL of this type (CIV 6: the Neighborhood, which is
    *  why it does not count toward the population cap). Absent means one. */
@@ -438,6 +446,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   AQUEDUCT: D({
     id: 'AQUEDUCT',
+    costProgressGame: 1000,
     plunder: { kind: 'gold', amount: 50 },
     name: 'Aqueduct',
     code: 'AQ',
@@ -480,6 +489,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   NEIGHBORHOOD: D({
     id: 'NEIGHBORHOOD',
+    costProgressGame: 1000,
     // CIV6 (M'banza): FIVE Housing whatever the tile's Appeal, +2 Food and
     // +4 Gold of its own, unlocked at Guilds rather than Urbanization, and a
     // free Apostle when it finishes.
@@ -546,6 +556,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // ENGINEERING districts, which is also what lets a Military Engineer rush it.
   DAM: D({
     id: 'DAM',
+    costProgressGame: 1000,
     name: 'Dam',
     code: 'DM',
     color: '#5f87a8',
@@ -565,6 +576,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // number that can be built per city".
   CANAL: D({
     id: 'CANAL',
+    costProgressGame: 1000,
     plunder: { kind: 'gold', amount: 50 },
     name: 'Canal',
     code: 'CN',

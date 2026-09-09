@@ -544,6 +544,10 @@ export function buildRules() {
       // straight off `Districts.Cost` and `CostProgressionParam1`
       perDistrict: PLACEABLE_DISTRICTS.map((d) => Math.round((DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST) * GAME_SPEED)),
       discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
+      // ...and the GAME_PROGRESS parameter, 0 on a row that does not carry
+      // one, pre-scaled like every other speed figure on the wire
+      progressGame: PLACEABLE_DISTRICTS.map(
+        (d) => Math.round((DISTRICTS[d]?.costProgressGame ?? 0) * GAME_SPEED)),
     },
     // TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`
     // straight through, so the GPU draws from the same table TS does. Kinds

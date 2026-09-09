@@ -1438,15 +1438,20 @@ class SimSeats:
             base = torch.where(_w, _open, base)
         return base
 
-    def _district_research_fac(self, row: int) -> torch.Tensor:
-        """[B] f64 — the RESEARCH factor every district's base is scaled by:
-        the seat's technologies or its civics, whichever fraction is larger.
-        The factor is the SEAT's; the base is the row's own."""
-        dcp = self.rules.district_cost
+    def _district_progress(self, row: int) -> torch.Tensor:
+        """[B] f64 — the GAME's own progress for this seat: its technologies
+        or its civics, whichever fraction is larger. ONE reader, because two
+        cost models read the same share and must never spell it differently."""
         rdv = self.rules_dev
         t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
         c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
-        return 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
+        return torch.maximum(t_pct, c_pct)
+
+    def _district_research_fac(self, row: int) -> torch.Tensor:
+        """[B] f64 — the RESEARCH factor a NUM_UNDER_AVG_PLUS_TECH district's
+        base is scaled by. The factor is the SEAT's; the base is the row's
+        own."""
+        return 1 + self.rules.district_cost.get("scale", 9) * self._district_progress(row)
 
     def _district_cost_si(self, row: int, si: int,
                           d_fac: torch.Tensor | None = None) -> torch.Tensor:
@@ -1467,7 +1472,15 @@ class SimSeats:
         # this row's OWN base (`Districts.Cost`) against the seat's research
         # factor — a shared 54 priced an Aqueduct as a Campus
         _b_si = float(d_per[di]) if di < len(d_per) else float(dcp.get("base", 32))
-        d_cost = torch.floor(_b_si * d_fac).to(self.dtype)
+        # CIV6 (COST_PROGRESSION_GAME_PROGRESS): six rows climb on the game's
+        # own progress instead of the specialty curve, and the climb is a flat
+        # ADD made after the discount and the variant ratio — the install
+        # gives the Bath and the Mbanza their own base AND the same parameter,
+        # so a Bath is `18 + term`, not half of `36 + term`.
+        _d_pg = dcp.get("progressGame") or []
+        _g_si = float(_d_pg[di]) if di < len(_d_pg) else 0.0
+        d_cost = (torch.full_like(d_fac, _b_si) if _g_si > 0
+                  else torch.floor(_b_si * d_fac)).to(self.dtype)
         if fc >= 0:
             # A FLAT-priced district (the Spaceport): no research scaling, no
             # under-represented discount.
@@ -1481,6 +1494,8 @@ class SimSeats:
         for _v in self._d_variants.get(di, []):
             _pm = self._row_plays_idx(row, int(_v["civ"]))
             out = torch.where(_pm, torch.floor(out * float(_v["costMult"])), out)
+        if _g_si > 0:
+            out = out + torch.floor(_g_si * self._district_progress(row)).to(self.dtype)
         return out
 
     def _district_cap(self, row: int, j: int) -> torch.Tensor:

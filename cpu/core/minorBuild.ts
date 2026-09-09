@@ -18,7 +18,6 @@
  * intact perimeter below a higher wall — is the same rule a major pays.
  */
 import type { CityState, DistrictId, GameState, Tile } from './types';
-import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -27,7 +26,7 @@ import { ENCAMPMENT_HP } from '../data/units';
 import { canPlaceDistrictIn, outerPool, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
 import { cityBorderGrowth } from './phase';
-import { districtCostIn, DISTRICT_SPECIALTY_COST } from './game';
+import { districtScaledBase, districtProgressAdd } from './game';
 import { computeCityStats } from './city';
 import { minorCity } from './cityStates';
 import { computeUnlocksIn, type Unlocks } from './effects';
@@ -178,8 +177,8 @@ function minorBuild(state: GameState, cityState: CityState): void {
     if (site < 0) continue;
     // the row's OWN base, not the specialty one: a minor builds real
     // districts too and the install prices an Aqueduct at 36
-    const cost = districtCostIn(cityState.research,
-      DISTRICTS[item.district]?.cost ?? DISTRICT_SPECIALTY_COST);
+    const cost = districtScaledBase(cityState.research, item.district)
+      + districtProgressAdd(cityState.research, item.district);
     if (pot < cost) return;
     cityState.prodProgress = pot - cost;
     const t = state.map.tiles[site];

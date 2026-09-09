@@ -99,12 +99,48 @@ def test_the_engine_pays_the_row(rules, path) -> None:
     print("  3 the price OK —", {k: int(v) for k, v in price.items()})
 
 
+def test_the_two_models_part(rules, path) -> None:
+    """CIV6 (`Districts.CostProgressionModel`): a GAME_PROGRESS row keeps its
+    flat base and ADDS `Param1 x progress`; a NUM_UNDER_AVG_PLUS_TECH row
+    MULTIPLIES its base by the research factor. They agree at zero research
+    and part the moment a tech lands, so a poke that never researches cannot
+    tell them apart — which is how one curve stood in for both."""
+    sim = build(path)
+    dcp = sim.rules.district_cost
+    pg = dcp.get("progressGame") or []
+    per = dcp.get("perDistrict") or []
+    hot = [i for i, v in enumerate(pg) if v]
+    assert hot, "no row carries the GAME_PROGRESS parameter"
+
+    # halfway through the tech tree, so `progress` is unmistakably non-zero
+    nt = sim.civ_techs.shape[2]
+    sim.civ_techs[:, 0, : nt // 2] = True
+    p = float(sim._district_progress(0)[0])
+    assert p > 0, "the scene researched nothing"
+
+    fac = float(sim._district_research_fac(0)[0])
+    for si, (di, *_rest) in enumerate(sim._scaffold):
+        cost = float(sim._district_cost_si(0, si)[0])
+        base = float(per[di]) if di < len(per) else float(dcp.get("base", 32))
+        if di in hot:
+            # ...and it must not be the multiplied one, or the two models
+            # would be one again
+            want = base + int(float(pg[di]) * p)
+            assert abs(cost - want) < 1e-6 or sim._district_discounted(0, di).any(), \
+                f"row {di}: GAME_PROGRESS wanted {want}, got {cost}"
+            assert abs(cost - base * fac) > 1e-9 or p == 0, \
+                f"row {di} still takes the specialty curve"
+    print(f"  4 the two models OK — {len(hot)} GAME_PROGRESS rows add "
+          f"{int(float(pg[hot[0]]) * p)} at progress {p:.3f}, the rest multiply")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
     test_the_wire(rules, path)
     test_bases_differ_from_the_specialty_one(rules, path)
     test_the_engine_pays_the_row(rules, path)
+    test_the_two_models_part(rules, path)
     print("BATTERY OK district_price")
     return 0
 

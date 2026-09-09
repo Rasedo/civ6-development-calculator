@@ -150,8 +150,10 @@ class SimMinors:
             c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(nC_c)
             # the research factor is the minor's; the BASE is the row's own,
             # picked inside the ladder where the district is known
-            d_fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
+            _mprog = torch.maximum(t_pct, c_pct)
+            d_fac = 1 + dcp.get("scale", 9) * _mprog
             d_per = dcp.get("perDistrict") or []
+            _d_pg = dcp.get("progressGame") or []
             site_s = self._minor_district_site(s)
             ladder: list[tuple[str, object]] = [("b", walls_by_tier[0] if walls_by_tier else -1),
                                                 ("d", self._citystate_didx[:, s]),
@@ -236,7 +238,11 @@ class SimMinors:
                         splane = splane & (self._adj_center_count() == 0)
                     avail = gate & ~held & unlock & cap_ok & splane.any(dim=1)
                     _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp.get("base", 32))
-                    d_cost = torch.floor(_b_dv * d_fac)
+                    # the row's OWN cost model — a minor builds real districts
+                    # and the GAME_PROGRESS rows climb differently.
+                    _g_dv = float(_d_pg[dv]) if dv < len(_d_pg) else 0.0
+                    d_cost = (torch.full_like(d_fac, _b_dv) + torch.floor(_g_dv * _mprog)
+                              if _g_dv > 0 else torch.floor(_b_dv * d_fac))
                     pay = avail & (self.citystate_prod[:, s] >= d_cost)
                     if bool(pay.any()):
                         rr = pay.nonzero(as_tuple=True)[0]

@@ -59,7 +59,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, DISTRICT_SPECIALTY_COST, districtDiscountMult } from './game';
+import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
@@ -781,13 +781,14 @@ export function districtSiteCost(
   state: GameState, actor: Seat, id: DistrictId, unlocks: Unlocks,
 ): number {
   // CIV6: the Spaceport's cost is FLAT — no research scaling, no discount.
-  const base = districtCostIn(actor.research, DISTRICTS[id]?.cost ?? DISTRICT_SPECIALTY_COST);
+  const base = districtScaledBase(actor.research, id);
   const cost0 = DISTRICTS[id]?.fixedCost
     ? Math.round(DISTRICTS[id].cost * GAME_SPEED)
     : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
       ? Math.floor(base * districtDiscountMult(id))
       : base;
-  return districtVariantCost(state, actor.seat, id, cost0);
+  return districtVariantCost(state, actor.seat, id, cost0)
+    + districtProgressAdd(actor.research, id);
 }
 
 /** The GROUND a district takes when it is placed — the same writes whether the

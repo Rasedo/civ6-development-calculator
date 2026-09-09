@@ -127,14 +127,38 @@ export function districtDiscounted(
   return D >= U && n < Math.ceil(D / U);
 }
 
+/** CIV6 (`Districts.CostProgressionModel`): a district's base against its
+ *  OWN model. The NUM_UNDER_AVG_PLUS_TECH rows take the research curve; the
+ *  GAME_PROGRESS rows take none here, because their climb is a flat ADD made
+ *  after the discount and the variant ratio (`districtProgressAdd`). */
+export function districtScaledBase(research: ResearchState, type?: DistrictId): number {
+  const base = type !== undefined
+    ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST;
+  return type !== undefined && DISTRICTS[type]?.costProgressGame !== undefined
+    ? Math.round(base * GAME_SPEED)
+    : districtCostIn(research, base);
+}
+
+/** The GAME_PROGRESS climb, added LAST. A civVariant carries its own base and
+ *  the same parameter, so a Bath is `18 + term` rather than half of
+ *  `36 + term`; folding the term into the base would halve it too. */
+export function districtProgressAdd(research: ResearchState, type?: DistrictId): number {
+  const p = type === undefined ? undefined : DISTRICTS[type]?.costProgressGame;
+  if (p === undefined) return 0;
+  const tPct = research.techs.length / Object.keys(TECHS).length;
+  const cPct = research.civics.length / Object.keys(CIVICS).length;
+  return Math.floor(Math.round(p * GAME_SPEED) * Math.max(tPct, cPct));
+}
+
 export function districtCost(state: GameState, seat: number, type?: DistrictId): number {
   // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
   if (type !== undefined && DISTRICTS[type]?.fixedCost) return Math.round(DISTRICTS[type].cost * GAME_SPEED);
-  const base = districtCostIn(seatOf(state, seat)!.research,
-    type !== undefined ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST);
+  const research = seatOf(state, seat)!.research;
+  const base = districtScaledBase(research, type);
   const cost = type !== undefined && districtDiscounted(state, seat, type)
     ? Math.floor(base * districtDiscountMult(type)) : base;
-  return type !== undefined ? districtVariantCost(state, seat, type, cost) : cost;
+  return (type !== undefined ? districtVariantCost(state, seat, type, cost) : cost)
+    + districtProgressAdd(research, type);
 }
 
 /** CIV6 (Bath): a civilization's unique district is "cheaper to build" —
