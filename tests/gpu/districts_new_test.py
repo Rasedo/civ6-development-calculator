@@ -90,6 +90,35 @@ def _claim(sim, b: int, row: int, col: int) -> None:
     sim._claim_version += 1
 
 
+def test_a_stripped_resource_stops_paying(sim) -> None:
+    """CIV6: a district PAVES a bonus resource — TS sets `tile.resource = null`
+    at six sites, a district pave and a wonder pave among them. The GPU models
+    the same fact with `res_stripped`, and every reader of the plane asks it
+    (`_res_avail_mask`, the improvement mask, the suzerain count) — except the
+    two ADJACENCY arms, which asked `res_id >= 0` alone and kept paying a Hansa
+    its RESOURCE point for a resource its own district had buried (seed 9209
+    t226: Industrial Zone adjacency 2 on the GPU, 1 on TS)."""
+    src = sim._adj_src_names.index("RESOURCE")
+    live = ((sim.res_id[0] >= 0) & ~sim.res_stripped[0] & ~sim.water[0]).nonzero()
+    assert live.numel(), "this fixture carries no live land resource"
+    t = int(live.flatten()[0])
+    nb = [int(x) for x in sim.neigh[t].tolist() if x >= 0]
+    assert nb, "the resource tile has no neighbour to be adjacent to"
+
+    before = sim._adj_source_plane(src)
+    assert float(before[0, nb[0]]) >= 1, "a live land resource must answer RESOURCE"
+
+    sim.res_stripped[0, t] = True
+    sim._eff_version += 1
+    after = sim._adj_source_plane(src)
+    assert float(after[0, nb[0]]) == float(before[0, nb[0]]) - 1, (
+        "a STRIPPED resource must stop answering: "
+        f"{float(before[0, nb[0]])} -> {float(after[0, nb[0]])}")
+    sim.res_stripped[0, t] = False
+    sim._eff_version += 1
+    print("  the stripped resource OK — it stops answering RESOURCE adjacency")
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -107,6 +136,7 @@ def main() -> None:
     dam, canal, wp, pres = cat["DAM"], cat["CANAL"], cat["WATER_PARK"], cat["PRESERVE"]
     gp, dq, ec = cat["GOVERNMENT_PLAZA"], cat["DIPLOMATIC_QUARTER"], cat["ENTERTAINMENT_COMPLEX"]
     iz = cat["INDUSTRIAL_ZONE"]
+    test_a_stripped_resource_stops_paying(sim)
 
     for i, d in enumerate(rj["districts"]):
         assert int(sim._appeal_adj[i]) == int(d.get("appealAdjacent", 0)), f"{d['id']} appeal"

@@ -2857,9 +2857,24 @@ class SimEconomy:
             v = self._dadj_cache[1].get(key)
             if v is None:
                 acc = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+                _per = []
                 for src, amt in srcs:
-                    acc = acc + amt * self._adj_source_plane(src)
+                    _pl = self._adj_source_plane(src)
+                    _per.append((self._adj_src_names[src]
+                                 if src < len(self._adj_src_names) else str(src),
+                                 amt, _pl))
+                    acc = acc + amt * _pl
                 v = torch.floor(acc)
+                if getattr(self, "_log_diff", False):
+                    _nm3 = self.districts_cat[di].get('id')
+                    for _b in range(self.B):
+                        for _t in (self.district[_b] == di).nonzero().flatten().tolist():
+                            _bits = ",".join(
+                                f"{n}x{int(float(p[_b, _t]))}@{a:g}"
+                                for n, a, p in _per if float(p[_b, _t]))
+                            self._diff_events.setdefault(_b, []).append(
+                                f"ds:{_t}:{_nm3} raw{float(acc[_b, _t]):.3f}"
+                                f" [{_bits}]")
                 self._dadj_cache[1][key] = v
             # a row that does not play the civilization keeps the base walk
             return torch.where(who.unsqueeze(1), v, self._district_adj_floor(di))
@@ -2888,12 +2903,18 @@ class SimEconomy:
             return cnt.to(self.dtype)
         if name == "NATURAL_WONDER":
             return (self.nwonder[:, nbc] & on_map).sum(dim=2).to(self.dtype)
+        # A STRIPPED resource is GONE, and every other reader of this plane
+        # says so (`_res_avail_mask`, the improvement mask, the suzerain
+        # count). TS models the same fact by setting `tile.resource = null` —
+        # at SIX sites, a district pave and a wonder pave among them — so a
+        # bonus resource paved over stops answering `matchesAdjacency`. These
+        # two arms asked `res_id >= 0` alone and kept paying a Hansa its
+        # RESOURCE point for a resource its own district had buried.
+        _live_r = (self.res_id[:, nbc] >= 0) & ~self.res_stripped[:, nbc]
         if name == "SEA_RESOURCE":
-            cnt = (self.water[:, nbc] & (self.res_id[:, nbc] >= 0) & on_map).sum(dim=2)
-            return cnt.to(self.dtype)
+            return (self.water[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
         if name == "RESOURCE":
-            cnt = (~self.water[:, nbc] & (self.res_id[:, nbc] >= 0) & on_map).sum(dim=2)
-            return cnt.to(self.dtype)
+            return (~self.water[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
         if name == "MOUNTAIN":
             cnt = (self.tile_mountain[:, nbc] & ~self.nwonder[:, nbc] & on_map).sum(dim=2)
             return cnt.to(self.dtype)
@@ -2929,9 +2950,22 @@ class SimEconomy:
         _var = self._variant_adj_floor(row, di)
         if _var is not None:
             base = _var
-        out = base * self._gov_mods(row)[10][:, di].unsqueeze(1)
+        mult = self._gov_mods(row)[10][:, di].unsqueeze(1)
+        out = base * mult
+        gmul = None
         if self.n_governors and row < self.n_majors:
-            out = out * self._governor_tile_adj(row, di).to(out.dtype)
+            gmul = self._governor_tile_adj(row, di).to(out.dtype)
+            out = out * gmul
+        if getattr(self, "_log_diff", False):
+            _nm = self.districts_cat[di].get('id')
+            _bel = 1 if (di in self._bel_adj_srcs and row < self.n_majors) else 0
+            for _b in range(self.B):
+                for _t in (self.district[_b] == di).nonzero().flatten().tolist():
+                    _g = float(gmul[_b, _t]) if gmul is not None else 1.0
+                    self._diff_events.setdefault(_b, []).append(
+                        f"db:{_t}:{_nm} base{int(float(base[_b, _t]))}"
+                        f" mult{float(mult[_b, 0]) * _g:g}"
+                        f" add{_bel} #gov{_g:g}")
         return out
 
     def _district_elig_site(self, row: int, j: int) -> torch.Tensor:
@@ -4905,6 +4939,20 @@ class SimEconomy:
             add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
             if getattr(self, "_log_diff", False):
+                # the PRE-FLOOR sum at the same tile+type key TS prints, from
+                # the WALK where the tile is known — the type-only helper
+                # could not name a tile and its log never paired.
+                _raw = self._district_adj_raw(
+                    di, self._adj_district_count().to(self.dtype))
+                _nm2 = dd.get('id')
+                for _b in range(B):
+                    for _j in range(t_d.shape[1]):
+                        _t = int(t_d[_b, _j])
+                        if _t < 0 or not bool(dlive[_b, _j, di]):
+                            continue
+                        self._diff_events.setdefault(_b, []).append(
+                            f"dr:{_t}:{_nm2} raw{float(_raw[_b, _t]):.3f}")
+            if getattr(self, "_log_diff", False):
                 _nm = dd.get('id')
                 _yn = ('food', 'production', 'gold', 'science', 'culture', 'faith')[yc]
                 for _b in range(B):
@@ -5244,6 +5292,18 @@ class SimEconomy:
                         f" z{float(citz[_b, _j, 5]):.3f}"
                         f" n{float(bon[_b, _j, 5]):.3f}"
                         f" r{float(trade[_b, _j, 5]):.3f}")
+                    # the same six for PRODUCTION — the queue's own input
+                    self._diff_events.setdefault(_b, []).append(
+                        f"bp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                        f":{int(self.city_center[_b, row, _j])}"
+                        f" t{float(tiles_y[_b, _j, 1]):.3f}"
+                        f" d{float(dist_y[_b, _j, 1]):.3f}"
+                        f" b{float(bld_y[_b, _j, 1]):.3f}"
+                        f" z{float(citz[_b, _j, 1]):.3f}"
+                        f" n{float(bon[_b, _j, 1]):.3f}"
+                        f" r{float(trade[_b, _j, 1]):.3f}"
+                        f" all{float(total[_b, _j, 1]):.3f}"
+                        f" yf{float(amen_yf[_b, _j]):.3f}")
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
         # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the

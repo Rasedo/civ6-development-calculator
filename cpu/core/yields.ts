@@ -291,7 +291,15 @@ export function districtAdjacency(
   const rows = own ?? def.adjacency;
   if (!def.adjacencyYield || (rows.length === 0 && extra.length === 0)) return 0;
   let sum = 0;
+  const _parts: string[] = [];
   const around = neighbors(map, tile);
+  for (const rule of [...rows, ...extra]) {
+    let _n = 0;
+    if (rule.source === 'RIVER') _n = hasRiver(tile) ? 1 : 0;
+    else if (rule.source === 'SELF') _n = 1;
+    else for (const n of around) if (matchesAdjacency(rule, n)) _n += 1;
+    if (_n) _parts.push(`${rule.source}x${_n}@${rule.amount}`);
+  }
   for (const rule of [...rows, ...extra]) {
     if (rule.source === 'RIVER') {
       if (hasRiver(tile)) sum += rule.amount;
@@ -303,13 +311,26 @@ export function districtAdjacency(
       if (matchesAdjacency(rule, n)) sum += rule.amount;
     }
   }
+  // the PRE-FLOOR sum, keyed on the tile and the type — the two names both
+  // engines share. A floor hides which source differs: 1.5 and 2.0 both look
+  // like "one apart" once floored.
+  const _dlr = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (_dlr) _dlr.push(`ds:${tile.index}:${type} raw${sum.toFixed(3)}`
+    + ` [${_parts.join(',')}]`);
   return Math.floor(sum);
 }
 
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
   const own = DISTRICTS[type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.adjacency;
-  return districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra], own)
-    * (ctx.mods.adjacencyMult[type] ?? 1);
+  const _base = districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra], own);
+  const _mult = ctx.mods.adjacencyMult[type] ?? 1;
+  // the FLOORED base and the multiplier apart: TS floors then multiplies, so
+  // a disagreement is in one half or the other and never both.
+  const _dlb = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (_dlb) _dlb.push(`db:${tile.index}:${type} base${_base} mult${_mult}`
+    + ` add${(ctx.mods.districtAdjacencyAdd?.[type] ?? []).length}`
+    + ` #civ${ctx.mods.civ} own${own ? own.length : -1}`);
+  return _base * _mult;
 }
 
 /**

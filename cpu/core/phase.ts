@@ -2571,7 +2571,17 @@ export function seatPhase(state: GameState): void {
         _dlcy.push(`bk:${actor.seat}:${state.turn}:${civCity.centerIndex}`
           + ` t${(_bk.tiles.faith ?? 0).toFixed(3)} d${(_bk.districts.faith ?? 0).toFixed(3)}`
           + ` b${(_bk.buildings.faith ?? 0).toFixed(3)} z${(_bk.citizens.faith ?? 0).toFixed(3)}`
-          + ` n${(_bk.bonuses.faith ?? 0).toFixed(3)} r${(_bk.trade.faith ?? 0).toFixed(3)}`); }
+          + ` n${(_bk.bonuses.faith ?? 0).toFixed(3)} r${(_bk.trade.faith ?? 0).toFixed(3)}`);
+        // the same six buckets for PRODUCTION — the queue's own input, and
+        // the yield a fraction of which shows up as queueProgress.
+        _dlcy.push(`bp:${actor.seat}:${state.turn}:${civCity.centerIndex}`
+          + ` t${(_bk.tiles.production ?? 0).toFixed(3)} d${(_bk.districts.production ?? 0).toFixed(3)}`
+          + ` b${(_bk.buildings.production ?? 0).toFixed(3)} z${(_bk.citizens.production ?? 0).toFixed(3)}`
+          + ` n${(_bk.bonuses.production ?? 0).toFixed(3)} r${(_bk.trade.production ?? 0).toFixed(3)}`
+          + ` all${(stats.total.production ?? 0).toFixed(3)}`
+          // the AMENITY tier's factor multiplies the summed buckets, so equal
+          // buckets and an unequal total is this and nothing else.
+          + ` yf${stats.amenities.tier.yieldFactor.toFixed(3)}`); }
       if (_dlcy) _dlcy.push(`gb:${actor.seat}:${state.turn}:${civCity.centerIndex}`
         + ` gfaith${((seatMods.faithPerSpecialty ?? 0)
           * completedDistrictCount(state, civCity, true)).toFixed(3)}`);
