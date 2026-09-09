@@ -1228,9 +1228,21 @@ export function bestTrainableOfClass(state: GameState, seat: number, promoClass:
  *  chassis, so the grant takes the strongest NAVAL unit this seat can train —
  *  `bestTrainableOfClass`'s rule, over the hulls rather than over a promotion
  *  class, because the naval line spans three of them. */
-export function bestTrainableNaval(state: GameState, seat: number): string | null {
+/** The strongest HULL a seat can train, for the Royal Navy Dockyard's grant.
+ *
+ *  The CITY is required, not optional-in-practice: `trainableUnits` refuses
+ *  every naval chassis without one (`!!city && cityNavalCapable`), which is
+ *  right for the gold rung — its unit spawns at the capital and can name no
+ *  Harbor — and wrong for a grant made BY a coastal district, whose city is
+ *  naval-capable by construction. Called without it this returned null and
+ *  the Dockyard granted nothing at all. */
+export function bestTrainableNaval(
+  state: GameState,
+  seat: number,
+  city?: { centerIndex: number; districts: { type: string; tileIndex: number }[] },
+): string | null {
   let best: UnitDef | undefined;
-  for (const d of trainableUnits(state, seat)) {
+  for (const d of trainableUnits(state, seat, city)) {
     if (!d.naval) continue;
     if (!best || (d.combat ?? 0) > (best.combat ?? 0)) best = d;
   }
@@ -1721,7 +1733,18 @@ export function spawnUnit(
     : [near, ...neighbors(state.map, near)]
       .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
       .find((t) => tileFreeForUnit(state, t.index, seat, probe));
-  if (!spot) return null;
+  if (!spot) {
+    // THE REFUSAL PRINTS. A probe that found no tile is not the same fact as
+    // a spawn nobody asked for, and a log of successes alone cannot tell
+    // them apart — the step log needed exactly this and for exactly this
+    // reason.
+    const dlN = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (dlN) {
+      dlN.push(`sp:${seat}:${state.turn}:${nearIndex}`
+        + `:${UNIT_TYPE_IDX.indexOf(unitType)} none`);
+    }
+    return null;
+  }
   const unit: Unit = {
     id: state.nextUnitId++,
     type: unitType,

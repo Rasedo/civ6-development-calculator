@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
 from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
@@ -2266,7 +2268,18 @@ class SimMasks:
         if bool(no_hold.any()):
             found = torch.where(no_hold, at_tile >= 0, found)
             spot = torch.where(no_hold, at_tile.clamp(min=0), spot)
+        # WHICH RULE ASKED. `_spawn_unit` has a dozen callers and the line
+        # named none of them, which is the same gap the pop and xp logs had
+        # before their writer joined the key. Read off the frame rather than
+        # threaded through every call site: it cannot fall out of date.
+        _why = sys._getframe(1).f_code.co_name if getattr(self, "_log_diff", False) else ""
         can = mask & found
+        # ...and the REFUSALS, the rows that WANTED a unit and got no tile.
+        if getattr(self, "_log_diff", False):
+            for _sb in (mask & ~found).nonzero(as_tuple=True)[0].tolist():
+                self._diff_events.setdefault(_sb, []).append(
+                    f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none {_why}")
         if not bool(can.any()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
@@ -2275,7 +2288,7 @@ class SimMasks:
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])}"
-                    f" at{int(spot[_sb])}")
+                    f" at{int(spot[_sb])} {_why}")
         nxt = getattr(self, self.POOL_NEXT[pre])
         slot = nxt[rows]
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"

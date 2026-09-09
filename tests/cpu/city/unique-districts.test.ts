@@ -10,6 +10,7 @@ import { getModifiers } from '../../../cpu/core/effects';
 import { districtAdjacency, effectiveAdjacency } from '../../../cpu/core/yields';
 import { projectCost } from '../../../cpu/core/game';
 import { DISTRICTS } from '../../../cpu/data/districts';
+import { bestTrainableNaval } from '../../../cpu/core/units';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { DISTRICT_PREREQ_ROWS } from '../../../cpu/data/civilizations';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
@@ -151,6 +152,27 @@ describe("the M'banza and the Dockyard", () => {
     expect(rn.grantsNavalUnit).toBe(true);
     expect(co.grantsNavalUnit).toBeUndefined();
     expect(rn.grantsUnit).toBeUndefined();
+  });
+
+  it('finds that hull only when the CITY comes with the question', () => {
+    // `trainableUnits` refuses every naval chassis without a city — right for
+    // the gold rung, whose unit spawns at the capital and can name no Harbor,
+    // and wrong for a grant made BY a coastal district. Asked without the
+    // city the Dockyard granted nothing at all, while the GPU granted a
+    // Caravel (seed 9235 t232: `nv hull34` against `nv hull-1`).
+    const state = makeState(makeMap(12, 12));
+    state.unitsMode = true;
+    const city = settleAt(state, tileAtCoords(state.map, 4, 4).index);
+    grantTechs(state, 'SAILING');
+    // a COMPLETED Harbor is the other half of `cityNavalCapable`, so the
+    // scene needs no coastline of its own
+    const ht = tileAtCoords(state.map, 5, 4);
+    ht.district = 'HARBOR';
+    ht.districtComplete = true;
+    city.districts.push({ type: 'HARBOR', tileIndex: ht.index });
+
+    expect(bestTrainableNaval(state, 0, city)).toBeTruthy();
+    expect(bestTrainableNaval(state, 0)).toBeNull();
   });
 });
 

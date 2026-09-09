@@ -11,7 +11,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { grantEraBoosts } from './game';
-import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
+import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
 import { governorFlag, governorSum } from './governors';
@@ -266,7 +266,15 @@ export function completeQueueItem(
         : undefined;
       if (dv?.grantsUnit) spawnUnit(state, dv.grantsUnit, dt.index, city.seat);
       if (dv?.grantsNavalUnit) {
-        const hull = bestTrainableNaval(state, city.seat);
+        const hull = bestTrainableNaval(state, city.seat, city);
+        // WHICH HULL, including NONE: `if (hull)` swallows the null, and a
+        // grant that fired and found nothing is a different fault from a
+        // grant that never fired at all.
+        const dlH = (globalThis as { __diffLog?: string[] }).__diffLog;
+        if (dlH) {
+          dlH.push(`nv:${city.seat}:${state.turn}:${dt.index}`
+            + ` hull${hull ? UNIT_TYPE_IDX.indexOf(hull) : -1}`);
+        }
         if (hull) spawnUnit(state, hull, dt.index, city.seat);
       }
       const ddef = dt.district ? DISTRICTS[dt.district] : null;

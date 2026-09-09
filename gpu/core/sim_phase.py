@@ -1304,6 +1304,11 @@ class SimPhase:
                     self._spawn_unit(row, _vw, _vat, _vu)
                 if _vnav:
                     _hull = self._best_trainable_naval(row)
+                    if getattr(self, "_log_diff", False):
+                        for _hb in _vw.nonzero(as_tuple=True)[0].tolist():
+                            self._diff_events.setdefault(_hb, []).append(
+                                f"nv:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                                f":{int(_vat[_hb])} hull{int(_hull[_hb])}")
                     self._spawn_unit(row, _vw & (_hull >= 0), _vat, _hull.clamp(min=0))
         # MONUMENTALITY pays era score per SPECIALTY district completed
         # (a city centre is never queued here).
