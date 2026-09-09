@@ -10,6 +10,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 .claude/hooks/no_heredoc.py"
+          }
+        ]
+      }
     ]
   },
   "permissions": {
@@ -28,10 +39,7 @@
       "Bash(tasklist *)"
     ],
     "deny": [
-      "Bash(sleep:*)",
-      "Bash(*sleep *)",
-      "Bash(*Start-Sleep*)",
-      "PowerShell(*Start-Sleep*)"
+      "Bash(sleep:*)"
     ]
   }
 }
