@@ -2880,6 +2880,21 @@ class SimEconomy:
             return torch.where(who.unsqueeze(1), v, self._district_adj_floor(di))
         return None
 
+    def _res_live(self) -> torch.Tensor:
+        """[B, T] bool — this tile HAS a resource, right now.
+
+        `tile.resource !== null`'s twin, and the ONE way to ask it. The fact is
+        spelled two ways on this engine: `res_id` is cleared outright where the
+        sea takes the ground (`_submerge`), and `res_stripped` is marked where
+        a district or wonder PAVES a bonus resource or a Builder HARVESTS one.
+        TS says both with the same `tile.resource = null`, at six sites.
+
+        That split is what let readers fall behind one at a time: the two
+        adjacency arms kept paying a Hansa for a resource its own district had
+        buried, and the Stave Church kept paying for a Fish its Harbor had
+        paved. Every reader that means "has a resource" comes here."""
+        return (self.res_id >= 0) & ~self.res_stripped
+
     def _adj_source_plane(self, src: int) -> torch.Tensor:
         """[B, T] — how much ONE adjacency source answers at each tile, in the
         district walk's own units. `districtAdjacency`'s `matchesAdjacency`
@@ -2903,14 +2918,7 @@ class SimEconomy:
             return cnt.to(self.dtype)
         if name == "NATURAL_WONDER":
             return (self.nwonder[:, nbc] & on_map).sum(dim=2).to(self.dtype)
-        # A STRIPPED resource is GONE, and every other reader of this plane
-        # says so (`_res_avail_mask`, the improvement mask, the suzerain
-        # count). TS models the same fact by setting `tile.resource = null` —
-        # at SIX sites, a district pave and a wonder pave among them — so a
-        # bonus resource paved over stops answering `matchesAdjacency`. These
-        # two arms asked `res_id >= 0` alone and kept paying a Hansa its
-        # RESOURCE point for a resource its own district had buried.
-        _live_r = (self.res_id[:, nbc] >= 0) & ~self.res_stripped[:, nbc]
+        _live_r = self._res_live()[:, nbc]
         if name == "SEA_RESOURCE":
             return (self.water[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
         if name == "RESOURCE":
@@ -4892,9 +4900,13 @@ class SimEconomy:
             if not (sv.numel() and bool(sv.any())):
                 continue
             _tw = self.terrain.gather(1, stf).reshape(B, n, M)
-            _rw = self.res_id.gather(1, stf).reshape(B, n, M) >= 0
+            # CIV6 (Stave Church): "+1 Production to each coastal RESOURCE
+            # tile" — and a Harbor or Water Park paves a bonus SEA resource
+            # away, so the tile stops carrying one (`t.resource !== null`).
+            _rlive = self._res_live()
+            _rw = _rlive.gather(1, stf).reshape(B, n, M)
             _tc = self.terrain.gather(1, ctr)
-            _rc = self.res_id.gather(1, ctr) >= 0
+            _rc = _rlive.gather(1, ctr)
             _hw = ((_tw == self._coast_terr) & _rw & take & sv.unsqueeze(2)).sum(dim=2).double()
             _hc = ((_tc == self._coast_terr) & _rc & sv).double()
             tiles_y = tiles_y + (_hw + _hc).unsqueeze(2) * _y6.double().view(1, 1, 6)

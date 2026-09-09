@@ -270,6 +270,20 @@ def main() -> None:
         sim.city_bldg[0, norway, 0, tb] = True
         sim._eff_version += 1
         d = prod() - y0
+        # ...and a coastal resource its own Harbor PAVED stops paying. TS
+        # writes `tile.resource = null` there, so `t.resource !== null` goes
+        # false; this engine says the same with `res_stripped`, and the
+        # reader has to ask (`_res_live`). Without that it kept paying for a
+        # Fish that no longer exists.
+        _paved = coast_nb[0]
+        sim.res_stripped[0, _paved] = True
+        sim._eff_version += 1
+        d_paved = prod() - y0
+        assert d_paved == d - 1, (
+            "a PAVED coastal resource must stop paying the Stave Church: "
+            f"{d} -> {d_paved}")
+        sim.res_stripped[0, _paved] = False
+        sim._eff_version += 1
         assert d == float(len(coast_nb)), f"one Production per worked coastal resource tile ({d} vs {len(coast_nb)})"
         play(sim, norway, None)
         sim._eff_version += 1
