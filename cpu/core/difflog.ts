@@ -19,6 +19,32 @@
  *
  * The gate pairs by key, keeps the LAST line per key, and prints only the
  * keys whose lines differ.
+ *
+ * ONE WINDOW PER KIND, AND EACH ENGINE TRIMS ITS OWN BUFFER. Past a dozen or
+ * so live kinds the two sides stop windowing the same turns — during A-4's
+ * hunt TS's `c:` lines were pushed out entirely while the GPU's survived, and
+ * a kind that appears on ONE side reads as a disagreement that is not one. So
+ * the set is a budget, not a collection. What earned its place:
+ *
+ *   PERMANENT — each decomposes a COMPOSED quantity, which is the only shape
+ *   that survives a hunt:
+ *     `ds:` adjacency per SOURCE with counts — cracked A-4's third layer
+ *     `dj:` a district's adjacency, keyed by CITY and tile
+ *     `dc:` the district price in parts (base/discount/variant/add/total)
+ *     `fi:` the turn's faith income, snapshot split from the roster tail
+ *     `up:` unit upkeep, the CHARGE beside the unit COUNT
+ *     `dm:` the minor's build — the only instrument on that path
+ *
+ *   SCAFFOLDING, kept only while a hunt needs it: `cy:` and `bk:`/`bp:` (the
+ *   per-city yield buckets), `sp2:`, `gb:`, `u1:`, `cf:`, `db:`. Delete these
+ *   when the hunt that wanted them closes; `ds:` and the bucket lines say
+ *   everything they said, with fewer keys.
+ *
+ * AND THE RULE THEY ALL COST ME: a key both engines print is not enough —
+ * the two sides must MEASURE THE SAME QUANTITY. Five lines in A-4's hunt named
+ * a shared key while comparing a catalog position against a `di`, a base walk
+ * against a variant walk, or a pre-factor total against a post-factor one.
+ * One produced a false elimination that had to be withdrawn.
  */
 import type { City, DistrictId, GameState, Unit } from './types';
 import { UNIT_TYPE_IDX } from '../data/units';
