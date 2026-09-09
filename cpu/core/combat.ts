@@ -49,7 +49,7 @@ import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promot
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { civOf, seatsAllied } from './seats';
-import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -2373,7 +2373,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   // same as any founding. Every `tile.district` reader depends on it: without
   // it the tile reads as open ground, a citizen may work it and settle scans
   // count it free. Real Civ 6: a conquered city-state IS a city with a centre.
-  center.district = 'CITY_CENTER';
+  markCityCentre(center);
   setTileOwner(center, seat, id);
   seatOf(state, seat)!.cities.push({
     id,
@@ -2429,7 +2429,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     }
   }
   revealAround(state, actor.seat, cityState.centerIndex, 3);
-  center.district = 'CITY_CENTER'; // HUNT: the captureCityState twin — see the note there
+  markCityCentre(center); // the captureCityState twin — see the note there
   actor.cities.push({
     id,
     name: cityState.name,

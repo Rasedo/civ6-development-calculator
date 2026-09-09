@@ -2818,18 +2818,6 @@ class SimEconomy:
             _cnt = self._adj_district_count()
             v = torch.floor(self._district_adj_raw(di, _cnt.to(self.dtype)))
             d[di] = v
-        # LOG ON EVERY CALL, not only on a cache MISS: a miss-only log covers
-        # whichever tiles happened to exist at the miss, which is a different
-        # tile set from the one TS walks — the sides then never pair.
-        if getattr(self, "_log_diff", False):
-            _cnt2 = self._adj_district_count()
-            _raw2 = self._district_adj_raw(di, _cnt2.to(self.dtype))
-            _nm = self.districts_cat[di].get('id')
-            for _b in range(self.B):
-                for _t in (self.district[_b] == di).nonzero().flatten().tolist():
-                    self._diff_events.setdefault(_b, []).append(
-                        f"da:{_t}:{_nm} raw{float(_raw2[_b, _t]):.3f}"
-                        f" n{int(_cnt2[_b, _t])}")
         return v
 
     def _district_adj_belief_floor(self, row: int, di: int) -> torch.Tensor:
@@ -4916,6 +4904,18 @@ class SimEconomy:
             adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
             add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
+            if getattr(self, "_log_diff", False):
+                _nm = dd.get('id')
+                _yn = ('food', 'production', 'gold', 'science', 'culture', 'faith')[yc]
+                for _b in range(B):
+                    for _j in range(t_d.shape[1]):
+                        if int(t_d[_b, _j]) < 0 or not bool(dlive[_b, _j, di]):
+                            continue
+                        self._diff_events.setdefault(_b, []).append(
+                            f"dj:{int(self._ROW_SEAT[row])}"
+                            f":{int(self.city_center[_b, row, _j])}:{_nm}"
+                            f" tile{int(t_d[_b, _j])}"
+                            f" adj{float(add[_b, _j]):g} y{_yn}")
             if di == self._hs_idx:
                 hs_adj = add
             elif di == self._commhub_idx or di == self._harbor_idx:

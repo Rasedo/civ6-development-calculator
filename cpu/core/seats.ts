@@ -30,6 +30,17 @@ export function tileSeat(t: Tile): number {
   return t.ownerSeat;
 }
 
+/** A tile becomes a CITY CENTRE — the flag AND the completion, together.
+ *  Every adjacency source pairs `district` with `districtComplete`, so a
+ *  centre marked but not completed reads as OPEN GROUND to its neighbours.
+ *  The two conquest paths set one and not the other, which cost a Holy Site
+ *  beside a captured centre the half-point a centre owes it, and showed up
+ *  only as one faith a turn. ONE writer, so a fourth path cannot set half. */
+export function markCityCentre(t: Tile): void {
+  t.district = 'CITY_CENTER';
+  t.districtComplete = true;
+}
+
 export function setTileOwner(t: Tile, seat: number, city = -1): void {
   // Real Civ 6 loses citizen management with the city, so a plot changing
   // HANDS drops its LOCK — the specialist pin is city-borne and already dies

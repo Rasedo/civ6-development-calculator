@@ -3,6 +3,7 @@ import { MP_SCALE } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
 import { BARB_SEAT, FREE_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
+import { districtAdjacency } from '../../../cpu/core/yields';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
 import { seatPhase, levyUnits, loyaltyDelta, applyLoyalty, flipCity } from '../../../cpu/core/phase';
@@ -272,5 +273,27 @@ describe('loyalty', () => {
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     expect(applyLoyalty(state, city, 'Unhappy')).toBe(false);
     expect(city.loyalty).toBeUndefined();
+  });
+
+  it('a CITY CENTRE counts as an adjacent district only once COMPLETE', () => {
+    // A conquered city's centre was flagged `CITY_CENTER` and left
+    // districtComplete FALSE. Every adjacency source pairs the two, so the
+    // centre read as open ground to its NEIGHBOURS: a Holy Site beside it
+    // lost the 0.5 a centre owes it and floored its faith to zero, while the
+    // GPU's `centre_slot_at` counted every centre. One faith a turn, and the
+    // only symptom was seat faith drifting at seed 9001 t174.
+    const state = makeState(makeMap(16, 16, 'GRASSLAND'));
+    const hs = tileAtCoords(state.map, 5, 5);
+    const a = tileAtCoords(state.map, 5, 4);
+    const b = tileAtCoords(state.map, 5, 6);
+    a.district = 'CAMPUS';
+    a.districtComplete = true;
+    b.district = 'CITY_CENTER';
+    b.districtComplete = false;
+    // one COMPLETE neighbour is 0.5, which floors to nothing
+    expect(districtAdjacency(state.map, hs, 'HOLY_SITE')).toBe(0);
+    // ...and the centre completing is the second half-point
+    b.districtComplete = true;
+    expect(districtAdjacency(state.map, hs, 'HOLY_SITE')).toBe(1);
   });
 });

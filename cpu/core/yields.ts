@@ -303,12 +303,6 @@ export function districtAdjacency(
       if (matchesAdjacency(rule, n)) sum += rule.amount;
     }
   }
-  // the RAW adjacency before the floor, at the tile both engines name the
-  // same way. A 0.5-per-district source floors to 0 at one neighbour and
-  // to 1 at two, so a count one apart is a whole yield apart.
-  const _dla = (globalThis as { __diffLog?: string[] }).__diffLog;
-  if (_dla) _dla.push(`da:${tile.index}:${type} raw${sum.toFixed(3)}`
-    + ` n${around.filter((n) => n.district !== null && n.districtComplete).length}`);
   return Math.floor(sum);
 }
 
@@ -420,6 +414,12 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     if (def.adjacencyYield) {
       const adj = effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
       out[def.adjacencyYield] += adj;
+      // the district's OWN adjacency yield, per CITY and per district —
+      // city, catalog row and tile all named at once, which is what the
+      // type-only helper could not do.
+      const _dlj = (globalThis as { __diffLog?: string[] }).__diffLog;
+      if (_dlj) _dlj.push(`dj:${city.seat}:${city.centerIndex}:${d.type}`
+        + ` tile${d.tileIndex} adj${adj} y${def.adjacencyYield}`);
       if (d.type === 'HOLY_SITE' && ctx.mods.workEthic) out.production += adj;
     }
   }

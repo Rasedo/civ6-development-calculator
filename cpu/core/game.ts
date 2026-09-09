@@ -52,7 +52,7 @@ import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
+import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -300,8 +300,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     hp: CITY_MAX_HP,
     foundedTurn: state.turn,
   };
-  tile.district = 'CITY_CENTER';
-  tile.districtComplete = true;
+  markCityCentre(tile);
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
   // Civ 6: a new city starts with its center plus the first ring only.
