@@ -575,7 +575,10 @@ def main() -> None:
     ap.add_argument("--resume", type=int, default=0, help="resume from the checkpoint taken at this turn (a prior --ckpt-every run, same seeds)")
     ap.add_argument("--styles", default=None,
                     help="comma list of ladder.STYLE_PRESETS names assigned per seat (cycled); "
-                         "omit for today's drawn styles — the battery runs without it")
+                         "omit for the same run as `--styles default`, NOT a draw: "
+                         "`_seat_style` answers STYLE_KNOBS for every seat when "
+                         "STYLE_TABLE is None. Only the CARD style is drawn per "
+                         "(seed, seat). The battery runs without it")
     ap.add_argument("--profile", action="store_true", help="batched only: print the turn-loop wall-time split (TS-children wait vs GPU vs digest)")
     ap.add_argument("--cprofile", default="", help="batched only: 'T0-T1' — cProfile the loop body over that turn window, in situ")
     ap.add_argument("--cprofile-out", default="", help="with --cprofile: also dump the raw pstats there, for caller attribution")

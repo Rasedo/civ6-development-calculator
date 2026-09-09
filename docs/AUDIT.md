@@ -34,7 +34,7 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at f7c918d3, 24 seeds to turn 250. A-3's ladder ran six layers deep and every one was a real defect |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
-| B-24r governor tails | 2 | a fourth card style, Foreign Investor and Affluence on C-38, four clauses on C-1/C-31 |
+| B-24r governor tails | 1 | the fourth card style SHIPPED and is measured; Foreign Investor and Affluence wait on C-38, four clauses on C-1/C-31 |
 | B-31r trade-route tails | 1 | plunder PERCENTAGES sourced and shipped, the base is DLL; chain depth RULED (6 stands); the per-district gold shape is ask 15; free-choice destination head is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask |
@@ -45,7 +45,7 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | B-66 formations | 0 | CLOSED — the three-member escort and the rider's own reveal shipped with #246H, pinned on both engines |
 | B-67 district price progression | 0 | CLOSED — the six GAME_PROGRESS rows take their own curve on both engines, and both pins now research before they read |
 | B-D unsourced data values | 1 | Democracy's route pays only its own city; per-city war weariness (DLL), GAME_SPEED shape, unit faith rate |
-| **B. Fidelity vs real Civ 6** | **12** | |
+| **B. Fidelity vs real Civ 6** | **11** | |
 | C-1 power | 1 | accident roll and damage tables (sourced, on ask 4), a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, join war, research agreement, a luxury lump; mark/demand/discuss on C-76; what a mid-build purchase does to the hammers is an ask |
 | C-16 the spy's second half | 1 | how the four UnitOperations probability columns compose (the escape's TERMS are sourced, its scale is ask 14); a Free City as spy ground |
@@ -68,7 +68,7 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **33** | |
+| **OPEN, TOTAL** | **32** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -1025,12 +1025,33 @@ the gate reaches is worth more here than one that re-reads the exporter.
 
 ## Harness — not weighted
 
-- **THE DRIVER NEEDS A REAL STYLE MECHANISM.** A style is one boolean read
-  at a single `if` inside `pick_research`. Wanted: NAMED KNOBS whose
-  defaults reproduce today's picks exactly (research depth, production tier
-  order, war appetite, expansion appetite, faith/culture lean, naval lean);
-  PRESETS built from the knobs, assignable per actor as data; an assignment
-  policy off the per-(seed, seat) stream or a table; CLI selection on the
-  probe and the gate. The bar is the probe diff: a preset earns its place by
-  ADDING reached rows without losing any. B-24r's fourth card style is the
-  first customer.
+- **THE DRIVER'S STYLE MECHANISM.** DONE 2026-09-09, and MEASURED rather
+  than asserted. `ladder.STYLE_KNOBS` names the knobs, `ladder.STYLE_PRESETS`
+  builds twelve presets from them, `drive.STYLE_TABLE` assigns them per seat
+  as data, and both the probe and the gate take `--styles`.
+  - THE DEFAULTS REPRODUCE TODAY'S PICKS EXACTLY, and this is proven, not
+    claimed: a 24-seed 250-turn probe run with `--styles default` came back
+    BYTE-IDENTICAL to the same run with the flag omitted. `_seat_style`
+    answers `STYLE_KNOBS` when `STYLE_TABLE is None` and `style_of('default')`
+    is that same dict, so the two are the same run by construction. Both
+    CLIs used to advertise "omit for today's drawn styles", which is false
+    and cost a 21-minute run to discover — only the CARD style is drawn per
+    (seed, seat). Both help strings now say so.
+  - THE BAR WAS RUN. `--styles darkage,default,default` (one seat carries the
+    preset) against the default run, 24 seeds to turn 250. SIX keys go from
+    NEVER to reached: `darkCard` 0/24 -> 24/24 first at t50 — the carrier it
+    was built for — plus `army`, `defensivePact`, `engineer`, `engImp` and
+    `engRoadOffer` at 1/24 each, three of which are the Military Engineer's
+    own coverage, which had none at all.
+  - ONE KEY GOES THE OTHER WAY, recorded rather than argued away:
+    `spyDistrict` 1/24 -> 0/24. It was one seed out of 24 firing at t191 in a
+    250-turn window, and its parent `spy` is unchanged at 1/24 — the spy is
+    still fielded, it just no longer stands on a district tile before the
+    window closes in that one game. A coin-flip row in both runs. The other
+    23 moved keys are seed-count wobble, 16 up and 7 down.
+  - A MONOCULTURE IS NOT THE TEST. Assigning the preset to EVERY seat
+    (`--styles darkage`) also reaches `darkCard` 24/24 but loses far more —
+    `placed:WATER_PARK` 9 -> 4, `dealTerm` 9 -> 6, `natHistory` 18 -> 15,
+    minor-war turns mean 13.0 -> 8.4 — because three seats playing one style
+    is a loss of variety, not a property of the preset. A preset is measured
+    ALONGSIDE the others or the diff says nothing.

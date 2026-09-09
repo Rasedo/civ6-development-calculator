@@ -108,7 +108,10 @@ def main() -> None:
                     help="override ladder.DIPLO_SHARE for a coverage sweep")
     ap.add_argument("--styles", default=None,
                     help="comma list of ladder.STYLE_PRESETS names assigned per seat "
-                         "(cycled); omit for today's drawn styles")
+                         "(cycled). Omitting it is the same run as `--styles default`, "
+                         "not a draw: `_seat_style` answers STYLE_KNOBS for every seat "
+                         "when STYLE_TABLE is None, and `style_of('default')` is that "
+                         "same dict. Only the CARD style is drawn per (seed, seat).")
     args = ap.parse_args()
     if args.deep_share is not None:
         ladder.DEEP_SHARE = args.deep_share
@@ -161,10 +164,17 @@ def main() -> None:
     free_seen = torch.zeros(sim.B, dtype=torch.long)
 
     def mark(key: str, mask, turn: int) -> None:
-        for b in range(sim.B):
-            if bool(mask[b]):
-                seeds_hit[key].add(seeds[b])
-                first_turn.setdefault(key, turn + 1)
+        # one sync, not one per game: `nonzero` answers "which games" in a
+        # single read where `bool(mask[b])` cost B of them on every key.
+        for b in mask.nonzero(as_tuple=True)[0].tolist():
+            seeds_hit[key].add(seeds[b])
+            first_turn.setdefault(key, turn + 1)
+
+    def every_seed(*keys: str) -> bool:
+        """True once every seed has hit every one of `keys`. These are all
+        "did it EVER happen" marks, so a game already in the set cannot learn
+        anything more and the measurement behind it can be skipped."""
+        return all(len(seeds_hit[k]) >= len(set(seeds)) for k in keys)
 
     _F = {n: i for i, n in enumerate(drive.DECIDE_FIELDS)}
     gw_before = None
@@ -189,6 +199,12 @@ def main() -> None:
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
+
+        # THE UNIT MASK, once per seat for the whole turn. Six blocks below
+        # read a column out of it and each used to rebuild the whole thing —
+        # 18 rebuilds a turn of the engine's most expensive call, all
+        # answering the same tensor because nothing here writes the sim.
+        _umask = {r: sim._seat_unit_mask(r) for r in seats}
 
         for row in seats:
             sl = sim._gov_policy_mods(sim.civ_civics[:, row])[4]
@@ -244,7 +260,7 @@ def main() -> None:
                 if _e:
                     _std |= (sim.improvement == _k).any(dim=1)
             for _row in seats:
-                _um = sim._seat_unit_mask(_row)
+                _um = _umask[_row]
                 if sim._A_ROAD >= 0:
                     _off_r |= _um[:, :, sim._A_ROAD].any(dim=1)
                 if sim._A_FINISH >= 0:
@@ -259,13 +275,13 @@ def main() -> None:
             if sim._A_BOOST >= 0:
                 _off_b = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
                 for _row in seats:
-                    _off_b |= sim._seat_unit_mask(_row)[:, :, sim._A_BOOST].any(dim=1)
+                    _off_b |= _umask[_row][:, :, sim._A_BOOST].any(dim=1)
                 mark("boostOffer", _off_b, t)
         # FORMATIONS: the column offered, then a Corps and an Army standing.
         if getattr(sim, "_A_FORM_UP", -1) >= 0:
             _off_f = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
             for _row in seats:
-                _off_f |= sim._seat_unit_mask(_row)[:, :, sim._A_FORM_UP:sim._A_FORM_UP + 6].any(dim=2).any(dim=1)
+                _off_f |= _umask[_row][:, :, sim._A_FORM_UP:sim._A_FORM_UP + 6].any(dim=2).any(dim=1)
             mark("formOffer", _off_f, t)
             _live_f = sim.unit_alive & (sim.unit_seat < 100)
             mark("corps", (_live_f & (sim.unit_formation == 1)).any(dim=1), t)
@@ -274,13 +290,13 @@ def main() -> None:
         if getattr(sim, "_A_ESCORT", -1) >= 0:
             _off_e = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
             for _row in seats:
-                _off_e |= sim._seat_unit_mask(_row)[:, :, sim._A_ESCORT].any(dim=1)
+                _off_e |= _umask[_row][:, :, sim._A_ESCORT].any(dim=1)
             mark("escOffer", _off_e, t)
             mark("escorted", (sim.unit_alive & sim.unit_escorted).any(dim=1), t)
         if getattr(sim, "_A_PERFORM", -1) >= 0:
             _off_c = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
             for _row in seats:
-                _off_c |= sim._seat_unit_mask(_row)[:, :, sim._A_PERFORM].any(dim=1)
+                _off_c |= _umask[_row][:, :, sim._A_PERFORM].any(dim=1)
             mark("concert", _off_c, t)
         # THE GREAT PERSON, end to end: a unit on the map, the verb offered,
         # a charge spent, and the two permanent channels a spent one leaves.
@@ -293,7 +309,7 @@ def main() -> None:
         if getattr(sim, "_A_GP", -1) >= 0:
             _off_g = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
             for _row in seats:
-                _umg = sim._seat_unit_mask(_row)
+                _umg = _umask[_row]
                 if _umg.shape[2] > sim._A_GP:
                     _off_g |= _umg[:, :, sim._A_GP].any(dim=1)
             mark("gpOffer", _off_g, t)
@@ -397,19 +413,18 @@ def main() -> None:
         # religions standing adjacent. The resolver cannot fire without it, so
         # this is what bounds any claim about it.
         rel_u = relig_t[sim.unit_type.clamp(min=0)] & sim.unit_alive
-        if bool(rel_u.any()):
+        if not every_seed("theoAdjacent") and bool(rel_u.any()):
             hit = torch.zeros(sim.B, dtype=torch.bool)
             for b in range(sim.B):
-                idxs = rel_u[b].nonzero(as_tuple=True)[0].tolist()
-                for i in idxs:
-                    ti, si = int(sim.unit_tile[b, i]), int(sim.unit_seat[b, i])
-                    for j in idxs:
-                        if j <= i:
-                            continue
-                        if int(sim.unit_seat[b, j]) == si:
-                            continue
-                        if int(sim.pair_dist[ti, int(sim.unit_tile[b, j])]) == 1:
-                            hit[b] = True
+                idx = rel_u[b].nonzero(as_tuple=True)[0]
+                if idx.numel() < 2:
+                    continue
+                ti = sim.unit_tile[b, idx]
+                si = sim.unit_seat[b, idx]
+                # the same question as the old ordered-pair walk, asked once:
+                # a DIFFERENT seat's religious unit one hex away
+                adj = sim.pair_dist[ti.unsqueeze(1), ti.unsqueeze(0)] == 1
+                hit[b] = bool((adj & (si.unsqueeze(1) != si.unsqueeze(0))).any())
             mark("theoAdjacent", hit, t)
 
     print(f"REACHABILITY — {sim.B} seeds x {args.turns} turns, driven")
