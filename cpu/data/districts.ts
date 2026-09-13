@@ -735,3 +735,40 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'WATER_PARK', unlockId: 'NATURAL_HISTORY', unlockKind: 'civic', placement: 'coastal' },
   { id: 'CANAL', unlockId: 'STEAM_POWER', placement: 'canal' },
 ];
+
+/** What a trade route pays PER DISTRICT at its destination — CIV6
+ *  `District_TradeRouteYields` (Districts.xml, plus the DLC packs for the
+ *  Diplomatic Quarter). Three columns per row in the install:
+ *  `YieldChangeAsOrigin` is 0 on EVERY row, so the origin's own districts pay
+ *  nothing; `YieldChangeAsDomesticDestination` and
+ *  `YieldChangeAsInternationalDestination` are the two below. The CITY_CENTER
+ *  row is the "flat head" every route pays (food 1 / production 1 at home,
+ *  gold 3 abroad). Unique districts inherit their base row — the install's
+ *  Hansa, Cothon, Royal Navy Dockyard, Suguba, Seowon, Lavra, Acropolis,
+ *  Ikanda, Oppidum, Observatory, Thanh, Hippodrome and Street Carnival rows
+ *  each equal the district they replace. The Indonesia/Khmer SCENARIO adds
+ *  culture rows to the centre, hub and harbor; scenario rows are not play.
+ *  Measured to the unit in the live game 2026-09-13 (tools/civ6lab
+ *  trade_probe.lua): every foreign destination paid 3 gold plus these rows,
+ *  a Harbor city 6, an origin with four specialty districts nothing more than
+ *  one with none. The GlobalParameters TRADE_ROUTE_GOLD_PER_*_DISTRICT are
+ *  dead rows in Gathering Storm and are not read anywhere. */
+export interface RouteYieldRow {
+  food?: number; production?: number; gold?: number; science?: number; culture?: number; faith?: number;
+}
+export const DISTRICT_ROUTE_YIELDS: Partial<Record<DistrictId, { domestic: RouteYieldRow; international: RouteYieldRow }>> = {
+  CITY_CENTER: { domestic: { food: 1, production: 1 }, international: { gold: 3 } },
+  COMMERCIAL_HUB: { domestic: { production: 1 }, international: { gold: 3 } },
+  HARBOR: { domestic: { production: 1 }, international: { gold: 3 } },
+  GOVERNMENT_PLAZA: { domestic: { food: 1, production: 1 }, international: { gold: 2 } },
+  DIPLOMATIC_QUARTER: { domestic: { food: 1, production: 1 }, international: { culture: 1 } },
+  CAMPUS: { domestic: { food: 1 }, international: { science: 1 } },
+  HOLY_SITE: { domestic: { food: 1 }, international: { faith: 1 } },
+  THEATER_SQUARE: { domestic: { food: 1 }, international: { culture: 1 } },
+  INDUSTRIAL_ZONE: { domestic: { production: 1 }, international: { production: 1 } },
+  ENCAMPMENT: { domestic: { production: 1 }, international: { production: 1 } },
+  ENTERTAINMENT_COMPLEX: { domestic: { food: 1 }, international: { food: 1 } },
+  WATER_PARK: { domestic: { food: 1 }, international: { food: 1 } },
+  // AERODROME, AQUEDUCT, CANAL, DAM, NEIGHBORHOOD, SPACEPORT carry no row;
+  // PRESERVE is not in this install at all.
+};

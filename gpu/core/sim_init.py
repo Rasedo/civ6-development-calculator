@@ -2401,6 +2401,10 @@ class SimInit:
         self._trade_range = int(_tr.get("range", 15))
         self._trade_sea_range = int(_tr.get("seaRange", 30))
         self._trade_intl_gold = int(_tr.get("intlGold", 3))  # international base gold
+        # District_TradeRouteYields' CITY_CENTER row: the flat head of every
+        # route, domestic and international (engine yield order)
+        self._route_centre_dom = torch.tensor([float(x) for x in _tr.get("centreRouteDom", [1, 1, 0, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]
+        self._route_centre_intl = torch.tensor([float(x) for x in _tr.get("centreRouteIntl", [0, 0, 3, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]
         self._trade_duration = int(_tr.get("duration", 20))  # route lifetime
         self._trade_plunder_gold = int(_tr["plunderGold"])
         self._trade_walk_rail = int(_tr["walkRail"])
@@ -2780,6 +2784,15 @@ class SimInit:
         self._spec_y = torch.tensor([[float(x) for x in d["spec"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
         self._spec_tb = [[int(b) for b in d["specTB"]] for d in self.districts_cat]  # [nD][*]
         self._spec_ta = torch.tensor([[float(x) for x in d["specTA"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        # District_TradeRouteYields per placeable district: what a route pays
+        # for this district standing at its DESTINATION, domestic and
+        # international columns (engine yield order). A repeatable type has
+        # no row, which is what lets the ONE-tile-per-type registry read it.
+        self._route_dom_y = torch.tensor([[float(x) for x in d.get("routeDom", [0] * 6)] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        self._route_intl_y = torch.tensor([[float(x) for x in d.get("routeIntl", [0] * 6)] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        if self._rep_any:
+            assert float((self._route_dom_y[self._is_repeatable].abs().sum() + self._route_intl_y[self._is_repeatable].abs().sum())) == 0.0, \
+                "a repeatable district with a trade-route row would need a tile-plane count, not the registry"
         self._spec_any = self._spec_y.abs().sum(dim=1) > 0  # [nD]
         self._b_dist_oh = (
             torch.nn.functional.one_hot(self._b_req_district.clamp(min=0), _ndc).to(torch.float64)

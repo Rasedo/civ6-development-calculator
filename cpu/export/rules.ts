@@ -71,7 +71,7 @@ const slotsOf = (xs: number[]): number[] => {
   while (out.length < PROMO_SLOTS) out.push(0);
   return out;
 };
-import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
+import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, DISTRICT_ROUTE_YIELDS, type AdjacencySource } from '../data/districts';
 import { ENGINEER_FINISH_FRACTION } from '../core/game';
 import { TECHS, ERAS, MODERN_ERA_INDEX, type ResearchEffect } from '../data/techs'; // era scale
 import {
@@ -614,6 +614,10 @@ export function buildRules() {
       cityStateRouteGold: CITY_STATE_ROUTE_GOLD,
       cityStateRouteSpec: CITY_STATE_ROUTE_SPEC,
       intlGold: INTL_ROUTE_GOLD,
+      // the CITY_CENTER row of District_TradeRouteYields — outside the
+      // placeable catalog, so it rides here
+      centreRouteDom: YIELD_KEYS.map((k) => DISTRICT_ROUTE_YIELDS.CITY_CENTER?.domestic[k] ?? 0),
+      centreRouteIntl: YIELD_KEYS.map((k) => DISTRICT_ROUTE_YIELDS.CITY_CENTER?.international[k] ?? 0),
       duration: TRADE_ROUTE_DURATION,
       plunderGold: PLUNDER_ROUTE_GOLD,
       walkRail: TRADE_WALK_EXPIRY_RAIL,
@@ -2055,6 +2059,10 @@ export function buildRules() {
         plun: plunRow(d.plunder),
         // specialist base yields, and the TOP building that upgrades them
         // (-1 none, -2 = any worship building)
+        // District_TradeRouteYields: what a route pays for THIS district
+        // standing at its destination — domestic and international columns
+        routeDom: YIELD_KEYS.map((k) => DISTRICT_ROUTE_YIELDS[id]?.domestic[k] ?? 0),
+        routeIntl: YIELD_KEYS.map((k) => DISTRICT_ROUTE_YIELDS[id]?.international[k] ?? 0),
         spec: YIELD_KEYS.map((k) => SPECIALIST_YIELDS[id]?.[k] ?? 0),
         // the buildings that lift this district's specialists, -2 = any
         // worship building; a district with no tier exports an empty list
