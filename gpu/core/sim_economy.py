@@ -1116,11 +1116,13 @@ class SimEconomy:
                 rows = free.nonzero(as_tuple=True)[0]
                 self.storm_event[rows, tile[rows]] = e
                 self.storm_left[rows, tile[rows]] = int(self._st_duration[e])
-        # CIV6 (`RandomEvents`, Duration 3): a storm PERSISTS, applying its
-        # footprint's effects on the turn it forms and on each turn it lasts.
-        # Live storms walk in ascending centre index, the TS walk's order;
-        # `Movement 8` (the storm's walk across the map) is DLL logic nobody
-        # can read, and a storm stays put.
+        # CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
+        # storm lives three turns — ENTRY (the footprint at the strike plot),
+        # MOVEMENT (the centre walks `_st_movement` unit steps, then the
+        # footprint lands where it stopped), DISSIPATION (it walks once more
+        # and does no damage). Live storms go in ascending centre index, the
+        # order taken BEFORE any of them moves, so none walks twice in one
+        # turn (`disasterPhase`'s `live` list).
         live = self.storm_left > 0
         order = live.long().cumsum(dim=1) * live.long()
         for k in range(1, int(order.max()) + 1):
@@ -1128,11 +1130,50 @@ class SimEconomy:
             hit_k = at.any(dim=1)
             if not bool(hit_k.any()):
                 break
-            self._storm_turn(hit_k, at.long().argmax(dim=1), strip)
+            centre = at.long().argmax(dim=1)
+            ev = self.storm_event.gather(1, centre.unsqueeze(1)).squeeze(1).clamp(min=0)
+            left = self.storm_left.gather(1, centre.unsqueeze(1)).squeeze(1)
+            age = self._st_duration[ev] - left  # 0 entry, 1 movement, 2 dissipation
+            walk = hit_k & (age >= 1)
+            if bool(walk.any()):
+                centre = self._storm_walk(walk, centre, ev)
+            self._storm_turn(hit_k & (age <= 1), centre, strip)
         self.storm_left.copy_((self.storm_left - 1).clamp(min=0))
         self.storm_event.copy_(torch.where(self.storm_left > 0, self.storm_event,
                                            torch.full_like(self.storm_event, -1)))
         self._eff_version += 1
+
+    def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
+        """`stormWalk` — CIV6 (`Movement 8`, measured 2026-09-13 over 31 storms):
+        `_st_movement` unit steps in the one turn, each step's heading drawn
+        from the `PrevailingWinds` band of the centre's CURRENT latitude
+        (`_wind_band`, `_wind_w`), and the step DROPPED where the storm's own
+        terrain rule fails at the destination (`storm_fam`), where the map
+        ends, or where another storm's centre stands. ONE draw per step, taken
+        or dropped: `pick` in [0, sum of the band's weights) names the first
+        heading whose cumulative weight exceeds it, in the hex order E NE NW W
+        SW SE. Returns the centre per game, unchanged where `walk` is off."""
+        fam = self._st_family_t[ev.clamp(min=0)]
+        bidx = torch.arange(self.B, device=self.device)
+        for _ in range(self._st_movement):
+            w = self._wind_w[self._wind_band[centre]]  # [B, 6]
+            total = w.sum(dim=1)
+            r = self._next_random(walk)
+            pick = (r * total.to(torch.float64)).floor().to(torch.long)
+            d = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=5)
+            dest = self.neigh[centre, d]  # [B], -1 off the map
+            dc = dest.clamp(min=0)
+            ok = (walk & (dest >= 0) & (self.storm_fam[bidx, dc] == fam)
+                  & (self.storm_left[bidx, dc] == 0))
+            if bool(ok.any()):
+                rows = ok.nonzero(as_tuple=True)[0]
+                src, dst = centre[rows], dest[rows]
+                self.storm_event[rows, dst] = self.storm_event[rows, src]
+                self.storm_left[rows, dst] = self.storm_left[rows, src]
+                self.storm_event[rows, src] = -1
+                self.storm_left[rows, src] = 0
+                centre = torch.where(ok, dest, centre)
+        return centre
 
     def _storm_turn(self, hit: torch.Tensor, centre: torch.Tensor, strip: torch.Tensor) -> None:
         """`stormTurn` — one turn of one storm: the first `hexes` slots of the

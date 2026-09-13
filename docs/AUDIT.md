@@ -1273,6 +1273,12 @@ the gate reaches is worth more here than one that re-reads the exporter.
     observed damage (4 of 4). `Hexes` is the footprint. The walk is now
     buildable in full; nothing about it is a guess except the per-step draw,
     which is the only model that produced the observed resultants.
+    SHIPPED 2026-09-13 (#253): `stormWalk` / `_storm_walk` — eight unit
+    steps on the movement turn, then the footprint; eight more on the
+    dissipation turn, no footprint; the heading per step drawn from
+    `PREVAILING_WINDS` at the centre's current latitude (`windBand`), a
+    step dropped where the family's terrain rule fails, at the map's edge,
+    or on another storm's centre; one draw per step on both engines.
   - A SEQUENCING NOTE, not a reason to defer indefinitely: a weighted
     direction draw per storm per turn is a NEW RNG CONSUMER, which reds
     fixtures across several classes with no engine bug behind it. It belongs

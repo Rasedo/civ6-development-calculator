@@ -2436,6 +2436,8 @@ class SimInit:
                          (3, _wx >= 0), (2, 18 * _wx >= _ws), (1, 3 * _wx >= _ws), (0, 3 * _wx >= 2 * _ws)):
             _wb = torch.where(_ok, torch.full_like(_wb, _bi), _wb)
         self._wind_band = _wb  # [T]
+        self._st_movement = int(_ds["stormMovement"])  # `STORM_MOVEMENT`: unit steps per walk
+        self._st_family_t = torch.tensor(self._st_family, dtype=torch.long, device=device)
 
         def _stf(k: str) -> torch.Tensor:
             return torch.tensor([float(e[k]) for e in _st], dtype=torch.float64, device=device)

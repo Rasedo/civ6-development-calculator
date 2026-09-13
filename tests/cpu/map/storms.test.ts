@@ -3,7 +3,8 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { disasterPhase, stormChances, stormFootprint, stormTile } from '../../../cpu/core/disasters';
+import { disasterPhase, stormChances, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
+import { hexDistance } from '../../../world/hex';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, WIND_BAND_LO, windBand } from '../../../cpu/data/disasters';
 import { disasterRateMult } from '../../../cpu/data/climate';
 import { makeYieldCtx } from '../../../cpu/core/effects';
@@ -128,14 +129,106 @@ describe('the eight storms are the install\'s table', () => {
     expect(first).toBeDefined();
     expect(STORM_EVENTS[first!.stormEvent!].family).toBe('BLIZZARD');
     expect(state.eventLog.some((e) => e.startsWith('Storm: BLIZZARD'))).toBe(true);
-    // the storm was applied once already (its spawn turn) and counts down
+    // the storm was applied once already (its spawn turn) and counts down —
+    // on a tile that MOVES with the walk, so follow the live record
+    const live = () => state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0);
+    const ev0 = first!.stormEvent;
     expect(first!.stormTurns).toBe(2);
     disasterPhase(state);
-    expect(first!.stormTurns).toBe(1);
+    expect(live()).toHaveLength(1);
+    expect(live()[0].stormTurns).toBe(1);
+    expect(live()[0].stormEvent).toBe(ev0);
     disasterPhase(state);
-    expect(first!.stormTurns).toBe(0);
-    expect(first!.stormEvent).toBe(-1);
+    expect(live()).toHaveLength(0);
+    expect(state.map.tiles.every((t) => (t.stormEvent ?? -1) === -1)).toBe(true);
     expect(state.eventLog.every((e) => !e.startsWith('Storm') || e.startsWith('Storm: BLIZZARD'))).toBe(true);
+  });
+
+  it('the walk is eight band-drawn steps, one draw each, dropped where the family cannot go', () => {
+    // CIV6 (`Movement 8`, measured): on an all-snow board a blizzard walks
+    // freely. Row 8 of 16 reads band 5 (-30..-5: NW 1 W 2 SW 2), so every
+    // step heads west-ish and the resultant is 4-8 hexes, never eastward.
+    const state = board(null, 'SNOW');
+    const idx = STORM_EVENTS.findIndex((e) => e.id === 'BLIZZARD_SIGNIFICANT');
+    const start = tileAtCoords(state.map, 8, 8);
+    start.stormEvent = idx;
+    start.stormTurns = 2;
+    expect(windBand(8, 16)).toBe(5);
+    const s0 = state.rngState;
+    const end = stormWalk(state, start, STORM_EVENTS[idx]);
+    expect(draws(s0, state.rngState)).toBe(8);
+    expect(end.stormEvent).toBe(idx);
+    expect(end.stormTurns).toBe(2);
+    expect(start.stormEvent).toBe(-1);
+    expect(start.stormTurns).toBe(0);
+    const dist = hexDistance(start.col, start.row, end.col, end.row);
+    expect(dist).toBeGreaterThanOrEqual(4);
+    expect(dist).toBeLessThanOrEqual(8);
+    expect(end.col).toBeLessThanOrEqual(start.col);
+    expect(state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0)).toHaveLength(1);
+    // a hurricane on the one OCEAN tile of a grassland board has nowhere to
+    // go: eight draws, eight dropped steps, the record where it was
+    const land = board(null, 'GRASSLAND');
+    const sea = tileAtCoords(land.map, 8, 8);
+    sea.terrain = 'OCEAN';
+    sea.elevation = 'FLAT';
+    const cat4 = STORM_EVENTS.findIndex((e) => e.id === 'HURRICANE_CAT_4');
+    sea.stormEvent = cat4;
+    sea.stormTurns = 2;
+    const s1 = land.rngState;
+    expect(stormWalk(land, sea, STORM_EVENTS[cat4])).toBe(sea);
+    expect(draws(s1, land.rngState)).toBe(8);
+    expect(sea.stormEvent).toBe(cat4);
+    // another storm's centre blocks a step the same way
+    const snow = board(null, 'SNOW');
+    const c = tileAtCoords(snow.map, 8, 8);
+    c.stormEvent = idx;
+    c.stormTurns = 2;
+    for (let d = 0; d < 6; d++) {
+      const n = tileAtCoords(snow.map, c.col + [1, 0, -1, -1, -1, 0][d], c.row + [0, -1, -1, 0, 1, 1][d]);
+      n.stormEvent = idx;
+      n.stormTurns = 1;
+    }
+    expect(stormWalk(snow, c, STORM_EVENTS[idx])).toBe(c);
+  });
+
+  it('a storm damages on its first two turns and walks on its last two', () => {
+    // ENTRY: the footprint at the strike plot, no walk. MOVEMENT: walk, then
+    // the footprint. DISSIPATION: walk, no footprint. Read off the draws a
+    // phase makes: a tornado on the board's one PLAINS HILL (no drought or
+    // flood candidate anywhere, so a fired roll picks from nothing and draws
+    // nothing more) can never leave its tile, so every step is a dropped
+    // draw and the footprint is one tile's eleven.
+    const scene = (seed: number) => {
+      const state = board(null, 'SNOW');
+      const c = tileAtCoords(state.map, 8, 8);
+      c.terrain = 'PLAINS';
+      c.elevation = 'HILLS';
+      c.stormEvent = STORM_EVENTS.findIndex((e) => e.id === 'TORNADO_FAMILY');
+      c.stormTurns = 3;
+      state.rngState = seed;
+      const counts: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        const s0 = state.rngState;
+        disasterPhase(state);
+        let k = 0;
+        for (; k < 80; k++) if (((s0 + k * STEP) >>> 0) === (state.rngState >>> 0)) break;
+        counts.push(k);
+      }
+      return { state, c, counts };
+    };
+    for (let seed = 1; seed < 100; seed++) {
+      const { state, c, counts } = scene(seed);
+      // a blizzard that formed on the snow adds its own draws — another seed
+      if (state.eventLog.some((e) => e.startsWith('Storm:'))) continue;
+      // the flood roll, the drought roll, the eight formation rolls, one per volcano
+      const base = 10 + state.map.tiles.filter((t) => t.volcano).length;
+      expect(counts).toEqual([base + 11, base + 8 + 11, base + 8]);
+      expect(c.stormTurns).toBe(0);
+      expect(c.stormEvent).toBe(-1);
+      return;
+    }
+    throw new Error('every seed formed a blizzard');
   });
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {

@@ -228,13 +228,17 @@ def main() -> int:
     c = free_tile(sim2, False)
     sim2.storm_event[0, c] = TOR1
     sim2.storm_left[0, c] = 3
-    lefts = []
+    sim2._st_chance = [0.0] * len(sim2._st_chance)  # no second storm forms in this scene
+    # the record MOVES with the walk on its second and third turns: follow it
+    lefts, count = [], []
     for _ in range(3):
         sim2._disaster_phase()
-        lefts.append(int(sim2.storm_left[0, c]))
-    assert lefts == [2, 1, 0], lefts
-    assert int(sim2.storm_event[0, c]) == -1, "an expired storm clears its event"
-    print("  6 persistence OK — a live storm counts down 3 -> 0 and clears at 0")
+        live = (sim2.storm_left[0] > 0).nonzero().flatten().tolist()
+        count.append(len(live))
+        lefts.append(int(sim2.storm_left[0, live[0]]) if live else 0)
+    assert lefts == [2, 1, 0] and count == [1, 1, 0], (lefts, count)
+    assert int((sim2.storm_event[0] >= 0).sum()) == 0, "an expired storm clears its event"
+    print("  6 persistence OK — a live storm counts down 3 -> 0, travels, and clears at 0")
     # a natural wonder keeps its row: silt that lands on one pays nothing,
     # food or production (tileYields early-returns above the fertility lines)
     sim3 = fresh(rules)
@@ -264,6 +268,39 @@ def main() -> int:
     assert got == [_band(r) for r in range(H)], f"the band per row is not windBand's: {got}"
     assert got[0] == 0 and got[H - 1] == 7
     print("  8 winds OK — 22 weighted rows over 8 latitude bands, north to south")
+    # -- 9: the walk — eight band-drawn steps, one draw each, dropped where the
+    # family cannot go ------------------------------------------------------
+    sim9 = fresh(rules)
+    assert sim9._st_movement == 8
+    CAT4_ = ids.index("HURRICANE_CAT_4")
+    sea = free_tile(sim9, True)
+    sim9.storm_event[0, sea] = CAT4_
+    sim9.storm_left[0, sea] = 2
+    s0 = int(sim9.rng_state[0])
+    end = int(sim9._storm_walk(torch.tensor([True]), torch.tensor([sea]), torch.tensor([CAT4_]))[0])
+    assert draws(s0, int(sim9.rng_state[0])) == 8, "the walk draws once per step, taken or dropped"
+    assert int(sim9.storm_event[0, end]) == CAT4_ and int(sim9.storm_left[0, end]) == 2, "the record did not travel with the centre"
+    assert end == sea or int(sim9.storm_event[0, sea]) == -1, "the record was duplicated"
+    assert bool(sim9.ocean_tile[0, end]), "a hurricane left the ocean"
+    assert int(sim9.pair_dist[sea, end]) <= 8
+    assert int((sim9.storm_left[0] > 0).sum()) == 1
+    # every neighbour holding a live storm: eight draws, no step
+    sim9.storm_event[0, end] = -1
+    sim9.storm_left[0, end] = 0
+    sim9.storm_event[0, sea] = CAT4_
+    sim9.storm_left[0, sea] = 2
+    for n in sim9.neigh[sea].tolist():
+        if n >= 0:
+            sim9.storm_event[0, n] = CAT4_
+            sim9.storm_left[0, n] = 1
+    s0 = int(sim9.rng_state[0])
+    end2 = int(sim9._storm_walk(torch.tensor([True]), torch.tensor([sea]), torch.tensor([CAT4_]))[0])
+    assert end2 == sea and draws(s0, int(sim9.rng_state[0])) == 8, "a blocked walk still draws its eight"
+    # a game with `walk` off draws nothing and keeps its centre
+    s0 = int(sim9.rng_state[0])
+    end3 = int(sim9._storm_walk(torch.tensor([False]), torch.tensor([sea]), torch.tensor([CAT4_]))[0])
+    assert end3 == sea and int(sim9.rng_state[0]) == s0
+    print("  9 walk OK — eight draws per walk, the record travels, the ocean and other storms bound it")
     print("BATTERY OK storms")
     return 0
 

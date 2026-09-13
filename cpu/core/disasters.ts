@@ -20,7 +20,7 @@ import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
 import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
-import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, type StormEvent } from '../data/disasters';
+import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { disasterRateMult, severitySplit } from '../data/climate';
 import { defertilize, desertificationLive, fertilityLive } from './climate';
 import { governorTileFlag } from './governors';
@@ -307,16 +307,53 @@ export function disasterPhase(state: GameState): void {
     center.stormTurns = ev.duration;
     log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
   }
-  // CIV6 (`RandomEvents`, Duration 3): a storm PERSISTS, applying its
-  // footprint's effects on the turn it forms and on each turn it lasts. Live
-  // storms walk in ascending centre index; `Movement 8` (the storm's walk
-  // across the map) is DLL logic nobody can read, and a storm stays put.
-  for (const center of map.tiles) {
-    if ((center.stormTurns ?? 0) <= 0) continue;
-    stormTurn(state, center, STORM_EVENTS[center.stormEvent!], strip);
+  // CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
+  // storm lives three turns. ENTRY: the footprint at the strike plot.
+  // MOVEMENT: the centre walks `STORM_MOVEMENT` unit steps, then the
+  // footprint lands where it stopped. DISSIPATION: the centre walks once
+  // more and does no damage. Live storms go in ascending centre index, the
+  // list taken BEFORE any of them moves, so none walks twice in one turn.
+  const live = map.tiles.filter((t) => (t.stormTurns ?? 0) > 0);
+  for (let center of live) {
+    const ev = STORM_EVENTS[center.stormEvent!];
+    const age = ev.duration - (center.stormTurns ?? 0); // 0 entry, 1 movement, 2 dissipation
+    if (age >= 1) center = stormWalk(state, center, ev);
+    if (age <= 1) stormTurn(state, center, ev, strip);
     center.stormTurns = (center.stormTurns ?? 0) - 1;
     if (center.stormTurns <= 0) center.stormEvent = -1;
   }
+}
+
+/**
+ * THE STORM'S WALK — CIV6 (`Movement 8`, measured 2026-09-13 over 31 storms):
+ * eight UNIT STEPS in the one turn, each step's heading drawn from the
+ * `PrevailingWinds` band of the centre's CURRENT latitude, and the step
+ * DROPPED where the storm's own terrain rule fails at the destination (a
+ * hurricane stays on `TERRAIN_OCEAN`), where the map ends, or where another
+ * storm's centre stands — the record has one tile. The resultant lands 4-8
+ * hexes away in open water, 1-5 against an obstacle. ONE draw per step,
+ * taken or dropped, so both engines' streams move alike: `pick` in
+ * [0, sum of the band's weights) names the first heading whose cumulative
+ * weight exceeds it, in the hex order E NE NW W SW SE. Returns the tile the
+ * record ends on.
+ */
+export function stormWalk(state: GameState, center: Tile, ev: StormEvent): Tile {
+  const map = state.map;
+  for (let step = 0; step < STORM_MOVEMENT; step++) {
+    const w = PREVAILING_WINDS[windBand(center.row, map.height)];
+    const total = w.reduce((a, b) => a + b, 0);
+    let pick = Math.floor(nextRandom(state) * total);
+    let d = 0;
+    while (d < 5 && pick >= w[d]) { pick -= w[d]; d++; }
+    const dest = neighborTile(map, center, d);
+    if (!dest || stormFamilyAt(dest) !== ev.family || (dest.stormTurns ?? 0) > 0) continue;
+    dest.stormEvent = center.stormEvent;
+    dest.stormTurns = center.stormTurns;
+    center.stormEvent = -1;
+    center.stormTurns = 0;
+    center = dest;
+  }
+  return center;
 }
 
 /** [8] per-turn chances at this climate phase: `severitySplit` over each

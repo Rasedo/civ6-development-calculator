@@ -108,6 +108,12 @@ export function windBand(row: number, height: number): number {
   return 7;
 }
 
+/** CIV6 (`RandomEvents`, `Movement="8"` on every storm row — MEASURED
+ *  2026-09-13, ask 16): the unit steps a storm's centre walks in its movement
+ *  turn and again as it dissipates, each step's heading drawn from
+ *  `PREVAILING_WINDS` at the centre's current latitude. */
+export const STORM_MOVEMENT = 8;
+
 export interface StormEvent {
   id: string;
   family: StormFamily;
