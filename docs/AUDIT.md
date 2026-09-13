@@ -127,6 +127,12 @@ in the entry).
    PROP/ALL pair suggests gentle = a share, catastrophic+ = all eligible;
    catastrophic painted 5/6 and 2/3, so "all" is not literal either),
    and pillaged-vs-removed. Both need more eruptions than four.
+   BUILD STATE (#257, 2026-09-13): the ring is already the engine's ring on
+   both sides; nothing is painted until the proportion is ruled or measured
+   (a dozen eruptions per severity in lab session 2, #252). Proposal for
+   the ruling: CATASTROPHIC+ paints every eligible ring tile (the XML's
+   ALL), GENTLE a rolled share (its PROP); a painted tile's improvement is
+   pillaged, its resource kept.
    The sourcing that preceded it: which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
 
@@ -831,7 +837,9 @@ the gate reaches is worth more here than one that re-reads the exporter.
     Corps from two adjacent Warriors at 2/2 left the merged unit at 0/2
     moves with formation 1 and the joiner gone — the formation ends the
     unit's turn. One of the five magnitudes shipped stylized on 2026-09-05
-    now has a source.
+    now has a source, and both engines already spend it: `formUp` sets
+    `movesLeft` to 0 on the host and the GPU's join zeroes `unit_mp`
+    (#259, 2026-09-13 — nothing to build).
   - THE SUPPORT STACKING CLASS SHIPPED with #246o. `Units.xml` types nine
     chassis `FormationClass="FORMATION_CLASS_SUPPORT"` — the Battering Ram,
     the Siege Tower, the Military Engineer, the Medic, the Observation
@@ -1209,13 +1217,28 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `GlobalParameters.xml` holds five MINOR knobs and every one is PLACEMENT
     (`START_DISTANCE_*`, `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER`); there is no
     city-state economy parameter of any kind, so what it spends them on is
-    DLL AI with no data behind it — ask 9.
+    DLL AI with no data behind it — ask 9. OBSERVED 2026-09-13 (#259): the
+    real minor banks by default (income minus unit upkeep) and BUYS A
+    DEFENDER when its army is gone (Mexico City, 4 units -> 1, spent ~207 of
+    260 in one turn); faith sat untouched. The rule to build once ruled: a
+    minor with fewer than N military units and a bank over a unit's price
+    buys its best trainable land unit — N and the price threshold are the
+    ask's magnitude.
   - POWER: C-1's minor arm, due when the ladder reaches a load.
   - Foreign Investor and Affluence (B-24r) wait on a minor that improves and
     accumulates.
 - **C-41. VOLCANIC SOIL.** Weight 1.
   - WHERE an eruption lays it — ask 1. The carrier (`addFeature` /
-    `_add_feature`) is in.
+    `_add_feature`) is in. MEASURED 2026-09-13: the affected set is the
+    RADIUS-1 RING, which is exactly the ring both engines already scorch
+    and fertilize (`disasterPhase` over `neighbors(map, volcano)`, the GPU
+    over `neigh[volcano]`) — #257 confirms it, nothing moves. What no
+    engine does yet is PAINT: the soil replaces a standing feature on a
+    PROPORTION of the ring (5/6, 2/3, 1/3 seen; gentle 0/6 and 1/1), an
+    improvement on a painted tile is pillaged or removed, a bonus resource
+    can be destroyed. The proportion per severity is the unsourced
+    magnitude, and the engine rolls no eruption SEVERITY at all — both are
+    the ask; `addFeature`'s bare-land refusal set stays until it is ruled.
 - **C-45. THE QUEUE'S DEPTH.** CLOSED 2026-09-08 (owner ruling).
   - The queue is ONE deep: the "queue" is the current build.
   - The depth was never a mechanic. Only the HEAD accrued — every
