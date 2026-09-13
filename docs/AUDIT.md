@@ -93,7 +93,7 @@ on these lines is a RULING, not research.
 | 12 Free City amenities | empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
 | 13 Free City defence | empty of a defence column, but ONE constraint found: that row carries `IgnoresUnitStrategicResourceRequirements="false"`, where TRIBE and CITY_STATE carry true — so whatever a Free City spawns must respect strategic resources |
 | 15 trade-route district gold | confirmed `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and `_PER_DESTINATION_DISTRICT` 2; the COMPOSITION is what no row states |
-| 16 storm `Movement 8` | NARROWED TO ONE SCALAR — see C-49 |
+| 16 storm `Movement 8` | MEASURED 2026-09-13 in the live game (`tools/civ6lab`) — see C-49 |
 
 Not re-swept, and deliberately: ask 4 (a per-game/per-object modelling
 choice), ask 7 (one forum report against this engine's standing principle),
@@ -206,7 +206,33 @@ in the entry).
     a mature pair of cities pays more than any observed route. Take the two
     rows literally, or keep the flat head?
 
-16. **C-49 — what `Movement 8` counts on a storm.** The HEADING is not DLL
+16. ~~C-49 — what `Movement 8` counts on a storm.~~ **MEASURED 2026-09-13**
+    in the live game over the tuner socket (`tools/civ6lab/lab.py storm`;
+    31 storms in `tools/civ6lab/runs/storm_20260913T*.jsonl`). A storm
+    born on turn S is active on S (Entry, footprint at the strike plot) and
+    S+1 (Movement, centre displaced); on S+2 it is no longer among the
+    active storms though its event record's CurrentLocation moved once
+    more in 4 of 5 (Dissipation), and `TilesDamaged` did not grow on that
+    turn in 4 of 4 land cases; EndTurn = S+3. THE MOVE: in open ocean a
+    CAT-5's centre displaced 4-8 hexes (fifteen strikes at three
+    latitudes: 5 8 4 4 7 / 7 5 4 5 5 / 6 7 6 7 6; three natural CAT-4s 7 7
+    5; tornadoes on land 6 5 6), and 1-5 when struck against the polar ice
+    (4 3 1 1 4 4 3 5 2 4). Every displacement agreed with the
+    `PrevailingWinds` band of the storm's latitude — all five at row 28
+    (lat +46) went EAST, all five at row 10 (lat -41) EAST-SOUTHEAST, all
+    five at the equator WEST — with off-axis wobble (+6,+2; +5,-3) that
+    one heading times eight cannot make. The model that fits all of it:
+    `Movement 8` is EIGHT UNIT STEPS in the movement turn, each step's
+    direction drawn from the band's weights at the storm's CURRENT
+    latitude, the step dropped where the storm's terrain rule fails
+    (hurricanes: `TERRAIN_OCEAN` only), the resultant 4-8. The per-step
+    draw is inferred from the resultants, not watched step by step; the
+    table's `CurrentDirection` is not the resultant's heading (a W read
+    beside a SW move) and should be taken as the last step drawn. So: the
+    pedia's three stages are right AND the wiki's "two more turns" is
+    right — two displacements, damage observed on the first two turns.
+    The sourcing that narrowed the ask to this one scalar:
+    the HEADING is not DLL
     after all: `Expansion2_RandomEvents.xml` publishes `<PrevailingWinds>`,
     22 weighted direction rows banded by latitude, and this map already
     carries the latitude they key on. Every storm row also carries
@@ -806,6 +832,33 @@ the gate reaches is worth more here than one that re-reads the exporter.
     56/35/20/10, and which is the counterspy's catch?
     `SPY_SUCCESS_PER_LEVEL_PCT`, `SPY_CAPTURE_PCT` and `SPY_ESCAPE_ROUTES`'
     base rates are the model values a published composition replaces.
+  - THE MISSION ROLL IS MEASURED (2026-09-13, `tools/civ6lab/spy_probe.lua`
+    over the tuner socket; `UnitManager.GetResultProbability` is the call
+    the UI's percentages come from). Every table it returned is
+    floor(p x 256)/256 of ONE 3d6 ROLL R against a threshold
+    T = BaseProbability - k, in six bands by margin:
+        R >= T+2       SUCCESS_UNDETECTED
+        R in {T, T+1}  SUCCESS_MUST_ESCAPE
+        R = T-1        FAIL_UNDETECTED
+        R in {T-3,T-2} FAIL_MUST_ESCAPE
+        R in {T-5,T-4} CAPTURED
+        R <= T-6       KILLED
+    checked on all four base values at two k's (k=2, base 13:
+    66/61/32/54/29/11 of 256; base 16: 11/29/24/61/61/66). A fresh level-1
+    spy with nothing else reads k = 2 against five cities of three civs
+    (success 49.6 / 37.1 / 25.4 / 15.6 percent for base 13/14/15/16 — this
+    engine's 56/35/20/10 were the wiki's rounding of a different column).
+    Gain Sources active in the target city reads k = 4: the +2 the mission
+    text promises. The target DISTRICT does not enter (Campus and Theater
+    identical), nor pillage, nor a garrison (each toggled and re-read); a
+    promotion enters only for its own operation (`xml_modifiers.py` lists
+    the whole level ledger: promotions +2 per op, Cryptography +1/+2,
+    Police State +2, Local Informants 3, Security Expert 2, the government
+    plaza's spy building +1, Wu Zetian +1). NOT YET MEASURED: the counterspy
+    term (needs an enemy counterspy in the city), the spy-level term past 1
+    (the tuner cannot raise a Spy's XP), and the ESCAPE roll below — no UI
+    call exposes it, so it needs sampled missions (a dozen spies on
+    8-turn missions under Autoplay, outcomes read from the mission log).
   - ONE ROW BREAKS THE PATTERN, and a 2026-09-08 re-read of the table found
     it: FABRICATE_SCANDAL carries `BaseProbability` and `LevelProbChange`
     and NO counterspy columns at all — no `EnemyProbChange`, no
@@ -1013,11 +1066,15 @@ the gate reaches is worth more here than one that re-reads the exporter.
 
     and the map already carries the latitude they key on: `mapgen`'s
     `latOf(row) = (row - half) / half`, a signed degree at `latOf x 90`.
-  - WHAT IS STILL UNSOURCED is the SPEED. Every storm row carries
-    `Movement="8" Duration="3" Spacing="15"` beside its `Hexes` footprint
-    (1, 3, 7, 19 — the centred hex counts), and nothing says what 8 counts.
-    That is ask 16, and it is the whole of what stands between this row and
-    a built walk.
+  - THE SPEED IS MEASURED (2026-09-13, ask 16, `tools/civ6lab`). `Movement
+    8` is eight unit steps in the ONE movement turn, each step drawn from the
+    `PrevailingWinds` band of the storm's current latitude and dropped where
+    the storm's terrain rule fails; the centre lands 4-8 hexes away in open
+    water, 1-5 against the ice. `Duration 3` is Entry, Movement, Dissipation
+    — the third turn displaces the record once more (4 of 5) and adds no
+    observed damage (4 of 4). `Hexes` is the footprint. The walk is now
+    buildable in full; nothing about it is a guess except the per-step draw,
+    which is the only model that produced the observed resultants.
   - A SEQUENCING NOTE, not a reason to defer indefinitely: a weighted
     direction draw per storm per turn is a NEW RNG CONSUMER, which reds
     fixtures across several classes with no engine bug behind it. It belongs

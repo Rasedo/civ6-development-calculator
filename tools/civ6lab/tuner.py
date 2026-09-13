@@ -136,7 +136,11 @@ class Tuner:
                 "(GameCore_Tuner and InGame appear only once a game is loaded)")
         idx = self.states[state]
         self._drain(0.05)
-        self._send(TAG_COMMAND, f'CMD:{idx}:{lua}\nprint("{SENTINEL}")')
+        # the snippet runs as a FUNCTION so a `return` inside it ends the
+        # snippet, not the chunk — a bare chunk-level return skipped the
+        # sentinel and read as a timeout
+        self._send(TAG_COMMAND,
+                   f'CMD:{idx}:(function()\n{lua}\nend)()\nprint("{SENTINEL}")')
         lines: list[str] = []
         deadline = time.monotonic() + timeout
         while True:
@@ -149,7 +153,11 @@ class Tuner:
                 continue
             tag, payload = m
             if payload.startswith("ERR:"):
-                raise TunerError(f"{state}: {payload}")
+                # keep what printed BEFORE the error: it is usually the
+                # evidence, and the error's line number counts from the
+                # `(function()` wrapper, so the snippet's line N is N+1 here
+                got = ("\n  printed before the error:\n    " + "\n    ".join(lines)) if lines else ""
+                raise TunerError(f"{state}: {payload}{got}")
             text = _output_text(payload)
             if text is None:
                 continue

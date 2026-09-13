@@ -72,7 +72,38 @@ LUA_PROBE_IG = ('print("UnitManager=" .. tostring(UnitManager ~= nil))\n'
 # field shows up instead of being missed.
 LUA_STORMS = """
 local n = GameClimate.GetNumActiveStorms()
-print("turn " .. Game.GetCurrentGameTurn() .. " storms " .. n)
+local now = Game.GetCurrentGameTurn()
+print("turn " .. now .. " storms " .. n)
+-- the game's own ledger of an event, keyed by its START turn: StartTurn,
+-- EndTurn, StartLocation, CurrentLocation, TilesDamaged... read for the last
+-- four start turns so a storm's record is seen at every stage of its life
+for st = now - 3, now do
+  local ok, ev = pcall(GameRandomEvents.GetEventsForTurn, st)
+  if ok and type(ev) == "table" and ev.RandomEvent ~= nil then
+    local parts = {}
+    for k, v in pairs(ev) do parts[#parts + 1] = tostring(k) .. "=" .. tostring(v) end
+    table.sort(parts)
+    print("event " .. st .. " " .. table.concat(parts, " "))
+    -- and the ground truth under the record's CURRENT location: pillaged
+    -- plots within 2, so a stage that damages shows up even when
+    -- TilesDamaged stays flat
+    if ev.CurrentLocation ~= nil then
+      local c = Map.GetPlotByIndex(ev.CurrentLocation)
+      if c ~= nil then
+        local pil = {}
+        for i = 0, Map.GetPlotCount() - 1 do
+          local q = Map.GetPlotByIndex(i)
+          if Map.GetPlotDistance(c:GetX(), c:GetY(), q:GetX(), q:GetY()) <= 2 then
+            local oki, ip = pcall(function() return q:IsImprovementPillaged() end)
+            local okd, dp = pcall(function() return q:IsDistrictPillaged() end)
+            if (oki and ip) or (okd and dp) then pil[#pil + 1] = q:GetX() .. ":" .. q:GetY() end
+          end
+        end
+        print("pillaged " .. st .. " at " .. c:GetX() .. ":" .. c:GetY() .. " n=" .. #pil .. " " .. table.concat(pil, ","))
+      end
+    end
+  end
+end
 for i = 0, n - 1 do
   local s = GameClimate.GetActiveStormByIndex(i)
   local parts = {}
@@ -120,8 +151,20 @@ if cap == nil then
     end
   end
 end
-if cap == nil then print("nocapital") return end
-local cx, cy = cap:GetX(), cap:GetY()
+local cx, cy
+if cap ~= nil then
+  cx, cy = cap:GetX(), cap:GetY()
+else
+  -- turn 1: no city yet, so the human's first unit (the Settler) is home
+  for p = 0, 62 do
+    local pl = Players[p]
+    if pl ~= nil and pl:IsAlive() and pl:IsMajor() and pl:IsHuman() then
+      for _, u in pl:GetUnits():Members() do cx, cy = u:GetX(), u:GetY(); break end
+    end
+    if cx ~= nil then break end
+  end
+end
+if cx == nil then print("nocapital") return end
 local ocean = GameInfo.Terrains["TERRAIN_OCEAN"].Index
 local best, bestd, bx, by = -1, 1e9, -1, -1
 for i = 0, Map.GetPlotCount() - 1 do
@@ -133,6 +176,31 @@ for i = 0, Map.GetPlotCount() - 1 do
 end
 print("capital " .. cx .. ":" .. cy)
 print("plot " .. best .. " " .. bx .. ":" .. by .. " dist " .. Map.GetPlotDistance(cx, cy, bx, by))
+"""
+
+LUA_PICK_ROW = """
+local row, reach = %d, %d
+local ocean = GameInfo.Terrains["TERRAIN_OCEAN"].Index
+local w, h = Map.GetGridSize()
+local best, bestopen, bx = -1, -1, -1
+for x = 0, w - 1 do
+  local q = Map.GetPlot(x, row)
+  if q ~= nil and q:GetTerrainType() == ocean then
+    -- openness: the nearest plot that is NOT deep ocean, within `reach`
+    local open = reach + 1
+    for i = 0, Map.GetPlotCount() - 1 do
+      local o = Map.GetPlotByIndex(i)
+      if o:GetTerrainType() ~= ocean or o:GetFeatureType() ~= -1 then
+        local d = Map.GetPlotDistance(x, row, o:GetX(), o:GetY())
+        if d < open then open = d end
+      end
+    end
+    if open > bestopen then best, bestopen, bx = q:GetIndex(), open, x end
+  end
+end
+if best < 0 then print("noocean") return end
+print("row " .. row .. " open-water radius " .. bestopen)
+print("plot " .. best .. " " .. bx .. ":" .. row .. " dist " .. bestopen)
 """
 
 LUA_APPLY = """
@@ -217,6 +285,17 @@ def parse_storms(lines: list[str]) -> list[dict]:
         elif w[0] == "loc":
             x, y = w[2].split(":")
             out.setdefault(int(w[1]), {"i": int(w[1])})["xy"] = [int(x), int(y)]
+        elif w[0] == "event":
+            ev = {"startTurn": int(w[1])}
+            for kv in w[2:]:
+                if "=" in kv:
+                    k, v = kv.split("=", 1)
+                    ev[k] = _num(v)
+            out.setdefault(-1 - int(w[1]), {"i": -1, "event": ev})
+            print(f"     event started t{w[1]}: " + " ".join(
+                kv for kv in w[2:] if kv.split("=")[0] in ("EndTurn", "TilesDamaged", "UnitsLost", "PopLost", "FertilityAdded", "CurrentLocation")))
+        elif w[0] == "pillaged":
+            print(f"     pillaged within 2 of the t{w[1]} record's location {w[3]}: {w[4]} {w[5] if len(w) > 5 else ''}")
         elif w[0] == "plots":
             row = out.setdefault(int(w[1]), {"i": int(w[1])})
             row["stormId"] = int(w[2].split("=")[1])
@@ -251,8 +330,15 @@ def cmd_probe(a) -> int:
 
 
 def cmd_lua(a) -> int:
+    code = pathlib.Path(a.file).read_text(encoding="utf-8") if a.file else a.code
+    if not code:
+        print("give Lua inline or with --file")
+        return 2
+    for kv in a.set or []:
+        k, v = kv.split("=", 1)
+        code = code.replace(k, v)
     t = Tuner(a.host, a.port).connect()
-    for ln in t.run(a.state, a.code, timeout=a.timeout):
+    for ln in t.run(a.state, code, timeout=a.timeout):
         print(ln)
     t.close()
     return 0
@@ -267,8 +353,13 @@ def cmd_storm(a) -> int:
     print(f"local player {lp}; record -> {jl}")
 
     # the scene: which plot to strike
-    if a.plot == "auto":
-        got = t.run(GC, LUA_PICK_PLOT % a.dist)
+    if a.plot == "auto" or a.plot.startswith("row:"):
+        if a.plot == "auto":
+            got = t.run(GC, LUA_PICK_PLOT % a.dist)
+        else:
+            # the most open deep-ocean plot on one ROW: a walk that cannot
+            # touch land or ice for `--dist` hexes, at a chosen latitude
+            got = t.run(GC, LUA_PICK_ROW % (int(a.plot[4:]), a.dist), timeout=120)
         print("   ", " | ".join(got))
         plot_line = [g for g in got if g.startswith("plot ")]
         if not plot_line:
@@ -341,13 +432,17 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("probe", help="handshake, list states, sanity-read the game").set_defaults(fn=cmd_probe)
     q = sub.add_parser("lua", help="run a Lua snippet and print its output")
-    q.add_argument("code")
+    q.add_argument("code", nargs="?", default="")
+    q.add_argument("--file", help="read the Lua from a file instead")
+    q.add_argument("--set", action="append", metavar="TOKEN=VALUE",
+                   help="textual substitution applied to the Lua before it runs (repeatable)")
     q.add_argument("--state", default=GC)
     q.add_argument("--timeout", type=float, default=15.0)
     q.set_defaults(fn=cmd_lua)
     s = sub.add_parser("storm", help="ASK 16: trigger a storm and record its walk")
     s.add_argument("--type", default="HURRICANE_CAT_5", help="RandomEvents row (Hexes 19, Movement 8, Duration 3)")
-    s.add_argument("--plot", default="auto", help="X,Y to strike, or auto = ocean ~--dist from the capital")
+    s.add_argument("--plot", default="auto",
+                   help="X,Y to strike; auto = ocean ~--dist from the capital; row:Y = the most open deep-ocean plot on row Y")
     s.add_argument("--dist", type=int, default=8)
     s.add_argument("--turns", type=int, default=5, help="turns to follow after the strike")
     s.add_argument("--repeat", type=int, default=1)

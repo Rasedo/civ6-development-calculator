@@ -54,6 +54,43 @@ UI's End Turn instead and names the blocker if one stops it.
 What settles the ask: distance per movement turn, how many turns it moves,
 and whether it moves once (the pedia's three stages) or twice (the wiki).
 
+RESULT (2026-09-13, 31 storms): one movement turn displaces the centre 4-8
+hexes in open water (1-5 against the ice), always along the storm's
+`PrevailingWinds` band, with off-axis wobble — eight unit steps, each drawn
+from the band; the dissipation turn displaces the record once more and adds
+no observed damage. Written up in `docs/AUDIT.md` under ask 16 / C-49.
+
+### `spy_probe.lua` — the mission roll (InGame)
+
+    python tools/civ6lab/lab.py lua --state InGame --file tools/civ6lab/spy_probe.lua \
+        --set SPYID=<unit id> --set TX=<x> --set TY=<y>
+
+Reads `UnitManager.GetResultProbability` for every offensive mission of one
+Spy against one district plot — the UI's own source. Spawn the spy first
+from `GameCore_Tuner`: `Players[0]:GetUnits():Create(GameInfo.Units["UNIT_SPY"].Index, x, y)`
+(the civic `CIVIC_DIPLOMATIC_SERVICE` via `GetCulture():SetCivic(idx, true)`).
+`spy_promote.lua` grants a promotion (`SetPromotion`); a Spy's XP cannot be
+raised from the tuner.
+
+RESULT: one 3d6 roll against `BaseProbability - k`, six outcome bands by
+margin, k = 2 for a fresh spy, +2 under Gain Sources; district, pillage and
+garrison do not enter. Full table in `docs/AUDIT.md` under C-16.
+
+BEWARE AUTOPLAY: it plays YOUR units too. The first spy left in a city came
+back nine turns later with a Gain Sources boost on that city and a mission
+running, and the boost read as a mystery +2 until the city's
+`GetSourceTurnsRemaining` was checked. Spawn fresh actors for each reading,
+or read before advancing turns.
+
+### `xml_modifiers.py` — the install's modifier ledger, both XML styles
+
+    python tools/civ6lab/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...
+
+Policies.xml and friends write modifier rows as child ELEMENTS, not
+attributes; a line grep for `ModifierType="..."` returns nothing there and
+reads as "no such modifier exists". This parses the XML and prints each
+modifier's arguments and what attaches it.
+
 ### `lua` — anything else
 
     python tools/civ6lab/lab.py lua "print(GameClimate.GetNumActiveStorms())"
