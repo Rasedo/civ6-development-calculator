@@ -727,7 +727,7 @@ class SimOrders:
                     # this seat? `unitsHostile` answers for every pair, so no
                     # seat needs a clause of its own.
                     _ms = self._visible_military_at(row).gather(1, tc.unsqueeze(1)).squeeze(1)
-                    _cs = self.civilian_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _cs = self._civclass_at(tc)  # civilian OR support: both are targets
                     _es = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                     neg = torch.full_like(_ms, -1)
                     m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0).unsqueeze(1)).squeeze(1), neg)

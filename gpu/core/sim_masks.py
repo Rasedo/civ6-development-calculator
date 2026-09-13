@@ -201,7 +201,8 @@ class SimMasks:
         self.rng_state.copy_(torch.where(mask, a, self.rng_state))
         return out
 
-    def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None) -> torch.Tensor:
+    def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None,
+                     parts: tuple[torch.Tensor, ...] | None = None) -> torch.Tensor:
         if k in WW_BATTLE_KEYS:
             self._ww_opened += mask.long()
         # Combat log: every roll of the logged game becomes a keyed CB<seq>
@@ -222,8 +223,14 @@ class SimMasks:
         dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
+            # `parts` splits the diff into the two strengths (TS damageRoll's
+            # `parts` twin), so a disagreement names its SIDE before its term
+            ad = (f" a{int(js_round(parts[0][b].to(torch.float64) * 10))}"
+                  f" d{int(js_round(parts[1][b].to(torch.float64) * 10))}") if parts is not None else ""
+            if parts is not None and len(parts) > 2:
+                ad += f" at{int(parts[2][b])} as{int(parts[3][b])} dt{int(parts[4][b])} ds{int(parts[5][b])}"
             self._combat_events.append(
-                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
+                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}{ad}"
             )
         return dmg
 
@@ -1355,6 +1362,29 @@ class SimMasks:
             era = torch.where(seat == 100 + s,
                               self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]), era)
         return self._embarked_def_by_era[era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1)]
+
+    def _civclass_at(self, tiles: torch.Tensor) -> torch.Tensor:
+        """The CAPTURABLE-class occupant of each tile — the civilian or the
+        support unit standing there, -1 for neither. `unitsAt` on TS returns
+        every unit of the hex and `stackDefender` hands back `enemies[0]`
+        when its `unitDomain === 'military'` filter comes up empty, so a lone
+        Military Engineer is shot or captured exactly like a lone Builder;
+        when a civilian AND a support unit share the hex the LOWER slot
+        answers, which is TS's array order under the append rule. Every
+        target scan reads this, never `civilian_at` alone (seed 9027 t215:
+        the walls' strike missed a lone engineer). `tiles` is [B] or [B, K],
+        already clamped."""
+        flat = tiles.dim() == 1
+        t = tiles.unsqueeze(1) if flat else tiles
+        c = self.civilian_at.gather(1, t)
+        s = self.support_at.gather(1, t)
+        out = torch.where((c >= 0) & (s >= 0), torch.minimum(c, s), torch.where(c >= 0, c, s))
+        return out.squeeze(1) if flat else out
+
+    def _civclass_plane(self) -> torch.Tensor:
+        """[B, T] — `_civclass_at` over the whole map."""
+        c, s = self.civilian_at, self.support_at
+        return torch.where((c >= 0) & (s >= 0), torch.minimum(c, s), torch.where(c >= 0, c, s))
 
     def _stack_fold(self, tc: torch.Tensor, seat, mslot: torch.Tensor,
                     m_seat: torch.Tensor, ok_m: torch.Tensor, cslot: torch.Tensor,
@@ -2915,7 +2945,7 @@ class SimMasks:
         on_map = nb >= 0
 
         _ms = self._visible_military_at(row).gather(1, nbc)
-        _cs = self.civilian_at.gather(1, nbc)
+        _cs = self._civclass_at(nbc)  # civilian OR support: both are targets
         _es = self.embarked_at.gather(1, nbc)
         neg = torch.full_like(_ms, -1)
         m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0)), neg)
@@ -3252,7 +3282,7 @@ class SimMasks:
             ring = self.ring2[tc]
             ringc = ring.clamp(min=0).reshape(B, -1)
             _rm = self.military_at.gather(1, ringc)
-            _rc = self.civilian_at.gather(1, ringc)
+            _rc = self._civclass_at(ringc)
             _rneg = torch.full_like(_rm, -1)
             _rms = torch.where(_rm >= 0, self.unit_seat.gather(1, _rm.clamp(min=0)), _rneg)
             _rcs = torch.where(_rc >= 0, self.unit_seat.gather(1, _rc.clamp(min=0)), _rneg)
@@ -3543,7 +3573,7 @@ class SimMasks:
             ring3 = self.ring3[tc]
             ring3c = ring3.clamp(min=0).reshape(B, -1)
             _rm3 = self.military_at.gather(1, ring3c)
-            _rc3 = self.civilian_at.gather(1, ring3c)
+            _rc3 = self._civclass_at(ring3c)
             _rneg3 = torch.full_like(_rm3, -1)
             _rms3 = torch.where(_rm3 >= 0, self.unit_seat.gather(1, _rm3.clamp(min=0)), _rneg3)
             _rcs3 = torch.where(_rc3 >= 0, self.unit_seat.gather(1, _rc3.clamp(min=0)), _rneg3)
@@ -3601,7 +3631,7 @@ class SimMasks:
         neg = torch.full((B, T), -1, dtype=torch.long, device=dev)
         land = torch.zeros(B, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for plane in (self._visible_military_at(row), self.civilian_at, self.embarked_at):
+        for plane in (self._visible_military_at(row), self.civilian_at, self.support_at, self.embarked_at):
             pc = plane.clamp(min=0)
             here = plane >= 0
             s = torch.where(here, self.unit_seat.gather(1, pc), neg)

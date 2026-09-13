@@ -71,7 +71,7 @@ class SimPhase:
         # measures from the district's tile, the centre's otherwise.
         org = ctr if origin is None else origin.clamp(min=0)
         dist = self.pair_dist[org].to(torch.long)  # [B, T]
-        _mil, _civ = self._visible_military_at(row), self.civilian_at
+        _mil, _civ = self._visible_military_at(row), self._civclass_plane()
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
         _emb = self.embarked_at
@@ -2260,7 +2260,7 @@ class SimPhase:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
         lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
-        for m in ("military_at", "civilian_at", "embarked_at"):
+        for m in ("military_at", "civilian_at", "support_at", "embarked_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)
             # gather evaluates EVERY lane, including the ones torch.where

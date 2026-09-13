@@ -16,6 +16,7 @@ import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
+import { UNIT_TYPE_IDX } from '../data/units';
 import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
@@ -833,7 +834,8 @@ export function gdrNavalCS(attacker: Unit, foeType: string): number {
   return UNITS[attacker.type]?.gdr && UNITS[foeType]?.naval ? -GDR_NAVAL_PENALTY : 0;
 }
 
-export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
+export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
+                           parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
   // CIV6: `Damage (HP) = 30 * e^(0.04 * StrengthDifference) *
   // randomBetween(80%, 120%)`, where "randomBetween is a random multiplier
   // between given arguments, including both ends". `30 * exp(0.04 * q / 10)`
@@ -853,7 +855,11 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   const r = nextRandom(state);
   const dmg = Math.max(1, Math.round(base * (0.8 + 0.4 * r)));
   const cb = (globalThis as any).__cbLog;
-  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} dmg${dmg}`);
+  // `parts` (where a call site passes them) splits the diff into the two
+  // strengths, so a disagreement names its SIDE before its term.
+  const ad = parts ? ` a${Math.round(parts.a * 10)} d${Math.round(parts.d * 10)}`
+    + (parts.at !== undefined ? ` at${parts.at} as${parts.as} dt${parts.dt} ds${parts.ds}` : '') : '';
+  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} dmg${dmg}${ad}`);
   return dmg;
 }
 
@@ -1937,7 +1943,10 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'rng', targetIndex);
+  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
+  defender.hp -= damageRoll(state, atkCS - defCS, 'rng', targetIndex, {
+    a: atkCS, d: defCS, at: UNIT_TYPE_IDX.indexOf(attacker.type), as: attacker.seat, dt: UNIT_TYPE_IDX.indexOf(defender.type), ds: defender.seat,
+  });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {

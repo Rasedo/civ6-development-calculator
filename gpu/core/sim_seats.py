@@ -3365,7 +3365,7 @@ class SimSeats:
             _mp0 = getattr(self, f"{atk_kind}_unit_mp")
             _mp0[:, u] = torch.where(fired, torch.zeros_like(_mp0[:, u]), _mp0[:, u])
         mslot = self._visible_military_at(row).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
         neg = torch.full_like(mslot, -1)
         m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -9726,7 +9726,7 @@ class SimSeats:
         # every non-barbarian and to no barbarian, and every other pair is the
         # symmetric war matrix — so no seat needs a clause of its own.
         mslot_raw = self._visible_military_at(a_seat[:, u]).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot_raw = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot_raw = self._civclass_at(ttc)  # civilian OR support: both are targets
         neg = torch.full_like(mslot_raw, -1)
         m_seat = torch.where(mslot_raw >= 0, self.unit_seat.gather(1, mslot_raw.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         c_seat = torch.where(cslot_raw >= 0, self.unit_seat.gather(1, cslot_raw.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -11943,7 +11943,7 @@ class SimSeats:
                                             torch.full_like(_cshp, XP_CITY_FELLED),
                                             torch.full_like(_cshp, XP_CITY_ATTACK)))
         mslot = self._visible_military_at(a_seat).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
         neg = torch.full_like(mslot, -1)
         m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -12008,6 +12008,9 @@ class SimSeats:
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
+            # the attacker's own position clauses — a Varu or Toa beside the
+            # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, foe_type=d_type).to(atk_e.dtype)
             if not barb:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
@@ -12102,7 +12105,7 @@ class SimSeats:
         # who holds the tile, and is any of them hostile? `unitsHostile`
         # answers for every pair, so no seat needs a clause of its own.
         mslot = self._visible_military_at(aseat).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
         neg = torch.full_like(mslot, -1)
         m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -12238,6 +12241,9 @@ class SimSeats:
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at0).to(def_e.dtype))
+            # the attacker's own position clauses — a Varu or Toa beside the
+            # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
+            atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type).to(atk_e.dtype)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
@@ -12258,7 +12264,8 @@ class SimSeats:
                              + self._gdr_armor_cs(d_type, _ucs_seat, at0)
                              + self._governor_territory_cs(_ucs_seat, tgt)).to(def_e.dtype)
             def_hp0 = self.unit_hp[bidx, ds0]
-            d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt)
+            d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt,
+                                      parts=(atk_e, def_e, at0, aseat, d_type, d_seat))
             g = unit_att.nonzero(as_tuple=True)[0]
             ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
             self.unit_hp[g, ds] -= d_def[g]

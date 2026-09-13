@@ -395,6 +395,42 @@ in the entry).
 The digest is the only instrument for this class; a round that widens what
 the gate reaches is worth more here than one that re-reads the exporter.
 
+- **A-5. THE THIRD LADDER — ONE UNIT CLASS THE TARGET SCANS NEVER SAW.**
+  Opened 2026-09-13 by #258 (purchase placement), which is NOT a defect:
+  it moved WHERE a bought unit stands, and seed 9027 walked into two
+  latents the gate had never reached, plus a third an audit found beside
+  them. All three on the GPU, TS the spec throughout:
+  1. t182 — a Slinger shooting from beside a freshly bought Varu read 10
+     on the GPU and 5 on TS: the two RANGED unit-target paths added
+     `_chassis_ability_cs` for the DEFENDER only, where `rangedAttack` and
+     `hostileRangedStrikeInner` read `chassisAbilityCS(attacker)` as the
+     melee path does. Found by splitting the combat log's diff into the
+     two strengths (`a<tenths> d<tenths>`, now permanent on the ranged
+     key). Poke: `tests/gpu/varu_ranged_test.py`.
+  2. t215 — seat 0's walls shot a lone Military Engineer on TS and not on
+     the GPU: the GPU files support chassis on `support_at`, and every
+     TARGET scan (`_seat_city_strike`, `_hostile_vs_unit`,
+     `_hostile_ranged_strike`, `_ranged_attack`, `_air_strike`, the
+     `_seat_unit_mask` neighbour/ring scans, the air-strike offers, the
+     order applier) read `civilian_at` alone. TS's `unitsAt` returns
+     every unit and `stackDefender` hands back `enemies[0]` when no
+     fighter stands there. `_civclass_at` / `_civclass_plane` are the one
+     answer now — the civilian OR the support unit, the LOWER slot when
+     both stand (TS array order under the append rule).
+  3. `_reclaim_pool` remapped three planes after a compaction and not
+     `support_at` — a live corruption every support unit on the map paid
+     the moment its pool compacted (poke `tests/gpu/reclaim_support_test.py`
+     failed before the fix: the plane still named slot 7 after the unit
+     moved to 3). No gate reached it because compaction needs a pool near
+     its cap.
+  THE PATTERN is [[new-class invariant sweep]]: the SUPPORT stacking class
+  was added with its own plane, and every reader that enumerated "the
+  planes" by hand stayed three wide. What still reads `civilian_at` alone
+  is enumerated in task #260 (storm/flood/nuke/ww occupancy, the
+  Encampment-silent check, the buy ledger's landing read, hold-the-line,
+  the trade walk's blocker, and more) — each to be classified against its
+  TS twin, not folded blind.
+
 - **A-1. BUENOS AIRES COUNTED DEAD BONUS RESOURCES.** CLOSED 2026-09-08 with
   #246l. The gate now runs past seed 9027 entirely.
   - TS counts a bonus resource by reading `t.resource`, and NULLS that field

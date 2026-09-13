@@ -555,6 +555,8 @@ def main() -> int:
                 ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
                 ("domination", [py, "tests/gpu/domination_test.py"], 4),
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
+                ("varu_ranged", [py, "tests/gpu/varu_ranged_test.py"], 2),  # a carrier beside the SHOOTER weakens the shot
+                ("reclaim_support", [py, "tests/gpu/reclaim_support_test.py"], 2),  # a compaction remaps the SUPPORT plane too
                 ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),
