@@ -191,7 +191,8 @@ class SimEconomy:
         t = tile.clamp(min=0).unsqueeze(1)
         return ((self.military_at.gather(1, t).squeeze(1) >= 0).long()
                 | ((self.civilian_at.gather(1, t).squeeze(1) >= 0).long() << 1)
-                | ((self.embarked_at.gather(1, t).squeeze(1) >= 0).long() << 2))
+                | ((self.embarked_at.gather(1, t).squeeze(1) >= 0).long() << 2)
+                | ((self.support_at.gather(1, t).squeeze(1) >= 0).long() << 3))
 
     def _ww_holds(self, row: int) -> bool:
         """Only MAJOR civs keep an accumulator: rows 0..n_majors-1. A city-state is a
@@ -1303,7 +1304,7 @@ class SimEconomy:
             u_type = getattr(self, f"{pool}_unit_type")
             u_seat = getattr(self, f"{pool}_unit_seat")
             lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
-            for plane in (self.military_at, self.civilian_at, self.embarked_at):
+            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
                 slot = plane.gather(1, tcu).squeeze(1)
                 on = hit & (slot >= lo_p) & (slot < hi_p)
                 if not bool(on.any()):
@@ -1312,9 +1313,11 @@ class SimEconomy:
                 utype = u_type[bidx, us].clamp(min=0, max=self.NU - 1)
                 useat = torch.where(on, u_seat[bidx, us], torch.full_like(slot, -1))
                 spared = self._storm_spares(useat, ev)
-                # `unitIsNoncombat`, the gate `stormTile` takes: a support
-                # chassis is killed outright like a civilian, not damaged.
-                civilian = self._type_noncombat[utype]
+                # `stormTile` gates the kill on `unitDomain === 'civilian'`: a
+                # SUPPORT chassis is not that domain, so it takes the damage
+                # branch with the fighters (the flood's `unitIsNoncombat` gate
+                # differs — see `_flood_tile`)
+                civilian = self._type_noncombat[utype] & ~self._type_support[utype]
                 naval = self.unit_naval[utype]
                 kill = on & civilian & civ_hit & ~spared
                 base = torch.where(naval, naval_dmg, land_dmg)
@@ -1469,8 +1472,10 @@ class SimEconomy:
             for pool in ("major", "barb"):
                 mil = getattr(self, f"{pool}_unit_alive")
                 lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
+                # `floodTile` gates on `unitIsNoncombat`: a SUPPORT chassis is
+                # noncombat, so it takes the civilian-kill roll
                 for plane, civilian in ((self.military_at, False), (self.civilian_at, True),
-                                        (self.embarked_at, False)):
+                                        (self.support_at, True), (self.embarked_at, False)):
                     slot = plane.gather(1, tc.unsqueeze(1)).squeeze(1)
                     on = hurt & (slot >= lo_p) & (slot < hi_p)
                     if not bool(on.any()):
@@ -4101,6 +4106,7 @@ class SimEconomy:
         nbc = nb.clamp(min=0).reshape(t.shape[0], -1)
         seat = getattr(self, f"{pre}_unit_seat").unsqueeze(2)
         near = torch.zeros(nb.shape, dtype=torch.long, device=self.device)
+        # (a support chassis carries no CHAPLAIN, so its plane adds nothing)
         for occ in (self.civilian_at, self.embarked_at):
             oc = occ.clamp(min=0)
             val = torch.where(

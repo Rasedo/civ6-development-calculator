@@ -559,6 +559,7 @@ def main() -> int:
                 ("reclaim_support", [py, "tests/gpu/reclaim_support_test.py"], 2),  # a compaction remaps the SUPPORT plane too
                 ("spy_roll", [py, "tests/gpu/spy_roll_test.py"], 2),  # the mission roll: 3d6 vs base - (2 + level)
                 ("sight", [py, "tests/gpu/sight_test.py"], 2),  # sight is occlusion by elevation
+                ("support_plane", [py, "tests/gpu/support_plane_test.py"], 2),  # every all-units reader sees the support plane
                 ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),

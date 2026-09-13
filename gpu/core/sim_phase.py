@@ -1462,8 +1462,9 @@ class SimPhase:
             _fo = self._fallout()
             # "This is an automatic action, which happens if its tile is not
             # occupied" — an enemy standing on the district holds it silent.
+            # `unitsAt(...).some(hostile)` on TS: every plane, the support one too
             _em = self.military_at.gather(1, e0.unsqueeze(1)).squeeze(1)
-            _ec = self.civilian_at.gather(1, e0.unsqueeze(1)).squeeze(1)
+            _ec = self._civclass_at(e0)
             _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
             _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
             occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)

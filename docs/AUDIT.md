@@ -438,11 +438,19 @@ the gate reaches is worth more here than one that re-reads the exporter.
      its cap.
   THE PATTERN is [[new-class invariant sweep]]: the SUPPORT stacking class
   was added with its own plane, and every reader that enumerated "the
-  planes" by hand stayed three wide. What still reads `civilian_at` alone
-  is enumerated in task #260 (storm/flood/nuke/ww occupancy, the
-  Encampment-silent check, the buy ledger's landing read, hold-the-line,
-  the trade walk's blocker, and more) — each to be classified against its
-  TS twin, not folded blind.
+  planes" by hand stayed three wide. SWEPT 2026-09-13 (#260), every
+  remaining reader against its TS twin: FOLDED where the twin walks every
+  unit — `_siege_assist` (a Ram or Tower IS a support chassis, so the GPU
+  had granted no assist since the class split), `_storm_tile` (the damage
+  branch, as `unitDomain === 'civilian'` gates the kill), `_flood_tile`
+  (the kill branch, as `unitIsNoncombat` gates it), `_nuke_hostile`, the
+  Encampment's silence, the barbarian spawn's empty tile and raid target,
+  `_nonbarb_unit_plane`, `_trade_walk_tick`'s plunderer, `_ww_occ`; LEFT
+  with a line where the twin cannot see one — the chaplain (no support
+  chassis carries it), hold-the-line (adds 0), the barbarian planes and
+  heathen conversion (the barbarians field none), the religious and
+  zone-of-control reads, the Rock Band's landing read. Poke:
+  `tests/gpu/support_plane_test.py`.
 
 - **A-1. BUENOS AIRES COUNTED DEAD BONUS RESOURCES.** CLOSED 2026-09-08 with
   #246l. The gate now runs past seed 9027 entirely.

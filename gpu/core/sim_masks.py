@@ -570,8 +570,9 @@ class SimMasks:
         negate the effects of support units" — the ram stops working above
         Ancient Walls, the tower above Medieval.
 
-        The chassis rides the CIVILIAN plane, which is where this model already
-        puts real Civ 6's other support unit, so `civilian_at` is the scan."""
+        Both chassis are SUPPORT units and stand on `support_at` since the
+        stacking class split (#246o) — that plane is the scan; `siegeAssist`
+        walks `unitsAt`, which sees them wherever they stack."""
         out = torch.zeros_like(tile)
         t = type_idx.clamp(min=0, max=self.NU - 1)
         helped = self._type_melee[t] | self._type_anticav[t]
@@ -586,7 +587,7 @@ class SimMasks:
         if not self._siege_support_any:
             return torch.where(helped, out, torch.zeros_like(out))
         nb = self.neigh[tile.clamp(min=0)]  # [B, 6]
-        occ = self.civilian_at.gather(1, nb.clamp(min=0))  # [B, 6]
+        occ = self.support_at.gather(1, nb.clamp(min=0))  # [B, 6]
         live = (nb >= 0) & (occ >= 0)
         o0 = occ.clamp(min=0)
         s = self.unit_seat.gather(1, o0)
@@ -777,7 +778,8 @@ class SimMasks:
 
     def _barb_unit_plane(self) -> torch.Tensor:
         """[B, T] — does a BARBARIAN unit stand on this tile? Both occupancy
-        slots answer, so a raider is found whichever plane holds it."""
+        slots answer, so a raider is found whichever plane holds it (the
+        barbarians field no support chassis, so that plane never holds one)."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for occ in (self.military_at, self.civilian_at):
             here = occ >= 0
@@ -3759,7 +3761,7 @@ class SimMasks:
         so a target is only offered where the blast reaches somebody else."""
         out = ((self.tile_seat >= 0) & (self.tile_seat != row)
                & ~self._allied_with(row, self.tile_seat))
-        for plane in ("military_at", "civilian_at", "embarked_at"):
+        for plane in ("military_at", "civilian_at", "support_at", "embarked_at"):
             sl = getattr(self, plane)
             s = torch.where(sl >= 0, self.unit_seat.gather(1, sl.clamp(min=0)),
                             torch.full_like(sl, -1))

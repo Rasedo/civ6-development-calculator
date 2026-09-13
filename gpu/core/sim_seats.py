@@ -9943,6 +9943,7 @@ class SimSeats:
         seat_col = torch.full((rows.numel(),), row, dtype=torch.long, device=self.device)
         for d in range(6):
             tgt = nb6[:, d]
+            # (the barbarians field no support chassis, so that plane holds none)
             for occ in (self.military_at, self.civilian_at):
                 src = torch.where(tgt >= 0, occ[rows, tgt.clamp(min=0)], torch.full_like(tgt, -1))
                 hit = (src >= 0) & (self.unit_seat[rows, src.clamp(min=0)] >= BARB_SEAT)
@@ -10091,9 +10092,10 @@ class SimSeats:
         stealth hull is not one (`_visible_military_at`)."""
         mil = self._visible_military_at(BARB_SEAT)
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
-        # a passenger is a unit on the tile too, and barbarians never embark
+        # a passenger is a unit on the tile too, and barbarians never embark;
+        # a support chassis is a unit on the tile too (TS walks state.units)
         return (((mil >= 0) & (mseat != BARB_SEAT))
-                | (self.civilian_at >= 0) | (self.embarked_at >= 0))
+                | (self.civilian_at >= 0) | (self.support_at >= 0) | (self.embarked_at >= 0))
 
     def _nonbarb_unit_at(self, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — `_nonbarb_unit_plane` evaluated AT `tiles`. A prober asking
@@ -11377,6 +11379,8 @@ class SimSeats:
         nb = self.neigh[tile.clamp(min=0)]  # [B, 6]
         B = tile.shape[0]
         out = torch.zeros(B, dtype=torch.long, device=self.device)
+        # (`holdTheLineCS` walks every unit, but a support chassis carries no
+        # HOLD_THE_LINE, so its plane would add nothing)
         for src in ("military_at", "civilian_at", "embarked_at"):
             occ = getattr(self, src).gather(1, nb.clamp(min=0))
             live = (nb >= 0) & (occ >= 0)
@@ -12880,11 +12884,14 @@ class SimSeats:
             return
         bb, kk = chk.nonzero(as_tuple=True)
         tiles = wt[bb, kk]
+        # `routePlunderer` walks EVERY unit on the tile — the support plane too
         ms = self.military_at[bb, tiles]
         cv = self.civilian_at[bb, tiles]
+        su = self.support_at[bb, tiles]
         eb = self.embarked_at[bb, tiles]
         s_m = torch.where(ms >= 0, self.unit_seat[bb, ms.clamp(min=0)], torch.full_like(ms, -1))
         s_c = torch.where(cv >= 0, self.unit_seat[bb, cv.clamp(min=0)], torch.full_like(cv, -1))
+        s_s = torch.where(su >= 0, self.unit_seat[bb, su.clamp(min=0)], torch.full_like(su, -1))
         s_e = torch.where(eb >= 0, self.unit_seat[bb, eb.clamp(min=0)], torch.full_like(eb, -1))
 
         def hostile(sp: torch.Tensor) -> torch.Tensor:
@@ -12894,9 +12901,10 @@ class SimSeats:
             at_war = self.war[bb, row, rb]
             return valid & (sp != row) & (barb | at_war)
 
-        h_m, h_c, h_e = hostile(s_m), hostile(s_c), hostile(s_e)
+        h_m, h_c, h_s, h_e = hostile(s_m), hostile(s_c), hostile(s_s), hostile(s_e)
         big = torch.full_like(s_m, 1 << 30)
         raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
+        raider = torch.minimum(raider, torch.where(h_s, s_s, big))
         raider = torch.minimum(raider, torch.where(h_e, s_e, big))
         # CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from
         # Plunder" — a guard of this seat's own on the Trader's tile or beside

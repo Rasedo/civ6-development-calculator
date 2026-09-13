@@ -1786,8 +1786,9 @@ class SimOrders:
                         & ((self.wpass.gather(1, _nbc)
                             & ~self.ocean_tile.gather(1, _nbc))  # barbarians have no CARTOGRAPHY
                            | self._canal_pass().gather(1, _nbc))
-                        & (self.military_at.gather(1, _nbc) < 0)  # no unit at all
+                        & (self.military_at.gather(1, _nbc) < 0)  # no unit at all (`unitsAt(...).length === 0`)
                         & (self.civilian_at.gather(1, _nbc) < 0)
+                        & (self.support_at.gather(1, _nbc) < 0)
                         & (self.embarked_at.gather(1, _nbc) < 0)
                     )
                     _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
@@ -1854,6 +1855,7 @@ class SimOrders:
             _mn_seat = torch.where(_mn >= 0, self.unit_seat.gather(1, _mn.clamp(min=0)), torch.full_like(_mn, -1))
             has_unit = (((_mn >= 0) & (_mn_seat != BARB_SEAT))
                         | (self.civilian_at.gather(1, nbc) >= 0)
+                        | (self.support_at.gather(1, nbc) >= 0)
                         | (self.embarked_at.gather(1, nbc) >= 0))
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
             valid = (nb >= 0) & (ctr | cs_nb | has_unit | (enc_nb if enc_nb is not None else False))
