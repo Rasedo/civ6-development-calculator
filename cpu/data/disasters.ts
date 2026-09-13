@@ -63,6 +63,51 @@ export type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
 /** the wire's family code: `sf` on the tile planes, `family` on each row */
 export const STORM_FAMILIES: readonly StormFamily[] = ['BLIZZARD', 'DUST_STORM', 'TORNADO', 'HURRICANE'];
 
+/**
+ * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
+ * WEIGHTED heading per latitude band, the heading a storm's walk draws each
+ * step from (C-49; the walk is measured, ask 16). Eight bands, lower bound
+ * inclusive, by signed degree (north positive, `windBand`); each row's six
+ * weights are in the hex direction order E, NE, NW, W, SW, SE (`AXIAL_DIRS`).
+ *   60..90    NW 1  W 2  SW 2        -5..0     W 1   SW 1
+ *   30..60    NE 2  E 2  SE 1        -30..-5   NW 1  W 2   SW 2
+ *   5..30     NW 2  W 2  SW 1        -60..-30  NE 1  E 2   SE 2
+ *   0..5      NW 1  W 1              -90..-60  NW 2  W 2   SW 1
+ */
+export const WIND_BAND_LO: readonly number[] = [60, 30, 5, 0, -5, -30, -60, -90];
+export const PREVAILING_WINDS: readonly (readonly number[])[] = [
+  [0, 0, 1, 2, 2, 0], //  60..90
+  [2, 2, 0, 0, 0, 1], //  30..60
+  [0, 0, 2, 2, 1, 0], //   5..30
+  [0, 0, 1, 1, 0, 0], //   0..5
+  [0, 0, 0, 1, 1, 0], //  -5..0
+  [0, 0, 1, 2, 2, 0], // -30..-5
+  [2, 1, 0, 0, 0, 2], // -60..-30
+  [0, 0, 2, 2, 1, 0], // -90..-60
+];
+
+/**
+ * The `PREVAILING_WINDS` band of a map row. `mapgen`'s latitude is
+ * `|row - half| / half` with `half = (height - 1) / 2`; the winds need it
+ * SIGNED, north (row 0) positive, in degrees: lat = (half - row) / half x 90.
+ * Compared in integers so both engines land on the same band at every
+ * boundary: with x = 2 (half - row) = (height - 1) - 2 row and s = height - 1,
+ * lat >= 60 is 3x >= 2s, lat >= 30 is 3x >= s, lat >= 5 is 18x >= s, and the
+ * southern bands mirror them.
+ */
+export function windBand(row: number, height: number): number {
+  const s = height - 1;
+  const x = s - 2 * row;
+  if (3 * x >= 2 * s) return 0;
+  if (3 * x >= s) return 1;
+  if (18 * x >= s) return 2;
+  if (x >= 0) return 3;
+  if (18 * x >= -s) return 4;
+  if (3 * x >= -s) return 5;
+  if (3 * x >= -2 * s) return 6;
+  return 7;
+}
+
 export interface StormEvent {
   id: string;
   family: StormFamily;

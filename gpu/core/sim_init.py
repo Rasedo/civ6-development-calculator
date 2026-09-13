@@ -2425,6 +2425,17 @@ class SimInit:
         self._st_ids = [str(e["id"]) for e in _st]
         self._st_family = [int(e["family"]) for e in _st]
         self._st_chance = [float(e["chance"]) for e in _st]
+        # CIV6 (`PrevailingWinds`, `PREVAILING_WINDS`): the weighted heading per
+        # latitude band, [8 bands, 6 hex directions E NE NW W SW SE]; and the
+        # band of every tile's row (`windBand`, the same integer comparisons)
+        self._wind_w = torch.tensor([[int(v) for v in b] for b in _ds["winds"]], dtype=torch.long, device=device)
+        _wr = torch.arange(self.T, device=device) // self.W
+        _ws, _wx = self.H - 1, (self.H - 1) - 2 * _wr
+        _wb = torch.full_like(_wx, 7)
+        for _bi, _ok in ((6, 3 * _wx >= -2 * _ws), (5, 3 * _wx >= -_ws), (4, 18 * _wx >= -_ws),
+                         (3, _wx >= 0), (2, 18 * _wx >= _ws), (1, 3 * _wx >= _ws), (0, 3 * _wx >= 2 * _ws)):
+            _wb = torch.where(_ok, torch.full_like(_wb, _bi), _wb)
+        self._wind_band = _wb  # [T]
 
         def _stf(k: str) -> torch.Tensor:
             return torch.tensor([float(e[k]) for e in _st], dtype=torch.float64, device=device)

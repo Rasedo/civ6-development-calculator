@@ -4,7 +4,7 @@ import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { disasterPhase, stormChances, stormFootprint, stormTile } from '../../../cpu/core/disasters';
-import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair } from '../../../cpu/data/disasters';
+import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, WIND_BAND_LO, windBand } from '../../../cpu/data/disasters';
 import { disasterRateMult } from '../../../cpu/data/climate';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
@@ -83,6 +83,24 @@ describe('the eight storms are the install\'s table', () => {
     // fertility: the yields table's rows — tornadoes have none
     expect(STORM_EVENTS.filter((e) => e.fertFood + e.fertProd > 0).map((e) => e.family)).not.toContain('TORNADO');
     expect(EV('HURRICANE_CAT_5').fertFood).toBe(0.45);
+  });
+
+  it('the prevailing winds are the install\'s 22 rows, banded by signed latitude', () => {
+    // CIV6 (`PrevailingWinds`): 22 weighted rows over eight bands, six hex headings
+    expect(PREVAILING_WINDS).toHaveLength(8);
+    expect(WIND_BAND_LO).toEqual([60, 30, 5, 0, -5, -30, -60, -90]);
+    expect(PREVAILING_WINDS.flat().filter((w) => w > 0)).toHaveLength(22);
+    // the mid-latitudes blow EAST (NE 2 E 2 SE 1), the tropics and the poles WEST
+    expect(PREVAILING_WINDS[1]).toEqual([2, 2, 0, 0, 0, 1]);
+    expect(PREVAILING_WINDS[2]).toEqual([0, 0, 2, 2, 1, 0]);
+    expect(PREVAILING_WINDS[6]).toEqual([2, 1, 0, 0, 0, 2]);
+    // a 26-row map: row 0 is the north pole's band, the equator sits between rows 12 and 13
+    expect([0, 5, 9, 12, 13, 16, 20, 25].map((r) => windBand(r, 26))).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    // the boundaries are lower-inclusive: on a 181-row map row 30 is exactly lat 60
+    expect(windBand(30, 181)).toBe(0);
+    expect(windBand(31, 181)).toBe(1);
+    expect(windBand(90, 181)).toBe(3); // lat 0
+    expect(windBand(91, 181)).toBe(4); // just south
   });
 
   it('a family starts on its own terrains, flat or hills, never a mountain', () => {

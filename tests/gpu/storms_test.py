@@ -249,6 +249,21 @@ def main() -> int:
         print('  7 natural wonder OK — silt on it pays neither food nor production')
     else:
         print('  7 natural wonder — the fixture holds none; no scene')
+    # -- 8: the prevailing winds ride the wire, banded by signed latitude ----
+    assert sim._wind_w.shape == (8, 6) and int((sim._wind_w > 0).sum()) == 22, "PrevailingWinds: 22 rows over 8 bands"
+    assert sim._wind_w[1].tolist() == [2, 2, 0, 0, 0, 1] and sim._wind_w[6].tolist() == [2, 1, 0, 0, 0, 2]
+    H, W = sim.H, sim.W
+    def _band(r):
+        s, x = H - 1, (H - 1) - 2 * r
+        for b, ok in ((0, 3 * x >= 2 * s), (1, 3 * x >= s), (2, 18 * x >= s), (3, x >= 0),
+                      (4, 18 * x >= -s), (5, 3 * x >= -s), (6, 3 * x >= -2 * s)):
+            if ok:
+                return b
+        return 7
+    got = [int(sim._wind_band[r * W]) for r in range(H)]
+    assert got == [_band(r) for r in range(H)], f"the band per row is not windBand's: {got}"
+    assert got[0] == 0 and got[H - 1] == 7
+    print("  8 winds OK — 22 weighted rows over 8 latitude bands, north to south")
     print("BATTERY OK storms")
     return 0
 
