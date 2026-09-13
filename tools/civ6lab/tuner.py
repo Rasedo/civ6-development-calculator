@@ -66,12 +66,26 @@ class Tuner:
                 "EnableTuner 1, and is FireTuner.exe closed?") from e
         self._drain(0.3)
         self._send(TAG_HANDSHAKE, "APP:")
-        m = self._recv(self.timeout)
-        self.app = m[1] if m else "<no APP reply>"
+        self.app = self._reply(self.timeout) or "<no APP reply>"
         self._send(TAG_HANDSHAKE, "LSQ:")
-        m = self._recv(self.timeout)
-        self.states = _parse_states(m[1] if m else "")
+        self.states = _parse_states(self._reply(self.timeout) or "")
         return self
+
+    def _reply(self, timeout: float) -> str | None:
+        """The next message that is NOT a print line. The game streams every
+        state's prints down this socket — a broken main menu emits a Lua
+        error per frame — so a handshake reply has to be picked out of the
+        stream rather than assumed to be the next message."""
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            m = self._recv(min(left, 2.0))
+            if m is None:
+                continue
+            if not m[1].startswith("O"):
+                return m[1]
 
     def close(self) -> None:
         if self.sock:
@@ -82,8 +96,7 @@ class Tuner:
         """The state list changes when a game loads: re-ask."""
         self._drain(0.1)
         self._send(TAG_HANDSHAKE, "LSQ:")
-        m = self._recv(self.timeout)
-        self.states = _parse_states(m[1] if m else "")
+        self.states = _parse_states(self._reply(self.timeout) or "")
         return self.states
 
     def _send(self, tag: int, payload: str) -> None:
@@ -112,13 +125,18 @@ class Tuner:
             buf += chunk
         return buf
 
-    def _drain(self, quiet: float) -> list[str]:
+    def _drain(self, quiet: float, budget: float = 1.0) -> list[str]:
+        """Swallow unsolicited output until `quiet` seconds of silence — or
+        `budget` seconds in all, because a state that prints every frame is
+        never silent."""
         out = []
-        while True:
+        end = time.monotonic() + budget
+        while time.monotonic() < end:
             m = self._recv(quiet)
             if m is None:
-                return out
+                break
             out.append(m[1])
+        return out
 
     # -- the one verb --------------------------------------------------------
     def run(self, state: str, lua: str, timeout: float = 15.0) -> list[str]:
@@ -158,7 +176,7 @@ class Tuner:
                 # `(function()` wrapper, so the snippet's line N is N+1 here
                 got = ("\n  printed before the error:\n    " + "\n    ".join(lines)) if lines else ""
                 raise TunerError(f"{state}: {payload}{got}")
-            text = _output_text(payload)
+            text = _output_text(payload, state)
             if text is None:
                 continue
             if text.strip() == SENTINEL:
@@ -183,9 +201,15 @@ def _parse_states(raw: str) -> dict[str, int]:
     return states
 
 
-def _output_text(payload: str) -> str | None:
-    """'O' NUL '<state>: text' -> text; anything else is not print output."""
+def _output_text(payload: str, state: str | None = None) -> str | None:
+    """'O' NUL '<state>: text' -> text; anything else is not print output.
+    With `state` given, a print from ANOTHER state (the front end's per-frame
+    error, a mod's chatter) is dropped rather than read as our output."""
     if not payload.startswith("O"):
         return None
     sep = payload.find(": ", 2)
-    return payload[sep + 2:] if sep >= 0 else payload[1:].lstrip("\x00").strip()
+    if sep < 0:
+        return payload[1:].lstrip("\x00").strip()
+    if state is not None and payload[1:sep].lstrip("\x00") != state:
+        return None
+    return payload[sep + 2:]

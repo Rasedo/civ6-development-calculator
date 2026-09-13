@@ -1,0 +1,324 @@
+################ 1. empty End Turn with the blocker-driven resolver
+turn before: 74
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 75
+turn after: 75
+################ 2. one spy per foreign city, Foment Unrest
+spawned 11
+UNITOPERATION_SPY_FOMENT_UNREST started 11 refused 0
+turn 75 spies active 11 idle 0 missions 0 captured-enemy 0
+################ 3. turns until the missions and escapes resolve
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 76
+turn 76 spies active 11 idle 0 missions 0 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 77
+turn 77 spies active 11 idle 0 missions 0 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 78
+turn 78 spies active 11 idle 0 missions 0 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 79
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 79 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 80
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 80 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 81
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 81 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+    unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing | end turn requested
+turn 82
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 82 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 83
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 83 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 84
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 84 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 85
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 84 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 86
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 86 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 87
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 86 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 88
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 88 spies active 6 idle 4 missions 11 captured-enemy 0
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 89
+mission CityName=LOC_CITY_NAME_ROXBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 PlotIndex=1611
+mission CityName=LOC_CITY_NAME_EDINBURGH CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 PlotIndex=1070
+mission CityName=LOC_CITY_NAME_STIRLING CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 PlotIndex=1371
+mission CityName=LOC_CITY_NAME_TAUMUTU CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 PlotIndex=1569
+mission CityName=LOC_CITY_NAME_NGARUAWAHIA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 PlotIndex=1210
+mission CityName=LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE CompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 PlotIndex=1386
+mission CityName=LOC_CITY_NAME_ATHENS CompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 PlotIndex=626
+mission CityName=LOC_CITY_NAME_ARGOS CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 PlotIndex=739
+mission CityName=LOC_CITY_NAME_PHARSALOS CompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 PlotIndex=1163
+mission CityName=LOC_CITY_NAME_KNOSSOS CompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 PlotIndex=743
+mission CityName=LOC_CITY_NAME_SPARTA CompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 PlotIndex=981
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 88 spies active 6 idle 4 missions 11 captured-enemy 0
+################ escape routes, one per call
+route set for spy 2031635
+route set for spy 2031635
+route set for spy 2228246
+route set for spy 2359320
+route set for spy 2424857
+route set for spy 2490394
+route set for spy 2687005
+
+TUNER: no tuner at 127.0.0.1:4318 Ч is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+TUNER: no tuner at 127.0.0.1:4318 Ч is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+TUNER: no tuner at 127.0.0.1:4318 Ч is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+TUNER: no tuner at 127.0.0.1:4318 Ч is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+################ turns until the escape results land
+TUNER: no tuner at 127.0.0.1:4318 Ч is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+turn 89 p0 human=true autoplay=false
+spy 2031635 at 21:16 op FOMENT_UNREST ends t0
+spy 2097172 at 23:12 IDLE
+spy 2162709 at 23:19 IDLE
+spy 2228246 at 19:12 op FOMENT_UNREST ends t0
+spy 2359320 at 6:23 op FOMENT_UNREST ends t0
+spy 2424857 at 10:20 op FOMENT_UNREST ends t0
+spy 2490394 at 9:26 op FOMENT_UNREST ends t0
+spy 2555931 at 51:22 IDLE
+spy 2621468 at 50:17 IDLE
+spy 2687005 at 51:26 op FOMENT_UNREST ends t0
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 89 spies active 6 idle 4 missions 11 captured-enemy 0
+################ one Autoplay turn: the AI resolves the escape prompts
+turn 90
+turn 90 p0 human=true autoplay=false
+spy 2031635 at 21:16 op FOMENT_UNREST ends t0
+spy 2097172 at 23:12 IDLE
+spy 2162709 at 23:19 IDLE
+spy 2228246 at 19:12 op FOMENT_UNREST ends t0
+spy 2359320 at 6:23 op FOMENT_UNREST ends t0
+spy 2424857 at 10:20 op FOMENT_UNREST ends t0
+spy 2490394 at 9:26 op FOMENT_UNREST ends t0
+spy 2555931 at 51:22 IDLE
+spy 2621468 at 50:17 IDLE
+spy 2687005 at 51:26 op FOMENT_UNREST ends t0
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_MALE_10 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 Name=LOC_CITIZEN_PERSIA_MALE_4 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_FEMALE_3 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_9 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_5 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=2 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_10 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=1 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_MALE_6 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 Name=LOC_CITIZEN_PERSIA_MODERN_FEMALE_10 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=5 LevelAfter=2 Name=LOC_CITIZEN_PERSIA_FEMALE_9 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=3 LevelAfter=1 Name=LOC_CITIZEN_PERSIA_MODERN_MALE_2 Operation=58 
+mission CityCompletionTurn=79 EscapeResult=-1 InitialResult=4 LevelAfter=2 Name=LOC_CITIZEN_PERSIA_MALE_9 Operation=58 
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 90 spies active 6 idle 4 missions 11 captured-enemy 0
+################ single escape route, then wait
+escaping spy 2031635
+one route requested
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+turn 90 spies active 5 idle 4 missions 11 captured-enemy 0
+next escaping now 2228246
+################ resolve the five pending escapes
+route set for spy 2228246
+route set for spy 2359320
+route set for spy 2424857
+route set for spy 2490394
+route set for spy 2687005
+Traceback (most recent call last):
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\lab.py"[0m, line [35m502[0m, in [35m<module>[0m
+    sys.exit([31mmain[0m[1;31m()[0m)
+             [31m~~~~[0m[1;31m^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\lab.py"[0m, line [35m495[0m, in [35mmain[0m
+    return [31ma.fn[0m[1;31m(a)[0m
+           [31m~~~~[0m[1;31m^^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\lab.py"[0m, line [35m368[0m, in [35mcmd_lua[0m
+    for ln in [31mt.run[0m[1;31m(a.state, code, timeout=a.timeout)[0m:
+              [31m~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\tuner.py"[0m, line [35m169[0m, in [35mrun[0m
+    m = self._recv(min(left, 2.0))
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\tuner.py"[0m, line [35m111[0m, in [35m_recv[0m
+    head = self._exactly(HEADER.size)
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\tuner.py"[0m, line [35m122[0m, in [35m_exactly[0m
+    chunk = self.sock.recv(n - len(buf))
+[1;35mConnectionResetError[0m: [35m[WinError 10054] ”даленный хост принудительно разорвал существующее подключение[0m
+GAME DIED resolving an escape

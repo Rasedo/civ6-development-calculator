@@ -255,7 +255,26 @@ in the entry).
     its strike needs a target rule. Name them, or leave the floor-15
     defence and the walls it revolted with?
 
-14. **C-16 — what the spy's escape chance is a chance OUT OF.** The install
+14. **C-16 — what the spy's escape chance is a chance OUT OF.** PARTLY
+    MEASURED 2026-09-13, then STOPPED ON CRASHES (`tools/civ6lab`,
+    `runs/escape_*.log`). Eleven socket-spawned spies ran Foment Unrest
+    for eight turns: 2 undetected successes, 3 successes that must
+    escape, 2 undetected fails, 3 fails that must escape, 1 captured —
+    the 3d6 mission model above, in the flesh. The ESCAPE itself: the
+    prompt is the human seat's alone (an Autoplay turn leaves the six
+    spies waiting), `PlayerOperations.SET_ESCAPE_ROUTE` from the socket
+    resolves one spy immediately (spy 2031635, level 2 after its
+    success, on-foot route: ESCAPED), and every attempt to resolve the
+    rest — six in a burst, then five one per call with pauses — killed
+    the game (EXCEPTION_ACCESS_VIOLATION reading 0xb0; dumps 7C1DF660,
+    B31A4D66 and two more). The consistent reading: a route whose roll
+    ends in CAPTURED or KILLED dereferences a field a socket-spawned spy
+    never had (an origin city, most likely); one escaped spy survived,
+    every batch that must contain a capture died. So: one data point
+    (escaped, level 2, on foot, no counterspy), which rules out nothing.
+    A future measurement needs spies TRAINED in a city and TRAVELLED in,
+    not spawned — a different scene, a later session. The install's
+    terms stand as sourced: the install
     publishes the whole term list and every term is a LEVEL:
     `ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1 per spy level,
     `_COUNTERSPY_LEVEL_MODIFIER` -1 per counterspy level,

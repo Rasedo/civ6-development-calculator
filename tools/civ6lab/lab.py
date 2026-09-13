@@ -218,6 +218,10 @@ print("autoplay " .. tostring(AutoplayManager.IsActive()))
 """
 
 LUA_ENDTURN = 'UI.RequestAction(ActionTypes.ACTION_ENDTURN); print("endturn requested")'
+# the End Turn path resolves blockers first (escape routes, research, civic,
+# idle cities) and then requests a FORCED end of turn, the way the Action
+# Panel does for the soft blockers
+UNBLOCK = pathlib.Path(__file__).parent / "unblock.lua"
 LUA_BLOCKER = """
 local b = NotificationManager.GetFirstEndTurnBlocking(Game.GetLocalPlayer())
 local name = "none"
@@ -263,12 +267,16 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
     t0 = turn(t)
     if lp < 0:
         raise TunerError("refusing to autoplay with no seat to return to (lp=-1)")
+    def end_turn() -> None:
+        lua = UNBLOCK.read_text(encoding="utf-8") if UNBLOCK.exists() else LUA_ENDTURN
+        print("   ", t.run(IG, lua, timeout=30)[-1])
+
     if how == "autoplay":
         print("   ", t.run(GC, LUA_AUTOPLAY % lp)[0])
     else:
-        print("   ", t.run(IG, LUA_ENDTURN)[0])
+        end_turn()
     deadline = time.monotonic() + wait
-    nagged = 0.0
+    nagged = time.monotonic()
     while time.monotonic() < deadline:
         time.sleep(2.0)
         try:
@@ -278,10 +286,11 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
         if tn > t0:
             return tn
         if how == "endturn" and time.monotonic() - nagged > 20:
+            # a blocker raised AFTER the request (an escape prompt, a city
+            # that just finished) needs the resolver again
             nagged = time.monotonic()
             try:
-                print("   ", t.run(IG, LUA_BLOCKER)[0],
-                      "— clear it in the game (or rerun with --advance autoplay)")
+                end_turn()
             except TunerError as e:
                 print("   ", e)
     raise TunerError(f"turn did not advance past {t0} within {wait}s")

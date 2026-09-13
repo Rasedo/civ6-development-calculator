@@ -1,0 +1,31 @@
+################ spawn 2 spies per foreign city
+spawned 22
+################ start Foment Unrest everywhere
+UNITOPERATION_SPY_FOMENT_UNREST started 23 refused 0
+spy 2031634 at 21:16 op FOMENT_UNREST ends t78
+spy 2097171 at 21:16 IDLE
+spy 2162708 at 21:16 IDLE
+spy 2228245 at 23:12 op FOMENT_UNREST ends t78
+spy 2293782 at 23:12 IDLE
+spy 2359319 at 23:19 op FOMENT_UNREST ends t78
+spy 2424856 at 23:19 IDLE
+spy 2490393 at 19:12 op FOMENT_UNREST ends t78
+spy 2555930 at 19:12 IDLE
+spy 2621467 at 26:10 op FOMENT_UNREST ends t78
+spy 2687004 at 26:10 IDLE
+spy 2752541 at 6:23 op FOMENT_UNREST ends t78
+spy 2818078 at 6:23 IDLE
+spy 2883615 at 10:20 op FOMENT_UNREST ends t78
+spy 2949152 at 10:20 IDLE
+spy 3014689 at 9:26 op FOMENT_UNREST ends t78
+spy 3080226 at 9:26 IDLE
+spy 3145763 at 51:22 op FOMENT_UNREST ends t78
+spy 3211300 at 51:22 IDLE
+spy 3276837 at 50:17 op FOMENT_UNREST ends t78
+spy 3342374 at 50:17 IDLE
+spy 3407911 at 51:26 op FOMENT_UNREST ends t78
+spy 3473448 at 51:26 IDLE
+turn 74 spies active 11 idle 12 missions 0 captured-enemy 0
+################ three turns to validate the loop
+TUNER: no tuner at 127.0.0.1:4318 — is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+TUNER: no tuner at 127.0.0.1:4318 — is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?

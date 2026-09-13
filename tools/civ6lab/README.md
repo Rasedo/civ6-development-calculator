@@ -82,6 +82,31 @@ running, and the boost read as a mystery +2 until the city's
 `GetSourceTurnsRemaining` was checked. Spawn fresh actors for each reading,
 or read before advancing turns.
 
+### The escape roll (ask 14) — what crashes and what does not
+
+`spy_start.lua` puts every idle spy of the local player standing on a
+foreign city centre onto OPNAME (socket-spawned spies CAN start missions
+where they stand; one mission per city per player). `spy_history.lua`
+reads `GetRecentMissions` and the spies' operations; `escape_fit.py`
+turns a run log into escape rates against the candidate readings of
+`ESPIONAGE_ESCAPE_BASE_CHANCE`. The mission roll ran clean for fifteen
+turns. Four crashes drew the boundary:
+
+* `UI.RequestAction(ACTION_ENDTURN, { REASON = "UserForced" })` and an
+  unconditional `GetNextEscapingSpyID()` from the socket: crash (dumps
+  7C1DF660, B31A4D66). `unblock.lua` is blocker-driven now and requests
+  the plain End Turn.
+* `SET_ESCAPE_ROUTE` for a spy whose roll ends ESCAPED: fine, resolves at
+  once. Any run of route requests that includes a CAPTURED or KILLED
+  outcome for a socket-spawned spy: EXCEPTION_ACCESS_VIOLATION at 0xb0.
+  Spawned spies lack whatever the capture path dereferences. Train and
+  travel real spies for this measurement.
+* The Autoplay AI does not answer the human seat's escape prompts.
+
+The tuner listener disappears during a load transition and returns once
+the map is up (the "Continue" click); the main menu after mods are toggled
+prints a Lua error every frame, which the client now reads past.
+
 ### Turn advancement and the Autoplay trap
 
 `lab.py advance --n N` passes turns by Autoplay (1 turn, return as the

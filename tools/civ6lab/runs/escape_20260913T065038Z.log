@@ -1,0 +1,10 @@
+turn 74 p0 human=true autoplay=false
+spies already present: 0
+################ one spy per foreign city
+spawned 11
+UNITOPERATION_SPY_FOMENT_UNREST started 11 refused 0
+turn 74 spies active 11 idle 0 missions 0 captured-enemy 0
+################ three turns
+TUNER: no sentinel from InGame within 30s; got []
+TUNER: no tuner at 127.0.0.1:4318 — is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
+TUNER: no tuner at 127.0.0.1:4318 — is Civ 6 running with EnableTuner 1, and is FireTuner.exe closed?
