@@ -64,6 +64,13 @@ export interface SpyMissionDef {
   /** CIV6 (Spy): the same table's success rate, at the Recruit level. A
    *  `certain` mission publishes none and rolls for nothing. */
   successPct?: number;
+  /** CIV6 (UnitOperations.BaseProbability, measured 2026-09-13 over the
+   *  tuner socket): the THRESHOLD the mission's one 3d6 roll is read
+   *  against — 13 Siphon Funds / Foment Unrest / Fabricate Scandal, 14
+   *  Sabotage Production / Steal Tech Boost / Neutralize Governor, 15
+   *  Great Work Heist / Disrupt Rocketry / Breach Dam, 16 Recruit
+   *  Partisans. A `certain` mission publishes none. */
+  baseProbability?: number;
 }
 
 /**
@@ -76,21 +83,21 @@ export interface SpyMissionDef {
 export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
   { id: 'LISTENING_POST', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
-  { id: 'SIPHON_FUNDS', district: 'COMMERCIAL_HUB', offensive: true, turns: 8, successPct: 56 },
-  { id: 'GREAT_WORK_HEIST', district: 'THEATER_SQUARE', offensive: true, turns: 8, successPct: 20 },
-  { id: 'SABOTAGE_PRODUCTION', district: 'INDUSTRIAL_ZONE', offensive: true, turns: 8, successPct: 35 },
-  { id: 'STEAL_TECH_BOOST', district: 'CAMPUS', offensive: true, turns: 8, successPct: 35 },
-  { id: 'RECRUIT_PARTISANS', district: 'NEIGHBORHOOD', offensive: true, turns: 8, successPct: 10 },
-  { id: 'DISRUPT_ROCKETRY', district: 'SPACEPORT', offensive: true, turns: 8, successPct: 20 },
-  { id: 'FOMENT_UNREST', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 56 },
-  { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 35 },
-  { id: 'BREACH_DAM', district: 'DAM', offensive: true, turns: 8, successPct: 20 },
+  { id: 'SIPHON_FUNDS', baseProbability: 13, district: 'COMMERCIAL_HUB', offensive: true, turns: 8, successPct: 56 },
+  { id: 'GREAT_WORK_HEIST', baseProbability: 15, district: 'THEATER_SQUARE', offensive: true, turns: 8, successPct: 20 },
+  { id: 'SABOTAGE_PRODUCTION', baseProbability: 14, district: 'INDUSTRIAL_ZONE', offensive: true, turns: 8, successPct: 35 },
+  { id: 'STEAL_TECH_BOOST', baseProbability: 14, district: 'CAMPUS', offensive: true, turns: 8, successPct: 35 },
+  { id: 'RECRUIT_PARTISANS', baseProbability: 16, district: 'NEIGHBORHOOD', offensive: true, turns: 8, successPct: 10 },
+  { id: 'DISRUPT_ROCKETRY', baseProbability: 15, district: 'SPACEPORT', offensive: true, turns: 8, successPct: 20 },
+  { id: 'FOMENT_UNREST', baseProbability: 13, district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 56 },
+  { id: 'NEUTRALIZE_GOVERNOR', baseProbability: 14, district: 'CITY_CENTER', offensive: true, turns: 8, successPct: 35 },
+  { id: 'BREACH_DAM', baseProbability: 15, district: 'DAM', offensive: true, turns: 8, successPct: 20 },
   { id: 'COUNTERSPY', district: 'CITY_CENTER', anyDistrict: true, offensive: false, athome: true, turns: 16 },
   // CIV6 (the chassis' mission table): "16 (Standard Speed)" turns at 56%;
   // (Fabricate Scandal) performed "in a City-State that you are not Suzerain
   // over". Appended LAST — the mission head is THE WIRE and every later verb
   // column derives its base from this list's length on both engines.
-  { id: 'FABRICATE_SCANDAL', district: 'CITY_CENTER', offensive: true, turns: 16, successPct: 56, citystate: true },
+  { id: 'FABRICATE_SCANDAL', baseProbability: 13, district: 'CITY_CENTER', offensive: true, turns: 16, successPct: 56, citystate: true },
 ];
 /** The operations the Espionage Pact can name: the OFFENSIVE ones, in catalog
  *  order — the only rows either of its outcomes can act on. */
@@ -126,6 +133,13 @@ export const SPY_SURVEILLANCE_REACH = 1;
 // "as if 2 levels more experienced" — nor what a failure costs. Those two are
 // this model's own; everything else here is sourced.
 // ---------------------------------------------------------------------------
+/** CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua`): every mission
+ *  is ONE roll of 3d6 read against `baseProbability - k`, and a fresh
+ *  Recruit — the install's level 1, this engine's level 0 — reads k = 2
+ *  before any level term (`LevelProbChange` 1 per level). */
+export const SPY_ROLL_DICE = 3;
+export const SPY_ROLL_FACES = 6;
+export const SPY_ROLL_LEVEL_BASE = 2;
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;
