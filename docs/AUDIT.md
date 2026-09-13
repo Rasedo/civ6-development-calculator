@@ -183,6 +183,12 @@ in the entry).
     A purchase detail worth keeping: a military purchase is refused while
     a military unit stands on the centre tile ("too many units of one
     class here") — the bought unit is placed ON the centre.
+    SHIPPED 2026-09-13 (#258): the banking half was already right on both
+    engines (`dropQueuedBuilding` -> `productionBank`; a bought unit's
+    ledger entry untouched); the placement rule landed as
+    `purchaseSpotBlocked` (units.ts) in the gold, faith and settler
+    purchases, the driver's candidates, and the GPU's gold/faith unit and
+    settler masks (`_blocked_for` at the spawn centre).
 
 8. ~~Two city-state names this roster invented.~~ **RULED 2026-09-13:
     renamed.** "Venice" is AMSTERDAM (base; Antioch carries the same text in

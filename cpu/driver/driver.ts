@@ -23,7 +23,7 @@ import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityS
 import { isExplored } from '../core/fog';
 import { buildingFaithCost, endTurn, engineerFinishCity, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost, unitsAcquired } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
-import { builderCost, goldBuyableUnits } from '../core/units';
+import { builderCost, goldBuyableUnits, purchaseSpotBlocked } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
@@ -180,6 +180,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     }
     const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
+      && !purchaseSpotBlocked(state, settlerSpawnCity, actor.seat, 'SETTLER')
       && goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)));
     let mil = 0;
     for (const u of state.units) {
@@ -194,7 +195,8 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     // Companies moves it, and every column offered here is a military unit.
     const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const anyU = goldBuyableUnits(state, actor.seat).some(
-      (def) => goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity))),
+      (def) => buyCity !== undefined && !purchaseSpotBlocked(state, buyCity, actor.seat, def.id)
+        && goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity))),
     );
     const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
     let tileOk = 0;

@@ -248,6 +248,40 @@ def inject_mil(sim, row: int, tiles: list[int], type_idx: int) -> None:
         sim.unit_next[0] += 1
 
 
+def clear_centre(sim, row: int) -> int:
+    """Lift whatever military unit stands on the spawn city's centre — the
+    purchase gate refuses a unit of a class already there — and return the
+    centre tile. The fixture's capital carries its starting Warrior."""
+    slot = int(sim._seat_buy_unit_slot(row)[0])
+    ctr = int(sim.city_center[0, row, slot])
+    assert ctr >= 0, f"row {row}: no spawn city"
+    if int(sim.military_at[0, ctr]) >= 0:
+        s0 = int(sim.military_at[0, ctr]) - sim.POOL_LO["major"]
+        sim.major_unit_alive[0, s0] = False
+        sim.military_at[0, ctr] = -1
+    return ctr
+
+
+def case_centre_block(sim, base, row: int) -> None:
+    """CIV6 (purchase placement, measured 2026-09-13): a unit of the class
+    already on the spawn city's centre refuses the purchase, and the gold
+    rung's candidates say so — the driver twin mirrors the validator."""
+    warr = sim._warrior_idx
+    if warr < 0:
+        return
+    sim.restore(base)
+    prep(sim, row)
+    sim.civ_treasury[0, row] = 1e6
+    tr = sim._seat_trainable_units(row)
+    ctr = clear_centre(sim, row)  # the BEFORE reading is a free centre
+    before = sim._seat_buy_unit_candidates(row, tr)[0]
+    assert bool(before.any()), f"row {row}: no gold unit candidate with a free centre"
+    inject_mil(sim, row, [ctr], warr)
+    after = sim._seat_buy_unit_candidates(row, tr)[0]
+    assert not bool(after.any()), f"row {row}: a military unit on the centre must refuse every military purchase"
+    print(f"  row {row}: centre block OK — a garrisoned centre refuses the gold unit rung")
+
+
 def case_unit(sim, base, row: int) -> None:
     warr = sim._warrior_idx
     if warr < 0:
@@ -257,6 +291,7 @@ def case_unit(sim, base, row: int) -> None:
 
     sim.restore(base)
     prep(sim, row)
+    clear_centre(sim, row)  # the starting Warrior would refuse the buy
     quota = 2 * n_cities(sim, row)
     assert int(sim._seat_army_count(row)[0]) < quota, f"row {row}: already at the military quota"
     sim.civ_treasury[0, row] = price
@@ -429,6 +464,7 @@ def case_faith_unit(sim, base, row: int) -> None:
         return
     sim.restore(base)
     prep(sim, row)
+    clear_centre(sim, row)  # the starting Warrior would refuse the buy
     j = cap_slot(sim, row)
     sim.civ_faith[0, row] = RICH
     sim.civ_treasury[0, row] = 0.0
@@ -459,6 +495,7 @@ def case_faith_unit(sim, base, row: int) -> None:
     # the same intent with the grant gone is refused
     sim.restore(base)
     prep(sim, row)
+    clear_centre(sim, row)  # so the refusal below is the GRANT's, not the centre's
     sim.civ_faith[0, row] = RICH
     sim._eff_version += 1
     n1 = units_of(sim, row)
@@ -539,6 +576,7 @@ def main() -> None:
         case_building(sim, base, row, mon)
         case_settler(sim, base, row)
         case_unit(sim, base, row)
+        case_centre_block(sim, base, row)
         case_tile(sim, base, row)
         case_worship(sim, base, row)
         case_faith_unit(sim, base, row)

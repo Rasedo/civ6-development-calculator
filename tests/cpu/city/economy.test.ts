@@ -79,6 +79,25 @@ describe('gold & faith purchases', () => {
     expect(seatOf(state, 0)!.treasury).toBe(0); // gold untouched
   });
 
+  it('a purchased land unit lands on the centre, and a unit of its class already there refuses it', () => {
+    // CIV6 (measured 2026-09-13): "too many units of one class here" — the
+    // purchase does not spill to a neighbour the way a trained unit does.
+    const state = makeState();
+    state.unitsMode = true;
+    const city = foundAt(state, 5, 5);
+    seatOf(state, 0)!.treasury = 100000;
+    expect(spawnUnit(state, 'WARRIOR', city.centerIndex, 0)?.tileIndex).toBe(city.centerIndex);
+    const refused = purchaseUnit(state, city.id, 'WARRIOR', 0);
+    expect(refused.ok).toBe(false);
+    expect(refused.reason).toMatch(/already stands on the city centre/);
+    // a CIVILIAN takes the other slot of the same tile
+    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
+    expect(state.units.filter((u) => u.tileIndex === city.centerIndex).length).toBe(2);
+    // ...and now the civilian slot is taken too
+    expect(purchaseSettler(state, city.id, 0).ok).toBe(false);
+    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false);
+  });
+
   it('buys units and settlers with gold', () => {
     const state = makeState();
     state.unitsMode = true;
@@ -94,6 +113,11 @@ describe('gold & faith purchases', () => {
     const sCost = settlerCost(state, 0) * 4;
     seatOf(state, 0)!.treasury = sCost;
     city.population = 2; // a 1-pop city may not buy a settler (real Civ 6)
+    // the Builder stands on the centre and holds its civilian slot: a Settler
+    // is refused until it walks off (real Civ 6 — "too many units of one class")
+    expect(purchaseSettler(state, city.id, 0).ok).toBe(false);
+    expect(seatOf(state, 0)!.treasury).toBe(sCost);
+    state.units[0].tileIndex = tileAtCoords(state.map, 6, 5).index;
     expect(purchaseSettler(state, city.id, 0).ok).toBe(true);
     expect(settlerCount(state, 0)).toBe(1); // a real UNIT spawns at the city
     expect(seatOf(state, 0)!.treasury).toBe(0);

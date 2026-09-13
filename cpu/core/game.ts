@@ -15,7 +15,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -802,6 +802,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   // CIV6 (Spy): "Cannot be purchased with Gold."
   if (UNITS[unitType]?.noGold) return { ok: false, reason: 'This unit cannot be purchased with Gold.' };
+  if (purchaseSpotBlocked(state, city, seat, unitType)) return { ok: false, reason: 'A unit of that class already stands on the city centre.' };
   const cost = goldPrice(state, seat, unitPurchaseCost(state, unitType, seat, city));
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
@@ -828,6 +829,7 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
   if (!city) return { ok: false, reason: 'No such city.' };
   if (getModifiers(state, seat).noSettlers) return { ok: false, reason: 'Isolationism forbids Settlers.' };
   if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
+  if (purchaseSpotBlocked(state, city, seat, 'SETTLER')) return { ok: false, reason: 'A unit of that class already stands on the city centre.' };
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   const cost = goldPrice(state, seat, settlerCost(state, seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, seat));
@@ -910,6 +912,7 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   if (!faithBuysLandUnits(state, seat)) return { ok: false, reason: 'Faith buys no land units here.' };
+  if (purchaseSpotBlocked(state, city, seat, unitType)) return { ok: false, reason: 'A unit of that class already stands on the city centre.' };
   const def = UNITS[unitType];
   if (!def || (def.combat ?? 0) <= 0 || def.naval || def.air !== undefined) {
     return { ok: false, reason: 'Not a land combat unit.' };

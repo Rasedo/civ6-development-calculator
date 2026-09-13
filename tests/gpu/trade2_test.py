@@ -14,7 +14,7 @@ income + expiry):
   * seat_route_dseat / seat_route_dcity / seat_route_exp are _MUTABLE, long,
     [B, NS, K];
   * an international route pays District_TradeRouteYields at its destination
-    count to GOLD only (war CANCELS routes at the declaration; no per-read gate);
+    (war CANCELS routes at the declaration; no per-read gate);
   * duration expiry drops a due route (exp <= turn) and keeps a future one;
   * the destination is keyed by (SEAT, CITY ID), so a route to an id that
     seat no longer holds is dropped while a live pair survives;

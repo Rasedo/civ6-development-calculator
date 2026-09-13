@@ -2327,3 +2327,13 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
   state.eventLog.push(`Tribal village: ${sub.id}.`);
   if (state.eventLog.length > 20) state.eventLog.shift();
 }
+
+/** CIV6 (purchase placement, measured in the live game 2026-09-13): a PURCHASED
+ *  unit is placed ON the city centre, and the purchase is REFUSED — "too many
+ *  units of one class here" — when a unit of its stacking class already stands
+ *  there. There is no spill to a neighbour, unlike a TRAINED unit's placement.
+ *  Aircraft and Spies hold no plot; a hull is placed by its own water rule. */
+export function purchaseSpotBlocked(state: GameState, city: { centerIndex: number }, seat: number, unitType: string): boolean {
+  if (isAirUnit(unitType) || isSpy(unitType) || UNITS[unitType]?.naval) return false;
+  return !tileFreeForUnit(state, city.centerIndex, seat, { type: unitType, seat });
+}

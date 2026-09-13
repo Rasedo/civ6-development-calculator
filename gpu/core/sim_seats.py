@@ -1732,6 +1732,14 @@ class SimSeats:
             rc.unsqueeze(0) >= 0,
             self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(0).expand(self.B, -1)),
             torch.ones_like(mil))
+        # CIV6 (purchase placement, measured 2026-09-13): the bought unit lands
+        # ON the spawn city's centre and the purchase is refused when a unit
+        # of its class already stands there — no spill to a neighbour, unlike
+        # a trained unit. Every column here is land military, so one probe of
+        # the military slot at the centre answers the row (`purchaseSpotBlocked`).
+        _slot0 = self._seat_buy_unit_slot(row)
+        _ctr0 = self.city_center[torch.arange(self.B, device=self.device), row, _slot0].clamp(min=0)
+        mil = mil & ~self._blocked_for(_ctr0.unsqueeze(1), row).squeeze(1).unsqueeze(1)
         if faith:
             # THE FAITH RUNG sells the same class out of the other purse. The
             # SCOUT skip below is the GOLD ladder's own preference, not a rule,
@@ -2389,7 +2397,8 @@ class SimSeats:
             pop_s = self.city_pop[bidx, row, spawn_slot]
             want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \
                 & (pop_s >= self.rules.settler_pop_gate) & self._afford(self.civ_treasury[:, row], sett_price) \
-                & ~self._no_settlers(row)
+                & ~self._no_settlers(row) \
+                & ~self._blocked_for(ctr_s.unsqueeze(1), row, is_civilian=True).squeeze(1)  # purchaseSpotBlocked: the centre's civilian slot
             if bool(want_s.any()):
                 landed_s = self._spawn_unit(row, want_s, ctr_s, self._settler_idx)
                 self.civ_treasury[:, row] = torch.where(landed_s, self.civ_treasury[:, row] - sett_price, self.civ_treasury[:, row])
