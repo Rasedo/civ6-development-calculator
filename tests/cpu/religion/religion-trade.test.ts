@@ -181,11 +181,12 @@ describe('trade routes', () => {
     expect(stats.breakdown.trade.food).toBe(1);
     expect(stats.breakdown.trade.production).toBe(1);
 
-    // destination development raises it: 2 specialty districts -> +1/+1
+    // each completed district adds its District_TradeRouteYields row: a
+    // Campus +1 food, a Holy Site +1 food (domestic column)
     b.population = 7; // allow the district count
     expect(queueDistrict(state, b.id, 'CAMPUS', tileAtCoords(state.map, 15, 9).index, 0).ok).toBe(true);
     expect(queueDistrict(state, b.id, 'HOLY_SITE', tileAtCoords(state.map, 13, 9).index, 0).ok).toBe(true);
-    expect(routeYields(state, b)).toMatchObject({ food: 2, production: 2 });
+    expect(routeYields(state, b)).toMatchObject({ food: 3, production: 1 });
   });
 
   it('enforces range', () => {

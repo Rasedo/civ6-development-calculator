@@ -309,7 +309,12 @@ in the entry).
     3 + 1 per destination specialty district is wrong on the gold
     districts (3 not 1), the Government Plaza (2), the food/production
     districts (their yield, not gold) and the domestic side; the table
-    is the port.
+    is the port. SHIPPED 2026-09-13 (#255): `DISTRICT_ROUTE_YIELDS` in
+    `cpu/data/districts.ts`, exported per district as `routeDom` /
+    `routeIntl` with the centre row on the trade block;
+    `districtRouteYields` feeds both `routeYields` and
+    `routeYieldsInternational`, and the GPU walk pays registry x table into
+    all six yields; `INTL_ROUTE_GOLD` / `intlGold` are gone.
     The sourcing history: `GlobalParameters`
     carries `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and
     `_PER_DESTINATION_DISTRICT` 2, unmodified by either expansion. This

@@ -47,11 +47,13 @@ def main() -> None:
 
     # --- 1) exported constants mirror cpu/core/trade.ts --------------------
     tr = rj["trade"]
-    assert int(tr["intlGold"]) == 3, f"intlGold should be 3, got {tr['intlGold']}"
+    assert [int(x) for x in tr["centreRouteIntl"]] == [0, 0, 3, 0, 0, 0], f"the centre's international row should be gold 3, got {tr['centreRouteIntl']}"
+    assert [int(x) for x in tr["centreRouteDom"]] == [1, 1, 0, 0, 0, 0], f"the centre's domestic row should be food 1 / production 1, got {tr['centreRouteDom']}"
     assert int(tr["duration"]) == 20, f"duration should be 20, got {tr['duration']}"
 
     sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    assert sim._trade_intl_gold == 3 and sim._trade_duration == 20, "engine trade consts mismatch"
+    assert sim._trade_duration == 20, "engine trade consts mismatch"
+    assert float(sim._route_centre_intl[2]) == 3.0 and float(sim._route_centre_dom[0]) == 1.0, "the centre rows must load"
     for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp", "seat_route_born", "seat_route_walk", "seat_route_leg"):
         assert _p in _MUTABLE, f"{_p} must be _MUTABLE — the route store rides snapshot/restore"
     B = sim.B
@@ -61,10 +63,10 @@ def main() -> None:
         assert _t.shape == (B, sim.seat_routes.shape[1], K), f"{_p} shape"
         assert _t.dtype == torch.long == sim.seat_routes.dtype, f"{_p} dtype must match seat_routes"
 
-    # --- 2) international income: intlGold + dest specialty, gold only -----
+    # --- 2) international income: District_TradeRouteYields at the dest ---
     #   Plant a route from row 1's capital to row 0's capital, keyed the way
-    #   TS keys it: (toSeat, toSeatCity). At t0 that capital holds no
-    #   specialty district, so gold = intlGold(3).
+    #   TS keys it: (toSeat, toSeatCity). At t0 that capital holds only its
+    #   centre, so the leg pays the centre row: gold 3 and nothing else.
     assert sim.n_majors >= 2 and bool(sim.city_alive[0, 1, 0]), "need a live second-row capital"
     dest_tile = int(sim.city_center[0, 0, 0])
     dest_cid = int(sim.city_id[0, 0, 0])
@@ -82,7 +84,7 @@ def main() -> None:
     gold = float(inc[0, 0, 2])
     # CIV6 (Mediterranean's Bride): an Egyptian sender takes +4 on the leg
     cleo = sim._cleo_intl_gold if sim._row_leads(1, "CLEOPATRA") else 0.0
-    assert abs(gold - (3.0 + cleo)) < 1e-9, f"peace intl income should be intlGold=3 (+{cleo}), got {gold}"
+    assert abs(gold - (3.0 + cleo)) < 1e-9, f"peace intl income should be the centre's 3 gold (+{cleo}), got {gold}"
     # gold ONLY — no food/prod/sci/cul/faith on the international leg
     for col, name in [(0, "food"), (1, "prod"), (3, "sci"), (4, "cul"), (5, "faith")]:
         assert abs(float(inc[0, 0, col])) < 1e-9, f"intl route must not pay {name}"
@@ -104,21 +106,35 @@ def main() -> None:
     sim.seat_route_exp[0, 1, 0] = int(sim.turn) + sim._trade_duration
     sim._seat_route_cache = None
 
-    # a completed specialty district at the destination adds 1 gold each
+    # a completed district at the destination adds ITS District_TradeRouteYields
+    # row: a Harbor +3 gold, a Campus +1 science and no gold at all
     own = (sim.city_slot_at(0)[0] == 0)  # capital-owned tiles
     cand = ((sim.district[0] < 0) & own & ~sim.centre_slot_at[0].ge(0)).nonzero(as_tuple=True)[0]
     if len(cand) > 0:
-        spec_idx = next((i for i, d in enumerate(sim.districts_cat) if d.get("countsTowardLimit", True)), 0)
+        def _didx(name: str) -> int:
+            return next(i for i, d in enumerate(sim.districts_cat) if d.get("id") == name or d.get("name", "").upper().replace(" ", "_") == name)
         t = int(cand[0])
-        sim.district[0, t] = spec_idx
-        sim.district_complete[0, t] = True
-        # specialtyDistricts is a REGISTRY read (`city_dist_tile`), never a
-        # tile scan — the poke must write both, as a real placement does.
-        sim.city_dist_tile[0, 0, 0, spec_idx] = t
+        for name, col, add in (("HARBOR", 2, 3.0), ("CAMPUS", 3, 1.0)):
+            di = _didx(name)
+            sim.city_dist_tile[0, 0, 0, :] = -1
+            sim.district[0, t] = di
+            sim.district_complete[0, t] = True
+            # the walk reads the REGISTRY (`city_dist_tile`), never a tile
+            # scan — the poke writes both, as a real placement does.
+            sim.city_dist_tile[0, 0, 0, di] = t
+            sim._eff_version += 1
+            sim._seat_route_cache = None
+            inc = sim._seat_route_income(1)
+            base = 3.0 + cleo
+            want_gold = base + (add if col == 2 else 0.0)
+            assert abs(float(inc[0, 0, 2]) - want_gold) < 1e-9, f"{name} dest → gold {want_gold}, got {float(inc[0, 0, 2])}"
+            if col != 2:
+                assert abs(float(inc[0, 0, col]) - add) < 1e-9, f"{name} dest → +{add} in column {col}, got {float(inc[0, 0, col])}"
+        sim.district[0, t] = -1
+        sim.district_complete[0, t] = False
+        sim.city_dist_tile[0, 0, 0, :] = -1
         sim._eff_version += 1
         sim._seat_route_cache = None
-        inc = sim._seat_route_income(1)
-        assert abs(float(inc[0, 0, 2]) - (4.0 + cleo)) < 1e-9, f"one dest specialty → 3+1 gold (+{cleo}), got {float(inc[0, 0, 2])}"
 
     # --- 3) duration expiry: due route dropped, future route kept ----------
     s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -641,7 +657,7 @@ def main() -> None:
     assert gold_w - float(inc_n[0, 0, 2]) == 1.0, "the sender gold did not ride the dest wonder"
     print("  Sankore OK (incoming x2 sci + domestic faith in the walk; sender +1/+1 on the intl leg)")
 
-    print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
+    print("trade2_test OK — intl District_TradeRouteYields (centre 3 gold, Harbor +3 gold, Campus +1 science), war-cancel with Trader return, "
           "round-trip expiry, walk + plunder, candidate/apply spend, "
           "(seat, city) dest keying incl. a capture, sea legs, trading posts, "
           "the stored course (reach parity, chain gold, Land Acquisition), _MUTABLE round-trip")

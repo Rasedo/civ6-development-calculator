@@ -16,7 +16,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
 import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
 import { civEraIndex } from './city';
-import { DISTRICTS } from '../data/districts';
+import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
@@ -461,11 +461,25 @@ export function claimTileEnRoute(state: GameState, seat: number, tileIndex: numb
   return true;
 }
 
-export function routeYields(state: GameState, dest: City): Yields {
+/** CIV6 (`District_TradeRouteYields`): what a route pays for each COMPLETED
+ *  district standing at its DESTINATION — `side` picks the domestic or the
+ *  international column of the table. The city centre is an entry of
+ *  `city.districts`, so the flat head every route pays (food 1 /
+ *  production 1 at home, gold 3 abroad) is simply its row. The origin's
+ *  own districts pay nothing: `YieldChangeAsOrigin` is 0 on every row, and
+ *  the live game agreed (ask 15, 2026-09-13). */
+export function districtRouteYields(state: GameState, dest: City, side: 'domestic' | 'international'): Yields {
   const out = emptyYields();
-  addYields(out, { food: 1, production: 1 }); // city center
-  const bonus = Math.floor(specialtyDistricts(state, dest) / 2);
-  addYields(out, { food: bonus, production: bonus });
+  for (const d of dest.districts) {
+    if (!state.map.tiles[d.tileIndex].districtComplete) continue;
+    const row = DISTRICT_ROUTE_YIELDS[d.type]?.[side];
+    if (row) addYields(out, row);
+  }
+  return out;
+}
+
+export function routeYields(state: GameState, dest: City): Yields {
+  const out = districtRouteYields(state, dest, 'domestic');
   // CIV6 (Isolationism): "Domestic routes provide +2 Food, +2 Production."
   addYields(out, getModifiers(state, dest.seat).domesticRouteYield);
   return out;
@@ -476,11 +490,6 @@ export function routeYields(state: GameState, dest: City): Yields {
 export const CITY_STATE_ROUTE_GOLD = 3;
 export const CITY_STATE_ROUTE_SPEC = 1;
 
-/** International routes are gold-heavy: +INTL_ROUTE_GOLD base +1 gold per
- * destination completed specialty district. No food/production (that is the
- * domestic-only channel). Exported for the GPU rules dump. */
-export const INTL_ROUTE_GOLD = 3;
-
 /**
  * CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): `origin` is
  * REQUIRED because a row may be intercontinental, and that is a fact about
@@ -488,8 +497,10 @@ export const INTL_ROUTE_GOLD = 3;
  * plain amount on a leg that earns triple.
  */
 export function routeYieldsInternational(state: GameState, origin: City, dest: City, seat: number): Yields {
-  const out = emptyYields();
-  out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
+  // the table's INTERNATIONAL column over the destination's districts —
+  // gold 3 from the centre, gold 3 more from a Harbor or Commercial Hub, a
+  // point of each specialty district's own yield
+  const out = districtRouteYields(state, dest, 'international');
   // CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own routes out;
   // "+2 Food for them" on anyone's route in.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INTL_ROUTE_GOLD;

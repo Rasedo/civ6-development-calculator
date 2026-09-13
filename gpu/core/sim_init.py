@@ -2400,7 +2400,6 @@ class SimInit:
         self._trade_wonders = [int(x) for x in _tr.get("capWonderWidx", [])]
         self._trade_range = int(_tr.get("range", 15))
         self._trade_sea_range = int(_tr.get("seaRange", 30))
-        self._trade_intl_gold = int(_tr.get("intlGold", 3))  # international base gold
         # District_TradeRouteYields' CITY_CENTER row: the flat head of every
         # route, domestic and international (engine yield order)
         self._route_centre_dom = torch.tensor([float(x) for x in _tr.get("centreRouteDom", [1, 1, 0, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]

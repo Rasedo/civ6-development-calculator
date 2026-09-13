@@ -3,7 +3,7 @@ import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfC
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, stampTradingPost, routePostGold, wonderRouteOriginGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, stampTradingPost, routePostGold, wonderRouteOriginGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA } from '../../../cpu/core/trade';
 import { computeCityStats } from '../../../cpu/core/city';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { GOVERNORS } from '../../../cpu/data/governors';
@@ -102,19 +102,26 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 }
 
 describe('international route yields', () => {
-  it('routeYieldsInternational pays INTL_ROUTE_GOLD + 1 gold per completed specialty district, gold only', () => {
+  it('routeYieldsInternational pays District_TradeRouteYields: the centre 3 gold, a Campus +1 science, the origin nothing', () => {
     const { state, origin, dest } = twoCitySandbox();
     expect(specialtyDistricts(state, dest)).toBe(0);
     let y = routeYieldsInternational(state, origin, dest, 0);
-    expect(y.gold).toBe(INTL_ROUTE_GOLD);
+    expect(y.gold).toBe(3); // the CITY_CENTER row
     expect(y.food).toBe(0);
     expect(y.production).toBe(0);
+    expect(y.science).toBe(0);
 
     addCompletedCampus(state, dest, 11, 6);
     expect(specialtyDistricts(state, dest)).toBe(1);
     y = routeYieldsInternational(state, origin, dest, 0);
-    expect(y.gold).toBe(INTL_ROUTE_GOLD + 1);
+    expect(y.gold).toBe(3); // a Campus pays SCIENCE, not gold
+    expect(y.science).toBe(1);
     expect(y.food).toBe(0);
+
+    // YieldChangeAsOrigin is 0 on every row: the ORIGIN's districts pay nothing
+    addCompletedCampus(state, origin, 4, 6);
+    const again = routeYieldsInternational(state, origin, dest, 0);
+    expect(again).toEqual(y);
   });
 
   it('a seat-0 international route to a civ city pays gold only and is suspended at war', () => {
@@ -127,7 +134,8 @@ describe('international route yields', () => {
     expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
     const peaceYields = cityTradeYields(state, origin, 0);
-    expect(peaceYields.gold).toBe(INTL_ROUTE_GOLD + 1); // 3 base + 1 specialty
+    expect(peaceYields.gold).toBe(3); // the centre row; the Campus pays science
+    expect(peaceYields.science).toBe(1);
     expect(peaceYields.food).toBe(0);
     expect(peaceYields.production).toBe(0);
 
@@ -375,10 +383,13 @@ describe('the route candidate weighs every destination at once', () => {
 
     const cand = routeCandidateRow(state, state.seats[0]);
     expect(cand[0]).toBe(origin.centerIndex);
-    // the foreign city pays INTL_ROUTE_GOLD + its districts; the domestic one
-    // pays 2 + 2*floor(districts/2), and the higher total takes the route
-    const intlSum = INTL_ROUTE_GOLD + specialtyDistricts(state, civ.cities[0]);
-    const domSum = 2 + 2 * Math.floor(specialtyDistricts(state, near) / 2);
+    // each destination pays its District_TradeRouteYields rows (the foreign
+    // one the international column, the domestic one the domestic column),
+    // and the higher total takes the route
+    const tot = (y: { food: number; production: number; gold: number; science: number; culture: number; faith: number }) =>
+      y.food + y.production + y.gold + y.science + y.culture + y.faith;
+    const intlSum = tot(routeYieldsInternational(state, origin, civ.cities[0], 0));
+    const domSum = tot(routeYields(state, near));
     expect(cand[1]).toBe(intlSum > domSum ? civ.cities[0].centerIndex : near.centerIndex);
     expect(intlSum).toBeGreaterThan(domSum);
   });

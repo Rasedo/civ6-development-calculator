@@ -7462,8 +7462,9 @@ class SimSeats:
         order (food, prod, gold, sci, cul, faith), or None when the row holds
         no active route batch-wide.
 
-        DOMESTIC legs pay routeYields' 1 + floor(destCompletedSpecialty/2) to
-        food AND production, plus Messenger of the Gods (the enhancer's
+        DOMESTIC legs pay routeYields — District_TradeRouteYields' DOMESTIC
+        column over the dest's completed districts plus the centre row (food
+        1 / production 1) — plus Messenger of the Gods (the enhancer's
         tradeReligionYields) when the DEST city follows this row's own religion
         — religion ids ARE seat ids, and the seat is the row. A CS leg (dest
         encoded -(2+cityStateIdx)) pays cityStateRouteGold to gold +
@@ -7471,8 +7472,9 @@ class SimSeats:
         gated on citystate_alive — TS removes a captured CS and prunes its
         routes at capture, and this gate is the mirror for the same-turn read.
         An INTERNATIONAL leg (seat_route_dcity >= 0, paired with
-        seat_route_dseat) pays intlGold + the dest city's completed specialty
-        count to GOLD only. A route pays while it LIVES — interdiction is the
+        seat_route_dseat) pays the table's INTERNATIONAL column over the
+        dest's completed districts plus the centre row (gold 3), into every
+        yield the rows name. A route pays while it LIVES — interdiction is the
         PLUNDER kill in _trade_walk_tick, and a war CANCELS the pair's routes
         at the declaration, so no per-read war or raid gate survives here.
 
@@ -7524,7 +7526,12 @@ class SimSeats:
         has_dest = dm.any(dim=2)
         from_j = fm.long().argmax(dim=2)
         dest_j = dm.long().argmax(dim=2)
-        per = (1 + self._district_counts(row)[1] // 2).double()  # [B, cols] routeYields' food (= prod) column
+        # routeYields: District_TradeRouteYields' DOMESTIC column over the dest
+        # city's completed districts (the registry, one tile per type) plus
+        # the centre row — six yields per destination column, [B, cols, 6]
+        _reg_o = self.city_dist_tile[:, row, :cols]
+        _comp_o = (_reg_o >= 0) & self.district_complete.gather(1, _reg_o.clamp(min=0).reshape(B, -1)).reshape_as(_reg_o)
+        dom6 = self._route_centre_dom.reshape(1, 1, 6) + _comp_o.double() @ self._route_dom_y  # [B, cols, 6]
         inc = torch.zeros(B, cols * 6, dtype=torch.float64, device=self.device)
         if self._gov_has_effects:
             _rg = self._gov_mods(row)[12]["rgold"]
@@ -7533,8 +7540,8 @@ class SimSeats:
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
-        inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
-        inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        for _yc in range(6):
+            inc.scatter_add_(1, from_j * 6 + _yc, dom6[:, :, _yc].gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
         # rows, the same shape the international leg pays
         if self._domestic_route_rows:
@@ -7632,8 +7639,8 @@ class SimSeats:
             if bool((pg_c > 0).any()):
                 inc.scatter_add_(1, from_j * 6 + 2, pg_c.double() * pays_c.double())
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
-        # (seat_route_dcity >= 0) pays intlGold + the dest city's completed
-        # specialty count to GOLD only.
+        # (seat_route_dcity >= 0) pays District_TradeRouteYields' INTERNATIONAL
+        # column over the dest's completed districts plus the centre row.
         rd_c = self.seat_route_dcity[:, row]  # [B, K] dest city id (>=0 = intl)
         intl = act & (rd_c >= 0)
         if bool(intl.any()):
@@ -7655,7 +7662,14 @@ class SimSeats:
             _comp = (_reg >= 0) & self.district_complete.gather(1, _reg.clamp(min=0).reshape(B, -1)).reshape_as(_reg)
             _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, n_majors, RC]
             spec_dest = _spec_all.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
-            gold_i = (self._trade_intl_gold + spec_dest).double()
+            # the table's INTERNATIONAL column at the dest's (row, column) of
+            # the registry, plus the centre row: six yields, [B, K, 6]; the
+            # gold column then takes every gold adder below
+            _nDr = _comp.shape[3]
+            _comp_d = _comp.gather(1, _rx.unsqueeze(3).expand(B, K_i, RCw, _nDr)).gather(
+                2, _col.unsqueeze(3).expand(B, K_i, 1, _nDr)).squeeze(2)  # [B, K, nD]
+            intl6 = self._route_centre_intl.reshape(1, 1, 6) + _comp_d.double() @ self._route_intl_y  # [B, K, 6]
+            gold_i = intl6[:, :, 2]
             # CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own
             # routes out; "+2 Food for them" on anyone's route in.
             gold_i = gold_i + self._cleo_intl_gold * self._row_leads(row, "CLEOPATRA").double().unsqueeze(1)
@@ -7695,6 +7709,8 @@ class SimSeats:
                 snd_s = _wcp.double() @ self._wond_sender_sci
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            for _yc in (0, 1, 3, 4, 5):
+                inc.scatter_add_(1, from_j * 6 + _yc, intl6[:, :, _yc] * pays_i.double())
             # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
             # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
             # on different landmasses, and it ADDS to the plain row rather
