@@ -18,7 +18,7 @@ import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
   SPY_MAX_LEVEL, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_TRAVEL_COLS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
-  SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT,
+  SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE,
   SPY_CAPTURE_PCT, SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
@@ -430,6 +430,57 @@ export function tickSpyEffects(state: GameState, seat: number): void {
   }
 }
 
+/** The six outcomes of a spy mission's roll, ranked by MARGIN — the two
+ *  successes first, so `out <= MISSION_SUCCESS_MUST_ESCAPE` is "it worked". */
+export const MISSION_SUCCESS_UNDETECTED = 0;
+export const MISSION_SUCCESS_MUST_ESCAPE = 1;
+export const MISSION_FAIL_UNDETECTED = 2;
+export const MISSION_FAIL_MUST_ESCAPE = 3;
+export const MISSION_CAPTURED = 4;
+export const MISSION_KILLED = 5;
+
+/**
+ * CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua` over the tuner
+ * socket): every mission is ONE roll R of 3d6 read against a threshold
+ * T = BaseProbability - k, in six bands by the margin d = R - T:
+ *   d >= 2 success undetected; d in {0, 1} success, must escape;
+ *   d = -1 fail undetected; d in {-3, -2} fail, must escape;
+ *   d in {-5, -4} captured; d <= -6 killed.
+ * The game's tables are floor(p x 256)/256 of exactly these bands (base 13,
+ * k = 2: 66/61/32/54/29/11 of 256).
+ */
+export function missionOutcome(r: number, t: number): number {
+  const d = r - t;
+  if (d >= 2) return MISSION_SUCCESS_UNDETECTED;
+  if (d >= 0) return MISSION_SUCCESS_MUST_ESCAPE;
+  if (d === -1) return MISSION_FAIL_UNDETECTED;
+  if (d >= -3) return MISSION_FAIL_MUST_ESCAPE;
+  if (d >= -5) return MISSION_CAPTURED;
+  return MISSION_KILLED;
+}
+
+/** T = BaseProbability - k, k = SPY_ROLL_LEVEL_BASE + the level the mission
+ *  rolls with (`effectiveLevel` in a city, `minorMissionLevel` at a minor):
+ *  a fresh Recruit reads k = 2, Gain Sources' +2 levels reads k = 4, a
+ *  promotion's +2 on its own operation likewise. */
+export function missionThreshold(def: SpyMissionDef, lvl: number): number {
+  return (def.baseProbability ?? 0) - (SPY_ROLL_LEVEL_BASE + lvl);
+}
+
+/** the 3d6 — one draw per die, mirrored draw for draw on both engines. */
+function missionRoll(state: GameState): number {
+  let r = 0;
+  for (let i = 0; i < SPY_ROLL_DICE; i++) r += Math.floor(nextRandom(state) * SPY_ROLL_FACES) + 1;
+  return r;
+}
+
+/** The level a mission at a MINOR rolls with: no city, so no Gain Sources
+ *  clock and no counter levels. */
+export function minorMissionLevel(state: GameState, unit: Unit, m: number): number {
+  return Math.max(0, spyLevel(unit) + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
+    + quartermasterLevels(state, unit.seat) + congressPactLevels(state, m));
+}
+
 function roll(state: GameState, pct: number): boolean {
   return Math.floor(nextRandom(state) * 100) < pct;
 }
@@ -453,9 +504,9 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     return;
   }
   const lvl = effectiveLevel(state, unit, here.city, m);
-  const ok = def.certain
-    || roll(state, (def.successPct ?? 0) + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
-  if (ok) {
+  const out = def.certain ? MISSION_SUCCESS_UNDETECTED
+    : missionOutcome(missionRoll(state), missionThreshold(def, lvl));
+  if (out <= MISSION_SUCCESS_MUST_ESCAPE) {
     applyMission(state, unit, m, here.city, here.seat.seat, lvl);
     if (def.offensive) {
       // CIV6: "Spies ... gain levels by successfully completing offensive
@@ -466,7 +517,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     }
   }
   if (def.certain) return;
-  if (!ok) spyEscape(state, unit, here.city.districts, here.seat.seat, here.city);
+  spyAftermath(state, unit, out, here.city.districts, here.seat.seat, here.city);
 }
 
 /**
@@ -478,10 +529,9 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
 function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMissionDef): void {
   const minor = spyMinorAt(state, unit.tileIndex);
   if (!minor) return;
-  const lvl = Math.max(0, spyLevel(unit) + promoValueFor(unit, 'SPY_OP_LEVEL', 1 << m)
-    + quartermasterLevels(state, unit.seat) + congressPactLevels(state, m));
-  const ok = roll(state, (def.successPct ?? 0) + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
-  if (ok) {
+  const lvl = minorMissionLevel(state, unit, m);
+  const out = missionOutcome(missionRoll(state), missionThreshold(def, lvl));
+  if (out <= MISSION_SUCCESS_MUST_ESCAPE) {
     if (m === SPY_M_FABRICATE_SCANDAL) {
       const k = SPY_SCANDAL_ENVOYS_BASE + SPY_SCANDAL_PER_LEVEL * lvl;
       for (const s of state.seats) {
@@ -493,9 +543,9 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
     }
     levelUpSpy(state, unit);
     dedicationEvent(state, unit.seat, DED_BODYGUARD);
-    return;
   }
-  spyEscape(state, unit, minor.districts ?? [], -1);
+  // a minor keeps no cell, so a catch there ends the career
+  spyAftermath(state, unit, out, minor.districts ?? [], -1);
 }
 
 /**
@@ -539,17 +589,45 @@ function spyEscape(state: GameState, unit: Unit,
     return;
   }
   if (jailer >= 0 && roll(state, SPY_CAPTURE_PCT)) {
-    // CIV6 (Spies and Espionage): a spy "may gain levels from successful
-    // offensive operations, or capturing an enemy Spy" — the post that made
-    // the catch likelier is the one that earns it, and the first of them by
-    // slot is the captor on both engines.
-    const captor = posted[0];
-    if (captor) levelUpSpy(state, captor);
-    // CIV6: captured spies "are imprisoned, but not killed", and the owner
-    // "can then attempt to trade with the civilization who captured the Spy,
-    // securing their release" — at the level it was caught at.
-    holdSpy(state, unit.seat, jailer, spyLevel(unit));
-    disbandUnit(state, unit.id);
+    spyCaptured(state, unit, jailer, posted);
+    return;
+  }
+  disbandUnit(state, unit.id);
+}
+
+/** The catch — from the roll's own CAPTURED band or a lost escape. */
+function spyCaptured(state: GameState, unit: Unit, jailer: number, posted: Unit[]): void {
+  // CIV6 (Spies and Espionage): a spy "may gain levels from successful
+  // offensive operations, or capturing an enemy Spy" — the post that made
+  // the catch likelier is the one that earns it, and the first of them by
+  // slot is the captor on both engines.
+  const captor = posted[0];
+  if (captor) levelUpSpy(state, captor);
+  // CIV6: captured spies "are imprisoned, but not killed", and the owner
+  // "can then attempt to trade with the civilization who captured the Spy,
+  // securing their release" — at the level it was caught at.
+  holdSpy(state, unit.seat, jailer, spyLevel(unit));
+  disbandUnit(state, unit.id);
+}
+
+/**
+ * What the roll's band does to the spy once the mission's own effect has
+ * landed: nothing for the two UNDETECTED bands, the escape sequence for the
+ * two MUST-ESCAPE bands (a success can still be seen), the catch for
+ * CAPTURED where a major runs a cell — a minor keeps none, so its catch ends
+ * the career like KILLED.
+ */
+function spyAftermath(state: GameState, unit: Unit, out: number,
+                      districts: { type: string; tileIndex: number }[], jailer: number,
+                      city?: City): void {
+  if (out === MISSION_SUCCESS_UNDETECTED || out === MISSION_FAIL_UNDETECTED) return;
+  if (out === MISSION_SUCCESS_MUST_ESCAPE || out === MISSION_FAIL_MUST_ESCAPE) {
+    spyEscape(state, unit, districts, jailer, city);
+    return;
+  }
+  if (out === MISSION_CAPTURED && jailer >= 0) {
+    const posted = city ? counterspiesGuarding(state, jailer, city, unit.tileIndex) : [];
+    spyCaptured(state, unit, jailer, posted);
     return;
   }
   disbandUnit(state, unit.id);

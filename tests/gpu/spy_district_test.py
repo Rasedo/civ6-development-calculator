@@ -206,9 +206,22 @@ def main() -> None:
     sim.unit_spy_mission[B0, v] = sim._spy_idle
     sim._gen_ver += 1
     order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_sabotage)
-    sim.rng_state[B0] = 7  # a draw that clears the success bar
-    for _ in range(int(sim.unit_spy_turns[B0, v])):
+    for _ in range(int(sim.unit_spy_turns[B0, v]) - 1):
         sim._tick_spies(row)
+    # the roll is the measured 3d6 (tests/gpu/spy_test.py `seek_band`): walk
+    # seeds until the resolving tick's roll SUCCEEDS unseen
+    _t = sim._mission_threshold(sim._spy_m_sabotage, sim._spy_effective_level(row, B0, v, sim._spy_m_sabotage, foe, theirs))
+    _one = torch.zeros(sim.B, dtype=torch.bool)
+    _one[B0] = True
+    for _seed in range(1, 20000):
+        sim.rng_state[B0] = _seed
+        _r = sum(int(sim._next_random(_one)[B0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
+        if sim._mission_outcome(_r, _t) == sim.M_SUCCESS_UNDETECTED:
+            sim.rng_state[B0] = _seed
+            break
+    else:
+        raise AssertionError(f"no seed in 20000 succeeds unseen against T={_t}")
+    sim._tick_spies(row)
     assert bool(sim.city_bldg_pillaged[B0, foe, theirs, wk]), "Sabotage did not pillage the Workshop"
     assert not bool(sim.district_pillaged[B0, iz]), "Sabotage darkened the district"
     yf = sim._seat_amenity(foe)[2][:, theirs:theirs + 1]

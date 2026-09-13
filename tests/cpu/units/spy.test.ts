@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
-import { spawnUnit, trainableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain } from '../../../cpu/core/units';
+import { spawnUnit, trainableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/core/seats';
 import {
@@ -43,10 +43,9 @@ import { BARB_SEAT } from '../../../cpu/core/seats';
 import type { City, CityState, GameState } from '../../../cpu/core/types';
 import { GWO_PORTRAIT } from '../../../cpu/data/greatWorks';
 
-/** `rngState` seeds whose FIRST draw clears the 50% success bar, and whose
- *  first two draws are fail-then-caught. Picked so no lane has to guard its
- *  own assertions behind an `if`. */
-const WINS = 7;
+/** a seed whose first three d6 draws sum to 18: the measured 3d6 succeeds
+ *  UNDETECTED at every threshold a scene below rolls against. */
+const WINS = 749;
 /** the mission's own published duration. */
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 const LOSES = 1;
@@ -249,21 +248,24 @@ describe('the clock', () => {
     expect(turnsOf(SPY_M_COUNTERSPY)).toBe(16);
     for (const m of SPY_MISSIONS) {
       expect(m.turns).toBe(m.id === 'COUNTERSPY' || m.id === 'FABRICATE_SCANDAL' ? 16 : 8);
-      // the table publishes a rate for exactly the missions that ROLL: a
-      // `certain` one succeeds outright, and the counterspy post never resolves
+      // the install publishes a BaseProbability for exactly the missions that
+      // ROLL: a `certain` one succeeds outright, and the counterspy post never
+      // resolves
       const rolls = !m.certain && m.id !== 'COUNTERSPY';
-      expect(m.successPct !== undefined).toBe(rolls);
+      expect(m.baseProbability !== undefined).toBe(rolls);
     }
-    const pct = (id: string) => SPY_MISSIONS.find((m) => m.id === id)!.successPct;
-    expect(pct('RECRUIT_PARTISANS')).toBe(10);
-    expect(pct('GREAT_WORK_HEIST')).toBe(20);
-    expect(pct('DISRUPT_ROCKETRY')).toBe(20);
-    expect(pct('BREACH_DAM')).toBe(20);
-    expect(pct('SABOTAGE_PRODUCTION')).toBe(35);
-    expect(pct('STEAL_TECH_BOOST')).toBe(35);
-    expect(pct('NEUTRALIZE_GOVERNOR')).toBe(35);
-    expect(pct('SIPHON_FUNDS')).toBe(56);
-    expect(pct('FOMENT_UNREST')).toBe(56);
+    // CIV6 (UnitOperations.BaseProbability): the 3d6 threshold per mission
+    const base = (id: string) => SPY_MISSIONS.find((m) => m.id === id)!.baseProbability;
+    expect(base('RECRUIT_PARTISANS')).toBe(16);
+    expect(base('GREAT_WORK_HEIST')).toBe(15);
+    expect(base('DISRUPT_ROCKETRY')).toBe(15);
+    expect(base('BREACH_DAM')).toBe(15);
+    expect(base('SABOTAGE_PRODUCTION')).toBe(14);
+    expect(base('STEAL_TECH_BOOST')).toBe(14);
+    expect(base('NEUTRALIZE_GOVERNOR')).toBe(14);
+    expect(base('SIPHON_FUNDS')).toBe(13);
+    expect(base('FOMENT_UNREST')).toBe(13);
+    expect(base('FABRICATE_SCANDAL')).toBe(13);
   });
 
   it('counter-espionage stands its post rather than ending', () => {
@@ -454,6 +456,21 @@ describe('what a finished mission does', () => {
     for (let i = 0; i < turnsOf(m); i++) tickSpies(state, 0);
   }
 
+  /** the roll is the measured 3d6, so a scene that needs the spy RUNNING
+   *  walks seeds: a fresh spy per seed until one lands in a must-escape
+   *  band; a spy the roll kept in place is disbanded, one it took off the
+   *  map is left where it fell (a success's effects are not the subject). */
+  function runUntilEscape(state: GameState, city: City, m: number) {
+    for (let seed = 1; seed < 400; seed++) {
+      const spy = spyAt(state, 0, city);
+      state.rngState = seed;
+      run(state, spy, m);
+      if (spy.spyMission === SPY_TRAVELLING) return spy;
+      if (state.units.some((u) => u.id === spy.id)) disbandUnit(state, spy.id);
+    }
+    throw new Error('no seed sent the spy running');
+  }
+
   it('Gain Sources arms the seat-keyed clock, and it decays', () => {
     const { state, theirs } = spyState();
     const spy = spyAt(state, 0, theirs);
@@ -476,17 +493,14 @@ describe('what a finished mission does', () => {
     expect(spy.spyLevel).toBe(1);
   });
 
-  /** pin a mission to certain FAILURE and every escape route shut. */
+  /** shut every escape route: a spy the roll sends running is caught or
+   *  killed. The roll itself is the measured 3d6, so the scenes walk seeds. */
   function pinFailure<T>(body: () => T): T {
-    const row = SPY_MISSIONS[SPY_M_SIPHON_FUNDS] as { successPct?: number };
-    const saved = row.successPct;
     const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    row.successPct = -1000;
     for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = -1000;
     try {
       return body();
     } finally {
-      row.successPct = saved;
       SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
     }
   }
@@ -502,8 +516,9 @@ describe('what a finished mission does', () => {
       const spy = spyAt(state, 0, theirs, district(state, theirs, 'COMMERCIAL_HUB'));
       state.rngState = seed;
       run(state, spy, SPY_M_SIPHON_FUNDS);
-      // the spy leaves the map either way — no escape route stands
-      expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+      // a success or an unseen failure keeps the spy on the map — those
+      // seeds say nothing about the split
+      if (state.units.some((u) => u.id === spy.id)) continue;
       if (spyHeldWith(state, 0, theirs.seat) === 1) {
         // "if you've trained the maximum number of Spies possible, you cannot
         // train a new Spy to replace one that gets captured."
@@ -531,7 +546,7 @@ describe('what a finished mission does', () => {
       const spy = spyAt(state, 0, theirs, hub);
       state.rngState = seed;
       run(state, spy, SPY_M_SIPHON_FUNDS);
-      expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+      if (state.units.some((u) => u.id === spy.id)) continue;
       if (spyHeldWith(state, 0, theirs.seat) === 1) {
         expect(guard.spyLevel).toBe(1);
         return;
@@ -545,16 +560,12 @@ describe('what a finished mission does', () => {
     // city" — by Airplane (an Aerodrome, 1 turn), Boat (a Harbor, 2), Vehicle
     // (a Commercial Hub, 3) or on Foot (always, 4), a survivor reappearing in
     // the CAPITAL.
-    const row = SPY_MISSIONS[SPY_M_FOMENT_UNREST] as { successPct?: number };
-    const saved = row.successPct;
     const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    row.successPct = -1000;
     for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = 1000;
     try {
       const { state, theirs, mine } = spyState();
       const aero = district(state, theirs, 'AERODROME');
-      const spy = spyAt(state, 0, theirs);
-      run(state, spy, SPY_M_FOMENT_UNREST);
+      const spy = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST);
       expect(spy.spyMission).toBe(SPY_TRAVELLING);
       expect(spy.spyTarget).toBe(mine.centerIndex);
       expect(spy.spyTurns).toBe(1);
@@ -563,11 +574,9 @@ describe('what a finished mission does', () => {
       expect(spy.spyMission).toBe(SPY_IDLE);
       // the Aerodrome dark, the same failure walks out on FOOT
       state.map.tiles[aero].districtPillaged = true;
-      const spy2 = spyAt(state, 0, theirs);
-      run(state, spy2, SPY_M_FOMENT_UNREST);
+      const spy2 = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST);
       expect(spy2.spyTurns).toBe(4);
     } finally {
-      row.successPct = saved;
       SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
     }
   });
@@ -593,18 +602,23 @@ describe('what a finished mission does', () => {
     expect(missionOffered(state, spy, SPY_M_FABRICATE_SCANDAL)).toBe(false);
     (cs as { suzerain?: number }).suzerain = -1;
     expect(missionOffered(state, spy, SPY_M_FABRICATE_SCANDAL)).toBe(true);
-    const row = SPY_MISSIONS[SPY_M_FABRICATE_SCANDAL] as { successPct?: number };
-    const saved = row.successPct;
-    row.successPct = 1000;
-    try {
-      run(state, spy, SPY_M_FABRICATE_SCANDAL);
+    // the roll is the measured 3d6: walk seeds until one SUCCEEDS, a fresh
+    // spy per seed — the first success is the only one that lands, so the
+    // envoy count below is that one mission's take
+    for (let seed = 1; ; seed++) {
+      expect(seed).toBeLessThan(400);
+      const s = seed === 1 ? spy : spawnUnit(state, SPY_UNIT, csTile, 0)!;
+      state.rngState = seed;
+      run(state, s, SPY_M_FABRICATE_SCANDAL);
+      if (s.spyLevel !== 1) {
+        if (state.units.some((u) => u.id === s.id)) disbandUnit(state, s.id);
+        continue;
+      }
       // CIV6: "all other players lose a number of Envoys determined by the
       // Spy's level" — MODEL-mapped as base + 1 per effective level.
       expect(envoysOf(cs, 1)).toBe(5 - SPY_SCANDAL_ENVOYS_BASE);
       expect(envoysOf(cs, 0)).toBe(3);
-      expect(spy.spyLevel).toBe(1);
-    } finally {
-      row.successPct = saved;
+      break;
     }
   });
 

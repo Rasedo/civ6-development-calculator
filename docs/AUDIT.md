@@ -1027,6 +1027,13 @@ the gate reaches is worth more here than one that re-reads the exporter.
     (the tuner cannot raise a Spy's XP), and the ESCAPE roll below — no UI
     call exposes it, so it needs sampled missions (a dozen spies on
     8-turn missions under Autoplay, outcomes read from the mission log).
+    SHIPPED 2026-09-13 (#254): `missionOutcome` / `_mission_outcome` (six
+    bands by margin), `missionThreshold` (base - (2 + level)), one 3d6 per
+    mission mirrored draw for draw, `spyAftermath` routing the bands —
+    a success can still have to escape, a failure can go unseen, the
+    roll itself can capture or kill. `successPct` and the per-level lift
+    left the mission roll; the ESCAPE keeps its model until ask 14. The
+    counterspy columns stay UNMEASURED and off the roll (lab session 2).
   - ONE ROW BREAKS THE PATTERN, and a 2026-09-08 re-read of the table found
     it: FABRICATE_SCANDAL carries `BaseProbability` and `LevelProbChange`
     and NO counterspy columns at all — no `EnemyProbChange`, no

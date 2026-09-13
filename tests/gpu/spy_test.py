@@ -76,6 +76,27 @@ def mask_row(sim, row, slot):
     return m[0, rank_of(sim, row, slot)]
 
 
+def seek_band(sim, want, t: int, start: int = 1) -> int:
+    """Walk rng seeds until the NEXT 3d6 lands in one of the wanted bands
+    against threshold `t`, leave the stream on that seed and return it. The
+    mission roll is the resolving tick's first draw, so this pins the BAND
+    the way `successPct = +-1000` once pinned the outcome."""
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[0] = True
+    for seed in range(start, start + 20000):
+        sim.rng_state[0] = seed
+        r = sum(int(sim._next_random(one)[0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
+        if sim._mission_outcome(r, t) in want:
+            sim.rng_state[0] = seed
+            return seed
+    raise AssertionError(f"no seed in 20000 lands a 3d6 in bands {sorted(want)} against T={t}")
+
+
+def city_threshold(sim, row, w, m, hr, hc) -> int:
+    """T for a mission spy `w` of `row` runs in city (hr, hc)."""
+    return sim._mission_threshold(m, sim._spy_effective_level(row, 0, w, m, hr, hc))
+
+
 def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -217,10 +238,12 @@ def main() -> None:
     assert (base, post) == (8, 16), f"the table reads {base}/{post}, not 8/16"
     for _mi, _md in enumerate(sim._spy_missions):
         _rolls = not _md["certain"] and _mi != sim._spy_m_counterspy
-        assert (_md["successPct"] > 0) == _rolls, (
-            f"mission {_mi} publishes {_md['successPct']}% and rolls={_rolls}")
-    assert sim._spy_missions[sim._spy_m_partisans]["successPct"] == 10
-    assert sim._spy_missions[sim._spy_m_siphon]["successPct"] == 56
+        assert (_md["baseProbability"] > 0) == _rolls, (
+            f"mission {_mi} publishes BaseProbability {_md['baseProbability']} and rolls={_rolls}")
+    # CIV6 (UnitOperations.BaseProbability): the 3d6 threshold per mission
+    assert sim._spy_missions[sim._spy_m_partisans]["baseProbability"] == 16
+    assert sim._spy_missions[sim._spy_m_siphon]["baseProbability"] == 13
+    assert sim._spy_roll_dice == 3 and sim._spy_roll_faces == 6 and sim._spy_roll_level_base == 2
     assert int(sim._spy_mission_turns(row, sim._spy_m_unrest)[0]) == base
     sim.civ_age[0, row] = 2
     sim.ded_picks[0, row, 0] = sim._ded_bodyguard
@@ -278,9 +301,11 @@ def main() -> None:
     sim._gen_ver += 1
     order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_sabotage)
     assert int(sim.unit_spy_mission[0, v]) == sim._spy_m_sabotage
-    sim.rng_state[0] = 7  # a draw that clears the success bar
-    for _ in range(int(sim.unit_spy_turns[0, v])):
+    for _ in range(int(sim.unit_spy_turns[0, v]) - 1):
         sim._tick_spies(row)
+    # the roll is the measured 3d6: a seed whose roll SUCCEEDS unseen
+    seek_band(sim, {sim.M_SUCCESS_UNDETECTED}, city_threshold(sim, row, v, sim._spy_m_sabotage, foe, theirs))
+    sim._tick_spies(row)
     assert bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a successful Sabotage did not pillage the Workshop"
     assert not bool(sim.district_pillaged[0, iz]), "Sabotage darkened the district itself"
     assert int(sim.unit_spy_level[0, v]) == 1, "an offensive success levels the Spy"
@@ -297,11 +322,10 @@ def main() -> None:
     # offensive operations, or capturing an enemy Spy". Both odds are PINNED
     # rather than rolled — the mission cannot succeed and the catch cannot
     # miss — so the poke reads the award, not the dice.
-    _pct0, _cap0 = sim._spy_missions[sim._spy_m_sabotage]["successPct"], sim._spy_capture_pct
+    _cap0 = sim._spy_capture_pct
     _per0 = sim._spy_success_per_level
     _rt0 = [r["basePct"] for r in sim._spy_escape_routes]
-    sim._spy_missions[sim._spy_m_sabotage]["successPct"] = 0
-    sim._spy_success_per_level = 0   # ...so no LEVEL can lift the pinned rate
+    sim._spy_success_per_level = 0   # ...so no LEVEL can lift the escape's rate
     sim._spy_capture_pct = 100
     for _r in sim._spy_escape_routes:
         _r["basePct"] = -1000        # ...and no route can save the spy
@@ -313,13 +337,17 @@ def main() -> None:
     sim._gen_ver += 1
     order(sim, row, w, sim._A_SPY_MISSION + sim._spy_m_sabotage)
     assert int(sim.unit_spy_mission[0, w]) == sim._spy_m_sabotage
-    for _ in range(int(sim.unit_spy_turns[0, w])):
+    for _ in range(int(sim.unit_spy_turns[0, w]) - 1):
         sim._tick_spies(row)
+    # the roll is the measured 3d6: a seed whose roll must ESCAPE (the shut
+    # routes then hand the spy to the post) or is CAPTURED outright
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE, sim.M_CAPTURED},
+              city_threshold(sim, row, w, sim._spy_m_sabotage, foe, theirs))
+    sim._tick_spies(row)
     assert not bool(sim.unit_alive[0, w]), "the pinned catch did not fire"
     assert not bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a pinned FAILURE wrecked the Workshop"
     assert int(sim.unit_spy_level[0, guard]) == 1, "the captor earned nothing"
     sim.unit_alive[0, guard] = False
-    sim._spy_missions[sim._spy_m_sabotage]["successPct"] = _pct0
     sim._spy_success_per_level = _per0
     sim._spy_capture_pct = _cap0
     for _r, _b in zip(sim._spy_escape_routes, _rt0):
@@ -460,10 +488,8 @@ def main() -> None:
     # (a Commercial Hub, 3) or on Foot (always, 4), a survivor reappearing in
     # the CAPITAL. The gates and the times are sourced; the base rates are
     # model values under the sourced "faster = more dangerous" ordering.
-    _pf = sim._spy_missions[sim._spy_m_unrest]["successPct"]
     _pl, _pc = sim._spy_success_per_level, sim._spy_capture_pct
     _rb = [r["basePct"] for r in sim._spy_escape_routes]
-    sim._spy_missions[sim._spy_m_unrest]["successPct"] = 0
     sim._spy_success_per_level = 0
     for _r in sim._spy_escape_routes:
         _r["basePct"] = 1000  # every escape succeeds
@@ -477,6 +503,7 @@ def main() -> None:
     w17 = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w17] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w17] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w17, sim._spy_m_unrest, foe, theirs))
     sim._tick_spies(row)
     assert int(sim.unit_spy_mission[0, w17]) == sim._spy_travelling, "the survivor is not riding home"
     assert int(sim.unit_spy_target[0, w17]) == cap_ctr, "the ride is not bound for the CAPITAL"
@@ -497,6 +524,7 @@ def main() -> None:
     w17b = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w17b] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w17b] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w17b, sim._spy_m_unrest, foe, theirs))
     sim._tick_spies(row)
     assert int(sim.unit_spy_turns[0, w17b]) == 4, "FOOT is not the 4-turn walk"
     sim.unit_alive[0, w17b] = False
@@ -511,12 +539,14 @@ def main() -> None:
     w18 = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w18] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w18] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w18, sim._spy_m_unrest, foe, theirs))
     sim._tick_spies(row)
     assert not bool(sim.unit_alive[0, w18]) and int(sim.seat_spy_held[0, row, foe].sum()) == held0 + 1
     sim._spy_capture_pct = 0
     w18b = spawn_spy(sim, row, ctr_t)
     sim.unit_spy_mission[0, w18b] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w18b] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w18b, sim._spy_m_unrest, foe, theirs))
     sim._tick_spies(row)
     assert not bool(sim.unit_alive[0, w18b]) and int(sim.seat_spy_held[0, row, foe].sum()) == held0 + 1
     sim.seat_spy_held[0, row, foe] = held_cell
@@ -535,11 +565,11 @@ def main() -> None:
     sim.unit_promos[0, w19] = ace_bit
     sim.unit_spy_mission[0, w19] = sim._spy_m_unrest
     sim.unit_spy_turns[0, w19] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w19, sim._spy_m_unrest, foe, theirs))
     sim._tick_spies(row)
     assert int(sim.unit_spy_mission[0, w19]) == sim._spy_travelling, "Ace Driver did not lift the escape"
     sim.unit_alive[0, w19] = False
     sim._spy_success_per_level = 0
-    sim._spy_missions[sim._spy_m_unrest]["successPct"] = _pf
     sim._spy_capture_pct = _pc
     for _r, _b in zip(sim._spy_escape_routes, _rb):
         _r["basePct"] = _b
@@ -571,18 +601,18 @@ def main() -> None:
     env0 = [int(sim.seat_citystate_envoys[0, o, s20]) for o in range(sim.n_majors)]
     for o in range(sim.n_majors):
         sim.seat_citystate_envoys[0, o, s20] = 5
-    _ps = sim._spy_missions[sim._spy_m_scandal]["successPct"]
-    sim._spy_missions[sim._spy_m_scandal]["successPct"] = 1000
     sim.unit_spy_level[0, w20] = 0
     sim.unit_spy_mission[0, w20] = sim._spy_m_scandal
     sim.unit_spy_turns[0, w20] = 1
+    # the roll is the measured 3d6: a seed whose roll SUCCEEDS unseen
+    seek_band(sim, {sim.M_SUCCESS_UNDETECTED},
+              sim._mission_threshold(sim._spy_m_scandal, sim._spy_minor_level(row, 0, w20, sim._spy_m_scandal)))
     sim._tick_spies(row)
     k20 = sim._spy_scandal_base
     for o in range(sim.n_majors):
         want = 5 if o == row else max(0, 5 - k20)
         assert int(sim.seat_citystate_envoys[0, o, s20]) == want, (o, want)
     assert int(sim.unit_spy_level[0, w20]) == 1, "an offensive success levels the Spy"
-    sim._spy_missions[sim._spy_m_scandal]["successPct"] = _ps
     for o in range(sim.n_majors):
         sim.seat_citystate_envoys[0, o, s20] = env0[o]
     sim._cs_resolve_suzerain()

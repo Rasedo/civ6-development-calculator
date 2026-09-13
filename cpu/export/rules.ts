@@ -692,7 +692,6 @@ export function buildRules() {
           citystate: m.citystate ? 1 : 0,
           turns: m.turns,
           // 0 where the chassis' table publishes none — `certain` decides those
-          successPct: m.successPct ?? 0,
           baseProbability: m.baseProbability ?? 0,
         })),
         travelMin: SPY_TRAVEL_TURNS_MIN,

@@ -372,6 +372,64 @@ class SimSpy:
         for plane in (self.city_spy_sources[:, row],):
             plane.copy_((plane - (plane > 0).long()).clamp(min=0))
 
+    # the six outcomes of a spy mission's roll, ranked by MARGIN — the two
+    # successes first, so `out <= M_SUCCESS_MUST_ESCAPE` is "it worked"
+    M_SUCCESS_UNDETECTED, M_SUCCESS_MUST_ESCAPE, M_FAIL_UNDETECTED = 0, 1, 2
+    M_FAIL_MUST_ESCAPE, M_CAPTURED, M_KILLED = 3, 4, 5
+
+    @staticmethod
+    def _mission_outcome(r: int, t: int) -> int:
+        """`missionOutcome`'s twin. CIV6 (measured 2026-09-13 over the tuner
+        socket): every mission is ONE roll R of 3d6 read against
+        T = BaseProbability - k, in six bands by the margin d = R - T:
+        d >= 2 success undetected; {0, 1} success, must escape; -1 fail
+        undetected; {-3, -2} fail, must escape; {-5, -4} captured; <= -6
+        killed. The game's tables are floor(p x 256)/256 of these bands."""
+        d = r - t
+        if d >= 2:
+            return 0
+        if d >= 0:
+            return 1
+        if d == -1:
+            return 2
+        if d >= -3:
+            return 3
+        if d >= -5:
+            return 4
+        return 5
+
+    def _mission_threshold(self, m: int, lvl: int) -> int:
+        """`missionThreshold`'s twin: T = baseProbability - (SPY_ROLL_LEVEL_BASE
+        + the level the mission rolls with) — a fresh Recruit reads k = 2."""
+        return int(self._spy_missions[m]["baseProbability"]) - (self._spy_roll_level_base + lvl)
+
+    def _mission_roll(self, b: int) -> int:
+        """the 3d6 — one draw per die, `missionRoll`'s twin draw for draw"""
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+        r = 0
+        for _ in range(self._spy_roll_dice):
+            r += int(self._next_random(one)[b] * self._spy_roll_faces) + 1
+        return r
+
+    def _spy_effective_level(self, row: int, b: int, v: int, m: int, hr: int, hc: int) -> int:
+        """`effectiveLevel`'s twin: the spy's level, Gain Sources' +2 while the
+        seat's clock runs in the city, the promotion's +2 on its own operation,
+        the Quartermaster and the Espionage Pact, less the city's counter
+        levels (Diplomatic Quarter, Consulate), floored at 0."""
+        lvl = int(self.unit_spy_level[b, v]) + (
+            self._spy_sources_levels
+            if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
+        lvl += (self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
+                + self._congress_pact_levels(b, m))
+        return max(0, lvl - self._counter_levels(b, hr, hc, int(self.unit_tile[b, v])))
+
+    def _spy_minor_level(self, row: int, b: int, v: int, m: int) -> int:
+        """`minorMissionLevel`'s twin: no city, so no Gain Sources clock and
+        no counter levels."""
+        return max(0, int(self.unit_spy_level[b, v]) + self._spy_op_levels(b, v, m)
+                   + self._quartermaster_levels(b, row) + self._congress_pact_levels(b, m))
+
     def _spy_roll(self, b: int, pct: int) -> bool:
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
@@ -397,15 +455,10 @@ class SimSpy:
             self.unit_spy_mission[b, v] = m
             self.unit_spy_turns[b, v] = int(self._spy_mission_turns(row, m, _sc)[b])
             return
-        lvl = int(self.unit_spy_level[b, v]) + (
-            self._spy_sources_levels
-            if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
-        lvl += (self._spy_op_levels(b, v, m) + self._quartermaster_levels(b, row)
-                + self._congress_pact_levels(b, m))
-        lvl = max(0, lvl - self._counter_levels(b, hr, hc, int(self.unit_tile[b, v])))
-        ok = bool(mdef["certain"]) or self._spy_roll(
-            b, mdef["successPct"] + self._spy_success_per_level * lvl)
-        if ok:
+        lvl = self._spy_effective_level(row, b, v, m, hr, hc)
+        out = (self.M_SUCCESS_UNDETECTED if bool(mdef["certain"])
+               else self._mission_outcome(self._mission_roll(b), self._mission_threshold(m, lvl)))
+        if out <= self.M_SUCCESS_MUST_ESCAPE:
             self._apply_mission(row, b, v, m, hr, hc, lvl)
             if mdef["offensive"]:
                 # CIV6: Spies "gain levels by successfully completing offensive
@@ -417,8 +470,7 @@ class SimSpy:
                 self._dedication_event(row, self._ded_bodyguard, one)
         if mdef["certain"]:
             return
-        if not ok:
-            self._spy_escape(row, b, v, hr, hc)
+        self._spy_aftermath(row, b, v, out, hr, hc)
 
     def _resolve_minor_mission(self, row: int, b: int, v: int, m: int) -> None:
         """CIV6 (Fabricate Scandal): the one CITY-STATE mission. On success
@@ -429,11 +481,9 @@ class SimSpy:
         cs = self._spy_minor_at(b, int(self.unit_tile[b, v]))
         if cs < 0:
             return
-        mdef = self._spy_missions[m]
-        lvl = max(0, int(self.unit_spy_level[b, v]) + self._spy_op_levels(b, v, m)
-                  + self._quartermaster_levels(b, row) + self._congress_pact_levels(b, m))
-        ok = self._spy_roll(b, mdef["successPct"] + self._spy_success_per_level * lvl)
-        if ok:
+        lvl = self._spy_minor_level(row, b, v, m)
+        out = self._mission_outcome(self._mission_roll(b), self._mission_threshold(m, lvl))
+        if out <= self.M_SUCCESS_MUST_ESCAPE:
             if m == self._spy_m_scandal:
                 k = self._spy_scandal_base + self._spy_scandal_per_level * lvl
                 for o in range(self.n_majors):
@@ -448,8 +498,8 @@ class SimSpy:
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
             self._dedication_event(row, self._ded_bodyguard, one)
-            return
-        self._spy_escape(row, b, v, -1, -1, cs=cs)
+        # a minor keeps no cell, so a catch there ends the career
+        self._spy_aftermath(row, b, v, out, -1, -1, cs=cs)
 
     def _spy_escape(self, row: int, b: int, v: int, hr: int, hc: int,
                     cs: int = -1) -> None:
@@ -495,17 +545,41 @@ class SimSpy:
             self.unit_spy_turns[b, v] = route["turns"]
             return
         if hr >= 0 and self._spy_roll(b, self._spy_capture_pct):
-            # CIV6 (Spies and Espionage): a spy "may gain levels from
-            # successful offensive operations, or capturing an enemy Spy" —
-            # the post that made the catch likelier is the one that earns it,
-            # and the first of them by slot is the captor on both engines.
-            if posted.numel():
-                self._level_up_spy(b, int(posted[0]))
-            # CIV6: captured spies "are imprisoned, but not killed", and the
-            # owner "can then attempt to trade with the civilization who
-            # captured the Spy, securing their release" — at the level it
-            # was caught at (the cell counts by level).
-            self.seat_spy_held[b, row, hr, min(int(self.unit_spy_level[b, v]), self._spy_max_level)] += 1
+            self._spy_captured(row, b, v, hr, posted)
+            return
+        self.unit_alive[b, v] = False
+
+    def _spy_captured(self, row: int, b: int, v: int, hr: int, posted: torch.Tensor) -> None:
+        """The catch — from the roll's own CAPTURED band or a lost escape
+        (`spyCaptured`)."""
+        # CIV6 (Spies and Espionage): a spy "may gain levels from
+        # successful offensive operations, or capturing an enemy Spy" —
+        # the post that made the catch likelier is the one that earns it,
+        # and the first of them by slot is the captor on both engines.
+        if posted.numel():
+            self._level_up_spy(b, int(posted[0]))
+        # CIV6: captured spies "are imprisoned, but not killed", and the
+        # owner "can then attempt to trade with the civilization who
+        # captured the Spy, securing their release" — at the level it
+        # was caught at (the cell counts by level).
+        self.seat_spy_held[b, row, hr, min(int(self.unit_spy_level[b, v]), self._spy_max_level)] += 1
+        self.unit_alive[b, v] = False
+
+    def _spy_aftermath(self, row: int, b: int, v: int, out: int, hr: int, hc: int,
+                       cs: int = -1) -> None:
+        """`spyAftermath`'s twin: nothing for the two UNDETECTED bands, the
+        escape sequence for the two MUST-ESCAPE bands (a success can still be
+        seen), the catch for CAPTURED where a major runs a cell — a minor
+        keeps none, so its catch ends the career like KILLED."""
+        if out in (self.M_SUCCESS_UNDETECTED, self.M_FAIL_UNDETECTED):
+            return
+        if out in (self.M_SUCCESS_MUST_ESCAPE, self.M_FAIL_MUST_ESCAPE):
+            self._spy_escape(row, b, v, hr, hc, cs=cs)
+            return
+        if out == self.M_CAPTURED and hr >= 0:
+            posted = self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v]))
+            self._spy_captured(row, b, v, hr, posted)
+            return
         self.unit_alive[b, v] = False
 
     def _apply_mission(self, row: int, b: int, v: int, m: int, hr: int, hc: int,

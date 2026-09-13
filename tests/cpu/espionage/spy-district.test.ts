@@ -29,7 +29,9 @@ import { PILLAGE_BUILDING_REPAIR_PERCENT } from '../../../cpu/data/constants';
 import { hexDistance } from '../../../world/hex';
 import type { City, GameState, QueueItem } from '../../../cpu/core/types';
 
-const WINS = 7;
+/** a seed whose first three d6 draws sum to 18: the measured 3d6 succeeds
+ *  UNDETECTED at every threshold a scene below rolls against. */
+const WINS = 749;
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 function spyBit(id: string): number {
   const k = promoRows('ESPIONAGE').findIndex((p) => p.id === id);
@@ -133,12 +135,9 @@ describe('the counterspy defends the district it stands on', () => {
   });
 
   it('a post on the centre catches nobody on the Hub — until Surveillance extends it', () => {
-    // the catch is pinned certain and every escape shut, so whether the post
-    // GUARDS the Hub decides the whole outcome
-    const row = SPY_MISSIONS[SPY_M_SIPHON_FUNDS] as { successPct?: number };
-    const saved = row.successPct;
+    // every escape shut and the roll the measured 3d6, so over a seed walk
+    // whether the post GUARDS the Hub decides whether it ever earns the level
     const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    row.successPct = -1000;
     for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = -1000;
     try {
       const run = (surveil: boolean): boolean => {
@@ -159,7 +158,6 @@ describe('the counterspy defends the district it stands on', () => {
       expect(run(false)).toBe(false);
       expect(run(true)).toBe(true);
     } finally {
-      row.successPct = saved;
       SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
     }
   });
