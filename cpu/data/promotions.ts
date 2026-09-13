@@ -139,6 +139,7 @@ export const PROMO_KINDS = [
   'CONCERT_LOYALTY',     // the host city loses v Loyalty
   'CONCERT_GOLD_PCT',    // v% of the concert's Tourism arrives as Gold
   'CONCERT_CONVERT',     // the host city converts to the performer's religion
+  'SEE_THROUGH',         // CIV6 (Sentry, CanSee): features put no height in the way of this unit's look
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -179,7 +180,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   // ---- RECON ----------------------------------------------------------
   P('RANGER', 'RECON', 1, [], { kind: 'TERRAIN_MOVE_WOODS' }),
   P('ALPINE', 'RECON', 1, [], { kind: 'TERRAIN_MOVE_HILLS' }),
-  P('SENTRY', 'RECON', 2, ['RANGER', 'ALPINE'], none),
+  P('SENTRY', 'RECON', 2, ['RANGER', 'ALPINE'], { kind: 'SEE_THROUGH' }),
   P('GUERRILLA', 'RECON', 2, ['RANGER', 'ALPINE'], { kind: 'MOVE_AFTER_ATTACK' }),
   P('SPYGLASS', 'RECON', 3, ['SENTRY'], cs('SIGHT', 1)),
   P('AMBUSH', 'RECON', 3, ['GUERRILLA'], cs('CS_ALL', 20)),

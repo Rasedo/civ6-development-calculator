@@ -6,7 +6,7 @@ import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
-import { isExplored, revealAround, unitSight } from './fog';
+import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
@@ -1891,7 +1891,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             && tileFreeForUnit(state, exit, unit.seat, unit)) {
           unit.tileIndex = exit;
           unit.movesLeft -= PORTAL_MP * MP_SCALE;
-          revealAround(state, unit.seat, exit, unitSight(unit));
+          revealAround(state, unit.seat, exit, unitSight(unit), { seeThrough: unitSeesThrough(unit) });
         }
       }
     });

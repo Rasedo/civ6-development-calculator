@@ -243,6 +243,13 @@ in the entry).
     open-ground range did not grow, and the same woods that hid B from a
     flat Ranger (budget 3) did not hide it from a hill Warrior (budget 2).
     Sentry's `CanSee` then means: treat features' through-cost as 0.
+    SHIPPED 2026-09-13 (#256): `canSee` / `_los_disk` cut every UNIT reveal
+    (spawn, walk hop, portal exit, the t0 load) by occlusion on both
+    engines over one hex-line rule (`hexLineBetween` / `los_tables`);
+    the install's SightThrough table is `cpu/data/sight.ts`; Sentry is
+    the SEE_THROUGH promotion kind. A city's founding/capture radius-3
+    and a claimed tile's radius-1 stay whole disks — measured for units
+    only.
     The sourcing history: `SightThroughModifier` (Woods,
     Rainforest, Hills 1; Mountains and the great natural wonders 2) and
     `SightModifier` (Hills +1, Mountains +2) are published; the WALK is not.
@@ -779,10 +786,10 @@ the gate reaches is worth more here than one that re-reads the exporter.
     `MODIFIER_PLAYER_UNIT_ADJUST_SEE_THROUGH_FEATURES`, `CanSee = true`. A
     BOOLEAN over a published table: `SightThroughModifier` costs 1 more per
     Woods, Rainforest or Hill and 2 per Mountain or great natural wonder,
-    and `SightModifier` pays +1 standing on Hills, +2 on a Mountain. Both
-    engines reveal a flat radius today. The TABLE is data; what the install
-    does not publish is the WALK — a sight BUDGET spent along the path, or a
-    radius with occlusion behind a blocker. Ask 16.
+    and `SightModifier` pays +1 standing on Hills, +2 on a Mountain. The
+    WALK was measured (ask 11): occlusion behind a blocker, no budget —
+    SHIPPED 2026-09-13 (#256) on both engines; Sentry is the SEE_THROUGH
+    kind (features' through-cost 0 for its look). Nothing left here.
   - GROUND_CREWS — `GROUND_CREWS_BONUS_HEALTH`,
     `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION`, and NO amount: the
     modifier type is the whole rule, so the engine's own healing supplies the

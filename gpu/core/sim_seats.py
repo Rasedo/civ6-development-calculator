@@ -10566,6 +10566,9 @@ class SimSeats:
             # its own Sight (the Destroyer's 3, the Varu's 3, the Mountie's 4)
             # would otherwise walk half-blind here alone.
             sight = self._unit_sight(u_type, u_promos)
+            # ...and the look sees THROUGH features if any member is a Sentry
+            # (CanSee) — `unitSeesThrough` ORed over the formation on TS too
+            see_thr = self._promo_flag(u_type, u_promos, "SEE_THROUGH")
             # ...and the RIDER's own sight from the same tile: a formation
             # carries an Observation Balloon or a Drone precisely because it
             # sees further than the chassis dragging it, so the circle is the
@@ -10577,7 +10580,11 @@ class SimSeats:
                     self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
                     self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1))
                 sight = torch.where(_rr >= 0, torch.maximum(sight, _rs), sight)
-            self._reveal_around(rows[major], srow[major], dest[rows][major], sight[rows][major])
+                see_thr = see_thr | ((_rr >= 0) & self._promo_flag(
+                    self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
+                    self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1), "SEE_THROUGH"))
+            self._reveal_around(rows[major], srow[major], dest[rows][major], sight[rows][major],
+                                see_through=see_thr[rows][major])
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."
         if self._pk.get("PILGRIM", -1) >= 0:

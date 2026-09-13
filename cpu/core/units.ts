@@ -58,7 +58,7 @@ import {
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
-import { revealAround, nearestUnexplored, unitSight } from './fog';
+import { revealAround, nearestUnexplored, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
@@ -1094,8 +1094,12 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     // the formation's members — which is the whole reason a formation carries
     // an Observation Balloon or a Drone.
     let sight = unitSight(unit);
-    for (const rider of riders) sight = Math.max(sight, unitSight(rider));
-    revealAround(state, unit.seat, to.index, sight);
+    let seeThrough = unitSeesThrough(unit);
+    for (const rider of riders) {
+      sight = Math.max(sight, unitSight(rider));
+      seeThrough = seeThrough || unitSeesThrough(rider);
+    }
+    revealAround(state, unit.seat, to.index, sight, { seeThrough });
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
     // wonder for the first time."
     if (neighbors(state.map, to).some((t) => naturalWonderAt(t) !== null)) {
@@ -1799,7 +1803,7 @@ export function spawnUnit(
     logXpWrite(state, unit, 'fp');
   }
   state.units.push(unit);
-  revealAround(state, seat, unit.tileIndex, unitSight(unit));
+  revealAround(state, seat, unit.tileIndex, unitSight(unit), { seeThrough: unitSeesThrough(unit) });
   // Track the strongest MELEE unit each civ has ever fielded —
   // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
   // training, purchase, levies and seat production alike).

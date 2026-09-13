@@ -1346,6 +1346,16 @@ class SimInit:
         # CIV6 (PLOT_HAS_ANY_PASSABLE_FEATURE): the Marae counts a feature
         # that is not impassable — a natural wonder included.
         self._feat_passable = torch.tensor([bool(x) for x in rules.improvements["featPassable"]], dtype=torch.bool, device=device)
+        # CIV6 (SightThroughModifier / SightModifier — ask 11): the height a
+        # feature puts in the way of a look, the heights the two elevations
+        # stand at and block with, and the hex lines of every pair within the
+        # farthest sight (`FEATURE_SIGHT_THROUGH`, `ELEVATION_SIGHT`, `SIGHT_MAX`)
+        self._feat_sight_through = torch.tensor([int(x) for x in rules.improvements["featSightThrough"]], dtype=torch.long, device=device)
+        self._sight_hills = int(rules.improvements["sightHills"])
+        self._sight_mountain = int(rules.improvements["sightMountain"])
+        self._sight_max = int(rules.improvements["sightMax"])
+        _lt, _lm = los_tables(self.W, self.H, self._sight_max)
+        self._los_tgt, self._los_mid = _lt.to(device), _lm.to(device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
         # `feat_id` is LIVE (`_add_feature` writes it); `feat_id0` keeps the
         # t0 bake the per-tile `feat_yields`/chop planes were computed from.
@@ -3666,8 +3676,15 @@ class SimInit:
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
                     if self.fog_of_war:
+                        # spawnUnit's revealAround: the chassis's own sight,
+                        # cut by occlusion (ask 11) — a fresh unit sees
+                        # through nothing
                         _s0 = int(self._type_sight[ti]) or 2
-                        self.seat_explored[b, seat] |= self.pair_dist[int(u_["tile"])] <= _s0
+                        _bb = torch.tensor([b], dtype=torch.long, device=device)
+                        self.seat_explored[b, seat] |= self._los_disk(
+                            _bb, torch.tensor([int(u_["tile"])], dtype=torch.long, device=device),
+                            torch.tensor([_s0], dtype=torch.long, device=device),
+                            torch.zeros(1, dtype=torch.bool, device=device))[0]
                     self.unit_next[b] += 1
 
         # The FIXTURE-LOADED starting units must seed the best-melee trackers:

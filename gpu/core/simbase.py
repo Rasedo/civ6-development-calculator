@@ -51,6 +51,63 @@ def hex_distance_from(width: int, height: int, center: int) -> torch.Tensor:
     return (dq.abs() + dr.abs() + (dq + dr).abs()) // 2
 
 
+def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """`hexLineBetween` for every pair within `rmax`, once per map. Returns
+    (targets [T, N], mids [T, N, rmax - 1]): for each tile, the tiles at
+    distance 1..rmax (-1 padded) and, per target, the tiles strictly BETWEEN
+    on the hex line — a cube lerp with the (1e-6, 2e-6, -3e-6) nudge and
+    cube rounding, each coordinate rounded with floor(x + 0.5) exactly as
+    the TS helper does, an off-map hex on the line absent (-1)."""
+    import math
+
+    def axial(c, r):
+        return c - ((r - (r & 1)) >> 1), r
+
+    def offset(q, r):
+        return q + ((r - (r & 1)) >> 1), r
+
+    def dist(c1, r1, c2, r2):
+        q1, s1 = axial(c1, r1)
+        q2, s2 = axial(c2, r2)
+        dq, dr = q1 - q2, s1 - s2
+        return (abs(dq) + abs(dr) + abs(dq + dr)) // 2
+
+    n_t = 1 + 3 * rmax * (rmax + 1) - 1
+    T = width * height
+    tgt = torch.full((T, n_t), -1, dtype=torch.long)
+    mid = torch.full((T, n_t, max(rmax - 1, 1)), -1, dtype=torch.long)
+    for a in range(T):
+        ac, ar = a % width, a // width
+        aq, arr = axial(ac, ar)
+        k = 0
+        for br in range(max(0, ar - rmax), min(height, ar + rmax + 1)):
+            for bc in range(max(0, ac - rmax - 1), min(width, ac + rmax + 2)):
+                n = dist(ac, ar, bc, br)
+                if n < 1 or n > rmax:
+                    continue
+                b = br * width + bc
+                tgt[a, k] = b
+                bq, brr = axial(bc, br)
+                ax, az, ay = aq + 1e-6, arr + 2e-6, -aq - arr - 3e-6
+                bx, bz, by = bq + 1e-6, brr + 2e-6, -bq - brr - 3e-6
+                for i in range(1, n):
+                    t = i / n
+                    x, y, z = ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t
+                    rx, ry, rz = math.floor(x + 0.5), math.floor(y + 0.5), math.floor(z + 0.5)
+                    dx, dy, dz = abs(rx - x), abs(ry - y), abs(rz - z)
+                    if dx > dy and dx > dz:
+                        rx = -ry - rz
+                    elif dy > dz:
+                        ry = -rx - rz
+                    else:
+                        rz = -rx - ry
+                    mc, mr = offset(rx, rz)
+                    if 0 <= mc < width and 0 <= mr < height:
+                        mid[a, k, i - 1] = mr * width + mc
+                k += 1
+    return tgt, mid
+
+
 def neighbor_table(width: int, height: int) -> torch.Tensor:
     even = [(1, 0), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
     odd = [(1, 0), (1, -1), (0, -1), (-1, 0), (0, 1), (1, 1)]

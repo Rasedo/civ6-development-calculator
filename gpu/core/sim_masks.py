@@ -2154,7 +2154,51 @@ class SimMasks:
                     f" at{int(spot[_sb])}")
         self.next_slot[rows] += 1
 
-    def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius) -> None:
+    def _sight_through_plane(self, see_through: bool) -> torch.Tensor:
+        """[B, T] long — `sightThrough`: the height a tile puts in the way of a
+        look across it, its elevation's plus its feature's; `see_through`
+        (Sentry) drops the feature half."""
+        out = self.hills.long() * self._sight_hills + self.tile_mountain.long() * self._sight_mountain
+        if not see_through:
+            # the LIVE feature: `feat_id` keeps a chopped tile's old id and
+            # `feat_stripped` says it is gone (`_feature_live`) — TS reads
+            # `tile.feature`, null after the chop (seed 9001 t182: a felled
+            # rainforest still blocked a look here)
+            live = (self.feat_id >= 0) & ~self.feat_stripped
+            out = out + torch.where(live, self._feat_sight_through[self.feat_id.clamp(min=0)], torch.zeros_like(out))
+        return out
+
+    def _los_disk(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> torch.Tensor:
+        """[K, T] bool — the tiles within `radius` of `tiles` an eye standing
+        THERE can see (`canSee` over `tilesWithin`): CIV6 (measured ask 11)
+        OCCLUSION BY ELEVATION — every tile strictly between (`_los_mid`) must
+        put no more in the way than the observer's own height (flat 0, hills
+        1, mountain 2). The range is the caller's; a hill adds height, never
+        reach. `see_through` [K] bool is the Sentry flag per look."""
+        K = rows.numel()
+        rad = radius if torch.is_tensor(radius) else torch.full((K,), int(radius), dtype=torch.long, device=self.device)
+        rad = rad.reshape(-1).expand(K) if rad.numel() == 1 else rad
+        tgt = self._los_tgt[tiles]            # [K, N]
+        mid = self._los_mid[tiles]            # [K, N, M]
+        th_all = self._sight_through_plane(False)[rows]   # [K, T]
+        th_feat0 = self._sight_through_plane(True)[rows]
+        th = torch.where(see_through.reshape(K, 1), th_feat0, th_all)
+        N, M = tgt.shape[1], mid.shape[2]
+        mth = th.gather(1, mid.clamp(min=0).reshape(K, -1)).reshape(K, N, M)
+        mth = torch.where(mid >= 0, mth, torch.zeros_like(mth))
+        obs_h = (self.hills[rows, tiles].long() * self._sight_hills
+                 + self.tile_mountain[rows, tiles].long() * self._sight_mountain)  # [K]
+        blocked = mth.max(dim=2).values > obs_h.reshape(K, 1)
+        d = self.pair_dist[tiles].gather(1, tgt.clamp(min=0)).to(torch.long)
+        vis = (tgt >= 0) & ~blocked & (d <= rad.reshape(K, 1))
+        disk = torch.zeros(K, self.T, dtype=torch.bool, device=self.device)
+        kk = torch.arange(K, device=self.device).unsqueeze(1).expand(K, N)
+        disk[kk[vis], tgt[vis]] = True
+        disk[torch.arange(K, device=self.device), tiles] = True
+        return disk
+
+    def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
+                       see_through: torch.Tensor | None = None) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
         assignment is last-write-wins), seat_row an int or [K] long, tiles
@@ -2177,8 +2221,13 @@ class SimMasks:
         carries no maps arm, that was the unsourced stub's invention."""
         if not self.fog_of_war or rows.numel() == 0:
             return
-        disk = self.pair_dist[tiles.clamp(min=0)] <= (
-            radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
+        # `see_through` names a UNIT's look (revealAround's `los`): the disk is
+        # cut by occlusion; a city's or a claimed tile's reveal passes none
+        if see_through is not None:
+            disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
+        else:
+            disk = self.pair_dist[tiles.clamp(min=0)] <= (
+                radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
         new = disk & ~self.seat_explored[rows, seat_row]
         self.seat_explored[rows, seat_row] |= disk
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
@@ -2328,7 +2377,8 @@ class SimMasks:
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
         self._reveal_around(rows, row, spot[rows],
-                            self._unit_sight(type_idx[rows], torch.zeros_like(slot)))
+                            self._unit_sight(type_idx[rows], torch.zeros_like(slot)),
+                            see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
