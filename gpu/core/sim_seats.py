@@ -13129,10 +13129,12 @@ class SimSeats:
         For each origin city in ARRAY order: its own cities (array order),
         then the MET city-states (index order), then every OTHER major's
         EXPLORED cities (seat asc, city asc). EVERY legal destination competes
-        on ONE key, the route's TOTAL yields — domestic
-        2 + 2*floor(specialtyDistricts(dest)/2), a city-state's flat
-        gold+specialty, an international `intlGold + specialtyDistricts(dest)`
-        — each FOREIGN key plus `_route_post_gold` at its destination —
+        on ONE key, the route's TOTAL yields — domestic: routeYields' food +
+        production (District_TradeRouteYields' domestic column over the
+        dest's completed districts, the centre row, the dest seat's
+        Isolationism term); a city-state's flat gold+specialty; an
+        international destination's six-yield table total — each FOREIGN
+        key plus `_route_post_gold` at its destination —
         with strictly-greater-beats semantics, so ties keep the FIRST pair
         in that flat scan order. Gated on capacity AND a free Trader — the
         unit the verb spends. Slot order IS TS array order for every row."""
@@ -13147,8 +13149,15 @@ class SimSeats:
             return neg, neg
         dt = self.city_dist_tile[:, row]  # [B, RC, nD] tile per district TYPE
         comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
-        spec = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
-        ysum = 2 + 2 * (spec // 2)  # [B, RC] long, >= 2
+        # routeYields' food + production: the table's DOMESTIC column over the
+        # dest's completed districts plus the centre row (1 + 1), plus the
+        # dest seat's own Isolationism term — routeCandidateRow keys on
+        # `y.food + y.production` of exactly that composition
+        _dom_fp = self._route_dom_y[:, 0] + self._route_dom_y[:, 1]  # [nD]
+        ysum = (comp.double() @ _dom_fp + float(self._route_centre_dom[0] + self._route_centre_dom[1])).long()  # [B, RC]
+        if self._gov_has_effects:
+            _drk = self._gov_mods(row)[12]["domroute"]
+            ysum = ysum + (_drk[:, 0] + _drk[:, 1]).long().unsqueeze(1)
         centers = self.city_center[:, row].clamp(min=0)  # [B, RC]
         reach = self._route_reach_from(row)  # [B, RC, T] chained trade range
         # routes hold PERSISTENT ids; stale ids at dead columns are masked by
@@ -13225,7 +13234,7 @@ class SimSeats:
         # INTERNATIONAL destinations join the SAME scan on the same key: any
         # OTHER major's city whose centre this seat has EXPLORED.
         _S_off = W2
-        dctr_l, dalv_l, did_l, drow_l, dspec_l = [], [], [], [], []
+        dctr_l, dalv_l, did_l, drow_l, dcomp_l = [], [], [], [], []
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
@@ -13235,13 +13244,13 @@ class SimSeats:
             drow_l.append(torch.full_like(self.city_id[:, r2], r2))
             _dt2 = self.city_dist_tile[:, r2]
             _cp2 = (_dt2 >= 0) & self.district_complete.gather(1, _dt2.clamp(min=0).reshape(B, -1)).reshape_as(_dt2)
-            dspec_l.append((_cp2 & self._is_specialty.reshape(1, 1, -1)).sum(dim=2))
+            dcomp_l.append(_cp2)  # [B, cols, nD] the dest's completed districts
         dctr = torch.cat(dctr_l, dim=1) if dctr_l else None
         if dctr is not None:
             dalv = torch.cat(dalv_l, dim=1)    # [B, D]
             did = torch.cat(did_l, dim=1)      # [B, D] dest city id
             drow = torch.cat(drow_l, dim=1)    # [B, D] dest seat row
-            dspec = torch.cat(dspec_l, dim=1)  # [B, D] dest specialty districts
+            dcomp = torch.cat(dcomp_l, dim=1)  # [B, D, nD] dest completed districts
             D = dctr.shape[1]
             rds = self.seat_route_dseat[:, row]  # [B, K]
             rdc = self.seat_route_dcity[:, row]  # [B, K]
@@ -13263,7 +13272,11 @@ class SimSeats:
                 & ~exists_ip
                 & want.reshape(B, 1, 1)
             )
-            ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec + self._route_post_gold(row, dctr)  # [B, D]
+            # routeYieldsInternational's six-yield total: the table's
+            # INTERNATIONAL column over the dest's completed districts plus
+            # the centre row (gold 3), then the destination's post gold
+            ysum_ip = (dcomp.double() @ self._route_intl_y.sum(dim=1) + float(self._route_centre_intl.sum())).long() \
+                + self._route_post_gold(row, dctr)  # [B, D]
             # CIV6 (Mediterranean's Bride): the driver values Egypt's own +4 Gold
             # and the +2 Food a route INTO Egypt pays (`routeYieldsInternational`)
             ysum_ip = ysum_ip + int(self._cleo_intl_gold) * self._row_leads(row, "CLEOPATRA").long().unsqueeze(1)

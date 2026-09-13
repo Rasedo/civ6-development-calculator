@@ -10,10 +10,10 @@ load rules + a fixture, drive BatchSim, assert on internal state).
 Proven here, turn-exact with the TS contract (cpu/core/trade.ts
 routeYieldsInternational + TRADE_ROUTE_DURATION, phase.ts seat pick +
 income + expiry):
-  * the exported constants: trade.intlGold = 3, trade.duration = 20;
+  * the exported constants: the centre rows of District_TradeRouteYields, trade.duration = 20;
   * seat_route_dseat / seat_route_dcity / seat_route_exp are _MUTABLE, long,
     [B, NS, K];
-  * an international route pays intlGold + dest completed-specialty
+  * an international route pays District_TradeRouteYields at its destination
     count to GOLD only (war CANCELS routes at the declaration; no per-read gate);
   * duration expiry drops a due route (exp <= turn) and keeps a future one;
   * the destination is keyed by (SEAT, CITY ID), so a route to an id that
