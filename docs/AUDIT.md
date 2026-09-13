@@ -82,17 +82,17 @@ on these lines is a RULING, not research.
 
 | ask | re-source result |
 |---|---|
-| 1 Volcanic Soil | NARROWED. The volcano rows carry no `Hexes` at all, unlike every storm row, so the affected SET is unpublished — but the severities split `PROP_DAMAGE_FERTILITY` (gentle) against `ALL_DAMAGE_FERTILITY` (catastrophic, megacolossal), and `FEATURE_VOLCANIC_SOIL` is `ValidForReplacement="true"`, so the soil replaces a standing FEATURE. Radius and improvement survival still open. |
+| 1 Volcanic Soil | MEASURED 2026-09-13 (`tools/civ6lab`, four eruptions): radius 1, a PROPORTION of the ring painted, improvements pillaged or removed, bonus resources sometimes destroyed — see ask 1. Earlier: NARROWED. The volcano rows carry no `Hexes` at all, unlike every storm row, so the affected SET is unpublished — but the severities split `PROP_DAMAGE_FERTILITY` (gentle) against `ALL_DAMAGE_FERTILITY` (catastrophic, megacolossal), and `FEATURE_VOLCANIC_SOIL` is `ValidForReplacement="true"`, so the soil replaces a standing FEATURE. Radius and improvement survival still open. |
 | 2 Encampment pool | empty — no encampment-on-capture parameter anywhere |
 | 3 religion tie | empty — no majority tiebreak parameter |
 | 5 wonder in a blast | empty — no NUKE globals, no wonder-in-blast column |
 | 6 opinion deltas | empty — the `LOC_DIPLO_MODIFIER_*` rows are TEXT TAGS with no amount attached |
 | 9 city-state spending | empty — no `MINOR_CIV_*` spending knob exists |
 | 10 Free City as spy ground | empty — `CivilizationLevels` carries nothing spy-related |
-| 11 how sight is spent | empty — the column sits beside DefenseModifier/MovementChange/Appeal and states no semantics |
+| 11 how sight is spent | MEASURED 2026-09-13 (`tools/civ6lab`): OCCLUSION by elevation, no budget, no range from hills — see ask 11 |
 | 12 Free City amenities | empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
 | 13 Free City defence | empty of a defence column, but ONE constraint found: that row carries `IgnoresUnitStrategicResourceRequirements="false"`, where TRIBE and CITY_STATE carry true — so whatever a Free City spawns must respect strategic resources |
-| 15 trade-route district gold | confirmed `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and `_PER_DESTINATION_DISTRICT` 2; the COMPOSITION is what no row states |
+| 15 trade-route district gold | MEASURED 2026-09-13 AND the table found: `District_TradeRouteYields` (Districts.xml) is the composition; the two GlobalParameters are dead in GS — see ask 15 |
 | 16 storm `Movement 8` | MEASURED 2026-09-13 in the live game (`tools/civ6lab`) — see C-49 |
 
 Not re-swept, and deliberately: ask 4 (a per-game/per-object modelling
@@ -100,7 +100,34 @@ choice), ask 7 (one forum report against this engine's standing principle),
 ask 8 (a rename decision, not a fact), ask 14 (the whole term list is already
 in the entry).
 
-1. **C-41 — where Volcanic Soil lands.** Which tiles an eruption paints,
+1. ~~C-41 — where Volcanic Soil lands.~~ **MEASURED 2026-09-13** in the
+   live game (`tools/civ6lab/volcano_erupt.lua` + `volcano_snap.lua`; an
+   eruption is `GameRandomEvents.ApplyEvent{EventType, NamedVolcano}` —
+   `Location` is ignored, the named-volcano index is the key). Four
+   eruptions, plots within 3 snapshotted before and after:
+     - CATASTROPHIC at Thera: 5 of the 6 ring tiles took VOLCANIC_SOIL
+       (Sparta's CITY CENTRE tile among them); a Forest was replaced; the
+       PASTURE was REMOVED while its Horses stayed; the QUARRY was
+       PILLAGED and kept. Nothing at distance 2 changed.
+     - MEGACOLOSSAL at Sabalan: of the 3 land ring tiles not already soil,
+       one took soil (its Jungle+Bananas gone), one kept its Jungle but
+       LOST its Bananas, and a coastal FISH at distance 1 was destroyed.
+       Distance 2 — a city centre, a Campus, a Bananas tile — untouched.
+     - CATASTROPHIC at Nisyros: 2 of the 3 land ring tiles took soil (a
+       Wheat destroyed with one); a Burnt Forest tile did not.
+     - GENTLE at Sahand: nothing changed within 3; GENTLE at Thera again:
+       the one ring tile not yet soil took it.
+   So: the affected set is the RADIUS-1 RING for every severity seen
+   (nothing at distance 2 in four tries, including a megacolossal one);
+   a PROPORTION of the ring is painted per eruption, not all of it; the
+   soil replaces a standing feature; an improvement on a painted tile is
+   PILLAGED or REMOVED (both seen; the resource under a removed pasture
+   survived); a BONUS resource on a ring tile — land or sea — can be
+   destroyed outright. Still open: the proportion per severity (the
+   PROP/ALL pair suggests gentle = a share, catastrophic+ = all eligible;
+   catastrophic painted 5/6 and 2/3, so "all" is not literal either),
+   and pillaged-vs-removed. Both need more eruptions than four.
+   The sourcing that preceded it: which tiles an eruption paints,
    and whether an already-improved tile takes it — DLL.
 
    RE-SOURCED 2026-09-09, and it narrowed on one side. The volcano rows in
@@ -160,7 +187,26 @@ in the entry).
     Which cities a spy may travel to is DLL. Both engines walk the major
     rows today. Open the Free City to spies, or leave it closed?
 
-11. **B-56r — how sight is SPENT.** `SightThroughModifier` (Woods,
+11. ~~B-56r — how sight is SPENT.~~ **MEASURED 2026-09-13** in the live
+    game (`tools/civ6lab/sight_find.lua` + `sight_read.lua`: a Warrior,
+    sight 2, then a Ranger, sight 3, placed on 17 geometries far from any
+    other eye, `PlayersVisibility[0]:IsVisible` read along one ray). It is
+    OCCLUSION BY ELEVATION, not a budget, and hills add no range:
+      - flat observer: A open -> B and (Ranger) C visible; A woods, hill,
+        hill+woods or mountain -> B and C hidden, for both units;
+      - hill observer: A woods or hill -> B and C visible; A hill+woods ->
+        hidden; A open -> the Warrior still sees exactly 2 (C hidden), the
+        Ranger exactly 3 — the hill's `SightModifier` +1 is the observer's
+        ELEVATION, not +1 range.
+    So: a tile on the ray blocks everything behind it iff its
+    `SightThroughModifier` sum (terrain + feature: hills 1, woods 1,
+    hills+woods 2, mountain 2) EXCEEDS the observer's `SightModifier`
+    (flat 0, hills 1, mountain 2); range is the unit's BaseSightRange
+    alone. A budget reading is refuted twice over: the hill observer's
+    open-ground range did not grow, and the same woods that hid B from a
+    flat Ranger (budget 3) did not hide it from a hill Warrior (budget 2).
+    Sentry's `CanSee` then means: treat features' through-cost as 0.
+    The sourcing history: `SightThroughModifier` (Woods,
     Rainforest, Hills 1; Mountains and the great natural wonders 2) and
     `SightModifier` (Hills +1, Mountains +2) are published; the WALK is not.
     Two readings fit the columns: a sight BUDGET spent along the hex path, or
@@ -196,7 +242,31 @@ in the entry).
     Foot 70) and the install has one base and no route term. Name the scale,
     or keep the per-route table?
 
-15. **B-31r — what a trade route pays per district.** `GlobalParameters`
+15. ~~B-31r — what a trade route pays per district.~~ **MEASURED
+    2026-09-13, AND THE TABLE WAS THERE ALL ALONG.** `Districts.xml`
+    carries `District_TradeRouteYields` with three columns per district
+    and yield — `YieldChangeAsOrigin` (0 on EVERY row),
+    `YieldChangeAsDomesticDestination`, `YieldChangeAsInternationalDestination`:
+    international — CITY_CENTER gold 3 (the flat head), COMMERCIAL_HUB /
+    HARBOR / COTHON / ROYAL_NAVY_DOCKYARD / SUGUBA gold 3, GOVERNMENT gold
+    2, CAMPUS / SEOWON science 1, HOLY_SITE / LAVRA faith 1, THEATER /
+    ACROPOLIS culture 1, INDUSTRIAL_ZONE / HANSA / ENCAMPMENT / IKANDA
+    production 1, ENTERTAINMENT / WATER_ENTERTAINMENT / STREET_CARNIVAL
+    food 1; domestic — food 1 from most districts, production 1 from
+    CITY_CENTER / COMMERCIAL_HUB / HARBOR / GOVERNMENT and the production
+    districts. The live game agrees to the unit
+    (`tools/civ6lab/trade_probe.lua`, `TradeManager:CalculateOriginYield*`
+    from five origins to ten destinations): every foreign destination
+    pays gold 3 plus the table's rows for its districts (a Harbor city 6),
+    an origin with four specialty districts pays NOTHING more than an
+    origin with none, and the only extra seen was a player-level
+    modifier (+4 on both Scottish origins, 0 elsewhere). The two
+    GlobalParameters are dead rows in Gathering Storm. This engine's flat
+    3 + 1 per destination specialty district is wrong on the gold
+    districts (3 not 1), the Government Plaza (2), the food/production
+    districts (their yield, not gold) and the domestic side; the table
+    is the port.
+    The sourcing history: `GlobalParameters`
     carries `TRADE_ROUTE_GOLD_PER_ORIGIN_DISTRICT` 2 and
     `_PER_DESTINATION_DISTRICT` 2, unmodified by either expansion. This
     engine pays a flat 3 plus ONE gold per destination SPECIALTY district and

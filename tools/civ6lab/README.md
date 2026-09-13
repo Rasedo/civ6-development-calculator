@@ -82,6 +82,30 @@ running, and the boost read as a mystery +2 until the city's
 `GetSourceTurnsRemaining` was checked. Spawn fresh actors for each reading,
 or read before advancing turns.
 
+### Turn advancement and the Autoplay trap
+
+`lab.py advance --n N` passes turns by Autoplay (1 turn, return as the
+human seat). NEVER let `SetReturnAsPlayer` see -1: the UI's
+`Game.GetLocalPlayer()` reads -1 while Autoplay holds the seat, and a
+return player of -1 parks the game with no local player and a turn that
+never ends — `SetActive(false)`, `SetTurns(0)` and every seat-setting call
+in both states were tried and none recovers it; only loading the autosave
+does. `local_player()` now falls back to the human major in GameCore and
+`advance()` refuses -1.
+
+### Other probes
+
+* `trade_probe.lua` (InGame) — a route's yields decomposed the UI's way
+  (`--set OOWNER=<player> --set ONAME=<city name fragment>` picks the
+  origin; default player 0's capital).
+* `sight_find.lua` (GameCore) + `sight_read.lua` (InGame) — the sight
+  matrix: observer elevation x first-tile kind, visibility along one ray.
+* `volcano_snap.lua` / `volcano_erupt.lua` (GameCore) — plots within 3 of a
+  volcano before/after `RANDOM_EVENT_VOLCANO_*` (the event needs the
+  NAMED volcano's index, matched by the plot's displayed name).
+* `cs_probe.lua` (InGame) — every city-state's gold, faith, units, build.
+* `prod_state.lua` (InGame) — a city's per-item production ledger.
+
 ### `xml_modifiers.py` — the install's modifier ledger, both XML styles
 
     python tools/civ6lab/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...

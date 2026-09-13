@@ -231,20 +231,38 @@ def turn(t: Tuner) -> int:
     return int(t.run(GC, LUA_TURN)[0])
 
 
+LUA_HUMAN_SEAT = """
+for p = 0, 62 do
+  local pl = Players[p]
+  if pl ~= nil and pl:IsAlive() and pl:IsMajor() and pl:IsHuman() then print(p) return end
+end
+print(0)
+"""
+
+
 def local_player(t: Tuner) -> int:
-    for st, lua in ((IG, "print(Game.GetLocalPlayer())"), (GC, LUA_TURN)):
-        try:
-            v = t.run(st, lua)[0]
-            if st == IG:
-                return int(v)
-        except TunerError:
-            pass
-    return 0
+    """The seat Autoplay must hand control back to. The UI's
+    Game.GetLocalPlayer() reads -1 WHILE Autoplay holds the seat — passing
+    that to SetReturnAsPlayer parks the game with no local player and no
+    turn end, ever (it did). So: the UI's answer when it is a seat, else the
+    first human major in GameCore, else seat 0."""
+    try:
+        v = int(t.run(IG, "print(Game.GetLocalPlayer())")[0])
+        if v >= 0:
+            return v
+    except (TunerError, ValueError):
+        pass
+    try:
+        return int(t.run(GC, LUA_HUMAN_SEAT)[0])
+    except (TunerError, ValueError):
+        return 0
 
 
 def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
     """Move the game ONE turn and return the new turn number."""
     t0 = turn(t)
+    if lp < 0:
+        raise TunerError("refusing to autoplay with no seat to return to (lp=-1)")
     if how == "autoplay":
         print("   ", t.run(GC, LUA_AUTOPLAY % lp)[0])
     else:
@@ -425,6 +443,15 @@ def cmd_storm(a) -> int:
     return 0
 
 
+def cmd_advance(a) -> int:
+    t = Tuner(a.host, a.port).connect()
+    lp = local_player(t)
+    for _ in range(a.n):
+        print("turn", advance(t, a.advance, lp, a.wait))
+    t.close()
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="127.0.0.1")
@@ -449,6 +476,11 @@ def main(argv=None) -> int:
     s.add_argument("--advance", choices=("autoplay", "endturn"), default="autoplay")
     s.add_argument("--wait", type=float, default=300.0, help="seconds to allow one turn to pass")
     s.set_defaults(fn=cmd_storm)
+    v = sub.add_parser("advance", help="pass N turns (Autoplay by default)")
+    v.add_argument("--n", type=int, default=1)
+    v.add_argument("--advance", choices=("autoplay", "endturn"), default="autoplay")
+    v.add_argument("--wait", type=float, default=300.0)
+    v.set_defaults(fn=cmd_advance)
     a = p.parse_args(argv)
     try:
         return a.fn(a)
