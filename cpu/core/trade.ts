@@ -20,7 +20,7 @@ import { DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
-import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, VENICE_DEST_LUXURY_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
@@ -183,7 +183,7 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
 /** CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
  *  yields of every Trade Route which passes through this city" — the
  *  DESTINATION's post, which `routeChainGold` cannot double because the
- *  stored chain never holds the destination. Bandar Brunei's suzerain pays
+ *  stored chain never holds the destination. Jakarta's suzerain pays
  *  the same city again. */
 export function routePostGold(state: GameState, seat: number, destCenter: number): number {
   if (!(seatOf(state, seat)?.tradingPosts ?? []).includes(destCenter)) return 0;
@@ -216,7 +216,7 @@ export function routeLengthGold(state: GameState, seat: number, originCenter: nu
   return HUNZA_ROUTE_GOLD * Math.floor(routeTravelTiles(state, originCenter, destCenter, r) / HUNZA_TILES_PER_GOLD);
 }
 
-/** CIV6 (Venice): "+1 Gold for each Luxury resource at the destination" of an
+/** CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the destination" of an
  *  international route — DISTINCT luxuries standing on the destination city's
  *  own tiles. */
 export function routeDestLuxuryGold(state: GameState, seat: number, dest: City): number {
@@ -226,20 +226,20 @@ export function routeDestLuxuryGold(state: GameState, seat: number, dest: City):
     if (t.ownerSeat !== dest.seat || t.ownerCity !== dest.id || !t.resource) continue;
     if (RESOURCES[t.resource]?.category === 'luxury') seen.add(t.resource);
   }
-  return VENICE_DEST_LUXURY_GOLD * seen.size;
+  return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
 }
 
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
   let g = 0;
-  // CIV6 (Bandar Brunei): "Your Trading Posts in FOREIGN cities provide +1
+  // CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities provide +1
   // Gold to your Trade Routes PASSING THROUGH or going to the city" — the
   // passing-through half. The chain rides this seat's own posts by
   // construction, so the only test left is whether the city is foreign.
-  const brunei = suzerainEffect(state, seat, 'routePostGold');
+  const jakarta = suzerainEffect(state, seat, 'routePostGold');
   for (const c of r.chain ?? []) {
     if (!centreHasCity(state, c)) continue;
     g += 1;
-    if (brunei && tileSeat(state.map.tiles[c]) !== seat) g += 1;
+    if (jakarta && tileSeat(state.map.tiles[c]) !== seat) g += 1;
     // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
     // Posts in your own cities" — a chain hop IS one of the seat's posts.
     if (civOf(state, seat) === 'ROME' && tileSeat(state.map.tiles[c]) === seat) g += ROME_OWN_POST_GOLD;
@@ -673,7 +673,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         }
         out.gold += routePostGold(state, seat, civCity.centerIndex);
         out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
-        // CIV6 (Venice): the destination's own luxuries pay this seat's route
+        // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
         out.gold += routeDestLuxuryGold(state, seat, civCity);
         // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
         // to this city provide +1 Science and +1 Gold for them."

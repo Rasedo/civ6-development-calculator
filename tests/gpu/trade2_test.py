@@ -401,7 +401,7 @@ def main() -> None:
     # CIV6 (Trading Post): stamped in "the origin and destination cities"
     # when a route runs its FULL term; each own post extends range one more
     # leg; a foreign destination's post pays +1 gold (+1 under Bandar
-    # Brunei's suzerain).
+    # Jakarta's suzerain).
     s10 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert "trading_post" in _MUTABLE and s10.trading_post.dtype == torch.bool
     assert tuple(s10.trading_post.shape) == (s10.B, s10.n_majors, s10.T)
@@ -446,7 +446,7 @@ def main() -> None:
     s10.trading_post[0, row_b, mid] = False
     print("  the post chain: own posts at living cities only, origin excluded")
 
-    # destination gold: 0 bare, 1 with a post, 2 under Bandar Brunei's suzerain
+    # destination gold: 0 bare, 1 with a post, 2 under Jakarta's suzerain
     csc10 = int(s10.citystate_center[0, 0])
     dest_t = torch.tensor([[csc10]], dtype=torch.long)
     assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 0
@@ -457,7 +457,7 @@ def main() -> None:
     s10.seat_citystate_envoys[0, row10, 1] = 3
     s10.citystate_suz_code[0, 1] = s10._suz_c_route_post
     s10._eff_version += 1
-    assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 2, "Bandar Brunei pays the destination again"
+    assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 2, "Jakarta pays the destination again"
     # the CS-leg income carries it: route colA -> CS 0
     s10.seat_routes[0, row10, 0, 0] = int(s10.city_id[0, row10, colA])
     s10.seat_routes[0, row10, 0, 1] = -2
@@ -469,7 +469,7 @@ def main() -> None:
     s10._eff_version += 1
     g_bare = float(s10._seat_route_income(row10)[0, colA, 2])
     assert abs((g_post - g_bare) - 2.0) < 1e-9, (g_post, g_bare)
-    print("  destination post gold: +1, +1 more under Brunei, on the CS leg income")
+    print("  destination post gold: +1, +1 more under Jakarta, on the CS leg income")
 
     # COMPLETION stamps both endpoints; a dest-dead drop stamps nothing
     s11 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))

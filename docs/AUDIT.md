@@ -142,12 +142,12 @@ in the entry).
     this engine banks both, on the standing rule that hammers never burn.
     One forum post against a principle — the owner's call.
 
-8. **Two city-state names this roster invented.** "Venice" and "Bandar
-    Brunei" are not Civ 6 city-states. Their bonuses are AMSTERDAM's (base;
-    Antioch carries the same text in Expansion1) and JAKARTA's. Both
-    MECHANICS are built and sourced; only the names are wrong. Renaming
-    them touches `seeder/place.ts`, which is hashed into `genStamp`, so the
-    fix costs a reseed and a fresh `worlds.lock`. Rename, or keep the names?
+8. ~~Two city-state names this roster invented.~~ **RULED 2026-09-13:
+    renamed.** "Venice" is AMSTERDAM (base; Antioch carries the same text in
+    Expansion1) and "Bandar Brunei" is JAKARTA. The seeder draws a name by
+    POSITION in the type's list, so the reseed relabelled every world in
+    place (seed 9131's trade minor at centre 428 is the same city under the
+    new name); `worlds.lock` moved with `genStamp`.
 
 9. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
     nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs

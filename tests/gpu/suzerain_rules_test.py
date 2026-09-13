@@ -274,7 +274,7 @@ def main() -> None:
     assert sim._suz_sci_pct == float(_sz["sciencePct"]) == 15.0, "Geneva is +15% Science"
     assert sim._suz_dist_gpp == 1.0, "Bologna pays ONE point"
     assert sim._suz_water_cul == 2.0, "Nan Madol pays +2 Culture"
-    assert sim._suz_dest_lux_gold == 1.0, "Venice pays +1 Gold per destination luxury"
+    assert sim._suz_dest_lux_gold == 1.0, "Amsterdam pays +1 Gold per destination luxury"
     assert (sim._suz_spice_n, sim._suz_spice_amen) == (2, 6), "Zanzibar is two luxuries of six"
     assert (sim._suz_route_tiles_per, sim._suz_route_len_gold) == (5, 1.0), "Hunza is +1 per 5 tiles"
     assert sim._suz_proj_pct == 20.0, "Hong Kong is +20% on projects"

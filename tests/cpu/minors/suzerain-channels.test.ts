@@ -17,7 +17,7 @@ import { suzerainProjectMult, suzerainLandPurchaseMult } from '../../../cpu/core
 import { routeChainGold, routeLengthGold, routeDestLuxuryGold, routeTravelTiles } from '../../../cpu/core/trade';
 import {
   CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING,
-  NAN_MADOL_WATER_CULTURE, VENICE_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES,
+  NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES,
   ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD,
   HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, BUENOS_AIRES_AMENITIES,
   type SuzEffect,
@@ -124,7 +124,7 @@ describe("Nan Madol's water-adjacent districts", () => {
   });
 });
 
-describe("Venice's destination luxuries and Hunza's road", () => {
+describe("Amsterdam's destination luxuries and Hunza's road", () => {
   it('counts DISTINCT luxuries on the destination city tiles', () => {
     const { state } = scene();
     const other = settleAt(state, tileAtCoords(state.map, 15, 15).index, 0);
@@ -135,7 +135,7 @@ describe("Venice's destination luxuries and Hunza's road", () => {
     owned[2].resource = 'WINE'; // a second copy is not a second head
     expect(routeDestLuxuryGold(state, 0, other)).toBe(0); // no suzerain yet
     suzerainOf(state, 'routeLuxuryGold');
-    expect(routeDestLuxuryGold(state, 0, other)).toBe(2 * VENICE_DEST_LUXURY_GOLD);
+    expect(routeDestLuxuryGold(state, 0, other)).toBe(2 * AMSTERDAM_DEST_LUXURY_GOLD);
   });
 
   it('pays a whole gold per five tiles the route travels', () => {
@@ -154,7 +154,7 @@ describe("Venice's destination luxuries and Hunza's road", () => {
   });
 });
 
-describe("Bandar Brunei's passing-through half", () => {
+describe("Jakarta's passing-through half", () => {
   it('pays again for a post in a FOREIGN chain city, never for its own', () => {
     const { state } = scene();
     state.seats.push(emptySeat(1));

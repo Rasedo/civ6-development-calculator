@@ -53,7 +53,7 @@ const CITY_STATE_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'mili
 const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
   scientific: ['Geneva', 'Bologna', 'Anshan'],
   cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
-  trade: ['Venice', 'Zanzibar', 'Bandar Brunei', 'Hunza'],
+  trade: ['Amsterdam', 'Zanzibar', 'Jakarta', 'Hunza'],
   industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff'],
   militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],

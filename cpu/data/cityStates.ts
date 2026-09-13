@@ -82,12 +82,12 @@ export type SuzEffect =
   | 'harborPower'        // Cardiff
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
-  | 'routePostGold'      // Bandar Brunei
+  | 'routePostGold'      // Jakarta
   | 'suzImprovement'     // Caguana / La Venta / Armagh
   | 'sciencePeace'       // Geneva
   | 'districtGpp'        // Bologna
   | 'waterDistrictCulture' // Nan Madol
-  | 'routeLuxuryGold'    // Venice
+  | 'routeLuxuryGold'    // Amsterdam
   | 'spiceLuxuries'      // Zanzibar
   | 'routeLengthGold'    // Hunza
   | 'projectProduction'  // Hong Kong
@@ -173,9 +173,9 @@ export const NAN_MADOL_WATER_CULTURE = 2;
 /** CIV6 (Leaders.xml, MINOR_CIV_AMSTERDAM_LUXURY_TRADE_ROUTE_BONUS):
  *  `MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_FOR
  *  _INTERNATIONAL` YIELD_GOLD Amount 1 — per DISTINCT luxury resource standing
- *  on the destination city's own tiles. (The install spells this bonus on
- *  AMSTERDAM, and on Antioch in Expansion1; see the roster note.) */
-export const VENICE_DEST_LUXURY_GOLD = 1;
+ *  on the destination city's own tiles. (Antioch carries the same text in
+ *  Expansion1.) */
+export const AMSTERDAM_DEST_LUXURY_GOLD = 1;
 
 /** CIV6 (Leaders.xml, MINOR_CIV_ZANZIBAR_{CINNAMON,CLOVES}_RESOURCE_BONUS):
  *  two `MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT` rows, Amount 1 each, for
@@ -232,9 +232,9 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', suz: 'waterDistrictCulture' },
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
   Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', suz: 'suzImprovement' },
-  Venice: { name: 'Venice', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', suz: 'routeLuxuryGold', note: 'the install spells this bonus on AMSTERDAM (base) and Antioch (Expansion1); no Civ 6 city-state is named Venice' },
+  Amsterdam: { name: 'Amsterdam', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', suz: 'routeLuxuryGold' },
   Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', suz: 'spiceLuxuries' },
-  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold', note: 'the install spells this bonus on JAKARTA; Bandar Brunei is a scenario minor there' },
+  Jakarta: { name: 'Jakarta', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold' },
   Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', suz: 'routeLengthGold' },
   'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', suz: 'projectProduction' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', suz: 'bonusAmenities' },
@@ -268,7 +268,7 @@ export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {
 export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   scientific: ['Geneva', 'Bologna', 'Anshan'],
   cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
-  trade: ['Venice', 'Zanzibar', 'Bandar Brunei', 'Hunza'],
+  trade: ['Amsterdam', 'Zanzibar', 'Jakarta', 'Hunza'],
   industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff'],
   militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],

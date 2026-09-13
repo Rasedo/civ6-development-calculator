@@ -491,9 +491,9 @@ describe('trading posts', () => {
 
   // CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
   // yields of every Trade Route which passes through this city"; Bandar
-  // Brunei's suzerain: "+1 Gold to your Trade Routes passing through or
+  // Jakarta's suzerain: "+1 Gold to your Trade Routes passing through or
   // going to the city".
-  it('routePostGold pays +1 at a posted destination, +1 more under Bandar Brunei', () => {
+  it('routePostGold pays +1 at a posted destination, +1 more under Jakarta', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const pcity = foundCity(state, tileAtCoords(state.map, 10, 10).index, 0).city!;
@@ -508,7 +508,7 @@ describe('trading posts', () => {
     expect(gold()).toBe(bare + 1);
     // seat 0 holds no post there — the post pays its OWNER only
     expect(routePostGold(state, 0, pcity.centerIndex)).toBe(0);
-    addNamedCs(state, 'Bandar Brunei', 'trade', 3, 3, { [civ.seat]: 3 });
+    addNamedCs(state, 'Jakarta', 'trade', 3, 3, { [civ.seat]: 3 });
     expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(2);
     expect(gold()).toBe(bare + 2);
   });

@@ -4594,7 +4594,7 @@ class SimSeats:
 
     def _city_lux_distinct(self) -> torch.Tensor:
         """[B, n_majors, RC] long — DISTINCT luxury resources standing on each
-        city's own tiles, the count Venice's suzerain pays a route per head.
+        city's own tiles, the count Amsterdam's suzerain pays a route per head.
         Ownership is the gate, not an improvement: the modifier reads the
         resource AT the destination."""
         B, NM, RC, NL = self.B, self.n_majors, self.RC, self._n_lux
@@ -7672,7 +7672,7 @@ class SimSeats:
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
-            # CIV6 (Venice): "+1 Gold for each Luxury resource at the
+            # CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the
             # destination" of an international route.
             if self._suz_c_dest_lux >= 0:
                 _ven = self._suz_effect(row, self._suz_c_dest_lux)
@@ -7837,7 +7837,7 @@ class SimSeats:
             if bool(_rome.any()):
                 own_c = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) == row)
                 cg = cg + own_c.double().sum(dim=2) * self._rome_post_gold * _rome.double().unsqueeze(1)
-            # CIV6 (Bandar Brunei): "Your Trading Posts in FOREIGN cities
+            # CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities
             # provide +1 Gold to your Trade Routes PASSING THROUGH ... the
             # city" — the chain rides this seat's own posts by construction,
             # so the only test left is whether the city is foreign.
@@ -12554,7 +12554,7 @@ class SimSeats:
         CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to
         the yields of every Trade Route which passes through this city" — the
         DESTINATION's post here (a route stores no path, so a pass-through
-        city has no carrier); Bandar Brunei's suzerain pays the same
+        city has no carrier); Jakarta's suzerain pays the same
         destination again."""
         if row >= self.n_majors:
             return torch.zeros_like(dest_ct)

@@ -327,7 +327,7 @@ class SimInit:
         self._suz_relic_sci = float(_suz["relicScience"])
         self._suz_route_cul = float(_suz["routeCulture"])
         self._suz_route_gold = float(_suz["routeGold"])
-        # Geneva / Bologna / Nan Madol / Venice / Zanzibar / Hunza / Hong Kong /
+        # Geneva / Bologna / Nan Madol / Amsterdam / Zanzibar / Hunza / Hong Kong /
         # Ngazargamu / Buenos Aires — the nine rows that used to ride a flat
         # capital channel, each now its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])
