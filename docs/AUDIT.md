@@ -87,7 +87,7 @@ on these lines is a RULING, not research.
 | 3 religion tie | empty — no majority tiebreak parameter |
 | 5 wonder in a blast | empty — no NUKE globals, no wonder-in-blast column |
 | 6 opinion deltas | empty — the `LOC_DIPLO_MODIFIER_*` rows are TEXT TAGS with no amount attached |
-| 9 city-state spending | empty — no `MINOR_CIV_*` spending knob exists |
+| 9 city-state spending | OBSERVED 2026-09-13 over 7 turns (`tools/civ6lab`): banks drift with income minus upkeep, and one minor spent ~207 of 260 on a unit after its army fell — see ask 9 |
 | 10 Free City as spy ground | empty — `CivilizationLevels` carries nothing spy-related |
 | 11 how sight is spent | MEASURED 2026-09-13 (`tools/civ6lab`): OCCLUSION by elevation, no budget, no range from hills — see ask 11 |
 | 12 Free City amenities | empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
@@ -164,10 +164,25 @@ in the entry).
    — a carrier without deltas is a constant, so neither half can ship
    alone.
 
-7. **C-2 — what a mid-build gold purchase does to the hammers.** One
-    tested report says a UNIT keeps its progress and a BUILDING's is wasted;
-    this engine banks both, on the standing rule that hammers never burn.
-    One forum post against a principle — the owner's call.
+7. ~~C-2 — what a mid-build gold purchase does to the hammers.~~ **MEASURED
+    2026-09-13** in the live game (`tools/civ6lab/prod_state.lua` around
+    `CityManager.RequestCommand(PURCHASE)`, turns 68-74, one city at 16.8
+    production a turn). Nothing burns, and the two kinds bank DIFFERENTLY:
+      - every item's progress survives every switch (Walls held 30/50
+        across two switches; Archer held 16/30 across three);
+      - buying a BUILDING in production (Library at 17/45) CLEARED its
+        ledger entry and pushed the 17 into the city's overflow: the next
+        item, Walls at 30/50, read 64/50 one turn later — 30 + 16.8 + 17;
+      - buying a UNIT (Archer at 16/30) left the per-type entry exactly
+        where it was, whether the Archer was the current item or not, and
+        pooled nothing (a Spearman queued after it gained 16, not 32).
+    The forum report was half right (units keep) and wrong where it
+    mattered (buildings are not wasted). This engine's "bank both" is the
+    right principle; the shape to port is: units keep a per-type ledger,
+    a bought building's hammers become overflow onto the next item.
+    A purchase detail worth keeping: a military purchase is refused while
+    a military unit stands on the centre tile ("too many units of one
+    class here") — the bought unit is placed ON the centre.
 
 8. ~~Two city-state names this roster invented.~~ **RULED 2026-09-13:
     renamed.** "Venice" is AMSTERDAM (base; Antioch carries the same text in
@@ -176,7 +191,17 @@ in the entry).
     place (seed 9131's trade minor at centre 428 is the same city under the
     new name); `worlds.lock` moved with `genStamp`.
 
-9. **C-38 — what a city-state SPENDS on.** Its Gold and Faith bank and
+9. **C-38 — what a city-state SPENDS on.** OBSERVED 2026-09-13 over seven
+    turns of six minors (`tools/civ6lab/cs_probe.lua`): the banks drift by
+    income minus unit upkeep — Geneva with 8 units 74 -> 56, Mohenjo-Daro
+    148 -> 158 -> 136, Fez flat at 44, Kabul 60 -> 78 -> 69 — and ONE
+    purchase was seen: Mexico City, its army cut from 4 units to 1, went
+    215 -> 260 and then to 53 with a new unit standing, ~207 gold spent in
+    one turn. So the real minor banks by default and buys a defender when
+    its military is gone; faith sat untouched throughout (Kabul 62 -> 69).
+    The rule's magnitude — how few units triggers the buy, what it buys —
+    needs a longer watch than seven turns. The earlier sourcing: its Gold
+    and Faith bank and
     nothing draws on them. `GlobalParameters.xml` carries five MINOR knobs
     and all five are placement; no XML row anywhere names a city-state
     purchase, build weight or reserve. Leave them banking, or name a rule?
@@ -736,6 +761,11 @@ the gate reaches is worth more here than one that re-reads the exporter.
     a P8 feature-design choice.
 
 - **B-66. FORMATIONS.** Weight 1.
+  - THE TURN-SPEND IS MEASURED (2026-09-13, `tools/civ6lab`): forming a
+    Corps from two adjacent Warriors at 2/2 left the merged unit at 0/2
+    moves with formation 1 and the joiner gone — the formation ends the
+    unit's turn. One of the five magnitudes shipped stylized on 2026-09-05
+    now has a source.
   - THE SUPPORT STACKING CLASS SHIPPED with #246o. `Units.xml` types nine
     chassis `FormationClass="FORMATION_CLASS_SUPPORT"` — the Battering Ram,
     the Siege Tower, the Military Engineer, the Medic, the Observation
@@ -854,7 +884,9 @@ the gate reaches is worth more here than one that re-reads the exporter.
     1848072002747657088) says a UNIT keeps its progress and a BUILDING's is
     WASTED — which contradicts this engine's standing rule that hammers
     never burn, on one forum post. Both engines BANK; the disposition is an
-    ask.
+    ask. MEASURED 2026-09-13 (ask 7): nothing burns — a bought building's
+    hammers become overflow onto the next item, a bought unit's stay in
+    its per-type ledger.
   - JOIN ONGOING WAR SHIPPED with #242k, as a WAR KIND rather than an
     agreement: `DIPLOACTION_THIRD_PARTY_WAR` publishes every column a kind
     needs (`InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE, no

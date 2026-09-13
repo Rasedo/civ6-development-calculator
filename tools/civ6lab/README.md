@@ -93,6 +93,24 @@ in both states were tried and none recovers it; only loading the autosave
 does. `local_player()` now falls back to the human major in GameCore and
 `advance()` refuses -1.
 
+### Results log (2026-09-13, one session, turns 1-74)
+
+| ask | finding |
+|---|---|
+| 16 storm walk | 8 band-drawn unit steps in one movement turn, 4-8 hexes net; a second displacement on the dissipation turn, no damage seen then |
+| C-16 mission roll | 3d6 vs BaseProbability - k, six bands; k=2 fresh, +2 Gain Sources; district/pillage/garrison/promotions (other ops) do not enter |
+| 11 sight | occlusion by elevation (through-height > observer height), no range from hills |
+| 15 trade per district | `District_TradeRouteYields` is the composition; origin side 0; the two GlobalParameters are dead |
+| 1 volcanic soil | radius-1 ring, a proportion painted, improvements pillaged or removed, bonus resources destroyed |
+| 7 mid-build purchase | per-item progress survives every switch; buying a BUILDING clears its entry and its hammers land on the next item through overflow (Walls 30 -> 64/50 at 16.8/turn); buying a UNIT leaves its per-type progress in place (Archer 16/30 before and after, current or not) |
+| 9 city-state spending | 7 turns: banks drift with income minus unit upkeep; Mexico City spent ~207 of 260 to buy a unit after its army fell 4 -> 1 |
+| formation turn-spend (stylized) | forming a Corps leaves the merged unit at 0 moves that turn (2/2 + 2/2 -> 0/2, formation 1) |
+| GDR jump | `UNITCOMMAND_MOVE_JUMP` refused on a fresh GDR at 5/5 moves everywhere within 3 — needs the Enhanced Mobility project; not measured |
+
+Refusal texts come back in the game's locale: decode `FAILURE_REASONS` bytes
+as cp1251 on this box ("too many units of one class here" = the centre
+tile already holds a military unit, so no military purchase lands).
+
 ### Other probes
 
 * `trade_probe.lua` (InGame) — a route's yields decomposed the UI's way
