@@ -373,6 +373,11 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         if p.returncode == 0 and name.startswith("eval"):
             for ln in p.stdout.strip().splitlines()[-1:]:
                 print(f"    | {ln}", flush=True)
+        if p.returncode == 0 and name.startswith("serve") and "--profile" in sys.argv:
+            # a profiled hunt shard: its turn-loop split is the whole point
+            # of the run, and a green lane's stdout is otherwise dropped
+            for ln in p.stdout.strip().splitlines()[-16:]:
+                print(f"    | {ln}", flush=True)
         if p.returncode != 0 and looks_oom(p.stdout + p.stderr):
             # #230: the box ran out of memory. Report it as its own thing —
             # a red here would blame the code for the machine.
@@ -550,6 +555,10 @@ def main() -> int:
                 serve_cmd += ["--ckpt-every", HUNT_CKPT_EVERY]
             if HUNT_RESUME:
                 serve_cmd += ["--resume", HUNT_RESUME]
+            if "--profile" in sys.argv:
+                # the gate's own turn-loop split (TS-children wait / GPU step /
+                # digest) — a hunt-mode measurement, never a battery verdict
+                serve_cmd += ["--profile"]
         serve_cmd += ["--seeds"]
         _shards = [("serve_" + "abcdefgh"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
