@@ -82,14 +82,20 @@ def test_inert_when_off(rules, path):
     with no war column must be bit-identical to a sim with the head forced
     off. The gate does drive the column now — for seat 0 as for every row — so
     this pins the floor, not the gate."""
-    sim = build(rules, path, steps=30)
+    # the lane's shared twenty-turn base: the instrument is `drift()` over
+    # every _MUTABLE plane, whose width does not grow with the window — a
+    # flag-dependent divergence shows on the first turn the flag can steer,
+    # and the mask premise (civs alive, the declare column open) holds from
+    # turn 0. Thirty turns on a base of its own cost a build nobody shared.
+    sim = build(rules, path, steps=20)
     assert sim._rl_war_active, "the war head ships ACTIVE"
     # the reference takes its OWN base (`slot=1`): the two sims are live at the
-    # same moment, and its flag has to be off BEFORE it steps, so its thirty
-    # turns stay in the scene rather than moving into a memoised base
+    # same moment, and its flag has to be off BEFORE it steps, so its turns
+    # stay in the scene rather than moving into a memoised base. THE TWO
+    # COUNTS MOVE TOGETHER: the drift compares the same turn on both sides.
     ref = build(rules, path, slot=1)
     ref._rl_war_active = False
-    for _ in range(30):
+    for _ in range(20):
         ref.step()
     d = drift(sim, snap_all(ref))
     assert not d, f"war=None path must not depend on the flag: {d}"

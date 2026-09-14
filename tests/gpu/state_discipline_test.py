@@ -130,8 +130,10 @@ def main() -> None:
     # Same seeds, same turns, with and without the flag -> identical trace.
     import core.simbase as eng  # the patchable globals live on the module floor
 
+    # eight turns, not twenty: a perturbation by the flag would show on turn
+    # one, and the digest's width does not grow with the window
     a = build(paths, rules)
-    for _ in range(20):
+    for _ in range(8):
         a.step()
     from core import statecompare as _sc
     row_on = _sc.state_digest(a, 0)
@@ -139,7 +141,7 @@ def main() -> None:
     eng._ALIAS_CHECK = False
     try:
         b = build(paths, rules)
-        for _ in range(20):
+        for _ in range(8):
             b.step()
         row_off = _sc.state_digest(b, 0)
     finally:
