@@ -16,15 +16,23 @@
  *
  * The GPU twin reads these through the wire's `goodyHuts` block.
  */
+import { srcConst, xml } from './provenance';
+
 export type GoodyKind =
   | 'CULTURE' | 'GOLD' | 'FAITH' | 'MILITARY' | 'SCIENCE' | 'SURVIVORS' | 'DIPLOMACY';
 
 /** every kind the install publishes, each at Weight 100 — so the kind draw is
  *  uniform over those with an eligible subtype */
-export const GOODY_KINDS: readonly GoodyKind[] =
-  ['CULTURE', 'GOLD', 'FAITH', 'MILITARY', 'SCIENCE', 'SURVIVORS', 'DIPLOMACY'];
+export const GOODY_KINDS: readonly GoodyKind[] = srcConst('goodyHuts.kinds',
+  ['CULTURE', 'GOLD', 'FAITH', 'MILITARY', 'SCIENCE', 'SURVIVORS', 'DIPLOMACY'], {
+    derived: 'the `GoodyHuts` rows in table order, GOODYHUT_ prefix stripped; METEOR_GOODIES is '
+      + 'an improvement drop, not a village kind, and is left out',
+    inputs: [xml('GoodyHuts', 'GoodyHutType=GOODYHUT_CULTURE', 'GoodyHutType')],
+  }) as readonly GoodyKind[];
 
-export const GOODY_KIND_WEIGHT = 100;
+export const GOODY_KIND_WEIGHT = srcConst('goodyHuts.kindWeight', 100,
+  xml('GoodyHuts', 'GoodyHutType=GOODYHUT_CULTURE', 'Weight',
+    { note: 'every GoodyHuts row carries Weight 100, so the kind draw is uniform' }));
 
 /** what a subtype pays — one channel per row, named for the effect it came from */
 export type GoodyPayload =
@@ -46,11 +54,14 @@ export type GoodyPayload =
 
 /** the payload channel index space BOTH engines address a reward by — the
  *  wire ships a subtype's channel as an index into this list */
-export const GOODY_PAYLOAD_KINDS: readonly GoodyPayload['kind'][] = [
-  'relic', 'civicBoost', 'techBoost', 'tech', 'gold', 'faith', 'unitByClass',
-  'unitInCity', 'experience', 'heal', 'population', 'governorTitle', 'envoy',
-  'favor', 'strategic',
-];
+export const GOODY_PAYLOAD_KINDS: readonly GoodyPayload['kind'][] = srcConst(
+  'goodyHuts.payloadKinds',
+  ['relic', 'civicBoost', 'techBoost', 'tech', 'gold', 'faith', 'unitByClass',
+    'unitInCity', 'experience', 'heal', 'population', 'governorTitle', 'envoy',
+    'favor', 'strategic'], {
+    stylized: 'this engine\'s reward CHANNEL space — one per effect a GoodyHutSubTypes row\'s '
+      + 'ModifierID lands on; the install names modifiers, not channels',
+  }) as readonly GoodyPayload['kind'][];
 
 export interface GoodySubType {
   id: string;

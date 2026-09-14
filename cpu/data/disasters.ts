@@ -1,5 +1,5 @@
 import type { CivId, LeaderId } from './seats';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 /**
  * RIVER FLOOD magnitudes, from the Gathering Storm Flood page's two tables.
@@ -21,21 +21,40 @@ import { xml, type SrcMap } from './provenance';
  * invented. The wiki page they were read from publishes no numbers; the
  * install does.
  */
-export const STANDARD_GAME_TURNS = 500;
+export const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
+  lab: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
+    + 'its OccurrencesPerGame over (owner ruling 2026-09-04)',
+});
+
+const freq = (ev: string) => xml('RandomEvent_Frequencies',
+  `RandomEventType=RANDOM_EVENT_${ev}&RealismSettingType=REALISM_SETTING_MODERATE`,
+  'OccurrencesPerGame');
 
 /** MODERATE floods: FLOOD_MODERATE 2, FLOOD_MAJOR 1.5, FLOOD_1000_YEAR 1 per
  *  game — 4.5 in all, split by severity in that proportion. */
 const FLOOD_PER_GAME = [2, 1.5, 1] as const;
 const FLOOD_TOTAL = FLOOD_PER_GAME[0] + FLOOD_PER_GAME[1] + FLOOD_PER_GAME[2];
-export const FLOOD_SEVERITY_P = [
+export const FLOOD_SEVERITY_P = srcConst('disasters.floodSeverityP', [
   FLOOD_PER_GAME[0] / FLOOD_TOTAL, FLOOD_PER_GAME[1] / FLOOD_TOTAL, FLOOD_PER_GAME[2] / FLOOD_TOTAL,
-] as const;
-export const FLOOD_CHANCE = FLOOD_TOTAL / STANDARD_GAME_TURNS;
+] as const, {
+  derived: 'each flood row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE over their sum '
+    + '(2 / 1.5 / 1 of 4.5)',
+  inputs: [freq('FLOOD_MODERATE'), freq('FLOOD_MAJOR'), freq('FLOOD_1000_YEAR')],
+});
+export const FLOOD_CHANCE = srcConst('disasters.floodChance', FLOOD_TOTAL / STANDARD_GAME_TURNS, {
+  derived: 'the three flood rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, summed, over '
+    + 'STANDARD_GAME_TURNS (owner ruling 2026-09-04)',
+  inputs: [freq('FLOOD_MODERATE'), freq('FLOOD_MAJOR'), freq('FLOOD_1000_YEAR')],
+});
 
 /** MODERATE droughts: DROUGHT_MAJOR 23 + DROUGHT_EXTREME 5. This engine has
  *  ONE drought kind, so the two are summed — the EXTREME severity is the storm table's
  *  sibling gap, not a magnitude this line invents. */
-export const DROUGHT_CHANCE = (23 + 5) / STANDARD_GAME_TURNS;
+export const DROUGHT_CHANCE = srcConst('disasters.droughtChance', (23 + 5) / STANDARD_GAME_TURNS, {
+  derived: 'DROUGHT_MAJOR + DROUGHT_EXTREME OccurrencesPerGame at REALISM_SETTING_MODERATE over '
+    + 'STANDARD_GAME_TURNS — this engine has ONE drought kind, so the two rows are summed',
+  inputs: [freq('DROUGHT_MAJOR'), freq('DROUGHT_EXTREME')],
+});
 
 /**
  * THE EIGHT STORMS, one row each from the install's `RandomEvents`,
@@ -62,7 +81,13 @@ export const DROUGHT_CHANCE = (23 + 5) / STANDARD_GAME_TURNS;
  */
 export type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
 /** the wire's family code: `sf` on the tile planes, `family` on each row */
-export const STORM_FAMILIES: readonly StormFamily[] = ['BLIZZARD', 'DUST_STORM', 'TORNADO', 'HURRICANE'];
+export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormFamilies',
+  ['BLIZZARD', 'DUST_STORM', 'TORNADO', 'HURRICANE'], {
+    derived: 'the four storm KINDS of the install `RandomEvents` storm rows, in table order — '
+      + 'each kind carries two Severity rows and this is the family they share',
+    inputs: [xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_BLIZZARD_SIGNIFICANT',
+      'RandomEventType')],
+  }) as readonly StormFamily[];
 
 /**
  * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
@@ -75,16 +100,29 @@ export const STORM_FAMILIES: readonly StormFamily[] = ['BLIZZARD', 'DUST_STORM',
  *   5..30     NW 2  W 2  SW 1        -60..-30  NE 1  E 2   SE 2
  *   0..5      NW 1  W 1              -90..-60  NW 2  W 2   SW 1
  */
-export const WIND_BAND_LO: readonly number[] = [60, 30, 5, 0, -5, -30, -60, -90];
+export const WIND_BAND_LO: readonly number[] = srcConst('disasters.windBandLo',
+  [60, 30, 5, 0, -5, -30, -60, -90], {
+    derived: 'the distinct `PrevailingWinds.MinimumLatitude` values, descending',
+    inputs: [xml('PrevailingWinds', 'MinimumLatitude=60&DirectionType=DIRECTION_WEST',
+      'MinimumLatitude')],
+  });
+/** one band's six weights, in the engine's E, NE, NW, W, SW, SE order */
+const windRow = (i: number, lo: number, w: readonly number[]): readonly number[] =>
+  srcConst(`disasters.winds.${i}`, w, {
+    derived: `the \`PrevailingWinds\` rows with MinimumLatitude ${lo}, their DirectionType Weight `
+      + 'laid out in the engine hex order E, NE, NW, W, SW, SE; a direction the band has no row '
+      + 'for reads 0',
+    inputs: [xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_WEST`, 'Weight')],
+  });
 export const PREVAILING_WINDS: readonly (readonly number[])[] = [
-  [0, 0, 1, 2, 2, 0], //  60..90
-  [2, 2, 0, 0, 0, 1], //  30..60
-  [0, 0, 2, 2, 1, 0], //   5..30
-  [0, 0, 1, 1, 0, 0], //   0..5
-  [0, 0, 0, 1, 1, 0], //  -5..0
-  [0, 0, 1, 2, 2, 0], // -30..-5
-  [2, 1, 0, 0, 0, 2], // -60..-30
-  [0, 0, 2, 2, 1, 0], // -90..-60
+  windRow(0, 60, [0, 0, 1, 2, 2, 0]), //  60..90
+  windRow(1, 30, [2, 2, 0, 0, 0, 1]), //  30..60
+  windRow(2, 5, [0, 0, 2, 2, 1, 0]), //   5..30
+  windRow(3, 0, [0, 0, 1, 1, 0, 0]), //   0..5
+  windRow(4, -5, [0, 0, 0, 1, 1, 0]), //  -5..0
+  windRow(5, -30, [0, 0, 1, 2, 2, 0]), // -30..-5
+  windRow(6, -60, [2, 1, 0, 0, 0, 2]), // -60..-30
+  windRow(7, -90, [0, 0, 2, 2, 1, 0]), // -90..-60
 ];
 
 /**
@@ -113,7 +151,11 @@ export function windBand(row: number, height: number): number {
  *  2026-09-13, ask 16): the unit steps a storm's centre walks in its movement
  *  turn and again as it dissipates, each step's heading drawn from
  *  `PREVAILING_WINDS` at the centre's current latitude. */
-export const STORM_MOVEMENT = 8;
+export const STORM_MOVEMENT = srcConst('disasters.stormMovement', 8,
+  xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_HURRICANE_CAT_4', 'Movement',
+    { note: 'every storm row carries Movement 8; what the number MEANS — unit steps of the '
+      + 'centre\'s walk, drawn from PREVAILING_WINDS — is the lab reading (C-49, ask 16, '
+      + 'measured 2026-09-13)' }));
 
 export interface StormEvent {
   id: string;
@@ -340,25 +382,45 @@ export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
  *  (VOLCANO_GENTLE 4, CATASTROPHIC 2.5, MEGACOLOSSAL 1.5 at MODERATE) where
  *  this engine rolls per VOLCANO, and the conversion needs the map's volcano
  *  count. Still the old stylization; still an open question. */
-export const ERUPTION_CHANCE_PER_VOLCANO = 0.02;
+export const ERUPTION_CHANCE_PER_VOLCANO = srcConst('disasters.eruptionChance', 0.02, {
+  stylized: 'the install counts eruptions per GAME (VOLCANO_GENTLE 4 / CATASTROPHIC 2.5 / '
+    + 'MEGACOLOSSAL 1.5 at MODERATE) where this engine rolls per VOLCANO, and the conversion '
+    + 'needs the map\'s volcano count — still the old stylization, still an open question',
+});
 export const DROUGHT_LENGTH = 8;
 
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
  *  pillages; these are the chances it takes the improvement away entirely. */
-export const FLOOD_DESTROY_P = [0, 0.5, 0.8] as const;
+const floodPage = (what: string) => ({
+  lab: `the GS Flood page's severity table (${what}), by severity Moderate / Major / 1000 Year`,
+});
+const floodDmg = (kind: string, col = 'Percentage') => [
+  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_MODERATE&DamageType=${kind}`, col),
+  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_MAJOR&DamageType=${kind}`, col),
+  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_1000_YEAR&DamageType=${kind}`, col),
+];
+export const FLOOD_DESTROY_P = srcConst('disasters.floodDestroyP', [0, 0.5, 0.8] as const,
+  floodPage('Improvement — Destroyed: 0 / 50% / 80%'));
 /** "District — 0 / 50% / 80%". A damaged district takes its buildings dark
  *  with it, which is the page's "Building 100%" column. */
-export const FLOOD_DISTRICT_P = [0, 0.5, 0.8] as const;
+export const FLOOD_DISTRICT_P = srcConst('disasters.floodDistrictP', [0, 0.5, 0.8] as const,
+  floodPage('District — 0 / 50% / 80%'));
 /** CIV6 (RandomEvent_Damages): BUILDING_PILLAGED is 100 on all three flood
  *  rows — including MODERATE, which carries no DISTRICT_PILLAGED row at all,
  *  so the two columns are plainly independent. */
-export const FLOOD_BLDG_P = [1, 1, 1] as const;
+export const FLOOD_BLDG_P = srcConst('disasters.floodBldgP', [1, 1, 1] as const, {
+  derived: 'Percentage/100 of each flood row\'s BUILDING_PILLAGED damage row (100 on all three)',
+  inputs: floodDmg('BUILDING_PILLAGED'),
+});
 /** "Population" and "Civilians killed", which the page gives the same
  *  percentage at every severity. */
-export const FLOOD_POP_P = [0, 0.15, 0.25] as const;
+export const FLOOD_POP_P = srcConst('disasters.floodPopP', [0, 0.15, 0.25] as const,
+  floodPage('Population / Civilians killed — 0 / 15% / 25%'));
 /** "Units" and "Garrison — 30-50 HP / 50-70 HP", inclusive of both ends. */
-export const FLOOD_DAMAGE_LO = [0, 30, 50] as const;
-export const FLOOD_DAMAGE_HI = [0, 50, 70] as const;
+export const FLOOD_DAMAGE_LO = srcConst('disasters.floodDmgLo', [0, 30, 50] as const,
+  floodPage('Units / Garrison — 30-50 HP / 50-70 HP, the low end'));
+export const FLOOD_DAMAGE_HI = srcConst('disasters.floodDmgHi', [0, 50, 70] as const,
+  floodPage('Units / Garrison — 30-50 HP / 50-70 HP, the high end'));
 
 /**
  * "Floods fertilize each type of Floodplains differently... Each expresses the
@@ -366,15 +428,20 @@ export const FLOOD_DAMAGE_HI = [0, 50, 70] as const;
  * may gain BOTH yields from the same flood." Columns are Plains, Grassland,
  * Desert floodplains, in that order.
  */
+const fertRow = (y: string, sev: number, r: readonly number[]) =>
+  srcConst(`disasters.floodFert${y}.${sev}`, r, {
+    lab: `the GS Flood page's fertilization table, ${y} row ${sev} (Moderate / Major / 1000 Year), `
+      + 'columns Plains, Grassland, Desert floodplains',
+  });
 export const FLOOD_FERT_FOOD = [
-  [0.30, 0.15, 0.25],
-  [0.45, 0.25, 0.30],
-  [0.60, 0.40, 0.45],
+  fertRow('Food', 0, [0.30, 0.15, 0.25]),
+  fertRow('Food', 1, [0.45, 0.25, 0.30]),
+  fertRow('Food', 2, [0.60, 0.40, 0.45]),
 ] as const;
 export const FLOOD_FERT_PROD = [
-  [0, 0, 0],
-  [0.10, 0.30, 0.15],
-  [0.15, 0.40, 0.25],
+  fertRow('Prod', 0, [0, 0, 0]),
+  fertRow('Prod', 1, [0.10, 0.30, 0.15]),
+  fertRow('Prod', 2, [0.15, 0.40, 0.25]),
 ] as const;
 
 /** Which fertility column a floodplain's terrain reads. Real Civ 6 puts

@@ -5,7 +5,7 @@
  * live with the rest of the project catalog.
  */
 
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export interface NuclearDeviceDef {
   id: string;
@@ -56,29 +56,44 @@ export const NUCLEAR_DEVICES: readonly NuclearDeviceDef[] =
 
 /** CIV6: "Any units (except Giant Death Robots) that end their turn in a
  *  contaminated tile take 50 damage each turn." */
-export const FALLOUT_DAMAGE = 50;
+export const FALLOUT_DAMAGE = srcConst('nuclear.falloutDamage', 50, {
+  lab: 'the GS Nuclear weapons page ("Any units (except Giant Death Robots) that end their turn '
+    + 'in a contaminated tile take 50 damage each turn"); no install table carries it',
+});
 
 /** CIV6 (Giant Death Robot): "The Giant Death Robot is the only unit that can
  *  survive a nuclear strike. A Nuclear Device or Thermonuclear Device does 50
  *  damage to it, but it is immune to damage from fallout." */
-export const NUKE_ROBOT_DAMAGE = 50;
+export const NUKE_ROBOT_DAMAGE = srcConst('nuclear.robotDamage', 50, {
+  lab: 'the GS Giant Death Robot page ("A Nuclear Device or Thermonuclear Device does 50 damage '
+    + 'to it, but it is immune to damage from fallout")',
+});
 
 /** CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
  *  protect adjacent tiles from nuclear strikes." Read like the anti-air
  *  weapon's own cover — one hex out, and the tile it stands on. */
-export const NUKE_COVER_RANGE = 1;
-export const NUKE_INTERCEPTORS: readonly string[] = [
-  'DESTROYER', 'BATTLESHIP', 'MISSILE_CRUISER', 'MOBILE_SAM',
-];
+export const NUKE_COVER_RANGE = srcConst('nuclear.coverRange', 1, {
+  lab: 'the GS Nuclear weapons page ("Destroyers, Battleships, Missile Cruisers, and Mobile SAMs '
+    + 'can protect adjacent tiles"), read like the Anti-Air Gun\'s own Range 1 cover',
+});
+export const NUKE_INTERCEPTORS: readonly string[] = srcConst('nuclear.NUKE_INTERCEPTORS',
+  ['DESTROYER', 'BATTLESHIP', 'MISSILE_CRUISER', 'MOBILE_SAM'], {
+    lab: 'the GS Nuclear weapons page names exactly these four as the hulls that cover adjacent '
+      + 'tiles; the install carries the cover as a DLL rule',
+  });
 
 /** CIV6: a finished device "can then be used by any unit or improvement
  *  capable of deploying it on the map. This includes bomber aircraft, Nuclear
  *  Submarines, and the Missile Silo." These are the UNIT half; the silo is an
  *  improvement, and launches for the seat rather than for anyone standing
  *  on it. */
-export const NUKE_CARRIERS: readonly string[] = [
-  'BOMBER', 'JET_BOMBER', 'NUCLEAR_SUBMARINE',
-];
+export const NUKE_CARRIERS: readonly string[] = srcConst('nuclear.NUKE_CARRIERS',
+  ['BOMBER', 'JET_BOMBER', 'NUCLEAR_SUBMARINE'], {
+    lab: 'the GS Nuclear weapons page ("bomber aircraft, Nuclear Submarines, and the Missile '
+      + 'Silo") — the UNIT half of that list; the silo is an improvement',
+  });
 
 /** CIV6: cleaning fallout "takes 1 build charge". */
-export const FALLOUT_CLEAN_CHARGES = 1;
+export const FALLOUT_CLEAN_CHARGES = srcConst('nuclear.cleanCharges', 1, {
+  lab: 'the GS Nuclear weapons page (cleaning fallout "takes 1 build charge")',
+});

@@ -10,7 +10,10 @@
  * revealed."
  */
 import type { DistrictId } from '../../world/types';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
+
+/** shorthand: one `GlobalParameters` row's `Value` */
+const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 
 export const SPY_UNIT = 'SPY';
 
@@ -20,20 +23,37 @@ export const SPY_UNIT = 'SPY';
  * carries its own `spyCapacity`; the two LEADER uniques (Wu Zetian's Defensive
  * Tactics, Catherine de Medici's Castles) are civilization uniques.
  */
-export const SPY_CAPACITY_CIVICS = ['DIPLOMATIC_SERVICE', 'NATIONALISM', 'IDEOLOGY', 'COLD_WAR'] as const;
-export const SPY_CAPACITY_TECHS = ['COMPUTERS'] as const;
+export const SPY_CAPACITY_CIVICS = srcConst('eras.espionage.capacityCivics',
+  ['DIPLOMATIC_SERVICE', 'NATIONALISM', 'IDEOLOGY', 'COLD_WAR'] as const, {
+    lab: 'the GS Spy page ("A player\'s Spy capacity increases by 1 for each of these"); the '
+      + 'install writes each as a civic modifier, not as a readable column',
+  });
+export const SPY_CAPACITY_TECHS = srcConst('eras.espionage.capacityTechs', ['COMPUTERS'] as const, {
+  lab: 'the GS Spy page (the Computers tech is the one technology source of Spy capacity)',
+});
 /** CIV6 (Espionage): "The maximum number of Spies a civilization can have is 5
  *  in vanilla Civilization VI and 6 from Rise and Fall onward". */
-export const SPY_CAPACITY_MAX = 6;
+export const SPY_CAPACITY_MAX = srcConst('eras.espionage.capacityMax', 6, {
+  lab: 'the GS Espionage page ("The maximum number of Spies a civilization can have is ... 6 '
+    + 'from Rise and Fall onward")',
+});
 
 /** CIV6 (Espionage): "In ascending order, the levels are as follows: Recruit,
  *  Agent, Secret Agent, Master Spy" — and "a Spy that reaches the Master Spy
  *  level stops gaining experience." */
-export const SPY_LEVELS = ['RECRUIT', 'AGENT', 'SECRET_AGENT', 'MASTER_SPY'] as const;
+export const SPY_LEVELS = srcConst('espionage.SPY_LEVELS',
+  ['RECRUIT', 'AGENT', 'SECRET_AGENT', 'MASTER_SPY'] as const, {
+    derived: 'the ESPIONAGE_MAX_LEVEL levels the GS Espionage page names in ascending order '
+      + '(Recruit, Agent, Secret Agent, Master Spy)',
+    inputs: [gp('ESPIONAGE_MAX_LEVEL')],
+  });
 export const SPY_MAX_LEVEL = SPY_LEVELS.length - 1;
 /** the level at which Listening Post reads two levels of visibility rather
  *  than one — "2 if the Spy's level is Secret Agent or higher". */
-export const SPY_SECRET_AGENT_LEVEL = 2;
+export const SPY_SECRET_AGENT_LEVEL = srcConst('eras.espionage.secretAgentLevel', 2, {
+  lab: 'the GS Listening Post description ("2 if the Spy\'s level is Secret Agent or higher") — '
+    + 'the Secret Agent rung of the level ladder, zero-based',
+});
 
 /** the code a spy's mission slot carries while it is doing nothing, and while
  *  it is in transit. A mission INDEX is `SPY_MISSIONS`'s own. */
@@ -163,9 +183,14 @@ export const SPY_M_FABRICATE_SCANDAL = mi('FABRICATE_SCANDAL');
 /** how many destinations the TRAVEL head offers — district tiles, nearest
  *  first. A city is several tiles now, so the head is three times the eight
  *  centres it once held (a MODEL width). */
-export const SPY_TRAVEL_COLS = 24;
+export const SPY_TRAVEL_COLS = srcConst<number>('eras.espionage.travelCols', 24, {
+  stylized: 'a MODEL width — how many district tiles the TRAVEL head offers, nearest first; '
+    + 'real Civ 6 offers every revealed city',
+});
 /** CIV6 (Surveillance): "+1 level at districts within 1 hex" of the post. */
-export const SPY_SURVEILLANCE_REACH = 1;
+export const SPY_SURVEILLANCE_REACH = srcConst('eras.espionage.surveilReach', 1, {
+  lab: 'the GS Surveillance promotion ("+1 level at districts within 1 hex")',
+});
 
 // ---------------------------------------------------------------------------
 // THE MODEL. Each mission's DURATION is the Spy chassis' own published table
@@ -178,15 +203,23 @@ export const SPY_SURVEILLANCE_REACH = 1;
  *  is ONE roll of 3d6 read against `baseProbability - k`, and a fresh
  *  Recruit — the install's level 1, this engine's level 0 — reads k = 2
  *  before any level term (`LevelProbChange` 1 per level). */
-export const SPY_ROLL_DICE = 3;
-export const SPY_ROLL_FACES = 6;
-export const SPY_ROLL_LEVEL_BASE = 2;
+const spyRoll = {
+  lab: 'C-16 — tools/civ6lab/spy_probe.lua, measured 2026-09-13 over the tuner socket: every '
+    + 'mission is ONE roll of 3d6 read against baseProbability - k, a fresh Recruit reading k = 2',
+};
+export const SPY_ROLL_DICE = srcConst('eras.espionage.rollDice', 3, spyRoll);
+export const SPY_ROLL_FACES = srcConst('eras.espionage.rollFaces', 6, spyRoll);
+export const SPY_ROLL_LEVEL_BASE = srcConst('eras.espionage.rollLevelBase', 2, spyRoll);
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;
 /** what each level adds to an ESCAPE route's base rate — the mission roll
  *  itself is the measured 3d6 above; the escape's scale is ask 14. */
-export const SPY_SUCCESS_PER_LEVEL_PCT = 10;
+export const SPY_SUCCESS_PER_LEVEL_PCT = srcConst('eras.espionage.successPerLevel', 10, {
+  stylized: 'what a level adds to an ESCAPE route\'s base rate — ask 14: the source names the '
+    + 'ordering, never a number (the install\'s ESPIONAGE_ESCAPE_LEVEL_BOOST is a 1-point roll '
+    + 'modifier on a different curve)',
+});
 /** on a failure, the chance the spy is caught rather than merely turned back. */
 export const SPY_CAPTURE_PCT = 50;
 
@@ -194,27 +227,51 @@ export const SPY_CAPTURE_PCT = 50;
  *  presence in an enemy city. Time to complete all offensive spy operations
  *  reduced by 25%." The establish half is the TRAVEL clock here — the only
  *  thing between arriving and starting. */
-export const BODYGUARD_OP_NUM = 3;
-export const BODYGUARD_OP_DEN = 4;
+const bodyguard = {
+  lab: 'the GS Bodyguard of Lies dedication, Golden face ("Time to complete all offensive spy '
+    + 'operations reduced by 25%") — 3/4 as the two integers both engines fold',
+};
+export const BODYGUARD_OP_NUM = srcConst('eras.espionage.bodyguardNum', 3, bodyguard);
+export const BODYGUARD_OP_DEN = srcConst('eras.espionage.bodyguardDen', 4, bodyguard);
 
 // --- the sourced effect magnitudes -----------------------------------------
 /** CIV6 (ESPIONAGE_FOMENT_UNREST_BASE_LOYALTY_CHANGE -15, LEVEL -5). */
-export const SPY_UNREST_LOYALTY = 15;
-export const SPY_UNREST_PER_LEVEL = 5;
+export const SPY_UNREST_LOYALTY = srcConst('eras.espionage.unrestLoyalty', 15, {
+  derived: 'the magnitude of ESPIONAGE_FOMENT_UNREST_BASE_LOYALTY_CHANGE (-15); this engine '
+    + 'stores the loyalty a mission TAKES, the install the signed change',
+  inputs: [gp('ESPIONAGE_FOMENT_UNREST_BASE_LOYALTY_CHANGE')],
+});
+export const SPY_UNREST_PER_LEVEL = srcConst('eras.espionage.unrestPerLevel', 5, {
+  derived: 'the magnitude of ESPIONAGE_FOMENT_UNREST_LEVEL_LOYALTY_CHANGE (-5)',
+  inputs: [gp('ESPIONAGE_FOMENT_UNREST_LEVEL_LOYALTY_CHANGE')],
+});
 /** CIV6 (ESPIONAGE_NEUTRALIZE_GOVERNOR_BASE_TURNS 6) — the parameters
  *  carry NO per-level row for this mission. */
-export const SPY_GOVERNOR_TURNS = 6;
+export const SPY_GOVERNOR_TURNS = srcConst('eras.espionage.governorTurns', 6,
+  gp('ESPIONAGE_NEUTRALIZE_GOVERNOR_BASE_TURNS'));
 /** CIV6 (Gain Sources): "Spies in this city operate at 2 levels higher for 24
  *  turns." */
-export const SPY_SOURCES_LEVELS = 2;
-export const SPY_SOURCES_TURNS = 24;
+export const SPY_SOURCES_LEVELS = srcConst('eras.espionage.sourcesLevels', 2,
+  gp('ESPIONAGE_BONUS_GAIN_SOURCES'));
+export const SPY_SOURCES_TURNS = srcConst('eras.espionage.sourcesTurns', 24, {
+  derived: 'the Gain Sources operation duration (8 turns) x '
+    + 'ESPIONAGE_GAIN_SOURCES_DURATION_MULTIPLIER (3) — the GS page states the product, 24 turns',
+  inputs: [gp('ESPIONAGE_GAIN_SOURCES_DURATION_MULTIPLIER')],
+});
 /** CIV6 (Recruit Partisans): "will cause 2-4 rebel anti-cavalry units to spawn
  *  around the district ... their level will match the current World Era." */
-export const SPY_PARTISANS_MIN = 2;
-export const SPY_PARTISANS_MAX = 4;
+const partisans = {
+  lab: 'the GS Recruit Partisans page ("will cause 2-4 rebel anti-cavalry units to spawn around '
+    + 'the district"); the install writes the spawn as a DLL operation',
+};
+export const SPY_PARTISANS_MIN = srcConst('eras.espionage.partisansMin', 2, partisans);
+export const SPY_PARTISANS_MAX = srcConst('eras.espionage.partisansMax', 4, partisans);
 /** MODEL: "there is a much higher chance than normal that they will be
  *  caught" — the source names the effect, not the number. */
-export const SPY_COUNTERSPY_CATCH_PCT = 30;
+export const SPY_COUNTERSPY_CATCH_PCT = srcConst('eras.espionage.counterspyPct', 30, {
+  stylized: 'the source names the effect ("a much higher chance than normal that they will be '
+    + 'caught"), never a number',
+});
 
 /**
  * CIV6 (Espionage): a discovered spy "will need to escape from the target
@@ -242,5 +299,7 @@ export const SPY_ESCAPE_ROUTES: readonly SpyEscapeRoute[] = [
 ];
 
 /** CIV6 (ESPIONAGE_FABRICATE_SCANDAL_BASE_ENVOYS_REMOVED 2, LEVEL 1). */
-export const SPY_SCANDAL_ENVOYS_BASE = 2;
-export const SPY_SCANDAL_PER_LEVEL = 1;
+export const SPY_SCANDAL_ENVOYS_BASE = srcConst('eras.espionage.scandalEnvoysBase', 2,
+  gp('ESPIONAGE_FABRICATE_SCANDAL_BASE_ENVOYS_REMOVED'));
+export const SPY_SCANDAL_PER_LEVEL = srcConst('eras.espionage.scandalEnvoysPerLevel', 1,
+  gp('ESPIONAGE_FABRICATE_SCANDAL_LEVEL_ENVOYS_REMOVED'));

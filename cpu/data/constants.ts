@@ -4,6 +4,11 @@
  * has NOT been swept (AUDIT B-D).
  */
 
+import { srcConst, xml } from './provenance';
+
+/** shorthand: one `GlobalParameters` row's `Value` */
+const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
+
 export const MAP_SIZES = {
   duel: { name: 'Duel (44×26)', width: 44, height: 26 },
   tiny: { name: 'Tiny (60×38)', width: 60, height: 38 },
@@ -16,9 +21,11 @@ export type MapSizeId = keyof typeof MAP_SIZES;
 /** Minimum distance between city centers.
  * Real Civ 6 blocks settling within 3 tiles of any center. */
 
-export const CITY_WORK_RADIUS = 3;
+export const CITY_WORK_RADIUS = srcConst('seats.workRadius', 3,
+  { ...gp('CITY_MIN_RANGE'), note: 'the settle-distance floor; this engine reads the same 3 as the work radius' });
 
-export const BORDER_MAX_RADIUS = 5;
+export const BORDER_MAX_RADIUS = srcConst('constants.BORDER_MAX_RADIUS', 5,
+  gp('PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE'));
 
 /** Culture needed for a city's next border expansion (n = tiles acquired so
  * far). The real Civ 6 curve, 10 + (6t)^1.3 with t the 1-based tile
@@ -29,12 +36,17 @@ export function borderGrowthCost(n: number): number {
 
 
 /** Gold price of buying a building/unit = production cost × this (Civ 6). */
-export const GAME_SPEED = 0.6;
+export const GAME_SPEED = srcConst('gameSpeed', 0.6, {
+  stylized: 'the COMPRESSION this engine plays at — every install production cost passes through '
+    + 'it; the install\'s own GameSpeeds table has no 0.6 row',
+});
 
-export const GOLD_PURCHASE_MULT = 4;
+export const GOLD_PURCHASE_MULT = srcConst('scenario.goldPurchaseMult', 4,
+  gp('GOLD_PURCHASE_MULTIPLIER'));
 export const FAITH_PURCHASE_MULT = 2;
 
-export const FOOD_PER_CITIZEN = 2;
+export const FOOD_PER_CITIZEN = srcConst('foodPerCitizen', 2,
+  gp('CITY_FOOD_CONSUMPTION_PER_POPULATION'));
 
 /**
  * THE MOVEMENT UNIT. CIV6 publishes a route's movement cost in QUARTERS of a
@@ -43,7 +55,10 @@ export const FOOD_PER_CITIZEN = 2;
  * this engine counts in. Every catalog figure below stays in WHOLE points and
  * is multiplied where it enters, which is `unitFullMoves` and nowhere else.
  */
-export const MP_SCALE = 4;
+export const MP_SCALE = srcConst('mpScale', 4, {
+  stylized: 'the QUARTER point — the unit this engine counts movement in, so the install\'s '
+    + '1.0 / 0.75 / 0.5 / 0.25 route costs are whole numbers here',
+});
 
 /**
  * THE ROAD LADDER. CIV6: "Roads are upgraded by researching technologies, or
@@ -56,22 +71,45 @@ export const MP_SCALE = 4;
  * already fires in lockstep on both engines — "your territory" is a per-seat
  * reading this model does not carry.
  */
-export const ROAD_TIER_MP: readonly number[] = [4, 4, 3, 2];
+export const ROAD_TIER_MP: readonly number[] = srcConst('roadTierMp', [4, 4, 3, 2], {
+  derived: 'Routes.MovementCost x MP_SCALE for ROUTE_ANCIENT_ROAD, ROUTE_MEDIEVAL_ROAD, '
+    + 'ROUTE_INDUSTRIAL_ROAD, ROUTE_MODERN_ROAD in that order (1, 1, 0.75, 0.50)',
+  inputs: [
+    xml('Routes', 'RouteType=ROUTE_ANCIENT_ROAD', 'MovementCost'),
+    xml('Routes', 'RouteType=ROUTE_MEDIEVAL_ROAD', 'MovementCost'),
+    xml('Routes', 'RouteType=ROUTE_INDUSTRIAL_ROAD', 'MovementCost'),
+    xml('Routes', 'RouteType=ROUTE_MODERN_ROAD', 'MovementCost'),
+  ],
+});
 export const ROAD_TIER_BRIDGES: readonly boolean[] = [false, true, true, true];
 /** the world-era index at which each road tier arrives, ascending. */
-export const ROAD_TIER_ERA: readonly number[] = [0, 1, 4, 5];
+export const ROAD_TIER_ERA: readonly number[] = srcConst('roadTierEra', [0, 1, 4, 5], {
+  derived: 'the ChronologyIndex of each road tier\'s Routes.PrereqEra, zero-based (the Ancient '
+    + 'road carries none): ERA_CLASSICAL 1, ERA_INDUSTRIAL 4, ERA_MODERN 5',
+  inputs: [
+    xml('Routes', 'RouteType=ROUTE_MEDIEVAL_ROAD', 'PrereqEra'),
+    xml('Routes', 'RouteType=ROUTE_INDUSTRIAL_ROAD', 'PrereqEra'),
+    xml('Routes', 'RouteType=ROUTE_MODERN_ROAD', 'PrereqEra'),
+  ],
+});
 
 /** CIV6 (Railroad): "Movement Cost 0.25", and it "Creates Bridges over
  *  Rivers" like every tier above the Ancient road. */
-export const RAILROAD_MP = 1;
+export const RAILROAD_MP = srcConst('railroadMp', 1,
+  xml('Routes', 'RouteType=ROUTE_RAILROAD', 'MovementCost', { scale: MP_SCALE }));
 
 /** what EMBARKING or DISEMBARKING costs on top of the step, unless a Harbor
  *  or a coastal City Center makes the dock free. Two whole points. */
-export const EMBARK_TRANSITION_MP = 2 * MP_SCALE;
+export const EMBARK_TRANSITION_MP = srcConst('embarkTransitionMp', 2 * MP_SCALE, {
+  derived: 'MOVEMENT_EMBARK_COST x MP_SCALE — the install writes the dock in whole points, this '
+    + 'engine in quarters',
+  inputs: [gp('MOVEMENT_EMBARK_COST')],
+});
 
 /** CIV6 (Railroad): the tech that unlocks it, and the resources one tile
  *  costs — "does not cost a charge, but does cost 1 Iron and 1 Coal". */
-export const RAILROAD_TECH = 'STEAM_POWER';
+export const RAILROAD_TECH = srcConst('constants.RAILROAD_TECH', 'STEAM_POWER',
+  xml('Routes_XP2', 'RouteType=ROUTE_RAILROAD', 'PrereqTech', { expect: 'TECH_STEAM_POWER' }));
 export const RAILROAD_COST: readonly (readonly [string, number])[] = [['IRON', 1], ['COAL', 1]];
 
 /**
@@ -80,7 +118,7 @@ export const RAILROAD_COST: readonly (readonly [string, number])[] = [['IRON', 1
  * the following techs each add more: Square Rigging (+1), Steam Power (+2) and
  * Combustion (+1)." Water tiles enter at cost 1.
  */
-export const EMBARK_MOVES = 2;
+export const EMBARK_MOVES = srcConst('combat.embarkMoves', 2, gp('MOVEMENT_WHILE_EMBARKED_BASE'));
 export const EMBARK_MOVE_TECHS: readonly (readonly [string, number])[] = [
   ['SQUARE_RIGGING', 1], ['STEAM_POWER', 2], ['COMBUSTION', 1],
 ];
@@ -93,8 +131,13 @@ export const EMBARK_MOVE_TECHS: readonly (readonly [string, number])[] = [
  * Civilopedia entry says it has only 4." So it rides on the chassis stat
  * rather than being folded into it, and reaches HULLS as well as passengers.
  */
-export const SEA_MOVE_TECH = 'MATHEMATICS';
-export const SEA_MOVE_TECH_BONUS = 1;
+export const SEA_MOVE_TECH = srcConst('constants.SEA_MOVE_TECH', 'MATHEMATICS',
+  xml('Technologies', 'TechnologyType=TECH_MATHEMATICS', 'TechnologyType',
+    { expect: 'TECH_MATHEMATICS' }));
+export const SEA_MOVE_TECH_BONUS = srcConst('constants.SEA_MOVE_TECH_BONUS', 1, {
+  lab: 'the GS Civilopedia Movement page ("+1 Movement after researching Mathematics" to every '
+    + 'unit at sea); the install carries it as a modifier, not as a readable column',
+});
 
 /**
  * CIV6 (Combat, "Attacking embarked units"): an embarked unit defends at a
@@ -107,16 +150,24 @@ export const SEA_MOVE_TECH_BONUS = 1;
  * fortify, support or class terms ride on top: the class is what the
  * normalization removes.
  */
-export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] = [15, 15, 15, 30, 35, 50, 55, 55, 55];
+export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] =
+  srcConst('combat.embarkedDefenseCsByEra', [15, 15, 15, 30, 35, 50, 55, 55, 55], {
+    derived: 'Eras.EmbarkedUnitStrength in ChronologyIndex order, with the ANCIENT row repeating '
+      + 'the Classical tier (the install writes 10 there; embarking needs a Classical technology, '
+      + 'so this engine never reads an Ancient embark)',
+    inputs: [xml('Eras', 'EraType=ERA_CLASSICAL', 'EmbarkedUnitStrength')],
+  });
 
 /** CIV6 (GlobalParameters.xml): COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20 —
  *  the one number the install publishes beside the cavalry capture's
  *  permission. The curve through it is this model's (STYLIZED, owner ruling
  *  2026-09-04): an even fight is a coin flip, certain at +base, nothing at
  *  -base — see `captureRoll`. */
-export const CAPTURE_BASE_STRENGTH_DIFF = 20;
+export const CAPTURE_BASE_STRENGTH_DIFF = srcConst('combat.captureBaseDiff', 20,
+  gp('COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE'));
 /** the hit points a captured unit arrives with — STYLIZED, no source */
-export const CAPTURED_UNIT_HP = 25;
+export const CAPTURED_UNIT_HP = srcConst('combat.capturedHp', 25,
+  { stylized: 'the hit points a captured unit arrives with; the install publishes none' });
 
 /** master switch for the LIVE scripted WATER movement (the seat
  * war-march taking water steps). N1 lands the full embark/movement MODEL and
@@ -135,13 +186,21 @@ export function setEmbarkLive(v: boolean): void {
 }
 
 /** Each citizen contributes these yields directly (Civ 6). */
-export const CITIZEN_SCIENCE = 0.5;
-export const CITIZEN_CULTURE = 0.3;
+export const CITIZEN_SCIENCE = srcConst('citizenScience', 0.5, {
+  derived: 'SCIENCE_PERCENTAGE_YIELD_PER_POP / 100 — the install writes the share as a percentage',
+  inputs: [gp('SCIENCE_PERCENTAGE_YIELD_PER_POP')],
+});
+export const CITIZEN_CULTURE = srcConst('citizenCulture', 0.3, {
+  derived: 'CULTURE_PERCENTAGE_YIELD_PER_POP / 100 — the install writes the share as a percentage',
+  inputs: [gp('CULTURE_PERCENTAGE_YIELD_PER_POP')],
+});
 
-export const CITY_CENTER_MIN_FOOD = 2;
+export const CITY_CENTER_MIN_FOOD = srcConst('centerMinFood', 2,
+  gp('YIELD_FOOD_CITY_TERRAIN_REPLACE'));
 /** CIV6 (GlobalParameters, PILLAGE_BUILDING_REPAIR_PERCENT 25): a pillaged
  *  building is repaired from its city's queue for this share of its price. */
-export const PILLAGE_BUILDING_REPAIR_PERCENT = 25;
+export const PILLAGE_BUILDING_REPAIR_PERCENT = srcConst('pillageBuildingRepairPct', 25,
+  gp('PILLAGE_BUILDING_REPAIR_PERCENT'));
 export const CITY_CENTER_MIN_PRODUCTION = 1;
 
 /** Food needed to grow from `pop` to `pop`+1 (Civ 6 formula). */
@@ -196,11 +255,18 @@ export function amenityTierIndex(name: string): number {
  * already matched; no change was needed. Recorded so the next sweep does not
  * re-derive it.
  */
-export const HOUSING_FRESH_WATER = 5;
-export const HOUSING_COASTAL = 3;
-export const HOUSING_NO_WATER = 2;
-export const AQUEDUCT_FRESH_BONUS = 2;
-export const AQUEDUCT_NO_FRESH_TOTAL = 6;
+const housingWiki = (what: string) => ({
+  lab: `the GS Housing / Aqueduct pages (${what}); the install carries city-site housing as a `
+    + 'DLL rule, not as a readable column',
+});
+export const HOUSING_FRESH_WATER = srcConst<number>('housing.fresh', 5,
+  housingWiki('5 for fresh water'));
+export const HOUSING_COASTAL = srcConst<number>('housing.coastal', 3, housingWiki('3 for coastal'));
+export const HOUSING_NO_WATER = srcConst<number>('housing.none', 2, housingWiki('2 for no water'));
+export const AQUEDUCT_FRESH_BONUS = srcConst('housing.aqFreshBonus', 2,
+  gp('CITY_POPULATION_AQUEDUCT_BOOST'));
+export const AQUEDUCT_NO_FRESH_TOTAL = srcConst('housing.aqNoFreshTotal', 6,
+  gp('CITY_POPULATION_AQUEDUCT_MIN'));
 
 export const LUXURY_AMENITY_CITIES = 4;
 
@@ -212,8 +278,19 @@ export const REGIONAL_RANGE = 6;
  * own GS yield, per resource page. An unimproved or pillaged source produces
  * nothing, which is the same predicate `civHasStrategic` already asks.
  */
+const perTurn = (res: string, n: number) => srcConst(`strategic.rate.${res}`, n, {
+  lab: `the GS ${res.charAt(0)}${res.slice(1).toLowerCase()} resource page — the improved tile's `
+    + 'own per-turn stockpile yield; the install writes it as an improvement modifier, '
+    + 'not as a Resources column',
+});
 export const STRATEGIC_PER_TURN: Record<string, number> = {
-  HORSES: 2, IRON: 2, NITER: 2, COAL: 3, OIL: 3, ALUMINUM: 2, URANIUM: 3,
+  HORSES: perTurn('HORSES', 2),
+  IRON: perTurn('IRON', 2),
+  NITER: perTurn('NITER', 2),
+  COAL: perTurn('COAL', 3),
+  OIL: perTurn('OIL', 3),
+  ALUMINUM: perTurn('ALUMINUM', 2),
+  URANIUM: perTurn('URANIUM', 3),
 };
 
 /** The stockpile index space: one slot per strategic resource, in the order
@@ -235,19 +312,29 @@ export function emptyStockpile(): number[] {
  *  load, and a cycle between trade.ts and units.ts would leave that NaN. */
 export const TRADE_ROAD_MAX_STEPS = 32;
 
-export const STOCKPILE_CAP_BASE = 50;
-export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING = 10;
+export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', 50, {
+  lab: 'the GS Resources page ("The maximum stockpile amount is initially 50 for each resource"); '
+    + 'the install carries the cap as a DLL rule',
+});
+export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
+  srcConst('strategic.capPerEncampmentBuilding', 10, {
+    lab: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',
+  });
 
 /** CIV6 (GS): every unit in this roster that asks for a strategic resource
  *  asks for 20 of it, paid "at the moment you start production (or the moment
  *  you purchase it)" — Horseman, Swordsman, Knight, Musketman and Bombard each
  *  say so on their own page. */
-export const UNIT_RESOURCE_COST = 20;
+export const UNIT_RESOURCE_COST = srcConst('constants.UNIT_RESOURCE_COST', 20, {
+  lab: 'the GS unit pages (Horseman, Swordsman, Knight, Musketman, Bombard each ask 20 of their '
+    + 'strategic resource at the moment production starts)',
+});
 
 /** CIV6 (Resource, GS): a unit whose seat could not meet its fuel bill this
  *  turn fights at "-20 Insufficient <resource>" (the combat preview's line) —
  *  GlobalParameters COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL, a flat 20. */
-export const FUEL_SHORT_CS = 20;
+export const FUEL_SHORT_CS = srcConst('strategic.fuelShortCs', 20,
+  gp('COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL'));
 
 export function maxSpecialtyDistricts(pop: number): number {
   return Math.floor((pop - 1) / 3) + 1;

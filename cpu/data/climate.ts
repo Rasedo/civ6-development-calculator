@@ -16,39 +16,66 @@
  * the page's own per-resource figures — 3280, 1960 and 768 raw units, which
  * it displays as ~3.28, ~1.96 and ~0.77 after dividing by 1000.
  */
-export const CARBON_PER_POWER: Record<string, number> = { COAL: 820, OIL: 490, URANIUM: 48 };
+const carbon = (res: string, n: number) => srcConst(`climate.carbonPerPower.${res}`, n, {
+  lab: 'the GS Climate page, Pollution formulae ("Each type of resource has an assigned number '
+    + 'of emitted carbon units per Power generated, which is 820, 490, and 48 for Coal, Oil, and '
+    + 'Uranium"); the install ships no readable CO2 table',
+});
+export const CARBON_PER_POWER: Record<string, number> = {
+  COAL: carbon('COAL', 820), OIL: carbon('OIL', 490), URANIUM: carbon('URANIUM', 48),
+};
 
 /** CIV6: "Units that consume one of these types of resources also discharge
  *  carbon per turn, but their emissions are equal to only half of Power
  *  Plants per unit of resource." */
-export const UNIT_CARBON_SHARE = 0.5;
+export const UNIT_CARBON_SHARE = srcConst('climate.unitShare', 0.5, {
+  derived: 'CLIMATE_CO2_PERCENT_FROM_UNITS / 100 — the install writes the share as a percentage',
+  inputs: [xml('GlobalParameters', 'Name=CLIMATE_CO2_PERCENT_FROM_UNITS', 'Value')],
+});
 
 /** CIV6: "for means of CO2 contributions each military unit only takes 0.5
  *  resource units" — the post-Antarctic-Update reduction, which the page is
  *  careful to say "does not affect the mechanics of resource production flow"
  *  and so applies to the EMISSION only, never to `chargeUnitUpkeep`'s spend. */
-export const UNIT_CARBON_RESOURCE_SHARE = 0.5;
+export const UNIT_CARBON_RESOURCE_SHARE = srcConst('climate.unitResourceShare', 0.5, {
+  lab: 'the GS Climate page ("for means of CO2 contributions each military unit only takes 0.5 '
+    + 'resource units", the post-Antarctic-Update reduction)',
+});
 
 /** CIV6 (Advanced Power Cells): "As of the Antarctic Late Summer Update, it
  *  also halves the CO2 emitted by units." */
-export const ADVANCED_POWER_CELLS_SHARE = 0.5;
-export const ADVANCED_POWER_CELLS_TECH = 'ADVANCED_POWER_CELLS';
+export const ADVANCED_POWER_CELLS_SHARE = srcConst('climate.cellsShare', 0.5, {
+  lab: 'the GS Advanced Power Cells page ("As of the Antarctic Late Summer Update, it also '
+    + 'halves the CO2 emitted by units")',
+});
+export const ADVANCED_POWER_CELLS_TECH = srcConst('climate.ADVANCED_POWER_CELLS_TECH',
+  'ADVANCED_POWER_CELLS',
+  xml('Technologies', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'TechnologyType',
+    { expect: 'TECH_ADVANCED_POWER_CELLS' }));
 
 /**
  * CIV6: "In order for the global temperature to rise by 0.5° (1 Climate
  * Change Point), you will need a different amount of CO2 emissions depending
  * on map size" — Duel 250,000. This world is 44x26, which IS Civ 6's Duel.
  */
-export const CO2_PER_POINT = 250_000;
+export const CO2_PER_POINT = srcConst('climate.co2PerPoint', 250_000, {
+  lab: 'the GS Climate page ("you will need a different amount of CO2 emissions depending on map '
+    + 'size" — Duel 250,000, which is this 44x26 world); the install ships no readable '
+    + 'climate-level table',
+});
 
 /** CIV6 (Carbon Recapture): "will recover 50,000 units of CO2". The project
  *  page states the same figure as the displayed "-50 lifetime carbon
  *  emissions", and lets a civ's lifetime total go below zero. */
-export const CARBON_RECAPTURE_UNITS = 50_000;
+export const CARBON_RECAPTURE_UNITS = srcConst('climate.recaptureUnits', 50_000, {
+  lab: 'the GS Carbon Recapture project page ("will recover 50,000 units of CO2")',
+});
 /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor". */
-export const CARBON_RECAPTURE_FAVOR = 30;
+export const CARBON_RECAPTURE_FAVOR = srcConst('climate.recaptureFavor', 30, {
+  lab: 'the GS Carbon Recapture project page ("awards 30 Diplomatic Favor")',
+});
 
-import { type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export interface ClimatePhase {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
@@ -110,12 +137,17 @@ export const CLIMATE_PHASES: readonly ClimatePhase[] =
  * Descending cuts: the first row whose cut the level clears is the band, which
  * is the same shape the appeal bands read by.
  */
+const defBand = (i: number, b: readonly [number, number]): readonly [number, number] =>
+  srcConst(`climate.deforestation.${i}`, b, {
+    lab: 'the GS Deforestation Level page\'s band table — [cut, CO2 emission modifier], '
+      + 'descending cuts',
+  }) as readonly [number, number];
 export const DEFORESTATION_BANDS: ReadonlyArray<readonly [number, number]> = [
-  [0.50, 0.50],
-  [0.40, 0.30],
-  [0.25, 0.10],
-  [0.10, 0.00],
-  [0.00, -0.20],
+  defBand(0, [0.50, 0.50]),
+  defBand(1, [0.40, 0.30]),
+  defBand(2, [0.25, 0.10]),
+  defBand(3, [0.10, 0.00]),
+  defBand(4, [0.00, -0.20]),
 ] as const;
 
 /**
@@ -129,7 +161,11 @@ export const DEFORESTATION_BANDS: ReadonlyArray<readonly [number, number]> = [
  * reproduces the published behaviour that the lowest, most seaward tiles go
  * under first and hills never do.
  */
-export const LOWLAND_MAX_BAND = 3;
+export const LOWLAND_MAX_BAND = srcConst('climate.lowlandMaxBand', 3, {
+  stylized: 'real Civ 6 stamps a coastal lowland\'s band at map generation as metres above sea '
+    + 'level and publishes neither the generator\'s rule nor the elevations; this engine reads '
+    + 'the band as hex distance to the nearest water, three deep',
+});
 
 /**
  * How much likelier a disaster is, and how much likelier it is to arrive at
@@ -176,7 +212,10 @@ export function deforestationModifier(level: number): number {
 /** CIV6 (Flood Barrier): "The formula is (80 x coastal lowland tiles) + (80 x
  *  coastal lowland tiles x flood level)" — so the price of a barrier climbs
  *  with the sea it holds back. */
-export const FLOOD_BARRIER_PER_TILE = 80;
+export const FLOOD_BARRIER_PER_TILE = srcConst('climate.barrierPerTile', 80, {
+  lab: 'the GS Flood Barrier page ("The formula is (80 x coastal lowland tiles) + (80 x coastal '
+    + 'lowland tiles x flood level)")',
+});
 
 /**
  * CIV6 (Diplomatic Favor, Losing Favor): "When you're producing too much CO2
@@ -187,9 +226,17 @@ export const FLOOD_BARRIER_PER_TILE = 80;
  * as the raw units "after taking away the last 3 digits (divided by 1000 and
  * rounded down to the closest integer)".
  */
-export const POLLUTION_DISPLAY_DIVISOR = 1000;
-export const FAVOR_PER_POLLUTION_OVER = 3;
-export const FAVOR_POLLUTION_CAP = 20;
+export const POLLUTION_DISPLAY_DIVISOR = srcConst('climate.pollutionDivisor', 1000, {
+  lab: 'the GS Climate page — the displayed pollution figure is the raw units "after taking away '
+    + 'the last 3 digits (divided by 1000 and rounded down)"',
+});
+export const FAVOR_PER_POLLUTION_OVER = srcConst('climate.favorPerOver', 3,
+  xml('GlobalParameters', 'Name=FAVOR_CO2_DIVISOR', 'Value'));
+export const FAVOR_POLLUTION_CAP = srcConst('climate.favorCap', 20, {
+  derived: 'the magnitude of FAVOR_CO2_MINIMUM (-20) — this engine stores the cap on the penalty, '
+    + 'the install the signed floor',
+  inputs: [xml('GlobalParameters', 'Name=FAVOR_CO2_MINIMUM', 'Value')],
+});
 
 /** The displayed pollution figure for a raw carbon total. */
 export function pollutionPoints(raw: number): number {

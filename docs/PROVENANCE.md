@@ -220,3 +220,35 @@ and governorPromotions (153 constants). No catalog value changed.
 ### Tooling findings (both acted on)
 1. Alphabetical order inside a pack is not the load order — `Expansion2_RemoveData.xml` deleted the civic boosts (Boosts read 14 rows where the game has ~112), and likely the DEFENDER/BUILDER governor promotions and four resolutions. The checker now follows each pack's .modinfo: InGameActions/UpdateDatabase under the ruleset's criteria, LoadOrder across actions, Priority within.
 2. `scale` could not express a fraction; it now compares exactly when the catalog value is fractional.
+
+## Wave 2, agent D report (2026-09-14) — the named scalars via `srcConst`
+
+Fully tagged: constants.ts, disasters.ts, espionage.ts, sight.ts,
+warKinds.ts, goodyHuts.ts, climate.ts, greatWorks.ts, nuclear.ts,
+greatPeople.ts (167 registrations; 2-D tables and Records registered per
+row / per key). UNTOUCHED, the next agent's job: seats.ts (226 module-level
+consts; the GlobalParameters rows for ~50 of them are already listed in the
+agent's report — WAR/PEACE min turns, LOYALTY_*, WAR_WEARINESS_*, the age
+thresholds, the congress and alliance and grievance and tourism
+parameters) and units.ts's top block (FORMATION_CS = COMBAT_CORPS/ARMY_
+STRENGTH_MODIFIER 10/17, FORMATION_COST_MULT = UNIT_CORPS/ARMY_COST_MODIFIER
+1.5/2.0, FORMATION_RESOURCE_MULT stylized). Helpers in tmp/agentD:
+`wirepaths.py` (a constant's rules.json path from rules.ts), `globalparams.txt`
+(all 476 GlobalParameters rows), q1..q7 batch queries. vitest 1790 green,
+tsc green, no value changed.
+
+DUMP GAP (closed by the maintainer): cpu/export/provenance.ts imported no
+symbol from sight.ts or goodyHuts.ts, so their 13 registrations never
+loaded; two side-effect imports fix it. The 13 were hand-verified MATCH.
+
+### MISMATCH — 1
+- scenario.goldPurchaseMult 4 vs GlobalParameters GOLD_PURCHASE_MULTIPLIER 2 (beside PURCHASE_DIVISOR 5) — the constant's comment states 4 as fact with no citation. #264: is the engine's cost×4 a deliberate price or a slip against the install's 2-and-divisor-5 formula?
+- (raised and re-pointed, no value touched) ARCHAEOLOGIST charges 3: the install has no BuildCharges column for the chassis; retagged LAB (the civilopedia's 3).
+
+### UNSOURCED, grouped
+- A. Stated with no source: FAITH_PURCHASE_MULT 2 (no FAITH_PURCHASE_MULTIPLIER row), CITY_CENTER_MIN_PRODUCTION 1, LUXURY_AMENITY_CITIES 4, REGIONAL_RANGE 6, TRADE_ROAD_MAX_STEPS 32, DROUGHT_LENGTH 8 (the install's droughts are 5 and 10 — an owner ask), the spy TRAVEL clock (1 / 8 tiles a turn / 5), SPY_CAPTURE_PCT 50.
+- B. Shape `srcConst` cannot take: MAP_SIZES, AMENITY_TIERS, ROAD_TIER_BRIDGES (= Routes.SupportsBridges, verified), RAILROAD_COST (= Route_ResourceCosts, verified), EMBARK_MOVE_TECHS, STORM_DISC, ARTIST_WORKS, SPECIALIST_*, GP_ABILITY/FX/PERM; in seats.ts SKY_EUREKAS, DEDICATION_ERAS, LOYALTY_AMENITY, GOV_INTOLERANCE, SEAT_CAPS (the last two are Records and CAN be registered per key).
+- C. Deliberately not registered — catalog-position codes and aggregates (SPY_M_*, WAR_KIND_*, GW_KIND_*, GP_CLASSES, FORMATION_MAX …): they assert nothing about the game.
+
+### Type note
+`srcConst` infers a non-fresh literal type; two sites needed `srcConst<number>(…)` (housing.fresh/coastal/none read into a `let`; eras.espionage.travelCols). Expect the same in seats.ts — annotation only.

@@ -18,39 +18,60 @@
  * composer checks against the seat's own row.
  */
 import type { CivId, LeaderId } from './seats';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 /** GreatWorkObjectTypes, numbered by the install's `Value` column. */
-export const GWO_SCULPTURE = 0;
-export const GWO_PORTRAIT = 1;
-export const GWO_LANDSCAPE = 2;
-export const GWO_RELIGIOUS = 3;
-export const GWO_ARTIFACT = 4;
-export const GWO_WRITING = 5;
-export const GWO_MUSIC = 6;
-export const GWO_RELIC = 7;
-export const GWO_COUNT = 8;
+const gwo = (id: string, v: number) => srcConst(`greatWorks.GWO_${id}`, v,
+  xml('GreatWorkObjectTypes', `GreatWorkObjectType=GREATWORKOBJECT_${id}`, 'Value'));
+export const GWO_SCULPTURE = gwo('SCULPTURE', 0);
+export const GWO_PORTRAIT = gwo('PORTRAIT', 1);
+export const GWO_LANDSCAPE = gwo('LANDSCAPE', 2);
+export const GWO_RELIGIOUS = gwo('RELIGIOUS', 3);
+export const GWO_ARTIFACT = gwo('ARTIFACT', 4);
+export const GWO_WRITING = gwo('WRITING', 5);
+export const GWO_MUSIC = gwo('MUSIC', 6);
+export const GWO_RELIC = gwo('RELIC', 7);
+export const GWO_COUNT = srcConst('greatWorks.GWO_COUNT', 8, {
+  derived: 'the number of `GreatWorkObjectTypes` rows',
+  inputs: [xml('GreatWorkObjectTypes', 'GreatWorkObjectType=GREATWORKOBJECT_RELIC', 'Value')],
+});
 export const GWO_ART = [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS] as const;
 
 /** GreatWorkSlotTypes. */
-export const GWS_WRITING = 0;
-export const GWS_ART = 1;
-export const GWS_MUSIC = 2;
-export const GWS_ARTIFACT = 3;
-export const GWS_RELIC = 4;
-export const GWS_CATHEDRAL = 5;
-export const GWS_PALACE = 6;
-export const GWS_COUNT = 7;
+const gws = (id: string, v: number) => srcConst(`greatWorks.GWS_${id}`, v, {
+  derived: `this engine's code for the install GREATWORKSLOT_${id}; the install's `
+    + '`GreatWorkSlotTypes` rows carry no Value column, so the numbering is the engine\'s own',
+  inputs: [xml('GreatWorkSlotTypes', `GreatWorkSlotType=GREATWORKSLOT_${id}`, 'GreatWorkSlotType')],
+});
+export const GWS_WRITING = gws('WRITING', 0);
+export const GWS_ART = gws('ART', 1);
+export const GWS_MUSIC = gws('MUSIC', 2);
+export const GWS_ARTIFACT = gws('ARTIFACT', 3);
+export const GWS_RELIC = gws('RELIC', 4);
+export const GWS_CATHEDRAL = gws('CATHEDRAL', 5);
+export const GWS_PALACE = gws('PALACE', 6);
+export const GWS_COUNT = srcConst('greatWorks.GWS_COUNT', 7, {
+  derived: 'the number of `GreatWorkSlotTypes` rows',
+  inputs: [xml('GreatWorkSlotTypes', 'GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')],
+});
 
 /** GreatWork_ValidSubTypes: the object types each slot type takes. */
+const accepts = (slot: string, objs: readonly number[]): readonly number[] =>
+  srcConst(`seats.greatWorks.accepts.${slot}`, objs, {
+    derived: `the GreatWorkObjectTypes.Value of every \`GreatWork_ValidSubTypes\` row whose `
+      + `GreatWorkSlotType is GREATWORKSLOT_${slot}`,
+    inputs: [xml('GreatWork_ValidSubTypes',
+      `GreatWorkSlotType=GREATWORKSLOT_${slot}`, 'GreatWorkSlotType')],
+  });
 export const GWS_ACCEPTS: readonly (readonly number[])[] = [
-  [GWO_WRITING],
-  [...GWO_ART],
-  [GWO_MUSIC],
-  [GWO_ARTIFACT],
-  [GWO_RELIC],
-  [GWO_RELIGIOUS],
-  [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS, GWO_WRITING, GWO_MUSIC, GWO_RELIC, GWO_ARTIFACT],
+  accepts('WRITING', [GWO_WRITING]),
+  accepts('ART', [...GWO_ART]),
+  accepts('MUSIC', [GWO_MUSIC]),
+  accepts('ARTIFACT', [GWO_ARTIFACT]),
+  accepts('RELIC', [GWO_RELIC]),
+  accepts('CATHEDRAL', [GWO_RELIGIOUS]),
+  accepts('PALACE', [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS, GWO_WRITING,
+    GWO_MUSIC, GWO_RELIC, GWO_ARTIFACT]),
 ];
 
 export function slotAccepts(slotType: number, obj: number): boolean {
@@ -81,9 +102,23 @@ export function gwKindObjects(kind: number): readonly number[] {
  * Culture / 2 Tourism, Music +4 / 4, an Artifact +3 / 3, a Relic +4 Faith /
  * 8 Tourism and no Culture. Indexed by object type.
  */
-export const GWO_CULTURE: readonly number[] = [3, 3, 3, 3, 3, 2, 4, 0];
-export const GWO_FAITH: readonly number[] = [0, 0, 0, 0, 0, 0, 0, 4];
-export const GWO_TOURISM: readonly number[] = [2, 2, 2, 2, 3, 2, 4, 8];
+const objYield = (key: string, table: string, col: string, v: readonly number[]) =>
+  srcConst(`seats.greatWorks.${key}`, v, {
+    derived: `the ${table}.${col} every work of each object type carries, indexed by `
+      + 'GreatWorkObjectTypes.Value (a handful of named works carry a raised figure; the table '
+      + 'value is the one the object type pays)',
+    inputs: [xml(table, 'GreatWorkType=GREATWORK_DONATELLO_1', col)],
+  });
+export const GWO_CULTURE: readonly number[] = objYield('objCulture',
+  'GreatWork_YieldChanges', 'YieldChange', [3, 3, 3, 3, 3, 2, 4, 0]);
+export const GWO_FAITH: readonly number[] = srcConst('seats.greatWorks.objFaith',
+  [0, 0, 0, 0, 0, 0, 0, 4], {
+    derived: 'the GreatWork_YieldChanges YIELD_FAITH row of each object type — only the RELIC '
+      + 'rows carry one, at 4',
+    inputs: [xml('GreatWork_YieldChanges', 'GreatWorkType=GREATWORK_RELIC_1', 'YieldChange')],
+  });
+export const GWO_TOURISM: readonly number[] = objYield('objTourism',
+  'GreatWorks', 'Tourism', [2, 2, 2, 2, 3, 2, 4, 8]);
 
 /** The theming RULE a holder's row declares (`Building_GreatWorks`). */
 export const GW_THEME_NONE = 0;
@@ -93,7 +128,13 @@ export const GW_THEME_ART = 1;
 export const GW_THEME_ARTIFACT = 2;
 /** A THEMED holder pays its works' base yields and tourism this many times
  *  over (ThemingYieldMultiplier / ThemingTourismMultiplier 100). */
-export const THEMING_MULT = 2;
+export const THEMING_MULT = srcConst('seats.greatWorks.themingMult', 2, {
+  derived: '1 + ThemingYieldMultiplier / 100 (and ThemingTourismMultiplier alike) — a themed '
+    + 'holder pays its works twice over',
+  inputs: [xml('Building_GreatWorks',
+    'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART',
+    'ThemingYieldMultiplier')],
+});
 
 export interface GreatWorkHolderDef {
   /** a building id (`BUILDINGS`) or a wonder id (`BUILT_WONDERS`) */

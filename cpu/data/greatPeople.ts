@@ -1,6 +1,6 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 import { LUXURY_AMENITY_CITIES } from './constants';
 import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
@@ -37,7 +37,21 @@ export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
  * 1320. Indexed in this engine's own era space, where nobody is Ancient and
  * nobody is Future — those two ends mirror their neighbour and are unreachable.
  */
-export const GP_ERA_GPP: readonly number[] = [60, 60, 120, 240, 420, 660, 960, 1320, 1320];
+export const GP_ERA_GPP: readonly number[] = srcConst('greatPeople.GP_ERA_GPP',
+  [60, 60, 120, 240, 420, 660, 960, 1320, 1320], {
+    derived: 'Eras.GreatPersonBaseCost in ChronologyIndex order, with the ANCIENT slot repeating '
+      + 'the Classical cost (the install writes 30 there; nobody is Ancient in this engine\'s '
+      + 'era space, so the end is unreachable) and the FUTURE slot mirroring Information',
+    inputs: [
+      xml('Eras', 'EraType=ERA_CLASSICAL', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_MEDIEVAL', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_RENAISSANCE', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_INDUSTRIAL', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_MODERN', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_ATOMIC', 'GreatPersonBaseCost'),
+      xml('Eras', 'EraType=ERA_INFORMATION', 'GreatPersonBaseCost'),
+    ],
+  });
 
 /**
  * CIV6: "most Great People classes' GPP cost (all but art-related People and
@@ -453,7 +467,11 @@ export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
  * the person's instant culture lump. CIV6 (GreatWorks.xml): a Writer makes 2
  * Works of Writing, an Artist 3 Works of Art, a Musician 2 Works of Music.
  */
-export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
+export const GW_WORKS_PER_PERSON = srcConst('seats.gwWorksByKind', [2, 3, 2] as const, {
+  derived: 'the number of `GreatWorks` rows each Great Person of the kind carries — a Writer 2 '
+    + 'Works of Writing, an Artist 3 Works of Art, a Musician 2 Works of Music',
+  inputs: [xml('GreatWorks', 'GreatWorkType=GREATWORK_DONATELLO_1', 'GreatWorkObjectType')],
+});
 export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
   WRITER: GW_KIND_WRITING,
   ARTIST: GW_KIND_ART,
@@ -461,8 +479,12 @@ export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
 };
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
-export const ARCHAEOLOGIST_CHARGES = 3;
-export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
+export const ARCHAEOLOGIST_CHARGES = srcConst('greatPeople.ARCHAEOLOGIST_CHARGES', 3, {
+  lab: 'the GS Archaeologist page (an Archaeologist extracts 3 Artifacts and is then consumed); '
+    + 'the install\'s Units row carries only ExtractsArtifacts, no charge count and no default',
+});
+export const ARCHAEOLOGIST_CIVIC = srcConst('greatPeople.ARCHAEOLOGIST_CIVIC', 'NATURAL_HISTORY',
+  xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'PrereqCivic', { expect: 'CIVIC_NATURAL_HISTORY' }));
 
 /**
  * The three works each Great Artist makes, in creation order — CIV6
@@ -510,8 +532,13 @@ export function personWorkObjects(cls: GreatPersonClass, at: number): number[] {
  * it is the TOURISM that doubles, not the Amphitheater's slot count, which
  * stays at 2). Culture is untouched. `printing` is the owning civ's tech state.
  */
-export const GW_PRINTING_TECH = 'PRINTING';
-export const GW_PRINTING_WRITING_MULT = 2;
+export const GW_PRINTING_TECH = srcConst('greatPeople.GW_PRINTING_TECH', 'PRINTING',
+  xml('Technologies', 'TechnologyType=TECH_PRINTING', 'TechnologyType',
+    { expect: 'TECH_PRINTING' }));
+export const GW_PRINTING_WRITING_MULT = srcConst('seats.gwPrintingWritingMult', 2, {
+  lab: 'the GS Printing / Great Work pages — Printing DOUBLES the Tourism of Great Works of '
+    + 'Writing (the culture is untouched); the install writes it as a modifier',
+});
 
 /** Specialist yields per district type (Civ 6-ish; only these take specialists). */
 /** CIV6 (wiki "Specialists (Civ6)", GS values): base yields per specialist

@@ -16,18 +16,31 @@
  * EVEREST 2 — Crater Lake, the Dead Sea, Galapagos, the Barrier Reef, the
  * Pantanal, Dover and the Eye of the Sahara carry no column at all.
  */
-export const ELEVATION_SIGHT: Readonly<Record<string, number>> = { HILLS: 1, MOUNTAIN: 2 };
+import { srcConst, xml } from './provenance';
+
+const terr = (t: string) => xml('Terrains', `TerrainType=${t}`, 'SightThroughModifier');
+const feat = (f: string) => xml('Features', `FeatureType=${f}`, 'SightThroughModifier');
+
+export const ELEVATION_SIGHT: Readonly<Record<string, number>> = {
+  HILLS: srcConst('improvements.sightHills', 1, terr('TERRAIN_GRASS_HILLS')),
+  MOUNTAIN: srcConst('improvements.sightMountain', 2, terr('TERRAIN_GRASS_MOUNTAIN')),
+};
 
 export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
-  WOODS: 1,
-  RAINFOREST: 1,
-  ULURU: 1,
-  TORRES_DEL_PAINE: 2,
-  MOUNT_KILIMANJARO: 2,
-  YOSEMITE: 2,
-  MOUNT_EVEREST: 2,
+  WOODS: srcConst('improvements.featSightThrough.WOODS', 1, feat('FEATURE_FOREST')),
+  RAINFOREST: srcConst('improvements.featSightThrough.RAINFOREST', 1, feat('FEATURE_JUNGLE')),
+  ULURU: srcConst('improvements.featSightThrough.ULURU', 1, feat('FEATURE_ULURU')),
+  TORRES_DEL_PAINE: srcConst('improvements.featSightThrough.TORRES_DEL_PAINE', 2,
+    feat('FEATURE_TORRES_DEL_PAINE')),
+  MOUNT_KILIMANJARO: srcConst('improvements.featSightThrough.MOUNT_KILIMANJARO', 2,
+    feat('FEATURE_KILIMANJARO')),
+  YOSEMITE: srcConst('improvements.featSightThrough.YOSEMITE', 2, feat('FEATURE_YOSEMITE')),
+  MOUNT_EVEREST: srcConst('improvements.featSightThrough.MOUNT_EVEREST', 2, feat('FEATURE_EVEREST')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both
  *  engines precompute (the Mountie's 4 plus a Spyglass is 5). */
-export const SIGHT_MAX = 5;
+export const SIGHT_MAX = srcConst('improvements.sightMax', 5, {
+  stylized: 'the precomputed line table\'s reach, sized to the deepest chassis this roster '
+    + 'fields (the Mountie\'s BaseSightRange 4 plus a Spyglass); no install row states a ceiling',
+});

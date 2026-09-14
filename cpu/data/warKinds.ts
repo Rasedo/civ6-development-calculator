@@ -38,9 +38,13 @@
  * (docs/AUDIT.md). A row for it would be a duplicate of the row below
  * with no condition of its own.
  */
+import { srcConst, xml } from './provenance';
+
 /** CIV6 (Formal War, DenouncementTurnsRequired): "Denounced ... at least 5
  *  turns ago" — the age the Formal kind's denouncement must have reached. */
-export const FORMAL_WAR_MIN_TURNS = 5;
+export const FORMAL_WAR_MIN_TURNS = srcConst('seats.formalWarMinTurns', 5,
+  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DECLARE_FORMAL_WAR',
+    'DenouncementTurnsRequired'));
 
 export type WarKindId =
   | 'surprise' | 'formal' | 'holy' | 'liberation' | 'reconquest' | 'protectorate'
@@ -141,15 +145,29 @@ export const WAR_GRIEVANCE_PCT: Readonly<Record<WarKindId, readonly [number, num
 
 /** CIV6 (Territorial War): "2 of your cities within 10 tiles of 2 opponents'
  *  cities" — the pair count and the reach. */
-export const TERRITORIAL_WAR_CITIES = 2;
-export const TERRITORIAL_WAR_RANGE = 10;
+export const TERRITORIAL_WAR_CITIES = srcConst('warKinds.TERRITORIAL_WAR_CITIES', 2, {
+  lab: 'the GS Territorial War page ("Must have 2 of your cities within 10 tiles of 2 opponents\' '
+    + 'cities"); the install writes only the RequiresAdjacentEmpires flag',
+});
+export const TERRITORIAL_WAR_RANGE = srcConst('warKinds.TERRITORIAL_WAR_RANGE', 10, {
+  lab: 'the GS Territorial War page ("within 10 tiles"); the install writes only the '
+    + 'RequiresAdjacentEmpires flag',
+});
 /** CIV6 (Colonial War, RequiresLeadXEras): "two technology eras behind you". */
-export const COLONIAL_WAR_ERA_LEAD = 2;
+export const COLONIAL_WAR_ERA_LEAD = srcConst('warKinds.COLONIAL_WAR_ERA_LEAD', 2,
+  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DECLARE_COLONIAL_WAR',
+    'RequiresLeadXEras'));
 /** CIV6 (Ideological War): "a different Tier 3 government" — the install's
  *  `Tier3` and the Gathering Storm `Tier4` rows are both LATE governments. */
-export const LATE_GOVERNMENT_TIER = 3;
+export const LATE_GOVERNMENT_TIER = srcConst('warKinds.LATE_GOVERNMENT_TIER', 3, {
+  lab: 'the GS Ideological War page ("a player who is in a different Tier 3 government"); the '
+    + 'install writes only RequiresDifferentLateGovernment',
+});
 
 /** CIV6 (TRAIT_TERRITORIAL_WAR_*, TRAIT_LIBERATION_WAR_*): every declared-war
  *  modifier of the roster carries `TurnsActive` 10 — the buff lives while the
  *  war the seat declared is under this many turns old. */
-export const WAR_BUFF_TURNS = 10;
+export const WAR_BUFF_TURNS = srcConst('seats.warBuffTurns', 10, {
+  lab: 'TRAIT_TERRITORIAL_WAR_* / TRAIT_LIBERATION_WAR_* carry TurnsActive 10; the install writes '
+    + 'it on the modifier, not as a table column a checker can read back',
+});
