@@ -718,7 +718,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'Cost', { scale: GAME_SPEED }),
-        'placement.excludeTerrains': { derived: 'the terrains ABSENT from the wonder\'s Building_ValidTerrains rows; the install lists what is allowed where this catalog lists what is refused', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_HERMITAGE', 'TerrainType')] },
+        'placement.excludeTerrains': { derived: 'the terrains ABSENT from the wonder\'s Building_ValidTerrains rows; the install lists what is allowed where this catalog lists what is refused', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_HERMITAGE', 'TerrainType', { absent: true })] },
         requiresCivic: xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'PrereqCivic', { expect: 'CIVIC_NATURAL_HISTORY' }),
         'effects.gpPoints.ARTIST': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_HERMITAGE&GreatPersonClassType=GREAT_PERSON_CLASS_ARTIST', 'PointsPerTurn'),
         'placement.requiresRiver': xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'RequiresRiver'),

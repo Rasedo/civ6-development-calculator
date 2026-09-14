@@ -135,7 +135,7 @@ export const SEA_MOVE_TECH = srcConst('constants.SEA_MOVE_TECH', 'MATHEMATICS',
   xml('Technologies', 'TechnologyType=TECH_MATHEMATICS', 'TechnologyType',
     { expect: 'TECH_MATHEMATICS' }));
 export const SEA_MOVE_TECH_BONUS = srcConst('constants.SEA_MOVE_TECH_BONUS', 1, {
-  lab: 'the GS Civilopedia Movement page ("+1 Movement after researching Mathematics" to every '
+  pedia: 'the GS Civilopedia Movement page ("+1 Movement after researching Mathematics" to every '
     + 'unit at sea); the install carries it as a modifier, not as a readable column',
 });
 
@@ -256,7 +256,7 @@ export function amenityTierIndex(name: string): number {
  * re-derive it.
  */
 const housingWiki = (what: string) => ({
-  lab: `the GS Housing / Aqueduct pages (${what}); the install carries city-site housing as a `
+  pedia: `the GS Housing / Aqueduct pages (${what}); the install carries city-site housing as a `
     + 'DLL rule, not as a readable column',
 });
 export const HOUSING_FRESH_WATER = srcConst<number>('housing.fresh', 5,
@@ -279,7 +279,7 @@ export const REGIONAL_RANGE = 6;
  * nothing, which is the same predicate `civHasStrategic` already asks.
  */
 const perTurn = (res: string, n: number) => srcConst(`strategic.rate.${res}`, n, {
-  lab: `the GS ${res.charAt(0)}${res.slice(1).toLowerCase()} resource page — the improved tile's `
+  pedia: `the GS ${res.charAt(0)}${res.slice(1).toLowerCase()} resource page — the improved tile's `
     + 'own per-turn stockpile yield; the install writes it as an improvement modifier, '
     + 'not as a Resources column',
 });
@@ -313,12 +313,12 @@ export function emptyStockpile(): number[] {
 export const TRADE_ROAD_MAX_STEPS = 32;
 
 export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', 50, {
-  lab: 'the GS Resources page ("The maximum stockpile amount is initially 50 for each resource"); '
+  pedia: 'the GS Resources page ("The maximum stockpile amount is initially 50 for each resource"); '
     + 'the install carries the cap as a DLL rule',
 });
 export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
   srcConst('strategic.capPerEncampmentBuilding', 10, {
-    lab: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',
+    pedia: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',
   });
 
 /** CIV6 (GS): every unit in this roster that asks for a strategic resource
@@ -326,7 +326,7 @@ export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
  *  you purchase it)" — Horseman, Swordsman, Knight, Musketman and Bombard each
  *  say so on their own page. */
 export const UNIT_RESOURCE_COST = srcConst('constants.UNIT_RESOURCE_COST', 20, {
-  lab: 'the GS unit pages (Horseman, Swordsman, Knight, Musketman, Bombard each ask 20 of their '
+  pedia: 'the GS unit pages (Horseman, Swordsman, Knight, Musketman, Bombard each ask 20 of their '
     + 'strategic resource at the moment production starts)',
 });
 

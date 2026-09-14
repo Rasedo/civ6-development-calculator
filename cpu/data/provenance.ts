@@ -11,13 +11,17 @@
  *             FOREST where the install says FEATURE_FOREST and LAKE where it
  *             says TERRAIN_COAST, and the mapping belongs in the tag where the
  *             checker can see it, never in a reader's head.
- *   LAB       a magnitude the install does not publish (DLL logic), measured
- *             in the live game: the runs/ file or the AUDIT entry that holds
- *             the measurement.
+ *   LAB       a magnitude the install does not publish (DLL logic), MEASURED
+ *             in the live game: the tools/civ6lab/runs/ file or the AUDIT
+ *             entry (C-16, ask 16) that holds the measurement. The checker
+ *             verifies the reference exists.
+ *   PEDIA     the install's published TEXT (a Civilopedia page, an ability
+ *             paragraph) where no table holds the number. Not a measurement.
  *   STYLIZED  a magnitude this engine chose. Named so the choice is visible
  *             instead of remembered (owner rulings 2026-09-04).
  *   DERIVED   arithmetic over other constants — the tag names the inputs and
- *             the formula in words; the checker evaluates what it can.
+ *             the formula in words; the checker resolves every input in the
+ *             install (a dangling input is RED) and evaluates what it can.
  *
  * A row-shaped catalog carries `src` INLINE, keyed by column name: the
  * exporter picks fields by name, so `src` never reaches the wire, and
@@ -46,6 +50,12 @@ export interface XmlSrc {
   /** the catalog holds `round(cell * scale)` — a unit's cost through
    *  GAME_SPEED; the checker applies the same arithmetic. */
   scale?: number;
+  /** THE FACT IS AN ABSENCE: the install row carries no such column (a
+   *  building with no PurchaseYield cannot be bought), or no such row
+   *  exists (no Improvement_ValidResources row = not resource-only). The
+   *  checker passes when the cell is MISSING and reds when it appears —
+   *  the reverse of a normal tag. As a `derived` input it means the same. */
+  absent?: boolean;
   note?: string;
 }
 
@@ -61,6 +71,16 @@ export interface StylizedSrc {
   stylized: string;
 }
 
+/** the install's PUBLISHED TEXT — a Civilopedia page, a concept entry, a
+ *  unit's or leader's ability text — where no table holds the number (a
+ *  "within 9 tiles" radius, a climate-phase table, a mission's duration
+ *  paragraph). Weaker than XML (prose can lag the tables) and stronger
+ *  than a wiki; not a measurement, so never `lab`. The checker counts it
+ *  and does not compare it. */
+export interface PediaSrc {
+  pedia: string;
+}
+
 /** arithmetic over other constants. `formula` is words the checker can
  *  match against its small vocabulary (`round(x*GAME_SPEED)`, `sum`, ...)
  *  or fail loudly on; `inputs` are XML/LAB sources of the operands. */
@@ -69,7 +89,7 @@ export interface DerivedSrc {
   inputs?: readonly Src[];
 }
 
-export type Src = XmlSrc | LabSrc | StylizedSrc | DerivedSrc;
+export type Src = XmlSrc | LabSrc | StylizedSrc | DerivedSrc | PediaSrc;
 
 /** the per-column tags a row-shaped catalog entry carries; `ranged.strength`
  *  style dotted keys reach into nested objects. */
@@ -101,6 +121,6 @@ export function srcConst<T extends number | string | boolean | readonly (number 
 
 /** shorthand for the common XML tag; `more` carries expect / scale / note */
 export function xml(table: string, where: string, col: string,
-  more?: Pick<XmlSrc, 'expect' | 'scale' | 'note'>): XmlSrc {
+  more?: Pick<XmlSrc, 'expect' | 'scale' | 'note' | 'absent'>): XmlSrc {
   return { xml: table, where, col, ...more };
 }

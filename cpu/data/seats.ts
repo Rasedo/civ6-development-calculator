@@ -194,13 +194,13 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 
 export const WW_ERA_BASE_FORMAL = srcConst('warWeariness.eraFormal',
   [16, 22, 28, 34, 40] as const, {
-    lab: 'the era table of civilization.fandom.com "War weariness (Civ6)" and its reference, CivFanatics thread 623207 — GlobalParameters carries only WAR_WEARINESS_WARMONGER_BASE 16 (row 0) and no era table at all, the scaling living in the DLL',
+    pedia: 'the era table of civilization.fandom.com "War weariness (Civ6)" and its reference, CivFanatics thread 623207 — GlobalParameters carries only WAR_WEARINESS_WARMONGER_BASE 16 (row 0) and no era table at all, the scaling living in the DLL',
   });
 /** The same table for a SURPRISE war (no casus belli). The premium runs 1.00
  *  at Ancient to 1.30 at Industrial+, never a flat 2. */
 export const WW_ERA_BASE_SURPRISE = srcConst('warWeariness.eraSurprise',
   [16, 25, 34, 43, 52] as const, {
-    lab: 'the same wiki era table\'s SURPRISE column (CivFanatics thread 623207); at Ancient the table\'s 16 is taken over the formula\'s 19, backed by WAR_WEARINESS_WARMONGER_BASE 16',
+    pedia: 'the same wiki era table\'s SURPRISE column (CivFanatics thread 623207); at Ancient the table\'s 16 is taken over the formula\'s 19, backed by WAR_WEARINESS_WARMONGER_BASE 16',
   });
 export const WW_ABROAD_MULT = srcConst('warWeariness.abroad', 2,
   gp('WAR_WEARINESS_PER_COMBAT_IN_FOREIGN_LANDS'));
@@ -333,7 +333,7 @@ export const CONGRESS_INTERVAL = srcConst('eras.congressInterval', 30,
 export const CONGRESS_MIN_ERA = srcConst('eras.congressMinEra', 2,
   gp('WORLD_CONGRESS_INITIAL_ERA'));
 export const DVP_PER_RESOLUTION = srcConst('eras.dvpPerResolution', 1,
-  { lab: 'CIV6 (World Congress, June 2019 rule): "Every civilization which voted for the outcome/target combo that eventually won gets 1 Diplomatic Victory point" — the install publishes no such row' });
+  { pedia: 'CIV6 (World Congress, June 2019 rule): "Every civilization which voted for the outcome/target combo that eventually won gets 1 Diplomatic Victory point" — the install publishes no such row' });
 /** Diplomatic Victory threshold (real Civ 6 GS: 20 points). */
 export const DIPLO_VICTORY_POINTS = srcConst('eras.diploVictoryPoints', 20,
   gp('DIPLOMATIC_VICTORY_POINTS_REQUIRED'));
@@ -622,7 +622,7 @@ export const CONGRESS_DV_DELTA = srcConst('eras.congressDvDelta', 2,
   modArg('ADD_DIPLOMATIC_VICTORY_POINTS'));
 /** The k-th EXTRA vote costs CONGRESS_VOTE_STEP * k favor. */
 export const CONGRESS_VOTE_STEP = srcConst('eras.congressVoteStep', 10,
-  { lab: 'CIV6 (World Congress): "The cost of each subsequent vote ... scales linearly by a factor of 10" — the vote curve is not an install row' });
+  { pedia: 'CIV6 (World Congress): "The cost of each subsequent vote ... scales linearly by a factor of 10" — the vote curve is not an install row' });
 export const CONGRESS_PROD_MULT = srcConst('eras.congressProdMult', 2,
   { derived: '1 + Amount/100 — the Urban Development Treaty outcome-A +100% district-building production', inputs: [modArg('INCREASE_DISTRICT_BUILDING_PRODUCTION')] });
 export const CONGRESS_GPP_MULT = srcConst('eras.congressGppMult', 2,
@@ -652,14 +652,14 @@ export const CONGRESS_TRADE_CAPACITY = srcConst('eras.congressTradeCapacity', 1,
   modArg('TARGET_ADD_TRADE_ROUTE'));
 /** Policy Treaty outcome A: favor per turn to every seat holding the card. */
 export const CONGRESS_POLICY_FAVOR = srcConst('eras.congressPolicyFavor', 1,
-  { lab: 'CIV6 (Policy Treaty, outcome A): "All players with this Policy in their Government gain 1 Diplomatic Favor per turn" — the install ships no readable WC_RES row for Policy Treaty' });
+  { pedia: 'CIV6 (Policy Treaty, outcome A): "All players with this Policy in their Government gain 1 Diplomatic Favor per turn" — the install ships no readable WC_RES row for Policy Treaty' });
 /** World Ideology: the wildcard slot the targeted government gains or loses. */
 export const CONGRESS_IDEOLOGY_SLOTS = srcConst('eras.congressIdeologySlots', 1,
   modArg('GOVT_ADD_WILDCARD_SLOT'));
 /** CIV6 (Culture Bomb): an annexed tile must fall "within 3 hexes of one of
  *  the owner's City Centers". */
 export const CULTURE_BOMB_RANGE = srcConst('eras.cultureBombRange', 3,
-  { lab: 'CIV6 (Culture Bomb): an annexed tile must fall "within 3 hexes of one of the owner\'s City Centers" — not an install row' });
+  { pedia: 'CIV6 (Culture Bomb): an annexed tile must fall "within 3 hexes of one of the owner\'s City Centers" — not an install row' });
 /** CIV6 (Diplomatic Favor, "Losing Favor"): "you additionally receive a
  *  -5/turn Diplomatic Favor penalty for each Original Capital city you occupy.
  *  Note that gaining a Capital through Loyalty flip will also count as
@@ -708,7 +708,7 @@ export interface EmergencyDef {
  *  carries no `Emergencies` rows (only `Emergencies_XP2` texts survive the
  *  layering), so the duration is the Civilopedia's own. */
 const EMERGENCY_SRC: SrcMap = {
-  turns: { lab: 'the GS Emergency page duration (30 turns; 60 for the nuclear emergency)' },
+  turns: { pedia: 'the GS Emergency page duration (30 turns; 60 for the nuclear emergency)' },
 };
 
 const RAW_EMERGENCIES: readonly EmergencyDef[] = [
@@ -736,34 +736,34 @@ export const EMERGENCY_CITY_STATE = 0;
 export const EMERGENCY_MILITARY = 1;
 export const EMERGENCY_NUCLEAR = 2;
 export const EMERGENCY_MEMBER_FAVOR = srcConst('eras.emergencyMemberFavor', 100,
-  { lab: 'the GS Emergency page\'s own reward table — "members gain 100 Diplomatic Favor" on success' });
+  { pedia: 'the GS Emergency page\'s own reward table — "members gain 100 Diplomatic Favor" on success' });
 export const EMERGENCY_TARGET_FAVOR = srcConst('eras.emergencyTargetFavor', 200,
-  { lab: 'the GS Emergency page\'s own reward table — "Target gains 200 Diplomatic Favor" on failure' });
+  { pedia: 'the GS Emergency page\'s own reward table — "Target gains 200 Diplomatic Favor" on failure' });
 /** CIV6 (both rows, "Specifics"): "Members gain +2 CS against targets' units;
  *  +1 MP in target's territory; target gains +20 Loyalty in the target city." */
 export const EMERGENCY_MEMBER_CS = srcConst('eras.emergencyMemberCs', 2,
-  { lab: 'the GS Emergency page\'s own reward table, "Specifics": "Members gain +2 CS against targets\' units"' });
+  { pedia: 'the GS Emergency page\'s own reward table, "Specifics": "Members gain +2 CS against targets\' units"' });
 export const EMERGENCY_MEMBER_MP = srcConst('eras.emergencyMemberMp', 1,
-  { lab: 'the GS Emergency page\'s own reward table, "Specifics": "+1 MP in target\'s territory"' });
+  { pedia: 'the GS Emergency page\'s own reward table, "Specifics": "+1 MP in target\'s territory"' });
 export const EMERGENCY_TARGET_LOYALTY = srcConst('eras.emergencyTargetLoyalty', 20,
-  { lab: 'the GS Emergency page\'s own reward table, "Specifics": "target gains +20 Loyalty in the target city"' });
+  { pedia: 'the GS Emergency page\'s own reward table, "Specifics": "target gains +20 Loyalty in the target city"' });
 /** the permanent rewards, one per row per outcome */
 export const EMERGENCY_MEMBER_HEAL = srcConst('eras.emergencyMemberHeal', 5,
-  { lab: 'the GS Emergency page\'s own reward table (Military, success): "Member units gain +5 Healing in the Target\'s territory"' });
+  { pedia: 'the GS Emergency page\'s own reward table (Military, success): "Member units gain +5 Healing in the Target\'s territory"' });
 export const EMERGENCY_TARGET_STRIKE_CS = srcConst('eras.emergencyTargetStrikeCs', 2,
-  { lab: 'the GS Emergency page\'s own reward table (Military, failure): "Target gains +2 CS when attacking member units with a City Strike"' });
+  { pedia: 'the GS Emergency page\'s own reward table (Military, failure): "Target gains +2 CS when attacking member units with a City Strike"' });
 export const EMERGENCY_ENVOY_GOLD = srcConst('eras.emergencyEnvoyGold', 1,
-  { lab: 'the GS Emergency page\'s own reward table (City-State, success): "Members gain +1 Gold/turn for each Envoy they have"' });
+  { pedia: 'the GS Emergency page\'s own reward table (City-State, success): "Members gain +1 Gold/turn for each Envoy they have"' });
 export const EMERGENCY_CS_ROUTE_GOLD = srcConst('eras.emergencyCsRouteGold', 2,
-  { lab: 'the GS Emergency page\'s own reward table (City-State, failure): "Target\'s Trade Routes to City-States gain +2 Gold"' });
+  { pedia: 'the GS Emergency page\'s own reward table (City-State, failure): "Target\'s Trade Routes to City-States gain +2 Gold"' });
 /** CIV6 (Nuclear Emergency, success): "Target units have -3 CS when fighting
  *  Member units" — the deeper, permanent version of the running penalty. */
 export const EMERGENCY_NUKE_TARGET_CS = srcConst('nuclear.emergencyNukeCS', 3,
-  { lab: 'the GS Emergency page\'s own reward table (Nuclear, success): "Target units have -3 CS when fighting Member units"' });
+  { pedia: 'the GS Emergency page\'s own reward table (Nuclear, success): "Target units have -3 CS when fighting Member units"' });
 /** CIV6 (Nuclear Emergency, failure): "Member cities exert 1 less Loyalty
  *  pressure." */
 export const EMERGENCY_NUKE_LOYALTY_CUT = srcConst('nuclear.emergencyNukeLoyaltyCut', 1,
-  { lab: 'the GS Emergency page\'s own reward table (Nuclear, failure): "Member cities exert 1 less Loyalty pressure"' });
+  { pedia: 'the GS Emergency page\'s own reward table (Nuclear, failure): "Member cities exert 1 less Loyalty pressure"' });
 
 export const TOURISM_PER_VISITOR_PER_CIV = srcConst('seats.tourismPerVisitorPerCiv', 200,
   gp('TOURISM_TOURISM_TO_MOVE_CITIZEN'));
@@ -874,7 +874,7 @@ export const DED_BODYGUARD = 10;
 export const DED_AUTOMATON = 11;
 export const DED_EVENT_SCORE = srcConst('eras.dedEventScore',
   [1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1] as const, {
-    lab: 'the Gathering Storm Civilopedia "Dedications" concept — the per-event Era Score of each dedication\'s DARK/NORMAL face, in catalog order; no install table publishes them',
+    pedia: 'the Gathering Storm Civilopedia "Dedications" concept — the per-event Era Score of each dedication\'s DARK/NORMAL face, in catalog order; no install table publishes them',
   });
 /**
  * WHICH DEDICATIONS A WORLD ERA OFFERS, indexed by `ERAS`. Real Civ 6 draws
@@ -900,7 +900,7 @@ export const DEDICATION_ERAS: readonly (readonly number[])[] = [
 /** CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
  *  Parks." */
 export const WISH_PARK_TOURISM_MULT = srcConst('eras.wishParkTourism', 2,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): "+100% Tourism to all National Parks"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): "+100% Tourism to all National Parks"' });
 /**
  * CIV6 (Wish You Were Here, Golden face): "Cities with Governors receive 50%
  * Tourism from World Wonders" — an ADDITIONAL half, and the source is explicit
@@ -908,25 +908,25 @@ export const WISH_PARK_TOURISM_MULT = srcConst('eras.wishParkTourism', 2,
  * Expressed as a fraction so both engines fold the same integer.
  */
 export const WISH_WONDER_TOURISM_NUM = srcConst('eras.wishWonderTourNum', 3,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): "Cities with Governors receive 50% Tourism from World Wonders" — the numerator of 3/2' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): "Cities with Governors receive 50% Tourism from World Wonders" — the numerator of 3/2' });
 export const WISH_WONDER_TOURISM_DEN = srcConst('eras.wishWonderTourDen', 2,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): the denominator of the 3/2 wonder-tourism fraction' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Wish You Were Here, Golden face): the denominator of the 3/2 wonder-tourism fraction' });
 /** CIV6 (To Arms!, Golden face): "+15% Production towards military units." */
 export const TO_ARMS_MIL_PROD_MULT = srcConst('eras.toArmsMilProd', 1.15,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (To Arms!, Golden face): "+15% Production towards military units"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (To Arms!, Golden face): "+15% Production towards military units"' });
 /** CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
  *  a new Continent or natural wonder" — per-event score on top of the
  *  catalog's per-kill 1. */
 export const DRACONES_DISCOVERY_SCORE = srcConst('eras.draconesDiscoveryScore', 3,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover a new Continent or natural wonder"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover a new Continent or natural wonder"' });
 /** CIV6 (Reform the Coinage, Golden face): "International Trade Routes
  *  provide +3 Gold per specialty district in the foreign city." */
 export const COINAGE_INTL_GOLD_PER_SPEC = srcConst('eras.coinageIntlGoldPerSpec', 3,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Reform the Coinage, Golden face): "International Trade Routes provide +3 Gold per specialty district in the foreign city"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Reform the Coinage, Golden face): "International Trade Routes provide +3 Gold per specialty district in the foreign city"' });
 /** CIV6 (Heartbeat of Steam, Golden face): "+10% Production toward Industrial
  *  era and later wonders." */
 export const STEAM_WONDER_PROD_MULT = srcConst('eras.steamWonderProd', 1.1,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Heartbeat of Steam, Golden face): "+10% Production toward Industrial era and later wonders"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Heartbeat of Steam, Golden face): "+10% Production toward Industrial era and later wonders"' });
 /**
  * CIV6 (Sky and Stars, Golden face): "Unlocks the Eurekas for Advanced Flight,
  * Nuclear Fission, and Rocketry if in the Atomic Era. If in the Information
@@ -941,18 +941,18 @@ export const SKY_EUREKAS: Readonly<Record<number, readonly string[]>> = {
 /** CIV6 (Sky and Stars, Golden face, GS): "Aluminum mines accumulate +2 more
  *  resources per turn." */
 export const SKY_ALUMINUM_PER_TURN = srcConst('eras.skyAluminumPerTurn', 2,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Sky and Stars, Golden face, GS): "Aluminum mines accumulate +2 more resources per turn"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Sky and Stars, Golden face, GS): "Aluminum mines accumulate +2 more resources per turn"' });
 /** CIV6 (Sky and Stars, Golden face): "+100% XP earned for all Air Units" —
  *  percentage POINTS, joining the unit's own building modifier. */
 export const SKY_AIR_XP_PCT = srcConst('eras.skyAirXpPct', 100,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Sky and Stars, Golden face): "+100% XP earned for all Air Units"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Sky and Stars, Golden face): "+100% XP earned for all Air Units"' });
 /** CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn." */
 export const AUTOMATON_URANIUM_PER_TURN = srcConst('eras.automatonUraniumPerTurn', 3,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Automaton Warfare, Golden face): "Receive 3 Uranium per turn"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Automaton Warfare, Golden face): "Receive 3 Uranium per turn"' });
 /** CIV6 (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more
  *  resource per turn." */
 export const AUTOMATON_URANIUM_PER_MINE = srcConst('eras.automatonUraniumPerMine', 1,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more resource per turn"' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more resource per turn"' });
 
 export const DEDICATION_PAYOUTS_LIVE = true;
 
@@ -968,13 +968,13 @@ export const ENGINEER_LIVE = srcConst('improvements.engineerLive', true,
   { stylized: 'the seat\'s engineer POLICY — one at a time, forting only tiles next to a hostile civ; real Civ 6 publishes no rule that quantifies its AI\'s chokepoint forting' });
 
 export const HEROIC_DEDICATIONS = srcConst('eras.heroicDedications', 3,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept: a HEROIC age (Dark -> Golden) commits three dedications where every other transition commits one' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept: a HEROIC age (Dark -> Golden) commits three dedications where every other transition commits one' });
 /** MONUMENTALITY / EXODUS OF THE EVANGELISTS grant +2 Movement to
  *  Builders and to Missionaries/Apostles/Inquisitors respectively, for the
  *  duration of the GOLDEN age that committed them (Civilopedia, Gathering
  *  Storm). Exported to the GPU as `eras.goldenMoveBonus`. */
 export const GOLDEN_MOVE_BONUS = srcConst('eras.goldenMoveBonus', 2,
-  { lab: 'the Gathering Storm Civilopedia \'Dedications\' concept: Monumentality and Exodus of the Evangelists each grant +2 Movement for the duration of the Golden age that committed them' });
+  { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept: Monumentality and Exodus of the Evangelists each grant +2 Movement for the duration of the Golden age that committed them' });
 
 export const GOVERNOR_LOYALTY = srcConst('eras.governorLoyalty', 8,
   { stylized: 'a GOVERNOR constant — the file header names the governor constants as deliberate model tuning, not Civ 6 values' });
@@ -1012,9 +1012,9 @@ export const COMPETITION_TURNS = srcConst('eras.competitionTurns', AGREEMENT_TUR
   { derived: 'the same 30-turn clock AGREEMENT_TURNS reads — CIV6 (Competition): each runs for exactly 30 turns', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
 /** The score fractions the two lower podiums cut at, as published. */
 export const COMPETITION_SILVER_PCT = srcConst('eras.competitionSilverPct', 25,
-  { lab: 'CIV6 (Competition): "all civs whose scores fall within the top 25%% ... win the Silver Tier rewards" — no install row' });
+  { pedia: 'CIV6 (Competition): "all civs whose scores fall within the top 25%% ... win the Silver Tier rewards" — no install row' });
 export const COMPETITION_BRONZE_PCT = srcConst('eras.competitionBronzePct', 50,
-  { lab: 'CIV6 (Competition): "all civs whose scores fall within the next highest quarter (i.e. the top 26-50%%)" win Bronze — no install row' });
+  { pedia: 'CIV6 (Competition): "all civs whose scores fall within the next highest quarter (i.e. the top 26-50%%)" win Bronze — no install row' });
 
 /**
  * WHAT A COMPETITION COUNTS. CIV6 (Expansion2_Emergencies.xml,
@@ -1215,7 +1215,7 @@ export const VISIBILITY_TECH = srcConst('eras.visibilityTech', 'PRINTING',
  *  higher visibility carries, per level of the difference — so a Top Secret
  *  reading of a civ that has None on you is worth four of these. */
 export const VISIBILITY_CS_PER_LEVEL = srcConst('eras.visibilityCsPerLevel', 3,
-  { lab: 'CIV6 ("Intel on enemy movements"): the Combat Strength the side with the higher visibility carries, per level of the difference — not an install row' });
+  { pedia: 'CIV6 ("Intel on enemy movements"): the Combat Strength the side with the higher visibility carries, per level of the difference — not an install row' });
 
 /**
  * The civic that opens each agreement.
@@ -1369,10 +1369,10 @@ export const ALLIANCE_REL3_PRESSURE_PCT = srcConst('seats.allianceRel3PressurePc
  *  live on its row in `WAR_KINDS` (data/warKinds.ts). */
 /** the declaration base the percent columns scale. */
 export const GRIEVANCE_WAR_BASE = srcConst('eras.grievanceWarBase', 100,
-  { lab: 'the GS Grievances page\'s own table row — "War declared: 100", the base the DiplomaticActions percent columns scale; the install publishes the percents but not the base' });
+  { pedia: 'the GS Grievances page\'s own table row — "War declared: 100", the base the DiplomaticActions percent columns scale; the install publishes the percents but not the base' });
 /** "War declared on a Friend or Ally": 75, to the friend or ally. */
 export const GRIEVANCE_WAR_ON_FRIEND = srcConst('eras.grievanceWarOnFriend', 75,
-  { lab: 'the GS Grievances page\'s own table row — "War declared on a Friend or Ally: 75"' });
+  { pedia: 'the GS Grievances page\'s own table row — "War declared on a Friend or Ally: 75"' });
 /** "War declared on a city-state a civ is the Suzerain over": 100. */
 export const GRIEVANCE_WAR_ON_SUZERAIN = srcConst('eras.grievanceWarOnSuzerain', 100,
   gp('GRIEVANCES_SUZERAIN_CITY_STATE_DOW'));
@@ -1388,13 +1388,13 @@ export const GRIEVANCE_CITY_TAKEN = srcConst('eras.grievanceCityTaken', 50,
 /** "Captured the final city of a civilization: 150 (all remaining civs gain
  *  Grievances against you)". */
 export const GRIEVANCE_LAST_CITY = srcConst('eras.grievanceLastCity', 150,
-  { lab: 'the GS Grievances page\'s own table row — "Captured the final city of a civilization: 150"' });
+  { pedia: 'the GS Grievances page\'s own table row — "Captured the final city of a civilization: 150"' });
 /** "City-state conquered: 50 (all civs gain Grievances against you)". */
 export const GRIEVANCE_CS_CONQUERED = srcConst('eras.grievanceCsConquered', 50,
   gp('GRIEVANCES_ALL_PLAYERS_CITY_STATE_CONQUEST'));
 /** "City-state razed: 100 (all civs gain Grievances against you)". */
 export const GRIEVANCE_CS_RAZED = srcConst('eras.grievanceCsRazed', 100,
-  { lab: 'the GS Grievances page\'s own table row — "City-state razed: 100"' });
+  { pedia: 'the GS Grievances page\'s own table row — "City-state razed: 100"' });
 /** "Denounced: 25". */
 export const GRIEVANCE_DENOUNCE = srcConst('eras.grievanceDenounce', 25,
   gp('GRIEVANCES_FOR_DENOUNCEMENT'));
@@ -1415,9 +1415,9 @@ export const GRIEVANCE_FRIEND_SHARE = srcConst('eras.grievanceFriendShare', 25,
  * the pair does not decay at all.
  */
 export const GRIEVANCE_DECAY_BASE = srcConst('eras.grievanceDecayBase', 10,
-  { lab: 'the GS Grievances page\'s own table row — "The base decay rate of Grievances is equal to 10 - x per turn, where x is each era after the Ancient Era"' });
+  { pedia: 'the GS Grievances page\'s own table row — "The base decay rate of Grievances is equal to 10 - x per turn, where x is each era after the Ancient Era"' });
 export const GRIEVANCE_DECAY_FLOOR = srcConst('eras.grievanceDecayFloor', 2,
-  { lab: 'the GS Grievances page\'s own table row — the same decay sentence reaching 2/turn by the Future era' });
+  { pedia: 'the GS Grievances page\'s own table row — the same decay sentence reaching 2/turn by the Future era' });
 /**
  * CIV6: "The base decay rate is modified if a party is currently occupying a
  * city or cities of the other party ... the rate changes by -1 for the
@@ -1428,9 +1428,9 @@ export const GRIEVANCE_DECAY_FLOOR = srcConst('eras.grievanceDecayFloor', 2,
  * modifier's — 3 in place of 1, same sign convention.
  */
 export const GRIEVANCE_OCCUPIED_DECAY = srcConst('eras.grievanceOccupiedDecay', 1,
-  { lab: 'the GS Grievances page\'s own table row — "the decay rate modifier is always 1" while a party occupies a city of the other' });
+  { pedia: 'the GS Grievances page\'s own table row — "the decay rate modifier is always 1" while a party occupies a city of the other' });
 export const GRIEVANCE_OCCUPIED_CAPITAL_DECAY = srcConst('eras.grievanceOccupiedCapitalDecay', 3,
-  { lab: 'the GS Grievances page\'s own table row — "if you occupy someone\'s Capital the rate becomes 3" (the page\'s copy has lost the sign glyph; the magnitude is read as the modifier\'s)' });
+  { pedia: 'the GS Grievances page\'s own table row — "if you occupy someone\'s Capital the rate becomes 3" (the page\'s copy has lost the sign glyph; the magnitude is read as the modifier\'s)' });
 
 /**
  * CIV6 (Diplomatic Favor, "Losing Favor"): "200 Grievance = -1/turn", with

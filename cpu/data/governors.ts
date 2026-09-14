@@ -53,7 +53,7 @@ const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
  *  magnitude respectively. */
 const governorSrc = (id: GovernorId): SrcMap => ({
   title: { stylized: 'the Civilopedia epithet; the install ships a localisation key' },
-  establishTurns: { lab: 'the GS Governor page ("3 turns for Victor and Ibrahim, 5 turns for the '
+  establishTurns: { pedia: 'the GS Governor page ("3 turns for Victor and Ibrahim, 5 turns for the '
     + 'rest"); the install carries no turns column' },
   cityStates: xml('Governors', `GovernorType=${GOVERNOR_INSTALL_ID[id]}`, 'AssignCityState'),
 });
@@ -310,7 +310,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
       'ModifierId=GARRISON_COMMANDER_ADJUST_CITY_COMBAT_BONUS&Name=Amount', 'Value'),
     'effects.loyaltyToOwn.loyalty': xml('ModifierArguments',
       'ModifierId=PRESTIGE_IDENTITY_PRESSURE_TO_DOMESTIC_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToOwn.range': { lab: 'the published promotion text ("within 9 tiles"); the install\'s '
+    'effects.loyaltyToOwn.range': { pedia: 'the published promotion text ("within 9 tiles"); the install\'s '
       + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius and no GlobalParameter names one' },
   },
   DEFENSE_LOGISTICS: {
@@ -337,7 +337,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
   EMISSARY: {
     'effects.loyaltyToForeign.loyalty': xml('ModifierArguments',
       'ModifierId=EMISSARY_IDENTITY_PRESSURE_TO_FOREIGN_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToForeign.range': { lab: 'the published promotion text ("within 9 tiles"); the install\'s '
+    'effects.loyaltyToForeign.range': { pedia: 'the published promotion text ("within 9 tiles"); the install\'s '
       + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' },
   },
   AFFLUENCE: {

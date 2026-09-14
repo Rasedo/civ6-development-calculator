@@ -25,16 +25,16 @@ export const SPY_UNIT = 'SPY';
  */
 export const SPY_CAPACITY_CIVICS = srcConst('eras.espionage.capacityCivics',
   ['DIPLOMATIC_SERVICE', 'NATIONALISM', 'IDEOLOGY', 'COLD_WAR'] as const, {
-    lab: 'the GS Spy page ("A player\'s Spy capacity increases by 1 for each of these"); the '
+    pedia: 'the GS Spy page ("A player\'s Spy capacity increases by 1 for each of these"); the '
       + 'install writes each as a civic modifier, not as a readable column',
   });
 export const SPY_CAPACITY_TECHS = srcConst('eras.espionage.capacityTechs', ['COMPUTERS'] as const, {
-  lab: 'the GS Spy page (the Computers tech is the one technology source of Spy capacity)',
+  pedia: 'the GS Spy page (the Computers tech is the one technology source of Spy capacity)',
 });
 /** CIV6 (Espionage): "The maximum number of Spies a civilization can have is 5
  *  in vanilla Civilization VI and 6 from Rise and Fall onward". */
 export const SPY_CAPACITY_MAX = srcConst('eras.espionage.capacityMax', 6, {
-  lab: 'the GS Espionage page ("The maximum number of Spies a civilization can have is ... 6 '
+  pedia: 'the GS Espionage page ("The maximum number of Spies a civilization can have is ... 6 '
     + 'from Rise and Fall onward")',
 });
 
@@ -51,7 +51,7 @@ export const SPY_MAX_LEVEL = SPY_LEVELS.length - 1;
 /** the level at which Listening Post reads two levels of visibility rather
  *  than one — "2 if the Spy's level is Secret Agent or higher". */
 export const SPY_SECRET_AGENT_LEVEL = srcConst('eras.espionage.secretAgentLevel', 2, {
-  lab: 'the GS Listening Post description ("2 if the Spy\'s level is Secret Agent or higher") — '
+  pedia: 'the GS Listening Post description ("2 if the Spy\'s level is Secret Agent or higher") — '
     + 'the Secret Agent rung of the level ladder, zero-based',
 });
 
@@ -111,7 +111,7 @@ export interface SpyMissionDef {
 const spyMissionSrc = (m: SpyMissionDef): SrcMap => {
   const where = `OperationType=UNITOPERATION_SPY_${m.id}`;
   const table = (what: string) => ({
-    lab: `the GS Spy chassis mission table (${what}); the install writes it as an operation `
+    pedia: `the GS Spy chassis mission table (${what}); the install writes it as an operation `
       + 'requirement set, not as a readable column',
   });
   const out: Record<string, unknown> = {
@@ -132,9 +132,9 @@ const spyMissionSrc = (m: SpyMissionDef): SrcMap => {
 /** PROVENANCE: the escape ROUTES and their return times are the Espionage
  *  page's; each route's base escape RATE is this model's own (ask 14). */
 const spyEscapeSrc: SrcMap = {
-  district: { lab: 'the GS Espionage page escape routes (Airplane/Boat/Vehicle/Foot and the '
+  district: { pedia: 'the GS Espionage page escape routes (Airplane/Boat/Vehicle/Foot and the '
     + 'district each needs)' },
-  turns: { lab: 'the GS Espionage page escape return times (1/2/3/4 turns)' },
+  turns: { pedia: 'the GS Espionage page escape return times (1/2/3/4 turns)' },
   basePct: { stylized: 'this model chose the per-route base escape rate under the sourced '
     + 'ordering; the source names no number (ask 14)' },
 };
@@ -189,7 +189,7 @@ export const SPY_TRAVEL_COLS = srcConst<number>('eras.espionage.travelCols', 24,
 });
 /** CIV6 (Surveillance): "+1 level at districts within 1 hex" of the post. */
 export const SPY_SURVEILLANCE_REACH = srcConst('eras.espionage.surveilReach', 1, {
-  lab: 'the GS Surveillance promotion ("+1 level at districts within 1 hex")',
+  pedia: 'the GS Surveillance promotion ("+1 level at districts within 1 hex")',
 });
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ export const SPY_CAPTURE_PCT = 50;
  *  reduced by 25%." The establish half is the TRAVEL clock here — the only
  *  thing between arriving and starting. */
 const bodyguard = {
-  lab: 'the GS Bodyguard of Lies dedication, Golden face ("Time to complete all offensive spy '
+  pedia: 'the GS Bodyguard of Lies dedication, Golden face ("Time to complete all offensive spy '
     + 'operations reduced by 25%") — 3/4 as the two integers both engines fold',
 };
 export const BODYGUARD_OP_NUM = srcConst('eras.espionage.bodyguardNum', 3, bodyguard);
@@ -261,7 +261,7 @@ export const SPY_SOURCES_TURNS = srcConst('eras.espionage.sourcesTurns', 24, {
 /** CIV6 (Recruit Partisans): "will cause 2-4 rebel anti-cavalry units to spawn
  *  around the district ... their level will match the current World Era." */
 const partisans = {
-  lab: 'the GS Recruit Partisans page ("will cause 2-4 rebel anti-cavalry units to spawn around '
+  pedia: 'the GS Recruit Partisans page ("will cause 2-4 rebel anti-cavalry units to spawn around '
     + 'the district"); the install writes the spawn as a DLL operation',
 };
 export const SPY_PARTISANS_MIN = srcConst('eras.espionage.partisansMin', 2, partisans);

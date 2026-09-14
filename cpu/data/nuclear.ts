@@ -41,7 +41,7 @@ const wmdSrc = (id: string): SrcMap => {
     range: xml('WMDs', where, 'ICBMStrikeRange'),
     upkeep: xml('WMDs', where, 'Maintenance'),
     uranium: {
-      lab: 'the GS Civilopedia Nuclear weapons page (10 / 20 Uranium to produce); the install '
+      pedia: 'the GS Civilopedia Nuclear weapons page (10 / 20 Uranium to produce); the install '
         + 'names the resource on the build project but never an amount',
     },
   };
@@ -57,7 +57,7 @@ export const NUCLEAR_DEVICES: readonly NuclearDeviceDef[] =
 /** CIV6: "Any units (except Giant Death Robots) that end their turn in a
  *  contaminated tile take 50 damage each turn." */
 export const FALLOUT_DAMAGE = srcConst('nuclear.falloutDamage', 50, {
-  lab: 'the GS Nuclear weapons page ("Any units (except Giant Death Robots) that end their turn '
+  pedia: 'the GS Nuclear weapons page ("Any units (except Giant Death Robots) that end their turn '
     + 'in a contaminated tile take 50 damage each turn"); no install table carries it',
 });
 
@@ -65,7 +65,7 @@ export const FALLOUT_DAMAGE = srcConst('nuclear.falloutDamage', 50, {
  *  survive a nuclear strike. A Nuclear Device or Thermonuclear Device does 50
  *  damage to it, but it is immune to damage from fallout." */
 export const NUKE_ROBOT_DAMAGE = srcConst('nuclear.robotDamage', 50, {
-  lab: 'the GS Giant Death Robot page ("A Nuclear Device or Thermonuclear Device does 50 damage '
+  pedia: 'the GS Giant Death Robot page ("A Nuclear Device or Thermonuclear Device does 50 damage '
     + 'to it, but it is immune to damage from fallout")',
 });
 
@@ -73,12 +73,12 @@ export const NUKE_ROBOT_DAMAGE = srcConst('nuclear.robotDamage', 50, {
  *  protect adjacent tiles from nuclear strikes." Read like the anti-air
  *  weapon's own cover — one hex out, and the tile it stands on. */
 export const NUKE_COVER_RANGE = srcConst('nuclear.coverRange', 1, {
-  lab: 'the GS Nuclear weapons page ("Destroyers, Battleships, Missile Cruisers, and Mobile SAMs '
+  pedia: 'the GS Nuclear weapons page ("Destroyers, Battleships, Missile Cruisers, and Mobile SAMs '
     + 'can protect adjacent tiles"), read like the Anti-Air Gun\'s own Range 1 cover',
 });
 export const NUKE_INTERCEPTORS: readonly string[] = srcConst('nuclear.NUKE_INTERCEPTORS',
   ['DESTROYER', 'BATTLESHIP', 'MISSILE_CRUISER', 'MOBILE_SAM'], {
-    lab: 'the GS Nuclear weapons page names exactly these four as the hulls that cover adjacent '
+    pedia: 'the GS Nuclear weapons page names exactly these four as the hulls that cover adjacent '
       + 'tiles; the install carries the cover as a DLL rule',
   });
 
@@ -89,11 +89,11 @@ export const NUKE_INTERCEPTORS: readonly string[] = srcConst('nuclear.NUKE_INTER
  *  on it. */
 export const NUKE_CARRIERS: readonly string[] = srcConst('nuclear.NUKE_CARRIERS',
   ['BOMBER', 'JET_BOMBER', 'NUCLEAR_SUBMARINE'], {
-    lab: 'the GS Nuclear weapons page ("bomber aircraft, Nuclear Submarines, and the Missile '
+    pedia: 'the GS Nuclear weapons page ("bomber aircraft, Nuclear Submarines, and the Missile '
       + 'Silo") — the UNIT half of that list; the silo is an improvement',
   });
 
 /** CIV6: cleaning fallout "takes 1 build charge". */
 export const FALLOUT_CLEAN_CHARGES = srcConst('nuclear.cleanCharges', 1, {
-  lab: 'the GS Nuclear weapons page (cleaning fallout "takes 1 build charge")',
+  pedia: 'the GS Nuclear weapons page (cleaning fallout "takes 1 build charge")',
 });

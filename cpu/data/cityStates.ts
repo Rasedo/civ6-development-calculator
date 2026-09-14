@@ -236,9 +236,9 @@ export interface SuzerainBonusDef {
  * column a checker can read back.
  */
 const SUZ_SRC: SrcMap = {
-  type: { lab: 'the GS City-State page classification (scientific / cultural / trade / industrial '
+  type: { pedia: 'the GS City-State page classification (scientific / cultural / trade / industrial '
     + '/ militaristic / religious)' },
-  bonus: { lab: 'the GS Civilopedia suzerain paragraph for this city-state, quoted' },
+  bonus: { pedia: 'the GS Civilopedia suzerain paragraph for this city-state, quoted' },
   suz: { stylized: 'the engine code for the clause; the install writes the bonus as a trait '
     + 'modifier chain, not as a readable column' },
 };

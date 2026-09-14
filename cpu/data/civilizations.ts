@@ -387,7 +387,7 @@ const GOVERNOR_YIELD_SRC: readonly (SrcMap | undefined)[] = [
 ];
 const GOVERNOR_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [
   { amount: ma('TOQUI_DOMESTIC_LOYALTY'),
-    range: { lab: 'the published Toqui text ("within 9 tiles"); MODIFIER_PLAYER_GOVERNORS_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' } },
+    range: { pedia: 'the published Toqui text ("within 9 tiles"); MODIFIER_PLAYER_GOVERNORS_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' } },
 ];
 const GARRISON_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [
   { amount: ma('TRAIT_ISIBONGO_GARRISONIDENTITY'), formation: mreq('TRAIT_ISIBONGO_GARRISONIDENTITY', 'CITY_HAS_GARRISON_UNIT_REQUIERMENT') },
@@ -592,7 +592,7 @@ const PLAZA_DISTRICT_PROD_SRC: readonly (SrcMap | undefined)[] = [{ pct: ma('PRO
 const greatWorkLoyaltySrc = (): SrcMap => ({
   amount: { derived: "the NEGATION of the install's Amount — IDENTITY_NEARBY_GREATWORKS writes 1 with ForeignCities true, and the foreign city LOSES it",
     inputs: [ma('IDENTITY_NEARBY_GREATWORKS')] },
-  range: { lab: 'the published Eleanor text ("within 9 tiles"); the install\'s modifier carries no radius' },
+  range: { pedia: 'the published Eleanor text ("within 9 tiles"); the install\'s modifier carries no radius' },
 });
 const GREAT_WORK_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [greatWorkLoyaltySrc(), greatWorkLoyaltySrc()];
 const GOVERNOR_XP_SRC: readonly (SrcMap | undefined)[] = [
@@ -618,8 +618,8 @@ const CULTURE_BOMB_SRC: readonly (SrcMap | undefined)[] = [
 ];
 const WONDER_CHARGE_SRC: readonly (SrcMap | undefined)[] = [
   { pct: ma('TRAIT_BUILDER_WONDER_PERCENT'),
-    startEra: { lab: "the leader's published text (Ancient and Classical wonders); TRAIT_BUILDER_WONDER_PERCENT carries no requirement set" },
-    endEra: { lab: "the leader's published text (Ancient and Classical wonders); TRAIT_BUILDER_WONDER_PERCENT carries no requirement set" } },
+    startEra: { pedia: "the leader's published text (Ancient and Classical wonders); TRAIT_BUILDER_WONDER_PERCENT carries no requirement set" },
+    endEra: { pedia: "the leader's published text (Ancient and Classical wonders); TRAIT_BUILDER_WONDER_PERCENT carries no requirement set" } },
 ];
 const WONDER_ERA_BOOST_SRC: readonly (SrcMap | undefined)[] = [
   { techs: ma('TRAIT_TECHNOLOGY_BOOST_WONDER_ERA'), civics: ma('TRAIT_CIVIC_BOOST_WONDER_ERA') },

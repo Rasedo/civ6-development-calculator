@@ -17,7 +17,7 @@
  * it displays as ~3.28, ~1.96 and ~0.77 after dividing by 1000.
  */
 const carbon = (res: string, n: number) => srcConst(`climate.carbonPerPower.${res}`, n, {
-  lab: 'the GS Climate page, Pollution formulae ("Each type of resource has an assigned number '
+  pedia: 'the GS Climate page, Pollution formulae ("Each type of resource has an assigned number '
     + 'of emitted carbon units per Power generated, which is 820, 490, and 48 for Coal, Oil, and '
     + 'Uranium"); the install ships no readable CO2 table',
 });
@@ -38,14 +38,14 @@ export const UNIT_CARBON_SHARE = srcConst('climate.unitShare', 0.5, {
  *  careful to say "does not affect the mechanics of resource production flow"
  *  and so applies to the EMISSION only, never to `chargeUnitUpkeep`'s spend. */
 export const UNIT_CARBON_RESOURCE_SHARE = srcConst('climate.unitResourceShare', 0.5, {
-  lab: 'the GS Climate page ("for means of CO2 contributions each military unit only takes 0.5 '
+  pedia: 'the GS Climate page ("for means of CO2 contributions each military unit only takes 0.5 '
     + 'resource units", the post-Antarctic-Update reduction)',
 });
 
 /** CIV6 (Advanced Power Cells): "As of the Antarctic Late Summer Update, it
  *  also halves the CO2 emitted by units." */
 export const ADVANCED_POWER_CELLS_SHARE = srcConst('climate.cellsShare', 0.5, {
-  lab: 'the GS Advanced Power Cells page ("As of the Antarctic Late Summer Update, it also '
+  pedia: 'the GS Advanced Power Cells page ("As of the Antarctic Late Summer Update, it also '
     + 'halves the CO2 emitted by units")',
 });
 export const ADVANCED_POWER_CELLS_TECH = srcConst('climate.ADVANCED_POWER_CELLS_TECH',
@@ -59,7 +59,7 @@ export const ADVANCED_POWER_CELLS_TECH = srcConst('climate.ADVANCED_POWER_CELLS_
  * on map size" — Duel 250,000. This world is 44x26, which IS Civ 6's Duel.
  */
 export const CO2_PER_POINT = srcConst('climate.co2PerPoint', 250_000, {
-  lab: 'the GS Climate page ("you will need a different amount of CO2 emissions depending on map '
+  pedia: 'the GS Climate page ("you will need a different amount of CO2 emissions depending on map '
     + 'size" — Duel 250,000, which is this 44x26 world); the install ships no readable '
     + 'climate-level table',
 });
@@ -68,11 +68,11 @@ export const CO2_PER_POINT = srcConst('climate.co2PerPoint', 250_000, {
  *  page states the same figure as the displayed "-50 lifetime carbon
  *  emissions", and lets a civ's lifetime total go below zero. */
 export const CARBON_RECAPTURE_UNITS = srcConst('climate.recaptureUnits', 50_000, {
-  lab: 'the GS Carbon Recapture project page ("will recover 50,000 units of CO2")',
+  pedia: 'the GS Carbon Recapture project page ("will recover 50,000 units of CO2")',
 });
 /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor". */
 export const CARBON_RECAPTURE_FAVOR = srcConst('climate.recaptureFavor', 30, {
-  lab: 'the GS Carbon Recapture project page ("awards 30 Diplomatic Favor")',
+  pedia: 'the GS Carbon Recapture project page ("awards 30 Diplomatic Favor")',
 });
 
 import { srcConst, xml, type SrcMap } from './provenance';
@@ -112,7 +112,7 @@ export interface ClimatePhase {
  */
 const CLIMATE_PHASE_SRC: SrcMap = Object.fromEntries(
   ['points', 'seaLevel', 'flood', 'submerge', 'iceMelt', 'fertility', 'desertification'].map((k) => [k, {
-    lab: 'the GS Climate page "Phases of Climate Change" table; the install ships no readable '
+    pedia: 'the GS Climate page "Phases of Climate Change" table; the install ships no readable '
       + 'climate-phase rows',
   }]),
 );
@@ -139,7 +139,7 @@ export const CLIMATE_PHASES: readonly ClimatePhase[] =
  */
 const defBand = (i: number, b: readonly [number, number]): readonly [number, number] =>
   srcConst(`climate.deforestation.${i}`, b, {
-    lab: 'the GS Deforestation Level page\'s band table — [cut, CO2 emission modifier], '
+    pedia: 'the GS Deforestation Level page\'s band table — [cut, CO2 emission modifier], '
       + 'descending cuts',
   }) as readonly [number, number];
 export const DEFORESTATION_BANDS: ReadonlyArray<readonly [number, number]> = [
@@ -213,7 +213,7 @@ export function deforestationModifier(level: number): number {
  *  coastal lowland tiles x flood level)" — so the price of a barrier climbs
  *  with the sea it holds back. */
 export const FLOOD_BARRIER_PER_TILE = srcConst('climate.barrierPerTile', 80, {
-  lab: 'the GS Flood Barrier page ("The formula is (80 x coastal lowland tiles) + (80 x coastal '
+  pedia: 'the GS Flood Barrier page ("The formula is (80 x coastal lowland tiles) + (80 x coastal '
     + 'lowland tiles x flood level)")',
 });
 
@@ -227,7 +227,7 @@ export const FLOOD_BARRIER_PER_TILE = srcConst('climate.barrierPerTile', 80, {
  * rounded down to the closest integer)".
  */
 export const POLLUTION_DISPLAY_DIVISOR = srcConst('climate.pollutionDivisor', 1000, {
-  lab: 'the GS Climate page — the displayed pollution figure is the raw units "after taking away '
+  pedia: 'the GS Climate page — the displayed pollution figure is the raw units "after taking away '
     + 'the last 3 digits (divided by 1000 and rounded down)"',
 });
 export const FAVOR_PER_POLLUTION_OVER = srcConst('climate.favorPerOver', 3,

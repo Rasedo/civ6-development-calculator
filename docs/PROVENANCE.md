@@ -18,7 +18,7 @@ longer appear (the alphabetical load order produced artefacts — Isolationism,
 three unique units' resource bills, the Okihtcitaw's rung — and hid one, the
 Pike and Shot's maintenance). Task #264 works THIS list.
 
-    XML CHECK RED — 4775 match, 64 mismatch, 204 unsourced, 1496 lab/stylized/derived (312 install files)
+    XML CHECK RED — 4775 match, 65 mismatch, 2 dangling, 204 unsourced, 812 derived, 3 lab (+0 unverifiable), 300 pedia, 378 stylized (312 install files)
 
 ### units (15)
 
@@ -92,9 +92,16 @@ MISMATCH civics.SUFFRAGE.effects.2.policy: catalog 'ECONOMIC_UNION' vs install '
 MISMATCH civics.CLASS_STRUGGLE.effects.1.policy: catalog 'FIVE_YEAR_PLAN' vs install 'CIVIC_IDEOLOGY' [Policies[PolicyType=POLICY_FIVE_YEAR_PLAN].PrereqCivic <- Expansion2_Policies.xml]
 ```
 
-### promotions (2)
+### projects (1)
 
 ```
+MISMATCH projects.RECOMMISSION_REACTOR.district: catalog 'INDUSTRIAL_ZONE' but the input is absent and the tag says the catalog then holds 'CITY_CENTER'
+```
+
+### promotions (3)
+
+```
+DANGLING promotions.ARMOR_PIERCING.requires: derived 'the UnitPromotionPrereqs rows of PROMOTION_ARMOR_PIERCING, r' names UnitPromotionPrereqs[UnitPromotion=PROMOTION_ARMOR_PIERCING&PrereqUnitPromotion=PROMOTION_ROUT].PrereqUnitPromotion (no such row)
 MISMATCH promotions.PROSELYTIZER.effects.0.v: catalog 75 vs install '50' [ModifierArguments[ModifierId=APOSTLE_EVICT_ALL&Name=Amount].Value <- UnitPromotions.xml]
 MISMATCH promotions.POP_STAR.effects.0.v: catalog 25 vs install '-75' [ModifierArguments[ModifierId=ROCKBAND_POP&Name=Amount].Value <- Expansion2_UnitPromotions.xml]
 ```
@@ -105,9 +112,10 @@ MISMATCH promotions.POP_STAR.effects.0.v: catalog 25 vs install '-75' [ModifierA
 MISMATCH builtWonders.COLOSSEUM.effects.regionalAmenities: catalog 3 vs install '2' [Buildings[BuildingType=BUILDING_COLOSSEUM].Entertainment <- Expansion1_Buildings.xml]
 ```
 
-### policies (1)
+### policies (2)
 
 ```
+DANGLING policies.LIBERALISM.obsoleteCivic: derived 'the PrereqCivic of the policy the install names in ObsoleteP' names ObsoletePolicies[PolicyType=POLICY_LIBERALISM].ObsoletePolicy (no such row)
 MISMATCH policies.LEGACY_FASCISM.effects.wwCutPct: catalog 15 vs install '20' [ModifierArguments[ModifierId=FASCISM_WAR_WEARINESS&Name=Amount].Value <- Expansion1_Governments.xml]
 ```
 

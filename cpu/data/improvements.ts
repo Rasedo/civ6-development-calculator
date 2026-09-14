@@ -249,7 +249,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_FARM', 'PlunderAmount'),
       'yields.food': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_FARM&YieldType=YIELD_FOOD', 'YieldChange'),
       housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_FARM', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_FARM', 'TilesRequired')] },
-      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_FARM', 'ResourceType')] },
+      resourceOnly: { derived: 'false: the install writes Improvement_ValidTerrains rows for the Farm beside its ValidResources rows, so it is not resource-ONLY', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_FARM', 'TerrainType')] },
     },
   },
   MINE: {
@@ -270,7 +270,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_MINE', 'PlunderAmount'),
       'yields.production': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_MINE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_MINE', 'Housing'),
-      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MINE', 'ResourceType')] },
+      resourceOnly: { derived: 'false: the install writes Improvement_ValidTerrains rows for the Mine beside its ValidResources rows, so it is not resource-ONLY', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MINE', 'TerrainType')] },
     },
   },
   QUARRY: {

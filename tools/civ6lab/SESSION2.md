@@ -141,6 +141,31 @@ is the measurable half. The other half — whether THIS engine rolls per
 object or scales one per-game rate — stays a modelling ruling and the
 owner's.
 
+## Scene G — the purchase price (GameCore or InGame), from the provenance round
+
+The engine buys at production cost × 4 (gold) and × 2 (faith); the install
+publishes GOLD_PURCHASE_MULTIPLIER 2 and PURCHASE_DIVISOR 5 and no faith
+row — the price is a DLL formula, and the owner ruled "prefer Civ 6", so it
+is measured, not argued.
+
+* In one city read the gold and faith purchase price of three units and
+  three buildings of different production costs (VERIFY in the City panel:
+  `city:GetGold():GetPurchaseCost(YieldTypes.YIELD_GOLD, hash, MilitaryFormationTypes.STANDARD_FORMATION)`
+  and the faith twin; the production cost from `GameInfo.Units[...].Cost`).
+* Repeat with the city's production already partly invested in the item
+  (the price should fall with progress — read it before and after a turn).
+* Record (item, cost, gold price, faith price, progress) to
+  `runs/purchase_<stamp>.jsonl`; a fit against `cost × m / d` with the two
+  GlobalParameters closes constants.GOLD_PURCHASE_MULT / FAITH_PURCHASE_MULT.
+
+## Scene H — the Pop Star's gold (InGame), from the provenance round
+
+The catalog says 25, the install's ROCKBAND_POP writes −75 on a tourism-bomb
+gold yield, and the relation is unverified. One Rock Band with the Pop Star
+promotion, one concert at a foreign wonder: read the gold the concert pays
+against the same concert without the promotion. Two draws is enough for a
+percentage.
+
 ## Carry-overs from session 1
 
 * Ask 14 — the escape roll's scale: spies TRAINED in a city, travelled in,

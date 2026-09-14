@@ -480,7 +480,7 @@ export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
 export const ARCHAEOLOGIST_CHARGES = srcConst('greatPeople.ARCHAEOLOGIST_CHARGES', 3, {
-  lab: 'the GS Archaeologist page (an Archaeologist extracts 3 Artifacts and is then consumed); '
+  pedia: 'the GS Archaeologist page (an Archaeologist extracts 3 Artifacts and is then consumed); '
     + 'the install\'s Units row carries only ExtractsArtifacts, no charge count and no default',
 });
 export const ARCHAEOLOGIST_CIVIC = srcConst('greatPeople.ARCHAEOLOGIST_CIVIC', 'NATURAL_HISTORY',
@@ -536,7 +536,7 @@ export const GW_PRINTING_TECH = srcConst('greatPeople.GW_PRINTING_TECH', 'PRINTI
   xml('Technologies', 'TechnologyType=TECH_PRINTING', 'TechnologyType',
     { expect: 'TECH_PRINTING' }));
 export const GW_PRINTING_WRITING_MULT = srcConst('seats.gwPrintingWritingMult', 2, {
-  lab: 'the GS Printing / Great Work pages — Printing DOUBLES the Tourism of Great Works of '
+  pedia: 'the GS Printing / Great Work pages — Printing DOUBLES the Tourism of Great Works of '
     + 'Writing (the culture is untouched); the install writes it as a modifier',
 });
 

@@ -146,11 +146,11 @@ export const WAR_GRIEVANCE_PCT: Readonly<Record<WarKindId, readonly [number, num
 /** CIV6 (Territorial War): "2 of your cities within 10 tiles of 2 opponents'
  *  cities" — the pair count and the reach. */
 export const TERRITORIAL_WAR_CITIES = srcConst('warKinds.TERRITORIAL_WAR_CITIES', 2, {
-  lab: 'the GS Territorial War page ("Must have 2 of your cities within 10 tiles of 2 opponents\' '
+  pedia: 'the GS Territorial War page ("Must have 2 of your cities within 10 tiles of 2 opponents\' '
     + 'cities"); the install writes only the RequiresAdjacentEmpires flag',
 });
 export const TERRITORIAL_WAR_RANGE = srcConst('warKinds.TERRITORIAL_WAR_RANGE', 10, {
-  lab: 'the GS Territorial War page ("within 10 tiles"); the install writes only the '
+  pedia: 'the GS Territorial War page ("within 10 tiles"); the install writes only the '
     + 'RequiresAdjacentEmpires flag',
 });
 /** CIV6 (Colonial War, RequiresLeadXEras): "two technology eras behind you". */
@@ -160,7 +160,7 @@ export const COLONIAL_WAR_ERA_LEAD = srcConst('warKinds.COLONIAL_WAR_ERA_LEAD', 
 /** CIV6 (Ideological War): "a different Tier 3 government" — the install's
  *  `Tier3` and the Gathering Storm `Tier4` rows are both LATE governments. */
 export const LATE_GOVERNMENT_TIER = srcConst('warKinds.LATE_GOVERNMENT_TIER', 3, {
-  lab: 'the GS Ideological War page ("a player who is in a different Tier 3 government"); the '
+  pedia: 'the GS Ideological War page ("a player who is in a different Tier 3 government"); the '
     + 'install writes only RequiresDifferentLateGovernment',
 });
 
@@ -168,6 +168,6 @@ export const LATE_GOVERNMENT_TIER = srcConst('warKinds.LATE_GOVERNMENT_TIER', 3,
  *  modifier of the roster carries `TurnsActive` 10 — the buff lives while the
  *  war the seat declared is under this many turns old. */
 export const WAR_BUFF_TURNS = srcConst('seats.warBuffTurns', 10, {
-  lab: 'TRAIT_TERRITORIAL_WAR_* / TRAIT_LIBERATION_WAR_* carry TurnsActive 10; the install writes '
+  pedia: 'TRAIT_TERRITORIAL_WAR_* / TRAIT_LIBERATION_WAR_* carry TurnsActive 10; the install writes '
     + 'it on the modifier, not as a table column a checker can read back',
 });

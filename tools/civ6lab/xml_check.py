@@ -25,9 +25,22 @@ the TAG names, so no per-table primary-key knowledge is needed: two rows that
 agree on every `where` column are the same row. Attribute rows and element
 rows (the Policies.xml style) both count.
 
-Scenario and mode packs are skipped (their tables would overwrite the base
-game's rows with a scenario's), and so is every `*_Icons_*`, `*_Text*`,
-`*Civilopedia*` file. Needs the install on disk, no game running.
+THE PACKS' ORDER IS THE GAME'S. Each pack's .modinfo lists its database
+actions (InGameActions/UpdateDatabase) under criteria; `_criteria_ok`
+evaluates them for a Gathering Storm game with no game mode, actions sort
+by LoadOrder and files by Priority. The BASE game has no manifest —
+alphabetical there is an assumption, and a MEASURED harmless one: its 82
+data files carry 0 Update and 0 Delete elements (23,196 Row, 329 Replace),
+so no base file can undo another's write (2026-09-14). `*_Icons_*`,
+`*_Text*`, `*Civilopedia*` files are skipped. Needs the install on disk,
+no game running.
+
+THE KINDS `check` reports: XML compared (match / mism); DERIVED with every
+XML input resolved (deriv) or one input missing (dangl — red); an input or
+tag marked `absent: true` passes when the cell is MISSING and is dangling
+when it is present; LAB with its runs/ file or AUDIT id found (lab) or
+none named (lab?); PEDIA and STYLIZED counted; untagged (unsrc). Red on
+mism + dangl only.
 """
 from __future__ import annotations
 
@@ -159,7 +172,26 @@ def parse_where(spec: str) -> dict[str, str]:
 
 
 CREATE_RE = re.compile(r'CREATE TABLE\s+"?(\w+)"?\s*\((.*?)\);', re.S)
-COLDEF_RE = re.compile(r'^\s*"?(\w+)"?\s+\w+[^,]*?DEFAULT\s+(\S+?)\s*,?\s*$', re.M)
+COLDEF_RE = re.compile(r'^\s*"?(\w+)"?\s+\w+.*?\bDEFAULT\s+(\S+?)\s*$', re.S)
+
+
+def _split_top(body: str) -> list[str]:
+    """a CREATE TABLE body split on commas OUTSIDE parentheses — a column's
+    CHECK (x IN (0,1)) carries commas of its own"""
+    parts, depth, cur = [], 0, []
+    for ch in body:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    if cur:
+        parts.append("".join(cur))
+    return parts
 
 
 def schema_defaults() -> dict[str, dict[str, str]]:
@@ -176,9 +208,10 @@ def schema_defaults() -> dict[str, dict[str, str]]:
         for m in CREATE_RE.finditer(text):
             table, body = m.group(1), m.group(2)
             cols = out.setdefault(table, {})
-            for cm in COLDEF_RE.finditer(body):
-                v = cm.group(2).strip().strip(",")
-                cols[cm.group(1)] = v.strip("'\"")
+            for coldef in _split_top(body):
+                cm = COLDEF_RE.match(coldef.strip())
+                if cm:
+                    cols[cm.group(1)] = cm.group(2).strip().strip("'\"")
     return out
 
 
@@ -300,51 +333,164 @@ def cmd_suggest(inst: Install, a: list[str], col: str | None) -> int:
     return 0
 
 
+AUDIT_MD = ROOT / "docs" / "AUDIT.md"
+RUNS_DIR = ROOT / "tools" / "civ6lab" / "runs"
+LAB_REF = re.compile(r"\b([ABC]-\d+r?)\b|\bask (\d+)\b|runs/([A-Za-z0-9_.-]+)")
+
+
+def xml_cell(inst: Install, src: dict, want) -> tuple[str | None, str]:
+    """the install cell a tag names, in the CATALOG's units (scale applied)"""
+    v, who = inst.get(src["xml"], src["where"], src["col"])
+    if v is not None and "scale" in src and _num(v) is not None:
+        # the catalog holds cell * scale — rounded when the catalog's value
+        # is a whole number (a cost through GAME_SPEED), exact when it is a
+        # fraction (a percentage stored as 0.25)
+        prod = float(_num(v)) * float(src["scale"])
+        if isinstance(want, (int, float)) and float(want) != int(want):
+            v = repr(prod)
+        else:
+            v = str(int(round(prod + 1e-9)))
+    return v, who
+
+
+def lab_ref_ok(text: str, audit: str) -> bool | None:
+    """True = the reference resolves, False = dangling, None = unverifiable
+    (the tag names no AUDIT id and no runs/ file)"""
+    found = False
+    for m in LAB_REF.finditer(text):
+        found = True
+        if m.group(3):
+            if not (RUNS_DIR / m.group(3)).exists():
+                return False
+        elif m.group(1):
+            if m.group(1) not in audit:
+                return False
+        elif m.group(2):
+            if f"ask {m.group(2)}" not in audit.lower() and f"| {m.group(2)} " not in audit:
+                return False
+    return True if found else None
+
+
+FALLBACK_RE = re.compile(r"^(\S+) where the install .*\b(no|NO)\b")
+PRESENCE_RE = re.compile(r"^true where the install (writes|carries|gives|has)\b", re.I)
+
+
+def _truthy(v) -> bool:
+    return v not in (0, 0.0, False, None, "", "0", "false")
+
+
+def derived_verdict(inst: Install, src: dict, value) -> tuple[str, str]:
+    """('ok' | 'dangling' | 'presence', why) for a DERIVED tag.
+
+    The formula is words, and three shapes of it carry checkable semantics:
+      * `X where the install ... no Y`  — the ABSENCE is the fact: when the
+        input is missing the catalog must hold X (true, 0, 99, CITY_CENTER);
+        when it is present nothing is claimed here;
+      * `true where the install writes/carries/gives ...` — PRESENCE is the
+        fact: the input present <=> the catalog value truthy;
+      * anything else — every input must resolve; an input marked
+        `absent: true` must NOT resolve; an unmarked missing input reads as
+        ZERO, so it passes only when the catalog value is falsy.
+    """
+    text = src["derived"]
+    inputs = [i for i in (src.get("inputs") or []) if "xml" in i]
+    present = []
+    missing = []
+    for inp in inputs:
+        v, who = inst.get(inp["xml"], inp["where"], inp["col"])
+        ref = f"{inp['xml']}[{inp['where']}].{inp['col']}"
+        if inp.get("absent"):
+            if v is not None:
+                return "presence", f"{ref} is PRESENT ({v!r} <- {who}) where the tag says absent"
+            continue
+        (present if v is not None else missing).append((ref, who, v))
+    fb = FALLBACK_RE.match(text)
+    if fb:
+        if missing and not present:
+            want = fb.group(1).strip("'\"`")
+            if values_equal(value, want) or str(value) == want:
+                return "ok", ""
+            return "presence", f"the input is absent and the tag says the catalog then holds {want!r}"
+        return "ok", ""
+    if PRESENCE_RE.match(text):
+        if bool(present) == _truthy(value):
+            return "ok", ""
+        state = "present" if present else "absent"
+        return "presence", f"the input is {state} ({present[0][0] if present else missing[0][0]})"
+    if missing:
+        if not _truthy(value):
+            return "ok", ""   # an absent cell reads as zero, and the catalog says zero
+        return "dangling", "; ".join(f"{r} {w}" for r, w, _ in missing)
+    return "ok", ""
+
+
 def cmd_check(inst: Install, path: pathlib.Path) -> int:
     dump = json.loads(path.read_text(encoding="utf-8"))
-    match = mismatch = unsourced = other = 0
-    per_cat: dict[str, list[int]] = {}
+    audit = AUDIT_MD.read_text(encoding="utf-8") if AUDIT_MD.exists() else ""
+    COLS = ("match", "mism", "unsrc", "deriv", "dangl", "lab", "lab?", "pedia", "styl")
+    tot = dict.fromkeys(COLS, 0)
+    per_cat: dict[str, dict[str, int]] = {}
+    red: list[str] = []
     for e in dump["constants"]:
         cat = e.get("catalog", "?")
-        tally = per_cat.setdefault(cat, [0, 0, 0, 0])  # match, mismatch, unsourced, other
+        t = per_cat.setdefault(cat, dict.fromkeys(COLS, 0))
         src = e.get("src")
         name = e["name"]
+
+        def hit(col: str) -> None:
+            t[col] += 1
+            tot[col] += 1
+
         if src is None:
-            unsourced += 1
-            tally[2] += 1
-            continue
-        if "xml" in src:
-            v, who = inst.get(src["xml"], src["where"], src["col"])
+            hit("unsrc")
+        elif "xml" in src:
             want = src.get("expect", e["value"])
-            if v is not None and "scale" in src and _num(v) is not None:
-                # the catalog holds cell * scale — rounded when the catalog's
-                # value is a whole number (a cost through GAME_SPEED), exact
-                # when it is a fraction (a percentage stored as 0.25)
-                prod = float(_num(v)) * float(src["scale"])
-                if isinstance(want, (int, float)) and float(want) != int(want):
-                    v = repr(prod)
-                else:
-                    v = str(int(round(prod + 1e-9)))
+            v, who = xml_cell(inst, src, want)
             if v is not None and values_equal(want, v):
-                match += 1
-                tally[0] += 1
+                hit("match")
             else:
-                mismatch += 1
-                tally[1] += 1
-                print(f"MISMATCH {name}: catalog {e['value']!r} vs install {v!r} "
-                      f"[{src['xml']}[{src['where']}].{src['col']} <- {who}]")
+                hit("mism")
+                red.append(f"MISMATCH {name}: catalog {e['value']!r} vs install {v!r} "
+                           f"[{src['xml']}[{src['where']}].{src['col']} <- {who}]")
+        elif "derived" in src:
+            verdict, why = derived_verdict(inst, src, e["value"])
+            if verdict == "ok":
+                hit("deriv")
+            elif verdict == "presence":
+                hit("mism")
+                red.append(f"MISMATCH {name}: catalog {e['value']!r} but {why}")
+            else:
+                hit("dangl")
+                red.append(f"DANGLING {name}: derived '{src['derived'][:60]}' names {why}")
+        elif "lab" in src:
+            ok = lab_ref_ok(src["lab"], audit)
+            if ok is False:
+                hit("dangl")
+                red.append(f"DANGLING {name}: lab reference not found — {src['lab'][:80]}")
+            elif ok:
+                hit("lab")
+            else:
+                hit("lab?")
+        elif "pedia" in src:
+            hit("pedia")
+        elif "stylized" in src:
+            hit("styl")
         else:
-            # LAB / STYLIZED / DERIVED: recorded, not compared here (yet)
-            other += 1
-            tally[3] += 1
+            hit("unsrc")
+    for line in red:
+        print(line)
     print()
-    print(f"{'catalog':<22} {'match':>6} {'mism':>5} {'unsrc':>6} {'other':>6}")
-    for cat, (m, mm, u, o) in sorted(per_cat.items()):
-        print(f"{cat:<22} {m:>6} {mm:>5} {u:>6} {o:>6}")
-    print(f"{'TOTAL':<22} {match:>6} {mismatch:>5} {unsourced:>6} {other:>6}")
-    print("XML CHECK " + ("RED" if mismatch else "OK") + f" — {match} match, {mismatch} mismatch, "
-          f"{unsourced} unsourced, {other} lab/stylized/derived ({len(inst.files)} install files)")
-    return 1 if mismatch else 0
+    print(f"{'catalog':<22} " + " ".join(f"{c:>6}" for c in COLS))
+    for cat, t in sorted(per_cat.items()):
+        print(f"{cat:<22} " + " ".join(f"{t[c]:>6}" for c in COLS))
+    print(f"{'TOTAL':<22} " + " ".join(f"{tot[c]:>6}" for c in COLS))
+    bad = tot["mism"] + tot["dangl"]
+    print("XML CHECK " + ("RED" if bad else "OK")
+          + f" — {tot['match']} match, {tot['mism']} mismatch, {tot['dangl']} dangling, "
+          f"{tot['unsrc']} unsourced, {tot['deriv']} derived, {tot['lab']} lab "
+          f"(+{tot['lab?']} unverifiable), {tot['pedia']} pedia, {tot['styl']} stylized "
+          f"({len(inst.files)} install files)")
+    return 1 if bad else 0
 
 
 def main(argv: list[str]) -> int:

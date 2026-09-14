@@ -22,7 +22,7 @@ import { srcConst, xml, type SrcMap } from './provenance';
  * install does.
  */
 export const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
-  lab: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
+  pedia: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
     + 'its OccurrencesPerGame over (owner ruling 2026-09-04)',
 });
 
@@ -107,12 +107,14 @@ export const WIND_BAND_LO: readonly number[] = srcConst('disasters.windBandLo',
       'MinimumLatitude')],
   });
 /** one band's six weights, in the engine's E, NE, NW, W, SW, SE order */
+const WIND_DIRS = ['EAST', 'NORTHEAST', 'NORTHWEST', 'WEST', 'SOUTHWEST', 'SOUTHEAST'] as const;
 const windRow = (i: number, lo: number, w: readonly number[]): readonly number[] =>
   srcConst(`disasters.winds.${i}`, w, {
     derived: `the \`PrevailingWinds\` rows with MinimumLatitude ${lo}, their DirectionType Weight `
       + 'laid out in the engine hex order E, NE, NW, W, SW, SE; a direction the band has no row '
-      + 'for reads 0',
-    inputs: [xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_WEST`, 'Weight')],
+      + 'for reads 0 — so a 0 here is an ABSENT row and a weight a present one',
+    inputs: WIND_DIRS.map((d, k) => xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_${d}`,
+      'Weight', w[k] === 0 ? { absent: true } : undefined)),
   });
 export const PREVAILING_WINDS: readonly (readonly number[])[] = [
   windRow(0, 60, [0, 0, 1, 2, 2, 0]), //  60..90
@@ -392,7 +394,7 @@ export const DROUGHT_LENGTH = 8;
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
  *  pillages; these are the chances it takes the improvement away entirely. */
 const floodPage = (what: string) => ({
-  lab: `the GS Flood page's severity table (${what}), by severity Moderate / Major / 1000 Year`,
+  pedia: `the GS Flood page's severity table (${what}), by severity Moderate / Major / 1000 Year`,
 });
 const floodDmg = (kind: string, col = 'Percentage') => [
   xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_MODERATE&DamageType=${kind}`, col),
@@ -430,7 +432,7 @@ export const FLOOD_DAMAGE_HI = srcConst('disasters.floodDmgHi', [0, 50, 70] as c
  */
 const fertRow = (y: string, sev: number, r: readonly number[]) =>
   srcConst(`disasters.floodFert${y}.${sev}`, r, {
-    lab: `the GS Flood page's fertilization table, ${y} row ${sev} (Moderate / Major / 1000 Year), `
+    pedia: `the GS Flood page's fertilization table, ${y} row ${sev} (Moderate / Major / 1000 Year), `
       + 'columns Plains, Grassland, Desert floodplains',
   });
 export const FLOOD_FERT_FOOD = [
