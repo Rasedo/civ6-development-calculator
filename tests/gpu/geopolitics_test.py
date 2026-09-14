@@ -95,6 +95,11 @@ def head_war(sim, row: int, tgt: int, sue: bool = False) -> None:
 
 
 # ------------------------------------------------------------------ helpers ---
+# `_STATIC` names the roster planes a poke may re-seat that `snapshot` /
+# `restore` does NOT carry (they are map-generation catalog, not `_MUTABLE`),
+# so the helper puts them back by hand and re-bumps the versions a re-seating
+# bumps — which is what lets the visibility poke share the default base.
+_STATIC = ("row_civ", "row_leader")
 _BASE: dict = {}
 
 
@@ -102,20 +107,22 @@ def build(rules, path, steps: int = 18, dtype=torch.float64, slot: int = 0):
     """ONE warmed engine per (fixture, warmup, dtype, slot); every poke below
     restores it. A build plus the founding warmup costs ~10 s where `restore`
     costs milliseconds, and `restore` round-trips every `_MUTABLE` plane —
-    which is everything these pokes write.
+    which is everything these pokes write, the `_STATIC` roster pair aside.
 
-    `slot` keys a SECOND engine for the two scenes that hold two live sims at
-    once: the World Congress twin (`s8b`, compared against `s8`) and the
-    visibility poke, which blanks the roster rows (`row_civ` / `row_leader`
-    are map-generation catalog, not `_MUTABLE`, so its base stays its own)."""
+    `slot` keys a SECOND engine for the one scene that holds two live sims at
+    once: the World Congress twin (`s8b`, compared against `s8`)."""
     key = (str(path), steps, str(dtype), slot)
     if key not in _BASE:
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
         for _ in range(steps):
             sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
     sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
     return sim
 
 
@@ -939,9 +946,9 @@ def poke_visibility(rules, path):
     alliance as alternatives, and the Combat Strength the leading side keeps.
     CIV6 (Diplomatic Visibility and Gossip)."""
     # `row_civ` / `row_leader` are the seeder's ROSTER — map-generation
-    # catalog, not `_MUTABLE` planes — and this poke blanks and re-seats them,
-    # so it takes a base of its own that no other poke shares.
-    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False, slot=2)
+    # catalog, not `_MUTABLE` planes — and this poke blanks and re-seats them;
+    # `build`'s `_STATIC` clone puts them back, so the default base serves.
+    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
     a, b = 1, 2
     # The BASE rule, so the seeder's draw cannot decide what this lane
     # measures: clear the roster rows. The uniques that ride visibility

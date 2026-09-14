@@ -25,15 +25,16 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
 
-# THE WARMED BASE, ONE PER (turns, slot). A scene pays a `restore` —
+# THE WARMED BASE, ONE PER (fixture, turns). A scene pays a `restore` —
 # milliseconds — instead of a fixture load, a settle and N steps. Every plane
-# these pokes write is in `_MUTABLE`, so the restore is the whole job; `slot`
-# keys a SECOND base for a scene that holds two live sims at once.
+# these pokes write is in `_MUTABLE`, so the restore is the whole job, and no
+# scene holds two live sims: 5b's probe loop hands its two ints out before the
+# sim it steers is restored, so ONE base serves the whole lane.
 _BASE: dict = {}
 
 
-def fresh(rules, path, turns=30, slot: int = 0):
-    key = (str(path), turns, slot)
+def fresh(rules, path, turns=30):
+    key = (str(path), turns)
     if key not in _BASE:
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
         for _ in range(turns):
@@ -150,8 +151,8 @@ def main() -> None:
     # The scripted patrol moves 2.78 tiles per moving unit-turn, so one order
     # per turn would cut civ mobility by ~two thirds. The action is a SEQUENCE
     # and the engine walks it, validating each step — it never extends a move.
-    def setup(slot=0):
-        s2 = fresh(rules, path, slot=slot)
+    def setup():
+        s2 = fresh(rules, path)
         s2.seat_ext[0, row] = True
         sl = next(
             v for v in range(s2.major_unit_alive.shape[1])
@@ -198,12 +199,12 @@ def main() -> None:
     # Find a direction that is legal NOW but illegal from where it lands, so the
     # refusal happens mid-sequence rather than at rank 0 — that is the case the
     # walk has to get right.
-    s7, sl7, rw7, nrows3 = setup()
+    # The probe runs FIRST and hands out two ints (the direction and the tile
+    # one step of it reaches), so the sim under test is restored AFTER the
+    # search and the whole scene lives on the one base.
     dead = None
     for d in range(6):
-        # slot 1: `s7` is still live below, and one base would hand back the
-        # same object twice
-        probe, slp, rwp, nrp = setup(1)
+        probe, slp, rwp, nrp = setup()
         if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
             continue
         probe.apply_seat_unit_sequence(row, seq_of([d], nrp, rwp))
@@ -212,6 +213,7 @@ def main() -> None:
             break
     assert dead is not None, "no direction becomes illegal after one step — pick another fixture"
     d_dead, stop_tile = dead
+    s7, sl7, rw7, nrows3 = setup()
     s7.apply_seat_unit_sequence(row, seq_of([d_dead, d_dead], nrows3, rw7))
     assert int(s7.major_unit_tile[0, sl7]) == stop_tile, (
         f"the walk did not stop at the illegal rank — ended {int(s7.major_unit_tile[0, sl7])}, "
@@ -323,7 +325,9 @@ def main() -> None:
     print(f"  8 replayed naval move sails OK ({wt8} -> {nb8}), land step refused")
 
     # --- 9) THE LADDER: the upgrade verb, its four gates and its charges ----
-    sim9 = fresh(rules, path, turns=20)
+    # Scenes 9-11 hand-place their unit and hand-set its tech and gold, so the
+    # warmup length decides nothing here: they share the lane's one base.
+    sim9 = fresh(rules, path)
     up_src = next((i for i in range(sim9.NU)
                    if int(sim9._type_up_to[i]) >= 0
                    and int(sim9._type_res_slot[int(sim9._type_up_to[i])]) < 0
@@ -381,7 +385,7 @@ def main() -> None:
     # wonder and the 4-hex spacing — not ownership. A city may be founded on
     # ground this seat already holds; only FOREIGN territory refuses, which is
     # `canFoundCity`'s `tileClaimed(tile) && tileSeat(tile) !== seat`.
-    sim10 = fresh(rules, path, turns=20)
+    sim10 = fresh(rules, path)
     nrows = sim10.n_majors
     ctrs = [int(t) for t in sim10.city_center[0, :nrows].reshape(-1).tolist() if t >= 0]
     ctrs += [int(t) for t in sim10.citystate_center[0].tolist() if t >= 0]
@@ -410,7 +414,7 @@ def main() -> None:
         assert int(sim10.city_alive[0, row].sum()) == n_before + 1
 
         # (b) FOREIGN ground refuses
-        sim11 = fresh(rules, path, turns=20)
+        sim11 = fresh(rules, path)
         foreign = 1 if row != 1 else 0
         sim11.tile_seat[0, spot] = foreign
         sim11.tile_city[0, spot] = sim11.city_id[0, foreign, 0]
