@@ -37,6 +37,11 @@ names its state and shows working calls.
 
 ## Experiments
 
+The SECOND session's scene list is `SESSION2.md`: the seven ledger lines
+the game can state (asks 2, 3, 5, 6, 10, 12, 13), ask 4's measurable half,
+and the carry-overs (the escape with TRAINED spies, the counterspy term,
+ask 9's longer watch).
+
 ### `storm` — ASK 16, the storm walk
 
 `Expansion2_RandomEvents.xml` gives a hurricane `Hexes=19 Movement=8

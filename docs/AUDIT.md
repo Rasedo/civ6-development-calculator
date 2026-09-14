@@ -80,18 +80,26 @@ RE-SOURCED 2026-09-09 against the install — TWELVE of the sixteen, so that
 nobody repeats a grep that came back empty. THE SOURCING IS DONE; what is left
 on these lines is a RULING, not research.
 
+RE-CLASSIFIED 2026-09-14 against the LIVE GAME (`tools/civ6lab`, online since
+2026-09-13 — AFTER the pass above, which is why these lines read "ruling"):
+seven of the eight ruling lines are FACTS the game states when asked. Asks
+2, 3, 5, 6, 10, 12 and 13 each have a scene in `tools/civ6lab/SESSION2.md`
+(the LAB tag on the row names it); ask 4 is half a measurement (per-plant
+independence) and half a modelling ruling that stays the owner's. A
+measured line closes the way asks 1, 7, 11, 15 and 16 closed.
+
 | ask | re-source result |
 |---|---|
 | 1 Volcanic Soil | MEASURED 2026-09-13 (`tools/civ6lab`, four eruptions): radius 1, a PROPORTION of the ring painted, improvements pillaged or removed, bonus resources sometimes destroyed — see ask 1. Earlier: NARROWED. The volcano rows carry no `Hexes` at all, unlike every storm row, so the affected SET is unpublished — but the severities split `PROP_DAMAGE_FERTILITY` (gentle) against `ALL_DAMAGE_FERTILITY` (catastrophic, megacolossal), and `FEATURE_VOLCANIC_SOIL` is `ValidForReplacement="true"`, so the soil replaces a standing FEATURE. Radius and improvement survival still open. |
-| 2 Encampment pool | empty — no encampment-on-capture parameter anywhere |
-| 3 religion tie | empty — no majority tiebreak parameter |
-| 5 wonder in a blast | empty — no NUKE globals, no wonder-in-blast column |
-| 6 opinion deltas | empty — the `LOC_DIPLO_MODIFIER_*` rows are TEXT TAGS with no amount attached |
+| 2 Encampment pool | LAB scene C (SESSION2.md); empty — no encampment-on-capture parameter anywhere |
+| 3 religion tie | LAB scene E (SESSION2.md); empty — no majority tiebreak parameter |
+| 5 wonder in a blast | LAB scene D (SESSION2.md); empty — no NUKE globals, no wonder-in-blast column |
+| 6 opinion deltas | LAB scene A (SESSION2.md); empty — the `LOC_DIPLO_MODIFIER_*` rows are TEXT TAGS with no amount attached |
 | 9 city-state spending | OBSERVED 2026-09-13 over 7 turns (`tools/civ6lab`): banks drift with income minus upkeep, and one minor spent ~207 of 260 on a unit after its army fell — see ask 9 |
-| 10 Free City as spy ground | empty — `CivilizationLevels` carries nothing spy-related |
+| 10 Free City as spy ground | LAB scene B (SESSION2.md); empty — `CivilizationLevels` carries nothing spy-related |
 | 11 how sight is spent | MEASURED 2026-09-13 (`tools/civ6lab`): OCCLUSION by elevation, no budget, no range from hills — see ask 11 |
-| 12 Free City amenities | empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
-| 13 Free City defence | empty of a defence column, but ONE constraint found: that row carries `IgnoresUnitStrategicResourceRequirements="false"`, where TRIBE and CITY_STATE carry true — so whatever a Free City spawns must respect strategic resources |
+| 12 Free City amenities | LAB scene B (SESSION2.md); empty — `CIVILIZATION_LEVEL_FREE_CITIES` is BOOLEAN PERMISSIONS ONLY, no amenity column |
+| 13 Free City defence | LAB scene B (SESSION2.md); empty of a defence column, but ONE constraint found: that row carries `IgnoresUnitStrategicResourceRequirements="false"`, where TRIBE and CITY_STATE carry true — so whatever a Free City spawns must respect strategic resources |
 | 15 trade-route district gold | MEASURED 2026-09-13 AND the table found: `District_TradeRouteYields` (Districts.xml) is the composition; the two GlobalParameters are dead in GS — see ask 15 |
 | 16 storm `Movement 8` | MEASURED 2026-09-13 in the live game (`tools/civ6lab`) — see C-49 |
 
@@ -151,16 +159,26 @@ in the entry).
 
 2. **B-51r — the Encampment's pool on a city capture.** `city_outer_hp`
    zeroes; the district's own pool rides through. No rule reached.
+   LAB (session 2, scene C): read every district's garrison and outer
+   damage before and after a capture — zeroed, carried, or healed.
 
 3. **C-64 — the majority-religion tie.** Two religions in equal cities; no
-   source names the winner.
+   source names the winner. LAB (session 2, scene E): equal followers in
+   one city and equal cities across the empire, swapping arrival order and
+   religion id to separate the two candidate rules.
 
 4. **C-74 / C-1 — per-GAME counts over per-OBJECT rolls.** The install
    counts eruptions and reactor accidents per game; this engine rolls per
    volcano and would roll per reactor. PROPOSAL: divide the per-turn rate
-   by the map's count of objects at risk.
+   by the map's count of objects at risk. LAB (session 2, scene F, HALF):
+   accidents per plant over many turns say whether the game rolls per
+   object; whether THIS engine mirrors that or scales a per-game rate is
+   the ruling that remains.
 
 5. **C-31 — a wonder in a nuke's blast.** Pillaged or not: unsourced.
+   LAB (session 2, scene D): a granted device on a scene with a wonder
+   and one unit per ring, three draws — the wonder's state and the
+   per-ring kill proportion together.
 
 6. **C-76 — the opinion deltas.** The install names every
    `LOC_DIPLO_MODIFIER_*` and publishes no amount; forum figures cite
@@ -168,7 +186,10 @@ in the entry).
    with a `DiplomaticYieldBonus` beside each); what no source gives is what
    MOVES a pair between them. Ruling this unblocks the whole of C-76 at once
    — a carrier without deltas is a constant, so neither half can ship
-   alone.
+   alone. LAB (session 2, scene A): the diplomacy AI exposes each modifier
+   between two players WITH its score; one act at a time from the socket,
+   read the same turn and at +5/+10/+20 for the decay. The one line the
+   game answers directly.
 
 7. ~~C-2 — what a mid-build gold purchase does to the hammers.~~ **MEASURED
     2026-09-13** in the live game (`tools/civ6lab/prod_state.lua` around
@@ -222,7 +243,9 @@ in the entry).
     the ten `UnitOperations` spy rows name a `TargetDistrict` and nothing
     else, and no requirement set anywhere keys on `CivilizationLevels`.
     Which cities a spy may travel to is DLL. Both engines walk the major
-    rows today. Open the Free City to spies, or leave it closed?
+    rows today. Open the Free City to spies, or leave it closed? LAB
+    (session 2, scene B): a TRAINED spy's travel targets after a loyalty
+    flip, and the missions the Free City offers if it is listed.
 
 11. ~~B-56r — how sight is SPENT.~~ **MEASURED 2026-09-13** in the live
     game (`tools/civ6lab/sight_find.lua` + `sight_read.lua`: a Warrior,
@@ -266,13 +289,16 @@ in the entry).
     the seat's luxuries and policies, and the Free Cities player has none —
     so every Free City sits at the bottom band forever. `CivilizationLevels`
     has no amenity column and no XML row names one. Give the free row a
-    fixed tier, or let the bottom band stand?
+    fixed tier, or let the bottom band stand? LAB (session 2, scene B): the
+    flipped city's amenities, need and tier on the flip turn and five later.
 
 13. **C-60 — a Free City's defence.** "Will repair pillaged improvements
     and spawn units to defend itself, and may build walls", "will try to
     retaliate". No XML row names the unit, the cadence or the walls, and
     its strike needs a target rule. Name them, or leave the floor-15
-    defence and the walls it revolted with?
+    defence and the walls it revolted with? LAB (session 2, scene B): its
+    defence strength and pools after the flip, what it trains over 15
+    turns, and whether it strikes a unit parked beside it.
 
 14. **C-16 — what the spy's escape chance is a chance OUT OF.** PARTLY
     MEASURED 2026-09-13, then STOPPED ON CRASHES (`tools/civ6lab`,
