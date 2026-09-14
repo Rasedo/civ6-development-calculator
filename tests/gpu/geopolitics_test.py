@@ -729,10 +729,14 @@ def poke_transfer(rules, path):
 
 
 def poke_float32(rules, path):
-    """h. A float32 build steps 30 turns with the pair machinery live."""
-    sim = build(rules, path, steps=30, dtype=torch.float32)
+    """h. The pair planes' dtypes are construction facts (bool / int8 / long),
+    not facts of the build's float dtype — asserted on the lane's own warm
+    base. The 30-turn float32 walk that used to carry them here is
+    district_breadth_test's `poke_float32_dtype` claim (the same build, the
+    same engine step, the same walk), and one lane pays for it."""
+    sim = build(rules, path)
     assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.int8 and sim.seat_denounced.dtype == torch.long
-    print("  h float32 dtype OK (30 turns, pair tensors dtype-stable, no walk crash)")
+    print("  h pair tensors dtype-stable OK (bool / int8 / long; the float32 walk is district_breadth's)")
 
 
 
