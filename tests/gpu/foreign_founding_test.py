@@ -91,8 +91,10 @@ def _found_off_home(sim, row: int) -> int:
         break
     assert site is not None, "no free tile on another landmass"
     before = _n_units(sim, row)
-    sim._found_city_at(row, torch.tensor([True]), torch.tensor([site]))
+    made = sim._found_city_at(row, torch.tensor([True]), torch.tensor([site]))
     assert int(sim.tile_seat[B0, site]) == row, "the founding did not land"
+    assert _n_units(sim, row) == before, "the founding body itself spawned a unit"
+    sim._found_city_grants(row, made, torch.tensor([site]))
     return _n_units(sim, row) - before
 
 
@@ -145,7 +147,8 @@ def test_home_and_a_plain_seat_get_nothing(rules, path) -> None:
                 and int(sim.tile_seat[B0, t]) < 0 and bool(sim.passable[B0, t])
                 and not bool(sim.water[B0, t]) and int(sim.centre_slot_at[B0, t]) < 0)
     before = _n_units(sim, ROW)
-    sim._found_city_at(ROW, torch.tensor([True]), torch.tensor([site]))
+    made = sim._found_city_at(ROW, torch.tensor([True]), torch.tensor([site]))
+    sim._found_city_grants(ROW, made, torch.tensor([site]))
     assert _n_units(sim, ROW) == before, "a home-continent founding granted a unit"
 
     # ...and a seat the roster does not name gets nothing abroad either
@@ -155,6 +158,67 @@ def test_home_and_a_plain_seat_get_nothing(rules, path) -> None:
     print("  4 the refusals OK — nothing at home, nothing for a plain seat")
 
 
+def _place(sim, tile: int, row: int, utype: int) -> int:
+    """a unit through the engine's own plane writer; returns the merged slot"""
+    slot = int(sim.unit_next[B0])
+    sim.major_unit_alive[B0, slot] = True
+    sim.major_unit_seat[B0, slot] = row
+    sim.major_unit_type[B0, slot] = utype
+    sim.major_unit_tile[B0, slot] = tile
+    sim.major_unit_hp[B0, slot] = 100
+    sim.unit_next[B0] += 1
+    g = slot + sim.POOL_LO["major"]
+    sim._occ_set(torch.tensor([B0]), torch.tensor([tile]), torch.tensor([g]))
+    sim._gen_ver += 1
+    return g
+
+
+def test_the_grant_lands_where_the_settler_stood(rules, path) -> None:
+    """THE APPLIER'S ORDER: found, clear the settler, THEN grant. With the
+    settler still on the centre and an own civilian on every land
+    neighbour, a grant spawned early finds no tile at all; spawned after
+    the clear it lands on the centre, where TS puts it (seed 9144 t118)."""
+    sim = build(path)
+    _seat(sim, ROW, civ="SPAIN")
+    home = int(sim._home_continent(ROW)[B0])
+    builder = UNITS.index("BUILDER")
+    site = None
+    for t in range(sim.T):
+        c = int(sim.tile_continent[B0, t])
+        if c < 0 or c == home or bool(sim.water[B0, t]) or not bool(sim.passable[B0, t]):
+            continue
+        if int(sim.tile_seat[B0, t]) >= 0 or int(sim.centre_slot_at[B0, t]) >= 0 or int(sim.district[B0, t]) >= 0:
+            continue
+        if int(sim.military_at[B0, t]) >= 0 or int(sim.civilian_at[B0, t]) >= 0:
+            continue
+        nbs = [int(n) for n in sim.neigh[t].tolist() if int(n) >= 0]
+        if any(int(sim.civilian_at[B0, n]) >= 0 or int(sim.military_at[B0, n]) >= 0 for n in nbs):
+            continue
+        site = t
+        break
+    assert site is not None, "no quiet tile on another landmass"
+    settler = _place(sim, site, ROW, int(sim._settler_idx))
+    ring = [int(n) for n in sim.neigh[site].tolist()
+            if int(n) >= 0 and bool(sim.passable[B0, n]) and not bool(sim.water[B0, n])]
+    for n in ring:
+        _place(sim, n, ROW, builder)
+    before = _n_units(sim, ROW)
+    made = sim._found_city_at(ROW, torch.tensor([True]), torch.tensor([site]))
+    assert bool(made[B0]), "the founding was refused"
+    # the applier's two lines between the founding and the grants
+    sim._occ_clear(torch.tensor([B0]), torch.tensor([site]), torch.tensor([settler]))
+    sim.unit_alive[B0, settler] = False
+    sim._found_city_grants(ROW, made, torch.tensor([site]))
+    assert _n_units(sim, ROW) == before, f"expected the settler traded for one Builder, got {_n_units(sim, ROW) - before:+d}"
+    live = sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == ROW)
+    newest = int(live.nonzero().flatten().tolist()[-1])
+    assert int(sim.major_unit_type[B0, newest]) == builder
+    assert int(sim.major_unit_tile[B0, newest]) == site, (
+        f"the granted Builder stands on {int(sim.major_unit_tile[B0, newest])}, not the centre {site}")
+    assert int(sim.civilian_at[B0, site]) == newest + sim.POOL_LO["major"]
+    print("  5 the order OK — the grant lands on the centre the settler just left")
+
+
 def main() -> int:
     rules = load_rules()
     path = _two_continent_fixture()
@@ -162,6 +226,7 @@ def main() -> int:
     test_spain_gets_a_builder_abroad(rules, path)
     test_victoria_gets_the_best_melee(rules, path)
     test_home_and_a_plain_seat_get_nothing(rules, path)
+    test_the_grant_lands_where_the_settler_stood(rules, path)
     print("BATTERY OK foreign_founding")
     return 0
 

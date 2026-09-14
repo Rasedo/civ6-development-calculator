@@ -9430,7 +9430,9 @@ class SimSeats:
         FOUND_CITY verb's mutation, ONE body for every seat (a major's seat
         IS its block row). canFoundCity is
         re-checked LIVE at the settler's own tile; the settler unit is
-        consumed by the CALLER. Returns the games that founded."""
+        consumed by the CALLER, and the units the founding GRANTS are the
+        caller's too (`_found_city_grants`, once the settler is off the
+        tile). Returns the games that founded."""
         seat = row
         tc = tile.clamp(min=0)
         # CIV6 settling criteria name land, passability, the oasis, the natural
@@ -9586,43 +9588,14 @@ class SimSeats:
             self._tile_owner_ver += 1
         self._all_roads_lead_to_rome(rows, row, s_idx)
         self._trajans_column(rows, row, slot)
-        # CIV6 (Kupe's Voyage): the FIRST city's Population and Builder
-        if self._capital_rows or self._grant_unit_rows:
+        # CIV6 (Kupe's Voyage): the FIRST city's Population (its Builder is a
+        # grant ROW, spawned by `_found_city_grants` once the settler is gone)
+        if self._capital_rows:
             _first = self.city_alive[rows, row].sum(dim=1) == 1
             for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
-            # CIV6 (Pax Britannica / Treasure Fleet): a city founded on a
-            # continent other than the HOME one. The FIRST city can never
-            # qualify — `civ_cap_tile` is stamped by then, so its own
-            # landmass IS the home one.
-            _tile_at = torch.zeros(self.B, dtype=torch.long, device=self.device)
-            _tile_at[rows] = s_idx
-            _foreign = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            _foreign[rows] = ~self._on_home_continent(row, _tile_at)[rows]
-            for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
-                _when = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                if _gf:
-                    _when[rows] = _first
-                if _gx:
-                    _when = _when | _foreign
-                if not bool(_when.any()):
-                    continue
-                _gm = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                _gm[rows] = (_when & self._row_is(row, _gc, _gl))[rows]
-                if not bool(_gm.any()):
-                    continue
-                # a row may name a chassis, or a promotion CLASS to take the
-                # best of; a class the seat can train none of grants nothing
-                _uid = (torch.full((self.B,), _gu, dtype=torch.long, device=self.device)
-                        if _gu >= 0 else self._best_trainable_of_class(row, _gp))
-                _gm = _gm & (_uid >= 0)
-                if not bool(_gm.any()):
-                    continue
-                _at = torch.zeros(self.B, dtype=torch.long, device=self.device)
-                _at[rows] = s_idx
-                self._spawn_unit(row, _gm, _at, _uid.clamp(min=0))
         self._eff_version += 1
         return found
 
@@ -9691,6 +9664,47 @@ class SimSeats:
             cur = self._trade_walk_step(rr, cur, tgt, w)
             land = walking & ~self.water[rr, cur]
             self.road[rr[land], cur[land]] = True
+
+    def _found_city_grants(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
+        """The units a FOUNDING hands the seat, in `foundCityAt`'s order: the
+        Ancestral Hall's Builder, then the roster's grant rows (Kupe's first
+        city; Spain's Builder and Victoria's melee unit on a foreign
+        continent). The verb's applier calls it AFTER the settler is off the
+        tile — TS disbands the settler before `foundCityAt` runs, so the
+        centre is free when a grant lands. The rows once ran inside
+        `_found_city_at`, while the settler still held the centre's civilian
+        slot: with every neighbour blocked the grant was REFUSED where TS
+        landed it on the centre (seed 9144 t118, a Treasure Fleet Builder)."""
+        if not bool(made.any()):
+            return
+        self._grant_new_city_unit(row, made, tile)
+        if not self._grant_unit_rows:
+            return
+        rows = made.nonzero(as_tuple=True)[0]
+        _first = self.city_alive[rows, row].sum(dim=1) == 1
+        # CIV6 (Pax Britannica / Treasure Fleet): a city founded on a
+        # continent other than the HOME one. The FIRST city can never
+        # qualify — `civ_cap_tile` is stamped by then, so its own
+        # landmass IS the home one.
+        _foreign = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        _foreign[rows] = ~self._on_home_continent(row, tile.clamp(min=0))[rows]
+        for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
+            _when = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            if _gf:
+                _when[rows] = _first
+            if _gx:
+                _when = _when | _foreign
+            _gm = _when & made & self._row_is(row, _gc, _gl)
+            if not bool(_gm.any()):
+                continue
+            # a row may name a chassis, or a promotion CLASS to take the
+            # best of; a class the seat can train none of grants nothing
+            _uid = (torch.full((self.B,), _gu, dtype=torch.long, device=self.device)
+                    if _gu >= 0 else self._best_trainable_of_class(row, _gp))
+            _gm = _gm & (_uid >= 0)
+            if not bool(_gm.any()):
+                continue
+            self._spawn_unit(row, _gm, tile.clamp(min=0), _uid.clamp(min=0))
 
     def _grant_new_city_unit(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
         """CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant

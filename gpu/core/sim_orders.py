@@ -159,7 +159,7 @@ class SimOrders:
                         fr = made.nonzero(as_tuple=True)[0]
                         self._occ_clear(fr, here[fr], sc[fr])
                         self.unit_alive[fr, sc[fr]] = False
-                        self._grant_new_city_unit(row, made, hc)
+                        self._found_city_grants(row, made, hc)  # the settler is gone: TS's order
 
             if _rk_excavate[n] and _xc >= 0:
                 exc = act & (a == _xc) & self._excavate_ok(

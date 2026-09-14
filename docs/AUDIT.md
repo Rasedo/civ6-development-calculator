@@ -450,7 +450,15 @@ the gate reaches is worth more here than one that re-reads the exporter.
   chassis carries it), hold-the-line (adds 0), the barbarian planes and
   heathen conversion (the barbarians field none), the religious and
   zone-of-control reads, the Rock Band's landing read. Poke:
-  `tests/gpu/support_plane_test.py`.
+  `tests/gpu/support_plane_test.py`. The battery that followed (94bcd0ef)
+  redded on seed 9144 t118 with an OLDER latent the new trajectory
+  reached: a founding's roster grants (Spain's Treasure Fleet Builder)
+  were spawned INSIDE `_found_city_at`, before the applier cleared the
+  settler, so the centre's civilian slot was taken and, with every
+  neighbour blocked, the grant was refused where TS — which disbands the
+  settler before `foundCityAt` — landed it on the centre. The grants are
+  the applier's now (`_found_city_grants`, after the clear, Ancestral
+  Hall first as on TS); `foreign_founding_test` case 5 pins the order.
 
 - **A-1. BUENOS AIRES COUNTED DEAD BONUS RESOURCES.** CLOSED 2026-09-08 with
   #246l. The gate now runs past seed 9027 entirely.
