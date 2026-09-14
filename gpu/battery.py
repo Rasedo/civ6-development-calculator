@@ -144,7 +144,12 @@ SLOW_TIER = frozenset({
 # sized out of what remains. `MEM_LOW_WATER_MB` is where the watchdog stops
 # ADMITTING new poke lanes — running ones always drain, because killing
 # anything on a shared box is forbidden.
-MEM_RESERVE_MB = 4096
+# 3 GB: twelve two-seed shards + nine poke workers at ~835 MB a lane is
+# 17.5 GB, and the box opens a battery with ~21 GB free — 4 GB reserved
+# narrowed the fan-out to eleven shards (25866347: room for 20 lanes, not
+# 21) while the run's floor stayed at 5.0 GB free. The low-water watch
+# (2 GB) still holds new lanes back if the owner's own work grows.
+MEM_RESERVE_MB = 3072
 MEM_LOW_WATER_MB = 2048
 MEM_LANE_MB_DEFAULT = 1500.0   # until a green run measures the real figure
 LOW_MEMORY = "--low-memory" in sys.argv

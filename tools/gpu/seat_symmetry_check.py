@@ -6,6 +6,39 @@ import pathlib
 import re
 import sys
 
+# ONE parse per file and ONE walk per scope for the whole run. The checks
+# below each re-parsed every reader file and re-walked every function —
+# nested functions once per enclosing scope — for 25 million `ast.walk`
+# visits and a 59 s lane; the trees are kept alive here so node ids stay
+# valid keys. Same nodes, same order, same findings.
+_TREES: dict[str, ast.AST | SyntaxError] = {}
+_NODES: dict[int, list[ast.AST]] = {}
+_RECV: dict[tuple[int, bool], set[str]] = {}
+_PARENTS: dict[int, dict[int, ast.AST]] = {}
+
+
+def _parsed(path: pathlib.Path) -> ast.AST:
+    """The file's tree, parsed once per path; a SyntaxError is raised on
+    every call exactly as a direct parse would raise it."""
+    key = str(path)
+    if key not in _TREES:
+        try:
+            _TREES[key] = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as e:
+            _TREES[key] = e
+    t = _TREES[key]
+    if isinstance(t, SyntaxError):
+        raise t
+    return t
+
+
+def _scope_nodes(fn: ast.AST) -> list[ast.AST]:
+    """Every node under the scope's body statements, in `ast.walk` order."""
+    hit = _NODES.get(id(fn))
+    if hit is None:
+        hit = _NODES[id(fn)] = [x for b in fn.body for x in ast.walk(b)]  # type: ignore[attr-defined]
+    return hit
+
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*$")
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -270,10 +303,12 @@ def _loop_bound_strings(var: str, loops: list[ast.For], tables: dict[str, object
 
 
 def enclosing_for(scope: ast.AST, node: ast.AST) -> list[ast.For]:
-    parent: dict[int, ast.AST] = {}
-    for p in ast.walk(scope):
-        for c in ast.iter_child_nodes(p):
-            parent[id(c)] = p
+    parent = _PARENTS.get(id(scope))
+    if parent is None:
+        parent = _PARENTS[id(scope)] = {}
+        for p in ast.walk(scope):
+            for c in ast.iter_child_nodes(p):
+                parent[id(c)] = p
     out, cur = [], parent.get(id(node))
     while cur is not None:
         if isinstance(cur, ast.For):
@@ -287,7 +322,7 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
     shapes: list[str] = []
     aliases: set[str] = set()
     for path in sorted(CORE.glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = _parsed(path)
         lits = _string_literals(tree)
         tables = _class_tables(tree)
         parent: dict[int, ast.AST] = {}
@@ -427,7 +462,7 @@ def external_binds() -> set[str]:
     out: set[str] = set()
     for path in _reader_files():
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         for node in ast.walk(tree):
@@ -447,6 +482,9 @@ def external_binds() -> set[str]:
 def _scope_receivers(fn: ast.AST, in_core: bool) -> set[str]:
     """The local names that hold a sim in this scope — `self` inside the
     engine, `sim`, anything assigned from a sim constructor or a `.sim`."""
+    hit = _RECV.get((id(fn), in_core))
+    if hit is not None:
+        return set(hit)
     recv = _sim_bound_locals(fn)
     if in_core:
         recv.add("self")
@@ -459,6 +497,7 @@ def _scope_receivers(fn: ast.AST, in_core: bool) -> set[str]:
              and isinstance(n.targets[0], ast.Name)
              and isinstance(n.value, ast.Call)
              and _SIM_CTOR.match(_callee(n.value))}
+    _RECV[(id(fn), in_core)] = set(recv)
     return recv
 
 
@@ -468,7 +507,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
     bad: list[tuple[str, int, str]] = []
     for path in _reader_files():
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         in_core = path.parent == CORE
@@ -476,8 +515,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
                                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))] + [tree]
         for fn in scopes:
             recv = _scope_receivers(fn, in_core)
-            body = fn.body if isinstance(fn, ast.Module) else fn.body
-            for node in [x for b in body for x in ast.walk(b)]:
+            for node in _scope_nodes(fn):
                 if not (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)):
                     continue
                 if node.value.id not in recv:
@@ -493,7 +531,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
             # `getattr(self, "x")` and `for name in ("a", "b"): getattr(self,
             # name)` read attributes the dotted scan cannot see — which is how
             # two planes deleted by the alias purge kept a live reader.
-            for node in [x for b in body for x in ast.walk(b)]:
+            for node in _scope_nodes(fn):
                 if not (isinstance(node, ast.Call) and _callee(node) == "getattr"):
                     continue
                 if not (node.args and isinstance(node.args[0], ast.Name) and node.args[0].id in recv):
@@ -557,7 +595,7 @@ def method_sigs() -> dict[str, _Sig | None]:
     out: dict[str, _Sig | None] = {}
     for path in sorted(CORE.glob("*.py")):
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
@@ -580,7 +618,7 @@ def bad_arity(sigs: dict[str, _Sig | None]) -> list[tuple[str, int, str]]:
     bad: list[tuple[str, int, str]] = []
     for path in _reader_files():
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         in_core = path.parent == CORE
@@ -588,7 +626,7 @@ def bad_arity(sigs: dict[str, _Sig | None]) -> list[tuple[str, int, str]]:
                                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))] + [tree]
         for fn in scopes:
             recv = _scope_receivers(fn, in_core)
-            for node in [x for b in fn.body for x in ast.walk(b)]:
+            for node in _scope_nodes(fn):
                 if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                         and isinstance(node.func.value, ast.Name) and node.func.value.id in recv):
                     continue
@@ -627,7 +665,7 @@ def bad_rules_reads(fields: set[str]) -> list[tuple[str, int, str]]:
     bad: list[tuple[str, int, str]] = []
     for path in _reader_files():
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         for node in ast.walk(tree):
@@ -685,7 +723,7 @@ def bad_gpromo_reads(channels: set[str]) -> list[tuple[str, int, str]]:
     bad: list[tuple[str, int, str]] = []
     for path in _reader_files():
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = _parsed(path)
         except SyntaxError:
             continue
         for node in ast.walk(tree):
@@ -859,7 +897,7 @@ def shadowed_methods() -> list[tuple[str, str, str, int]]:
     defs: dict[str, str] = {}
     binds: dict[str, tuple[str, int]] = {}
     for path in sorted(CORE.glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = _parsed(path)
         rel = path.name
         for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
             for st in cls.body:
@@ -952,7 +990,7 @@ def collapsed_roster_masks() -> list[tuple[str, int, str]]:
     out: list[tuple[str, int, str]] = []
     for f in sorted(ROOT.glob("gpu/core/*.py")) + sorted(ROOT.glob("policy/*.py")):
         try:
-            tree = ast.parse(f.read_text(encoding="utf-8"))
+            tree = _parsed(f)
         except SyntaxError:
             continue
         for node in ast.walk(tree):

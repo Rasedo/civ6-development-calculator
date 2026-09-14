@@ -4721,7 +4721,7 @@ class SimEconomy:
         return self.city_worked[:, row]
 
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
-                        record: bool = False) -> torch.Tensor:
+                        record: bool = False, maint: torch.Tensor | None = None) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
         yield order (food, production, gold, science, culture, faith) for ANY
         seat row, dead columns zeroed and gold NET of cityMaintenance. n is the
@@ -5416,7 +5416,14 @@ class SimEconomy:
             for wi in range(compw.shape[2]):
                 wmm = wmm * torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)
             total = total * wmm
-        total[:, :, 2] = total[:, :, 2] - self._seat_housing(row)[0][:, sl]  # total.gold -= cityMaintenance
+        # total.gold -= cityMaintenance. `maint` is the housing body's first
+        # half handed in by a caller that needs its second half too (the
+        # city-stats snapshot): the body reads nothing the walk writes, so
+        # one derivation serves both, and the callers below still derive
+        # their own.
+        if maint is None:
+            maint = self._seat_housing(row)[0]
+        total[:, :, 2] = total[:, :, 2] - maint[:, sl]
         # Dead columns contribute nothing (their static centre yields preload).
         return torch.where(alive.unsqueeze(2), total, torch.zeros_like(total))
 
@@ -5460,8 +5467,8 @@ class SimEconomy:
         self.city_amen_tier[:, row, : self.RC] = torch.where(
             _alive_t, tier_idx.to(self.city_amen_tier.dtype),
             torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
-        total = self._seat_city_walk(row, amen_yf=yield_f, record=True)
-        housing = self._seat_housing(row)[1]
+        maint, housing = self._seat_housing(row)  # once: maintenance for the walk, housing below
+        total = self._seat_city_walk(row, amen_yf=yield_f, record=True, maint=maint)
         pop = self.city_pop[:, row, : self.RC].double()
         surplus = total[:, :, 0] - pop * self.rules.food_per_citizen
         head = housing - pop
@@ -5492,8 +5499,9 @@ class SimEconomy:
 
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(0)
-        total = self._seat_city_walk(0, amen_yf=yield_f)
-        return total.to(self.dtype), self._seat_housing(0)[1].to(self.dtype), growth_f.to(self.dtype), tier_idx
+        maint, housing = self._seat_housing(0)
+        total = self._seat_city_walk(0, amen_yf=yield_f, maint=maint)
+        return total.to(self.dtype), housing.to(self.dtype), growth_f.to(self.dtype), tier_idx
 
     def seat_score(self, row: int) -> torch.Tensor:
         """[B] — empireScore(state, seat, 'balanced') for ANY seat row, in the
