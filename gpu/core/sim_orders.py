@@ -329,7 +329,7 @@ class SimOrders:
                     # top (`EVICT_PCT_ROWS`). Per GAME, so it rides `hr`.
                     _ev = torch.full((self.B,), float(self._remove_heresy_pct),
                                      dtype=torch.long, device=self.device)
-                    for _vc, _vl, _vp in self._evict_pct_rows:
+                    for _vc, _vl, _vp in self._live_rows(row, self._evict_pct_rows):
                         _ev = _ev + self._row_is(row, _vc, _vl).long() * _vp
                     keep = (100 - _ev.clamp(max=100))[hr]
                     cs_h = _cslot[hr]
@@ -1021,7 +1021,7 @@ class SimOrders:
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
                 # improvement — the same claim a district's bomb makes
                 # (`CULTURE_BOMB_ROWS`)
-                for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
+                for _bc, _bl, _bi, _bd in self._live_rows(row, self._culture_bomb_rows):
                     if _bi < 0:
                         continue
                     _bw = did & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) == _bi) \

@@ -510,7 +510,7 @@ class SimEconomy:
         (Dynastic Cycle)'s "Eurekas and Inspirations provide 50% ... instead
         of 40%" are both the RESEARCHING seat's (`BOOST_PCT_ROWS`)."""
         frac = self.rules.boost_fraction
-        for _bc, _bl, _bt, _bp in self._boost_pct_rows:
+        for _bc, _bl, _bt, _bp in self._live_rows(row, self._boost_pct_rows):
             if bool(_bt) != (not is_civic):
                 continue
             frac = frac + self._row_is(row, _bc, _bl).to(cost.dtype).reshape(
@@ -1630,7 +1630,7 @@ class SimEconomy:
         # CIV6 (Madrasa): a UNIQUE building may arrive on a different edge of
         # the tree from the row it replaces. The override REPLACES that row's
         # own unlock for the seat it names (`BUILDING_PREREQ_ROWS`).
-        for _qc, _ql, _qb, _qt, _qv in self._building_prereq_rows:
+        for _qc, _ql, _qb, _qt, _qv in self._live_rows(row, self._building_prereq_rows):
             if _qb < 0 or (_qt < 0 and _qv < 0):
                 continue
             _qw = self._row_is(row, _qc, _ql)
@@ -1972,7 +1972,7 @@ class SimEconomy:
             return z
         inc = int(self._gov_bonus_inc[gov])
         rate = torch.full_like(z, 100)
-        for _civ, _lead, _gov, _pct in self._legacy_rate_rows:
+        for _civ, _lead, _gov, _pct in self._live_rows(row, self._legacy_rate_rows):
             if _gov == gov:
                 rate = torch.maximum(rate, torch.where(self._row_is(row, _civ, _lead),
                                                        torch.full_like(z, 100 + _pct), z))
@@ -3211,7 +3211,7 @@ class SimEconomy:
         """[B, H] long — the extra slots this row's roster rows open per holder
         (Nkisi's four Palace slots)."""
         out = torch.zeros(self.B, self.GW_H, dtype=torch.long, device=self.device)
-        for _c, _l, _h, _n in self._gw_extra_rows:
+        for _c, _l, _h, _n in self._live_rows(row, self._gw_extra_rows):
             out[:, _h] = out[:, _h] + self._row_is(row, _c, _l).long() * _n
         return out
 
@@ -3470,7 +3470,7 @@ class SimEconomy:
         obj = self.city_gw_obj[:, row]
         filled = obj >= 0
         out = torch.zeros(B, RC, self.GW_H, dtype=torch.bool, device=self.device)
-        auto_rows = [(self._row_is(row, _c, _l), int(_n), bool(_w)) for _c, _l, _n, _w in self._gw_auto_theme_rows]
+        auto_rows = [(self._row_is(row, _c, _l), int(_n), bool(_w)) for _c, _l, _n, _w in self._live_rows(row, self._gw_auto_theme_rows)]
         for h in range(self.GW_H):
             cols = (self._gw_slot_holder == h).nonzero(as_tuple=True)[0]
             if cols.numel() == 0:
@@ -3734,7 +3734,7 @@ class SimEconomy:
                 continue
             pct_o = torch.zeros(B, dtype=torch.long, device=self.device)
             pct_d = torch.zeros(B, dtype=torch.long, device=self.device)
-            for civ, lead, o_f, d_f, pct in self._route_pressure_rows:
+            for civ, lead, o_f, d_f, pct in self._live_rows(row, self._route_pressure_rows):
                 has = self._row_is(row, civ, lead).long() * pct
                 if o_f:
                     pct_o = pct_o + has
@@ -4854,7 +4854,7 @@ class SimEconomy:
         # CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
         # tile of the named terrain (`CENTER_ADJ_ROWS`) — after the floors, as
         # TS adds them beside `tileYieldsForCenter`
-        for _cc, _cl, _ct, _cy, _ca in self._center_adj_rows:
+        for _cc, _cl, _ct, _cy, _ca in self._live_rows(row, self._center_adj_rows):
             _cw = self._row_is(row, _cc, _cl)
             if bool(_cw.any()):
                 _nb = self.neigh[ctr]  # [B, n, 6]
@@ -5235,7 +5235,7 @@ class SimEconomy:
             ) * alivef
         # CIV6 (EFFECT_ADJUST_CITY_GREATWORK_YIELD): the roster's per-work rows
         # (`GREAT_WORK_YIELD_ROWS`), per work of the row's object type held here
-        for _gc, _gl, _gk, _gy, _ga in self._great_work_yield_rows:
+        for _gc, _gl, _gk, _gy, _ga in self._live_rows(row, self._great_work_yield_rows):
             _gw = self._row_is(row, _gc, _gl)
             if bool(_gw.any()):
                 bld_y[:, :, _gy] = bld_y[:, :, _gy] + _ga * _gw.double().unsqueeze(1) * _byo[:, :, _gk].double() * alivef
@@ -5314,7 +5314,7 @@ class SimEconomy:
         # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the
         # yields the row names, in cities at the row's own tier. The tier comes
         # from `_seat_amenity`, the one body that decides it.
-        _hrows = [r for r in self._happy_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        _hrows = self._live_rows(row, self._happy_yield_rows)
         if _hrows:
             _tier = self._seat_amenity(row)[0]
             if j is not None:
@@ -5327,7 +5327,7 @@ class SimEconomy:
         # CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for
         # a city with an ESTABLISHED governor, tripled in one this seat did not
         # found
-        _grows = [r for r in self._governor_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        _grows = self._live_rows(row, self._governor_yield_rows)
         if _grows:
             _est = self._governor_established(row)[:, sl] if j is None else \
                 self._governor_established(row)[:, sl][:, j:j + 1]
@@ -5338,7 +5338,7 @@ class SimEconomy:
                 total[:, :, _gy] = torch.where(_hit, total[:, :, _gy] * (1.0 + _gp / 100.0), total[:, :, _gy])
         # CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
         # "+3% ... for each Promotion they have earned, including their first"
-        _trows = [r for r in self._governor_title_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        _trows = self._live_rows(row, self._governor_title_yield_rows)
         if _trows:
             _tit = self._governor_titles(row)[:, sl] if j is None else                 self._governor_titles(row)[:, sl][:, j:j + 1]
             for _tc, _tl, _ty, _tp in _trows:
@@ -5347,7 +5347,7 @@ class SimEconomy:
                 total[:, :, _ty] = torch.where(_tw, total[:, :, _ty] * _f, total[:, :, _ty])
         # CIV6 (Righteousness of the Faith): the worship building this row
         # holds adds to the city's Science, Faith and Culture
-        _wrows = [r for r in self._worship_rows if bool(self._row_is(row, r[0], r[1]).any())]
+        _wrows = self._live_rows(row, self._worship_rows)
         if _wrows:
             _hasw = (bldg & self._b_worship.reshape(1, 1, -1)).any(dim=2)
             for _wc, _wl, _wcp, _wyp in _wrows:
@@ -5375,7 +5375,7 @@ class SimEconomy:
                     gym[:, 4] = gym[:, 4] * (1 + _cz * _suz_n.to(gym.dtype))
             # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
             # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
-            for _yc, _yl, _yy, _yp in self._yield_per_suzerain_rows:
+            for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):
                 _yw = self._row_is(row, _yc, _yl)
                 if not bool(_yw.any()):
                     continue

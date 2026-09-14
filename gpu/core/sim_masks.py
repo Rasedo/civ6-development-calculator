@@ -1013,7 +1013,7 @@ class SimMasks:
         if self._governor_xp_rows and self.n_governors and row < self.n_majors:
             _est = self._governor_established(row).gather(1, col.unsqueeze(1)).squeeze(1)
             _own = self.city_founder[:, row].gather(1, col.unsqueeze(1)).squeeze(1) == row
-            for _xc, _xl, _xp, _xf in self._governor_xp_rows:
+            for _xc, _xl, _xp, _xf in self._live_rows(row, self._governor_xp_rows):
                 _xw = self._row_is(row, _xc, _xl) & _est & (_own == bool(_xf))
                 pct = pct + _xw.long() * _xp
         return torch.where(cls >= 0, pct, torch.zeros_like(pct))
@@ -1089,7 +1089,7 @@ class SimMasks:
         "Citizens may work Mountain tiles" — a MOUNTAIN and nothing else the
         impassable plane refuses (an ice sheet stays unworkable)."""
         out = self.work_ok
-        for _wc, _wl in self._work_mountain_rows:
+        for _wc, _wl in self._live_rows(row, self._work_mountain_rows):
             _ww = self._row_is(row, _wc, _wl)
             if bool(_ww.any()):
                 out = out | (_ww.unsqueeze(1) & self.tile_mountain & (self.feat_id < 0))
@@ -1105,7 +1105,7 @@ class SimMasks:
         base = (self.civ_civics[:, row, base_i] if base_i >= 0
                 else torch.zeros(B, dtype=torch.bool, device=dev))
         out = [base, base]
-        for _fc, _fl, _ft, _fn, _fci, _fcs in self._formation_rows:
+        for _fc, _fl, _ft, _fn, _fci, _fcs in self._live_rows(row, self._formation_rows):
             if _ft != tier or _fci < 0:
                 continue
             _fw = self._row_is(row, _fc, _fl)
@@ -1122,7 +1122,7 @@ class SimMasks:
         hf = (cv[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
               else torch.zeros(self.B, dtype=torch.bool, device=self.device))
         out = self.farm_flat | (self.farm_hill & hf.unsqueeze(1))
-        for _fc, _fl, _ft, _fh, _fv in self._farm_terrain_rows:
+        for _fc, _fl, _ft, _fh, _fv in self._live_rows(row, self._farm_terrain_rows):
             _fok = self._row_is(row, _fc, _fl)
             if _fv >= 0:
                 _fok = _fok & cv[:, _fv]
@@ -1152,7 +1152,7 @@ class SimMasks:
         what this row adds to each yield a POWERED building's powered half
         pays (`POWERED_YIELD_ROWS`); None when no row is seated."""
         out = None
-        for _pc, _pl, _py, _pa in self._powered_yield_rows:
+        for _pc, _pl, _py, _pa in self._live_rows(row, self._powered_yield_rows):
             _pw = self._row_is(row, _pc, _pl)
             if not bool(_pw.any()):
                 continue
@@ -1165,7 +1165,7 @@ class SimMasks:
         """[B] double — CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the
         roster's factor over one class's per-turn points (`GPP_CLASS_ROWS`)."""
         m = torch.ones(self.B, dtype=torch.float64, device=self.device)
-        for _gc, _gl, _gk, _gp in self._gpp_class_rows:
+        for _gc, _gl, _gk, _gp in self._live_rows(row, self._gpp_class_rows):
             if _gk == cls:
                 m = m * torch.where(self._row_is(row, _gc, _gl), torch.full_like(m, 1.0 + _gp / 100.0), torch.ones_like(m))
         return m
@@ -2448,7 +2448,7 @@ class SimMasks:
         if self._spy_promo_rows and self._spy_idx >= 0:
             _ti = type_idx if isinstance(type_idx, torch.Tensor) else torch.full_like(slot, int(type_idx))
             _is_spy = (_ti[rows] if _ti.shape[0] == self.B else _ti) == self._spy_idx
-            for _sc, _sl, _sn in self._spy_promo_rows:
+            for _sc, _sl, _sn in self._live_rows(row, self._spy_promo_rows):
                 _sw = self._row_is(row, _sc, _sl)[rows] & _is_spy
                 _spy_lvl = _spy_lvl + _sw.long() * _sn
         getattr(self, f"{pre}_unit_spy_level")[rows, slot] = _spy_lvl
@@ -3946,7 +3946,7 @@ class SimMasks:
         # it until now.
         if self._levy_rows:
             _lpct = 0
-            for _lc, _ll, _ld, _le, _lm, _lcs in self._levy_rows:
+            for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
                 if bool(self._row_is(row, _lc, _ll).any()):
                     _lpct = max(_lpct, _ld)
             if _lpct > 0:

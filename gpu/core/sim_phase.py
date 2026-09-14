@@ -150,7 +150,7 @@ class SimPhase:
         # settle your first city" — the only yield a CITY-LESS seat makes, so
         # it banks here, above the economy block both engines skip; it
         # completes with the turn the first city gives the seat.
-        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):
             if not (_cy[3] or _cy[4]):
                 continue
             _nc = self.civ_alive[:, row] & ~active & self._row_is(row, _cc, _cl)
@@ -388,7 +388,7 @@ class SimPhase:
         # CIV6 (Grand Vizier): "Gain ... a Governor Title when the Gunpowder
         # technology is researched" — RunOnce, and a title is DERIVED on both
         # engines, so the HELD tech is what makes it permanent
-        for _tc, _tl, _tt, _ta in self._governor_title_grant_rows:
+        for _tc, _tl, _tt, _ta in self._live_rows(row, self._governor_title_grant_rows):
             if _tt < 0:
                 continue
             out = out + (self.civ_techs[:, row, _tt] & self._row_is(row, _tc, _tl)).long() * _ta
@@ -488,7 +488,7 @@ class SimPhase:
         does a city whose loyalty collapses under this row's pull join it at
         once? The RECEIVER's roster row (`skipsFreeCityStep`)."""
         out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        for _c, _l in self._skip_free_city_rows:
+        for _c, _l in self._live_rows(row, self._skip_free_city_rows):
             out = out | self._row_is(row, _c, _l)
         return out
 
@@ -677,7 +677,7 @@ class SimPhase:
         # at THIS call's city column — `cur` is [B], one city per call, so a
         # full-width read would broadcast against the wrong axis
         _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._prod_mult_rows:
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._live_rows(row, self._prod_mult_rows):
             if _rp >= 0 or _ru >= 0 or _rev == 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
@@ -761,7 +761,7 @@ class SimPhase:
             _pd_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _pz = self.city_dist_tile[bidx, row, col, self._govplaza_didx]
             _pz_ok = (_pz >= 0) & self.district_complete[bidx, _pz.clamp(min=0)]
-            for _zc, _zl, _zp in self._plaza_district_prod_rows:
+            for _zc, _zl, _zp in self._live_rows(row, self._plaza_district_prod_rows):
                 _zw = self._row_is(row, _zc, _zl)[bidx]
                 _emall = torch.where(_pd_i & _pz_ok & _zw, _emall * (1.0 + _zp / 100.0), _emall)
         # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
@@ -771,7 +771,7 @@ class SimPhase:
             _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
         # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         # a promotion class, ONE unit type (EFFECT_ADJUST_UNIT_PRODUCTION), or every unit
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._prod_mult_rows:
+        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._live_rows(row, self._prod_mult_rows):
             if _rp < 0 and _ru < 0 and _rev != 2:
                 continue
             _who = self._row_is(row, _rc, _rl)
@@ -802,7 +802,7 @@ class SimPhase:
         # CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         # toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         # BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
-        for _fc, _fl, _fs, _fe, _fp in self._wonder_era_prod_rows:
+        for _fc, _fl, _fs, _fe, _fp in self._live_rows(row, self._wonder_era_prod_rows):
             _fw = self._row_is(row, _fc, _fl)
             if not bool(_fw.any()) or _fs < 0 or _fe < 0:
                 continue
@@ -828,7 +828,7 @@ class SimPhase:
             #  answers 0 or 1 as a LONG, not a bool
             _hcross = ((_hat >= 0) & (_hctr >= 0)
                        & (self._river_cross(_hctr.clamp(min=0), _hat.clamp(min=0)) != 0))
-            for _rc, _rl, _rk, _rp in self._river_cross_prod_rows:
+            for _rc, _rl, _rk, _rp in self._live_rows(row, self._river_cross_prod_rows):
                 _rw = self._row_is(row, _rc, _rl)[bidx]
                 _kind = _hd if _rk == 1 else (_hb & (_hbd >= 0))
                 _emall = torch.where(_hcross & _kind & _rw, _emall * (1.0 + _rp / 100.0), _emall)
@@ -974,7 +974,7 @@ class SimPhase:
             # CIV6 (TRAIT_EXTRASAKAHORSEARCHER): a row may name ONE chassis
             # instead of a class — the Saka Horse Archer is ranged, so the
             # light-cavalry row above never reaches it.
-            for _ec, _el, _ecls, _en, _eu in self._extra_unit_copy_rows:
+            for _ec, _el, _ecls, _en, _eu in self._live_rows(row, self._extra_unit_copy_rows):
                 if _eu >= 0:
                     _hit = ui == _eu
                 elif _ecls == 0:  # COPY_CLASSES[0] = LIGHT_CAVALRY
@@ -988,7 +988,7 @@ class SimPhase:
                     self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
             # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
             # a citizen, in a city this seat founded.
-            for _pc, _pl, _pu, _pa, _pf in self._unit_pop_cost_rows:
+            for _pc, _pl, _pu, _pa, _pf in self._live_rows(row, self._unit_pop_cost_rows):
                 if _pu < 0:
                     continue
                 _pw = made_u & (ui == _pu) & self._row_is(row, _pc, _pl)
@@ -1277,7 +1277,7 @@ class SimPhase:
             self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
         # CIV6 (Religious Convert): "Receives an Apostle each time he
         # finishes a ... Theater Square district" (`DISTRICT_UNIT_ROWS`)
-        for _dc, _dl, _dd, _du in self._district_unit_rows:
+        for _dc, _dl, _dd, _du in self._live_rows(row, self._district_unit_rows):
             if _du < 0 or _dd < 0:
                 continue
             _dw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1335,7 +1335,7 @@ class SimPhase:
         # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
         # completing a Harbor" — the roster's own carrier, a FULL bomb
         # like the Congress's (`CULTURE_BOMB_ROWS`)
-        for _bc, _bl, _bi, _bd in self._culture_bomb_rows:
+        for _bc, _bl, _bi, _bd in self._live_rows(row, self._culture_bomb_rows):
             if _bd < 0:
                 continue
             _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
@@ -1540,7 +1540,7 @@ class SimPhase:
         _f_all = faith_sum.clone()
         # CIV6 (The Last Prophet): "+1 Science for each foreign city following
         # Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
-        for _fc, _fl, _fy, _fa, _fp in self._foreign_follower_yield_rows:
+        for _fc, _fl, _fy, _fa, _fp in self._live_rows(row, self._foreign_follower_yield_rows):
             _fw = self._row_is(row, _fc, _fl)
             if not bool(_fw.any()):
                 continue
@@ -1586,7 +1586,7 @@ class SimPhase:
         # they have met that has founded a Religion and is not currently at
         # war". Acquaintance between MAJORS is not modelled on either engine —
         # every one is known — so "met" is every live major.
-        for _pc, _pl, _pa in self._peaceful_founder_rows:
+        for _pc, _pl, _pa in self._live_rows(row, self._peaceful_founder_rows):
             _pw = self._row_is(row, _pc, _pl)
             if not bool(_pw.any()):
                 continue
@@ -1624,7 +1624,7 @@ class SimPhase:
             self._eff_version += 1
             # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
             # technology, in the capital (`GRANT_UNIT_ROWS`)
-            for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
+            for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
                 if _gt < 0 or _gu < 0:
                     continue
                 _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl) & (self.civ_cap_tile[:, row] >= 0)
@@ -1831,7 +1831,7 @@ class SimPhase:
                 # CIV6 (Nobel Prize, EFFECT_ADJUST_GREAT_PERSON_POINTS): the
                 # roster's own per-BUILDING points, in the same per-city term
                 nb_r = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
-                for _gc, _gl, _gb, _gcls, _ga in self._gpp_building_rows:
+                for _gc, _gl, _gb, _gcls, _ga in self._live_rows(row, self._gpp_building_rows):
                     if _gcls != cls or _gb < 0:
                         continue
                     nb_r = nb_r + (self.city_bldg[:, row, :, _gb]
@@ -1870,7 +1870,7 @@ class SimPhase:
             # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_GREAT_PERSON): the roster's
             # happiness rows (`HAPPY_GPP_ROWS`) — a FLAT add per city at the
             # named tier holding the named district, after every factor
-            for _hc, _hl, _ht, _hcls, _hd, _ha in self._happy_gpp_rows:
+            for _hc, _hl, _ht, _hcls, _hd, _ha in self._live_rows(row, self._happy_gpp_rows):
                 if _hcls != cls:
                     continue
                 _hw = self._row_is(row, _hc, _hl)
@@ -1967,7 +1967,7 @@ class SimPhase:
         another seat claimed down to its last member is caught the turn after —
         both engines read it at the same point in the seat loop
         (`grantGuaranteedGreatPeople`, `GP_GUARANTEE_ROWS`)."""
-        for _gc, _gl, _cls in self._gp_guarantee_rows:
+        for _gc, _gl, _cls in self._live_rows(row, self._gp_guarantee_rows):
             if _cls < 0 or _cls >= self._gp_nc:
                 continue
             who = active & self._row_is(row, _gc, _gl)
@@ -2024,7 +2024,7 @@ class SimPhase:
         # CIV6 (Magnanimous): "After recruiting or patronizing a Great Person,
         # 20% of its Great Person point cost is refunded" — read the price
         # BEFORE the offer is retired below (`GP_REFUND_ROWS`)
-        for _rc, _rl, _rp in self._gp_refund_rows:
+        for _rc, _rl, _rp in self._live_rows(row, self._gp_refund_rows):
             _rw = hit & self._row_is(row, _rc, _rl)
             if not bool(_rw.any()):
                 continue
@@ -2041,7 +2041,7 @@ class SimPhase:
         self.gp_passed_by[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_passed_by[:, cls])
         # CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great
         # Person" — every class, patronage included (`GP_FAVOR_ROWS`)
-        for _fc, _fl, _fa in self._gp_favor_rows:
+        for _fc, _fl, _fa in self._live_rows(row, self._gp_favor_rows):
             _fw = hit & self._row_is(row, _fc, _fl)
             self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + _fw.to(self.civ_diplo_favor.dtype) * _fa
         self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned

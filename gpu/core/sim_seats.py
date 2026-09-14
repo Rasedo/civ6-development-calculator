@@ -624,7 +624,7 @@ class SimSeats:
             return
         # CIV6 (Faces of Peace): "Cannot declare war on City-States" — a minor
         # takes no war KIND, so the ban reads as a formal one (`WAR_BAN_ROWS`)
-        for _bc, _bl, _bw in self._war_ban_rows:
+        for _bc, _bl, _bw in self._live_rows(row, self._war_ban_rows):
             if _bw == 2:
                 declare = declare & ~self._row_is(row, _bc, _bl)
         if not bool(declare.any()):
@@ -687,7 +687,7 @@ class SimSeats:
         per-game [B] mask — `warBuffRowsOf`: (kind, combat, moves, prod %,
         override civic, who)."""
         out = []
-        for _c, _l, _k, _cs, _mv, _pp, _ov in self._war_buff_rows:
+        for _c, _l, _k, _cs, _mv, _pp, _ov in self._live_rows(row, self._war_buff_rows):
             who = self._row_is(row, _c, _l)
             if bool(who.any()):
                 out.append((_k, _cs, _mv, _pp, _ov, who))
@@ -1362,6 +1362,40 @@ class SimSeats:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self.row_leader[:, row] == leader
 
+    def _live_rows(self, row: int, table: list) -> list:
+        """the rows of `table` (a roster-row list whose first two fields are
+        civ, leader) that SOME game in the batch plays at seat row `row`, in
+        `table`'s own order — memoised per (row, table), under a stamp of the
+        two roster planes.
+
+        A caller may swap `table` for this list ONLY where the loop body is a
+        no-op for a row no game plays: every effect gated on the row's own
+        `_row_is(row, ...)` mask, by an early `continue`, a `torch.where`, or
+        an `&`. Every `.any()` a converted loop used to pay per row, per call,
+        per turn is then paid once per roster.
+
+        THE STAMP is the roster planes' own in-place write counters, NOT
+        `_gen_ver`: `row_civ` / `row_leader` are map generation, written by the
+        fixture loader and never by the engine, and the one thing that rewrites
+        them — a test re-seating a row — writes them in place, which moves
+        `Tensor._version` (a host-side int: reading it syncs nothing).
+        `_gen_ver` counts UNIT generations, bumping on every unit born, killed,
+        captured or converted, so keying the memo on it would rebuild every
+        table many times a turn and cost more than the loops it replaces.
+        `restore()` clears the dict too, for a base whose planes are swapped
+        for clones wholesale (the poke lanes' `_STATIC` restore)."""
+        rc, rl = self.row_civ, self.row_leader
+        stamp = (id(rc), rc._version, id(rl), rl._version)
+        if self._live_rows_stamp != stamp:
+            self._live_rows_stamp = stamp
+            self._live_rows_cache.clear()
+        key = (row, id(table))
+        hit = self._live_rows_cache.get(key)
+        if hit is None:
+            hit = [r for r in table if bool(self._row_is(row, r[0], r[1]).any())]
+            self._live_rows_cache[key] = hit
+        return hit
+
     # the wire's ban index space, `SEAT_BANS` in cpu/data/civilizations.ts
     BAN_HARVEST, BAN_GREAT_WRITER, BAN_HOLY_SITE, BAN_GREAT_PROPHET, BAN_FOUND_RELIGION = range(5)
 
@@ -1409,7 +1443,7 @@ class SimSeats:
         it did NOT found. The ONE reader, so the amenity and the loyalty
         cannot drift apart on which cities count (`NOT_FOUNDED_ROWS`)."""
         out = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
-        rows = [r for r in self._not_founded_rows if r[2] == channel]
+        rows = [r for r in self._live_rows(row, self._not_founded_rows) if r[2] == channel]
         if not rows:
             return out
         not_ours = self.city_founder[:, row] != row
@@ -1427,7 +1461,7 @@ class SimSeats:
         base = (self.civ_techs[:, row, utech] if utech >= 0
                 else (self.civ_civics[:, row, uciv] if uciv >= 0
                       else torch.ones(self.B, dtype=torch.bool, device=self.device)))
-        for _pc, _pl, _pd, _pt, _pv in self._district_prereq_rows:
+        for _pc, _pl, _pd, _pt, _pv in self._live_rows(row, self._district_prereq_rows):
             if _pd != di or (_pt < 0 and _pv < 0):
                 continue
             _w = self._row_is(row, _pc, _pl)
@@ -1524,7 +1558,7 @@ class SimSeats:
         ask it, so a roster row cannot reach one and miss the other."""
         cap = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
                + self._gp_city_perm(row, "districtLimit")[:, j].long())
-        for _dc, _dl, _da in self._extra_district_rows:
+        for _dc, _dl, _da in self._live_rows(row, self._extra_district_rows):
             cap = cap + self._row_is(row, _dc, _dl).long() * _da
         return cap
 
@@ -1533,7 +1567,7 @@ class SimSeats:
         CIV6 (Righteousness of the Faith): the row pays `costPct` of it
         (`buildingFaithCost`)."""
         out = torch.full((self.B,), float(self._worship_cost), dtype=torch.float64, device=self.device)
-        for _wc, _wl, _wcp, _wyp in self._worship_rows:
+        for _wc, _wl, _wcp, _wyp in self._live_rows(row, self._worship_rows):
             _w = self._row_is(row, _wc, _wl)
             out = torch.where(_w, torch.full_like(out, float(round(self._worship_cost * _wcp / 100.0))), out)
         return out
@@ -1541,7 +1575,7 @@ class SimSeats:
     def _row_banned(self, row: int, ban: int) -> torch.Tensor:
         """[B] bool — this seat row may not do `ban` (`SEAT_BAN_ROWS`)."""
         out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        for civ, lead, which in self._seat_ban_rows:
+        for civ, lead, which in self._live_rows(row, self._seat_ban_rows):
             if which == ban:
                 out = out | self._row_is(row, civ, lead)
         return out
@@ -1793,7 +1827,7 @@ class SimSeats:
         tpm = self._gov_mods(row)[6].double()
         # CIV6 (EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN): the roster's terrain rows (`TILE_COST_ROWS`)
         _tpct = torch.zeros_like(tpm)
-        for _tc, _tl, _tt, _tp in self._tile_cost_rows:
+        for _tc, _tl, _tt, _tp in self._live_rows(row, self._tile_cost_rows):
             _tpct = _tpct + (self._row_is(row, _tc, _tl) & (self.terrain.gather(1, tgt.unsqueeze(1)).squeeze(1) == _tt)).double() * _tp
         return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_tiles_purchased[:, row].double()) * tpm * (1.0 + _tpct / 100.0))
 
@@ -1931,7 +1965,7 @@ class SimSeats:
         if self._suz_c_faith_bldg >= 0:
             v_cls = ((self._b_req_district == -1) | (self._b_req_district == self._encamp_didx)) & not_worship
             out = out | (self._suz_effect(row, self._suz_c_faith_bldg).unsqueeze(1) & v_cls.reshape(1, -1))
-        for _fc, _fl, _fd in self._faith_purchase_district_rows:
+        for _fc, _fl, _fd in self._live_rows(row, self._faith_purchase_district_rows):
             if _fd < 0:
                 continue
             d_cls = (self._b_req_district == _fd) & not_worship
@@ -3809,7 +3843,7 @@ class SimSeats:
             wid = (cur[:, j] - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
             isw = (cur[:, j] >= self.WONDER_BASE) & (cur[:, j] < self.WONDER_BASE + nw)
             band = torch.zeros(B, dtype=torch.bool, device=self.device)
-            for _c, _l, _s, _e, _p in self._wonder_charge_rows:
+            for _c, _l, _s, _e, _p in self._live_rows(row, self._wonder_charge_rows):
                 if _s < 0 or _e < 0 or _p <= 0:
                     continue
                 band = band | (self._row_is(row, _c, _l)
@@ -3835,7 +3869,7 @@ class SimSeats:
         cur = self._q_head(row)[rows, cols]
         wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
         isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw)
-        for _c, _l, _s, _e, _p in self._wonder_charge_rows:
+        for _c, _l, _s, _e, _p in self._live_rows(row, self._wonder_charge_rows):
             if _s < 0 or _e < 0 or _p <= 0:
                 continue
             hit = (self._row_is(row, _c, _l)[rows] & isw
@@ -5282,7 +5316,7 @@ class SimSeats:
                 # successfully completing an Emergency" — as a MEMBER of it
                 # (`EMERGENCY_FAVOR_ROWS`)
                 _pay = torch.full_like(zero_f, float(self._emg_member_favor))
-                for _ec, _el, _ep in self._emergency_favor_rows:
+                for _ec, _el, _ep in self._live_rows(row, self._emergency_favor_rows):
                     _ew = self._row_is(row, _ec, _el)
                     _pay = torch.where(_ew, torch.floor(_pay * (100 + _ep) / 100.0), _pay)
                 self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(
@@ -5509,7 +5543,7 @@ class SimSeats:
         out = out + self._not_founded_sum(row, 1)[bidx, col]
         # CIV6 (Radio Oranje): "+2 Loyalty per turn in the ORIGIN city of a
         # domestic Trade Route" — once per such route out of this city
-        for _dc, _dl, _da in self._domestic_route_loyalty_rows:
+        for _dc, _dl, _da in self._live_rows(row, self._domestic_route_loyalty_rows):
             _dw = self._row_is(row, _dc, _dl)
             if not bool(_dw.any()):
                 continue
@@ -5526,7 +5560,7 @@ class SimSeats:
             gslot = self.military_at.gather(1, ctr.unsqueeze(1)).squeeze(1)
             gar = (gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)
             form = self.unit_formation[bidx, gslot.clamp(min=0)] > 0
-            for _lc, _ll, _la, _lf in self._garrison_loyalty_rows:
+            for _lc, _ll, _la, _lf in self._live_rows(row, self._garrison_loyalty_rows):
                 _lw = self._row_is(row, _lc, _ll)[bidx]
                 hit = _lw & gar & (form if _lf else torch.ones_like(gar))
                 out = out + hit.double() * _la
@@ -5872,7 +5906,7 @@ class SimSeats:
             return
         t_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
         c_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for _c, _l, _t, _v in self._wonder_era_boost_rows:
+        for _c, _l, _t, _v in self._live_rows(row, self._wonder_era_boost_rows):
             w = self._row_is(row, _c, _l).long()
             t_n = t_n + w * int(_t)
             c_n = c_n + w * int(_v)
@@ -5885,7 +5919,7 @@ class SimSeats:
         the answer must stay [B]: collapsing it with `.any()` paid every
         game in the batch for one game's France."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for _c, _l, _p in self._wonder_tourism_rows:
+        for _c, _l, _p in self._live_rows(row, self._wonder_tourism_rows):
             out = out + self._row_is(row, _c, _l).long() * int(_p)
         return out
 
@@ -6972,7 +7006,7 @@ class SimSeats:
         `followerReligionsForCity` + `withFollowerBelief` are the twin.
         """
         one = self._fol_tab(key, self._follower_id_for(self._city_rel(row)[:, sl]))
-        rows = self._all_follower_belief_rows
+        rows = self._live_rows(row, self._all_follower_belief_rows)
         if not rows:
             return one
         on = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -7290,7 +7324,7 @@ class SimSeats:
             if out is None:
                 out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
             out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
-        for _tc, _tl, _ti, _ty, _ta in self._terrain_adj_yield_rows:
+        for _tc, _tl, _ti, _ty, _ta in self._live_rows(row, self._terrain_adj_yield_rows):
             _tw = self._row_is(row, _tc, _tl)
             if not bool(_tw.any()):
                 continue
@@ -7531,10 +7565,9 @@ class SimSeats:
         # unpaid the turn her last outgoing route expired — TS pays it
         # regardless (seed 9001 t90, the whole of that hunt).
         _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").any())
-                      or any(bool(self._row_is(row, r[0], r[1]).any())
-                             for r in self._incoming_route_yield_rows)
-                      or any(r[5] == 1 and bool(self._row_is(row, r[0], r[1]).any())
-                             for r in self._route_improvement_rows))
+                      or bool(self._live_rows(row, self._incoming_route_yield_rows))
+                      or any(r[5] == 1
+                             for r in self._live_rows(row, self._route_improvement_rows)))
         if not bool(act.any()) and not _dest_rows:
             self._seat_route_cache = (key, None)
             return None
@@ -7572,7 +7605,7 @@ class SimSeats:
             _octr_d = self.city_center[:, row].gather(1, from_j)
             _dctr_d = self.city_center[:, row].gather(1, dest_j)
             _across_d = self._route_intercontinental(_octr_d, _dctr_d)
-            for _rc, _rl, _ry, _ra, _rx_d in self._domestic_route_rows:
+            for _rc, _rl, _ry, _ra, _rx_d in self._live_rows(row, self._domestic_route_rows):
                 _who = self._row_is(row, _rc, _rl)
                 if not bool(_who.any()):
                     continue
@@ -7583,7 +7616,7 @@ class SimSeats:
         # CIV6 (Qhapaq Ñan,
         # EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
         # ORIGIN city's own mountains pay on every domestic leg
-        for _tc, _tl, _ty, _ta in self._route_terrain_rows:
+        for _tc, _tl, _ty, _ta in self._live_rows(row, self._route_terrain_rows):
             _tw = self._row_is(row, _tc, _tl)
             if bool(_tw.any()):
                 _mtn = self._city_terrain_count(row, self.tile_mountain).gather(1, from_j).double()
@@ -7591,7 +7624,7 @@ class SimSeats:
         # CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
         # the ORIGIN side): this row's route out, per named improvement at its
         # destination city (`ROUTE_IMPROVEMENT_ROWS`) — the domestic leg
-        for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+        for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(row, self._route_improvement_rows):
             if _is != 0:
                 continue
             _iw = self._row_is(row, _ic, _il)
@@ -7741,7 +7774,7 @@ class SimSeats:
             # than replacing it (`addRouteRows`).
             _octr_i = self.city_center[:, row].gather(1, from_j)  # [B, K]
             _across_i = self._route_intercontinental(_octr_i, _dctr)
-            for _rc, _rl, _ry, _ra, _rx_i in self._intl_route_rows:
+            for _rc, _rl, _ry, _ra, _rx_i in self._live_rows(row, self._intl_route_rows):
                 _who = self._row_is(row, _rc, _rl)
                 if not bool(_who.any()):
                     continue
@@ -7752,7 +7785,7 @@ class SimSeats:
             # CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold
             # for every flat Desert tile in the ORIGIN city" — the international
             # twin of the domestic per-terrain rows (`INTL_ROUTE_TERRAIN_ROWS`)
-            for _tc, _tl, _tt, _tflat, _ty, _ta in self._intl_route_terrain_rows:
+            for _tc, _tl, _tt, _tflat, _ty, _ta in self._live_rows(row, self._intl_route_terrain_rows):
                 _tw = self._row_is(row, _tc, _tl)
                 if not bool(_tw.any()) or _tt < 0:
                     continue
@@ -7766,7 +7799,7 @@ class SimSeats:
             # CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
             # Routes to civilizations that are MORE ADVANCED than Russia. +1 per
             # 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
-            for _pc, _pl, _pper in self._progress_trade_rows:
+            for _pc, _pl, _pper in self._live_rows(row, self._progress_trade_rows):
                 _pw = self._row_is(row, _pc, _pl)
                 if not bool(_pw.any()) or _pper <= 0:
                     continue
@@ -7783,7 +7816,7 @@ class SimSeats:
                 inc.scatter_add_(1, from_j * 6 + 4,
                                  torch.div(_ah_c, _pper, rounding_mode="floor").double() * _ok.double())
             # the ORIGIN side of the improvement rows on the international leg
-            for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+            for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(row, self._route_improvement_rows):
                 if _is != 0:
                     continue
                 _iw = self._row_is(row, _ic, _il)
@@ -7912,7 +7945,7 @@ class SimSeats:
         # civilization sends to this one" — the same FOREIGN count Cleopatra's
         # Gold reads (`INCOMING_ROUTE_YIELD_ROWS`)
         if self._incoming_route_yield_rows:
-            _ir = [r for r in self._incoming_route_yield_rows if bool(self._row_is(row, r[0], r[1]).any())]
+            _ir = self._live_rows(row, self._incoming_route_yield_rows)
             if _ir:
                 _icid = self.city_id[:, row, :cols]
                 _icnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
@@ -7942,7 +7975,7 @@ class SimSeats:
                 _in_for = _in_for + _hit2.sum(dim=1).double()
             _in_all = (_in_dom + _in_for) * alive.double()
             _addr = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
-            for _ic, _il, _ii, _iy, _ia, _is in self._route_improvement_rows:
+            for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(row, self._route_improvement_rows):
                 if _is != 1:
                     continue
                 _iw = self._row_is(row, _ic, _il)
@@ -8048,14 +8081,14 @@ class SimSeats:
         out[:, 1] = out[:, 1] + self._gp_perm(row, "policySlotEconomic").long()
         # CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): the roster's own
         # slot (`POLICY_SLOT_ROWS`) — Plato's Republic, the Holy Roman Emperor
-        for _pc, _pl, _pk, _pa in self._policy_slot_rows:
+        for _pc, _pl, _pk, _pa in self._live_rows(row, self._policy_slot_rows):
             out[:, _pk] = out[:, _pk] + self._row_is(row, _pc, _pl).long() * _pa
         # CIV6 (Founding Fathers): "All Diplomatic policy slots in the current
         # government are converted to Wildcard slots" — the install's
         # `ReplacesAll`, so the whole kind moves, in whatever government is
         # adopted (`SLOT_CONVERT_ROWS`). A conversion is a MOVE, which this
         # delta record can say: the kind leaves and the other arrives.
-        for _cc, _cl, _cf, _ct in self._slot_convert_rows:
+        for _cc, _cl, _cf, _ct in self._live_rows(row, self._slot_convert_rows):
             _cw = self._row_is(row, _cc, _cl) & _has
             if not bool(_cw.any()):
                 continue
@@ -8075,7 +8108,7 @@ class SimSeats:
             return out
         gov, has = self._adopted_gov(self._seat_civics(row))
         extra = self._wonder_extra_slots(row)
-        for _fc, _fl, _fk, _fa in self._slot_favor_rows:
+        for _fc, _fl, _fk, _fa in self._live_rows(row, self._slot_favor_rows):
             _fw = self._row_is(row, _fc, _fl) & has
             _held = (self._gov_slots[gov][:, _fk] + (0 if extra is None else extra[:, _fk])).clamp(min=0)
             out = out + torch.where(_fw, _held * _fa, torch.zeros_like(out))
@@ -8380,7 +8413,7 @@ class SimSeats:
                     per = per + self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_mine
                 # CIV6 (EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE):
                 # the roster's flat add for this resource (`STOCKPILE_RATE_ROWS`)
-                for _sc, _sl, _sr, _st, _sa, _sp in self._stockpile_rate_rows:
+                for _sc, _sl, _sr, _st, _sa, _sp in self._live_rows(row, self._stockpile_rate_rows):
                     if _sr == rid and _sa:
                         per = per + self._row_is(row, _sc, _sl).long() * _sa
                 pt = here.long() * per.unsqueeze(1)  # [B, T] — each accruing tile's own rate
@@ -8392,7 +8425,7 @@ class SimSeats:
                 # CIV6 (EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): the roster's
                 # percentage on the named terrain, floored per tile as TS does
                 pct = torch.zeros_like(pt)
-                for _sc, _sl, _sr, _st, _sa, _sp in self._stockpile_rate_rows:
+                for _sc, _sl, _sr, _st, _sa, _sp in self._live_rows(row, self._stockpile_rate_rows):
                     if _st >= 0 and _sp:
                         pct = pct + (self._row_is(row, _sc, _sl).unsqueeze(1) & (self.terrain == _st)).long() * _sp
                 bank[:, k] += ((pt * (100 + pct)) // 100).sum(dim=1)
@@ -8474,7 +8507,7 @@ class SimSeats:
         cap = self._stock_cap_base + self._stock_cap_per_enc * n
         # CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's
         # per-building rows (`STOCKPILE_CAP_ROWS`), every standing copy
-        for _kc, _kl, _kb, _ka in self._stockpile_cap_rows:
+        for _kc, _kl, _kb, _ka in self._live_rows(row, self._stockpile_cap_rows):
             _kw = self._row_is(row, _kc, _kl)
             if bool(_kw.any()):
                 _kn = (self.city_bldg[:, row, :cols, _kb] & self.city_alive[:, row, :cols]).sum(dim=1)
@@ -8659,7 +8692,7 @@ class SimSeats:
         housing = water + torch.einsum("bjn,bn->bj", selb_h.double(), self._b_cols(row)["housing"])
         housing = housing + self._palace_housing * is_cap_a
         # CIV6 (Kupe's Voyage): "The Palace receives +3 Housing" (`CAPITAL_ROWS`)
-        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):
             if _ch:
                 housing = housing + _ch * self._row_is(row, _cc, _cl).to(housing.dtype).reshape(-1, *([1] * (housing.dim() - 1))) * is_cap_a
         # THE DISTRICT'S OWN HOUSING (the Dam's +3). A type a city may hold
@@ -8787,7 +8820,7 @@ class SimSeats:
             have = have + ((_held[:, :, _lbi] & _lw.unsqueeze(1)).double()
                            * self._city_improved_res_kinds(row, 3).double() * _lamt)
         # CIV6 (Kupe's Voyage): "The Palace receives ... +1 Amenity"
-        for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+        for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):
             if _ca:
                 have = have + _ca * self._row_is(row, _cc, _cl).double().unsqueeze(1) * is_cap.double()
         # CIV6 (Entertainment Complex, Water Park): "+1 Amenity from
@@ -8842,7 +8875,7 @@ class SimSeats:
         have = have + self._not_founded_sum(row, 0)[:, :cols]
         # CIV6 (Dharma): "Cities gain an Amenity for every Religion with at
         # least 1 Follower" (`RELIGION_AMENITY_ROWS`)
-        for _rc, _rl, _rf, _ra in self._religion_amenity_rows:
+        for _rc, _rl, _rf, _ra in self._live_rows(row, self._religion_amenity_rows):
             _rw = self._row_is(row, _rc, _rl)
             if not bool(_rw.any()):
                 continue
@@ -9586,7 +9619,7 @@ class SimSeats:
         # CIV6 (Mother Russia): "Extra territory upon founding cities" — the
         # SECOND ring, `amount` of it, in ascending TILE INDEX so both engines
         # claim the same ground (`CITY_TILES_ROWS`)
-        for _tc, _tl, _tn in self._city_tiles_rows:
+        for _tc, _tl, _tn in self._live_rows(row, self._city_tiles_rows):
             _tw = self._row_is(row, _tc, _tl)[rows]
             if _tn <= 0 or not bool(_tw.any()):
                 continue
@@ -9607,7 +9640,7 @@ class SimSeats:
         # grant ROW, spawned by `_found_city_grants` once the settler is gone)
         if self._capital_rows:
             _first = self.city_alive[rows, row].sum(dim=1) == 1
-            for _cc, _cl, _cpop, _ch, _ca, _cy in self._capital_rows:
+            for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
@@ -9703,7 +9736,7 @@ class SimSeats:
         # landmass IS the home one.
         _foreign = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         _foreign[rows] = ~self._on_home_continent(row, tile.clamp(min=0))[rows]
-        for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._grant_unit_rows:
+        for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
             _when = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             if _gf:
                 _when[rows] = _first
@@ -10044,7 +10077,7 @@ class SimSeats:
         +1 build charge" needs."""
         z = torch.zeros(self.B, dtype=torch.long, device=self.device)
         # CIV6 (EFFECT_ADJUST_UNIT_BUILD_CHARGES): the roster's per-type rows (`UNIT_CHARGE_ROWS`)
-        for _uc, _ul, _uu, _ua in self._unit_charge_rows:
+        for _uc, _ul, _uu, _ua in self._live_rows(row, self._unit_charge_rows):
             z = z + (self._row_is(row, _uc, _ul) & (type_idx == _uu)).long() * _ua
         if self._gov_has_effects and self._builder_idx >= 0:
             z = z + (type_idx == self._builder_idx).long() * self._gov_mods(row)[12]["bcharge"].long()
@@ -12723,7 +12756,7 @@ class SimSeats:
         earn 1 Diplomatic Favor per turn", off the rate stored this turn
         (`tourismFavorOf`, `TOURISM_FAVOR_ROWS`)."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for _tc, _tl, _tper, _tfav in self._tourism_favor_rows:
+        for _tc, _tl, _tper, _tfav in self._live_rows(row, self._tourism_favor_rows):
             _tw = self._row_is(row, _tc, _tl)
             _n = torch.div(self.civ_tour_rate[:, row], max(1, _tper), rounding_mode="floor")
             out = out + torch.where(_tw, _n * _tfav, torch.zeros_like(out))
@@ -12734,7 +12767,7 @@ class SimSeats:
         enter a Golden Age", cumulative, so it reads the seat's own count of
         them (`GOLDEN_ROUTE_CAPACITY_ROWS`)."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for _gc, _gl, _ga in self._golden_route_capacity_rows:
+        for _gc, _gl, _ga in self._live_rows(row, self._golden_route_capacity_rows):
             out = out + self._row_is(row, _gc, _gl).long() * _ga * self.golden_ages[:, row]
         return out
 
@@ -12747,7 +12780,7 @@ class SimSeats:
         if not self._route_cap_rows:
             return cap
         alive = self.city_alive[:, row]
-        for _c, _l, _amt, _tech, _capn, _plaza, _tier, _pfc in self._route_cap_rows:
+        for _c, _l, _amt, _tech, _capn, _plaza, _tier, _pfc in self._live_rows(row, self._route_cap_rows):
             who = self._row_is(row, _c, _l)
             if _tech >= 0:
                 who = who & self.civ_techs[:, row, _tech]
@@ -12792,7 +12825,7 @@ class SimSeats:
         if not self._trade_gain_tile_rows or not bool(moved.any()):
             return
         rad = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for _rc, _rl, _rr in self._trade_gain_tile_rows:
+        for _rc, _rl, _rr in self._live_rows(row, self._trade_gain_tile_rows):
             rad = torch.maximum(rad, self._row_is(row, _rc, _rl).long() * _rr)
         if not bool((rad > 0).any()):
             return
@@ -13115,7 +13148,7 @@ class SimSeats:
         # CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading
         # Post in the destination city" — the post an ordinary route only
         # plants when it COMPLETES (`IMMEDIATE_POST_ROWS`)
-        for _mc, _ml in self._immediate_post_rows:
+        for _mc, _ml in self._live_rows(row, self._immediate_post_rows):
             _mw = self._row_is(row, _mc, _ml)[rows]
             if bool(_mw.any()):
                 _mr = rows[_mw]
@@ -13352,7 +13385,7 @@ class SimSeats:
                 _across3 = self._route_intercontinental(
                     _octr3.unsqueeze(2).expand(B, RC, D),
                     dctr.unsqueeze(1).expand(B, RC, D))
-                for _rc, _rl, _ry, _ra, _rx3 in self._intl_route_rows:
+                for _rc, _rl, _ry, _ra, _rx3 in self._live_rows(row, self._intl_route_rows):
                     _who = self._row_is(row, _rc, _rl)
                     if not bool(_who.any()):
                         continue

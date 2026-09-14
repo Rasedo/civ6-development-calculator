@@ -2868,6 +2868,11 @@ class SimInit:
         # per-row merged column tables, built lazily. `row_civ` comes off the
         # fixture and is never written again, so a row's table cannot go stale.
         self._bvar_col_cache: dict[int, dict[str, torch.Tensor]] = {}
+        # `_live_rows`: the roster rows some game plays at a seat row, keyed
+        # (row, id(table)) under a stamp of the two roster planes' in-place
+        # write counters — see sim_seats.py for why the stamp is NOT `_gen_ver`.
+        self._live_rows_cache: dict[tuple[int, int], list] = {}
+        self._live_rows_stamp: tuple = ()
         # the CLAUSES, each keyed (building idx, civ idx)
         self._bvar_feature_y = {(bi, c): torch.tensor([float(x) for x in v["featureTileY"]], dtype=dtype, device=device)
                                 for bi, c, v in self._bvar_cols if any(float(x) for x in v["featureTileY"])}
@@ -3961,6 +3966,8 @@ class SimInit:
         # would otherwise serve the previous civilization's merged building
         # columns (ten poke lanes cleared it by hand before this line existed)
         self._bvar_col_cache = {}
+        self._live_rows_cache = {}
+        self._live_rows_stamp = ()
         self._bel_version += 1
         self._gen_ver += 1
         self._rp_kill_version += 1
