@@ -56,13 +56,34 @@ IMPS = RULES["improvements"]["ids"]
 ONE = torch.tensor([0], dtype=torch.long)
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load, the trio's seating and a settle. `_STATIC` names
+# the planes these scenes write that `snapshot`/`restore` does not carry, all
+# map-generation catalog rather than `_MUTABLE`: `row_civ` / `row_leader`,
+# which `play` and `row_of` re-seat in nearly every scene; `tile_river`, which
+# the Iteru district scene wets when the fixture offers no river plot; and
+# `floodplain`, which the flood scene stamps. No scene holds two of these
+# engines live at once — `sim2`..`sim4` are read one after another, and the
+# only thing asked of an earlier one is a catalog scalar.
+_STATIC = ("row_civ", "row_leader", "tile_river", "floodplain")
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
     """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
     capitals settle, so the founding clauses land as the old fixtures had them."""
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    key = str(path)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        sim = settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    return sim
 
 
 def civ(sim, name: str) -> int:

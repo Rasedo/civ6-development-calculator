@@ -45,6 +45,26 @@ def plant(sim, row: int, col: int, wi: int) -> int:
     return tile
 
 
+# THE WARMED BASE, ONE PER FIXTURE. Every block below used to build an engine
+# of its own — a fixture load and a settle apiece — where a `restore` costs
+# milliseconds. Everything the blocks write (`city_wonder`, `built_wonder`,
+# `built_wonder_complete`, the district registry, `improvement` / `pillaged`,
+# `civ_techs` / `civ_civics` / `civ_tech_boosted`, `civ_gpp`, the city queue
+# and the merged unit pool) is `_MUTABLE` and rides the snapshot, and no block
+# reads an earlier block's engine once the next one is asked for.
+_BASE: dict = {}
+
+
+def build(rules, path):
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    return sim
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -90,7 +110,7 @@ def main() -> None:
     assert rows[oracle]["distGpp"] == 2, "the Oracle pays its districts +2"
     print(f"  catalog OK — {len(rows)} rows, {len(gpp_rows)} pay GP points, {len(tiley_rows)} key on terrain")
 
-    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    sim = build(rules, paths[0])
     ncls = sim._wond_gpp.shape[1]
 
     # --- 2) per-turn Great Person points reach the seat ---------------------
@@ -109,7 +129,7 @@ def main() -> None:
     print("  GP points OK — the owner collects, a neighbour does not")
 
     # --- 3) housing and amenities land on the HOLDING city ------------------
-    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s3 = build(rules, paths[0])
     h0 = s3._seat_housing(0)[1][0, 0].item()
     gbath = _find(rows, lambda r: r["cityHousing"] == 3 and r["cityAmenities"] == 1, "the Great Bath")
     plant(s3, 0, 0, gbath)
@@ -122,7 +142,7 @@ def main() -> None:
     print("  housing/amenities OK — paid to the holding city, not to its siblings")
 
     # --- 4) policy slots, by KIND ------------------------------------------
-    s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s4 = build(rules, paths[0])
     assert int(s4._wonder_extra_slots(0).sum()) == 0, "no wonder, no extra slot"
     plant(s4, 0, 0, alhambra)
     xs = s4._wonder_extra_slots(0)
@@ -133,7 +153,7 @@ def main() -> None:
     print("  policy slots OK — military and economic, counted per kind")
 
     # --- 5) occupation defence, and its fortification floor -----------------
-    s5 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s5 = build(rules, paths[0])
     assert s5._occupy_def() is None or int(s5._occupy_def().sum()) == 0, "no wonder stands, so no tile defends"
     wt = plant(s5, 0, 0, montsm)
     occ = s5._occupy_def()
@@ -149,7 +169,7 @@ def main() -> None:
     print("  occupation defence OK — complete only, through the tdef reader")
 
     # --- 6) Mont St. Michel hands every Apostle the MARTYR promotion --------
-    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s6 = build(rules, paths[0])
     _rd = s6.rules_dev
     _cls = int(_rd.u_promo_class[s6._apostle_idx])
     _mcol = int((_rd.promo_kind[_cls] == s6._pk["MARTYR"]).any(dim=1).long().argmax())
@@ -169,7 +189,7 @@ def main() -> None:
     print("  martyr OK — the wonder writes the promotion at purchase")
 
     # --- 7) the loyalty aura clamps a city in range -------------------------
-    s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s7 = build(rules, paths[0])
     here = s7.city_center[:, 0, 0].clamp(min=0)
     assert not bool(s7._wonder_loyalty_aura(0, here)[0]), "no wonder, no aura"
     plant(s7, 0, 0, liberty)
@@ -181,7 +201,7 @@ def main() -> None:
     print("  loyalty aura OK — its own city in, a distant centre out")
 
     # --- 8) the wonder charges ride EVERY spawn path ------------------------
-    s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s8 = build(rules, paths[0])
     ti_b = torch.full((s8.B,), s8._builder_idx, dtype=torch.long)
     assert int(s8._extra_charges(0, ti_b)[0]) == 0, "no wonder, no extra charge"
     plant(s8, 0, 0, pyramids)
@@ -202,7 +222,7 @@ def main() -> None:
     print("  charges OK — builder, spread and Great Engineer, per owner, at creation")
 
     # --- 9) free research completes the FIRST available rows ----------------
-    s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s9 = build(rules, paths[0])
     t_before = int(s9.civ_techs[0, 0].sum())
     c_before = int(s9.civ_civics[0, 0].sum())
     two = torch.full((s9.B,), 2, dtype=torch.long)
@@ -216,7 +236,7 @@ def main() -> None:
     print("  free research OK — techs and civics, first available, owner only")
 
     # --- 10) the tourism multipliers ---------------------------------------
-    s10 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s10 = build(rules, paths[0])
     assert float(s10._seat_wonder_mult(0, s10._wond_resorttour)[0]) == 1.0, "no wonder, no multiplier"
     plant(s10, 0, 0, cristo)
     assert float(s10._seat_wonder_mult(0, s10._wond_resorttour)[0]) == 2.0, "Cristo Redentor doubles resort tourism"
@@ -227,7 +247,7 @@ def main() -> None:
     print("  tourism multipliers OK — the resort one is the seat's, the relic one its city's")
 
     # --- 11) the terrain-keyed tile yields are read off the LIVE feature ----
-    s11 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s11 = build(rules, paths[0])
     assert s11._wond_tiley, "the tile-yield rules must survive the export"
     emp = [r for r in s11._wond_tiley if r[4]]
     assert emp, "Etemenanki's Marsh rule is empire-wide"
@@ -237,7 +257,7 @@ def main() -> None:
     print(f"  tile yields OK — {len(s11._wond_tiley)} rules, {len(emp)} empire-wide")
 
     # --- 12) the whole thing still steps ------------------------------------
-    s12 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s12 = build(rules, paths[0])
     for wi in (alhambra, montsm, artemis, taj, oxford, bolshoi, apadana, arsenal):
         plant(s12, 0, 0, wi)
     for _ in range(6):
@@ -246,7 +266,7 @@ def main() -> None:
     print("  step OK — eight wonders standing, six turns clean")
 
     # --- 13) Ruhr Valley: +1 production per Mine and Quarry the CITY owns ---
-    s13 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s13 = build(rules, paths[0])
     ctr13 = int(s13.city_center[0, 0, 0])
     mine_i, quarry_i = s13._mine_iidx, s13._quarry_iidx
     own = [int(t) for t in (s13.city_slot_at(0)[0] == 0).nonzero(as_tuple=True)[0].tolist()
@@ -269,7 +289,7 @@ def main() -> None:
     print("  Ruhr Valley OK — a Mine and a Quarry the city owns, pillage and ownership gated")
 
     # --- 14) the Oracle: every district in ITS city, +2 of its own type -----
-    s14 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s14 = build(rules, paths[0])
     cls14 = next(c for c in range(s14._gp_nc) if int(s14._gp_class_district[c]) >= 0)
     d14 = int(s14._gp_class_district[cls14])
     ctr14 = int(s14.city_center[0, 0, 0])
@@ -292,7 +312,7 @@ def main() -> None:
     print("  Oracle OK — its own city's district pays +2 of its class")
 
     # --- 15) the Great Library boosts every Ancient/Classical technology ----
-    s15 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s15 = build(rules, paths[0])
     nt15 = min(s15.civ_tech_boosted.shape[2], s15._tech_era.numel())
     early = (s15._tech_era[:nt15] <= 1)
     s15.civ_tech_boosted[:, 0, :nt15] = False

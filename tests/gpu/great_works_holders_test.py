@@ -40,14 +40,30 @@ def place(sim, row: int, col: int, obj: int, maker: int = -1, era: int = -1, sea
     return int(((sim.city_gw_obj[0, row, col] >= 0) & (before < 0)).nonzero()[0])
 
 
+# THE WARMED BASE, ONE PER (fixture, roster, Palace). A scene pays a `restore`
+# — milliseconds — instead of a fixture load, the roster's seating and a
+# settle. The roster planes `row_civ` / `row_leader` are map-generation catalog
+# rather than `_MUTABLE`, so the names a scene asks for are part of the KEY and
+# no scene ever re-seats them; everything the scenes themselves write
+# (`city_bldg`, `city_wonder`, `built_wonder_complete`, `city_bldg_pillaged`,
+# the `city_gw_*` slots) is `_MUTABLE` and rides the snapshot. No scene holds
+# two of these engines live at once.
+_BASE: dict = {}
+
+
 def fresh(rules, path, names=("ROME", "EGYPT", "NORWAY"), keep_palace=False):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(names):
-        play(sim, r, name)
-    sim = settle_all(sim)
-    if not keep_palace:
-        sim.city_is_cap[:, :, :] = False
-    clear_works(sim)
+    key = (str(path), tuple(names), bool(keep_palace))
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(names):
+            play(sim, r, name)
+        sim = settle_all(sim)
+        if not keep_palace:
+            sim.city_is_cap[:, :, :] = False
+        clear_works(sim)
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 

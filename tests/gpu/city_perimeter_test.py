@@ -34,10 +34,23 @@ from core.simbase import HIT_MELEE, HIT_RANGED, HIT_BOMBARD, ASSIST_RAM, ASSIST_
 from warmup import settle_all
 
 
+# THE WARMED BASE, ONE PER (fixture, turns). A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps. Every plane
+# the bodies below write (the city pools, the merged unit pool, the occupancy
+# planes, `civ_techs`, `unit_next`) is in `_MUTABLE`, so `restore` carries all
+# of it back; no scene here holds two of these sims live at once.
+_BASE: dict = {}
+
+
 def build(rules, path, turns: int = 8):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+    key = (str(path), turns)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 

@@ -46,10 +46,24 @@ UNI = [u["id"] for u in RJ["units"]]
 PRO = RJ["promotions"]
 
 
+# THE WARMED BASE, ONE PER (fixture, turns). A poke pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps. Everything
+# the bodies below write (the merged unit pool, the four occupancy planes,
+# `unit_escorted`, `unit_promos`, `civ_techs`, `seat_explored`, `seat_ext`) is
+# in `_MUTABLE`, so `restore` carries it all back; no poke holds two of these
+# sims live at once.
+_BASE: dict = {}
+
+
 def fresh(rules, path, turns=6):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+    key = (str(path), turns)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 

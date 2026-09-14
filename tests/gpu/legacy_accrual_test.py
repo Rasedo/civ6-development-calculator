@@ -45,9 +45,28 @@ TYPES = ["wonderConstruction", "combatExperience", "greatPeople", "envoys",
          "overallProduction", "districtProjects"]
 
 
-def build(path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], load_rules(),
-                               device="cpu", dtype=torch.float64))
+# THE WARMED BASE, ONE PER FIXTURE SET. A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. `_STATIC` names the
+# roster planes the scenes below write that `snapshot`/`restore` does not carry
+# (`row_civ` and `row_leader` are map-generation catalog, not `_MUTABLE`), so
+# the helper puts those back by hand as well. No scene holds two of these
+# engines live at once — the two-game scene asks for its own fixture set, which
+# is a key of its own.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
+def build(*paths) -> BatchSim:
+    key = tuple(str(p) for p in paths)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(p) for p in paths], load_rules(),
+                                  device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    return sim
 
 
 def gov_index(rules, gid: str) -> int:
@@ -161,9 +180,7 @@ def test_america_halves_the_interval(rules, path) -> None:
 def test_the_rate_is_per_game(rules, path) -> None:
     """A [B] roster mask reduced with `.any()` would pay EVERY game for what
     one game seats — the collapsed-roster-mask class. Two games, one carrier."""
-    sim = settle_all(BatchSim([load_fixture(fixture_paths()[0]),
-                               load_fixture(fixture_paths()[1])],
-                              load_rules(), device="cpu", dtype=torch.float64))
+    sim = build(fixture_paths()[0], fixture_paths()[1])
     auto = gov_index(rules, "AUTOCRACY")
     civ = sim._legacy_rate_rows[0][0]
     sim.row_civ[0, ROW] = civ
