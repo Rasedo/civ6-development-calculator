@@ -29,10 +29,32 @@ B0 = 0
 ROW = 0
 
 
-def build(rules, path) -> BatchSim:
+# THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. `_STATIC` names the
+# roster plane these pokes write that `snapshot`/`restore` does not carry
+# (`row_civ` is not in `_MUTABLE`), so the helper puts it back by hand.
+# `slot` keys a SECOND base because `unowned_at` is a closure over the FIRST
+# sim and scenes 3 and 4 call it while their own sim is live — the tile it
+# answers must still be read off a map that carries scene 1's claim.
+_STATIC = ("row_civ",)
+_BASE: dict = {}
+
+
+def build(rules, path, slot: int = 0) -> BatchSim:
     """Every seat's capital FOUNDED — a t0 fixture seats settlers, and
     founding is an ORDER, so a bare step raises no city."""
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    key = (str(path), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def main() -> int:
@@ -82,7 +104,7 @@ def main() -> int:
     print(f"  2 range OK — tile {far} at distance {radius + 2} was left alone")
 
     # 3 — an OWNED tile never changes hands
-    sim2 = build(rules, paths[0])
+    sim2 = build(rules, paths[0], slot=1)
     if civ >= 0:
         sim2.row_civ[B0, ROW] = civ
     sim2._eff_version += 1
@@ -93,7 +115,7 @@ def main() -> int:
     print("  3 ownership OK — a held tile is never taken")
 
     # 4 — a row that is NOT the Cree claims nothing
-    sim3 = build(rules, paths[0])
+    sim3 = build(rules, paths[0], slot=1)
     other = next((c for c in range(int(sim3.row_civ.max()) + 1) if c != civ), -1)
     if other >= 0:
         sim3.row_civ[B0, ROW] = other

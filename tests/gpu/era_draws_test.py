@@ -31,8 +31,28 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
 from core.simbase import BARB_SEAT  # noqa: E402
 
 
+# THE BASE, ONE PER (fixture, batch width). A scene pays a `restore` —
+# milliseconds — instead of `b` fixture loads and a construction. `_STATIC`
+# names the one plane these pokes write that `snapshot`/`restore` does not
+# carry (`citystate_suz_code` is not in `_MUTABLE` and is no alias), so the
+# helper puts it back by hand; `citystate_alive` is a view of `city_alive`,
+# which is, and `sim.turn` is carried by the snapshot itself.
+_STATIC = ("citystate_suz_code",)
+_BASE: dict = {}
+
+
 def build(rules, path, b: int = 3):
-    return BatchSim([load_fixture(path) for _ in range(b)], rules, device="cpu", dtype=torch.float64)
+    key = (str(path), b)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path) for _ in range(b)], rules, device="cpu", dtype=torch.float64)
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def test_nth_open(rules, path) -> None:

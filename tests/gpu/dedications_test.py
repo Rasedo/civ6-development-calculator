@@ -24,12 +24,26 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all, works_of, clear_works
 
 
+# THE WARMED BASE, ONE PER FIXTURE SET. A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and three stepped turns.
+# Every plane these pokes write is in `_MUTABLE`, so a restore is the whole
+# reset; the first sim's reads are all done before the second is built.
+_BASE: dict = {}
+
+
 def build():
-    rules = load_rules()
-    sim = settle_all(BatchSim([load_fixture(p) for p in fixture_paths()[:1]],
-                              rules, device="cpu", dtype=torch.float64))
-    for _ in range(3):
-        sim.step()
+    paths = fixture_paths()[:1]
+    key = tuple(str(p) for p in paths)
+    if key not in _BASE:
+        rules = load_rules()
+        sim = settle_all(BatchSim([load_fixture(p) for p in paths],
+                                  rules, device="cpu", dtype=torch.float64))
+        for _ in range(3):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
     return sim
 
 

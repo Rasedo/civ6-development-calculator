@@ -42,12 +42,30 @@ MINOR_LADDER = ("ANCIENT_WALLS", "MEDIEVAL_WALLS", "RENAISSANCE_WALLS", "LIBRARY
                 "MARKET", "WORKSHOP", "BARRACKS", "STABLE", "SHRINE")
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load, a settle and the stepped turns. `_STATIC` names
+# the one plane these pokes write that `snapshot`/`restore` does not carry
+# (`citystate_type` is not in `_MUTABLE` and is no alias), so the helper puts
+# it back by hand.
+_STATIC = ("citystate_type",)
+_BASE: dict = {}
+
+
 def fresh(rules, path):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(3):
-        sim.step()
-    if int(sim.turn) % 12 == 0:  # keep the population tick out of the clock scene
-        sim.step()
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(3):
+            sim.step()
+        if int(sim.turn) % 12 == 0:  # keep the population tick out of the clock scene
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._bldg_version += 1
     return sim
 
 

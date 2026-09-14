@@ -48,15 +48,35 @@ def play(sim, row: int, name):
     sim._bldg_version += 1
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_STATIC` names the roster planes
+# `play` writes that `snapshot`/`restore` does not carry (they are not in
+# `_MUTABLE`), so the helper puts them back by hand — the base is already
+# seated ROME/EGYPT/NORWAY — and re-bumps exactly the versions `play` bumps.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
 def fresh(rules, path):
     """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
     capitals settle, so the founding clauses land as the old fixtures had them."""
     from core import BatchSim, load_fixture
     from warmup import settle_all
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    key = str(path)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        sim = settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def stand(sim, row, ty, tile):

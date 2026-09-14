@@ -32,9 +32,30 @@ ROW = 1
 PLAIN = {2: 3, 5: 2, 1: 1}   # yield column -> the published plain amount: gold, faith, production
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_STATIC` names the planes these
+# pokes write that `snapshot`/`restore` does not carry (they are not in
+# `_MUTABLE`): the roster pair `_seat` re-seats and the landmass id the
+# continent pokes rewrite. The helper puts them back by hand and re-bumps
+# exactly the versions a re-seating bumps.
+_STATIC = ("row_civ", "row_leader", "tile_continent")
+_BASE: dict = {}
+
+
 def build(path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], load_rules(),
-                               device="cpu", dtype=torch.float64))
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], load_rules(),
+                                  device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def _two_continent_fixture():

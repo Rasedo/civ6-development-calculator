@@ -37,9 +37,25 @@ RULES = json.loads((Path(__file__).resolve().parent.parent.parent
 FEATS = [f for f in RULES["improvements"]["featNatural"]]
 
 
-def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+# THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. Every plane these
+# pokes write (`feat_id`, `feat_stripped`, `improvement`, `mine_ok`) is in
+# `_MUTABLE`, so a restore is the whole reset. `slot` keys a SECOND base for
+# the one sim that stays live across the others: step 6 reads `sim2`'s planted
+# tile after steps 4, 5 and 5b have built theirs.
+_BASE: dict = {}
+
+
+def fresh(rules, path, slot: int = 0) -> BatchSim:
+    key = (str(path), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
+                                  dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def one_at(sim, tile: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -90,7 +106,7 @@ def main() -> None:
 
     # 3 — the arrival's catalog yields join the production plane
     prod_cat = float(RULES["improvements"]["featCatalogY"][woods][1])
-    sim2 = fresh(rules, path)
+    sim2 = fresh(rules, path, slot=1)
     t2 = bare_land(sim2)
     p_before = float(sim2._neutral_prod()[B0, t2]) + float(sim2._feat_add_y()[B0, t2, 1])
     att, tt = one_at(sim2, t2)

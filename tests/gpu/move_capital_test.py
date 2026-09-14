@@ -44,11 +44,37 @@ def play(sim, row: int, name) -> None:
     sim._bldg_version += 1
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_STATIC` names the roster planes
+# `play` writes and `_ATTRS` the project seat table scene 2 appends to; neither
+# is in `_MUTABLE`, so the helper puts both back by hand — the base is already
+# seated PHOENICIA/EGYPT/NORWAY — and re-bumps exactly the versions `play`
+# bumps.
+_STATIC = ("row_civ", "row_leader")
+_ATTRS = ("_proj_seat_rows",)
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("PHOENICIA", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    key = str(path)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("PHOENICIA", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        sim = settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot(),
+                      {k: getattr(sim, k).clone() for k in _STATIC},
+                      {k: list(getattr(sim, k)) for k in _ATTRS})
+    sim, snap, stat, attrs = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    for k, v in attrs.items():
+        setattr(sim, k, list(v))
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def test_wire(rules, path) -> None:

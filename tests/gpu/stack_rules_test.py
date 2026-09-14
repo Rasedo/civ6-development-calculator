@@ -28,14 +28,28 @@ from core.engine import BARB_SEAT
 from warmup import settle_all
 
 
+# THE WARMED BASE, ONE PER (fixture set, stepped turns). A scene pays a
+# `restore` — milliseconds — instead of a fixture load, a settle and the
+# stepped turns. Every plane these pokes write is in `_MUTABLE` or a range
+# view of one, so a restore is the whole reset.
+_BASE: dict = {}
+
+
 def build(turns: int = 10):
-    rules = load_rules()
-    sim = settle_all(BatchSim(
-        [load_fixture(p) for p in fixture_paths()[:1]],
-        rules, device="cpu", dtype=torch.float64,
-    ))
-    for _ in range(turns):
-        sim.step()
+    paths = fixture_paths()[:1]
+    key = (tuple(str(p) for p in paths), turns)
+    if key not in _BASE:
+        rules = load_rules()
+        sim = settle_all(BatchSim(
+            [load_fixture(p) for p in paths],
+            rules, device="cpu", dtype=torch.float64,
+        ))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
     return sim
 
 

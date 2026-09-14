@@ -32,9 +32,22 @@ B0 = 0
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. Every plane these pokes write is in
+# `_MUTABLE`, so a restore is the whole reset.
+_BASE: dict = {}
+
+
 def build(path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], load_rules(),
-                               device="cpu", dtype=torch.float64))
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], load_rules(),
+                                  device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def test_the_plane_is_the_fixture(rules, path) -> None:

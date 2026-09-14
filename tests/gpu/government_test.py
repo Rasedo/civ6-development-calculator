@@ -22,6 +22,38 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from warmup import settle_all
 
 
+# THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. `_CAT` names the
+# government catalog tensors scene 11/12 overwrite and `_ATTRS` the two master
+# switches scenes 1, 5 and 11 replace; neither is in `_MUTABLE`, so the helper
+# puts both back by hand and bumps the catalog version the rows are keyed on.
+# `slot` keys a SECOND base for the one sim that stays live across the others:
+# `sim` forces both switches on and is still read at steps 6, 9 and 10, after
+# `sim2` has forced one of them off, so it cannot share an object with them.
+_CAT = ("_gov_ucs_by_type", "_gov_dc_house", "_gov_dc_amen")
+_ATTRS = ("_gov_live", "_gov_has_effects")
+_BASE: dict = {}
+
+
+def build(rules, path, slot: int = 0) -> BatchSim:
+    key = (str(path), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(),
+                      {k: getattr(sim, k).clone() for k in _CAT},
+                      {k: getattr(sim, k) for k in _ATTRS})
+    sim, snap, cat, attrs = _BASE[key]
+    sim.restore(snap)
+    for k, v in cat.items():
+        getattr(sim, k).copy_(v)
+    for k, v in attrs.items():
+        setattr(sim, k, v)
+    sim._gov_cat_version += 1
+    sim._eff_version += 1
+    sim._bldg_version += 1
+    return sim
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
@@ -36,7 +68,7 @@ def main() -> None:
 
     paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    sim = build(rules, paths[0], slot=0)
 
     # Force the master switch on in-memory so the pokes are export-independent.
     sim._gov_live = True
@@ -139,7 +171,7 @@ def main() -> None:
 
     # 5) The master switch ships LIVE — a real sim computes the mods; forcing
     #    the switch off in-memory silences them.
-    sim2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    sim2 = build(rules, paths[0], slot=1)
     assert sim2._gov_live is True, "governments ship LIVE (rules.governmentsLive True)"
     sim2._gov_has_effects = False  # force-off in memory
     cy, cpy, ch, cym, _s2, _e2, _tp2, *_ = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
@@ -191,7 +223,7 @@ def main() -> None:
     #    below. ONE detector serves every row, so the lane also proves a CIV
     #    row reads its OWN slotted-policy count.
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
-    simp = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    simp = build(rules, paths[0], slot=1)
     simp.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
     simp._slot_greedily(0)  # the store is the truth now; a hand-set scene fills it with the greedy reference
     _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civ_civics[:, 0])
@@ -199,7 +231,7 @@ def main() -> None:
     simp.civ_civic_boosted[:, 0] = False
     simp._detect_seat_boosts(0, torch.ones(simp.B, dtype=torch.bool))
     assert bool(simp.civ_civic_boosted[0, 0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
-    simn = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    simn = build(rules, paths[0], slot=1)
     simn.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS"]))
     _, _, _, _, sln, *_ = simn._gov_policy_mods(simn.civ_civics[:, 0])
     assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
@@ -209,7 +241,7 @@ def main() -> None:
     # ...and the same row on a CIV seat: the policies condition is keyed on
     # that seat's own civics, not on seat 0's.
     if simp.n_majors > 1:
-        simr = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+        simr = build(rules, paths[0], slot=1)
         simr.civ_civics[:, 1].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
         simr._slot_greedily(1)
         simr.civ_civic_boosted[:, 1:] = False
@@ -261,7 +293,7 @@ def main() -> None:
     # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;
     #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto
     #     the adopted slot proves the promotion-class mask arms.
-    simc = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    simc = build(rules, paths[0], slot=1)
     simc._gov_live = True
     simc._gov_has_effects = True
     simc.civ_civics[:, 0].copy_(cF)

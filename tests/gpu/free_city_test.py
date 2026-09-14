@@ -59,13 +59,40 @@ def lead(sim, row: int, civ: str, leader: str) -> None:
     sim._eff_version += 1
 
 
+# THE WARMED BASE, ONE PER (fixture, Eleanor). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. `_STATIC` names the
+# roster planes these pokes write that `snapshot`/`restore` does not carry
+# (they are not in `_MUTABLE`), and `_ATTRS` the plain scalars a scene
+# replaces outright; the helper puts both back by hand and re-bumps exactly
+# the versions `play` bumps, because the seating it restores is a seating
+# like any other.
+_STATIC = ("row_civ", "row_leader")
+_ATTRS = ("_free_city_loyalty",)
+_BASE: dict = {}
+
+
 def fresh(rules, path, eleanor: bool = False) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    if eleanor:
-        lead(sim, 1, "ENGLAND", "ELEANOR_ENGLAND")
-    return settle_all(sim)
+    key = (str(path), eleanor)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        if eleanor:
+            lead(sim, 1, "ENGLAND", "ELEANOR_ENGLAND")
+        sim = settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot(),
+                      {k: getattr(sim, k).clone() for k in _STATIC},
+                      {k: getattr(sim, k) for k in _ATTRS})
+    sim, snap, stat, attrs = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    for k, v in attrs.items():
+        setattr(sim, k, v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def revolt(sim, row: int = 0):

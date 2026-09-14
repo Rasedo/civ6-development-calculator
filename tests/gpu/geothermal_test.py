@@ -44,9 +44,26 @@ PLANT = 17           # IMPROVEMENT_IDS
 BOATS = 18
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_ATTRS` names the district catalog
+# list scene 3 rewrites a row of; it is a plain Python list, not a `_MUTABLE`
+# plane, so the helper hands back a fresh copy of the loaded one.
+_ATTRS = ("_d_amen_adj",)
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
+                                  dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: list(getattr(sim, k)) for k in _ATTRS})
+    sim, snap, attrs = _BASE[key]
+    sim.restore(snap)
+    for k, v in attrs.items():
+        setattr(sim, k, list(v))
+    sim._bldg_version += 1
+    return sim
 
 
 def neigh_count(sim, on: torch.Tensor) -> torch.Tensor:
