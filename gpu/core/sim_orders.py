@@ -31,6 +31,17 @@ class SimOrders:
         # touching the sim. Liveness is NOT folded in — a unit can die to an
         # earlier rank's retaliation, so `present` below still reads it fresh.
         _n = min(smap.shape[1], actions.shape[1], simbase.UNIT_SLOTS)
+        # ...and the rank loop BREAKS at the first rank no game holds, so cut
+        # `_n` to that break point before the tables are built. The loop then
+        # walks exactly the ranks it walked before, in the same order, but the
+        # ONE `.tolist()` sync below is a 36 x _n block rather than 36 x 256 —
+        # a few hundred Python objects a call on a seat fielding twenty units
+        # instead of nine thousand.
+        _gap = (~(smap[:, :_n] >= 0).any(dim=0)).nonzero()
+        if _gap.numel():
+            _n = int(_gap[0, 0])
+        if _n == 0:
+            return   # nothing before the loop writes state: the call is a no-op
         _held = smap[:, :_n] >= 0
         _cmd = _held & (actions[:, :_n] >= 0) & (actions[:, :_n] != 12) & ctl.unsqueeze(1)
         # Which ARMS can fire at each rank, decided from the action block alone
@@ -78,6 +89,12 @@ class SimOrders:
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
+        # `_row_ocean_open` is a pure read of this seat's TECH row, and the move
+        # arm asked it once per rank. Memoised on the row itself — cloned,
+        # `torch.equal` on the way in — rather than hoisted outright, so a tech
+        # arriving mid-call still rebuilds it.
+        _cart_fp = torch.zeros(0, dtype=torch.bool, device=dev)
+        _cart = _cart_fp
         _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
         if getattr(self, "_A_REPAIR", -1) >= 0:
             _ic.append(self._A_REPAIR)
@@ -637,34 +654,39 @@ class SimOrders:
                     tgt.unsqueeze(1), row, is_naval=is_nav,
                     is_civilian=is_civ, is_support=self._type_support[utp.clamp(min=0)],
                 ).squeeze(1)
-                terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
-                _canal = self._canal_pass().gather(1, tc.unsqueeze(1)).squeeze(1)
-                cart = self._row_ocean_open(row)
-                _wet = self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
-                _hull = (_wet & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | cart)) | _canal
+                _tc1 = tc.unsqueeze(1)
+                _pass = self.passable.gather(1, _tc1).squeeze(1)
+                terr = _pass
+                _canal = self._canal_pass().gather(1, _tc1).squeeze(1)
+                if not torch.equal(_cart_fp, techs):
+                    _cart_fp, _cart = techs.clone(), self._row_ocean_open(row)
+                cart = _cart
+                _wet = self.wpass.gather(1, _tc1).squeeze(1)
+                # ONE enterable-water plane for both readers: a HULL floats
+                # over it and through a Canal's passage, and an embarked LAND
+                # unit takes the same water without the passage. It used to be
+                # gathered and re-ANDed twice.
+                _water = _wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart)
+                _hull = _water | _canal
                 if self._embark_live:
                     ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
                             else torch.zeros(B, dtype=torch.bool, device=dev))
-                    water = _wet & (
-                        ~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | cart
-                    )
                     any_war = self.war[:, row].any(dim=1)
-                    terr = torch.where(is_nav, _hull, terr | (water & ship & ~is_nav & any_war))
+                    terr = torch.where(is_nav, _hull, terr | (_water & ship & ~is_nav & any_war))
                 else:
                     terr = torch.where(is_nav, _hull, terr)
                 _wlk = self.unit_water_walk[ut]
                 if bool(_wlk.any()):
-                    terr = torch.where(
-                        _wlk, self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) | _wet, terr)
+                    terr = torch.where(_wlk, _pass | _wet, terr)
                 # CIV6 (Enhanced Mobility): the robot "can perform a Jump action
                 # to cross over mountain terrain".
                 _jmp = (ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves)
                 if bool(_jmp.any()):
-                    terr = terr | (_jmp & self.tile_mountain.gather(1, tc.unsqueeze(1)).squeeze(1))
+                    terr = terr | (_jmp & self.tile_mountain.gather(1, _tc1).squeeze(1))
                 # CIV6 (Mountain Tunnel): a tunnelled mountain is ENTERABLE
                 # by anything — `tunnelAt`'s twin, on the jump's own site
                 if self.TUNNEL >= 0:
-                    terr = terr | (self.improvement.gather(1, tc.unsqueeze(1)).squeeze(1) == self.TUNNEL)
+                    terr = terr | (self.improvement.gather(1, _tc1).squeeze(1) == self.TUNNEL)
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
                 clf = self._cliff_block_dirs(
                     hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
@@ -888,6 +910,17 @@ class SimOrders:
                         self._occ_clear(dr, hc[dr], sc[dr])
 
             if _rk_imp[n] and self.improvements_on and self._builder_idx >= 0:
+                # WHICH improvement columns any game actually COMMANDED at this
+                # rank. Every row below is `base & (a == _col) & <the row's own
+                # ground plane>`, so a column nobody asked for is all-False
+                # whatever that plane answers — and the plane is the expensive
+                # half (`_uniq_improvement_ok`, `_suz_improvement_ok`,
+                # `_imp_ground_ok`, `_imp_gov_ok`, one [B, T] build each). One
+                # rank carries at most B distinct actions, so this ONE sync
+                # skips the ground plane of every one of the twenty-odd rows
+                # nobody wants. The rank table upstairs decides whether the
+                # FAMILY fires; this decides which of its rows do.
+                _acmd = set(a[act].unique().tolist())
                 mining = (techs[:, self._mine_unlock_tech] if self._mine_unlock_tech >= 0
                           else torch.zeros(B, dtype=torch.bool, device=dev))
                 constr = (techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0
@@ -928,6 +961,8 @@ class SimOrders:
                     _col = self._A_IMP[_k] if _k < len(self._A_IMP) else -1
                     if _col < 0:
                         continue
+                    if _col not in _acmd:
+                        continue   # `(a == _col)` is empty: the row cannot fire
                     if _k == self.TUNNEL:
                         continue   # its target is not `hc` — its own block below
                     if _k == self.FARM:
@@ -996,7 +1031,8 @@ class SimOrders:
                 # LOWEST-index adjacent bare mountain, `tunnelTarget`'s twin
                 # and a MODEL choice recorded in docs/AUDIT.md (the action space carries
                 # no target).
-                if self.TUNNEL >= 0 and self.TUNNEL < len(self._A_IMP) and self._A_IMP[self.TUNNEL] >= 0:
+                if (self.TUNNEL >= 0 and self.TUNNEL < len(self._A_IMP)
+                        and self._A_IMP[self.TUNNEL] in _acmd):
                     _tcol = self._A_IMP[self.TUNNEL]
                     _tnb = self.neigh[hc]                                   # [B, 6]
                     _tnc = _tnb.clamp(min=0)
@@ -1021,7 +1057,12 @@ class SimOrders:
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
                 # improvement — the same claim a district's bomb makes
                 # (`CULTURE_BOMB_ROWS`)
-                for _bc, _bl, _bi, _bd in self._live_rows(row, self._culture_bomb_rows):
+                # ONE `did` sync for the bomb walk and the charge below: every
+                # row's `_bw` is `did & ...`, so nothing was laid means no row
+                # can fire, and `_culture_bomb` writes tiles, never `did`.
+                _did_any = bool(did.any())
+                for _bc, _bl, _bi, _bd in (self._live_rows(row, self._culture_bomb_rows)
+                                           if _did_any else ()):
                     if _bi < 0:
                         continue
                     _bw = did & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) == _bi) \
@@ -1033,18 +1074,21 @@ class SimOrders:
                     _live = _bcol >= 0
                     if bool(_live.any()):
                         self._culture_bomb(row, _br[_live], hc[_br][_live], _bcol[_live])
-                if bool(did.any()):
+                if _did_any:
                     _r = did.nonzero(as_tuple=True)[0]
                     self._eff_version += 1
                     self._spend_build_charge(_r, sc, hc)
                 # REPAIR (`builderRepair`): improvement first, else district;
                 # the turn is spent, NO charge.
-                _rp = (
-                    act & (a == self._A_REPAIR) & (utp == self._builder_idx)
-                    & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
-                    & (self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
-                       | self.district_pillaged.gather(1, hc.unsqueeze(1)).squeeze(1))
-                )
+                if self._A_REPAIR in _acmd:
+                    _rp = (
+                        act & (a == self._A_REPAIR) & (utp == self._builder_idx)
+                        & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
+                        & (self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+                           | self.district_pillaged.gather(1, hc.unsqueeze(1)).squeeze(1))
+                    )
+                else:
+                    _rp = torch.zeros(B, dtype=torch.bool, device=dev)
                 if bool(_rp.any()):
                     _r = _rp.nonzero(as_tuple=True)[0]
                     _tt = hc[_r]
@@ -1057,15 +1101,18 @@ class SimOrders:
                 # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
                 # "Can Remove Tile Improvements (costs no charge)". GONE, not
                 # pillaged; based aircraft scatter; the turn is spent.
-                _rmv = (
-                    act & (a == getattr(self, "_A_REMOVE_IMP", -2))
-                    & (((utp == self._builder_idx) if self._builder_idx >= 0
-                        else torch.zeros_like(act))
-                       | ((utp == self._eng_idx) if self._eng_idx >= 0
-                          else torch.zeros_like(act)))
-                    & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
-                    & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0)
-                )
+                if getattr(self, "_A_REMOVE_IMP", -2) in _acmd:
+                    _rmv = (
+                        act & (a == getattr(self, "_A_REMOVE_IMP", -2))
+                        & (((utp == self._builder_idx) if self._builder_idx >= 0
+                            else torch.zeros_like(act))
+                           | ((utp == self._eng_idx) if self._eng_idx >= 0
+                              else torch.zeros_like(act)))
+                        & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
+                        & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0)
+                    )
+                else:
+                    _rmv = torch.zeros(B, dtype=torch.bool, device=dev)
                 if bool(_rmv.any()):
                     _r = _rmv.nonzero(as_tuple=True)[0]
                     _tt = hc[_r]
@@ -1730,14 +1777,18 @@ class SimOrders:
         # spawned mid-loop are invisible to the pre_alive mask.
         pre_alive = self.barb_unit_alive.clone()
         any_camp = bool((self.camp_tile >= 0).any())
+        _k_live: list[int] = []
         if any_camp:
             du_all = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
             near_any_all = (pre_alive.unsqueeze(1) & (du_all <= 1)).any(dim=2)  # [B, K]
-        for k in range(self.K if any_camp else 0):
+            # WHICH camp slots are live at all, in ONE sync. Neither loop below
+            # writes `camp_tile` — the garrison loop touches only the barbarian
+            # pool and the guard loop only `guard` — so this one snapshot serves
+            # both, in place of a `bool(active.any())` sync per slot per loop.
+            _k_live = (self.camp_tile >= 0).any(dim=0).nonzero(as_tuple=True)[0].tolist()
+        for k in _k_live:
             camp = self.camp_tile[:, k]
             active = camp >= 0
-            if not bool(active.any()):
-                continue
             near_any = near_any_all[:, k]
             # A camp's CLASS is its LOCATION's: Horses within barbHorseRange
             # makes it a cavalry outpost, a reachable coast a pirate camp. The
@@ -1799,11 +1850,9 @@ class SimOrders:
         guard = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=dev)
         if any_camp:
             du_g = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)
-        for k in range(self.K if any_camp else 0):
+        for k in _k_live:
             camp = self.camp_tile[:, k]
             active = camp >= 0
-            if not bool(active.any()):
-                continue
             near = self.barb_unit_alive & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
             any_near = near.any(dim=1)
             first = near.long().argmax(dim=1)
@@ -1823,13 +1872,27 @@ class SimOrders:
         u_live = self.barb_unit_alive[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
         u_rngd_all = self.barb_unit_alive & (self._type_ranged_strength[self.barb_unit_type.clamp(min=0, max=self.NU - 1)] > 0)
         any_rngd = bool(u_rngd_all.any())
+        # The RANGE promotion is a whole-POOL read, and the ranged arm below
+        # asked for the whole pool once per raider only to take one column of
+        # it. Memoised on the pool's promotions and types — cloned, `torch.equal`
+        # on the way in — so a promotion won mid-loop still rebuilds it. The
+        # empty fingerprints below never compare equal, so the first raider
+        # builds it.
+        _rng_val = torch.zeros(0, dtype=torch.long, device=dev)
+        _rng_pfp = torch.zeros(0, dtype=self.barb_unit_promos.dtype, device=dev)
+        _rng_tfp = torch.zeros(0, dtype=self.barb_unit_type.dtype, device=dev)
         for u in u_live:
             act = self.barb_unit_alive[:, u] & ~guard[:, u]
             if not bool(act.any()):
                 continue
             here = self.barb_unit_tile[:, u]
+            _here1 = here.unsqueeze(1)
             nb = self.neigh[here]
             nbc = nb.clamp(min=0)
+            # ONE centre plane for the whole iteration: the adjacency scan and
+            # the resolved-target read below are separated by mask math only,
+            # so both asked the same registry for the same answer.
+            _cplane = self._centre_seat_plane()
             # ANY adjacent centre is a melee target — `caps.alwaysHostile`
             # needs no war, `cityAtIndex` names no seat, and a CITY-STATE
             # centre answers through `attackTargets`'s cityStateTarget arm
@@ -1838,7 +1901,7 @@ class SimOrders:
             ctr = self.centre_slot_at.gather(1, nbc) >= 0
             # the CENTRE tile only — TS's cityStateTarget arm keys on
             # `centerIndex`, never on territory, and only for a LIVE minor
-            _ctr_nb = self._centre_seat_plane().gather(1, nbc)
+            _ctr_nb = _cplane.gather(1, nbc)
             cs_nb = (_ctr_nb >= 100) & (_ctr_nb < BARB_SEAT)
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
@@ -1867,8 +1930,13 @@ class SimOrders:
             if any_rngd and bool((act & rngd).any()):
                 # CIV6 (Forward Observers / Coincidence Rangefinding): "+1
                 # Range" — the only thing that moves a chassis's own.
+                if not (torch.equal(_rng_pfp, self.barb_unit_promos)
+                        and torch.equal(_rng_tfp, self.barb_unit_type)):
+                    _rng_pfp = self.barb_unit_promos.clone()
+                    _rng_tfp = self.barb_unit_type.clone()
+                    _rng_val = self._promo_pool_val("barb", "RANGE")
                 rng_u = (self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
-                         + self._promo_pool_val("barb", "RANGE")[:, u])
+                         + _rng_val[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 # a district's defenses are a target at range, priced by the
                 # -17 rather than refused; every centre — a major's or a live
@@ -1889,7 +1957,7 @@ class SimOrders:
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
-            _csp = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            _csp = _cplane.gather(1, ttc.unsqueeze(1)).squeeze(1)
             cs_here = (_csp >= 100) & (_csp < BARB_SEAT)
             _csi = (_csp - 100).clamp(min=0)
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
@@ -1932,13 +2000,15 @@ class SimOrders:
             if any_rngd and bool(rng_att.any()):
                 self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
+            # `isTerritorial` — owned by any major OR city-state. ONE read for
+            # both wreck arms: only `pillaged` is written between them, never
+            # `tile_seat`, so the two reads were always the same answer.
+            _h_seat = self.tile_seat.gather(1, _here1).squeeze(1)
+            h_owned = (_h_seat >= 0) & (_h_seat < BARB_SEAT)
             pillage = torch.zeros_like(act)
             if self.improvements_on:
-                h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
-                h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
-                _h_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                # `isTerritorial` — owned by any major OR city-state
-                h_owned = (_h_seat >= 0) & (_h_seat < BARB_SEAT)
+                h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
+                h_unpil = ~self.pillaged.gather(1, _here1).squeeze(1)
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
@@ -1958,16 +2028,13 @@ class SimOrders:
 
             dist_pillage = torch.zeros_like(act)
             if self.districts_on:
-                h_dist = self.district.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_dcomp = self.district_complete.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
-                _hd_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                # `isTerritorial` — owned by any major OR city-state
-                h_downed = (_hd_seat >= 0) & (_hd_seat < BARB_SEAT)
+                h_dist = self.district.gather(1, _here1).squeeze(1)
+                h_dcomp = self.district_complete.gather(1, _here1).squeeze(1)
+                h_dunpil = ~self.district_pillaged.gather(1, _here1).squeeze(1)
                 # CIV6: the Encampment "cannot be pillaged normally".
                 dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
                                 & (h_dist != self._encamp_didx)
-                                & h_dcomp & h_dunpil & h_downed)
+                                & h_dcomp & h_dunpil & h_owned)
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
                     _dvv = h_dist[rows].clamp(min=0)

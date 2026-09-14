@@ -2980,8 +2980,19 @@ class SimMasks:
 
     def _seat_unit_mask(self, row: int) -> torch.Tensor:
         B, dev = self.B, self.device
-        N = simbase.UNIT_SLOTS
+        _NFULL = simbase.UNIT_SLOTS
         smap = self._seat_slot_map(row)
+        # THE RANK AXIS IS A DENSE PREFIX. `_seat_slot_map` ranks a seat's live
+        # units by cumsum, so the held ranks are 0..k-1 in every game and every
+        # rank past the widest k is empty in ALL of them. EVERY arm below is
+        # ANDed with `present` (or `alive`, which is `present` unsqueezed), so
+        # those ranks can only ever answer False — build the mask over the held
+        # prefix and pad the tail back with False. Same [B, UNIT_SLOTS, A]
+        # answer, with the neighbour gathers, the ring-2/ring-3 planes, the
+        # stacking rule and the improvement walk sized to the units in play
+        # rather than to the 256-slot pool.
+        N = max(int((smap >= 0).any(dim=0).long().sum()), 1)
+        smap = smap[:, :N]
         present = smap >= 0
         sc = smap.clamp(min=0)
         alive = present.unsqueeze(2)
@@ -3205,7 +3216,36 @@ class SimMasks:
         _res_cols: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
             _rq = self.res_imp.gather(1, tc)
+            # WHICH BASE EACH ROW RIDES, decided once over the whole rank
+            # block. Every column below is `base & <the row's own clauses>`,
+            # and an empty base makes the column empty whatever those clauses
+            # answer — so a roster with no Builder standing on bare ground, no
+            # Military Engineer, or none of the chassis a `builtBy` row names
+            # need not build that row's [B, T] ground plane at all. Two
+            # `.any()` syncs and one type census replace up to two dozen
+            # `_uniq_improvement_ok` / `_suz_improvement_ok` / `_imp_ground_ok`
+            # / `_imp_gov_ok` plane builds. The chain mirrors the branch chain
+            # below rank for rank.
+            _zcol = torch.zeros(B, N, 1, dtype=torch.bool, device=dev)
+            _any_here = bool(here_ok.any())
+            _any_eng = bool(eng_here.any())
+            _utyp = set(torch.unique(utype[present]).tolist())
             for _k in range(3, self._imp_unlock.numel()):
+                if self.SEASIDE >= 0 and _k == self.SEASIDE:
+                    _base_live = _any_here
+                elif self._imp_built_by[_k] >= 0:
+                    _base_live = int(self._imp_built_by[_k]) in _utyp
+                elif self._imp_suz[_k] or self._imp_uniq[_k] >= 0:
+                    _base_live = _any_here
+                elif _k == self.TUNNEL:
+                    _base_live = int(self._eng_idx) in _utyp
+                elif self._imp_eng[_k]:
+                    _base_live = _any_eng
+                else:
+                    _base_live = _any_here
+                if not _base_live:
+                    _res_cols.append(_zcol)
+                    continue
                 _ut = int(self._imp_unlock[_k])
                 _unl = (techs[:, _ut].unsqueeze(1) if _ut >= 0
                         else torch.ones(B, 1, dtype=torch.bool, device=dev))
@@ -3657,6 +3697,13 @@ class SimMasks:
             + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt,
             dim=2,
         )
+        if N < _NFULL:
+            # the empty tail the prefix above stood in for: False everywhere,
+            # which is what every `present`-gated arm would have written there.
+            out = torch.cat(
+                [out, torch.zeros(B, _NFULL - N, out.shape[2], dtype=out.dtype, device=dev)],
+                dim=1,
+            )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:
             assert out.shape[-1] == len(self._act_names), (
                 f"_seat_unit_mask is {out.shape[-1]} wide but the enum has {len(self._act_names)} entries"
