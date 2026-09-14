@@ -327,6 +327,14 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         child_env.update({
             "CIV6_SERVE": "1", "CIV6_SERVE_SEED": str(sd),
             "CIV6_SERVE_HORIZON": str(env.horizon), "PYTHONIOENCODING": "utf-8",
+            # A HEAP CAP for the child. The modifier memo (getModifiers by
+            # input fingerprint) made its Modifiers objects long-lived, and V8
+            # let the old space grow ~650 MB per child before collecting —
+            # memory the battery's planner trades for shards. The child is
+            # 95% idle, so the extra collections cost nothing it needs: 256 MB
+            # holds a turn-250 state with room (its checkpoint dump is ~2 MB)
+            # and the lane's peak came back to the pre-memo 945 MB.
+            "NODE_OPTIONS": (os.environ.get("NODE_OPTIONS", "") + " --max-old-space-size=256").strip(),
         })
         if resume:
             assert ckpt_dir is not None

@@ -2,7 +2,7 @@
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import type { CivId, LeaderId } from '../data/seats';
-import { AGE_GOLDEN } from '../data/seats';
+import { AGE_GOLDEN, ALLIANCE_ECONOMIC } from '../data/seats';
 import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type LegacyRateRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, DOMESTIC_ROUTE_YIELD_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, CAPTURE_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
@@ -12,7 +12,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity } from './seats';
+import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -844,9 +844,225 @@ export function notFoundedSum(state: GameState, city: City, channel: NotFoundedC
   return n;
 }
 
+/**
+ * The seat-modifier MEMO. `getModifiers` rebuilds the whole `Modifiers` object
+ * — a hundred roster-table filters, the research walk, the government's
+ * adoption and card set, the beliefs and the city-state suzerainties — and it
+ * is asked ~130 times per seat per turn from every corner of cpu/core. The
+ * answer only changes when one of its INPUTS does, so the object is kept and
+ * handed back until a fingerprint of every input this function (and everything
+ * it calls) reads says otherwise. The GPU twin memoises the same derivation the
+ * same way (`_gov_mods` in gpu/core/sim_economy.py): the inputs are compared on
+ * the way in, never a turn or version counter.
+ *
+ * WHERE IT LIVES: a module-level WeakMap keyed by the state object, NOT a field
+ * on the state. `JSON.stringify(state)` (the driver's `{ckpt}` dump), the
+ * manifest-driven `stateDigest` and the group dumps therefore cannot see it, a
+ * checkpoint reload builds a fresh state and so starts with no memo at all, and
+ * the entry dies with the state it belongs to.
+ *
+ * THE CONTRACT: the object handed back is SHARED. No caller may write into it.
+ * `withGovernor` and `withFollowerBelief` are the two readers that layer on top
+ * of one, and both already copy every collection they touch (`withFollowerBelief`'s
+ * GEO-H note is that lesson learned the hard way).
+ */
+interface ModsMemo {
+  /** every input value, in one flat list — see `modsFingerprint`. */
+  fp: unknown[];
+  /** write cursor into `fp` while a fingerprint is being taken. */
+  n: number;
+  /** did this fingerprint differ from the stored one? */
+  dirty: boolean;
+  mods: Modifiers | null;
+}
+
+const MODS_MEMO = new WeakMap<GameState, Map<number, ModsMemo>>();
+
+/** a section separator, so a value can never be mistaken for a neighbouring
+ *  list's — two lists that trade a member keep the same total length. */
+const FP_MARK: unique symbol = Symbol('fp');
+
+function fpPush(m: ModsMemo, v: unknown): void {
+  const a = m.fp;
+  if (m.n < a.length) {
+    if (a[m.n] !== v) {
+      a[m.n] = v;
+      m.dirty = true;
+    }
+  } else {
+    a.push(v);
+    m.dirty = true;
+  }
+  m.n += 1;
+}
+
+/** The rosters whose plot rows gate on the WORLD era — the one input
+ *  `plotYieldRowsFor` reads lazily, so the fingerprint pays `worldEraIndex`
+ *  (a walk of every seat's research) only for a seat that can read it.
+ *  Built on first use rather than at module scope: a derived constant across an
+ *  import cycle reads undefined. */
+let ERA_GATED_PLOT: { civs: Set<string>; leaders: Set<string> } | null = null;
+
+function plotRowsGateOnEra(civ: string | null, leader: string | null): boolean {
+  if (ERA_GATED_PLOT === null) {
+    const civs = new Set<string>();
+    const leaders = new Set<string>();
+    for (const r of PLOT_YIELD_ROWS) {
+      if (r.eraAtLeast === undefined) continue;
+      if (r.civ !== undefined) civs.add(r.civ);
+      else if (r.leader !== undefined) leaders.add(r.leader);
+    }
+    ERA_GATED_PLOT = { civs, leaders };
+  }
+  return (civ !== null && ERA_GATED_PLOT.civs.has(civ))
+    || (leader !== null && ERA_GATED_PLOT.leaders.has(leader));
+}
+
+/**
+ * Every value `buildModifiers` and its callees read out of `state`, pushed in a
+ * fixed order. A missed input is a stale answer, so this list is written against
+ * the call tree rather than against the fields that "look like" they matter:
+ *
+ *  - the roster: `civOf` / `leaderOf` (the ~100 `rowIsFor` table filters,
+ *    `legacyRatePct`, Phoenicia's coastal loyalty);
+ *  - `age` (the golden-age flag and `inDarkAge`);
+ *  - `research.techs` / `research.civics` (`modifiersFromResearch`,
+ *    `completedEffectsIn`, `computeUnlocksIn`, `computeAdoption`,
+ *    `unlockedPolicyIds`'s `civEraIndex`, `plotYieldRowsFor`'s civic clause);
+ *  - the city count and population SUM (the belief seat's `followers`/`cities`);
+ *  - `religion`'s pantheon / founded / founder / enhancer;
+ *  - `government.policies` (the stored cards), `government.held` (the legacy
+ *    cards' gate) and `government.govTurns` (`legacyBonusPct`);
+ *  - the World Congress record (`congressPolicyBlocked` and, under the
+ *    city-state block, `congressSuzBonusBlocked`);
+ *  - the WORLD era, where a plot row of this roster gates on one;
+ *  - and, only while minors stand: each seat's economic-alliance level with
+ *    this one and its war state (`suzerainShareSeats`, `suzerainSciencePct`),
+ *    every seat's governors POSTED AT A MINOR (`envoysWith`, which is asked for
+ *    every contender, not just this seat), and each minor's id, type, name and
+ *    whole envoy ledger (`cityStateEnvoyBonuses`, `isSuzerain`).
+ */
+function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): void {
+  const civ = civOf(state, seat);
+  const leader = leaderOf(state, seat);
+  fpPush(m, civ);
+  fpPush(m, leader);
+  fpPush(m, s.age);
+
+  const techs = s.research.techs;
+  for (let i = 0; i < techs.length; i++) fpPush(m, techs[i]);
+  fpPush(m, FP_MARK);
+  const civics = s.research.civics;
+  for (let i = 0; i < civics.length; i++) fpPush(m, civics[i]);
+  fpPush(m, FP_MARK);
+
+  const cities = s.cities;
+  let pop = 0;
+  for (let i = 0; i < cities.length; i++) pop += cities[i].population;
+  fpPush(m, cities.length);
+  fpPush(m, pop);
+
+  const rel = s.religion;
+  fpPush(m, rel?.pantheon ?? null);
+  fpPush(m, rel?.founded ?? false);
+  fpPush(m, rel?.founder ?? null);
+  fpPush(m, rel?.enhancer ?? null);
+
+  const gov = s.government;
+  const stored = gov.policies;
+  for (let i = 0; i < stored.length; i++) fpPush(m, stored[i]);
+  fpPush(m, FP_MARK);
+  fpPush(m, gov.held);
+  const govTurns = gov.govTurns;
+  if (govTurns) for (let i = 0; i < govTurns.length; i++) fpPush(m, govTurns[i]);
+  fpPush(m, FP_MARK);
+  // the government ROWS are a catalog, but they are still an input `applyGovernment`
+  // reads: a test borrows a row onto the adopted government by SWAPPING the
+  // effects object in memory (`borrowingRow`), exactly as the GPU poke does, so
+  // the identity of each row's effects rides the fingerprint.
+  for (let i = 0; i < GOVERNMENT_LIST.length; i++) fpPush(m, GOVERNMENT_LIST[i].effects);
+  fpPush(m, FP_MARK);
+
+  const congress = state.congress;
+  if (congress) {
+    for (let i = 0; i < congress.length; i++) {
+      const a = congress[i];
+      fpPush(m, a.res);
+      fpPush(m, a.outcome);
+      fpPush(m, a.target);
+    }
+  }
+  fpPush(m, FP_MARK);
+
+  if (plotRowsGateOnEra(civ, leader)) fpPush(m, worldEraIndex(state));
+  fpPush(m, FP_MARK);
+
+  const minors = state.cityStates;
+  if (minors && minors.length) {
+    for (const o of state.seats) {
+      fpPush(m, o.seat);
+      fpPush(m, alliedAtLevel(state, seat, o.seat, ALLIANCE_ECONOMIC, 3));
+      fpPush(m, civsAtWar(state, seat, o.seat));
+      const roster = o.governors;
+      if (roster) {
+        for (let i = 0; i < roster.length; i++) {
+          const g = roster[i];
+          fpPush(m, g.minorId);
+          // a governor who is not posted at a minor answers no envoy question;
+          // the minorId above is what turns the rest of the row on
+          if (g.minorId >= 0) {
+            fpPush(m, g.appointed);
+            fpPush(m, g.establishTurns);
+            fpPush(m, g.promotions);
+          }
+        }
+      }
+      fpPush(m, FP_MARK);
+    }
+    for (const cs of minors) {
+      fpPush(m, cs.id);
+      fpPush(m, cs.type);
+      fpPush(m, cs.name);
+      const envoys = cs.envoys;
+      for (const k in envoys) {
+        fpPush(m, k);
+        fpPush(m, envoys[k]);
+      }
+      fpPush(m, FP_MARK);
+    }
+  }
+}
+
 export function getModifiers(state: GameState, seat: number): Modifiers {
   const s = seatOf(state, seat);
   if (!s) return defaultModifiers(); // no such seat — unreachable from real callers
+  let perSeat = MODS_MEMO.get(state);
+  if (perSeat === undefined) {
+    perSeat = new Map<number, ModsMemo>();
+    MODS_MEMO.set(state, perSeat);
+  }
+  let memo = perSeat.get(seat);
+  if (memo === undefined) {
+    memo = { fp: [], n: 0, dirty: false, mods: null };
+    perSeat.set(seat, memo);
+  }
+  memo.n = 0;
+  memo.dirty = false;
+  modsFingerprint(state, seat, s, memo);
+  // a SHORTER fingerprint than last time is a change too (a minor conquered, a
+  // governor recalled): the tail nobody wrote this pass has to go.
+  if (memo.n !== memo.fp.length) {
+    memo.fp.length = memo.n;
+    memo.dirty = true;
+  }
+  const hit = memo.mods;
+  if (!memo.dirty && hit !== null) return hit;
+  const built = buildModifiers(state, seat, s);
+  memo.mods = built;
+  return built;
+}
+
+function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
   const cities = citiesOf(state, seat);
   let pop = 0;
   for (const c of cities) pop += c.population;
