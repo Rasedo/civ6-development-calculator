@@ -4512,18 +4512,30 @@ class SimSeats:
         ok = (best >= suz_min) & ~tied
         self.citystate_suzerain[:, : self.S] = torch.where(ok, arg, torch.full_like(arg, -1))
 
+    def _suzerain_masks_all(self, env: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, n_majors, S] — `_suzerain_mask` for every major row at once
+        from ONE envoy table. The per-row form recomputed `_envoys_here_all`
+        (n_majors x n_governors governor scans) on every call, and the
+        suzerain-effect and war loops called it once per seat: 9,300 calls
+        over fifty late-game turns of a three-seat shard. Same bits: at least
+        `suzerainEnvoys`, alive, and STRICTLY more envoys than every other
+        row (a tie leaves no suzerain)."""
+        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+        if env is None:
+            env = self._envoys_here_all()
+        NM = self.n_majors
+        # strict[b, r, o, s]: row r out-envoys row o at minor s; the diagonal
+        # (r == o) is set True so it drops out of the all-over-o
+        strict = env.unsqueeze(2) > env.unsqueeze(1)
+        eye = torch.eye(NM, dtype=torch.bool, device=env.device).reshape(1, NM, NM, 1)
+        beats = (strict | eye).all(dim=2)
+        return (env >= suz_min) & self.citystate_alive.unsqueeze(1) & beats
+
     def _suzerain_mask(self, row: int) -> torch.Tensor:
         """[B, S] city-states seat row `row` is Suzerain of — the `isSuzerain`
         twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
         other seat row (a tie leaves no suzerain)."""
-        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        env = self._envoys_here_all()
-        mine = env[:, row]
-        m = (mine >= suz_min) & self.citystate_alive
-        for o in range(self.n_majors):
-            if o != row:
-                m = m & (mine > env[:, o])
-        return m
+        return self._suzerain_masks_all()[:, row]
 
     def _alliance_levels_of(self, row: int) -> torch.Tensor:
         """[B, n_majors] - the live alliance's LEVEL against each other major
@@ -4583,8 +4595,11 @@ class SimSeats:
                 codes[code] = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=self.device)
             else:
                 hold = self.citystate_suz_code[:, :self.S] == code
-                base = torch.stack(
-                    [(self._suz_live_mask(r) & hold[:, : self.S]).any(dim=1) for r in range(self.n_majors)], dim=1)
+                # one envoy table for every row (`_suzerain_masks_all`), not a
+                # per-row rebuild inside the loop
+                blocked = self._congress_suz_bonus_blocked()
+                live_all = self._suzerain_masks_all()[:, :, : self.S] & ~blocked.unsqueeze(1)
+                base = (live_all & hold[:, : self.S].unsqueeze(1)).any(dim=2)
                 # CIV6 (Economic alliance 3): "Allies share the Suzerain bonus
                 # of all city-states of which they are Suzerain."
                 NMh = self.n_majors

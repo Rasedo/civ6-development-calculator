@@ -56,10 +56,11 @@ class SimMasks:
         minor? `sueForPeaceWithCityState`'s block: a minor will not talk while
         its patron is still fighting you."""
         out = torch.zeros(self.B, self.S, dtype=torch.bool, device=self.device)
+        suz_all = self._suzerain_masks_all()[:, :, : self.S]  # one envoy table for the loop
         for x in range(self.n_majors):
             if x == row:
                 continue
-            out = out | (self._suzerain_mask(x)[:, : self.S] & self.war[:, row, x].unsqueeze(1))
+            out = out | (suz_all[:, x] & self.war[:, row, x].unsqueeze(1))
         return out
 
     def _seat_war_mask(self, row: int) -> torch.Tensor:
@@ -2970,10 +2971,11 @@ class SimMasks:
         cs_row0 = self.n_majors
         out = self.war[:, row, cs_row0:cs_row0 + S][:, :self.S] if self.S > 0 else torch.zeros(self.B, 0, dtype=torch.bool, device=self.device)
         out = out.clone()
+        suz_all = self._suzerain_masks_all()[:, :, :self.S]  # one envoy table for the loop
         for sx in range(self.n_majors):
             if sx == row:
                 continue
-            out = out | (self._suzerain_mask(sx)[:, :self.S] & self.war[:, row, sx].unsqueeze(1))
+            out = out | (suz_all[:, sx] & self.war[:, row, sx].unsqueeze(1))
         return out
 
     def _seat_unit_mask(self, row: int) -> torch.Tensor:
