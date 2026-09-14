@@ -18,7 +18,7 @@ longer appear (the alphabetical load order produced artefacts — Isolationism,
 three unique units' resource bills, the Okihtcitaw's rung — and hid one, the
 Pike and Shot's maintenance). Task #264 works THIS list.
 
-    XML CHECK RED — 3940 match, 48 mismatch, 939 unsourced, 1426 lab/stylized/derived (312 install files)
+    XML CHECK RED — 4052 match, 60 mismatch, 203 unsourced, 1398 lab/stylized/derived (312 install files)
 
 ### units (15)
 
@@ -117,10 +117,47 @@ MISMATCH policies.LEGACY_FASCISM.effects.wwCutPct: catalog 15 vs install '20' [M
 MISMATCH governments.FASCISM.effects.wwCutPct: catalog 15 vs install '20' [ModifierArguments[ModifierId=FASCISM_WAR_WEARINESS&Name=Amount].Value <- Expansion1_Governments.xml]
 ```
 
+### pantheons (2)
+
+```
+MISMATCH pantheons.RIVER_GODDESS.effects.riverCity.amenities: catalog 1 vs install '2' [ModifierArguments[ModifierId=RIVER_GODDESS_HOLY_SITE_AMENITIES_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
+MISMATCH pantheons.RIVER_GODDESS.effects.riverCity.housing: catalog 1 vs install '2' [ModifierArguments[ModifierId=RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
+```
+
+### followerBeliefs (3)
+
+```
+MISMATCH followerBeliefs.FEED_THE_WORLD.effects.buildingYields.SHRINE.food: catalog 1 vs install '3' [ModifierArguments[ModifierId=FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
+MISMATCH followerBeliefs.FEED_THE_WORLD.effects.buildingYields.TEMPLE.food: catalog 2 vs install '3' [ModifierArguments[ModifierId=FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
+MISMATCH followerBeliefs.DIVINE_INSPIRATION.effects.faithPerWonder: catalog 2 vs install '4' [ModifierArguments[ModifierId=DIVINE_INSPIRATION_WONDER_FAITH_MODIFIER&Name=Amount].Value <- Beliefs.xml]
+```
+
+### founderBeliefs (4)
+
+```
+MISMATCH founderBeliefs.TITHE.effects.perFollowers.per: catalog 4 vs install '1' [ModifierArguments[ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
+MISMATCH founderBeliefs.TITHE.effects.perFollowers.yields.gold: catalog 1 vs install '3' [ModifierArguments[ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
+MISMATCH founderBeliefs.WORLD_CHURCH.effects.perFollowers.per: catalog 5 vs install '4' [ModifierArguments[ModifierId=WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
+MISMATCH founderBeliefs.CROSS_CULTURAL_DIALOGUE.effects.perFollowers.per: catalog 5 vs install '4' [ModifierArguments[ModifierId=CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
+```
+
+### enhancerBeliefs (2)
+
+```
+MISMATCH enhancerBeliefs.ITINERANT_PREACHERS.effects.pressureRangeBonus: catalog 2 vs install '3' [ModifierArguments[ModifierId=ITINERANT_PREACHERS_SPREAD_DISTANCE&Name=DistanceChange].Value <- Beliefs.xml]
+MISMATCH enhancerBeliefs.SCRIPTURE.effects.spreadPressureMult: catalog 1.5 vs install '25' [ModifierArguments[ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier].Value <- Beliefs.xml]
+```
+
 ### congressResolutions (1)
 
 ```
 MISMATCH congressResolutions.WORLD_RELIGION.minEra: catalog 4 vs install None [Resolutions[ResolutionType=WC_RES_WORLD_RELIGION].EarliestEra <- (row found in Expansion2_Congress.xml, no column EarliestEra, no default)]
+```
+
+### scenario (1)
+
+```
+MISMATCH scenario.goldPurchaseMult: catalog 4 vs install '2' [GlobalParameters[Name=GOLD_PURCHASE_MULTIPLIER].Value <- GlobalParameters.xml]
 ```
 
 ## Wave 1, agent A report (2026-09-14) — units, techs, civics, improvements, promotions
@@ -252,3 +289,38 @@ loaded; two side-effect imports fix it. The 13 were hand-verified MATCH.
 
 ### Type note
 `srcConst` infers a non-fresh literal type; two sites needed `srcConst<number>(…)` (housing.fresh/coastal/none read into a `let`; eras.espionage.travelCols). Expect the same in seats.ts — annotation only.
+
+## Wave 2, agent C report (2026-09-14) — beliefs, governor promotions, the SKIP rule
+
+Complete: religion.ts (BELIEF_SRC + the B() merge; pantheons 31/33,
+follower 8/10, founder 11/12, enhancer 5/9 constants tagged) and
+governors.ts GOVERNOR_PROMOTIONS (PROMO_INSTALL_ID + PROMO_EFFECT_SRC via
+G(); 42/42 rows, 153/153 constants, 0 mismatches). The SKIP rule in
+cpu/export/provenance.ts: `kind`, `mask`, `code` join SKIP_COL and an empty
+array is not a constant — 674 constants left the dump, 528 of them
+unsourced (unsourced 731 → 203 across the whole dump); `effects` was NOT
+added (it is the object key every belief and promotion row hangs its
+magnitudes on). UNTOUCHED: civilizations.ts's row lists — nothing started;
+a ready-to-splice provenance block for ~60 lists (`withSrc()` + positional
+`*_SRC` tables, UNVERIFIED against the checker) and the trait dumps are in
+.claude/scratchpad/provenance_wave2/agentC/ (civ_src_block.ts, lib.py,
+q_trait.py, alltraits.txt, civtraits.txt, gov2.txt). No value changed.
+
+### MISMATCH — 11, all beliefs (governor promotions clean)
+- RIVER_GODDESS riverCity amenities 1 vs 2, housing 1 vs 2 — GS raised both.
+- FEED_THE_WORLD SHRINE food 1 vs 3, TEMPLE food 2 vs 3 — GS is +3 each (+2 housing, which the engine models under RELIGIOUS_COMMUNITY).
+- DIVINE_INSPIRATION faithPerWonder 2 vs 4 — GS.
+- TITHE per 4 vs 1, gold 1 vs 3 — GS's Tithe is +3 gold per CITY (Amount 3, PerXItems 1); the engine kept the pre-GS "+1 per 4 followers" shape.
+- WORLD_CHURCH per 5 vs 4; CROSS_CULTURAL_DIALOGUE per 5 vs 4 — transcription slips (the Amounts match).
+- ITINERANT_PREACHERS pressureRangeBonus 2 vs DistanceChange 3 — slip.
+- SCRIPTURE spreadPressureMult 1.5 vs SpreadMultiplier 25 — a PERCENT (×1.25), the catalog's comment made it ×1.5: unit and magnitude.
+
+### UNSOURCED — 9
+- GS DELETES the belief (Expansion2_RemoveData.xml): ORAL_TRADITION's plantation culture (now GODDESS_OF_FESTIVALS's clause), CHURCH_PROPERTY's per-city gold; GODDESS_OF_THE_HARVEST is deleted too but carries no constant.
+- No install row anywhere: CRUSADE's combat clause, MESSENGER_OF_THE_GODS's route yields.
+- The row exists but GS rewrote the clause: RELIGIOUS_COMMUNITY's shrine/temple housing (GS: +2 gold on international routes; the housing moved to FEED_THE_WORLD at 2), SCRIPTURE's missionary charge bonus (GS carries none).
+- Condition differs: GODDESS_OF_FESTIVALS's `category: 'luxury'` (install: PLOT_HAS_PLANTATION_REQUIREMENTS) — the Amount is tagged, the condition honestly not.
+Two lines for #264 beyond the mismatches: four beliefs the engine fields that Gathering Storm does not have at all (Oral Tradition, Church Property, Crusade, Messenger of the Gods) and one whose clause GS replaced (Religious Community).
+
+### Types widened
+`BeliefDef.src?`, `GovernorPromotionDef.src?` — own files only.

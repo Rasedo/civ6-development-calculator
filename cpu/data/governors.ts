@@ -203,12 +203,310 @@ export interface GovernorPromotionDef {
   requires?: readonly string[];
   description: string;
   effects: GovernorEffects;
+  /** PROVENANCE, per column — see PROMO_INSTALL_ID / PROMO_SRC below. */
+  src?: SrcMap;
 }
+
+/**
+ * The install's own id for each promotion. It is NOT
+ * `GOVERNOR_PROMOTION_<ROLE>_<NAME>` uniformly — half the table drops the role
+ * (GOVERNOR_PROMOTION_REDOUBT, _ZONING_COMMISSIONER, _WATER_WORKS), two rows
+ * carry the WRONG role (Victor's Arms Race Proponent is filed under EDUCATOR,
+ * Pingala's Curator under MERCHANT; GovernorPromotionSets is what actually
+ * assigns them), and three are renamed outright: Provision = EXPEDITION,
+ * Reinforced Materials = REINFORCED_INFRASTRUCTURE, Renewable Subsidizer =
+ * MERCHANT_RENEWABLE_ENERGY.
+ */
+const PROMO_INSTALL_ID: Readonly<Record<string, string>> = {
+  LAND_ACQUISITION: 'GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION',
+  HARBORMASTER: 'GOVERNOR_PROMOTION_MERCHANT_HARBORMASTER',
+  FORESTRY_MANAGEMENT: 'GOVERNOR_PROMOTION_MERCHANT_FORESTRY_MANAGEMENT',
+  TAX_COLLECTOR: 'GOVERNOR_PROMOTION_MERCHANT_TAX_COLLECTOR',
+  CONTRACTOR: 'GOVERNOR_PROMOTION_MERCHANT_CONTRACTOR',
+  RENEWABLE_SUBSIDIZER: 'GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY',
+  REDOUBT: 'GOVERNOR_PROMOTION_REDOUBT',
+  GARRISON_COMMANDER: 'GOVERNOR_PROMOTION_GARRISON_COMMANDER',
+  DEFENSE_LOGISTICS: 'GOVERNOR_PROMOTION_DEFENSE_LOGISTICS',
+  EMBRASURE: 'GOVERNOR_PROMOTION_EMBRASURE',
+  AIR_DEFENSE_INITIATIVE: 'GOVERNOR_PROMOTION_AIR_DEFENSE_INITIATIVE',
+  ARMS_RACE_PROPONENT: 'GOVERNOR_PROMOTION_EDUCATOR_ARMS_RACE_PROPONENT',
+  MESSENGER: 'GOVERNOR_PROMOTION_AMBASSADOR_MESSENGER',
+  EMISSARY: 'GOVERNOR_PROMOTION_AMBASSADOR_EMISSARY',
+  AFFLUENCE: 'GOVERNOR_PROMOTION_AMBASSADOR_AFFLUENCE',
+  LOCAL_INFORMANTS: 'GOVERNOR_PROMOTION_LOCAL_INFORMANTS',
+  FOREIGN_INVESTOR: 'GOVERNOR_PROMOTION_AMBASSADOR_FOREIGN_INVESTOR',
+  PUPPETEER: 'GOVERNOR_PROMOTION_AMBASSADOR_PUPPETEER',
+  GROUNDBREAKER: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_GROUNDBREAKER',
+  SURPLUS_LOGISTICS: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_SURPLUS_LOGISTICS',
+  PROVISION: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_EXPEDITION',
+  INDUSTRIALIST: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_INDUSTRIALIST',
+  BLACK_MARKETEER: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_BLACK_MARKETEER',
+  VERTICAL_INTEGRATION: 'GOVERNOR_PROMOTION_RESOURCE_MANAGER_VERTICAL_INTEGRATION',
+  BISHOP: 'GOVERNOR_PROMOTION_CARDINAL_BISHOP',
+  GRAND_INQUISITOR: 'GOVERNOR_PROMOTION_CARDINAL_GRAND_INQUISITOR',
+  LAYING_ON_OF_HANDS: 'GOVERNOR_PROMOTION_CARDINAL_LAYING_ON_OF_HANDS',
+  CITADEL_OF_GOD: 'GOVERNOR_PROMOTION_CARDINAL_CITADEL_OF_GOD',
+  PATRON_SAINT: 'GOVERNOR_PROMOTION_CARDINAL_PATRON_SAINT',
+  DIVINE_ARCHITECT: 'GOVERNOR_PROMOTION_CARDINAL_DIVINE_ARCHITECT',
+  GUILDMASTER: 'GOVERNOR_PROMOTION_BUILDER_GUILDMASTER',
+  ZONING_COMMISSIONER: 'GOVERNOR_PROMOTION_ZONING_COMMISSIONER',
+  AQUACULTURE: 'GOVERNOR_PROMOTION_AQUACULTURE',
+  REINFORCED_MATERIALS: 'GOVERNOR_PROMOTION_REINFORCED_INFRASTRUCTURE',
+  WATER_WORKS: 'GOVERNOR_PROMOTION_WATER_WORKS',
+  PARKS_AND_RECREATION: 'GOVERNOR_PROMOTION_PARKS_RECREATION',
+  LIBRARIAN: 'GOVERNOR_PROMOTION_EDUCATOR_LIBRARIAN',
+  CONNOISSEUR: 'GOVERNOR_PROMOTION_EDUCATOR_CONNOISSEUR',
+  RESEARCHER: 'GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER',
+  GRANTS: 'GOVERNOR_PROMOTION_EDUCATOR_GRANTS',
+  SPACE_INITIATIVE: 'GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE',
+  CURATOR: 'GOVERNOR_PROMOTION_MERCHANT_CURATOR',
+};
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts) for each promotion's EFFECT columns.
+ * `governor`, `tier` and `requires` are tagged uniformly by `promoSrc` below
+ * off GovernorPromotionSets / GovernorPromotions.Level /
+ * GovernorPromotionPrereqs; this table carries only what a promotion PAYS,
+ * which the install writes in GovernorPromotionModifiers -> Modifiers ->
+ * ModifierArguments.
+ */
+const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
+  LAND_ACQUISITION: {
+    'effects.passRouteGold': xml('ModifierArguments',
+      'ModifierId=FOREIGN_EXCHANGE_GOLD_FROM_FOREIGN_TRADE_PASSING_THROUGH&Name=Amount', 'Value'),
+    'effects.borderExpansionPct': xml('ModifierArguments',
+      'ModifierId=LAND_ACQUISITION_FASTER_PLOT_ANNEXING&Name=Amount', 'Value'),
+  },
+  HARBORMASTER: {
+    'effects.adjacencyMult.COMMERCIAL_HUB': {
+      derived: '1 + Amount/100 — the install writes the percentage (100), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=HARBORMASTER_BONUS_COMMERCIAL_HUB_ADJACENCY&Name=Amount', 'Value')],
+    },
+    'effects.adjacencyMult.HARBOR': {
+      derived: '1 + Amount/100 — the install writes the percentage (100), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=HARBORMASTER_BONUS_HARBOR_ADJACENCY&Name=Amount', 'Value')],
+    },
+  },
+  FORESTRY_MANAGEMENT: {
+    'effects.goldPerFeature': xml('ModifierArguments',
+      'ModifierId=FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD&Name=Amount', 'Value'),
+    'effects.appealNearFeature': xml('ModifierArguments',
+      'ModifierId=FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_APPEAL&Name=Amount', 'Value'),
+  },
+  TAX_COLLECTOR: {
+    'effects.perCitizen.gold': xml('ModifierArguments',
+      'ModifierId=TAX_COLLECTOR_ADJUST_CITIZEN_GPT&Name=Amount', 'Value'),
+  },
+  CONTRACTOR: {
+    'effects.districtGoldBuy': xml('ModifierArguments',
+      'ModifierId=CONTRACTOR_ENABLE_DISTRICT_PURCHASE&Name=CanPurchase', 'Value'),
+  },
+  REDOUBT: {
+    'effects.cityDefense': xml('ModifierArguments',
+      'ModifierId=DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH&Name=Amount', 'Value'),
+  },
+  GARRISON_COMMANDER: {
+    'effects.territoryCS': xml('ModifierArguments',
+      'ModifierId=GARRISON_COMMANDER_ADJUST_CITY_COMBAT_BONUS&Name=Amount', 'Value'),
+    'effects.loyaltyToOwn.loyalty': xml('ModifierArguments',
+      'ModifierId=PRESTIGE_IDENTITY_PRESSURE_TO_DOMESTIC_CITIES&Name=Amount', 'Value'),
+    'effects.loyaltyToOwn.range': { lab: 'the published promotion text ("within 9 tiles"); the install\'s '
+      + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius and no GlobalParameter names one' },
+  },
+  DEFENSE_LOGISTICS: {
+    'effects.noSiege': xml('ModifierArguments',
+      'ModifierId=DEFENSE_LOGISTICS_SIEGE_PROTECTION&Name=Protected', 'Value'),
+    'effects.stockpilePerTurn': xml('ModifierArguments',
+      'ModifierId=DEFENSE_LOGISTICS_BONUS_STRATEGICS&Name=Amount', 'Value'),
+  },
+  EMBRASURE: {
+    'effects.extraStrikes': xml('ModifierArguments',
+      'ModifierId=CITY_DEFENDER_ADJUST_ATTACKS_PER_TURN&Name=Amount', 'Value'),
+    'effects.freePromoOnTrain': xml('Modifiers', 'ModifierId=CITY_DEFENDER_FREE_PROMOTIONS', 'ModifierType',
+      { expect: 'MODIFIER_CITY_TRAINED_UNITS_ADJUST_GRANT_EXPERIENCE',
+        note: "its Amount is -1, the install's marker for 'one free promotion', not an XP figure" }),
+  },
+  AIR_DEFENSE_INITIATIVE: {
+    'effects.airDefenseCS': xml('ModifierArguments',
+      'ModifierId=AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS&Name=Amount', 'Value'),
+  },
+  MESSENGER: {
+    'effects.envoysAtMinor': xml('ModifierArguments',
+      'ModifierId=MESSENGER_GRANT_FREE_ENVOYS&Name=Amount', 'Value'),
+  },
+  EMISSARY: {
+    'effects.loyaltyToForeign.loyalty': xml('ModifierArguments',
+      'ModifierId=EMISSARY_IDENTITY_PRESSURE_TO_FOREIGN_CITIES&Name=Amount', 'Value'),
+    'effects.loyaltyToForeign.range': { lab: 'the published promotion text ("within 9 tiles"); the install\'s '
+      + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' },
+  },
+  AFFLUENCE: {
+    'effects.minorLuxuries': xml('Modifiers', 'ModifierId=AFFLUENCE_COPY_LUXURIES_FOR_IMPORT', 'ModifierType',
+      { expect: 'MODIFIER_GOVERNOR_ADJUST_CITY_COPY_LUXURIES_FOR_IMPORT' }),
+  },
+  LOCAL_INFORMANTS: {
+    'effects.spyLevelPenalty': xml('ModifierArguments',
+      'ModifierId=LOCAL_INFORMANTS_SPY_DEFENSE_BONUS&Name=Amount', 'Value'),
+  },
+  PUPPETEER: {
+    'effects.envoyDoubleAtMinor': xml('ModifierArguments',
+      'ModifierId=AMBASSADOR_ADJUST_CITY_ENVOY_MODIFIER&Name=Percent', 'Value',
+      { expect: 100, note: 'the install writes +100% envoys; the engine spells the same thing as a boolean' }),
+  },
+  GROUNDBREAKER: {
+    'effects.harvestMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (50), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=GROUNDBREAKER_BONUS_HARVEST_YIELDS&Name=Amount', 'Value')],
+    },
+  },
+  SURPLUS_LOGISTICS: {
+    'effects.growthMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (20), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=SURPLUS_LOGISTICS_EXTRA_GROWTH&Name=Amount', 'Value')],
+    },
+    'effects.routeStartFood': xml('ModifierArguments',
+      'ModifierId=SURPLUS_LOGISTICS_TRADE_ROUTE_FOOD&Name=Amount', 'Value'),
+  },
+  PROVISION: {
+    'effects.settlerFreePop': {
+      derived: "the NEGATION of the install's Enabled — EXPEDITION_ADJUST_SETTLERS_CONSUME_POPULATION "
+        + 'sets Enabled=false, which is what settlerFreePop=true means',
+      inputs: [xml('ModifierArguments',
+        'ModifierId=EXPEDITION_ADJUST_SETTLERS_CONSUME_POPULATION&Name=Enabled', 'Value')],
+    },
+  },
+  BLACK_MARKETEER: {
+    'effects.resourceDiscountPct': xml('ModifierArguments',
+      'ModifierId=BLACK_MARKETEER_STRATEGIC_RESOURCE_COST_DISCOUNT&Name=Amount', 'Value'),
+  },
+  VERTICAL_INTEGRATION: {
+    'effects.industryAllSources': xml('ModifierArguments',
+      'ModifierId=VERTICAL_INTEGRATION_PRODUCTION_REGIONAL_STACKING&Name=YieldType', 'Value',
+      { expect: 'YIELD_PRODUCTION' }),
+  },
+  BISHOP: {
+    'effects.pressureMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (100), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=CARDINAL_BISHOP_PRESSURE&Name=Amount', 'Value')],
+    },
+    'effects.faithPerSpecialty': xml('ModifierArguments',
+      'ModifierId=CARDINAL_BISHOP_FAITH_DISTRICT&Name=Amount', 'Value'),
+  },
+  GRAND_INQUISITOR: {
+    'effects.theologyCS': xml('ModifierArguments',
+      'ModifierId=CARDINAL_GRAND_INQUISITOR_COMBAT&Name=Amount', 'Value'),
+  },
+  LAYING_ON_OF_HANDS: {
+    'effects.fullHeal': xml('ModifierArguments',
+      'ModifierId=CARDINAL_LAYING_ON_OF_HANDS_HEAL&Name=Amount', 'Value',
+      { expect: 100, note: 'the install heals 100% in one turn; the engine spells it as a boolean' }),
+  },
+  CITADEL_OF_GOD: {
+    'effects.ignoreForeignPressure': xml('ModifierArguments',
+      'ModifierId=CARDINAL_CITADEL_OF_GOD_PRESSURE&Name=Enable', 'Value'),
+    'effects.faithOnBuildPct': xml('ModifierArguments',
+      'ModifierId=CARDINAL_CITADEL_OF_GOD_FAITH_FINISH_BUILDINGS&Name=BuildingProductionPercent', 'Value'),
+  },
+  PATRON_SAINT: {
+    'effects.firstPromoBonus': xml('ModifierArguments',
+      'ModifierId=CARDINAL_PATRON_SAINT_PROMOTION&Name=Amount', 'Value'),
+  },
+  DIVINE_ARCHITECT: {
+    'effects.districtFaithBuy': xml('ModifierArguments',
+      'ModifierId=CARDINAL_FAITH_PURCHASE_DISTRICT&Name=CanPurchase', 'Value'),
+  },
+  GUILDMASTER: {
+    'effects.builderCharges': xml('ModifierArguments',
+      'ModifierId=GUILDMASTER_ADDITIONAL_BUILDER_CHARGES_UNIT_MODIFIER&Name=Amount', 'Value'),
+  },
+  ZONING_COMMISSIONER: {
+    'effects.districtProdMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (20), the catalog the multiplier',
+      inputs: [xml('ModifierArguments',
+        'ModifierId=ZONING_COMMISSIONER_FASTER_DISTRICT_CONSTRUCTION&Name=Amount', 'Value')],
+    },
+  },
+  REINFORCED_MATERIALS: {
+    'effects.envDamageImmune': xml('ModifierArguments',
+      'ModifierId=REINFORCED_INFRASTRUCTURE_PREVENET_STRUCTURAL_DAMAGE&Name=Prevent', 'Value'),
+  },
+  WATER_WORKS: {
+    'effects.waterWorks': xml('Modifiers', 'ModifierId=WATER_WORKS_NEIGHBORHOOD_HOUSING', 'ModifierType',
+      { expect: 'MODIFIER_CITY_DISTRICTS_ADJUST_DISTRICT_HOUSING',
+        note: 'the four magnitudes are WATER_WORKS_HOUSING / _AMENITIES below' }),
+  },
+  LIBRARIAN: {
+    'effects.yieldMult.science': {
+      derived: '1 + Amount/100 — the install writes the percentage (15), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=LIBRARIAN_SCIENCE_YIELD_BONUS&Name=Amount', 'Value')],
+    },
+    'effects.yieldMult.culture': {
+      derived: '1 + Amount/100 — the install writes the percentage (15), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=LIBRARIAN_CULTURE_YIELD_BONUS&Name=Amount', 'Value')],
+    },
+  },
+  CONNOISSEUR: {
+    'effects.perCitizen.culture': xml('ModifierArguments',
+      'ModifierId=CONNOISSEUR_CULTURE_CITIZEN&Name=Amount', 'Value'),
+  },
+  RESEARCHER: {
+    'effects.perCitizen.science': xml('ModifierArguments',
+      'ModifierId=RESEARCHER_SCIENCE_CITIZEN&Name=Amount', 'Value'),
+  },
+  GRANTS: {
+    'effects.gppMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (100), the catalog the multiplier',
+      inputs: [xml('ModifierArguments',
+        'ModifierId=EDUCATOR_INCREASE_CITY_GREAT_PERSON_POINT_BONUS&Name=Amount', 'Value')],
+    },
+  },
+  SPACE_INITIATIVE: {
+    'effects.projectProdMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (30), the catalog the multiplier',
+      inputs: [xml('ModifierArguments',
+        'ModifierId=EDUCATOR_FASTER_SPACE_RACE_PRODUCTION&Name=Amount', 'Value')],
+    },
+  },
+  CURATOR: {
+    'effects.gwTourismMult': {
+      derived: 'ScalingFactor/100 — the install writes 200 (double), the catalog the multiplier',
+      inputs: [xml('ModifierArguments',
+        'ModifierId=CURATOR_DOUBLE_WRITING_TOURISM&Name=ScalingFactor', 'Value')],
+    },
+  },
+};
+
+/** the install-backed tags every promotion row carries, plus its own effects.
+ *  `requires` reaches the dump as ONE leaf (an all-scalar array is not split),
+ *  so its tag names the FIRST prerequisite row and the note names the rest —
+ *  the same shape `TECH_SRC.prereqs` uses. */
+const promoSrc = (id: string, governor: GovernorId,
+                  requires?: readonly string[]): SrcMap => {
+  const iid = PROMO_INSTALL_ID[id];
+  const first = requires?.[0];
+  return {
+    governor: xml('GovernorPromotionSets', `GovernorPromotion=${iid}`, 'GovernorType',
+      { expect: GOVERNOR_INSTALL_ID[governor] }),
+    tier: xml('GovernorPromotions', `GovernorPromotionType=${iid}`, 'Level'),
+    ...(first === undefined ? {} : {
+      requires: xml('GovernorPromotionPrereqs',
+        `GovernorPromotionType=${iid}&PrereqGovernorPromotion=${PROMO_INSTALL_ID[first]}`,
+        'PrereqGovernorPromotion', {
+          expect: PROMO_INSTALL_ID[first],
+          note: requires!.length > 1
+            ? `and ${requires!.slice(1).map((r) => PROMO_INSTALL_ID[r]).join(', ')}`
+            : undefined,
+        }),
+    }),
+    ...PROMO_EFFECT_SRC[id],
+  };
+};
 
 const G = (id: string, governor: GovernorId, tier: number, name: string,
            description: string, effects: GovernorEffects,
            requires?: readonly string[]): GovernorPromotionDef =>
-  ({ id, name, governor, tier, requires, description, effects });
+  ({ id, name, governor, tier, requires, description, effects,
+     src: promoSrc(id, governor, requires) });
 
 /**
  * The Gathering Storm promotion tables, one row per published ability, in

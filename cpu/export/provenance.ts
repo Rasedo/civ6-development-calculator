@@ -40,6 +40,10 @@ import { CIV_LEVELS } from '../data/civLevels';
 import { BOOSTS } from '../data/boosts';
 import { CONGRESS_RESOLUTIONS, EMERGENCIES } from '../data/seats';
 import { CLIMATE_PHASES } from '../data/climate';
+// scalar-only modules: imported for their `srcConst` registrations, which
+// only exist once the module has loaded
+import '../data/sight';
+import '../data/goodyHuts';
 import { SRC_REGISTRY, type Src } from '../data/provenance';
 
 type Row = Record<string, unknown>;
@@ -82,7 +86,13 @@ const ROW_CATALOGS: Readonly<Record<string, Rows>> = {
   climatePhases: CLIMATE_PHASES,
 };
 
-const SKIP_COL = /^(id|name|description|src|civ|leader)$|(Name|Text|Note|Description|Label)$/;
+/** Columns that are not game CONSTANTS. `id`/`name`/`description` and the
+ *  Name/Text/Note/Description/Label suffixes are prose or identity; `civ` and
+ *  `leader` are the roster's own keys; and `kind`, `mask` and `code` are ENGINE
+ *  VOCABULARY — a discriminant this engine chose to sort its own rows by
+ *  (`kind: 'district' | 'building'`), a bitmask layout, a scaffold index — with
+ *  no cell in the install to read them from. */
+const SKIP_COL = /^(id|name|description|src|civ|leader|kind|mask|code)$|(Name|Text|Note|Description|Label)$/;
 
 export interface ProvenanceEntry {
   catalog: string;
@@ -97,6 +107,10 @@ function isScalar(v: unknown): v is number | string | boolean {
 
 /** flatten one row into dotted leaves */
 function leaves(v: unknown, path: string, out: [string, unknown][]): void {
+  // an EMPTY array is the absence of a clause, not a constant — a tech with no
+  // `effects`, a promotion with no `requires`. It has nothing to read from the
+  // install, so it is not an unsourced constant either.
+  if (Array.isArray(v) && v.length === 0) return;
   if (isScalar(v)) {
     out.push([path, v]);
   } else if (Array.isArray(v)) {

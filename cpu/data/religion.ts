@@ -19,6 +19,7 @@
 
 import type { DistrictId, GreatPersonClass, ResourceCategory, Yields } from '../core/types';
 import type { AdjacencyRule } from './districts';
+import { xml, type SrcMap } from './provenance';
 
 export interface BeliefEffects {
   /** extra ADJACENCY rules one district type reads while this belief is held
@@ -54,10 +55,247 @@ export interface BeliefDef {
   name: string;
   description: string;
   effects: BeliefEffects;
+  /** PROVENANCE, per column — see BELIEF_SRC below. */
+  src?: SrcMap;
 }
 
+/**
+ * PROVENANCE (cpu/data/provenance.ts), keyed by the engine's belief id and
+ * attached by the row builder below. The install writes a belief's magnitude
+ * two hops away: `BeliefModifiers` names a modifier, that modifier is usually a
+ * MODIFIER_ALL_CITIES_ATTACH_MODIFIER whose only argument is the INNER modifier
+ * id, and the inner one's `ModifierArguments` row carries the Amount. Every tag
+ * below points at the cell that IS the number — the inner row — so the checker
+ * reads one cell, not a chain.
+ *
+ * Four engine ids spell an install belief differently:
+ * LADY_OF_THE_REEDS = BELIEF_LADY_OF_THE_REEDS_AND_MARSHES,
+ * DEFENDER_OF_THE_FAITH = BELIEF_DEFENDER_OF_FAITH,
+ * FIRE_GODDESS = BELIEF_GODDESS_OF_FIRE, and the mapping lives in the tag.
+ *
+ * SIX rows have NO install source and stay untagged:
+ * ORAL_TRADITION, GODDESS_OF_THE_HARVEST and CHURCH_PROPERTY are DELETED by
+ * Gathering Storm (DLC/Expansion2/Data/Expansion2_RemoveData.xml deletes both
+ * the Beliefs row and its BeliefModifiers), so the loaded install has no row to
+ * read; CRUSADE and MESSENGER_OF_THE_GODS appear nowhere in the install at all;
+ * RELIGIOUS_COMMUNITY's Beliefs row EXISTS but GS re-wrote it to "+2 Gold on
+ * international Trade Routes" — the +1 Housing per Shrine/Temple this catalog
+ * carries is the pre-GS clause, and GS's housing sits on FEED_THE_WORLD's own
+ * modifiers at Amount 2.
+ */
+const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
+  // ---- PANTHEONS ----
+  GOD_OF_THE_OPEN_SKY: {
+    'effects.improvementYields.PASTURE.culture':
+      xml('ModifierArguments', 'ModifierId=GOD_OF_THE_OPEN_SKY_PASTURE_CULTURE_MODIFIER&Name=Amount', 'Value'),
+  },
+  GODDESS_OF_THE_HUNT: {
+    'effects.improvementYields.CAMP.food':
+      xml('ModifierArguments', 'ModifierId=GODDESS_OF_THE_HUNT_CAMP_FOOD_MODIFIER&Name=Amount', 'Value'),
+    'effects.improvementYields.CAMP.production':
+      xml('ModifierArguments', 'ModifierId=GODDESS_OF_THE_HUNT_CAMP_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+  },
+  GOD_OF_THE_SEA: {
+    'effects.improvementYields.FISHING_BOATS.production':
+      xml('ModifierArguments', 'ModifierId=GOD_OF_THE_SEA_FISHINGBOATS_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+  },
+  STONE_CIRCLES: {
+    'effects.improvementYields.QUARRY.faith':
+      xml('ModifierArguments', 'ModifierId=STONE_CIRCLES_QUARRY_FAITH_MODIFIER&Name=Amount', 'Value'),
+  },
+  LADY_OF_THE_REEDS: {
+    // one install modifier under PLOT_HAS_REEDS_REQUIREMENTS covers all three
+    // features; the engine writes the same Amount once per feature.
+    'effects.featureYields.MARSH.production':
+      xml('ModifierArguments', 'ModifierId=LADY_OF_THE_REEDS_PRODUCTION2_MODIFIER&Name=Amount', 'Value'),
+    'effects.featureYields.OASIS.production':
+      xml('ModifierArguments', 'ModifierId=LADY_OF_THE_REEDS_PRODUCTION2_MODIFIER&Name=Amount', 'Value'),
+    'effects.featureYields.FLOODPLAINS.production':
+      xml('ModifierArguments', 'ModifierId=LADY_OF_THE_REEDS_PRODUCTION2_MODIFIER&Name=Amount', 'Value'),
+  },
+  GOD_OF_CRAFTSMEN: {
+    'effects.improvementOnResource.category':
+      xml('Modifiers', 'ModifierId=GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION_MODIFIER', 'SubjectRequirementSetId',
+        { expect: 'PLOT_HAS_STRATEGIC_IMPROVED_REQUIREMENTS' }),
+    'effects.improvementOnResource.yields.production':
+      xml('ModifierArguments', 'ModifierId=GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+  },
+  RELIGIOUS_SETTLEMENTS: {
+    'effects.borderCostMult': {
+      derived: '1 - Amount/100 — the install writes the DISCOUNT (15%), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=RELIGIOUS_SETTLEMENTS_CULTUREBORDER&Name=Amount', 'Value')],
+    },
+  },
+  FERTILITY_RITES: {
+    'effects.growthMult': {
+      derived: '1 + Amount/100 — the install writes the percentage (10), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=FERTILITY_RITES_GROWTH&Name=Amount', 'Value')],
+    },
+  },
+  DIVINE_SPARK: {
+    'effects.gppFlat.PROPHET':
+      xml('ModifierArguments', 'ModifierId=DIVINE_SPARK_HOLY_SITE_MODIFIER&Name=Amount', 'Value'),
+    'effects.gppFlat.SCIENTIST':
+      xml('ModifierArguments', 'ModifierId=DIVINE_SPARK_SCIENTIST_MODIFIER&Name=Amount', 'Value',
+        { note: "the install hangs it on the Library (BUILDING_IS_LIBRARY), the engine on the Campus" }),
+    'effects.gppFlat.ARTIST':
+      xml('ModifierArguments', 'ModifierId=DIVINE_SPARK_WRITER_MODIFIER&Name=Amount', 'Value',
+        { note: 'the install pays a WRITER off the Amphitheater; the engine pays an ARTIST off the Theater Square' }),
+  },
+  RIVER_GODDESS: {
+    'effects.riverCity.amenities':
+      xml('ModifierArguments', 'ModifierId=RIVER_GODDESS_HOLY_SITE_AMENITIES_MODIFIER&Name=Amount', 'Value'),
+    'effects.riverCity.housing':
+      xml('ModifierArguments', 'ModifierId=RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER&Name=Amount', 'Value'),
+  },
+  GODDESS_OF_FESTIVALS: {
+    // the install's clause is PLOT_HAS_PLANTATION, not "an improved luxury";
+    // only the AMOUNT is comparable, and `category` stays untagged.
+    'effects.improvementOnResource.yields.culture':
+      xml('ModifierArguments', 'ModifierId=GODDESS_OF_FESTIVALS_PLANTATION_CULTURE_MODIFIER&Name=Amount', 'Value'),
+  },
+  RELIGIOUS_IDOLS: {
+    'effects.improvementOnResource.category':
+      xml('Modifiers', 'ModifierId=RELIGIOUS_IDOLS_BONUS_MINE_FAITH_MODIFIER', 'SubjectRequirementSetId',
+        { expect: 'PLOT_HAS_BONUS_MINE_REQUIREMENTS' }),
+    'effects.improvementOnResource.yields.faith':
+      xml('ModifierArguments', 'ModifierId=RELIGIOUS_IDOLS_BONUS_MINE_FAITH_MODIFIER&Name=Amount', 'Value'),
+  },
+  DANCE_OF_THE_AURORA: {
+    'effects.districtAdjacency.district':
+      xml('ModifierArguments', 'ModifierId=DANCE_OF_THE_AURORA_FAITHTUNDRAADJACENCY&Name=DistrictType', 'Value',
+        { expect: 'DISTRICT_HOLY_SITE' }),
+    'effects.districtAdjacency.rules.0.source':
+      xml('ModifierArguments', 'ModifierId=DANCE_OF_THE_AURORA_FAITHTUNDRAADJACENCY&Name=TerrainType', 'Value',
+        { expect: 'TERRAIN_TUNDRA', note: 'the install writes a second row for TERRAIN_TUNDRA_HILLS; the engine has one TUNDRA' }),
+    'effects.districtAdjacency.rules.0.amount':
+      xml('ModifierArguments', 'ModifierId=DANCE_OF_THE_AURORA_FAITHTUNDRAADJACENCY&Name=Amount', 'Value'),
+  },
+  DESERT_FOLKLORE: {
+    'effects.districtAdjacency.district':
+      xml('ModifierArguments', 'ModifierId=DESERT_FOLKLORE_FAITHDESERTADJACENCY&Name=DistrictType', 'Value',
+        { expect: 'DISTRICT_HOLY_SITE' }),
+    'effects.districtAdjacency.rules.0.source':
+      xml('ModifierArguments', 'ModifierId=DESERT_FOLKLORE_FAITHDESERTADJACENCY&Name=TerrainType', 'Value',
+        { expect: 'TERRAIN_DESERT', note: 'the install writes a second row for TERRAIN_DESERT_HILLS; the engine has one DESERT' }),
+    'effects.districtAdjacency.rules.0.amount':
+      xml('ModifierArguments', 'ModifierId=DESERT_FOLKLORE_FAITHDESERTADJACENCY&Name=Amount', 'Value'),
+  },
+  SACRED_PATH: {
+    'effects.districtAdjacency.district':
+      xml('ModifierArguments', 'ModifierId=SACRED_PATH_FAITHFEATUREADJACENCY&Name=DistrictType', 'Value',
+        { expect: 'DISTRICT_HOLY_SITE' }),
+    'effects.districtAdjacency.rules.0.source':
+      xml('ModifierArguments', 'ModifierId=SACRED_PATH_FAITHFEATUREADJACENCY&Name=FeatureType', 'Value',
+        { expect: 'FEATURE_JUNGLE', note: "the install's JUNGLE is this engine's RAINFOREST" }),
+    'effects.districtAdjacency.rules.0.amount':
+      xml('ModifierArguments', 'ModifierId=SACRED_PATH_FAITHFEATUREADJACENCY&Name=Amount', 'Value'),
+  },
+  FIRE_GODDESS: {
+    // BELIEF_GODDESS_OF_FIRE — one modifier under PLOT_HAS_GODDES_FIRE_REQUIREMENTS
+    // covers both features.
+    'effects.featureYields.GEOTHERMAL_FISSURE.faith':
+      xml('ModifierArguments', 'ModifierId=GODDESS_OF_FIRE_FEATURES_FAITH_MODIFIER&Name=Amount', 'Value'),
+    'effects.featureYields.VOLCANIC_SOIL.faith':
+      xml('ModifierArguments', 'ModifierId=GODDESS_OF_FIRE_FEATURES_FAITH_MODIFIER&Name=Amount', 'Value'),
+  },
+
+  // ---- FOLLOWER ----
+  WORK_ETHIC: {
+    'effects.workEthic':
+      xml('Modifiers', 'ModifierId=WORK_ETHIC_ADJACENCY_PRODUCTION_2', 'ModifierType',
+        { expect: 'MODIFIER_ALL_DISTRICTS_ADJUST_YIELD_BASED_ON_ADJACENCY_BONUS' }),
+  },
+  FEED_THE_WORLD: {
+    'effects.buildingYields.SHRINE.food':
+      xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.TEMPLE.food':
+      xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER&Name=Amount', 'Value'),
+  },
+  CHORAL_MUSIC: {
+    'effects.buildingYields.SHRINE.culture':
+      xml('ModifierArguments', 'ModifierId=CHORAL_MUSIC_SHRINE_CULTURE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.TEMPLE.culture':
+      xml('ModifierArguments', 'ModifierId=CHORAL_MUSIC_TEMPLE_CULTURE_MODIFIER&Name=Amount', 'Value'),
+  },
+  ZEN_MEDITATION: {
+    'effects.amenitiesIfSpecialty.min':
+      xml('Modifiers', 'ModifierId=ZEN_MEDITATION_AMENITY', 'SubjectRequirementSetId',
+        { expect: 'CITY_FOLLOWS_RELIGION_WITH_2 DISTRICTS_REQUIREMENTS',
+          note: "the space in the install's requirement-set id is the install's own" }),
+    'effects.amenitiesIfSpecialty.amenities':
+      xml('ModifierArguments', 'ModifierId=ZEN_MEDITATION_AMENITY_MODIFIER&Name=Amount', 'Value'),
+  },
+  DIVINE_INSPIRATION: {
+    'effects.faithPerWonder':
+      xml('ModifierArguments', 'ModifierId=DIVINE_INSPIRATION_WONDER_FAITH_MODIFIER&Name=Amount', 'Value'),
+  },
+
+  // ---- FOUNDER ----
+  TITHE: {
+    'effects.perFollowers.per':
+      xml('ModifierArguments', 'ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=PerXItems', 'Value',
+        { note: "GS's Tithe is BELIEF_YIELD_PER_CITY, not per follower — the engine kept the pre-GS clause" }),
+    'effects.perFollowers.yields.gold':
+      xml('ModifierArguments', 'ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=Amount', 'Value'),
+  },
+  WORLD_CHURCH: {
+    'effects.perFollowers.per':
+      xml('ModifierArguments', 'ModifierId=WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER&Name=PerXItems', 'Value'),
+    'effects.perFollowers.yields.culture':
+      xml('ModifierArguments', 'ModifierId=WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER&Name=Amount', 'Value'),
+  },
+  CROSS_CULTURAL_DIALOGUE: {
+    'effects.perFollowers.per':
+      xml('ModifierArguments', 'ModifierId=CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER&Name=PerXItems', 'Value'),
+    'effects.perFollowers.yields.science':
+      xml('ModifierArguments', 'ModifierId=CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER&Name=Amount', 'Value'),
+  },
+  PILGRIMAGE: {
+    'effects.perCity.faith':
+      xml('ModifierArguments', 'ModifierId=PILGRIMAGE_FAITH_CITY_MODIFIER&Name=Amount', 'Value'),
+  },
+  STEWARDSHIP: {
+    // the install pays per DISTRICT (Campus, Commercial Hub); the engine pays
+    // off the district's two buildings, at the same Amount.
+    'effects.buildingYields.LIBRARY.science':
+      xml('ModifierArguments', 'ModifierId=STEWARDSHIP_SCIENCE_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.UNIVERSITY.science':
+      xml('ModifierArguments', 'ModifierId=STEWARDSHIP_SCIENCE_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.MARKET.gold':
+      xml('ModifierArguments', 'ModifierId=STEWARDSHIP_GOLD_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.BANK.gold':
+      xml('ModifierArguments', 'ModifierId=STEWARDSHIP_GOLD_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+  },
+
+  // ---- ENHANCER ----
+  ITINERANT_PREACHERS: {
+    'effects.pressureRangeBonus':
+      xml('ModifierArguments', 'ModifierId=ITINERANT_PREACHERS_SPREAD_DISTANCE&Name=DistanceChange', 'Value'),
+  },
+  SCRIPTURE: {
+    'effects.spreadPressureMult':
+      xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier', 'Value',
+        { note: "the install's SpreadMultiplier is a PERCENT (25), i.e. a x1.25 lump, not x1.5" }),
+  },
+  JUST_WAR: {
+    'effects.combatNearFollowing':
+      xml('ModifierArguments', 'ModifierId=JUST_WAR_COMBAT_BONUS_MODIFIER&Name=Amount', 'Value'),
+  },
+  DEFENDER_OF_THE_FAITH: {
+    'effects.combatDefendFollowing':
+      xml('ModifierArguments', 'ModifierId=DEFENDER_OF_FAITH_COMBAT_BONUS_MODIFIER&Name=Amount', 'Value'),
+  },
+  HOLY_ORDER: {
+    'effects.missionaryCostMult': {
+      derived: '1 - Amount/100 — the install writes the purchase DISCOUNT (30), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER&Name=Amount', 'Value')],
+    },
+  },
+};
+
 const B = (id: string, name: string, description: string, effects: BeliefEffects): BeliefDef =>
-  ({ id, name, description, effects });
+  ({ id, name, description, effects, ...(BELIEF_SRC[id] ? { src: BELIEF_SRC[id] } : {}) });
 
 export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
   [
