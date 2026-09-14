@@ -25,10 +25,22 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
 
-def fresh(rules, path, turns=30):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+# THE WARMED BASE, ONE PER (turns, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps. Every plane
+# these pokes write is in `_MUTABLE`, so the restore is the whole job; `slot`
+# keys a SECOND base for a scene that holds two live sims at once.
+_BASE: dict = {}
+
+
+def fresh(rules, path, turns=30, slot: int = 0):
+    key = (str(path), turns, slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 
@@ -138,8 +150,8 @@ def main() -> None:
     # The scripted patrol moves 2.78 tiles per moving unit-turn, so one order
     # per turn would cut civ mobility by ~two thirds. The action is a SEQUENCE
     # and the engine walks it, validating each step — it never extends a move.
-    def setup():
-        s2 = fresh(rules, path)
+    def setup(slot=0):
+        s2 = fresh(rules, path, slot=slot)
         s2.seat_ext[0, row] = True
         sl = next(
             v for v in range(s2.major_unit_alive.shape[1])
@@ -189,7 +201,9 @@ def main() -> None:
     s7, sl7, rw7, nrows3 = setup()
     dead = None
     for d in range(6):
-        probe, slp, rwp, nrp = setup()
+        # slot 1: `s7` is still live below, and one base would hand back the
+        # same object twice
+        probe, slp, rwp, nrp = setup(1)
         if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
             continue
         probe.apply_seat_unit_sequence(row, seq_of([d], nrp, rwp))

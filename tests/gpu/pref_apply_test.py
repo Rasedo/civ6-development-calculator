@@ -31,10 +31,22 @@ from warmup import settle_all
 ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these seats hold cities
 
 
-def fresh(rules, path, turns=25):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+# THE WARMED BASE, ONE PER (turns, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps. Every plane
+# these pokes write is in `_MUTABLE`, so the restore is the whole job; `slot`
+# keys a SECOND base for a scene that holds two live sims at once.
+_BASE: dict = {}
+
+
+def fresh(rules, path, turns=25, slot: int = 0):
+    key = (str(path), turns, slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 

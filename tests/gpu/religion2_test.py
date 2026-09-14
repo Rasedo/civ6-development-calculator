@@ -52,10 +52,26 @@ from warmup import settle_all
 
 
 # ------------------------------------------------------------------ helpers ---
-def build(rules, path, steps: int = 20, dtype=torch.float64):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
-    for _ in range(steps):
-        sim.step()
+# THE WARMED BASE, ONE PER (steps, dtype, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps. `_STATIC`
+# names the planes these pokes write that `snapshot`/`restore` does not carry
+# (they are not in `_MUTABLE`), so the helper puts those back by hand as well;
+# `slot` keys a SECOND base for any scene that holds two live sims at once.
+_STATIC = ("hills",)
+_BASE: dict = {}
+
+
+def build(rules, path, steps: int = 20, dtype=torch.float64, slot: int = 0):
+    key = (str(path), steps, str(dtype), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
+        for _ in range(steps):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
     return sim
 
 

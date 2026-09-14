@@ -48,8 +48,27 @@ from warmup import settle_all
 
 
 # ------------------------------------------------------------------ helpers ---
-def build(rules, path):
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+# THE WARMED BASE, ONE PER (steps, slot). A scene pays a `restore` — milliseconds
+# — instead of a fixture load, a settle and N steps. `_STATIC` names the planes
+# these pokes write that `snapshot`/`restore` does not carry (they are not in
+# `_MUTABLE`), so the helper puts those back by hand as well; `slot` keys a
+# SECOND base for any scene that holds two live sims at once.
+_STATIC = ("ocean_tile", "cliff_mask", "river_mask")
+_BASE: dict = {}
+
+
+def build(rules, path, steps: int = 0, slot: int = 0):
+    key = (str(path), steps, slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(steps):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    return sim
 
 
 def idx(rules, name: str) -> int:
@@ -193,9 +212,7 @@ def poke_galley_city(rules, path, GALLEY):
     """1. A GALLEY on a water tile adjacent to a coastal civ city batters it
     (siege → _melee_city) and CAPTURES it at 0 HP — naval melee
     takes coastal cities from the sea, through the existing combat path."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r, j, ctr = first_civ_city(sim)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -232,9 +249,7 @@ def poke_galley_city(rules, path, GALLEY):
 def poke_galley_cs(rules, path, GALLEY):
     """2. A GALLEY on water adjacent to a city-state CENTER captures it
     (citystate_hit → _capture_city_state) — naval melee takes coastal CS too."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     live = sim.citystate_alive[0].nonzero(as_tuple=True)[0]
     assert len(live), "no city-state on this seed"
     s = int(live[0])
@@ -276,9 +291,7 @@ def poke_galley_cs(rules, path, GALLEY):
 def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
     """3. A QUADRIREME (rangedStrength 25, range 1) on water bombards an
     adjacent civ unit — one roll, NO retaliation, NO advance (civ_only_att path)."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     assert float(sim._type_ranged_strength[QUAD]) > 0 and bool(sim.unit_naval[QUAD]), "quadrireme must be a naval ranged unit"
     r, j, ctr = first_civ_city(sim)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
@@ -305,9 +318,7 @@ def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
 def poke_quadrireme_city(rules, path, QUAD):
     """4. A QUADRIREME bombards an adjacent coastal city — HP drops but FLOORS
     at 1 (civ_only_sieg: ranged never captures; melee finishes)."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r, j, ctr = first_civ_city(sim)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -337,9 +348,7 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     own): a GALLEY SPAWNS on the nearest free WATER tile, then attacks. Plus the
     MOVE-verb limit — the controlled MOVE verb reads the land `passable` plane
     (no wpass), so it cannot step a ship onto water."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r, j, ctr = first_civ_city(sim)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -393,9 +402,7 @@ def poke_ocean_gate(rules, path, GALLEY):
     exact `wpass & (~ocean | cartography)` gate as the war-march water step):
     an OCEAN spot is refused pre-CARTOGRAPHY, allowed post-; COAST is ungated."""
     cart = None
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     cart = sim._cartography_tech
     assert cart >= 0, "CARTOGRAPHY tech must be exported"
     r, j, ctr = first_civ_city(sim)
@@ -431,9 +438,7 @@ def poke_ocean_gate(rules, path, GALLEY):
     assert int(sim.major_unit_tile[0, n0]) == ot, "the ship must land on the (now-enterable) ocean tile"
 
     # COAST is ungated: a fresh coast candidate spawns with CARTOGRAPHY absent.
-    sim2 = build(rules, path)
-    for _ in range(25):
-        sim2.step()
+    sim2 = build(rules, path, 25)
     r2, j2, ctr2 = first_civ_city(sim2)
     anchor2 = empty_neighbor(sim2, ctr2)
     ct = empty_neighbor(sim2, anchor2)
@@ -451,9 +456,7 @@ def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
     body): a naval unit IS struck (tile-agnostic scan), and an EMBARKED target
     takes the flat-CS override. Override proved by a two-run damage compare on
     one RNG."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     assert sim._walls_bidx >= 0
     assert bool(sim.city_alive[0, 0, 0]), "seat-0 capital must be alive"
     c, ctr = 0, int(sim.city_center[0, 0, 0])
@@ -496,9 +499,7 @@ def poke_walls_civ(rules, path, GALLEY, WARRIOR):
     ship IS struck and an EMBARKED seat-0 target takes the flat-CS override.
     Isolation: one at-war civ seat with a walled city and ZERO units/queue, all
     other seats at peace, all barbarians cleared — only the strike can touch major_unit_hp."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r, j, ctr = first_civ_city(sim)
     # make civ seat r the ONLY aggressor; strip its army/economy so nothing else fires
     sim.war[:, 0, 1:sim.n_majors] = sim.war[:, 1:sim.n_majors, 0] = False
@@ -546,9 +547,7 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     """8. Capturing an EMBARKED civ-seat civilian: the captured unit appends at
     the seat-0 POOL END (unit_next) and KEEPS embarked under its new seat (civk).
     """
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r = 0
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -590,9 +589,7 @@ def poke_flank_support(rules, path, GALLEY):
     """9. Flank/support (_flank_support): a NAVAL unit counts for flanking (a
     seat-0 ship) and for support (a civ-seat ship); the SAME unit EMBARKED
     counts 0."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     r = 0
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -666,9 +663,7 @@ def poke_amphibious(rules, path, WARRIOR, ARCHER):
     the attack outright rather than softening it, and the victor comes ashore.
     """
     def scene(emb: bool = True, utype: int | None = None, cliff: bool = False):
-        sim = build(rules, path)
-        for _ in range(25):
-            sim.step()
+        sim = build(rules, path, 25)
         sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
         sim.sync_war()
         _r, _j, ctr = first_civ_city(sim)
@@ -736,9 +731,7 @@ def poke_embarked_support(rules, path, WARRIOR, GALLEY):
     Support against attacks of enemy naval units" — so an escort still counts
     for them against everything else, on top of the normalized embarked CS."""
     def scene(escorted: bool, naval: bool) -> int:
-        sim = build(rules, path)
-        for _ in range(25):
-            sim.step()
+        sim = build(rules, path, 25)
         sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
         sim.sync_war()
         sim.civ_civics[:, :, sim._flank_support_civic] = True
@@ -936,9 +929,7 @@ def poke_canal(rules, path, GALLEY, WARRIOR):
     """16. CIV6 (Canal): "Allows Naval units to pass through this tile." The
     passage is a HULL fact and nothing else — the ground stays land for the
     land plane, for the water plane, and for a pillaged district."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     assert sim._canal_didx >= 0, "the district catalog carries no Canal"
     neutralize_barbs(sim)
     w, land = shore_pair(sim)
@@ -981,9 +972,7 @@ def poke_canal(rules, path, GALLEY, WARRIOR):
 def poke_water_walk(rules, path, GDR):
     """17. CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast
     tiles as it would on land" — no embark, no seafaring tech, its own pool."""
-    sim = build(rules, path)
-    for _ in range(25):
-        sim.step()
+    sim = build(rules, path, 25)
     assert bool(sim.unit_water_walk[GDR]), "the robot's row carries no water walk"
     assert not bool(sim.unit_water_walk.sum() > 1), "only the robot walks water"
     neutralize_barbs(sim)
