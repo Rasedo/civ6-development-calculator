@@ -236,15 +236,6 @@ class SimPhase:
             # phase.ts adds stats.total.gold straight in.
             gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
             faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
-            if getattr(self, "_log_diff", False):
-                for _b in range(B):
-                    if not bool(cact[_b]):
-                        continue
-                    self._diff_events.setdefault(_b, []).append(
-                        f"cy:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                        f":{int(self.city_center[_b, row, j])}"
-                        f" f{float(total[_b, j, 5]):.6f}"
-                        f" g{float(total[_b, j, 2]):.6f}")
             sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
@@ -1260,15 +1251,6 @@ class SimPhase:
         bidx = torch.arange(self.B, device=self.device)
         _pct = self._governor_sum(row, "faithOnBuildPct")[bidx, col]
         _pay = torch.floor(cost.double() * _pct / 100.0) * mask.double()
-        if getattr(self, "_log_diff", False):
-            for _b in range(self.B):
-                if not bool(mask[_b]):
-                    continue
-                self._diff_events.setdefault(_b, []).append(
-                    f"cf:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                    f":{int(self.city_center[_b, row, int(col[_b])])}"
-                    f" cost{int(float(cost[_b]))} pct{int(float(_pct[_b]))}"
-                    f" pay{int(float(_pay[_b]))}")
         self.civ_faith[:, row] = self.civ_faith[:, row] + torch.zeros_like(
             self.civ_faith[:, row]).index_add_(0, bidx, _pay.to(self.civ_faith.dtype))
 

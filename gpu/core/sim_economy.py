@@ -3010,16 +3010,6 @@ class SimEconomy:
         if self.n_governors and row < self.n_majors:
             gmul = self._governor_tile_adj(row, di).to(out.dtype)
             out = out * gmul
-        if getattr(self, "_log_diff", False):
-            _nm = self.districts_cat[di].get('id')
-            _bel = 1 if (di in self._bel_adj_srcs and row < self.n_majors) else 0
-            for _b in range(self.B):
-                for _t in (self.district[_b] == di).nonzero().flatten().tolist():
-                    _g = float(gmul[_b, _t]) if gmul is not None else 1.0
-                    self._diff_events.setdefault(_b, []).append(
-                        f"db:{_t}:{_nm} base{int(float(base[_b, _t]))}"
-                        f" mult{float(mult[_b, 0]) * _g:g}"
-                        f" add{_bel} #gov{_g:g}")
         return out
 
     def _district_elig_site(self, row: int, j: int) -> torch.Tensor:
@@ -5309,26 +5299,8 @@ class SimEconomy:
                 else torch.zeros(B, 6, dtype=F64, device=dev)
             _spec = self._district_counts(row)[1] if self.districts_on \
                 else torch.zeros(B, self.RC, dtype=torch.long, device=dev)
-            if getattr(self, "_log_diff", False):
-                for _b in range(B):
-                    for _j in range(cols):
-                        if not bool(self.city_alive[_b, row, _j]):
-                            continue
-                        self._diff_events.setdefault(_b, []).append(
-                            f"sp2:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                            f":{int(self.city_center[_b, row, _j])}"
-                            f" spec{int(_spec[_b, _j])}")
             _gb = self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
-            if getattr(self, "_log_diff", False):
-                for _b in range(B):
-                    for _j in range(cols):
-                        if not bool(self.city_alive[_b, row, _j]):
-                            continue
-                        self._diff_events.setdefault(_b, []).append(
-                            f"gb:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                            f":{int(self.city_center[_b, row, _j])}"
-                            f" gfaith{float(_gb[_b, _j, 5]):.3f}")
             bon = bon + _gb
 
         trade = zeros6
@@ -5337,32 +5309,6 @@ class SimEconomy:
             trade = _rt[:, sl] * alivef.unsqueeze(2)
 
         total = tiles_y + dist_y + bld_y + citz + bon + trade
-        if getattr(self, "_log_diff", False):
-            for _b in range(B):
-                for _j in range(cols):
-                    if not bool(self.city_alive[_b, row, _j]):
-                        continue
-                    self._diff_events.setdefault(_b, []).append(
-                        f"bk:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                        f":{int(self.city_center[_b, row, _j])}"
-                        f" t{float(tiles_y[_b, _j, 5]):.3f}"
-                        f" d{float(dist_y[_b, _j, 5]):.3f}"
-                        f" b{float(bld_y[_b, _j, 5]):.3f}"
-                        f" z{float(citz[_b, _j, 5]):.3f}"
-                        f" n{float(bon[_b, _j, 5]):.3f}"
-                        f" r{float(trade[_b, _j, 5]):.3f}")
-                    # the same six for PRODUCTION — the queue's own input
-                    self._diff_events.setdefault(_b, []).append(
-                        f"bp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                        f":{int(self.city_center[_b, row, _j])}"
-                        f" t{float(tiles_y[_b, _j, 1]):.3f}"
-                        f" d{float(dist_y[_b, _j, 1]):.3f}"
-                        f" b{float(bld_y[_b, _j, 1]):.3f}"
-                        f" z{float(citz[_b, _j, 1]):.3f}"
-                        f" n{float(bon[_b, _j, 1]):.3f}"
-                        f" r{float(trade[_b, _j, 1]):.3f}"
-                        f" all{float(total[_b, _j, 1]):.3f}"
-                        f" yf{float(amen_yf[_b, _j]):.3f}")
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
         # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the

@@ -35,10 +35,11 @@
  *     `up:` unit upkeep, the CHARGE beside the unit COUNT
  *     `dm:` the minor's build — the only instrument on that path
  *
- *   SCAFFOLDING, kept only while a hunt needs it: `cy:` and `bk:`/`bp:` (the
- *   per-city yield buckets), `sp2:`, `gb:`, `u1:`, `cf:`, `db:`. Delete these
- *   when the hunt that wanted them closes; `ds:` and the bucket lines say
- *   everything they said, with fewer keys.
+ *   SCAFFOLDING is kept only while a hunt needs it and deleted when that
+ *   hunt closes — eight kinds (the per-city yield buckets, the specialty
+ *   count, the governor's faith, the per-unit upkeep, the build-faith pay,
+ *   the adjacency halves) left on 2026-09-14 once A-4 and A-5 were green.
+ *   A new hunt adds its own and takes them out again in the closing commit.
  *
  * AND THE RULE THEY ALL COST ME: a key both engines print is not enough —
  * the two sides must MEASURE THE SAME QUANTITY. Five lines in A-4's hunt named

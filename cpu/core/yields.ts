@@ -324,12 +324,6 @@ export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, 
   const own = DISTRICTS[type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.adjacency;
   const _base = districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra], own);
   const _mult = ctx.mods.adjacencyMult[type] ?? 1;
-  // the FLOORED base and the multiplier apart: TS floors then multiplies, so
-  // a disagreement is in one half or the other and never both.
-  const _dlb = (globalThis as { __diffLog?: string[] }).__diffLog;
-  if (_dlb) _dlb.push(`db:${tile.index}:${type} base${_base} mult${_mult}`
-    + ` add${(ctx.mods.districtAdjacencyAdd?.[type] ?? []).length}`
-    + ` #civ${ctx.mods.civ} own${own ? own.length : -1}`);
   return _base * _mult;
 }
 

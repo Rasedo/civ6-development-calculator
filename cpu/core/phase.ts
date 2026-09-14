@@ -44,7 +44,7 @@ import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasabl
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT } from '../data/constants';
-import { cityDistrictSum, completedDistrictCount, darkBuildings } from './yields';
+import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
@@ -2560,31 +2560,6 @@ export function seatPhase(state: GameState): void {
       // subtracts it — so this must not charge it a second time.
       goldSum += y.gold;
       faithSum += y.faith; // the faith yield gains its consumer
-      // WHICH city's faith yield: the loop-top snapshot, per city, keyed
-      // on the CENTRE tile — the one name both engines give a city.
-      const _dlcy = (globalThis as { __diffLog?: string[] }).__diffLog;
-      if (_dlcy) _dlcy.push(`cy:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-        + ` f${y.faith.toFixed(6)} g${y.gold.toFixed(6)}`);
-      if (_dlcy) _dlcy.push(`sp2:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-        + ` spec${completedDistrictCount(state, civCity, true)}`);
-      if (_dlcy) { const _bk = stats.breakdown;
-        _dlcy.push(`bk:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-          + ` t${(_bk.tiles.faith ?? 0).toFixed(3)} d${(_bk.districts.faith ?? 0).toFixed(3)}`
-          + ` b${(_bk.buildings.faith ?? 0).toFixed(3)} z${(_bk.citizens.faith ?? 0).toFixed(3)}`
-          + ` n${(_bk.bonuses.faith ?? 0).toFixed(3)} r${(_bk.trade.faith ?? 0).toFixed(3)}`);
-        // the same six buckets for PRODUCTION — the queue's own input, and
-        // the yield a fraction of which shows up as queueProgress.
-        _dlcy.push(`bp:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-          + ` t${(_bk.tiles.production ?? 0).toFixed(3)} d${(_bk.districts.production ?? 0).toFixed(3)}`
-          + ` b${(_bk.buildings.production ?? 0).toFixed(3)} z${(_bk.citizens.production ?? 0).toFixed(3)}`
-          + ` n${(_bk.bonuses.production ?? 0).toFixed(3)} r${(_bk.trade.production ?? 0).toFixed(3)}`
-          + ` all${(stats.total.production ?? 0).toFixed(3)}`
-          // the AMENITY tier's factor multiplies the summed buckets, so equal
-          // buckets and an unequal total is this and nothing else.
-          + ` yf${stats.amenities.tier.yieldFactor.toFixed(3)}`); }
-      if (_dlcy) _dlcy.push(`gb:${actor.seat}:${state.turn}:${civCity.centerIndex}`
-        + ` gfaith${((seatMods.faithPerSpecialty ?? 0)
-          * completedDistrictCount(state, civCity, true)).toFixed(3)}`);
       const production = y.production;
       sciSum += y.science;
       const culC = y.culture;
@@ -2963,11 +2938,6 @@ export function seatPhase(state: GameState): void {
     // lands: a rate difference and a roster difference look identical in the
     // purse and are two different bugs.
     const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
-    if (_dlu) for (const u of state.units) {
-      if (u.seat !== actor.seat) continue;
-      _dlu.push(`u1:${actor.seat}:${state.turn}:${u.tileIndex}`
-        + `:${UNIT_TYPE_IDX.indexOf(u.type)} m${unitUpkeep(seatMods, u.type)}`);
-    }
     if (_dlu) _dlu.push(`up:${actor.seat}:${state.turn}`
       + ` n${state.units.filter((u) => u.seat === actor.seat).length}`
       + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
