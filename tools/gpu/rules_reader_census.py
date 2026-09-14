@@ -1,7 +1,11 @@
 """THE READER CENSUS — every rules.json key must be READ by both engines.
 
     python tools/gpu/rules_reader_census.py            # report
-    python tools/gpu/rules_reader_census.py --strict   # exit 1 on an unlisted orphan
+    python tools/gpu/rules_reader_census.py --strict   # exit 1 on any orphan not in ALLOWLIST
+    python tools/gpu/rules_reader_census.py --baseline tools/gpu/rules_reader_census_baseline.txt
+        # the battery's form: exit 1 only on an orphan the baseline does not
+        # list; regenerate the baseline DELIBERATELY (`> that file`) when a
+        # known orphan is read or deleted, never as a battery side effect
 
 Provenance (docs/PROVENANCE.md) says a constant is RIGHT; it cannot say the
 constant is USED. The Stave Church, the Sea Dog's civic gate and the walls'
@@ -139,6 +143,21 @@ def main(argv: list[str]) -> int:
         print("provenance.json missing — run `npm run export`; TS half skipped")
 
     bad = len(no_gpu) + len(no_ts)
+    if "--baseline" in argv:
+        # THE RATCHET: the known orphans are task #263's list; the battery
+        # must catch a NEW one — a key exported or a column added that no
+        # engine reads — while the list burns down.
+        bpath = pathlib.Path(argv[argv.index("--baseline") + 1])
+        known = {ln.strip() for ln in bpath.read_text(encoding="utf-8").splitlines()
+                 if ln.startswith("    ")}
+        now = set(no_gpu) | set(no_ts)
+        new = sorted(now - known)
+        for n in new:
+            print(f"NEW ORPHAN {n}")
+        fixed = len(known - now)
+        print("READER CENSUS " + ("RED" if new else "OK") + f" against {bpath.name} — "
+              f"{len(new)} new, {len(now) - len(new)} known, {fixed} fixed")
+        return 1 if new else 0
     if strict and bad:
         print("READER CENSUS RED — an exported key or catalog column nobody names; read it or allowlist it with a reason")
         return 1

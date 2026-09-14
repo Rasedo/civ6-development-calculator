@@ -482,6 +482,16 @@ def main() -> int:
         ("lock", [npm, "run", "seed:check"]),
         ("seed", [npm, "run", "seed"]),
         ("export", [npm, "run", "export"]),
+        # THE CONSTANTS AGAINST THE REAL GAME. `export` just wrote
+        # provenance.json; the checker re-reads every tagged constant from
+        # the install and compares. The ledger (docs/PROVENANCE.md) already
+        # knows today's disagreements and #264 burns them down, so the step
+        # is a RATCHET: red only on a NEW disagreement or a tag that stopped
+        # resolving. A box without the install prints SKIPPED and passes.
+        ("provenance", [py, "tools/civ6lab/xml_check.py", "check", "--baseline", "docs/PROVENANCE.md"]),
+        # ...and a constant can be RIGHT and read by nobody: the reader
+        # census, ratcheted the same way against its committed baseline.
+        ("census", [py, "tools/gpu/rules_reader_census.py", "--baseline", "tools/gpu/rules_reader_census_baseline.txt"]),
     ):
         run(name, cmd, threads=24)
         if failed.is_set():

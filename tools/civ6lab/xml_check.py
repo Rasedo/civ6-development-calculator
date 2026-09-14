@@ -3,6 +3,7 @@
     python tools/civ6lab/xml_check.py get Units UnitType=UNIT_BUILDER Cost
     python tools/civ6lab/xml_check.py row Units UnitType=UNIT_BUILDER
     python tools/civ6lab/xml_check.py check [seeder/worlds/provenance.json]
+    python tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md   # the battery's form
     python tools/civ6lab/xml_check.py suggest Units UnitType=UNIT_ 50 --col Cost
 
 `get` prints one cell and the file that last wrote it; `row` the whole row
@@ -424,7 +425,21 @@ def derived_verdict(inst: Install, src: dict, value) -> tuple[str, str]:
     return "ok", ""
 
 
-def cmd_check(inst: Install, path: pathlib.Path) -> int:
+RED_LINE = re.compile(r"^(MISMATCH|DANGLING) (\S+?):")
+
+
+def known_red(baseline: pathlib.Path) -> set[str]:
+    """the constant names a baseline file (docs/PROVENANCE.md, or a saved
+    check output) already lists as MISMATCH or DANGLING"""
+    out = set()
+    for ln in baseline.read_text(encoding="utf-8").splitlines():
+        m = RED_LINE.match(ln.strip())
+        if m:
+            out.add(m.group(2))
+    return out
+
+
+def cmd_check(inst: Install, path: pathlib.Path, baseline: pathlib.Path | None = None) -> int:
     dump = json.loads(path.read_text(encoding="utf-8"))
     audit = AUDIT_MD.read_text(encoding="utf-8") if AUDIT_MD.exists() else ""
     COLS = ("match", "mism", "unsrc", "deriv", "dangl", "lab", "lab?", "pedia", "styl")
@@ -485,11 +500,27 @@ def cmd_check(inst: Install, path: pathlib.Path) -> int:
         print(f"{cat:<22} " + " ".join(f"{t[c]:>6}" for c in COLS))
     print(f"{'TOTAL':<22} " + " ".join(f"{tot[c]:>6}" for c in COLS))
     bad = tot["mism"] + tot["dangl"]
-    print("XML CHECK " + ("RED" if bad else "OK")
-          + f" — {tot['match']} match, {tot['mism']} mismatch, {tot['dangl']} dangling, "
-          f"{tot['unsrc']} unsourced, {tot['deriv']} derived, {tot['lab']} lab "
-          f"(+{tot['lab?']} unverifiable), {tot['pedia']} pedia, {tot['styl']} stylized "
-          f"({len(inst.files)} install files)")
+    summary = (f"{tot['match']} match, {tot['mism']} mismatch, {tot['dangl']} dangling, "
+               f"{tot['unsrc']} unsourced, {tot['deriv']} derived, {tot['lab']} lab "
+               f"(+{tot['lab?']} unverifiable), {tot['pedia']} pedia, {tot['styl']} stylized "
+               f"({len(inst.files)} install files)")
+    if baseline is not None:
+        # THE RATCHET: the ledger already knows these lines and #264 burns
+        # them down; what the battery must catch is a NEW disagreement — a
+        # catalog edit that moved a value away from the install, or a tag
+        # that stopped resolving. A fixed line is news too, but good news.
+        known = known_red(baseline)
+        now = {RED_LINE.match(ln).group(2) for ln in red if RED_LINE.match(ln)}
+        new = sorted(now - known)
+        fixed = sorted(known - now)
+        for n in new:
+            print(f"NEW RED {n}")
+        if fixed:
+            print(f"fixed since the baseline ({len(fixed)}): " + ", ".join(fixed[:12]) + (" …" if len(fixed) > 12 else ""))
+        print("XML CHECK " + ("RED" if new else "OK") + f" against {baseline.name} — "
+              f"{len(new)} new, {len(now) - len(new)} known, {len(fixed)} fixed; " + summary)
+        return 1 if new else 0
+    print("XML CHECK " + ("RED" if bad else "OK") + " — " + summary)
     return 1 if bad else 0
 
 
@@ -502,11 +533,21 @@ def main(argv: list[str]) -> int:
         i = argv.index("--col")
         col = argv[i + 1]
         argv = argv[:i] + argv[i + 2:]
+    baseline = None
+    if "--baseline" in argv:
+        i = argv.index("--baseline")
+        baseline = pathlib.Path(argv[i + 1])
+        argv = argv[:i] + argv[i + 2:]
+    cmd, rest = argv[0], argv[1:]
     if not INSTALL.exists():
+        if cmd == "check" and baseline is not None:
+            # the battery's hook on a box without the game: not an engine
+            # failure, and not a pass either — say so and step aside
+            print(f"XML CHECK SKIPPED — no install at {INSTALL}")
+            return 0
         print(f"no install at {INSTALL}")
         return 2
     inst = Install()
-    cmd, rest = argv[0], argv[1:]
     if cmd == "get":
         return cmd_get(inst, rest)
     if cmd == "row":
@@ -514,7 +555,7 @@ def main(argv: list[str]) -> int:
     if cmd == "suggest":
         return cmd_suggest(inst, rest, col)
     if cmd == "check":
-        return cmd_check(inst, pathlib.Path(rest[0]) if rest else DUMP)
+        return cmd_check(inst, pathlib.Path(rest[0]) if rest else DUMP, baseline)
     print(__doc__)
     return 2
 
