@@ -51,14 +51,36 @@ from core.simbase import js_round
 from warmup import settle_all
 
 
+# THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and the founding settle. Everything
+# these pokes write is a `_MUTABLE` plane except `fog_of_war`, a plain bool two
+# scenes force, so `_ATTRS` hands that one back by hand. `slot` keys a further
+# base for the three sims section 3b holds live side by side.
+_ATTRS = ("fog_of_war",)
+_BASE: dict = {}
+
+
+def _warm(rules, path, slot: int = 0) -> BatchSim:
+    key = (str(path), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k) for k in _ATTRS})
+    sim, snap, at = _BASE[key]
+    sim.restore(snap)
+    for k, v in at.items():
+        setattr(sim, k, v)
+    sim._bldg_version += 1
+    return sim
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
     paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
-    def mk() -> BatchSim:
-        return settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    def mk(slot: int = 0) -> BatchSim:
+        return _warm(rules, paths[0], slot)
 
     # --- 1) the exported chain: catalog + gating + sequence + prices --------
     rows = rj["projects"]["rows"]
@@ -289,8 +311,8 @@ def main() -> None:
     # Launch Moon Landing: a one-time Culture lump of js_round(10 x the seat's
     # science/turn) into the pool AND the lifetime bank; Mars Colony: NOTHING.
     base = mk()
-    twin = mk()
-    mars = mk()
+    twin = mk(1)   # three live sims at once: a slot each
+    mars = mk(2)
     for s in (base, twin, mars):
         s.city_current[0, 1, 0, 0] = -1
     sci_pre = float(base.seat_science_total[0, 1])

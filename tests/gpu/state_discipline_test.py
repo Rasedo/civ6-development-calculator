@@ -38,8 +38,32 @@ from core.engine import _MUTABLE
 from warmup import settle_all
 
 
-def build(paths, rules):
+# THE WARMED BASE, ONE PER FIXTURE PAIR. Standing a B=2 engine up costs ~3 s
+# where `restore` costs a millisecond, and every plane the scenes below write
+# is `_MUTABLE`, so the restore is the whole job. Scene 2 is the exception: it
+# REBINDS `major_unit_hp`, registers an alias for it and hangs `_seat_hp` on
+# the object — three writes a restore does not carry, and a rebound view is
+# precisely the poison the scene exists to demonstrate — so it keeps a build
+# of its own (`fresh=True`). The steps stay in the scenes: each wants its own
+# horizon, and a base per horizon would build as often as before.
+_BASE: dict = {}
+
+
+def _stand_up(paths, rules):
     return settle_all(BatchSim([load_fixture(p) for p in paths[:2]], rules, device="cpu", dtype=torch.float64))
+
+
+def build(paths, rules, fresh: bool = False):
+    if fresh:
+        return _stand_up(paths, rules)
+    key = tuple(str(p) for p in paths[:2])
+    if key not in _BASE:
+        sim = _stand_up(paths, rules)
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def main() -> None:
@@ -52,7 +76,8 @@ def main() -> None:
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
     # --- 1) the check runs clean on the real engine ------------------------
-    sim = build(paths, rules)
+    # ...on a build of its own: scene 2 below poisons this object for good.
+    sim = build(paths, rules, fresh=True)
     for _ in range(30):
         sim.step()
     assert len(sim._mut_sig) == len([k for k in _MUTABLE if hasattr(sim, k)]), "_MUTABLE baseline incomplete"
@@ -87,12 +112,18 @@ def main() -> None:
     # (correctly: a broken view is the more fundamental error), so the
     # dtype-drift probe needs a plane that owns its own storage.
     nm = next(k for k in _MUTABLE if hasattr(s2, k) and k not in s2._aliases)
-    setattr(s2, nm, getattr(s2, nm).to(torch.int8) if getattr(s2, nm).dtype != torch.int8 else getattr(s2, nm).float())
+    # the drifted plane is a REBIND, which no `restore` undoes — put it back by
+    # hand so the shared base is clean for the scene below.
+    _keep = getattr(s2, nm)
     try:
-        s2._check_state_discipline()
-        raise SystemExit(f"FAIL: dtype drift on {nm} was NOT detected")
-    except AssertionError as e:
-        assert "_MUTABLE DRIFT" in str(e), f"wrong assertion fired: {e}"
+        setattr(s2, nm, _keep.to(torch.int8) if _keep.dtype != torch.int8 else _keep.float())
+        try:
+            s2._check_state_discipline()
+            raise SystemExit(f"FAIL: dtype drift on {nm} was NOT detected")
+        except AssertionError as e:
+            assert "_MUTABLE DRIFT" in str(e), f"wrong assertion fired: {e}"
+    finally:
+        setattr(s2, nm, _keep)
     print(f"  _MUTABLE dtype drift is detected (probed {nm})")
 
     # --- 4) the check does not itself change behaviour ---------------------
