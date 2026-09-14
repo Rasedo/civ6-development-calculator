@@ -611,77 +611,113 @@ def pick_production(
     # of the policy. Absent -> no cap, never a silent ban.
     n_cities, city_cap = col("n_cities", 0), col("city_cap", 10 ** 9)
     room = n_cities < city_cap
+    room_u = room.unsqueeze(1)
     melee, ranged = col("melee", 0), col("ranged", 0)
     n_units, cap = col("unit_count", 0), col("unit_cap", 10 ** 9)
+    cap_rows = ctx.get("is_capital")
 
-    solo_taken = {nm: torch.zeros(B, dtype=torch.bool, device=dev) for nm in SOLO_TIERS}
     out = torch.full((B, C), -1, dtype=torch.long, device=dev)
+    # THE COLUMNS WORTH WALKING. Every production column is `& room_j` (see
+    # `_seat_production_mask`), so a slot with no city — or one whose queue is
+    # full — is ALL-FALSE, decides -1, and threads every counter unchanged:
+    # walking it is a no-op costing a tier pass. The roster carries `citySlots`
+    # columns and a seat holds `maxCities` of them at most, so this is most of
+    # the walk. ONE batched reduction and ONE transfer answers for all of them.
+    live_cols = [j for j, v in enumerate(mask.any(dim=2).any(dim=0).tolist()) if v]
+    if not live_cols:
+        return out
     # roster lanes are city-invariant — slice once, not per j
     if roster is not None and u_lo < W:
-        nu0 = min(u_hi, W) - u_lo
+        u_hi0 = min(u_hi, W)
+        nu0 = u_hi0 - u_lo
         rng_t0, nav0 = roster["is_ranged"][:nu0], roster["naval"][:nu0]
         comb0, rstr0 = roster["combat"][:nu0], roster["ranged_str"][:nu0]
         mel_lane0, rng_lane0 = ~rng_t0 & ~nav0 & (comb0 > 0), rng_t0 & ~nav0
-    for j in range(C):
+        # ...and so is each lane's ranking key: `_best_in_lane`'s
+        # `strength*NU - idx`, built once rather than twice per city.
+        _ar0 = torch.arange(nu0, device=dev)
+        mel_key = (comb0 * nu0 - _ar0).unsqueeze(0).expand(B, -1)
+        rng_key = (rstr0 * nu0 - _ar0).unsqueeze(0).expand(B, -1)
+        neg_key = torch.full_like(mel_key, -(10 ** 9))
+    # THE TIER PLAN. Everything in a tier body that does not depend on the city
+    # column — the roster lookups, the class bounds, the district rotation, the
+    # constant a solo tier writes — is resolved ONCE here instead of once per
+    # city. The walk below is then the tensor work and nothing else.
+    plan: list = []
+    solo_thread: list = []
+    for name in (tier_order or PROD_PRIORITY):
+        if name in SOLO_TIERS:
+            rkey, capped = SOLO_TIERS[name]
+            idx = roster[rkey] if roster else -1
+            if idx < 0 or u_lo + idx >= W:
+                continue
+            plan.append(("solo", name, u_lo + idx, capped,
+                         torch.full((B,), u_lo + idx, dtype=torch.long, device=dev)))
+            solo_thread.append((name, u_lo + idx))
+            continue
+        if name == "unit":
+            if roster is None or u_lo >= W:
+                continue
+            plan.append(("unit", None, None, None, None))
+            continue
+        lo, hi = classes[name]
+        if lo >= hi or lo >= W:
+            continue
+        hi = min(hi, W)
+        if name == "district" and ctx.get("dist_rot") is not None:
+            rot = (torch.arange(hi - lo, device=dev) + int(ctx["dist_rot"])) % (hi - lo)
+            plan.append(("rot", lo, hi, rot, None))
+            continue
+        # POLICY (the wonder arm): the wonder tier raises from the CAPITAL
+        # only. The MASK offers any city — Civ 6's rule — so the heuristic
+        # lives here with the rest of the policy. Absent ctx -> no gate (a net
+        # is free to build anywhere).
+        plan.append((name if name in ("settler", "wonder") else "class",
+                     lo, hi, None, None))
+    solo_taken = {nm: torch.zeros(B, dtype=torch.bool, device=dev) for nm, _c in solo_thread}
+    for j in live_cols:
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
         under_cap = n_units < cap
-        for name in (tier_order or PROD_PRIORITY):
-            if name in SOLO_TIERS:
-                key, capped = SOLO_TIERS[name]
-                idx = roster[key] if roster else -1
-                if idx < 0 or u_lo + idx >= W:
-                    continue
-                hit = mask[:, j, u_lo + idx] & ~solo_taken[name]
-                if capped:
+        mj = mask[:, j]
+        for kind, p1, p2, p3, p4 in plan:
+            if kind == "solo":
+                hit = mj[:, p2] & ~solo_taken[p1]
+                if p3:
                     hit = hit & under_cap
-                best = torch.where((best < 0) & hit,
-                                   torch.full_like(best, u_lo + idx), best)
-                continue
-            if name == "unit":
-                if roster is None or u_lo >= W:
-                    continue
-                legal = mask[:, j, u_lo:min(u_hi, W)]
+                best = torch.where((best < 0) & hit, p4, best)
+            elif kind == "unit":
+                legal = mj[:, u_lo:u_hi0]
                 mel_ok = legal & mel_lane0
                 rng_ok = legal & rng_lane0
-                pick_m = u_lo + _best_in_lane(mel_ok, comb0)
-                pick_r = u_lo + _best_in_lane(rng_ok, rstr0)
+                pick_m = u_lo + torch.where(mel_ok, mel_key, neg_key).argmax(dim=1)
+                pick_r = u_lo + torch.where(rng_ok, rng_key, neg_key).argmax(dim=1)
                 want_r = ranged * 2 < melee
                 use_r = want_r & rng_ok.any(dim=1)
                 use_m = ~use_r & mel_ok.any(dim=1)
                 chosen = torch.where(use_r, pick_r, torch.where(use_m, pick_m, best))
                 hit = (use_r | use_m) & under_cap
                 best = torch.where((best < 0) & hit, chosen, best)
-                continue
-            lo, hi = classes[name]
-            if lo >= hi or lo >= W:
-                continue
-            sub = mask[:, j, lo:min(hi, W)]
-            if name == "district" and ctx.get("dist_rot") is not None:
-                idx = (torch.arange(sub.shape[1], device=dev) + int(ctx["dist_rot"])) % sub.shape[1]
-                rolled = sub[:, idx]
+            elif kind == "rot":
+                rolled = mj[:, p1:p2][:, p3]
                 best = torch.where((best < 0) & rolled.any(dim=1),
-                                   lo + idx[rolled.float().argmax(dim=1)], best)
-                continue
-            if name == "settler":
-                sub = sub & ~taken.unsqueeze(1) & room.unsqueeze(1)
-            elif name == "wonder":
-                # POLICY: the wonder tier raises from the CAPITAL only. The
-                # MASK offers any city — Civ 6's rule — so the heuristic
-                # lives here with the rest of the policy. Absent ctx -> no
-                # gate (a net is free to build anywhere).
-                cap_rows = ctx.get("is_capital")
-                if cap_rows is not None:
+                                   p1 + p3[rolled.float().argmax(dim=1)], best)
+            else:
+                sub = mj[:, p1:p2]
+                if kind == "settler":
+                    sub = sub & ~taken.unsqueeze(1) & room_u
+                elif kind == "wonder" and cap_rows is not None:
                     sub = sub & cap_rows[:, j].to(torch.bool).unsqueeze(1)
-            has = sub.any(dim=1)
-            first = lo + sub.float().argmax(dim=1)
-            best = torch.where((best < 0) & has, first, best)
+                best = torch.where((best < 0) & sub.any(dim=1),
+                                   p1 + sub.float().argmax(dim=1), best)
+            # every tier writes only where `best < 0`, so once no row is still
+            # undecided the rest of the chain is provably a no-op.
+            if not bool((best < 0).any()):
+                break
 
         out[:, j] = best
         # thread every counter the next city will read, exactly as TS does
-        for nm, (k, _c) in SOLO_TIERS.items():
-            i2 = roster[k] if roster else -1
-            if i2 >= 0:
-                solo_taken[nm] = solo_taken[nm] | (best == u_lo + i2)
+        for nm, c2 in solo_thread:
+            solo_taken[nm] = solo_taken[nm] | (best == c2)
         taken = taken | ((best >= lo_s) & (best < hi_s))
         is_unit = (best >= u_lo) & (best < u_hi)
         n_units = n_units + is_unit.long()
