@@ -140,6 +140,18 @@ SLOW_TIER = frozenset({
     # the pool between them — demoted, not deleted
     "trade2", "culture_victory", "districts_new", "climate", "war_weariness",
     "bankruptcy", "sourced_rows", "spawn_reclaim",
+    # 2026-09-14 evening, the same record at 196 rows: the twenty-four lanes
+    # of fifteen seconds or more that have NEVER appeared in failed_lanes,
+    # 512 s of the 2,225 s pool. The box is 12 physical cores under 24
+    # logical ones, so every second of pool work is contention on the serve
+    # shards, which are the wall. Instruments (wire / enum / discipline
+    # checks) stay whatever their record; lanes that failed even once stay.
+    "great_works_holders", "fallout", "capture_cavalry", "watermill",
+    "stockpile_ceiling", "peace_target", "spy", "spy_district",
+    "feature_appeal", "tribal_villages", "rock_band", "escort", "formation",
+    "citizens", "free_city", "spy_release_level", "feature_add",
+    "home_continent_rows", "danube_rows", "era_draws", "cree_claim",
+    "all_follower_beliefs", "robot", "barb_camps",
 })
 
 # ---------------------------------------------------------------- memory --
