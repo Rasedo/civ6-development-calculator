@@ -24,7 +24,10 @@ export function sourceStampOver(roots: string[], params: unknown): string {
   const h = createHash('sha256');
   for (const f of stampedFiles(roots)) {
     h.update(relative(ROOT, f).split(sep).join('/'));
-    h.update(readFileSync(f));
+    // the working tree's line endings are an accident of autocrlf and of
+    // which files a tool rewrote since checkout; the stamp names the SOURCE,
+    // so CRLF folds to LF before hashing (a fresh checkout failed the lock)
+    h.update(readFileSync(f, 'utf8').replace(/\r\n/g, '\n'));
   }
   h.update(JSON.stringify(params));
   return h.digest('hex');
