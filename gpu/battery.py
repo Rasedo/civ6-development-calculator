@@ -98,14 +98,20 @@ def print_hunt_reminder() -> None:
 # The TS children cost nothing: profiled at under 1% of the serve lane, whose
 # wall is the gate's own process — sim.step, the decide pass and the digest
 # extract — which is also why the gate runs as two processes at all.
-POKE_WORKERS = 9
+POKE_WORKERS = 8
 # Serve shards at full fan-out. A shard pays a fixed per-turn dispatch price
 # plus a per-seed one that is near-LINEAR in B (the driven games are
 # data-dependent Python loops), so 24 seeds over 12 two-seed shards beat 8
 # three-seed ones on a 24-core box: measured at 6588d518, one seed 216 s,
 # three seeds 332 s, and the battery's 8-shard lane 501 s. The memory
 # planner narrows this when the box cannot hold 12 + POKE_WORKERS lanes.
-MAX_SHARDS = 12
+# 16 x (1-2 seeds) + 8 poke workers = 24 lanes at the 763 MB a two-seed
+# lane measured at 8dfbcb6d (18.3 GB + the 3 GB reserve against ~21 GB
+# free); that battery ran twelve shards at 370-408 s against ~250 s for a
+# two-seed shard alone, so the lane is contention-bound and narrower
+# shards with one fewer poke worker trade pool wall (2,587 s / 8 = 323 s)
+# for serve wall. The planner still narrows on memory.
+MAX_SHARDS = 16
 POKE_OMP = 1
 
 # --------------------------------------------------------- the SLOW tier --
