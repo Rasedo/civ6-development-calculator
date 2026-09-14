@@ -1278,7 +1278,8 @@ export function buildRules() {
       droughtLength: DROUGHT_LENGTH,
       // THE EIGHT STORMS, one record per `STORM_EVENTS` row in table order;
       // `family` is the `STORM_FAMILIES` index the tile plane `sf` speaks
-      storms: STORM_EVENTS.map((ev) => ({ ...ev, family: STORM_FAMILIES.indexOf(ev.family) })),
+      // `src` (provenance) is the one column that must NOT ride the spread
+      storms: STORM_EVENTS.map((ev) => ({ ...ev, family: STORM_FAMILIES.indexOf(ev.family), src: undefined })),
       // CIV6 (`PrevailingWinds`): [8 latitude bands][6 hex directions E NE NW W SW SE]
       winds: PREVAILING_WINDS.map((b) => [...b]),
       stormMovement: STORM_MOVEMENT,

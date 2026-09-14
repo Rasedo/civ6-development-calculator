@@ -9,6 +9,7 @@ import { GAME_SPEED } from './constants';
 import { TECHS, ERAS } from './techs';
 import { CIVICS } from './civics';
 import type { CivId } from './seats';
+import { xml, type SrcMap } from './provenance';
 
 /**
  * FORMATIONS, indexed by tier: 0 a lone unit, 1 a Corps (a Fleet at sea), 2 an
@@ -50,6 +51,11 @@ export const FORMATION_TRAIN_BUILDING = { land: 'MILITARY_ACADEMY', naval: 'SEAP
 export interface UnitDef {
   id: string;
   name: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts): the install row and
+   *  column each number came from, `expect` where the install spells an id
+   *  differently, `scale: GAME_SPEED` on a cost. Stripped by the exporter;
+   *  checked by tools/civ6lab/xml_check.py. */
+  src?: SrcMap;
   cost: number;
   maintenance: number;
   moves: number;
@@ -345,6 +351,13 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 3,
       builder: true,
       description: 'Builds improvements, removes features and repairs pillaging (3 charges).',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_BUILDER', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_BUILDER', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_BUILDER', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_BUILDER', 'Combat'),
+        charges: xml('Units', 'UnitType=UNIT_BUILDER', 'BuildCharges'),
+      },
     }),
     U({
       id: 'SCOUT',
@@ -357,6 +370,13 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       recon: true,
       revealStealth: true,
       description: 'Fast, fragile explorer.',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_SCOUT', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_SCOUT', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_SCOUT', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_SCOUT', 'Combat'),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_SCOUT', 'UpgradeUnit', { expect: 'UNIT_SKIRMISHER' }),
+      },
     }),
     U({
       id: 'WARRIOR',
@@ -391,6 +411,16 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       ranged: { strength: 25, range: 2 },
       requiresTech: 'ARCHERY',
       description: 'Ranged attacker, range 2.',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_ARCHER', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_ARCHER', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_ARCHER', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_ARCHER', 'Combat'),
+        'ranged.strength': xml('Units', 'UnitType=UNIT_ARCHER', 'RangedCombat'),
+        'ranged.range': xml('Units', 'UnitType=UNIT_ARCHER', 'Range'),
+        requiresTech: xml('Units', 'UnitType=UNIT_ARCHER', 'PrereqTech', { expect: 'TECH_ARCHERY' }),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_ARCHER', 'UpgradeUnit', { expect: 'UNIT_CROSSBOWMAN' }),
+      },
     }),
     U({
       id: 'SPEARMAN',
@@ -430,6 +460,15 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'IRON_WORKING',
       requiresResource: 'IRON',
       description: 'Classical heavy melee (needs Iron access).',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'Combat'),
+        requiresTech: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'PrereqTech', { expect: 'TECH_IRON_WORKING' }),
+        requiresResource: xml('Units', 'UnitType=UNIT_SWORDSMAN', 'StrategicResource', { expect: 'RESOURCE_IRON' }),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_SWORDSMAN', 'UpgradeUnit', { expect: 'UNIT_MAN_AT_ARMS' }),
+      },
     }),
     U({
       id: 'PIKEMAN',

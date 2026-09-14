@@ -17,6 +17,7 @@ import type { WorldFile } from '../../world/file';
 import { loadWorld } from '../world/load';
 import { buildFixture } from './planes';
 import { buildRules } from './rules';
+import { buildProvenance } from './provenance';
 import { exportStamp } from './stamp';
 
 const eargs = process.argv.slice(2);
@@ -45,6 +46,12 @@ const rules = buildRules() as Record<string, unknown>;
 rules.srcStamp = srcStamp;
 writeFileSync(`${DIR}/rules.json`, JSON.stringify(rules));
 console.log(`rules.json: srcStamp ${srcStamp.slice(0, 16)}`);
+
+// every catalog constant with its source tag, for tools/civ6lab/xml_check.py
+const prov = buildProvenance();
+writeFileSync(`${DIR}/provenance.json`, JSON.stringify(prov));
+const tagged = Object.values(prov.coverage).reduce((s, c) => s + c.tagged, 0);
+console.log(`provenance.json: ${tagged}/${prov.constants.length} constants tagged`);
 
 for (const f of worldFiles) {
   const world = JSON.parse(readFileSync(`${DIR}/${f}`, 'utf-8')) as WorldFile;
