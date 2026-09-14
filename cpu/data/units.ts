@@ -9,7 +9,10 @@ import { GAME_SPEED } from './constants';
 import { TECHS, ERAS } from './techs';
 import { CIVICS } from './civics';
 import type { CivId } from './seats';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
+
+/** shorthand: one `GlobalParameters` row's `Value` */
+const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 
 /**
  * FORMATIONS, indexed by tier: 0 a lone unit, 1 a Corps (a Fleet at sea), 2 an
@@ -23,7 +26,12 @@ import { xml, type SrcMap } from './provenance';
  * COMBAT_ARMY_STRENGTH_MODIFIER; each raises Combat, Ranged and Bombard
  * Strength alike, embarked included.
  */
-export const FORMATION_CS: readonly number[] = [0, 10, 17];
+export const FORMATION_CS: readonly number[] = [
+  srcConst('combat.formationCs.0', 0,
+    { derived: 'a LONE unit takes no formation modifier — the install carries a strength modifier only for the Corps and the Army' }),
+  srcConst('combat.formationCs.1', 10, gp('COMBAT_CORPS_STRENGTH_MODIFIER')),
+  srcConst('combat.formationCs.2', 17, gp('COMBAT_ARMY_STRENGTH_MODIFIER')),
+];
 
 /** the civic each tier waits on — index by the tier being FORMED. */
 export const FORMATION_CIVIC: readonly string[] = ['', 'NATIONALISM', 'MOBILIZATION'];
@@ -37,16 +45,43 @@ export const FORMATION_MAX = 2;
  *  UNIT_ARMY_COST_MODIFIER 2.0 for the three-step (GlobalParameters.xml — the
  *  civilopedia's "225%" is contradicted by the table), and the enabling
  *  building takes 25% off that price. */
-export const FORMATION_COST_MULT: readonly number[] = [1, 1.5, 2.0];
+export const FORMATION_COST_MULT: readonly number[] = [
+  srcConst('combat.formationCostMult.0', 1,
+    { derived: 'a LONE unit pays the chassis price — the install carries a cost modifier only for the Corps and the Army' }),
+  srcConst('combat.formationCostMult.1', 1.5, gp('UNIT_CORPS_COST_MODIFIER')),
+  srcConst('combat.formationCostMult.2', 2.0, gp('UNIT_ARMY_COST_MODIFIER')),
+];
 /** CIV6 (Formations, two agreeing secondary sources — the Gathering Storm
  *  strategic-resources guide and the Unit page): a Corps costs DOUBLE the
  *  chassis' strategic resource up front and an Army TRIPLE, maintenance
  *  unchanged. No install row carries it. Indexed by formation tier.
  *  A merge (`formUp`) pays nothing — only a DIRECT train charges. */
-export const FORMATION_RESOURCE_MULT: readonly number[] = [1, 2, 3];
+export const FORMATION_RESOURCE_MULT: readonly number[] = srcConst(
+  'combat.formationResourceMult', [1, 2, 3] as const, {
+    stylized: 'CIV6 (Formations), TWO AGREEING SECONDARY SOURCES and no install row: the Gathering Storm strategic-resources guide and the Unit page both say a Corps costs DOUBLE the chassis\' strategic resource up front and an Army TRIPLE, maintenance unchanged',
+  });
 
-export const FORMATION_TRAIN_DISCOUNT = 0.75;
-export const FORMATION_TRAIN_BUILDING = { land: 'MILITARY_ACADEMY', naval: 'SEAPORT' } as const;
+export const FORMATION_TRAIN_DISCOUNT = srcConst('combat.formationTrainDiscount', 0.75, {
+  derived: '1 - Amount/100 — the enabling building\'s own CORPS_ARMY discount of 25 percentage points (the Military Academy on land, the Seaport at sea; both rows carry 25)',
+  inputs: [
+    xml('ModifierArguments',
+      'ModifierId=MILITARY_ACADEMY_TRAINED_CORPS_ARMY_DISCOUNT&Name=Amount', 'Value'),
+    xml('ModifierArguments',
+      'ModifierId=SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT&Name=Amount', 'Value'),
+  ],
+});
+/** the install names each building as a formation-train discount carrier through its own
+ *  `BuildingModifiers` row (`MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT`). */
+export const FORMATION_TRAIN_BUILDING = {
+  land: srcConst('militaryAcademyBidx', 'MILITARY_ACADEMY',
+    xml('BuildingModifiers',
+      'BuildingType=BUILDING_MILITARY_ACADEMY&ModifierId=MILITARY_ACADEMY_TRAINED_CORPS_ARMY_DISCOUNT',
+      'BuildingType', { expect: 'BUILDING_MILITARY_ACADEMY' })),
+  naval: srcConst('seaportBidx', 'SEAPORT',
+    xml('BuildingModifiers',
+      'BuildingType=BUILDING_SEAPORT&ModifierId=SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT',
+      'BuildingType', { expect: 'BUILDING_SEAPORT' })),
+} as const;
 
 export interface UnitDef {
   id: string;

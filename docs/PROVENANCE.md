@@ -18,7 +18,7 @@ longer appear (the alphabetical load order produced artefacts — Isolationism,
 three unique units' resource bills, the Okihtcitaw's rung — and hid one, the
 Pike and Shot's maintenance). Task #264 works THIS list.
 
-    XML CHECK RED — 4052 match, 60 mismatch, 203 unsourced, 1398 lab/stylized/derived (312 install files)
+    XML CHECK RED — 4775 match, 64 mismatch, 204 unsourced, 1496 lab/stylized/derived (312 install files)
 
 ### units (15)
 
@@ -158,6 +158,15 @@ MISMATCH congressResolutions.WORLD_RELIGION.minEra: catalog 4 vs install None [R
 
 ```
 MISMATCH scenario.goldPurchaseMult: catalog 4 vs install '2' [GlobalParameters[Name=GOLD_PURCHASE_MULTIPLIER].Value <- GlobalParameters.xml]
+```
+
+### eras (4)
+
+```
+MISMATCH eras.darkT: catalog 12 vs install '14' [GlobalParameters[Name=DARK_AGE_SCORE_BASE_THRESHOLD].Value <- Expansion2_GlobalParameters.xml]
+MISMATCH eras.goldenT: catalog 24 vs install '28' [GlobalParameters[Name=GOLDEN_AGE_SCORE_BASE_THRESHOLD].Value <- Expansion2_GlobalParameters.xml]
+MISMATCH eras.delegationCost: catalog 10 vs install '25' [DiplomaticActions[DiplomaticActionType=DIPLOACTION_DIPLOMATIC_DELEGATION].Cost <- DiplomaticActions.xml]
+MISMATCH eras.embassyCost: catalog 25 vs install '50' [DiplomaticActions[DiplomaticActionType=DIPLOACTION_RESIDENT_EMBASSY].Cost <- DiplomaticActions.xml]
 ```
 
 ## Wave 1, agent A report (2026-09-14) — units, techs, civics, improvements, promotions
@@ -397,3 +406,49 @@ trait of all 263 modifier ids was verified against TraitModifiers; every
 Three facts live in the install's published TEXT, not a table: Toqui's and
 Eleanor's 9-tile loyalty radii, Qin's Ancient–Classical wonder band. Tagged
 `lab` as the least wrong; a `text` kind (with the LOC key) would be honest.
+
+## Wave 3, agent F report (2026-09-14) — seats.ts scalars and units.ts's formation block
+
+seats.ts: 170 srcConst registrations over 226 module-level consts (the
+rest are catalog-position codes, wire-order lists, functions, or the
+shapes below); units.ts top block: 10. vitest 1790 green, tsc green, no
+value changed. New install sources found: LOYALTY_AMENITY =
+Happinesses_XP1.IdentityPerTurnChange (all five tiers), GOV_INTOLERANCE =
+Governments.OtherGovernmentIntolerance (ten rows), every alliance
+magnitude off AllianceEffects → ModifierArguments, the alliance route
+yields per index (the install ships NO military-alliance route modifier —
+the engine's 0 is right), most congress magnitudes off ResolutionEffects,
+ERA_SCORE_MOMENT_MIN from TAJ_MAHAL_EXTRA_ERA_SCORE.MinScore, the formation
+train discount from the two buildings' 25, FORMATION_TRAIN_BUILDING from
+the BuildingModifiers rows that carry the discount. Sign conventions via
+`expect` with a note: favorOccupiedCapital 5 (install −5),
+grievanceFavorMax 10 (install −10), GOV_INTOLERANCE 20 (install −20).
+
+### MISMATCH — 4
+- eras.darkT 12 vs DARK_AGE_SCORE_BASE_THRESHOLD 14; eras.goldenT 24 vs
+  GOLDEN_AGE_SCORE_BASE_THRESHOLD 28 — the row's own CIV6 (Ages) comment
+  quotes the pre-GS 12/24; the install's gap is 14, the engine's 12. FIX
+  (and the file header's claim that these are "model tuning" is
+  contradicted by the row's citation — rewrite).
+- eras.delegationCost 10 vs 25; eras.embassyCost 25 vs 50 — the wiki's
+  sentence quoted in the comment; the shipped table is double both (the
+  engine's embassy equals the install's delegation). FIX.
+
+### UNSOURCED, grouped
+- A. No source stated (12): MAX_CITIES_PER_SEAT 6, LOYALTY_RANGE 9
+  (near-miss: CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF 10), ERA_LENGTH 50,
+  AGE_PRESSURE, the six ERA_SCORE_* awards (the header calls them model
+  tuning; the install's Moments table matches three exactly — PANTHEON 1,
+  RELIGION 2, GP 1 — and WONDER 3 matches the past-era row where the
+  game-era row pays 4; FOUND/CONQUER are aggregates), two feature flags
+  (ADMIRAL_MARCH_LIVE's comment is misplaced — it describes
+  HEROIC_DEDICATIONS 137 lines away), DOW_PROXIMITY 9.
+- B. Catalog-position codes and wire-order lists (61), deliberately not
+  registered.
+- C. FORMATION_CIVIC — the base corps/army civic gate is DLL; only
+  overrides name a civic (Shaka's early gates, Horn-Chest-Loins). Left
+  untagged.
+- Could not wrap: SEAT_CAPS (object of objects; the `minor` cell is
+  declared UNREACHED), DEAL_PERMANENT (boolean[]), two functions,
+  COMPETITIONS (a row catalog — EmergencyScoreSources confirms every
+  scored amount in its comments; a ready row-tagging follow-up).
