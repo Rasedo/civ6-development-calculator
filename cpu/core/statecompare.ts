@@ -336,14 +336,16 @@ const GAME: Record<string, Extractor> = {
   competition: (s) => {
     const civs = s.seats.filter((x) => isCiv(x.seat)).map((x) => x.seat).sort((a, b) => a - b);
     const c = s.competition;
-    return [c?.kind ?? -1, c?.left ?? 0,
+    // ONE row, so ONE outer array (the game group has a single row and
+    // foldRows reads vals[0]; flat, only the kind was ever compared)
+    return [[c?.kind ?? -1, c?.left ?? 0,
       ...civs.map((j) => c?.score[j] ?? 0),
-      ...civs.map((j) => (c?.member[j] ? 1 : 0))];
+      ...civs.map((j) => (c?.member[j] ? 1 : 0))]];
   },
-  congressActive: (s) => [0, 1].flatMap((i) => {
+  congressActive: (s) => [[0, 1].flatMap((i) => {
     const a = s.congress?.[i];
     return a ? [a.res, a.outcome, a.target] : [-1, -1, -1];
-  }),
+  })],
   // Sorted by (kind, target, city) and padded to the slot table: the TS list
   // is an array in trigger order and the GPU a fixed table, so the ORDER is
   // not a fact either engine owns.
@@ -357,21 +359,26 @@ const GAME: Record<string, Extractor> = {
       out.push(...(e ? [e.kind, e.target, e.city, e.phase, e.act, mask(e.affected), mask(e.members)]
                      : [-1, -1, -1, -1, -1, 0, 0]));
     }
-    return out;
+    return [out];
   },
   lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
   roadTier: (s) => [s.roadTier ?? 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   enhancerBeliefsClaimed: (s) => [(s.claimedEnhancers ?? []).length],
+  // one flat row: each class's claimed list behind its LENGTH (the lists
+  // vary), then the offer, price and passed-by vectors (one per class)
   greatPeopleByClass: (s) => {
     const claimed = new Set(s.claimedGreatPeople);
-    return [
-      ...GP_CLASSES.map((c) => GREAT_PEOPLE[c].flatMap((p, at) => (claimed.has(p.id) ? [at] : []))),
-      GP_CLASSES.map((_, i) => s.gpOffer?.[i] ?? -1),
-      GP_CLASSES.map((_, i) => s.gpPrice?.[i] ?? 0),
-      GP_CLASSES.map((_, i) => s.gpPassedBy?.[i] ?? -1),
-    ];
+    return [[
+      ...GP_CLASSES.flatMap((c) => {
+        const at = GREAT_PEOPLE[c].flatMap((p, i) => (claimed.has(p.id) ? [i] : []));
+        return [at.length, ...at];
+      }),
+      ...GP_CLASSES.map((_, i) => s.gpOffer?.[i] ?? -1),
+      ...GP_CLASSES.map((_, i) => s.gpPrice?.[i] ?? 0),
+      ...GP_CLASSES.map((_, i) => s.gpPassedBy?.[i] ?? -1),
+    ]];
   },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
@@ -910,6 +917,12 @@ export function foldRows(
   cols: readonly { compare: 'exact' | 'milli'; vals: readonly Val[] }[],
 ): { exact: string; milli: string } {
   const accs = { exact: new Acc(), milli: new Acc() };
+  for (let i = 0; i < cols.length; i++) {
+    if (cols[i].vals.length !== keys.length) {
+      throw new Error(`digest column ${i} carries ${cols[i].vals.length} values for ${keys.length} rows — `
+        + 'an extractor handed ONE row\'s list as the whole column');
+    }
+  }
   for (let r = 0; r < keys.length; r++) {
     const seed = step(0x811c9dc5, ((keys[r] % TWO32) + TWO32) % TWO32);
     const h: Record<string, number> = { exact: seed, milli: seed };

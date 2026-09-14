@@ -48,7 +48,12 @@ ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"
 
 _MASK = 0xFFFFFFFF
 _2_32 = 1 << 32
-_VEC_MIN_ROWS = 64
+# the row floor below which the scalar fold beats the numpy one. Measured
+# 2026-09-14 on a turn-220 state: 16 and 32 beat 64 at B=1 and through
+# `fold_rows_multi` at B=3; 8 loses (the 9-row seat and city-state groups
+# go vector and pay numpy's per-op overhead). The check at the bottom of the
+# file sets it to 0 to exercise the arithmetic on every group.
+_VEC_MIN_ROWS = 16
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> dict:
@@ -242,24 +247,26 @@ GAME = {
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
-    "competition": lambda sim, b, rows: (
+    # ONE row, so ONE outer list. The game group has a single row and the
+    # fold reads `vals[0]`: these four used to hand the fold a FLAT list and
+    # only its first element was ever compared (the competition's kind, the
+    # first resolution's id, the first emergency's kind, the first class's
+    # claimed list). Found 2026-09-14 when the vector fold refused a 1-row
+    # group; `fold_rows` now refuses the shape on both engines.
+    "competition": lambda sim, b, rows: [(
         [int(sim.comp_kind[b]), int(sim.comp_left[b])]
         + [float(sim.comp_score[b, r]) for r in range(sim.n_majors)]
-        + [int(bool(sim.comp_member[b, r])) for r in range(sim.n_majors)]),
-    "congressActive": lambda sim, b, rows: [int(x) for x in sim.congress_active[b].reshape(-1).tolist()],
-    "emergencyTable": lambda sim, b, rows: _emg_table(sim, b),
+        + [int(bool(sim.comp_member[b, r])) for r in range(sim.n_majors)])],
+    "congressActive": lambda sim, b, rows: [[int(x) for x in sim.congress_active[b].reshape(-1).tolist()]],
+    "emergencyTable": lambda sim, b, rows: [_emg_table(sim, b)],
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
     "roadTier": lambda sim, b, rows: [int(sim.road_tier)],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
     "beliefsClaimed": lambda sim, b, rows: [int(sim.claimed_f_n[b]) + int(sim.claimed_o_n[b])],
     "enhancerBeliefsClaimed": lambda sim, b, rows: [int(sim.claimed_e_n[b])],
-    "greatPeopleByClass": lambda sim, b, rows: [
-        *[[int(i) for i in sim.gp_claimed[b, c, : int(sim._gp_roster[c])].nonzero(as_tuple=True)[0].tolist()]
-          for c in range(sim.gp_claimed.shape[1])],
-        [int(x) for x in sim.gp_offer[b].tolist()],
-        [float(x) for x in sim.gp_price[b].tolist()],
-        [int(x) for x in sim.gp_passed_by[b].tolist()],
-    ],
+    # one flat row: each class's claimed list behind its LENGTH (the lists
+    # vary), then the offer, price and passed-by vectors (one per class)
+    "greatPeopleByClass": lambda sim, b, rows: [_gp_by_class(sim, b)],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
@@ -297,6 +304,18 @@ def _civ_mask(plane: str, offset: int = 0):
         m = getattr(sim, plane)[b].tolist()
         return [[i + offset for i, on in enumerate(m[c]) if on] for c in rows]
     return get
+
+
+def _gp_by_class(sim, b) -> list:
+    out: list = []
+    for c in range(sim.gp_claimed.shape[1]):
+        at = [int(i) for i in sim.gp_claimed[b, c, : int(sim._gp_roster[c])].nonzero(as_tuple=True)[0].tolist()]
+        out.append(len(at))
+        out.extend(at)
+    out.extend(int(x) for x in sim.gp_offer[b].tolist())
+    out.extend(float(x) for x in sim.gp_price[b].tolist())
+    out.extend(int(x) for x in sim.gp_passed_by[b].tolist())
+    return out
 
 
 def _emg_table(sim, b):
@@ -1051,11 +1070,11 @@ def _fold_rows_np(keys, cols) -> dict | None:
     accumulators."""
     if _np is None:
         return None
-    # Below ~64 rows the per-op numpy overhead LOSES to the scalar loop —
-    # the seat/city/game groups are 1-15 rows and vectorising them QUADRUPLED
-    # digest time. The vector path exists for the tile group's 1144 rows, the
-    # unit group's mid-game hundreds — and `fold_rows_multi`, whose
-    # whole-batch concatenation clears the floor for every group.
+    # Below the floor the per-op numpy overhead LOSES to the scalar loop
+    # (the game / seat / city-state groups); the vector path exists for the
+    # tile group's 1144 rows, the unit group's mid-game hundreds, the city
+    # group — and `fold_rows_multi`, whose whole-batch concatenation lifts
+    # every group over the floor at B >= 2.
     if len(keys) < _VEC_MIN_ROWS:
         return None
     h = _chain_np(keys, cols)
@@ -1122,6 +1141,11 @@ def fold_rows(keys, cols) -> dict:
     serve lane's wall); small groups keep the loop below, unless a whole
     batch folds at once through `fold_rows_multi`. Same bits every way.
     """
+    for i, (_, vals) in enumerate(cols):
+        if len(vals) != len(keys):
+            raise AssertionError(
+                f"digest column {i} carries {len(vals)} values for {len(keys)} rows — "
+                "an extractor handed ONE row's list as the whole column")
     vec = _fold_rows_np(keys, cols)
     if vec is not None:
         return vec
