@@ -35,9 +35,26 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from warmup import settle_all
 
 
-def fresh(rules, path, n: int = 1) -> BatchSim:
-    return BatchSim([load_fixture(path) for _ in range(n)], rules, device="cpu",
-                    dtype=torch.float64)
+# THE WARMED BASE, ONE PER (fixture, batch width, settled). A scene pays a
+# `restore` — milliseconds — instead of a fixture load and, for the scenes that
+# want a founded map, a settle. Every plane these pokes write is in `_MUTABLE`
+# or a view of one (the `major_unit_*` planes are range views of the merged
+# `unit_*` bases), so the restore is the whole of it.
+_BASE: dict = {}
+
+
+def fresh(rules, path, n: int = 1, settled: bool = False) -> BatchSim:
+    key = (str(path), n, settled)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path) for _ in range(n)], rules, device="cpu",
+                       dtype=torch.float64)
+        if settled:
+            sim = settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100) -> int:
@@ -151,7 +168,7 @@ def main() -> int:
     print("  5 armor plating + the naval penalty OK")
 
     # --- 6) Enhanced Mobility: the moves, and the mountain ------------------
-    s7 = settle_all(fresh(rules, paths[0]))
+    s7 = fresh(rules, paths[0], settled=True)
     # a free land tile with a MOUNTAIN neighbour
     stand = -1
     d_mtn = -1
@@ -182,7 +199,7 @@ def main() -> int:
     print(f"  6 Enhanced Mobility OK (+3 Moves, mountain hex {d_mtn} opens)")
 
     # --- 7) no experience, and no formation ---------------------------------
-    s8 = settle_all(fresh(rules, paths[0]))
+    s8 = fresh(rules, paths[0], settled=True)
     assert not bool(s8._xp_eligible(L(s8, gdr))[0]), \
         "CIV6: 'Cannot earn experience or Promotions'"
     assert bool(s8._xp_eligible(L(s8, foot))[0]), "and every other chassis still does"
@@ -213,7 +230,7 @@ def main() -> int:
     assert not bool(s8._seat_unit_mask(row)[b, rank, fcol]), \
         "CIV6: 'Cannot form Corps or Armies by any means'"
     # the same pair of any other chassis DOES form
-    s9 = settle_all(fresh(rules, paths[0]))
+    s9 = fresh(rules, paths[0], settled=True)
     for _k, _ci in enumerate(s9._formation_civic):
         if _ci >= 0:
             s9.civ_civics[b, row, _ci] = True

@@ -31,9 +31,27 @@ B0 = 0
 ROW = 0
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_STATIC` names the state these pokes
+# write that `snapshot`/`restore` does not carry (it is not in `_MUTABLE`), so
+# the helper puts it back by hand as well.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
 def build(path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], load_rules(),
-                               device="cpu", dtype=torch.float64))
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], load_rules(),
+                                  device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    return sim
 
 
 def _seat(sim, row: int, civ) -> None:

@@ -30,9 +30,28 @@ RULES = json.loads((ROOT / "seeder" / "worlds" / "rules.json").read_text())
 UNITS = [u["id"] for u in RULES["units"]]
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. `_STATIC` names the state the ban
+# scene writes that `snapshot`/`restore` does not carry (it is not in
+# `_MUTABLE`), so the helper puts it back by hand as well; every harvested
+# plane IS in `_MUTABLE`, which the registry scene asserts on its own.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    return settle_all(sim)
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
 
 
 def test_column(rules, path) -> None:

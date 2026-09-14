@@ -37,12 +37,25 @@ STRIKER = 0  # the walled civ: acts FIRST in the phase
 VICTIM = 1  # its enemy: acts after, so it cannot step away pre-strike
 
 
+# THE WARMED BASE, ONE PER FIXTURE SET. A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and forty steps. Every
+# plane the two scenes write is in `_MUTABLE` or a view of one (the
+# `major_unit_*` planes are range views of the merged `unit_*` bases).
+_BASE: dict = {}
+
+
 def build():
-    rules = load_rules()
     paths = fixture_paths()[:1]
-    sim = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
-    for _ in range(40):  # far enough in that both civs hold a city
-        sim.step()
+    key = tuple(str(p) for p in paths)
+    if key not in _BASE:
+        rules = load_rules()
+        sim = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
+        for _ in range(40):  # far enough in that both civs hold a city
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
     assert sim.n_majors > 2, "this lane needs two civs"
     return sim
 

@@ -34,9 +34,23 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load and a settle. Every plane these pokes write is in
+# `_MUTABLE` or a view of one (`citystate_alive` is a view of `city_alive`), so
+# the restore is the whole of it.
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
+                                  dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def post(sim, row: int, g: int, s: int, promos: int = 0) -> None:

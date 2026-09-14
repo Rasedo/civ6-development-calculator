@@ -42,10 +42,23 @@ from warmup import settle_all
 B0, ROW = 0, 0
 
 
+# THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
+# instead of a fixture load, a settle and eight steps. Every plane these pokes
+# write is in `_MUTABLE`, so the restore is the whole of it; the building
+# version moves because `restore` rewrites `city_bldg` in place.
+_BASE: dict = {}
+
+
 def build(rules, path) -> BatchSim:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(8):
-        sim.step()
+    key = str(path)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(8):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
     return sim
 
 

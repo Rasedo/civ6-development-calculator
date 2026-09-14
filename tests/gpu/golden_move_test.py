@@ -28,10 +28,25 @@ from core.engine import BARB_SEAT
 from warmup import settle_all
 
 
-def build() -> BatchSim:
-    rules = load_rules()
+# THE WARMED BASE, ONE PER (fixture set, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load and a settle. Every plane these
+# pokes write is in `_MUTABLE` or a view of one (the embark plane and the barb
+# pool's planes are range views of the merged `unit_*` bases). `slot` keys a
+# SECOND base for the one scene that holds two live sims at once.
+_BASE: dict = {}
+
+
+def build(slot: int = 0) -> BatchSim:
     paths = fixture_paths()[:1]
-    return settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
+    key = (tuple(str(p) for p in paths), slot)
+    if key not in _BASE:
+        rules = load_rules()
+        sim = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bldg_version += 1
+    return sim
 
 
 def put(sim: BatchSim, pre: str, type_idx: int, seat: int) -> int:
@@ -148,8 +163,9 @@ def main() -> None:
             "a CIV in a golden FREE_INQUIRY got no extra discount — the call "
             "site is still asking about civ 0"
         )
-        # ...and seat 0's Golden age must not pay for the civ
-        sim6 = build()
+        # ...and seat 0's Golden age must not pay for the civ. `sim5` is read
+        # again below, so this one takes a base of its own.
+        sim6 = build(slot=1)
         golden(sim6, 0, fi)
         assert float(sim6._eff_cost(cost, boosted, 1)[0]) == float(plain[0]), (
             "seat 0's dedication discounted a CIV's research"
