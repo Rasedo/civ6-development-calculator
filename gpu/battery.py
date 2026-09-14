@@ -121,6 +121,11 @@ SLOW_TIER = frozenset({
     "governor_roster", "occupancy", "centre_defence", "advance_borders",
     "citystate_war", "seat", "controlled", "snapshot", "citystate_bonus",
     "formation_train",
+    # 2026-09-14 (owner: "trim tests"): the eight lanes the battery's own
+    # record named as never having caught anything in 189 runs, 475 s of
+    # the pool between them — demoted, not deleted
+    "trade2", "culture_victory", "districts_new", "climate", "war_weariness",
+    "bankruptcy", "sourced_rows", "spawn_reclaim",
 })
 
 # ---------------------------------------------------------------- memory --

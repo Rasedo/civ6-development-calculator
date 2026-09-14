@@ -67,8 +67,9 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
-| **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **32** | |
+| C-80 constants vs the install | 3 | 67 ledger lines (docs/PROVENANCE.md) — catalog values the install contradicts, every one a FIX toward the install per the owner's 2026-09-14 ruling; two wait for the lab (purchase price, Pop Star); 58 census orphans (tools/gpu/rules_reader_census_baseline.txt) — exported keys or catalog columns no engine reads — to classify |
+| **C. Absent systems** | **24** | |
+| **OPEN, TOTAL** | **35** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -1428,6 +1429,46 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - LEY LINE adjacency is out of scope by construction: it is a Secret
     Societies resource class this engine's map never places, so every
     `LeyLine_*` row on a unique district is unreachable.
+
+- **C-80. CONSTANTS VS THE INSTALL.** Weight 3.
+  - THE INSTRUMENTS EXIST (2026-09-14): every catalog constant carries a
+    source tag (`cpu/data/provenance.ts`: XML row/column with `expect`,
+    `scale`, `absent`; LAB; PEDIA; STYLIZED; DERIVED with inputs);
+    `npm run export` writes provenance.json beside rules.json;
+    `tools/civ6lab/xml_check.py check` re-reads the install in the game's
+    own load order (each pack's .modinfo) and compares. 6,539 constants,
+    6,335 tagged, 4,775 match. The battery runs the checker and the reader
+    census (`tools/gpu/rules_reader_census.py`) in stage 0 as RATCHETS
+    against docs/PROVENANCE.md and the census baseline: a NEW disagreement
+    or a NEW unread key is red; the known lists below are this entry.
+  - OPEN, the ledger: 67 lines in docs/PROVENANCE.md's authoritative
+    section (65 mismatch, 2 dangling) over 18 catalogs. The owner ruled
+    (2026-09-14): no constant was their choice, prefer Civ 6, fewer
+    stylizations — so every line moves to the install's value in ONE
+    fixture-moving batch (`.claude/scratchpad/provenance_fix_brief.md`
+    holds the per-line target), comments rewritten to cite the table, both
+    engines grepped for a hard-coded twin of the old literal, battery after.
+    The shape of them: Gathering Storm changes the catalogs never took
+    (River Goddess, Feed the World, Divine Inspiration, Tithe's shape, the
+    age thresholds 14/28, delegation 25 / embassy 50, the Colosseum's 2, the
+    Palace's 2 amenities, the Airport's slots), transcription slips (Mamluk,
+    Varu, Toa, Minas Geraes, Inquisitor, Proselytizer, Itinerant Preachers,
+    two follower-count divisors), three wrong upgrade rungs, two row
+    comments that invert the XML they cite (the Fort's tech, the Sphinx's
+    appeal), a building cost LADDER priced off a published table instead of
+    `Buildings.Cost`, four beliefs the install does not have at all (Oral
+    Tradition and Church Property deleted by the expansion; Crusade and
+    Messenger of the Gods nowhere), and two lines the lab must measure
+    first (the purchase price formula — SESSION2 scene G; the Pop Star's
+    percent — scene H).
+  - OPEN, the census: 30 wire keys no GPU literal names and 28 catalog
+    columns no TS code names (the baseline file IS the list). Each is a
+    dead export (delete on both sides), a reader under another spelling
+    (teach the census), or a MISSING RULE on one engine — the Stave Church
+    class, a defect. Not yet classified.
+  - REACH: the checker and the census are static; the ledger's fixes are
+    behaviour-changing and reach whatever the gate reaches (a battery per
+    batch, fixtures may move).
 
 ## Harness — not weighted
 
