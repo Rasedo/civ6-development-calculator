@@ -21,9 +21,13 @@
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 import type { CivId, LeaderId } from '../../world/roster';
 import { GAME_SPEED } from './constants';
+import { xml, type SrcMap } from './provenance';
 
 export interface ProjectDef {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
+   *  exporter; checked by tools/civ6lab/xml_check.py. */
+  src?: SrcMap;
   name: string;
   district: DistrictId;
   yield: YieldKey | null;
@@ -116,6 +120,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'science',
       gpClass: 'SCIENTIST',
       description: 'Convert production into science and Great Scientist points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'PrereqDistrict', { expect: 'DISTRICT_CAMPUS' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_SCIENTIST' }),
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'YieldType', { expect: 'YIELD_SCIENCE' }),
+      },
     }),
     P({
       id: 'FESTIVAL',
@@ -126,6 +135,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       gpClasses: ['WRITER', 'ARTIST', 'MUSICIAN'],
       gppFraction: 0.11,
       description: 'Convert production into culture and Great Writer/Artist/Musician points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'PrereqDistrict', { expect: 'DISTRICT_THEATER' }),
+        gpClass: { derived: 'the PRIMARY of the THREE Project_GreatPersonPoints classes the install gives this project; the catalog keeps one for wire-index stability and the full list in gpClasses', inputs: [xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'GreatPersonClassType')] },
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'YieldType', { expect: 'YIELD_CULTURE' }),
+        gpClasses: { derived: 'the Project_GreatPersonPoints classes of this project, as engine class ids', inputs: [xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'GreatPersonClassType')] },
+        gppFraction: { derived: 'the Festival pays Points 5 per class where a single-class project pays 10, so half the generic PROJECT_GPP_FRACTION', inputs: [xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER&GreatPersonClassType=GREAT_PERSON_CLASS_WRITER', 'Points')] },
+      },
     }),
     P({
       id: 'PRAYERS',
@@ -134,6 +150,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'faith',
       gpClass: 'PROPHET',
       description: 'Convert production into faith and Great Prophet points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_PROPHET' }),
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'YieldType', { expect: 'YIELD_FAITH' }),
+      },
     }),
     P({
       id: 'INVESTMENT',
@@ -142,6 +163,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'gold',
       gpClass: 'MERCHANT',
       description: 'Convert production into gold and Great Merchant points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'PrereqDistrict', { expect: 'DISTRICT_COMMERCIAL_HUB' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_MERCHANT' }),
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'YieldType', { expect: 'YIELD_GOLD' }),
+      },
     }),
     P({
       id: 'SHIPPING',
@@ -150,6 +176,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'gold',
       gpClass: 'ADMIRAL',
       description: 'Convert production into gold and Great Admiral points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_ADMIRAL' }),
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'YieldType', { expect: 'YIELD_GOLD' }),
+      },
     }),
     P({
       id: 'TRAINING',
@@ -158,6 +189,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: null,
       gpClass: 'GENERAL',
       description: 'Convert production into Great General points.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'PrereqDistrict', { expect: 'DISTRICT_ENCAMPMENT' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_GENERAL' }),
+      },
     }),
 
     // REPAIR OUTER DEFENSES, the last of the BASE rows — the laser and space
@@ -176,6 +211,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       gpClass: null,
       repair: true,
       description: 'Restores the Walls of this city and its Encampment.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_REPAIR_OUTER_DEFENSES', 'PrereqDistrict')] },
+        repair: xml('Projects', 'ProjectType=PROJECT_REPAIR_OUTER_DEFENSES', 'OuterDefenseRepair'),
+      },
     }),
 
     // THE LASER STATIONS (before the space rows so those stay LAST, in chain
@@ -190,8 +229,25 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // is counted on the CITY that built it. The LAGRANGE station pays a
     // one-time 30 Aluminum instead and "is guaranteed to provide its bonus" —
     // a one-time charge, so it never goes dark once paid.
-    P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn while this city is powered.' }),
-    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, orbital: true, resource: 'ALUMINUM', resourceCost: 30, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
+    P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn while this city is powered.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_TERRESTRIAL_LASER', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_TERRESTRIAL_LASER', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_TERRESTRIAL_LASER', 'PrereqTech', { expect: 'TECH_OFFWORLD_MISSION' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_TERRESTRIAL_LASER', 'PrereqProjectType', { expect: 'PROJECT_LAUNCH_EXOPLANET_EXPEDITION' }),
+        laser: { derived: 'true for the two Offworld Mission laser stations the install chains off the Exoplanet Expedition', inputs: [xml('Projects', 'ProjectType=PROJECT_TERRESTRIAL_LASER', 'PrereqTech')] },
+      },
+    }),
+    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, orbital: true, resource: 'ALUMINUM', resourceCost: 30, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_ORBITAL_LASER', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_ORBITAL_LASER', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_ORBITAL_LASER', 'PrereqTech', { expect: 'TECH_OFFWORLD_MISSION' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_ORBITAL_LASER', 'PrereqProjectType', { expect: 'PROJECT_LAUNCH_EXOPLANET_EXPEDITION' }),
+        laser: { derived: 'true for the two Offworld Mission laser stations the install chains off the Exoplanet Expedition', inputs: [xml('Projects', 'ProjectType=PROJECT_ORBITAL_LASER', 'PrereqTech')] },
+        orbital: { derived: 'true for the install row named ORBITAL_LASER, whose bonus needs no city Power', inputs: [xml('Projects', 'ProjectType=PROJECT_ORBITAL_LASER', 'ProjectType')] },
+      },
+    }),
 
     // THE SPACE RACE, four steps, each needing the previous one COMPLETE, all
     // run in a SPACEPORT. SOURCED against the Gathering Storm Civilopedia
@@ -215,12 +271,57 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // a city whose Industrial Zone holds a Nuclear Power Plant; completing it
     // "resets the age of the reactor to 0". 400 Production, and the cost
     // "does not scale with further research".
-    P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.' }),
-    P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
-    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
-    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
-    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
-    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'SPACEPORT', yield: null, gpClass: null, once: true, victory: true, cost: 2100, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — launches the craft; winning is its arrival.' }),
+    P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'PrereqTech', { expect: 'TECH_NUCLEAR_FISSION' }),
+        recommission: { derived: 'true for the install RECOMMISSION_REACTOR row', inputs: [xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'ProjectType')] },
+      },
+    }),
+    P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        requiresCivic: xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'PrereqCivic', { expect: 'CIVIC_GLOBAL_WARMING_MITIGATION' }),
+        carbonRecapture: { derived: 'true for the install CARBON_RECAPTURE row', inputs: [xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'ProjectType')] },
+      },
+    }),
+    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EARTH_SATELLITE', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EARTH_SATELLITE', 'Cost', { scale: GAME_SPEED }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_LAUNCH_EARTH_SATELLITE', 'MaxPlayerInstances')] },
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EARTH_SATELLITE', 'PrereqTech', { expect: 'TECH_ROCKETRY' }),
+      },
+    }),
+    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MOON_LANDING', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MOON_LANDING', 'Cost', { scale: GAME_SPEED }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_LAUNCH_MOON_LANDING', 'MaxPlayerInstances')] },
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MOON_LANDING', 'PrereqTech', { expect: 'TECH_SATELLITES' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_LAUNCH_MOON_LANDING', 'PrereqProjectType', { expect: 'PROJECT_LAUNCH_EARTH_SATELLITE' }),
+      },
+    }),
+    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, once: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MARS_BASE', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MARS_BASE', 'Cost', { scale: GAME_SPEED }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_LAUNCH_MARS_BASE', 'MaxPlayerInstances')] },
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_LAUNCH_MARS_BASE', 'PrereqTech', { expect: 'TECH_NANOTECHNOLOGY' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_LAUNCH_MARS_BASE', 'PrereqProjectType', { expect: 'PROJECT_LAUNCH_MOON_LANDING' }),
+      },
+    }),
+    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'SPACEPORT', yield: null, gpClass: null, once: true, victory: true, cost: 2100, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — launches the craft; winning is its arrival.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'Cost', { scale: GAME_SPEED }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'MaxPlayerInstances')] },
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'PrereqTech', { expect: 'TECH_SMART_MATERIALS' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'PrereqProjectType', { expect: 'PROJECT_LAUNCH_MARS_BASE' }),
+        victory: xml('Projects', 'ProjectType=PROJECT_LAUNCH_EXOPLANET_EXPEDITION', 'SpaceRace'),
+      },
+    }),
 
     // THE NUCLEAR CHAIN, all four in the City Center, which every city has.
     // CIV6 (Manhattan Project): 1000 Production, "becomes available after
@@ -231,31 +332,104 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // REPEATABLE — "there is no limit on the number that a player can build,
     // as long as they have enough Gold to support them" — 800 and 1000
     // Production, and each charges its device's Uranium once, when it starts.
-    P({ id: 'MANHATTAN_PROJECT', name: 'Manhattan Project', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FISSION', description: 'Opens the Build Nuclear Device project.' }),
-    P({ id: 'OPERATION_IVY', name: 'Operation Ivy', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'MANHATTAN_PROJECT', description: 'Opens the Build Thermonuclear Device project.' }),
-    P({ id: 'BUILD_NUCLEAR_DEVICE', name: 'Build Nuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 1, cost: 800, requiresTech: 'NUCLEAR_FISSION', requiresProject: 'MANHATTAN_PROJECT', resource: 'URANIUM', resourceCost: 10, description: 'Repeatable: adds one Nuclear Device to this seat inventory.' }),
-    P({ id: 'BUILD_THERMONUCLEAR_DEVICE', name: 'Build Thermonuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 2, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'OPERATION_IVY', resource: 'URANIUM', resourceCost: 20, description: 'Repeatable: adds one Thermonuclear Device to this seat inventory.' }),
+    P({ id: 'MANHATTAN_PROJECT', name: 'Manhattan Project', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FISSION', description: 'Opens the Build Nuclear Device project.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_MANHATTAN_PROJECT', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_MANHATTAN_PROJECT', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_MANHATTAN_PROJECT', 'PrereqTech', { expect: 'TECH_NUCLEAR_FISSION' }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_MANHATTAN_PROJECT', 'MaxPlayerInstances')] },
+      },
+    }),
+    P({ id: 'OPERATION_IVY', name: 'Operation Ivy', district: 'CITY_CENTER', yield: null, gpClass: null, once: true, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'MANHATTAN_PROJECT', description: 'Opens the Build Thermonuclear Device project.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_OPERATION_IVY', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_OPERATION_IVY', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_OPERATION_IVY', 'PrereqTech', { expect: 'TECH_NUCLEAR_FUSION' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_OPERATION_IVY', 'PrereqProjectType', { expect: 'PROJECT_MANHATTAN_PROJECT' }),
+        once: { derived: 'true where the install row carries MaxPlayerInstances 1', inputs: [xml('Projects', 'ProjectType=PROJECT_OPERATION_IVY', 'MaxPlayerInstances')] },
+      },
+    }),
+    P({ id: 'BUILD_NUCLEAR_DEVICE', name: 'Build Nuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 1, cost: 800, requiresTech: 'NUCLEAR_FISSION', requiresProject: 'MANHATTAN_PROJECT', resource: 'URANIUM', resourceCost: 10, description: 'Repeatable: adds one Nuclear Device to this seat inventory.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'PrereqTech', { expect: 'TECH_NUCLEAR_FISSION' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'PrereqProjectType', { expect: 'PROJECT_MANHATTAN_PROJECT' }),
+        wmd: { derived: 'the 1-based index of this device in NUCLEAR_DEVICES; the install marks the row only with WMD true', inputs: [xml('Projects', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'WMD')] },
+        resource: xml('Projects', 'ProjectType=PROJECT_BUILD_NUCLEAR_DEVICE', 'PrereqResource', { expect: 'RESOURCE_URANIUM' }),
+      },
+    }),
+    P({ id: 'BUILD_THERMONUCLEAR_DEVICE', name: 'Build Thermonuclear Device', district: 'CITY_CENTER', yield: null, gpClass: null, wmd: 2, cost: 1000, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'OPERATION_IVY', resource: 'URANIUM', resourceCost: 20, description: 'Repeatable: adds one Thermonuclear Device to this seat inventory.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Projects', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'PrereqTech', { expect: 'TECH_NUCLEAR_FUSION' }),
+        requiresProject: xml('ProjectPrereqs', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'PrereqProjectType', { expect: 'PROJECT_OPERATION_IVY' }),
+        wmd: { derived: 'the 1-based index of this device in NUCLEAR_DEVICES; the install marks the row only with WMD true', inputs: [xml('Projects', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'WMD')] },
+        resource: xml('Projects', 'ProjectType=PROJECT_BUILD_THERMONUCLEAR_DEVICE', 'PrereqResource', { expect: 'RESOURCE_URANIUM' }),
+      },
+    }),
 
     // CIV6 (Expansion2_Projects.xml): the three DECOMMISSION projects —
     // Cost 400 apiece, PrereqDistrict DISTRICT_INDUSTRIAL_ZONE,
     // `UnlocksFromEffect` (the Climate Accords competition opens them), and
     // each one's `Project_BuildingCosts` row names the plant it consumes.
-    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Coal Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Oil Power Plant and all its effects from this city.' }),
-    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Nuclear Power Plant and all its effects from this city.' }),
+    P({ id: 'DECOMMISSION_COAL_POWER_PLANT', name: 'Decommission Coal Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'COAL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Coal Power Plant and all its effects from this city.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_COAL_POWER_PLANT', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_COAL_POWER_PLANT', 'Cost', { scale: GAME_SPEED }),
+        consumesBuilding: xml('Project_BuildingCosts', 'ProjectType=PROJECT_DECOMMISSION_COAL_POWER_PLANT', 'ConsumedBuildingType', { expect: 'BUILDING_COAL_POWER_PLANT' }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row; the install names the flag, not the competition', inputs: [xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_COAL_POWER_PLANT', 'ProjectType')] },
+      },
+    }),
+    P({ id: 'DECOMMISSION_OIL_POWER_PLANT', name: 'Decommission Oil Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'OIL_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Oil Power Plant and all its effects from this city.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_OIL_POWER_PLANT', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_OIL_POWER_PLANT', 'Cost', { scale: GAME_SPEED }),
+        consumesBuilding: xml('Project_BuildingCosts', 'ProjectType=PROJECT_DECOMMISSION_OIL_POWER_PLANT', 'ConsumedBuildingType', { expect: 'BUILDING_FOSSIL_FUEL_POWER_PLANT' }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row; the install names the flag, not the competition', inputs: [xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_OIL_POWER_PLANT', 'ProjectType')] },
+      },
+    }),
+    P({ id: 'DECOMMISSION_NUCLEAR_POWER_PLANT', name: 'Decommission Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, cost: 400, consumesBuilding: 'NUCLEAR_POWER_PLANT', competitionOnly: 'CLIMATE_ACCORDS', description: 'Removes the Nuclear Power Plant and all its effects from this city.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT', 'Cost', { scale: GAME_SPEED }),
+        consumesBuilding: xml('Project_BuildingCosts', 'ProjectType=PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT', 'ConsumedBuildingType', { expect: 'BUILDING_POWER_PLANT' }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row; the install names the flag, not the competition', inputs: [xml('Projects', 'ProjectType=PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT', 'ProjectType')] },
+      },
+    }),
 
     // CIV6 (Expansion2_Projects.xml, PROJECT_COTHON_CAPITAL_MOVE):
     // PrereqDistrict DISTRICT_COTHON, Cost 100,
     // COST_PROGRESSION_GAME_PROGRESS Param1 1500,
     // `MaxSimultaneousInstances=1`. APPENDED LAST — a project's catalog index
     // IS its action code, so an insert would shift every later one.
-    P({ id: 'COTHON_CAPITAL_MOVE', name: 'Move the Capital', district: 'HARBOR', civ: 'PHOENICIA', yield: null, gpClass: null, cost: 100, costProgressGame: 1500, movesCapital: true, description: 'When complete, this seat capital moves to this city.' }),
+    P({ id: 'COTHON_CAPITAL_MOVE', name: 'Move the Capital', district: 'HARBOR', civ: 'PHOENICIA', yield: null, gpClass: null, cost: 100, costProgressGame: 1500, movesCapital: true, description: 'When complete, this seat capital moves to this city.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_COTHON_CAPITAL_MOVE', 'PrereqDistrict', { expect: 'DISTRICT_COTHON' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_COTHON_CAPITAL_MOVE', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_COTHON_CAPITAL_MOVE', 'CostProgressionParam1'),
+        movesCapital: { derived: 'true for the install COTHON_CAPITAL_MOVE row, whose effect moves the capital', inputs: [xml('Projects', 'ProjectType=PROJECT_COTHON_CAPITAL_MOVE', 'ProjectType')] },
+      },
+    }),
     // CIV6 (Expansion2_Projects.xml): the two SCORED-COMPETITION projects,
     // both `UnlocksFromEffect` and both Cost 200 — offered only while their
     // competition runs, repeatable while it does. APPENDED LAST, because a
     // project's catalog index IS its action code.
-    P({ id: 'TRAIN_ATHLETES', name: 'Training Athletes', district: 'CITY_CENTER', yield: null, gpClass: null, cost: 200, competitionOnly: 'WORLD_GAMES', description: 'Repeatable while the World Games run: scores 50 for this seat.' }),
-    P({ id: 'TRAIN_ASTRONAUTS', name: 'Training Astronauts', district: 'SPACEPORT', yield: null, gpClass: null, cost: 200, competitionOnly: 'SPACE_STATION', description: 'Repeatable while the Space Station competition runs: scores 30 for this seat.' }),
+    P({ id: 'TRAIN_ATHLETES', name: 'Training Athletes', district: 'CITY_CENTER', yield: null, gpClass: null, cost: 200, competitionOnly: 'WORLD_GAMES', description: 'Repeatable while the World Games run: scores 50 for this seat.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_TRAIN_ATHLETES', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_TRAIN_ATHLETES', 'Cost', { scale: GAME_SPEED }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_TRAIN_ATHLETES', 'ProjectType')] },
+      },
+    }),
+    P({ id: 'TRAIN_ASTRONAUTS', name: 'Training Astronauts', district: 'SPACEPORT', yield: null, gpClass: null, cost: 200, competitionOnly: 'SPACE_STATION', description: 'Repeatable while the Space Station competition runs: scores 30 for this seat.',
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_TRAIN_ASTRONAUTS', 'PrereqDistrict', { expect: 'DISTRICT_SPACEPORT' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_TRAIN_ASTRONAUTS', 'Cost', { scale: GAME_SPEED }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_TRAIN_ASTRONAUTS', 'ProjectType')] },
+      },
+    }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 

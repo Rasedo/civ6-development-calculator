@@ -44,7 +44,18 @@ const srcStamp = exportStamp({ dir: DIR });
 
 const rules = buildRules() as Record<string, unknown>;
 rules.srcStamp = srcStamp;
-writeFileSync(`${DIR}/rules.json`, JSON.stringify(rules));
+const rulesJson = JSON.stringify(rules);
+// PROVENANCE NEVER RIDES THE WIRE. A catalog exported by a spread carries
+// its `src` tags onto rules.json silently (civLevels and the storms did,
+// 2026-09-14; each spread now sets `src: undefined`). The wire ALSO has a
+// legitimate `src` — a district adjacency rule's SOURCE-KIND index, an
+// integer the GPU reads — so a strip by key name deleted a real field once
+// and the test is for the tag's SHAPE: an object with a kind key.
+if (/"src":\{"(xml|lab|stylized|derived)"/.test(rulesJson)) {
+  console.error('rules.json carries a provenance tag — an exporter spreads a tagged row; set `src: undefined` there');
+  process.exit(1);
+}
+writeFileSync(`${DIR}/rules.json`, rulesJson);
 console.log(`rules.json: srcStamp ${srcStamp.slice(0, 16)}`);
 
 // every catalog constant with its source tag, for tools/civ6lab/xml_check.py

@@ -1,4 +1,5 @@
 import type { CivId, LeaderId } from './seats';
+import { xml, type SrcMap } from './provenance';
 
 /**
  * RIVER FLOOD magnitudes, from the Gathering Storm Flood page's two tables.
@@ -116,6 +117,9 @@ export const STORM_MOVEMENT = 8;
 
 export interface StormEvent {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
+   *  exporter; checked by tools/civ6lab/xml_check.py. */
+  src?: SrcMap;
   family: StormFamily;
   /** the install's Severity, 1 or 2 — the climate ramp moves mass onto 2 */
   severity: 1 | 2;
@@ -145,11 +149,70 @@ export interface StormEvent {
   fertProd: number;
 }
 
+
+/**
+ * PROVENANCE for one storm row (cpu/data/provenance.ts). Every magnitude is an
+ * install column; the ones this catalog holds as a FRACTION are `derived` from
+ * the install's PERCENTAGE, because the checker compares in the catalog's own
+ * units and cannot divide. A damage row the install does not carry reads 0
+ * here, which is the row's absence rather than a value.
+ */
+const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
+  const ev = `RandomEventType=RANDOM_EVENT_${id}`;
+  const dmg = (kind: string, col = 'Percentage') =>
+    xml('RandomEvent_Damages', `${ev}&DamageType=${kind}`, col);
+  const pct = (kind: string, col = 'Percentage') => ({
+    derived: `Percentage/100 - the install writes the share as a percentage, this catalog as a `
+      + `fraction; no ${kind} row at all reads 0`,
+    inputs: [dmg(kind, col)],
+  });
+  const fert = (y: string) => ({
+    derived: 'Percentage/100 of the RandomEvent_Yields row; no row at all reads 0',
+    inputs: [xml('RandomEvent_Yields', `${ev}&YieldType=${y}`, 'Percentage')],
+  });
+  const band = (kind: string, col: 'MinHP' | 'MaxHP', live: boolean) => (live
+    ? dmg(kind, col)
+    : { derived: `0 - the install row carries no ${kind} row`, inputs: [dmg(kind, col)] });
+  return {
+    family: {
+      derived: 'the engine family of the install RandomEvents row - the two Severity rows of one '
+        + 'storm kind share it',
+      inputs: [xml('RandomEvents', ev, 'RandomEventType')],
+    },
+    severity: xml('RandomEvents', ev, 'Severity'),
+    hexes: xml('RandomEvents', ev, 'Hexes'),
+    duration: xml('RandomEvents', ev, 'Duration'),
+    chance: {
+      derived: 'OccurrencesPerGame at REALISM_SETTING_MODERATE / STANDARD_GAME_TURNS (owner ruling '
+        + '2026-09-04)',
+      inputs: [xml('RandomEvent_Frequencies',
+        `${ev}&RealismSettingType=REALISM_SETTING_MODERATE`, 'OccurrencesPerGame')],
+    },
+    impPill: pct('IMPROVEMENT_PILLAGED'),
+    impDest: pct('IMPROVEMENT_DESTROYED'),
+    distPill: pct('DISTRICT_PILLAGED'),
+    bldgPill: pct('BUILDING_PILLAGED'),
+    pop: pct('POPULATION_LOSS'),
+    civKill: pct('UNIT_KILLED_CIVILIAN'),
+    landP: pct('UNIT_DAMAGE_LAND'),
+    navalP: pct('UNIT_DAMAGE_NAVAL'),
+    landLo: band('UNIT_DAMAGE_LAND', 'MinHP', !!d.landP),
+    landHi: band('UNIT_DAMAGE_LAND', 'MaxHP', !!d.landP),
+    navalLo: band('UNIT_DAMAGE_NAVAL', 'MinHP', !!d.navalP),
+    navalHi: band('UNIT_DAMAGE_NAVAL', 'MaxHP', !!d.navalP),
+    lowlandPill: pct('IMPROVEMENT_PILLAGED', 'CoastalLowlandPercentage'),
+    lowlandDist: pct('DISTRICT_PILLAGED', 'CoastalLowlandPercentage'),
+    fertFood: fert('YIELD_FOOD'),
+    fertProd: fert('YIELD_PRODUCTION'),
+  };
+};
+
 const storm = (
   id: string, family: StormFamily, severity: 1 | 2, perGame: number, hexes: number,
   d: Partial<StormEvent>,
 ): StormEvent => ({
   id, family, severity, chance: perGame / STANDARD_GAME_TURNS, hexes, duration: 3,
+  src: stormSrc(id, d),
   impPill: 0, impDest: 0, distPill: 0, bldgPill: 0, pop: 0, civKill: 0,
   landP: 0, navalP: 0, landLo: 0, landHi: 0, navalLo: 0, navalHi: 0,
   lowlandPill: 0, lowlandDist: 0, fertFood: 0, fertProd: 0, ...d,
@@ -228,6 +291,8 @@ export const STORM_DISC: readonly (readonly [number, number])[] = (() => {
  * Russia is the CIVILIZATION's over the two blizzard rows.
  */
 export interface StormUnitRow {
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   civ?: CivId;
   leader?: LeaderId;
   event: string;
@@ -235,7 +300,30 @@ export interface StormUnitRow {
   /** the +percent of MODIFIED_DAMAGE_OPPOSING_PLAYER; 0 on a noDamage row */
   amount: number;
 }
-export const STORM_UNIT_ROWS: readonly StormUnitRow[] = [
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts). `event` is the install's own
+ * `RandomEvents` row; the other two columns name the MODIFIER the trait
+ * attaches (MODIFIER_PLAYER_ADJUST_RANDOM_EVENT_NO_UNIT_DAMAGE and
+ * ..._MODIFIED_DAMAGE_OPPOSING_PLAYER), which the install writes as a modifier
+ * type rather than as a column this checker can read back.
+ */
+const stormUnitSrc = (r: StormUnitRow): SrcMap => ({
+  event: xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${r.event}`, 'RandomEventType',
+    { expect: `RANDOM_EVENT_${r.event}` }),
+  effect: {
+    derived: "'noDamage' for the install NO_UNIT_DAMAGE modifier, 'doubleOpposing' for "
+      + 'MODIFIED_DAMAGE_OPPOSING_PLAYER',
+    inputs: [xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${r.event}`, 'RandomEventType')],
+  },
+  amount: {
+    derived: 'the Amount argument of MODIFIER_PLAYER_ADJUST_RANDOM_EVENT_MODIFIED_DAMAGE_'
+      + 'OPPOSING_PLAYER; 0 on a noDamage row, which carries no Amount',
+    inputs: [xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${r.event}`, 'RandomEventType')],
+  },
+});
+
+const RAW_STORM_UNIT_ROWS: readonly StormUnitRow[] = [
   { leader: 'HOJO', event: 'HURRICANE_CAT_4', effect: 'noDamage', amount: 0 },
   { leader: 'HOJO', event: 'HURRICANE_CAT_5', effect: 'noDamage', amount: 0 },
   { leader: 'HOJO', event: 'HURRICANE_CAT_4', effect: 'doubleOpposing', amount: 100 },
@@ -245,6 +333,8 @@ export const STORM_UNIT_ROWS: readonly StormUnitRow[] = [
   { civ: 'RUSSIA', event: 'BLIZZARD_SIGNIFICANT', effect: 'doubleOpposing', amount: 100 },
   { civ: 'RUSSIA', event: 'BLIZZARD_CRIPPLING', effect: 'doubleOpposing', amount: 100 },
 ];
+export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
+  RAW_STORM_UNIT_ROWS.map((r) => ({ ...r, src: stormUnitSrc(r) }));
 
 /** NOT covered by the per-GAME-counts ruling: the install counts eruptions per GAME
  *  (VOLCANO_GENTLE 4, CATASTROPHIC 2.5, MEGACOLOSSAL 1.5 at MODERATE) where

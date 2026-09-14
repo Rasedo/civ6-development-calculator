@@ -1,3 +1,4 @@
+import { xml, type SrcMap } from './provenance';
 import type { DistrictId, YieldKey } from '../../world/types';
 
 type Yields = Partial<Record<YieldKey, number>>;
@@ -22,6 +23,8 @@ export type GovernorId = 'REYNA' | 'VICTOR' | 'AMANI' | 'MAGNUS' | 'MOKSHA' | 'L
 
 export interface GovernorDef {
   id: GovernorId;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   name: string;
   /** the descriptive title the Civilopedia gives — "The Financier". */
   title: string;
@@ -35,7 +38,27 @@ export interface GovernorDef {
 /** CIV6 (AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS, Amount 25). */
 export const AIR_DEFENSE_INITIATIVE_CS = 25;
 
-export const GOVERNORS: readonly GovernorDef[] = [
+
+/** the install's own name for each governor's role. */
+const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
+  REYNA: 'GOVERNOR_THE_MERCHANT', VICTOR: 'GOVERNOR_THE_DEFENDER',
+  AMANI: 'GOVERNOR_THE_AMBASSADOR', MAGNUS: 'GOVERNOR_THE_RESOURCE_MANAGER',
+  MOKSHA: 'GOVERNOR_THE_CARDINAL', LIANG: 'GOVERNOR_THE_BUILDER',
+  PINGALA: 'GOVERNOR_THE_EDUCATOR',
+};
+
+/** PROVENANCE (cpu/data/provenance.ts). `cityStates` is the install's own
+ *  `Governors.AssignCityState`; the epithet and the establish clock are the
+ *  Civilopedia's, which the install writes as a localisation key and a DLL
+ *  magnitude respectively. */
+const governorSrc = (id: GovernorId): SrcMap => ({
+  title: { stylized: 'the Civilopedia epithet; the install ships a localisation key' },
+  establishTurns: { lab: 'the GS Governor page ("3 turns for Victor and Ibrahim, 5 turns for the '
+    + 'rest"); the install carries no turns column' },
+  cityStates: xml('Governors', `GovernorType=${GOVERNOR_INSTALL_ID[id]}`, 'AssignCityState'),
+});
+
+const RAW_GOVERNORS: readonly GovernorDef[] = [
   { id: 'REYNA', name: 'Reyna', title: 'The Financier', establishTurns: 5 },
   { id: 'VICTOR', name: 'Victor', title: 'The Castellan', establishTurns: 3 },
   { id: 'AMANI', name: 'Amani', title: 'The Diplomat', establishTurns: 5, cityStates: true },
@@ -44,6 +67,8 @@ export const GOVERNORS: readonly GovernorDef[] = [
   { id: 'LIANG', name: 'Liang', title: 'The Surveyor', establishTurns: 5 },
   { id: 'PINGALA', name: 'Pingala', title: 'The Educator', establishTurns: 5 },
 ];
+export const GOVERNORS: readonly GovernorDef[] =
+  RAW_GOVERNORS.map((g) => ({ ...g, src: governorSrc(g.id) }));
 
 export const GOVERNOR_INDEX: Readonly<Record<GovernorId, number>> = Object.fromEntries(
   GOVERNORS.map((g, i) => [g.id, i]),

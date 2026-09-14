@@ -532,7 +532,8 @@ export function buildRules() {
     // only — the GPU indexes its per-row capability vectors by position).
     // Ten permissions per class of player; the GPU reads the one that forks a
     // live rule and asserts the rest against its own shape.
-    civLevels: CIV_LEVEL_ORDER.map((id) => ({ level: id, ...CIV_LEVELS[id] })),
+    // (`src` is provenance and must not ride the spread — export.ts asserts it)
+    civLevels: CIV_LEVEL_ORDER.map((id) => ({ level: id, ...CIV_LEVELS[id], src: undefined })),
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
     // real Civ 6 bands — Content exactly 0, Displeased -1..-2.
     amenityTiers: AMENITY_TIERS.map((t) => ({ min: t.min, growth: t.growthFactor, yield: t.yieldFactor })),

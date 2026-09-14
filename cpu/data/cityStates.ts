@@ -17,6 +17,7 @@
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
+import { type SrcMap } from './provenance';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
@@ -217,6 +218,8 @@ export const NGAZARGAMU_BUILDINGS: readonly (readonly string[])[] = [
  *  `Happiness="1"` luxury would have. */
 export const BUENOS_AIRES_AMENITIES = 1;
 export interface SuzerainBonusDef {
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   name: string;
   type: CityStateType;
   bonus: string;
@@ -224,7 +227,23 @@ export interface SuzerainBonusDef {
   suz: SuzEffect;
   note?: string;
 }
-export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts). A city-state's TYPE is the install's
+ * `Types`/`Civilizations` classification for that minor; the BONUS text is the
+ * Civilopedia's suzerain paragraph, and `suz` is the engine's own code for the
+ * clause — the install writes each bonus as a trait's modifier chain, not as a
+ * column a checker can read back.
+ */
+const SUZ_SRC: SrcMap = {
+  type: { lab: 'the GS City-State page classification (scientific / cultural / trade / industrial '
+    + '/ militaristic / religious)' },
+  bonus: { lab: 'the GS Civilopedia suzerain paragraph for this city-state, quoted' },
+  suz: { stylized: 'the engine code for the clause; the install writes the bonus as a trait '
+    + 'modifier chain, not as a readable column' },
+};
+
+const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% bonus Science output when you are not at war with any civilization.', suz: 'sciencePeace' },
   Bologna: { name: 'Bologna', type: 'scientific', bonus: 'Your districts with a building provide +1 Great Person point of their type (Writer, Artist, and Musician for Theater Square districts with a building).', suz: 'districtGpp' },
   Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience' },
@@ -250,6 +269,10 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', suz: 'suzImprovement' },
 };
+
+export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(
+  Object.entries(RAW_CITY_STATE_SUZERAIN_BONUS).map(([k, v]) => [k, { ...v, src: SUZ_SRC }]),
+);
 
 export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {
   scientific: '#4a90d9',

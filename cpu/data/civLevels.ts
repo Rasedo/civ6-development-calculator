@@ -1,3 +1,5 @@
+import { xml, type SrcMap } from './provenance';
+
 /**
  * THE INSTALL'S `CivilizationLevels` TABLE, VERBATIM.
  *
@@ -20,6 +22,9 @@
 export type CivLevelId = 'TRIBE' | 'CITY_STATE' | 'FULL_CIV' | 'FREE_CITIES';
 
 export interface CivLevelDef {
+  /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
+   *  exporter; checked by tools/civ6lab/xml_check.py. */
+  readonly src?: SrcMap;
   /** may found NEW cities with a Settler */
   readonly canFoundCities: boolean;
   /** a city's culture box claims a tile — FALSE for everyone but a full civ */
@@ -38,7 +43,26 @@ export interface CivLevelDef {
   readonly ignoresUnitStrategicResourceRequirements: boolean;
 }
 
-export const CIV_LEVELS: Readonly<Record<CivLevelId, CivLevelDef>> = {
+
+/** PROVENANCE (cpu/data/provenance.ts): every column of this table is the
+ *  install's own `CivilizationLevels` column of the same name. */
+const civLevelSrc = (id: CivLevelId): SrcMap => {
+  const where = `CivilizationLevelType=CIVILIZATION_LEVEL_${id}`;
+  return {
+    canFoundCities: xml('CivilizationLevels', where, 'CanFoundCities'),
+    canAnnexTilesWithCulture: xml('CivilizationLevels', where, 'CanAnnexTilesWithCulture'),
+    canAnnexTilesWithGold: xml('CivilizationLevels', where, 'CanAnnexTilesWithGold'),
+    canAnnexTilesWithReceivedInfluence: xml('CivilizationLevels', where, 'CanAnnexTilesWithReceivedInfluence'),
+    canEarnGreatPeople: xml('CivilizationLevels', where, 'CanEarnGreatPeople'),
+    canGiveInfluence: xml('CivilizationLevels', where, 'CanGiveInfluence'),
+    canReceiveInfluence: xml('CivilizationLevels', where, 'CanReceiveInfluence'),
+    canBuildWonders: xml('CivilizationLevels', where, 'CanBuildWonders'),
+    startingTilesForCity: xml('CivilizationLevels', where, 'StartingTilesForCity'),
+    ignoresUnitStrategicResourceRequirements: xml('CivilizationLevels', where, 'IgnoresUnitStrategicResourceRequirements'),
+  };
+};
+
+const RAW_CIV_LEVELS: Readonly<Record<CivLevelId, CivLevelDef>> = {
   TRIBE: {
     canFoundCities: false,
     canAnnexTilesWithCulture: false,
@@ -88,6 +112,10 @@ export const CIV_LEVELS: Readonly<Record<CivLevelId, CivLevelDef>> = {
     ignoresUnitStrategicResourceRequirements: false,
   },
 };
+
+export const CIV_LEVELS: Readonly<Record<CivLevelId, CivLevelDef>> = Object.fromEntries(
+  Object.entries(RAW_CIV_LEVELS).map(([k, v]) => [k, { ...v, src: civLevelSrc(k as CivLevelId) }]),
+) as Readonly<Record<CivLevelId, CivLevelDef>>;
 
 /** WIRE ORDER — append only. The GPU indexes its per-row capability vectors
  *  by this position, so a new class goes at the END. */

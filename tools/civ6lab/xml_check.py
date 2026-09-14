@@ -41,20 +41,104 @@ INSTALL = pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 DUMP = ROOT / "seeder" / "worlds" / "provenance.json"
 
-SKIP_DLC = re.compile(r"Scenario|Mode$|Pack$", re.I)
 SKIP_FILE = re.compile(r"Icons|Text|Civilopedia|Colors|Gossip|DiplomacyStatements|Presentation", re.I)
+
+# THE RULESET THIS CHECKER READS FOR: a Gathering Storm game with every
+# content pack and NO game mode. A pack's .modinfo gates each database
+# action on criteria; these are the answers the evaluator gives.
+GAME_CORE = "Expansion2"
+RULESET = "RULESET_EXPANSION_2"
+
+
+def _criteria_ok(crit: ET.Element | None) -> bool:
+    """evaluate one <Criteria> block for the ruleset above. A test this code
+    does not know is FALSE (a game mode, a scenario, a configuration value),
+    so unknown content stays out rather than sneaking in."""
+    if crit is None:
+        return True
+    any_of = crit.get("any") == "1"
+    results = []
+    for t in crit:
+        tag, text = t.tag, (t.text or "").strip()
+        if tag == "GameCoreInUse":
+            results.append(text == GAME_CORE)
+        elif tag == "RuleSetInUse":
+            results.append(RULESET in [x.strip() for x in text.split(",")])
+        elif tag == "LeaderPlayable":
+            results.append(True)   # every leader of an installed pack is playable
+        elif tag == "AlwaysMet":
+            results.append(True)
+        elif tag == "NeverMet":
+            results.append(False)
+        else:
+            # ConfigurationValueMatches (game modes), ModInUse, ... — not this ruleset
+            results.append(False)
+    if not results:
+        return True
+    return any(results) if any_of else all(results)
+
+
+def modinfo_files(pack: pathlib.Path, pack_rank: int) -> list[tuple[int, int, int, int, pathlib.Path]]:
+    """(LoadOrder, pack rank, action order, file order, path) for every
+    database file a pack's .modinfo applies under this ruleset. Within an
+    action, `Priority` orders files (higher first, the schema before the
+    removals before the content); across actions `<LoadOrder>` (default 0)."""
+    out = []
+    for mi in sorted(pack.glob("*.modinfo")):
+        try:
+            root = ET.parse(mi).getroot()
+        except ET.ParseError:
+            continue
+        crits = {c.get("id"): c for c in root.iter("Criteria")}
+        n_act = 0
+        for act in root.iter("UpdateDatabase"):
+            # only the in-game actions: FrontEndActions feed the setup screen
+            parent_ok = any(act in list(p) for p in root.iter("InGameActions"))
+            if not parent_ok:
+                continue
+            cid = act.get("criteria")
+            if cid is not None and not _criteria_ok(crits.get(cid)):
+                continue
+            lo = 0
+            props = act.find("Properties")
+            if props is not None and props.find("LoadOrder") is not None:
+                lo = int((props.find("LoadOrder").text or "0").strip())
+            files = [(-int(f.get("Priority", "0")), i, (f.text or "").strip())
+                     for i, f in enumerate(act.findall("File"))]
+            files.sort()
+            for k, (_, _, rel) in enumerate(files):
+                p = pack / rel.replace("\\", "/")
+                if p.suffix.lower() == ".xml" and p.exists() and not SKIP_FILE.search(p.name):
+                    out.append((lo, pack_rank, n_act, k, p))
+            n_act += 1
+    return out
 
 
 def data_files() -> list[pathlib.Path]:
-    """the install's data files in load order"""
+    """the install's data files in LOAD ORDER: the base game's data directory
+    (no manifest exists for it; alphabetical), then every content pack's
+    database actions as its .modinfo orders them under this ruleset —
+    Expansion2 first (it re-ships the Expansion1 content itself; Expansion1's
+    own actions are gated on a game core this ruleset does not use), then
+    the other packs alphabetically, actions by LoadOrder, files by Priority.
+    Alphabetical order inside a pack was WRONG: Expansion2_RemoveData.xml
+    sorted between Civics and Technologies and deleted the civic boosts the
+    content files had just added (agent B, 2026-09-14)."""
     out = sorted(INSTALL.glob("Base/Assets/Gameplay/Data/*.xml"))
+    out = [f for f in out if not SKIP_FILE.search(f.name)]
     dlc = INSTALL / "DLC"
-    packs = [p for p in sorted(dlc.iterdir()) if p.is_dir() and not SKIP_DLC.search(p.name)]
-    ordered = [p for p in packs if p.name == "Expansion1"] + [p for p in packs if p.name == "Expansion2"] \
-        + [p for p in packs if p.name not in ("Expansion1", "Expansion2")]
-    for p in ordered:
-        out += sorted((p / "Data").glob("*.xml"))
-    return [f for f in out if not SKIP_FILE.search(f.name)]
+    packs = [p for p in sorted(dlc.iterdir()) if p.is_dir() and list(p.glob("*.modinfo"))]
+    ranked = [p for p in packs if p.name == "Expansion2"] + [p for p in packs if p.name != "Expansion2"]
+    acts = []
+    for rank, p in enumerate(ranked):
+        acts += modinfo_files(p, rank)
+    acts.sort(key=lambda t: t[:4])
+    seen = set()
+    for _, _, _, _, p in acts:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
 
 
 def _cells(el: ET.Element) -> dict[str, str]:
@@ -233,9 +317,14 @@ def cmd_check(inst: Install, path: pathlib.Path) -> int:
             v, who = inst.get(src["xml"], src["where"], src["col"])
             want = src.get("expect", e["value"])
             if v is not None and "scale" in src and _num(v) is not None:
-                # the catalog holds round(cell * scale) — compare in the
-                # catalog's own units
-                v = str(int(round(float(_num(v)) * float(src["scale"]) + 1e-9)))
+                # the catalog holds cell * scale — rounded when the catalog's
+                # value is a whole number (a cost through GAME_SPEED), exact
+                # when it is a fraction (a percentage stored as 0.25)
+                prod = float(_num(v)) * float(src["scale"])
+                if isinstance(want, (int, float)) and float(want) != int(want):
+                    v = repr(prod)
+                else:
+                    v = str(int(round(prod + 1e-9)))
             if v is not None and values_equal(want, v):
                 match += 1
                 tally[0] += 1

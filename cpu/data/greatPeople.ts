@@ -1,5 +1,6 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
+import { xml, type SrcMap } from './provenance';
 import { LUXURY_AMENITY_CITIES } from './constants';
 import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
@@ -88,6 +89,9 @@ export function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
 export interface GreatPersonDef {
   id: string;
   name: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
+   *  exporter; checked by tools/civ6lab/xml_check.py. */
+  src?: SrcMap;
   class: GreatPersonClass;
   /** the ERA this person belongs to, which is what orders the class's queue
    *  and what prices the recruit. */
@@ -95,8 +99,62 @@ export interface GreatPersonDef {
   effect: GpEffect;
 }
 
+
+/** the install's own era id, indexed by this engine's era number. */
+const GP_ERA_ID: readonly string[] = [
+  'ERA_ANCIENT', 'ERA_CLASSICAL', 'ERA_MEDIEVAL', 'ERA_RENAISSANCE', 'ERA_INDUSTRIAL',
+  'ERA_MODERN', 'ERA_ATOMIC', 'ERA_INFORMATION', 'ERA_FUTURE',
+];
+
+/** the handful whose install id is spelled differently from this catalog's —
+ *  the mapping belongs in the tag, never in a reader's head. */
+const GP_INSTALL_ID: Readonly<Record<string, string>> = {
+  GP_JOHN_ROEBLING: 'JOHN_A_ROEBLING',
+  GP_ANDREI_RUBLEV: 'ANDREY_RUBLEV',
+  GP_SERGEI_GORSHKOV: 'SERGEY_GORSHKOV',
+  GP_THELFLD: 'AETHELFLAED',
+  GP_GENGHIS_KHAN_UNIT: 'GENGHIS_KHAN',
+  GP_SIMON_BOLIVAR_UNIT: 'SIMON_BOLIVAR',
+  GP_SAMORI_TOURE: 'SAMORI_TURE',
+  GP_EDGAR_ALLAN_POE: 'EDGAR_ALLEN_POE',
+  GP_H_G_WELLS: 'HG_WELLS',
+  GP_ANTONIO_CARLOS_GOMES: 'ANTONIO_CARLOS_GOMEZ',
+  GP_JEANNE_D_ARC: 'JOAN_OF_ARC',
+  GP_LILI_UOKALANI: 'LILIUOKALANI',
+};
+
+/** the four this install's readable data files do not carry a row for at all
+ *  (they ship in DLC packs the checker skips) — their class and era stay
+ *  UNSOURCED rather than pointing at a row that is not there. */
+const GP_NO_INSTALL_ROW: ReadonlySet<string> = new Set([
+  'GP_TOGO_HEIHACHIRO', 'GP_AMINA', 'GP_SUDIRMAN', 'GP_JOSE_DE_SAN_MARTIN',
+]);
+
+/**
+ * PROVENANCE for one Great Person row. `class` and `era` are the install's
+ * `GreatPersonIndividuals` columns; the payout is not — real Civ 6 gives every
+ * individual a unique ability, and this model pays one lump in the class's own
+ * currency instead (see the header).
+ */
+const gpSrc = (id: string, cls: GreatPersonClass, era: number): SrcMap => {
+  const lump: SrcMap = {
+    [`effect.${GP_CURRENCY[cls]}`]: {
+      stylized: 'this model pays one lump in the class currency, sized by GP_ERA_GPP, in place of '
+        + 'the install per-individual ability it has no channel for',
+    },
+  };
+  if (GP_NO_INSTALL_ROW.has(id)) return lump;
+  const where = `GreatPersonIndividualType=GREAT_PERSON_INDIVIDUAL_${GP_INSTALL_ID[id] ?? id.slice(3)}`;
+  return {
+    ...lump,
+    class: xml('GreatPersonIndividuals', where, 'GreatPersonClassType',
+      { expect: `GREAT_PERSON_CLASS_${cls}` }),
+    era: xml('GreatPersonIndividuals', where, 'EraType', { expect: GP_ERA_ID[era] }),
+  };
+};
+
 const P = (cls: GreatPersonClass, id: string, name: string, era: number): GreatPersonDef =>
-  ({ id, name, class: cls, era, effect: gpEffect(cls, era) });
+  ({ id, name, class: cls, era, effect: gpEffect(cls, era), src: gpSrc(id, cls, era) });
 
 /**
  * CIV6 (the nine Great Person pages): every person in the game, with the ERA

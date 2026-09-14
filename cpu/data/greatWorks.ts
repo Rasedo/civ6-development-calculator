@@ -18,6 +18,7 @@
  * composer checks against the seat's own row.
  */
 import type { CivId, LeaderId } from './seats';
+import { xml, type SrcMap } from './provenance';
 
 /** GreatWorkObjectTypes, numbered by the install's `Value` column. */
 export const GWO_SCULPTURE = 0;
@@ -107,7 +108,104 @@ export interface GreatWorkHolderDef {
  *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
  *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
  *  slots, which take any object. */
-export const GW_HOLDERS: readonly GreatWorkHolderDef[] = [
+/** PROVENANCE (cpu/data/provenance.ts): the install's `Buildings.IsWonder` and the row's
+ *  own `Building_GreatWorks` slot rows. */
+const GW_HOLDER_SRC: Record<string, SrcMap> = {
+  PALACE: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_PALACE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_PALACE', 'BuildingType')] },
+  },
+  TEMPLE: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_TEMPLE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_RELIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_TEMPLE&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_TEMPLE&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_TEMPLE', 'BuildingType')] },
+  },
+  AMPHITHEATER: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_AMPHITHEATER', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_AMPHITHEATER&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_AMPHITHEATER&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_AMPHITHEATER', 'BuildingType')] },
+  },
+  MUSEUM: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ART', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ART', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ART', 'BuildingType')] },
+  },
+  ARCHAEOLOGICAL_MUSEUM: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ARTIFACT', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ARTIFACT', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ARTIFACT', 'BuildingType')] },
+  },
+  BROADCAST_CENTER: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_BROADCAST_CENTER', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_MUSIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADCAST_CENTER&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADCAST_CENTER&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_BROADCAST_CENTER', 'BuildingType')] },
+  },
+  CATHEDRAL: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_CATHEDRAL', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_CATHEDRAL&GreatWorkSlotType=GREATWORKSLOT_CATHEDRAL', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_CATHEDRAL&GreatWorkSlotType=GREATWORKSLOT_CATHEDRAL', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'BuildingType')] },
+  },
+  NATIONAL_HISTORY_MUSEUM: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_GOV_CULTURE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_GOV_CULTURE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_GOV_CULTURE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_GOV_CULTURE', 'BuildingType')] },
+  },
+  GREAT_LIBRARY: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_GREAT_LIBRARY', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_GREAT_LIBRARY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_GREAT_LIBRARY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_GREAT_LIBRARY', 'BuildingType')] },
+  },
+  MONT_ST_MICHEL: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_RELIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MONT_ST_MICHEL&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_MONT_ST_MICHEL&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'BuildingType')] },
+  },
+  BOLSHOI_THEATRE: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_BOLSHOI_THEATRE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BOLSHOI_THEATRE&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BOLSHOI_THEATRE&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'NumSlots'),
+    'slots.1.type': { derived: 'the engine slot code for the install GREATWORKSLOT_MUSIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BOLSHOI_THEATRE&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'GreatWorkSlotType')] },
+    'slots.1.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BOLSHOI_THEATRE&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_BOLSHOI_THEATRE', 'BuildingType')] },
+  },
+  OXFORD_UNIVERSITY: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_OXFORD_UNIVERSITY', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_OXFORD_UNIVERSITY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_OXFORD_UNIVERSITY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_OXFORD_UNIVERSITY', 'BuildingType')] },
+  },
+  HERMITAGE: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ART', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'BuildingType')] },
+  },
+  ST_BASILS_CATHEDRAL: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_RELIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL', 'BuildingType')] },
+  },
+  APADANA: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_APADANA', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_APADANA', 'BuildingType')] },
+  },
+};
+
+const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1 }], theme: GW_THEME_NONE },
   { id: 'TEMPLE', wonder: false, slots: [{ type: GWS_RELIC, count: 1 }], theme: GW_THEME_NONE },
   { id: 'AMPHITHEATER', wonder: false, slots: [{ type: GWS_WRITING, count: 2 }], theme: GW_THEME_NONE },
@@ -124,6 +222,8 @@ export const GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'ST_BASILS_CATHEDRAL', wonder: true, slots: [{ type: GWS_RELIC, count: 3 }], theme: GW_THEME_NONE },
   { id: 'APADANA', wonder: true, slots: [{ type: GWS_PALACE, count: 2 }], theme: GW_THEME_NONE },
 ];
+export const GW_HOLDERS: readonly GreatWorkHolderDef[] =
+  RAW_GW_HOLDERS.map((h) => ({ ...h, src: GW_HOLDER_SRC[h.id] }));
 
 /** CIV6 (EFFECT_ADJUST_..._EXTRA_GREAT_WORK_SLOTS): a roster row widening one
  *  holder's slot row for its seat. The layout carries every row at its widest. */

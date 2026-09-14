@@ -48,7 +48,11 @@ export const CARBON_RECAPTURE_UNITS = 50_000;
 /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor". */
 export const CARBON_RECAPTURE_FAVOR = 30;
 
+import { type SrcMap } from './provenance';
+
 export interface ClimatePhase {
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   /** Climate Change points at which this phase begins. */
   points: number;
   /** metres of sea-level rise, the page's own column. */
@@ -71,7 +75,22 @@ export interface ClimatePhase {
 /** CIV6 (Phases of Climate Change), read row by row off the page's table.
  *  Index 0 is Phase I. Phase 0 — no climate change yet — is the absence of a
  *  row, which `climatePhase` returns as -1. */
-export const CLIMATE_PHASES: readonly ClimatePhase[] = [
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts). The install's readable Gameplay data
+ * ships no climate-phase table at all — no `ClimateChangeLevels`, no
+ * `GameClimate` rows survive the layering — so every column of this ladder is
+ * the Gathering Storm Climate page's own "Phases of Climate Change" table,
+ * read row by row (the file header says so).
+ */
+const CLIMATE_PHASE_SRC: SrcMap = Object.fromEntries(
+  ['points', 'seaLevel', 'flood', 'submerge', 'iceMelt', 'fertility', 'desertification'].map((k) => [k, {
+    lab: 'the GS Climate page "Phases of Climate Change" table; the install ships no readable '
+      + 'climate-phase rows',
+  }]),
+);
+
+const RAW_CLIMATE_PHASES: readonly ClimatePhase[] = [
   { points: 2, seaLevel: 0.5, flood: 0, submerge: 0, iceMelt: 0.10, fertility: true, desertification: false },
   { points: 3, seaLevel: 1.0, flood: 1, submerge: 0, iceMelt: 0.20, fertility: true, desertification: false },
   { points: 4, seaLevel: 1.5, flood: 2, submerge: 0, iceMelt: 0.30, fertility: true, desertification: false },
@@ -79,7 +98,9 @@ export const CLIMATE_PHASES: readonly ClimatePhase[] = [
   { points: 6, seaLevel: 2.5, flood: 3, submerge: 0, iceMelt: 0.55, fertility: false, desertification: true },
   { points: 7, seaLevel: 3.0, flood: 0, submerge: 2, iceMelt: 0.70, fertility: false, desertification: true },
   { points: 8, seaLevel: 3.5, flood: 0, submerge: 3, iceMelt: 0.85, fertility: false, desertification: true },
-] as const;
+];
+export const CLIMATE_PHASES: readonly ClimatePhase[] =
+  RAW_CLIMATE_PHASES.map((p) => ({ ...p, src: CLIMATE_PHASE_SRC }));
 
 /**
  * CIV6 (Deforestation Level): "a percentage of number of features cleared

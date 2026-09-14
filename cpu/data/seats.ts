@@ -1,3 +1,4 @@
+import { xml, type SrcMap } from './provenance';
 
 
 /** `free` is the FREE CITIES player of CIV6 (CIVILIZATION_FREE_CITIES,
@@ -313,6 +314,8 @@ export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
 
 export interface CongressResolutionDef {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   name: string;
   /** civEraIndex floor for the slate (0 = from the congress's own gate). */
   minEra: number;
@@ -327,7 +330,105 @@ export interface CongressResolutionDef {
  * indices key on it. The unmodeled rows (Trade Policy, Treaty Organization,
  * World Religion, Mercenary Companies, ...) are open AUDIT items.
  */
-export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
+/**
+ * PROVENANCE (cpu/data/provenance.ts): the install's own `Resolutions` row for each
+ * modelled resolution. Four rows this catalog carries have no readable install row at
+ * all (POLICY_TREATY, TREATY_ORGANIZATION, GOVERNANCE_DOCTRINE, SCORED_COMPETITION) and stay untagged.
+ */
+const CONGRESS_SRC: Record<string, SrcMap> = {
+  URBAN_DEVELOPMENT_TREATY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_URBAN_DEVELOPMENT', 'TargetKind', { expect: 'DISTRICT' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_URBAN_DEVELOPMENT', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_URBAN_DEVELOPMENT', 'LatestEra', { expect: 'ERA_MODERN' }),
+  },
+  PATRONAGE: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_PATRONAGE', 'TargetKind', { expect: 'GREATPERSONCLASS' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_PATRONAGE', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_PATRONAGE', 'LatestEra', { expect: 'ERA_MODERN' }),
+  },
+  MIGRATION_TREATY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_MIGRATION_TREATY', 'TargetKind', { expect: 'PLAYER' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_MIGRATION_TREATY', 'EarliestEra', { expect: 'ERA_INDUSTRIAL' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_MIGRATION_TREATY', 'LatestEra')] },
+  },
+  HERITAGE_ORGANIZATION: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_HERITAGE_ORG', 'TargetKind', { expect: 'GREATWORKOBJECT' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_HERITAGE_ORG', 'EarliestEra', { expect: 'ERA_MODERN' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_HERITAGE_ORG', 'LatestEra')] },
+  },
+  MERCENARY_COMPANIES: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_MERCENARY_COMPANIES', 'TargetKind', { expect: 'YIELD' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_MERCENARY_COMPANIES', 'EarliestEra')] },
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_MERCENARY_COMPANIES', 'LatestEra')] },
+  },
+  TRADE_POLICY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_TRADE_TREATY', 'TargetKind', { expect: 'PLAYER' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_TRADE_TREATY', 'EarliestEra')] },
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_TRADE_TREATY', 'LatestEra')] },
+  },
+  WORLD_IDEOLOGY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_IDEOLOGY', 'TargetKind', { expect: 'GOVERNMENT' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_IDEOLOGY', 'EarliestEra', { expect: 'ERA_MODERN' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_WORLD_IDEOLOGY', 'LatestEra')] },
+  },
+  BORDER_CONTROL_TREATY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_BORDER_CONTROL', 'TargetKind', { expect: 'PLAYER' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_BORDER_CONTROL', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_BORDER_CONTROL', 'LatestEra', { expect: 'ERA_MODERN' }),
+  },
+  SOVEREIGNTY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_SOVEREIGNTY', 'TargetKind', { expect: 'MINORCIVBONUS' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_SOVEREIGNTY', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_SOVEREIGNTY', 'LatestEra', { expect: 'ERA_MODERN' }),
+  },
+  PUBLIC_WORKS_PROGRAM: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_WORKS', 'TargetKind', { expect: 'PROJECT' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_WORKS', 'EarliestEra', { expect: 'ERA_ATOMIC' }),
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_WORKS', 'LatestEra', { expect: 'ERA_INFORMATION' }),
+  },
+  DEFORESTATION_TREATY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_DEFORESTATION_TREATY', 'TargetKind', { expect: 'FEATURE' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_DEFORESTATION_TREATY', 'EarliestEra', { expect: 'ERA_ATOMIC' }),
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_DEFORESTATION_TREATY', 'LatestEra', { expect: 'ERA_INFORMATION' }),
+  },
+  GLOBAL_ENERGY_TREATY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_GLOBAL_ENERGY_TREATY', 'TargetKind', { expect: 'BUILDING' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_GLOBAL_ENERGY_TREATY', 'EarliestEra', { expect: 'ERA_MODERN' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_GLOBAL_ENERGY_TREATY', 'LatestEra')] },
+  },
+  PUBLIC_RELATIONS: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_RELATIONS', 'TargetKind', { expect: 'PLAYER' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_RELATIONS', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_PUBLIC_RELATIONS', 'LatestEra', { expect: 'ERA_ATOMIC' }),
+  },
+  MILITARY_ADVISORY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_MILITARY_ADVISORY', 'TargetKind', { expect: 'UNITPROMOTIONCLASS' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_MILITARY_ADVISORY', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_MILITARY_ADVISORY', 'LatestEra', { expect: 'ERA_ATOMIC' }),
+  },
+  WORLD_RELIGION: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'TargetKind', { expect: 'RELIGION' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'EarliestEra', { expect: 'ERA_INDUSTRIAL' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'LatestEra')] },
+  },
+  ESPIONAGE_PACT: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_ESPIONAGE_PACT', 'TargetKind', { expect: 'UNITOPERATION' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_ESPIONAGE_PACT', 'EarliestEra', { expect: 'ERA_INDUSTRIAL' }),
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_ESPIONAGE_PACT', 'LatestEra', { expect: 'ERA_ATOMIC' }),
+  },
+  ARMS_CONTROL: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_ARMS_CONTROL', 'TargetKind', { expect: 'PLAYER' }),
+    minEra: xml('Resolutions', 'ResolutionType=WC_RES_ARMS_CONTROL', 'EarliestEra', { expect: 'ERA_ATOMIC' }),
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_ARMS_CONTROL', 'LatestEra')] },
+  },
+  LUXURY_POLICY: {
+    target: xml('Resolutions', 'ResolutionType=WC_RES_LUXURY', 'TargetKind', { expect: 'RESOURCE' }),
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_LUXURY', 'EarliestEra')] },
+    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_LUXURY', 'LatestEra')] },
+  },
+};
+
+const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: +100% Production towards buildings in this district. /
   // B: No buildings can be created in this district." (through Modern)
   { id: 'URBAN_DEVELOPMENT_TREATY', name: 'Urban Development Treaty', minEra: 0, maxEra: 5, target: 'district' },
@@ -427,6 +528,9 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6 (Expansion2_Congress.xml): the row carries NO era columns.
   { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 0, maxEra: 99, target: 'luxury' },
 ];
+export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] =
+  RAW_CONGRESS_RESOLUTIONS.map((r) => ({ ...r, src: CONGRESS_SRC[r.id] }));
+
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
 export const CONGRESS_MIGRATION = 2;
@@ -531,7 +635,15 @@ export interface EmergencyDef {
   name: string;
   turns: number;
 }
-export const EMERGENCIES: readonly EmergencyDef[] = [
+
+/** PROVENANCE (cpu/data/provenance.ts): the install's readable Gameplay data
+ *  carries no `Emergencies` rows (only `Emergencies_XP2` texts survive the
+ *  layering), so the duration is the Civilopedia's own. */
+const EMERGENCY_SRC: SrcMap = {
+  turns: { lab: 'the GS Emergency page duration (30 turns; 60 for the nuclear emergency)' },
+};
+
+const RAW_EMERGENCIES: readonly EmergencyDef[] = [
   // CIV6: "The Target has attacked and occupied a City-state; it must be
   // Liberated!" Success: "Members gain +1 Gold/turn for each Envoy they have;
   // members gain 100 Diplomatic Favor". Failure: "Target's Trade Routes to
@@ -550,6 +662,8 @@ export const EMERGENCIES: readonly EmergencyDef[] = [
   // is the target's CAPITAL, and the members win by taking it.
   { id: 'NUCLEAR', name: 'Nuclear Emergency', turns: 60 },
 ];
+export const EMERGENCIES: readonly EmergencyDef[] =
+  RAW_EMERGENCIES.map((e) => ({ ...e, src: EMERGENCY_SRC }));
 export const EMERGENCY_CITY_STATE = 0;
 export const EMERGENCY_MILITARY = 1;
 export const EMERGENCY_NUCLEAR = 2;

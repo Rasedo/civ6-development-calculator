@@ -5,8 +5,12 @@
  * live with the rest of the project catalog.
  */
 
+import { xml, type SrcMap } from './provenance';
+
 export interface NuclearDeviceDef {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   name: string;
   /** CIV6: "a blast radius of 1 (i.e., the target tile and all adjacent
    *  tiles)" — hexes out from the target the destruction reaches. */
@@ -25,10 +29,30 @@ export interface NuclearDeviceDef {
 
 /** Catalog order is the WIRE order: a device is addressed by this index on
  *  both engines, and the two nuclear heads are one per row. */
-export const NUCLEAR_DEVICES: readonly NuclearDeviceDef[] = [
+
+/** PROVENANCE (cpu/data/provenance.ts). Four columns are the install's `WMDs`
+ *  row; the URANIUM charge is the BUILD PROJECT's `PrereqResource` amount,
+ *  which the install writes nowhere as a number — the Civilopedia's 10/20. */
+const wmdSrc = (id: string): SrcMap => {
+  const where = `WeaponType=WMD_${id}`;
+  return {
+    radius: xml('WMDs', where, 'BlastRadius'),
+    fallout: xml('WMDs', where, 'FalloutDuration'),
+    range: xml('WMDs', where, 'ICBMStrikeRange'),
+    upkeep: xml('WMDs', where, 'Maintenance'),
+    uranium: {
+      lab: 'the GS Civilopedia Nuclear weapons page (10 / 20 Uranium to produce); the install '
+        + 'names the resource on the build project but never an amount',
+    },
+  };
+};
+
+const RAW_NUCLEAR_DEVICES: readonly NuclearDeviceDef[] = [
   { id: 'NUCLEAR_DEVICE', name: 'Nuclear Device', radius: 1, fallout: 10, range: 12, upkeep: 14, uranium: 10 },
   { id: 'THERMONUCLEAR_DEVICE', name: 'Thermonuclear Device', radius: 2, fallout: 20, range: 15, upkeep: 16, uranium: 20 },
 ];
+export const NUCLEAR_DEVICES: readonly NuclearDeviceDef[] =
+  RAW_NUCLEAR_DEVICES.map((d) => ({ ...d, src: wmdSrc(d.id) }));
 
 /** CIV6: "Any units (except Giant Death Robots) that end their turn in a
  *  contaminated tile take 50 damage each turn." */

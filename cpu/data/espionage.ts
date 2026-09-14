@@ -10,6 +10,7 @@
  * revealed."
  */
 import type { DistrictId } from '../../world/types';
+import { xml, type SrcMap } from './provenance';
 
 export const SPY_UNIT = 'SPY';
 
@@ -41,6 +42,8 @@ export const SPY_TRAVELLING = -2;
 
 export interface SpyMissionDef {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   /** the district the mission is run in — CIV6 (UnitOperations) gives each
    *  one a `TargetDistrict`, the CITY_CENTER where it names none. The spy
    *  STANDS on that tile: the travel head lands it there, the mission is
@@ -77,7 +80,46 @@ export interface SpyMissionDef {
  *
  * Absent, and recorded: Zombie Outbreak (a game mode).
  */
-export const SPY_MISSIONS: readonly SpyMissionDef[] = [
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts). `baseProbability` is the install's own
+ * `UnitOperations.BaseProbability` (measured 2026-09-13 over the tuner socket
+ * and agreeing with the table); `district`, the shape flags and the duration
+ * are the chassis' published mission table, which the install writes as an
+ * operation's requirement set rather than as a column a checker can read.
+ */
+const spyMissionSrc = (m: SpyMissionDef): SrcMap => {
+  const where = `OperationType=UNITOPERATION_SPY_${m.id}`;
+  const table = (what: string) => ({
+    lab: `the GS Spy chassis mission table (${what}); the install writes it as an operation `
+      + 'requirement set, not as a readable column',
+  });
+  const out: Record<string, unknown> = {
+    district: table('the district the operation is run in'),
+    offensive: table('whether the operation is run in a rival city and levels the spy'),
+    turns: table('the operation duration in turns'),
+  };
+  if (m.baseProbability !== undefined) {
+    out.baseProbability = xml('UnitOperations', where, 'BaseProbability');
+  }
+  if (m.certain !== undefined) out.certain = table('the 100%-success operations');
+  if (m.anyDistrict !== undefined) out.anyDistrict = table('the counterspy post guards any district');
+  if (m.athome !== undefined) out.athome = table('run in the spy own city');
+  if (m.citystate !== undefined) out.citystate = table('run in a city-state');
+  return out as SrcMap;
+};
+
+/** PROVENANCE: the escape ROUTES and their return times are the Espionage
+ *  page's; each route's base escape RATE is this model's own (ask 14). */
+const spyEscapeSrc: SrcMap = {
+  district: { lab: 'the GS Espionage page escape routes (Airplane/Boat/Vehicle/Foot and the '
+    + 'district each needs)' },
+  turns: { lab: 'the GS Espionage page escape return times (1/2/3/4 turns)' },
+  basePct: { stylized: 'this model chose the per-route base escape rate under the sourced '
+    + 'ordering; the source names no number (ask 14)' },
+};
+
+const RAW_SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
   { id: 'LISTENING_POST', district: 'CITY_CENTER', offensive: false, certain: true, turns: 8 },
   { id: 'SIPHON_FUNDS', baseProbability: 13, district: 'COMMERCIAL_HUB', offensive: true, turns: 8 },
@@ -96,6 +138,8 @@ export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   // column derives its base from this list's length on both engines.
   { id: 'FABRICATE_SCANDAL', baseProbability: 13, district: 'CITY_CENTER', offensive: true, turns: 16, citystate: true },
 ];
+export const SPY_MISSIONS: readonly SpyMissionDef[] =
+  RAW_SPY_MISSIONS.map((m) => ({ ...m, src: spyMissionSrc(m) }));
 /** The operations the Espionage Pact can name: the OFFENSIVE ones, in catalog
  *  order — the only rows either of its outcomes can act on. */
 export const SPY_OFFENSIVE_MISSIONS: readonly number[] = SPY_MISSIONS
@@ -184,15 +228,17 @@ export const SPY_COUNTERSPY_CATCH_PCT = 30;
  */
 export interface SpyEscapeRoute {
   id: string;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
   district: DistrictId | null;
   turns: number;
   basePct: number;
 }
 export const SPY_ESCAPE_ROUTES: readonly SpyEscapeRoute[] = [
-  { id: 'AIRPLANE', district: 'AERODROME', turns: 1, basePct: 40 },
-  { id: 'BOAT', district: 'HARBOR', turns: 2, basePct: 50 },
-  { id: 'VEHICLE', district: 'COMMERCIAL_HUB', turns: 3, basePct: 60 },
-  { id: 'FOOT', district: null, turns: 4, basePct: 70 },
+  { id: 'AIRPLANE', district: 'AERODROME', turns: 1, basePct: 40, src: spyEscapeSrc },
+  { id: 'BOAT', district: 'HARBOR', turns: 2, basePct: 50, src: spyEscapeSrc },
+  { id: 'VEHICLE', district: 'COMMERCIAL_HUB', turns: 3, basePct: 60, src: spyEscapeSrc },
+  { id: 'FOOT', district: null, turns: 4, basePct: 70, src: spyEscapeSrc },
 ];
 
 /** CIV6 (ESPIONAGE_FABRICATE_SCANDAL_BASE_ENVOYS_REMOVED 2, LEVEL 1). */

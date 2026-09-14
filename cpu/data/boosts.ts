@@ -16,6 +16,7 @@
  */
 
 import type { DistrictId, GreatPersonClass, ImprovementId } from '../core/types';
+import { type SrcMap } from './provenance';
 
 export type BoostCheck =
   | { kind: 'building'; id: string; count: number }
@@ -34,12 +35,14 @@ export type BoostCheck =
 export interface BoostDef {
   desc: string;
   check?: BoostCheck;
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
 }
 
 export const BOOST_FRACTION = 0.4;
 
 /** Keyed by tech/civic id (ids never collide between the two trees). */
-export const BOOSTS: Record<string, BoostDef> = {
+const RAW_BOOSTS: Record<string, BoostDef> = {
   IRRIGATION: { desc: 'Farm a resource.', check: { kind: 'improvement', id: 'FARM', count: 1, onResource: true } },
   WRITING: { desc: 'Meet another civilization. (manual)' },
   ASTROLOGY: { desc: 'Own a tile adjacent to a natural wonder.', check: { kind: 'nearNaturalWonder' } },
@@ -113,3 +116,21 @@ export const BOOSTS: Record<string, BoostDef> = {
 
   NUCLEAR_PROGRAM: { desc: 'Build a Research Lab.', check: { kind: 'building', id: 'RESEARCH_LAB', count: 1 } },
 };
+
+/**
+ * PROVENANCE (cpu/data/provenance.ts). Every boost row's two columns come from
+ * the install's `Boosts` table (`Boosts.TriggerDescription` and
+ * `Boosts.BoostClass` plus its arguments), but neither is transcribable: the
+ * description is a localisation key and the trigger class is a DLL predicate
+ * this model re-expresses in its own terms. Both are recorded as chosen, with
+ * the install column they stand for named. The BOOST amount itself is the
+ * install's `Boosts.Boost` = 40, which `BOOST_FRACTION` carries.
+ */
+const BOOST_SRC: SrcMap = {
+  desc: { stylized: 'an English paraphrase of the install Boosts.TriggerDescription, written for the research panel; the install ships a localisation key, not prose' },
+  'check.kind': { stylized: 'the engine predicate that stands in for the install BoostClass; the install names a BOOST_TRIGGER_* class and its arguments, which this model re-expresses in the terms its own state can observe' },
+};
+
+export const BOOSTS: Record<string, BoostDef> = Object.fromEntries(
+  Object.entries(RAW_BOOSTS).map(([k, v]) => [k, { ...v, src: BOOST_SRC }]),
+);
