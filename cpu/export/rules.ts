@@ -21,7 +21,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
@@ -232,7 +232,7 @@ const effectRow = (fx: PolicyEffects) => ({
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP } from '../data/constants';
-import { GOODY_KINDS, GOODY_KIND_WEIGHT, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
+import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
@@ -559,7 +559,6 @@ export function buildRules() {
     // other game-speed figure on the wire is.
     goodyHuts: {
       kinds: GOODY_KINDS,
-      kindWeight: GOODY_KIND_WEIGHT,
       payloadKinds: GOODY_PAYLOAD_KINDS,
       subTypes: GOODY_SUBTYPES.map((g) => {
         const pl = g.payload;
@@ -760,7 +759,6 @@ export function buildRules() {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
       capitalBonus: CITY_STATE_CAPITAL_BONUS,
-      meetRange: CITY_STATE_MEET_RANGE, // civ-seat proximity-meet radius
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
       maxHp: CITY_STATE_MAX_HP,
@@ -825,7 +823,6 @@ export function buildRules() {
       citySlots: CITY_SLOTS_PER_SEAT,
       productionQueueMax: PRODUCTION_QUEUE_MAX,
       settlerBase: Math.round(80 * GAME_SPEED), // 48 + 18·max(0, cities − 1 + live + queued)
-      settlerPer: Math.round(30 * GAME_SPEED),
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
       engineerCls: GP_CLASSES.indexOf('ENGINEER'),
@@ -910,18 +907,6 @@ export function buildRules() {
       allianceRel2TheoCs: ALLIANCE_REL2_THEO_CS,
       allianceRel3FaithPerPop: ALLIANCE_REL3_FAITH_PER_POP,
       openBordersCivic: civicIdx.get(OPEN_BORDERS_CIVIC) ?? -1,
-      research: {
-        spearTech: techIdx.get('BRONZE_WORKING') ?? -1,
-        horseTech: techIdx.get('HORSEBACK_RIDING') ?? -1,
-        archerTech: techIdx.get('ARCHERY') ?? -1,
-      },
-      builder: {
-        mineTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE')),
-        lumberTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL')),
-        gains: ['FARM', 'MINE', 'LUMBER_MILL'].map((imp) =>
-          YIELD_KEYS.reduce((g, k) => g + (BALANCED_WEIGHTS[k] ?? 0) * (IMPROVEMENTS[imp as ImprovementId].yields[k] ?? 0), 0),
-        ),
-      },
       peaceGold0: PEACE_GOLD_COST(0),
       peaceGoldSlope: PEACE_GOLD_COST(1) - PEACE_GOLD_COST(0),
       cityMaxHp: CITY_MAX_HP,
@@ -1370,7 +1355,6 @@ export function buildRules() {
       formationResourceMult: [...FORMATION_RESOURCE_MULT],
       formationTrainDiscount: FORMATION_TRAIN_DISCOUNT,
       encampHp: ENCAMPMENT_HP, // the ENCAMPMENT garrison pool cap
-      unitHealPerTurn: 10,
       barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // inert pending its hunt
       barbLadder: [
         'WARRIOR',
@@ -2098,9 +2082,6 @@ export function buildRules() {
         // FLAT price (the Spaceport): speed-scaled here, -1 = the generic curve.
         fixedCost: DISTRICTS[id].fixedCost ? Math.round(DISTRICTS[id].cost * GAME_SPEED) : -1,
       })),
-      askable: (['CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB', 'THEATER_SQUARE'] as const).map((id) =>
-        PLACEABLE_DISTRICTS.indexOf(id),
-      ),
     },
     palace: {
       // The GPU has no `city_bldg` bit for the Palace — it is a capital TERM

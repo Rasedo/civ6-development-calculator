@@ -303,7 +303,6 @@ export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
 export const CITY_STATE_CAPITAL_BONUS = 2;
 export const CITY_STATE_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;
-export const CITY_STATE_MEET_RANGE = 3;
 export const QUEST_COOLDOWN = 12;
 export const QUEST_ENVOYS = 1;
 export const CITY_STATE_MAX_HP = 150;

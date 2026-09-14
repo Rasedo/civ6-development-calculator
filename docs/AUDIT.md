@@ -1461,11 +1461,31 @@ the gate reaches is worth more here than one that re-reads the exporter.
     Messenger of the Gods nowhere), and two lines the lab must measure
     first (the purchase price formula — SESSION2 scene G; the Pop Star's
     percent — scene H).
-  - OPEN, the census: 30 wire keys no GPU literal names and 28 catalog
-    columns no TS code names (the baseline file IS the list). Each is a
-    dead export (delete on both sides), a reader under another spelling
-    (teach the census), or a MISSING RULE on one engine — the Stave Church
-    class, a defect. Not yet classified.
+  - THE CENSUS IS CLASSIFIED (2026-09-14): of 59 orphan lines, 11 were
+    dead exports (deleted — `cityState.meetRange`, `combat.unitHealPerTurn`,
+    the scaffold's askable list, the goody kind weights, a duplicate settler
+    price, the driver's dead research/builder hints), 38 are the same rule
+    under another spelling (allowlisted with the reader's file:line), and
+    SIX ARE MISSING RULES — the baseline keeps their ten lines so the
+    ratchet names them until built:
+    1. `amenitiesIfSpecialty` (Liberalism, +1 amenity at 2+ specialty
+       districts): TS pays it (`cpu/core/city.ts` walks the channel); the
+       GPU never loads the column (`sim_init` loads `housingIfDistricts`,
+       `newDeal`, `amenitiesAll` and not this one) — a PARITY defect the
+       gate has not reached (no seed adopted the card with the districts).
+    2. `civLevels.canAnnexTilesWithReceivedInfluence`: the install says a
+       city-state grows its borders from envoys spent on it; neither engine
+       has the channel — a minor's borders are frozen at founding.
+    3. `civLevels.startingTilesForCity` (6 / 5 / 0 by class): both engines
+       found every city with the same centre-plus-ring claim.
+    4. `diploVis.flatLevels` (Catherine de Medici's +1 visibility with
+       everyone): exported and reaching both engines; TS reads `postLevels`
+       only, the GPU binds `_vflat` in two loops and uses it in neither.
+    5. `improvements.damageEntering` / `damageAdjacent` (the Great Wall's
+       10/10, the Pa's 10): recorded in the catalog, exported by nobody —
+       no damage-on-entry hook exists on either engine.
+    6. `improvements.noSwap` (Golf Course, Open-Air Museum): no tile-swap
+       verb exists on either engine — an unbuilt install clause.
   - REACH: the checker and the census are static; the ledger's fixes are
     behaviour-changing and reach whatever the gate reaches (a battery per
     batch, fixtures may move).

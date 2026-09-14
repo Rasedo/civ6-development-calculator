@@ -1,64 +1,15 @@
-rules.json: 1511 key paths over 70 groups
-  wire keys with NO GPU literal: 30
-    cityState.meetRange
-    civLevels[].canAnnexTilesWithGold
+rules.json: 1500 key paths over 70 groups
+  wire keys with NO GPU literal: 4
     civLevels[].canAnnexTilesWithReceivedInfluence
-    civLevels[].canBuildWonders
-    civLevels[].canEarnGreatPeople
-    civLevels[].canFoundCities
-    civLevels[].canGiveInfluence
-    civLevels[].canReceiveInfluence
-    civLevels[].ignoresUnitStrategicResourceRequirements
     civLevels[].startingTilesForCity
-    climate.lowlandMaxBand
-    combat.unitHealPerTurn
-    disasters.storms[].severity
-    districtScaffold.askable[]
-    districts[].notAdjCenter
-    districts[].onCoastalWater
-    districts[].reqAdjCenter
-    districts[].reqWaterOrMountain
-    goodyHuts.kindWeight
     governments[].amenitiesIfSpecialty[]
-    nuclear.devices[].uranium
     policies[].amenitiesIfSpecialty[]
-    seats.bandVenueBits.WATER_PARK
-    seats.builder.gains[]
-    seats.builder.lumberTech
-    seats.builder.mineTech
-    seats.research.archerTech
-    seats.research.horseTech
-    seats.research.spearTech
-    seats.settlerPer
 provenance.json: 844 catalog columns
-  columns with NO TS property access: 29
-    boosts.desc
-    buildings.powerPlant
-    buildings.unlockCivic
-    builtWonders.diplomatic
-    civLevels.canAnnexTilesWithGold
+  columns with NO TS property access: 6
     civLevels.canAnnexTilesWithReceivedInfluence
-    civLevels.canBuildWonders
-    civLevels.canEarnGreatPeople
-    civLevels.canFoundCities
-    civLevels.canGiveInfluence
-    civLevels.canReceiveInfluence
-    civLevels.ignoresUnitStrategicResourceRequirements
     civLevels.startingTilesForCity
     diploVis.flatLevels
-    governors.title
-    improvements.buildInLine
     improvements.damageAdjacent
     improvements.damageEntering
-    improvements.defenseCS
     improvements.noSwap
-    improvements.resourceOnly
-    nuclearDevices.uranium
-    projects.gpClasses
-    projects.gppFraction
-    scaffoldDistricts.unlockId
-    scaffoldDistricts.unlockKind
-    storms.severity
-    units.cavalryTag
-    units.upgradesTo
 READER CENSUS REPORTED

@@ -44,12 +44,100 @@ PROVENANCE = ROOT / "seeder" / "worlds" / "provenance.json"
 GPU_DIRS = [ROOT / "gpu" / "core", ROOT / "policy"]
 TS_DIRS = [ROOT / "cpu" / "core"]
 
+CIV_LEVEL_REASON = (
+    "an install `CivilizationLevels` permission carried literally: only "
+    "canAnnexTilesWithCulture forks a live rule (cpu/core/phase.ts:497, "
+    "gpu/core/sim_init.py:3865); the rest are asserted against each engine's own shape in "
+    "tests/cpu/minors/civ-levels.test.ts:38 and tests/gpu/minor_record_test.py:99")
+
 # key -> why nobody needs to read it
+#
+# Two kinds of entry live here. A name that NOTHING has to read (prose, an
+# identity column). And a name one engine reads under ANOTHER SPELLING: the
+# fact IS implemented, the census's by-name heuristic simply cannot see the
+# reader — a cpu/data helper that closes over the column (`POWER_PLANT_IDS`,
+# `civUpgradeTarget`), a dynamic `row[k]` over a key list, a wire column the
+# GPU consumes re-encoded as an integer code, or a value only a test asserts.
+# Every entry names its reader with a file:line, so a later sweep can check
+# the claim instead of trusting the sentence.
 ALLOWLIST: dict[str, str] = {
     "srcStamp": "the source hash: compared by the battery, not read by a rule",
     "id": "identity — rows are addressed by index on the wire",
     "name": "prose",
     "description": "prose",
+    # ---- prose columns ----
+    "desc": "prose: the eureka's Civilopedia sentence (cpu/data/boosts.ts:36)",
+    "title": "prose: the governor's Civilopedia epithet (cpu/data/governors.ts:30)",
+    # ---- read through a cpu/data helper the census does not walk ----
+    "powerPlant": "TS reads it as POWER_PLANT_IDS (cpu/data/buildings.ts:1078), consumed at "
+                  "cpu/core/yields.ts:605, climate.ts:43, congress.ts:231; the GPU reads the wire "
+                  "key (gpu/core/simbase.py:433)",
+    "upgradesTo": "TS reads it in civUpgradeTarget (cpu/data/units.ts:3565), called from "
+                  "cpu/core/units.ts:1352 and cpu/core/stockpile.ts:224",
+    "cavalryTag": "TS reads it in isLightCavalry (cpu/data/units.ts:3573), called from "
+                  "cpu/core/production.ts:385",
+    "defenseCS": "TS reads it in improvementDefenseCS (cpu/data/improvements.ts:1500), called "
+                 "from cpu/core/combat.ts:108 and :655; the GPU reads the wire's `defCs` "
+                 "(gpu/core/sim_init.py:1855)",
+    "gpClasses": "TS reads it in gpClassesOf (cpu/data/projects.ts:468), called from "
+                 "cpu/core/production.ts:165",
+    "gppFraction": "TS reads it in gppFractionOf (cpu/data/projects.ts:472), called from "
+                   "cpu/core/production.ts:167",
+    # ---- read dynamically, by a key the code holds in a list ----
+    "diplomatic": "the Potala Palace's extraSlots column, read as `xs[k]` over SLOT_KINDS at "
+                  "cpu/core/effects.ts:1159",
+    # ---- the same fact under the other engine's spelling ----
+    "onCoastalWater": "the GPU reads this clause as districtScaffold placement code 2 "
+                      "(gpu/core/sim_economy.py:3057), TS as def.placement.onCoastalWater "
+                      "(cpu/core/rules.ts:519) — HARBOR and WATER_PARK, checked row for row",
+    "reqAdjCenter": "the GPU reads this clause as placement code 1 (gpu/core/sim_economy.py:3067), "
+                    "TS as def.placement.requiresAdjacentCityCenter (cpu/core/rules.ts:584) — the "
+                    "Aqueduct, the only row carrying it",
+    "reqWaterOrMountain": "the other half of placement code 1's `aqsrc` "
+                          "(gpu/core/sim_economy.py:3069) against "
+                          "def.placement.requiresWaterSourceOrMountain (cpu/core/rules.ts:589)",
+    "notAdjCenter": "the GPU reads this clause as placement code 3 "
+                    "(gpu/core/sim_economy.py:3067), TS as "
+                    "def.placement.notAdjacentToCityCenter (cpu/core/rules.ts:595) — the "
+                    "Encampment and the Preserve",
+    "unlockId": "the scaffold table's SOURCE column: TS gates a district on the tech/civic's own "
+                "`unlockDistrict` effect (cpu/core/rules.ts:495), and the exporter resolves this "
+                "column into the `unlockTech`/`unlockCivic` indices the GPU reads",
+    "unlockKind": "the same scaffold source column — which of the two indices the exporter fills",
+    "unlockCivic": "the Madrasa's PrereqCivic: the live gate is BUILDING_PREREQ_ROWS, read at "
+                   "cpu/core/effects.ts:120 and gpu/core/sim_economy.py:1632; the building "
+                   "variant's own column is the same install row transcribed twice",
+    "uranium": "the charge is paid off the BUILD PROJECT's own row (`rs`/`rc`, "
+               "cpu/core/stockpile.ts:277 and gpu/core/sim_seats.py:3029); the device column is "
+               "the same install fact transcribed a second time",
+    "severity": "both engines take a storm's severity from its POSITION in its family pair — "
+                "stormFamilyPair (cpu/data/disasters.ts:291) and its twin "
+                "(gpu/core/sim_init.py:2467) — so neither reads the column",
+    "resourceOnly": "the rule is the resource early return: a resourced tile offers exactly "
+                    "RESOURCES[r].improvement (cpu/core/rules.ts:328) and no other arm lists a "
+                    "resource-only row",
+    "buildInLine": "ruled NOT a legality rule on both engines — cpu/core/rules.ts:204 and "
+                   "gpu/core/sim_seats.py:3678: the install's line-DRAWING helper for the "
+                   "placement UI",
+    "WATER_PARK": "a MAP KEY of `seats.bandVenueBits`, which the GPU loads whole "
+                  "(gpu/core/sim_init.py:1542); the district bits are applied through "
+                  "`bandVenueDistricts` (gpu/core/sim_masks.py:2680), not by name",
+    # ---- carried for a test to assert, not for a rule to read ----
+    "lowlandMaxBand": "the cap the shipped `lw` plane is asserted against, read at "
+                      "tests/gpu/climate_test.py:92 and :275; the band itself is derived once on "
+                      "TS (deriveLowlands) and the GPU reads the plane, not the constant",
+    # `canAnnexTilesWithReceivedInfluence` and `startingTilesForCity` are NOT
+    # here: those two rows the engine's shape CONTRADICTS rather than matches
+    # (a city-state's border never grows on either engine, and every city of
+    # every class starts with its whole first ring). They stay orphans on
+    # purpose — see the AUDIT.
+    "canFoundCities": CIV_LEVEL_REASON,
+    "canAnnexTilesWithGold": CIV_LEVEL_REASON,
+    "canBuildWonders": CIV_LEVEL_REASON,
+    "canEarnGreatPeople": CIV_LEVEL_REASON,
+    "canGiveInfluence": CIV_LEVEL_REASON,
+    "canReceiveInfluence": CIV_LEVEL_REASON,
+    "ignoresUnitStrategicResourceRequirements": CIV_LEVEL_REASON,
 }
 
 SKIP_GROUPS = {"trace"}  # the trace column tables ride along for the driver, not a rule
