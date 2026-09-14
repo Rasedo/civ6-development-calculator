@@ -197,16 +197,36 @@ class SimGovernors:
 
     def _envoys_here(self, row: int) -> torch.Tensor:
         """[B, S] long — `envoysHere`'s twin, the count every question about who
-        LEADS and what a seat has EARNED here asks."""
+        LEADS and what a seat has EARNED here asks. A major row reads the
+        memoised table (same bits: the table is built from `_envoys_here_one`,
+        and its no-governor short cut is `_envoys_with`'s own)."""
+        if row < self.n_majors:
+            return self._envoys_here_all()[:, row]
+        return self._envoys_here_one(row)
+
+    def _envoys_here_one(self, row: int) -> torch.Tensor:
+        """[B, S] long — one row's effective count, derived."""
         return self._envoys_with(row, self.seat_citystate_envoys[:, row].to(torch.long))
 
     def _envoys_here_all(self) -> torch.Tensor:
         """[B, majors, S] long — the effective count for every seat at once,
-        which is what both halves of the suzerain contest weigh."""
+        which is what both halves of the suzerain contest weigh.
+
+        Memoised by an INPUT FINGERPRINT (the store and the four governor
+        planes, compared by value): a dozen suzerain reads per seat turn
+        each rebuilt this table — n_majors x 2 x n_governors scans — for an
+        answer that moves only when an envoy is sent or Amani moves. Callers
+        never write into the returned tensor."""
         env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
         if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
             return env
-        return torch.stack([self._envoys_here(r) for r in range(self.n_majors)], dim=1)
+        ins = (env, self.civ_gov_minor, self.civ_gov_appointed, self.civ_gov_establish, self.civ_gov_promos)
+        ent = self._envoys_all_cache
+        if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
+            return ent[1]
+        out = torch.stack([self._envoys_here_one(r) for r in range(self.n_majors)], dim=1)
+        self._envoys_all_cache = (tuple(x.clone() for x in ins), out)
+        return out
 
     def _governor_post_minor(self, row: int, live: torch.Tensor) -> None:
         """CIV6 (Amani, Messenger): "Can be assigned to a City-state" — she is
@@ -365,19 +385,35 @@ class SimGovernors:
 
     def _governor_mask(self, row: int) -> torch.Tensor:
         """[B, RC, NP] bool — the promotion rows an established governor pays
-        in each city slot, its DEFAULT ability included."""
+        in each city slot, its DEFAULT ability included.
+
+        Memoised per row by an INPUT FINGERPRINT: the seven planes the
+        derivation reads, compared by VALUE against the clones kept with the
+        answer. Not a version key — governor posting, promotion and the
+        establish tick write these planes without touching `_eff_version`,
+        and a city's death rewrites city_alive / city_id from many sites. The
+        driven shard called this 300 times a turn (every ability channel of
+        every city-stats pass) for an answer that changes a few times a game.
+        Callers never write into the returned tensor."""
         dev, NP, RC = self.device, self.n_gov_promos, self.RC
+        if NP == 0:
+            return torch.zeros(self.B, RC, NP, dtype=torch.bool, device=dev)
+        ins = (self.civ_gov_appointed[:, row], self.civ_gov_out[:, row],
+               self.civ_gov_city[:, row], self.civ_gov_establish[:, row],
+               self.civ_gov_promos[:, row], self.city_alive[:, row], self.city_id[:, row])
+        ent = self._gov_mask_cache.get(row)
+        if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
+            return ent[1]
         at = self._governor_at(row)
         est = self._governor_established(row, at)
-        out = torch.zeros(self.B, RC, NP, dtype=torch.bool, device=dev)
-        if NP == 0:
-            return out
         held = self.civ_gov_promos[:, row].gather(1, at.clamp(min=0))  # [B, RC]
         pidx = torch.arange(NP, device=dev).reshape(1, 1, -1)
         out = ((held.unsqueeze(2) >> pidx) & 1).bool()
         base = self._gov_base_promo[at.clamp(min=0)]                   # [B, RC]
         out = out | (pidx == base.unsqueeze(2))
-        return out & est.unsqueeze(2)
+        out = out & est.unsqueeze(2)
+        self._gov_mask_cache[row] = (tuple(x.clone() for x in ins), out)
+        return out
 
     def _governor_sum(self, row: int, channel: str) -> torch.Tensor:
         """[B, RC] f64 — one ADDITIVE promotion channel, summed per city."""

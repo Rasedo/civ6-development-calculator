@@ -697,6 +697,25 @@ CITY_STATE = {
 }
 
 
+def _gw_rows(sim, b, rows):
+    """every layout slot's work — object, maker, era, civilization; -1s for
+    an empty slot — exactly like the TS extractor: per city, slot-major, the
+    four planes in that order. One fancy-index per plane; the 0-d reads it
+    replaced were the costliest extractor by far."""
+    if not rows:
+        return []
+    if _np is None:  # pragma: no cover — numpy rides with torch
+        return [
+            [int(x) for i in range(sim.GW_W)
+             for x in (sim.city_gw_obj[b, c, s, i], sim.city_gw_maker[b, c, s, i], sim.city_gw_era[b, c, s, i], sim.city_gw_seat[b, c, s, i])]
+            for c, s in rows
+        ]
+    ci = _np.asarray([c for c, _ in rows], dtype=_np.int64)
+    si = _np.asarray([s for _, s in rows], dtype=_np.int64)
+    planes = [getattr(sim, p)[b].numpy()[ci, si] for p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat")]
+    return _np.stack(planes, axis=-1).reshape(len(rows), -1).astype(_np.int64).tolist()
+
+
 def _cty(plane: str):
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
@@ -814,11 +833,7 @@ CITY = {
     ],
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.
-    "greatWorks": lambda sim, b, rows: [
-        [int(x) for i in range(sim.GW_W)
-         for x in (sim.city_gw_obj[b, c, s, i], sim.city_gw_maker[b, c, s, i], sim.city_gw_era[b, c, s, i], sim.city_gw_seat[b, c, s, i])]
-        for c, s in rows
-    ],
+    "greatWorks": lambda sim, b, rows: _gw_rows(sim, b, rows),
     "powered": lambda sim, b, rows: [1 if sim.city_powered[b, c, s] else 0 for c, s in rows],
 }
 

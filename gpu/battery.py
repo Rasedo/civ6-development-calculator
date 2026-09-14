@@ -473,8 +473,13 @@ def main() -> int:
     ruff = Path(py).with_name("ruff.exe" if os.name == "nt" else "ruff")
     t0 = time.time()
 
-    print("stage 0 (serial): tsc, export", flush=True)
-    for name, cmd in (
+    # STAGE 0 in two phases. The five static checks read the tree and write
+    # nothing, so they run at once (pyright, ~10 s, is the wall; tsc, parse,
+    # lint and f821 finish underneath it — 17 s serial became ~10 s). The
+    # generation chain after them is ORDERED: lock before seed, seed before
+    # export, export before the two ratchets that read what it wrote.
+    print("stage 0: tsc | parse | lint | f821 | pyright, then lock, seed, export, provenance, census", flush=True)
+    _static = (
         ("tsc", [npx, "tsc", "--noEmit"]),
         ("parse", ["node", "tools/parse-check.mjs"]),
         ("lint", [npx, "oxlint", "cpu", "seeder", "world", "tools", "tests"]),  # no-constant-binary-expression et al
@@ -485,6 +490,14 @@ def main() -> int:
         # and `tests` is in scope because a poke lane is engine code too.
         ("f821", [str(ruff), "check", "--select", "F821,F841", "gpu", "policy", "tools", "tests"]),
         ("pyright", [npx, "pyright"]),
+    )
+    _ths = [threading.Thread(target=run, args=(name, cmd), kwargs={"threads": 24}, daemon=True)
+            for name, cmd in _static]
+    for th in _ths:
+        th.start()
+    for th in _ths:
+        th.join()
+    for name, cmd in (
         # The lock check runs BEFORE seed: `seed` rewrites worlds.lock, so a
         # check placed after it diffs a generation against itself and can
         # never fail. Checked first, it diffs against the COMMITTED baseline —
@@ -504,9 +517,9 @@ def main() -> int:
         # census, ratcheted the same way against its committed baseline.
         ("census", [py, "tools/gpu/rules_reader_census.py", "--baseline", "tools/gpu/rules_reader_census_baseline.txt"]),
     ):
-        run(name, cmd, threads=24)
         if failed.is_set():
             break
+        run(name, cmd, threads=24)
 
     _serve_names: list[str] = []
     _poke_names: list[str] = []

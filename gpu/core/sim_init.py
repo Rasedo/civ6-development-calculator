@@ -2615,6 +2615,9 @@ class SimInit:
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
+        # `_envoys_here_all` / `_suzerain_masks_all`: (input clones..., answer)
+        self._envoys_all_cache = None
+        self._suz_all_cache = None
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # {row: (ver, civ, slots, dark, era, mods)}
@@ -2868,6 +2871,8 @@ class SimInit:
         # per-row merged column tables, built lazily. `row_civ` comes off the
         # fixture and is never written again, so a row's table cannot go stale.
         self._bvar_col_cache: dict[int, dict[str, torch.Tensor]] = {}
+        # `_governor_mask` per row: (the seven input planes cloned, the answer)
+        self._gov_mask_cache: dict[int, tuple] = {}
         # `_live_rows`: the roster rows some game plays at a seat row, keyed
         # (row, id(table)) under a stamp of the two roster planes' in-place
         # write counters — see sim_seats.py for why the stamp is NOT `_gen_ver`.
@@ -3723,6 +3728,7 @@ class SimInit:
         self._rp_kill_version += 1
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
+        self._envoys_all_cache = self._suz_all_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     def register_alias(self, name: str, recompute) -> None:
@@ -3968,11 +3974,13 @@ class SimInit:
         self._bvar_col_cache = {}
         self._live_rows_cache = {}
         self._live_rows_stamp = ()
+        self._gov_mask_cache = {}
         self._bel_version += 1
         self._gen_ver += 1
         self._rp_kill_version += 1
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
+        self._envoys_all_cache = self._suz_all_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     @staticmethod

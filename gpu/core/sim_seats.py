@@ -4555,15 +4555,25 @@ class SimSeats:
         `suzerainEnvoys`, alive, and STRICTLY more envoys than every other
         row (a tie leaves no suzerain)."""
         suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        if env is None:
+        memo = env is None
+        if memo:
+            # the per-row `_suzerain_mask` readers (a dozen per seat turn)
+            # land here with no table of their own: fingerprint on the table
+            # and the alive plane, compared by value
             env = self._envoys_here_all()
+            ent = self._suz_all_cache
+            if ent is not None and torch.equal(ent[0], env) and torch.equal(ent[1], self.citystate_alive):
+                return ent[2]
         NM = self.n_majors
         # strict[b, r, o, s]: row r out-envoys row o at minor s; the diagonal
         # (r == o) is set True so it drops out of the all-over-o
         strict = env.unsqueeze(2) > env.unsqueeze(1)
         eye = torch.eye(NM, dtype=torch.bool, device=env.device).reshape(1, NM, NM, 1)
         beats = (strict | eye).all(dim=2)
-        return (env >= suz_min) & self.citystate_alive.unsqueeze(1) & beats
+        out = (env >= suz_min) & self.citystate_alive.unsqueeze(1) & beats
+        if memo:
+            self._suz_all_cache = (env.clone(), self.citystate_alive.clone(), out)
+        return out
 
     def _suzerain_mask(self, row: int) -> torch.Tensor:
         """[B, S] city-states seat row `row` is Suzerain of — the `isSuzerain`
