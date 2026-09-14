@@ -6479,13 +6479,24 @@ class SimSeats:
         0 Urban Development Treaty / 1 Patronage / 2 Migration Treaty /
         3 Heritage Organization (CONGRESS_RESOLUTIONS). Outcome -1 = not
         standing."""
-        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        tgt = torch.full_like(out, -1)
-        for k in range(self.congress_active.shape[1]):
-            hit = self.congress_active[:, k, 0] == r
-            out = torch.where(hit, self.congress_active[:, k, 1], out)
-            tgt = torch.where(hit, self.congress_active[:, k, 2], tgt)
-        return out, tgt
+        # 28 readers, 15,000 calls in fifty late-game turns of a three-seat
+        # shard: memoised per resolution behind the standing table, compared
+        # by VALUE (the table is [B, 2, 3]); readers never write the answer
+        ca = self.congress_active
+        ent = self._congress_slot_cache
+        if ent is None or not torch.equal(ent[0], ca):
+            ent = (ca.clone(), {})
+            self._congress_slot_cache = ent
+        hit = ent[1].get(r)
+        if hit is None:
+            out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            tgt = torch.full_like(out, -1)
+            for k in range(ca.shape[1]):
+                on = ca[:, k, 0] == r
+                out = torch.where(on, ca[:, k, 1], out)
+                tgt = torch.where(on, ca[:, k, 2], tgt)
+            hit = ent[1][r] = (out, tgt)
+        return hit
 
     def _congress_by_id(self, name: str) -> tuple[torch.Tensor, torch.Tensor]:
         """(outcome, target) of the standing resolution with this catalog id.

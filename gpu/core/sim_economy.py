@@ -5574,8 +5574,11 @@ class SimEconomy:
         if not self._res_unit_pairs:
             return out
         provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged & owned
-        for u_idx, res_idx in self._res_unit_pairs:
-            out[:, u_idx] = (provides & (self.res_id == res_idx)).any(dim=1)
+        # one [B, P, T] test over the P (unit, resource) pairs — each unit
+        # names at most one resource, so the pair rows write distinct columns
+        u_vec, r_vec = self._res_pair_vecs
+        hit = (provides.unsqueeze(1) & (self.res_id.unsqueeze(1) == r_vec.reshape(1, -1, 1))).any(dim=2)
+        out[:, u_vec] = hit
         if row >= 0:
             for u_idx, slot, cost in self._res_slot_units:
                 out[:, u_idx] = out[:, u_idx] & (self.civ_stockpile[:, row, slot] >= cost)

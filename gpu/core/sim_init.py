@@ -2615,6 +2615,10 @@ class SimInit:
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
+        self._congress_slot_cache = None  # (congress_active clone, {r: (outcome, target)})
+        # statecompare's per-digest memo: set by state_digest_all around one
+        # whole-batch extraction, None otherwise
+        self._dg_memo: dict | None = None
         # `_envoys_here_all` / `_suzerain_masks_all`: (input clones..., answer)
         self._envoys_all_cache = None
         self._suz_all_cache = None
@@ -3114,6 +3118,9 @@ class SimInit:
         self._type_req_bldg = torch.tensor([int(u.get("requiresBuilding", -1)) for u in ru], dtype=torch.long, device=device)
         self._type_resource = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
+        self._res_pair_vecs = (
+            torch.tensor([u for u, _ in self._res_unit_pairs], dtype=torch.long, device=device),
+            torch.tensor([r for _, r in self._res_unit_pairs], dtype=torch.long, device=device))
         # GS: the STOCKPILE slot a unit charges, and what it charges.
         self._type_res_slot = torch.tensor([int(u.get("resSlot", -1)) for u in ru], dtype=torch.long, device=device)
         self._type_res_cost = torch.tensor([int(u.get("resCost", 0)) for u in ru], dtype=torch.long, device=device)
@@ -3729,6 +3736,7 @@ class SimInit:
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
         self._envoys_all_cache = self._suz_all_cache = None
+        self._congress_slot_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     def register_alias(self, name: str, recompute) -> None:
@@ -3981,6 +3989,7 @@ class SimInit:
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
         self._envoys_all_cache = self._suz_all_cache = None
+        self._congress_slot_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     @staticmethod

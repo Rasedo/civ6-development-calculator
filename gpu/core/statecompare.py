@@ -759,12 +759,13 @@ def _queue_cost(sim, b, rows):
     the head; every other kind carries the cost it locked."""
     stored = sim.city_cost[b].tolist()
     cur = sim.city_current[b].tolist()
-    live: dict = {}
+    live: dict = sim._dg_memo if sim._dg_memo is not None else {}
     out = []
     for c, s in rows:
-        if c not in live:
-            live[c] = sim._live_building_cost(c)[b].tolist()
-        out.append([live[c][s][k] if 0 <= cur[c][s][k] < sim.NB else stored[c][s][k]
+        key = ("lbc", c)
+        if key not in live:
+            live[key] = sim._live_building_cost(c).tolist()  # whole batch, once per digest
+        out.append([live[key][b][s][k] if 0 <= cur[c][s][k] < sim.NB else stored[c][s][k]
                     for k in range(sim.QD)])
     return out
 
@@ -772,12 +773,13 @@ def _queue_cost(sim, b, rows):
 def _spec_rows(sim, b, rows):
     # one _city_specialists call per distinct seat row — the digest asks
     # per city and the recompute walks the tile window
-    cache: dict = {}
+    cache: dict = sim._dg_memo if sim._dg_memo is not None else {}
     out = []
     for c, s in rows:
-        if c not in cache:
-            cache[c] = sim._city_specialists(c)
-        out.append([int(x) for x in cache[c][b, s].tolist()])
+        key = ("spec", c)
+        if key not in cache:
+            cache[key] = sim._city_specialists(c)
+        out.append([int(x) for x in cache[key][b, s].tolist()])
     return out
 
 
@@ -1185,20 +1187,27 @@ def state_digest_all(sim, manifest: dict | None = None, include_gaps: bool = Fal
     cost). Extraction stays per game because the row sets differ."""
     man = manifest or load_manifest()
     outs: list[dict] = [{} for _ in range(sim.B)]
-    for g in man["groups"]:
-        name = g["name"]
-        fields = [f for f in g["fields"] if include_gaps or "gap" not in f]
-        per_b = []
-        for b in range(sim.B):
-            rows = group_rows(sim, b, name)
-            keys = group_keys(sim, b, name, rows)
-            per_b.append((keys, [(f["compare"], EXTRACTORS[name][f["name"]](sim, b, rows))
-                                 for f in fields]))
-        digs = fold_rows_multi(per_b)
-        if digs is None:
-            digs = [fold_rows(k, c) for k, c in per_b]
-        for b in range(sim.B):
-            outs[b][name] = dict(digs[b], rows=len(per_b[b][0]))
+    # an extractor that derives a WHOLE-BATCH tensor per seat row (the
+    # specialists, the live building prices) derives it once per digest,
+    # not once per game: the memo lives for this call only
+    sim._dg_memo = {}
+    try:
+        for g in man["groups"]:
+            name = g["name"]
+            fields = [f for f in g["fields"] if include_gaps or "gap" not in f]
+            per_b = []
+            for b in range(sim.B):
+                rows = group_rows(sim, b, name)
+                keys = group_keys(sim, b, name, rows)
+                per_b.append((keys, [(f["compare"], EXTRACTORS[name][f["name"]](sim, b, rows))
+                                     for f in fields]))
+            digs = fold_rows_multi(per_b)
+            if digs is None:
+                digs = [fold_rows(k, c) for k, c in per_b]
+            for b in range(sim.B):
+                outs[b][name] = dict(digs[b], rows=len(per_b[b][0]))
+    finally:
+        sim._dg_memo = None
     return outs
 
 

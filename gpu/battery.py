@@ -99,6 +99,13 @@ def print_hunt_reminder() -> None:
 # wall is the gate's own process — sim.step, the decide pass and the digest
 # extract — which is also why the gate runs as two processes at all.
 POKE_WORKERS = 9
+# Serve shards at full fan-out. A shard pays a fixed per-turn dispatch price
+# plus a per-seed one that is near-LINEAR in B (the driven games are
+# data-dependent Python loops), so 24 seeds over 12 two-seed shards beat 8
+# three-seed ones on a 24-core box: measured at 6588d518, one seed 216 s,
+# three seeds 332 s, and the battery's 8-shard lane 501 s. The memory
+# planner narrows this when the box cannot hold 12 + POKE_WORKERS lanes.
+MAX_SHARDS = 12
 POKE_OMP = 1
 
 # --------------------------------------------------------- the SLOW tier --
@@ -521,6 +528,7 @@ def main() -> int:
             break
         run(name, cmd, threads=24)
 
+    _s0_wall = time.time() - t0  # the WALL of stage 0, its static checks overlap
     _serve_names: list[str] = []
     _poke_names: list[str] = []
     # The memory report at the end reads these three. Stage 0 can BAIL before
@@ -549,14 +557,14 @@ def main() -> int:
         # #230: how wide this run may fan out, given the memory this box
         # actually has free right now. Never a refusal — a narrower run, which
         # is a LONGER run.
-        _k, _pokes, _why = plan_pool(min(8, len(_seeds)))
+        _k, _pokes, _why = plan_pool(min(MAX_SHARDS, len(_seeds)))
         if HUNT:
             # one seed, one shard, and nothing else running beside it
             _k, _pokes, _why = 1, 0, "hunt mode: one serve shard, no poke pool"
         print(f"memory: {_why}", flush=True)
-        if (_k, _pokes) != (min(8, len(_seeds)), POKE_WORKERS):
+        if (_k, _pokes) != (min(MAX_SHARDS, len(_seeds)), POKE_WORKERS):
             print(f"        {_k} serve shard(s) and {_pokes} poke worker(s) "
-                  f"instead of {min(8, len(_seeds))} and {POKE_WORKERS}", flush=True)
+                  f"instead of {min(MAX_SHARDS, len(_seeds))} and {POKE_WORKERS}", flush=True)
         print_hunt_reminder()
         mem_min_free[0] = free_mb() or 10 ** 9
         _mem_free_start = mem_min_free[0]
@@ -577,7 +585,7 @@ def main() -> int:
                 # ...and its function-level attribution over a turn window
                 serve_cmd += ["--cprofile", _argval("--cprofile")]
         serve_cmd += ["--seeds"]
-        _shards = [("serve_" + "abcdefgh"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
+        _shards = [("serve_" + "abcdefghijklmnop"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
         _serve_names = [s[0] for s in _shards]
         if HUNT:
@@ -821,8 +829,7 @@ def main() -> int:
                    + [_t.get(n, 0.0) for n in _serve_names[1:]])
         _pk = [_t.get(n, 0.0) for n in _poke_names]
         _pool = max(sum(_pk) / max(1, _pokes), max(_pk, default=0.0))
-        _s0 = sum(dt for n, dt, _ in results
-                  if n not in set(_serve_names) | set(_poke_names) | {"vitest"})
+        _s0 = _s0_wall
         print(f"budget: stage 0 {_s0:.0f}s + slowest lane {max(_srv, _pool):.0f}s"
               f"  |  serve {_srv:.0f}s over {len(_serve_names)} shards"
               f"  vs  pokes {sum(_pk):.0f}s/{_pokes} workers = {_pool:.0f}s"
