@@ -324,3 +324,42 @@ Two lines for #264 beyond the mismatches: four beliefs the engine fields that Ga
 
 ### Types widened
 `BeliefDef.src?`, `GovernorPromotionDef.src?` — own files only.
+
+## Triage draft for #264 (2026-09-14) — one decision per line, nothing applied yet
+
+Three bins. FIX = the install is the source and the catalog is wrong (a GS
+change the catalog never took, or a slip); one catalog edit, both engines
+read the wire, then grep both engines for a hard-coded duplicate of the old
+number. STYLIZED = the engine differs on purpose; the tag becomes
+`{ stylized: '<reason>' }` and the line leaves. ASK = a modelling question
+the owner rules on. Every FIX is behaviour-changing: batched, battery after,
+fixtures may move.
+
+### FIX (35)
+- units: INQUISITOR.religiousStrength 75; MINAS_GERAES.antiAir 95; MAMLUK cost 220 (raw) / maintenance 4; VARU maintenance 2; TOA maintenance 0; PIKE_AND_SHOT maintenance 3; BATTERING_RAM.upgradesTo SIEGE_TOWER; VARU.upgradesTo CUIRASSIER; TOA and U_BOAT lose requiresResource (and the U-Boat its resourceCost/resourceUpkeep) — the install exempts them.
+- techs: MILITARY_ENGINEERING's Fort effect moves to SIEGE_TACTICS (and the comment is rewritten); STEEL's Oil Well moves to REFINING; BANKING's Quarry +2 gold is deleted (no such row); ROBOTICS's Pasture row becomes +1 FOOD, and a REPLACEABLE_PARTS Pasture +1 production row is added; SYNTHETIC_MATERIALS Camp gold 2.
+- civics: SUFFRAGE loses Economic Union and CLASS_STRUGGLE loses Five-Year Plan; both policies hang on IDEOLOGY.
+- improvements: LUMBER_MILL production 2; SPHINX appealAdjacent 2 (comment rewritten — it inverted the XML).
+- promotions: PROSELYTIZER 50.
+- buildings: PALACE amenities 2; PAGODA housing 0; Electronics Factory base production 3 (its extra is the POWERED bonus — check the powered path carries 5 vs 3); HANGAR/AIRPORT airSlots 1; AIRPORT production 4; AQUATICS_CENTER raw 480; Thermal Bath's ratio premise (the Zoo is 360, not 445 — the install prices both at 360).
+- districts: Acropolis Wonder_Culture 2; SPACEPORT maintenance 0.
+- builtWonders: COLOSSEUM regionalAmenities 2.
+- policies/governments: Fascism wwCutPct 20 (one fact, two readers — fix both).
+- congress: WORLD_RELIGION era window = through Industrial (minEra none, maxEra 4), the inverse of today.
+- beliefs: RIVER_GODDESS 2/2; FEED_THE_WORLD shrine 3 / temple 3; DIVINE_INSPIRATION 4; WORLD_CHURCH per 4; CROSS_CULTURAL_DIALOGUE per 4; ITINERANT_PREACHERS 3; SCRIPTURE ×1.25 (a percent, 25).
+
+### STYLIZED (6) — retag, quoting the reason already in the row
+- PALACE.cost 0 (autoCapital, never built); CITY_CENTER.cost 0 (founded, never produced); SPY.moves 0 (the spy jumps; memory `zero-mp-chassis`); NEIGHBORHOOD.housing 0 and PRESERVE.housing 0 (appeal-based here, per the rows); Tsikhe's ratio cost (the buildings header's rule — see ASK 3 before retagging).
+
+### ASK (owner) (9)
+1. GOLD_PURCHASE_MULT 4 vs the install's GOLD_PURCHASE_MULTIPLIER 2 with PURCHASE_DIVISOR 5 — the install's price is a formula (cost × 2 … / 5 …); is the engine's flat ×4 a chosen price or a slip? Same question for FAITH_PURCHASE_MULT 2 (no install row at all).
+2. NATURALIST charges 0 vs ParkCharges 1 — the engine consumes the unit on designation; the install spends a charge. Same behaviour, different shape — keep the shape or mirror the column?
+3. THE BUILDING COST LADDER: buildings.ts prices from a published ladder, not the XML, and variants by ratio. The checker will disagree with every building whose ladder rung differs from the install's Cost. Move buildings to install costs wholesale (one fixture-moving batch), or declare the ladder STYLIZED and tag every cost so?
+4. TITHE's shape — GS is +3 gold per CITY with the religion; the engine's "+1 per 4 followers" is pre-GS. Rewrite the effect (a new effect kind on both engines), or STYLIZED?
+5. Four beliefs Gathering Storm does not have (ORAL_TRADITION, CHURCH_PROPERTY deleted by the expansion; CRUSADE, MESSENGER_OF_THE_GODS nowhere in the install) and RELIGIOUS_COMMUNITY's replaced clause — remove them from the roster (a fixture-moving change: religions draw from the pool) or keep as STYLIZED?
+6. POP_STAR 25 vs the install's -75 on a tourism-bomb gold yield — the relation is unverified; a lab scene (a Rock Band's concert) settles it.
+7. LIGHTHOUSE's flat +1 food beside its coast modifier — likely DOUBLE-PAYING; confirm against the Lighthouse's install rows (nil base yields) and drop the flat food?
+8. CATHEDRAL culture 3 — no install row (Faith 3 only; the culture presumably stands in for the great-work slot). Drop it, or STYLIZED until great works fill the slot?
+9. CODE_OF_LAWS → CHIEFDOM has no PrereqCivic in the install (starting government) — not a defect; the tag stays as a pointer. Confirm and allowlist.
+
+Order of work: the ASK list goes to the owner first (one message); FIX lands as ONE batch with the per-line comments rewritten, a battery, and the fixture note; STYLIZED retags ride the same commit.
