@@ -3956,6 +3956,11 @@ class SimInit:
         self._fx_row_cache = None
         self._fadjq_cache = self._rcy_cache = self._bsum_row_cache = None
         self._bld_cache = {}
+        # keyed by roster ROW alone, on the premise that `row_civ` is never
+        # written after __init__ — a restored base that a test has re-seated
+        # would otherwise serve the previous civilization's merged building
+        # columns (ten poke lanes cleared it by hand before this line existed)
+        self._bvar_col_cache = {}
         self._bel_version += 1
         self._gen_ver += 1
         self._rp_kill_version += 1

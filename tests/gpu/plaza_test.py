@@ -42,10 +42,25 @@ UNI = [u["id"] for u in RJ["units"]]
 SCF = RJ["districtScaffold"]
 
 
+# THE WARMED BASE, ONE PER `turns`. A scene pays a `restore` — milliseconds —
+# instead of a fixture load, a settle and N steps, and `restore` round-trips
+# every `_MUTABLE` plane, which is everything these pokes write (`city_bldg`,
+# `conquest_turns`, the unit pool, the city queue, the district planes).
+# `_bvar_col_cache` is keyed by ROW alone rather than by a version counter, so
+# it is emptied by hand the way a fresh build leaves it.
+_BASE: dict = {}
+
+
 def fresh(rules, path, turns=20):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+    key = (str(path), turns)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
+    sim._bvar_col_cache.clear()
     return sim
 
 

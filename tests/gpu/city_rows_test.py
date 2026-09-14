@@ -48,19 +48,50 @@ def play(sim, row: int, name):
     sim._bldg_version += 1
 
 
+# THE WARMED BASE — ONE engine per shape, restored per scene. A build plus the
+# founding warmup costs ~10 s where `restore` costs milliseconds, and `restore`
+# round-trips every `_MUTABLE` plane, which is everything these pokes write
+# through the engine's own verbs. `_STATIC` names what it does NOT carry:
+# every scene re-seats a roster row through `play` (`row_civ`/`row_leader` are
+# map-generation catalog), and `tundra_plot` re-grounds a tile (`terrain` and
+# `hills` are map generation too). `_bvar_col_cache` is keyed by ROW alone
+# rather than by a version counter, so a re-seated row would keep the previous
+# civilization's building columns; a fresh build leaves it empty, so does this.
+_STATIC = ("row_civ", "row_leader", "terrain", "hills")
+_BASE: dict = {}
+
+
+def _memo(key, make) -> BatchSim:
+    if key not in _BASE:
+        sim = make()
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._bvar_col_cache.clear()
+    return sim
+
+
 def fresh(rules, path) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    def make() -> BatchSim:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        return settle_all(sim)
+
+    return _memo((str(path), "fresh"), make)
 
 
 def bare(rules, path) -> BatchSim:
     """Unsettled, so a founding clause can be measured at its own moment."""
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r in range(sim.n_majors):
-        play(sim, r, None)
-    return sim
+    def make() -> BatchSim:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r in range(sim.n_majors):
+            play(sim, r, None)
+        return sim
+
+    return _memo((str(path), "bare"), make)
 
 
 def T(*xs) -> torch.Tensor:

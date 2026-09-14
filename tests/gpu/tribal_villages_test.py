@@ -26,9 +26,33 @@ B0 = 0
 ROW = 0
 
 
-def build(path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], load_rules(),
-                               device="cpu", dtype=torch.float64))
+# THE WARMED BASE, ONE PER BATCH WIDTH. A scene pays a `restore` —
+# milliseconds — instead of a fixture load and the founding settle, and
+# `restore` round-trips every `_MUTABLE` plane, `tile_goody`, `rng_state` and
+# the unit pool included. Two things it does not carry go back by hand: the
+# roster rows the Epic Quest scene seats (`row_civ`/`row_leader` are
+# map-generation catalog, not state) and `_goody_sub`, the subtype TABLE the
+# arms scene narrows to a single row per subtype. `_bvar_col_cache` is keyed by
+# ROW alone rather than by a version counter, so it is emptied the way a fresh
+# build leaves it.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
+def build(path, games: int = 1) -> BatchSim:
+    key = (str(path), games)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path) for _ in range(games)], load_rules(),
+                                  device="cpu", dtype=torch.float64))
+        _BASE[key] = (sim, sim.snapshot(),
+                      {k: getattr(sim, k).clone() for k in _STATIC}, sim._goody_sub)
+    sim, snap, stat, subs = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._goody_sub = subs
+    sim._bvar_col_cache.clear()
+    return sim
 
 
 def _hut_with_unit(sim):
@@ -136,8 +160,7 @@ def test_a_barbarian_claims_nothing(rules, path) -> None:
 def test_the_draw_moves_one_games_stream(rules, path) -> None:
     """Kind then subtype, and for the CLAIMING game alone — a batched draw
     would walk every other game's stream off TS's."""
-    wide = settle_all(BatchSim([load_fixture(path), load_fixture(path)],
-                               load_rules(), device="cpu", dtype=torch.float64))
+    wide = build(path, 2)
     assert wide.B > 1, "this lane needs a batch wider than one to mean anything"
     wide.turn = 250
     one = torch.zeros(wide.B, dtype=torch.bool)
@@ -209,8 +232,7 @@ def test_the_real_move_path_at_three_games(rules, path) -> None:
     single-seed run passes it. This lane is the shape guard: three games, one
     of them not moving.
     """
-    wide = settle_all(BatchSim([load_fixture(path) for _ in range(3)],
-                               load_rules(), device="cpu", dtype=torch.float64))
+    wide = build(path, 3)
     assert wide.B == 3
     gs = int((wide.unit_seat[B0] == ROW).nonzero().flatten()[0])
     here = int(wide.unit_tile[B0, gs])

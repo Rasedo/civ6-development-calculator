@@ -28,8 +28,34 @@ from warmup import settle_all
 RICH = 10_000.0
 
 
-def build(rules, path):
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+# THE WARMED BASE, ONE PER (steps, slot). A scene pays a `restore` —
+# milliseconds — instead of a fixture load, a settle and N steps, and `restore`
+# round-trips every `_MUTABLE` plane (the very tuple `snap_all`/`drift` below
+# compare). Two things it does not carry are put back by hand: `row_leader`,
+# which the Enkidu scene blanks and which is map-generation catalog rather than
+# state, and `_rl_war_active`, the head's own flag. `slot` keys a SECOND engine
+# for the one scene that holds two live sims at once — the flag-off reference
+# in test_inert_when_off. `_bvar_col_cache` is keyed by ROW alone rather than
+# by a version counter, so it is emptied the way a fresh build leaves it.
+_STATIC = ("row_leader",)
+_BASE: dict = {}
+
+
+def build(rules, path, steps: int = 0, slot: int = 0):
+    key = (str(path), steps, slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(steps):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot(),
+                      {k: getattr(sim, k).clone() for k in _STATIC}, sim._rl_war_active)
+    sim, snap, stat, active = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._rl_war_active = active
+    sim._bvar_col_cache.clear()
+    return sim
 
 
 def snap_all(sim):
@@ -56,12 +82,14 @@ def test_inert_when_off(rules, path):
     with no war column must be bit-identical to a sim with the head forced
     off. The gate does drive the column now — for seat 0 as for every row — so
     this pins the floor, not the gate."""
-    sim = build(rules, path)
+    sim = build(rules, path, steps=30)
     assert sim._rl_war_active, "the war head ships ACTIVE"
-    ref = build(rules, path)
+    # the reference takes its OWN base (`slot=1`): the two sims are live at the
+    # same moment, and its flag has to be off BEFORE it steps, so its thirty
+    # turns stay in the scene rather than moving into a memoised base
+    ref = build(rules, path, slot=1)
     ref._rl_war_active = False
     for _ in range(30):
-        sim.step()
         ref.step()
     d = drift(sim, snap_all(ref))
     assert not d, f"war=None path must not depend on the flag: {d}"
@@ -72,9 +100,7 @@ def test_inert_when_off(rules, path):
 
 
 def test_declare(rules, path):
-    sim = build(rules, path)
-    for _ in range(20):
-        sim.step()
+    sim = build(rules, path, steps=20)
     sim._rl_war_active = True
     m = sim._seat_war_mask(0)[0]
     assert bool(m[0]), "declare-war column should be open (civ 0 alive, at peace)"
@@ -99,9 +125,7 @@ def test_declare(rules, path):
 
 
 def test_peace(rules, path):
-    sim = build(rules, path)
-    for _ in range(20):
-        sim.step()
+    sim = build(rules, path, steps=20)
     sim._rl_war_active = True
     sim._apply_war_column(0, war_vec(sim, 0))  # declare on civ 0
     sim.step()
@@ -148,9 +172,7 @@ def test_capture_plunder(rules, path):
     city, ends the war — the tail of TS `attackCity`. The raze path (seat 0's
     city slots full) gets neither: `transferCity` returns false and pays
     nothing."""
-    sim = build(rules, path)
-    for _ in range(20):
-        sim.step()
+    sim = build(rules, path, steps=20)
     idx = sim.city_alive[0, 1:sim.n_majors].nonzero()
     assert len(idx), "no civ city by t20 on this seed"
     r = int(idx[0, 0])
@@ -222,9 +244,7 @@ def test_cs_siege(rules, path):
     the counter, attacker consumed, NO advance; `captureCityState` at 0 HP
     converts it into a seat-0 city (pop x0.75 min 1, half HP, the radius-2
     cityStateId territory transfers)."""
-    sim = build(rules, path)
-    for _ in range(20):
-        sim.step()
+    sim = build(rules, path, steps=20)
     live = sim.citystate_alive[0].nonzero(as_tuple=True)[0]
     if len(live) < 1:
         print("  cs siege SKIPPED (no city-state on this seed)")
@@ -320,9 +340,7 @@ def test_golden_war(rules, path):
     """CIV6 (Golden Age War): To Arms! + a Golden age + a ripened
     denouncement = a FORMAL war at a quarter of the warmonger price,
     remembered per pair for the captures; peace forgets it."""
-    sim = build(rules, path)
-    for _ in range(20):
-        sim.step()
+    sim = build(rules, path, steps=20)
     one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
     GOLDEN, FORMAL, SURPRISE = 8, 1, 0  # WAR_KINDS codes
     pct = sim._war_griev_pct[GOLDEN]

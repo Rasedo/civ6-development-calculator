@@ -52,11 +52,49 @@ def lead(sim, row: int, civ: str, leader: str) -> None:
     sim._eff_version += 1
 
 
+# THE WARMED BASE — ONE engine per shape, restored per scene. A build plus the
+# founding warmup costs ~10 s where `restore` costs milliseconds, and `restore`
+# round-trips every `_MUTABLE` plane, which is everything these pokes write
+# (`war`, `trading_post`, `civ_techs`, `golden_ages`, `ded_picks`).
+# `_STATIC` names what it does NOT carry: every scene re-seats a roster row
+# through `play`/`lead`, and `row_civ`/`row_leader` are map-generation catalog
+# rather than state. `_bvar_col_cache` is keyed by ROW alone rather than by a
+# version counter, so a re-seated row would keep the previous civilization's
+# building columns; a fresh build leaves it empty and so does this.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
+def _memo(key, make) -> BatchSim:
+    if key not in _BASE:
+        sim = make()
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._bvar_col_cache.clear()
+    return sim
+
+
 def fresh(rules, path) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    def make() -> BatchSim:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        return settle_all(sim)
+
+    return _memo((str(path), "fresh"), make)
+
+
+def wide(rules, path, n: int) -> BatchSim:
+    """`n` copies of the fixture, UNSETTLED and with the fixture's own roster —
+    its own base, because neither the seating nor the founding above applies."""
+    def make() -> BatchSim:
+        return BatchSim([load_fixture(path) for _ in range(n)], rules,
+                        device="cpu", dtype=torch.float64)
+
+    return _memo((str(path), "wide", n), make)
 
 
 def seat(sim, row: int, name, leader=None):
@@ -211,8 +249,7 @@ def test_wonder_tourism_is_per_game(rules, path) -> None:
     where a single game seats France must not pay every game: a collapsed
     `.any()` here doubled a neighbouring game's tourism, and only a batched
     serve shard could see it (single-seed runs stayed green)."""
-    sim = BatchSim([load_fixture(path), load_fixture(path)], rules,
-                   device="cpu", dtype=torch.float64)
+    sim = wide(rules, path, 2)
     _c, _l, _p = sim._wonder_tourism_rows[0]
     row = 1
     # game 0 seats nobody on this row; game 1 seats the carrier

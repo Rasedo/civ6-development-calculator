@@ -52,11 +52,33 @@ def lead(sim, row: int, civ: str, leader: str) -> None:
     sim._eff_version += 1
 
 
+# THE WARMED BASE — ONE engine, restored per scene. A build plus the founding
+# warmup costs ~10 s where `restore` costs milliseconds, and `restore`
+# round-trips every `_MUTABLE` plane, which is everything these pokes write
+# (`feat_id`, `improvement`, `civ_civics`, `city_pop`, the amenity ground).
+# `_STATIC` names what it does NOT carry: every scene re-seats a roster row
+# through `play`/`lead`, and `row_civ`/`row_leader` are map-generation catalog
+# rather than state. `_bvar_col_cache` is keyed by ROW alone rather than by a
+# version counter, so a re-seated row would keep the previous civilization's
+# building columns; a fresh build leaves it empty and so does this.
+_STATIC = ("row_civ", "row_leader")
+_BASE: dict = {}
+
+
 def fresh(rules, path) -> BatchSim:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
-        play(sim, r, name)
-    return settle_all(sim)
+    key = str(path)
+    if key not in _BASE:
+        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
+            play(sim, r, name)
+        settle_all(sim)
+        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
+    sim, snap, stat = _BASE[key]
+    sim.restore(snap)
+    for k, v in stat.items():
+        getattr(sim, k).copy_(v)
+    sim._bvar_col_cache.clear()
+    return sim
 
 
 def T(*xs) -> torch.Tensor:
