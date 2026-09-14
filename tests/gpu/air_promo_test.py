@@ -23,10 +23,23 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
 
+_BASE: dict = {}
+
+
 def fresh(rules, path, turns=30):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
+    """ONE warmed engine per (fixture, warmup); every scene below restores it.
+    A build plus the founding warmup costs ~10 s where `restore` costs
+    milliseconds, and `restore` round-trips every `_MUTABLE` plane — which is
+    all these scenes write (the unit pool and its promotions, the district
+    registry, the tile planes, the age/dedication picks, the purses)."""
+    key = (str(path), turns)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 

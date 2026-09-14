@@ -36,18 +36,31 @@ import drive  # noqa: E402
 import ladder  # noqa: E402
 
 
+_BASE: dict = {}
+
+
 def build(rules, path, turns=25):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    # Unlock the scaffold for every row: districts gate on techs/civics and an
-    # undriven world researches nothing — the TILE WIRE, not the unlock, is
-    # what this lane proves.
-    for _di, ut, uc, _plc, _fc in sim._scaffold:
-        if ut >= 0:
-            sim.civ_techs[:, :, ut] = True
-        if uc >= 0:
-            sim.civ_civics[:, :, uc] = True
-    for _ in range(turns):
-        sim.step()
+    """ONE warmed engine per (fixture, warmup); every scene below restores it.
+    The unlock and the warmup cost ~10 s apiece where `restore` costs
+    milliseconds, and `restore` round-trips every `_MUTABLE` plane — which is
+    everything these scenes write except `tile_ftu` (section 5 puts that one
+    back by hand)."""
+    key = (str(path), turns)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        # Unlock the scaffold for every row: districts gate on techs/civics and an
+        # undriven world researches nothing — the TILE WIRE, not the unlock, is
+        # what this lane proves.
+        for _di, ut, uc, _plc, _fc in sim._scaffold:
+            if ut >= 0:
+                sim.civ_techs[:, :, ut] = True
+            if uc >= 0:
+                sim.civ_civics[:, :, uc] = True
+        for _ in range(turns):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 
@@ -149,17 +162,23 @@ def main() -> None:
     t5 = int(ladder.pick_district_tile(fg._district_elig(row, j, di, plc), fg.district_rank_adj(di, plc))[0])
     assert t5 >= 0, "no eligible tile to plant a feature on"
     tech5 = 0
-    fg.tile_ftu[0, t5] = tech5
-    fg.feat_stripped[0, t5] = False
-    fg.civ_techs[0, row, tech5] = False
-    assert not bool(fg._district_elig(row, j, di, plc)[0, t5]), \
-        "a standing removable feature must block the plot until its tech is in"
-    fg.civ_techs[0, row, tech5] = True
-    assert bool(fg._district_elig(row, j, di, plc)[0, t5]), "the removal tech must open the plot"
-    fg.civ_techs[0, row, tech5] = False
-    fg.feat_stripped[0, t5] = True
-    assert bool(fg._district_elig(row, j, di, plc)[0, t5]), \
-        "an ALREADY-CLEARED tile needs no tech — there is nothing left to remove"
+    # `tile_ftu` is map generation, not a `_MUTABLE` plane, so a restore would
+    # not undo this poke on the shared base — put it back by hand.
+    _ftu0 = int(fg.tile_ftu[0, t5])
+    try:
+        fg.tile_ftu[0, t5] = tech5
+        fg.feat_stripped[0, t5] = False
+        fg.civ_techs[0, row, tech5] = False
+        assert not bool(fg._district_elig(row, j, di, plc)[0, t5]), \
+            "a standing removable feature must block the plot until its tech is in"
+        fg.civ_techs[0, row, tech5] = True
+        assert bool(fg._district_elig(row, j, di, plc)[0, t5]), "the removal tech must open the plot"
+        fg.civ_techs[0, row, tech5] = False
+        fg.feat_stripped[0, t5] = True
+        assert bool(fg._district_elig(row, j, di, plc)[0, t5]), \
+            "an ALREADY-CLEARED tile needs no tech — there is nothing left to remove"
+    finally:
+        fg.tile_ftu[0, t5] = _ftu0
 
     # --- 6) the record carries the tile, both directions --------------------
     rec_sim = build(rules, path)

@@ -95,10 +95,27 @@ def head_war(sim, row: int, tgt: int, sue: bool = False) -> None:
 
 
 # ------------------------------------------------------------------ helpers ---
-def build(rules, path, steps: int = 18, dtype=torch.float64):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
-    for _ in range(steps):
-        sim.step()
+_BASE: dict = {}
+
+
+def build(rules, path, steps: int = 18, dtype=torch.float64, slot: int = 0):
+    """ONE warmed engine per (fixture, warmup, dtype, slot); every poke below
+    restores it. A build plus the founding warmup costs ~10 s where `restore`
+    costs milliseconds, and `restore` round-trips every `_MUTABLE` plane —
+    which is everything these pokes write.
+
+    `slot` keys a SECOND engine for the two scenes that hold two live sims at
+    once: the World Congress twin (`s8b`, compared against `s8`) and the
+    visibility poke, which blanks the roster rows (`row_civ` / `row_leader`
+    are map-generation catalog, not `_MUTABLE`, so its base stays its own)."""
+    key = (str(path), steps, str(dtype), slot)
+    if key not in _BASE:
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
+        for _ in range(steps):
+            sim.step()
+        _BASE[key] = (sim, sim.snapshot())
+    sim, snap = _BASE[key]
+    sim.restore(snap)
     return sim
 
 
@@ -132,11 +149,11 @@ def keep_capital_only(sim, row) -> int:
     return slots[0]
 
 
-def controlled_pair(rules, path, extra_for_a: bool = True):
+def controlled_pair(rules, path, extra_for_a: bool = True, slot: int = 0):
     """A sim where seat ROWS 1 and 2 are unit-less, capital-only (strength
     8 v 8) — plus, when extra_for_a, a spare city for row 1 ADJACENT to row
     2's capital (16 v 8: si > sj AND si > sj*1.3, proximity 1)."""
-    sim = build(rules, path)
+    sim = build(rules, path, slot=slot)
     assert sim.n_majors >= 3, "fixtures must carry two civs"
     sim.major_unit_alive[:] = False  # strengths reduce to nCities*8 exactly
     ja = keep_capital_only(sim, 1)
@@ -921,7 +938,10 @@ def poke_visibility(rules, path):
     """j. DIPLOMATIC VISIBILITY: five levels, one per source, the post and the
     alliance as alternatives, and the Combat Strength the leading side keeps.
     CIV6 (Diplomatic Visibility and Gossip)."""
-    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
+    # `row_civ` / `row_leader` are the seeder's ROSTER — map-generation
+    # catalog, not `_MUTABLE` planes — and this poke blanks and re-seats them,
+    # so it takes a base of its own that no other poke shares.
+    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False, slot=2)
     a, b = 1, 2
     # The BASE rule, so the seeder's draw cannot decide what this lane
     # measures: clear the roster rows. The uniques that ride visibility
@@ -1039,7 +1059,7 @@ def main() -> None:
     # `civ_grievance [B, NS, NS]` is ONE plane and the BASE is what carries the
     # state through a snapshot.
     assert "civ_grievance" in _MUT2, "civ_grievance must be registered in _MUTABLE"
-    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s3 = build(rules, path, steps=0)
     # ANTISYMMETRY: one write pays a cell and its mirror, so the pair carries
     # exactly one signed balance and the diagonal never moves.
     s3._add_grievance(0, 1, 40)
@@ -1066,7 +1086,7 @@ def main() -> None:
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
     assert _round_trips("civ_diplo_favor", _MUT2), "civ_diplo_favor must round-trip through _MUTABLE"
-    s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s4 = build(rules, path, steps=0)
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
     suz_min = int(s4.rules.citystate.get("suzerainEnvoys", 3))
@@ -1083,7 +1103,7 @@ def main() -> None:
         assert int(s4._suzerain_count(1)[0]) == 1, "the strictly-higher civ is suzerain"
         assert int(s4._suzerain_count(0)[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
-    s5 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s5 = build(rules, path, steps=0)
     f0 = int(s5.civ_diplo_favor[0, 0])
     s5.step()
     f1 = int(s5.civ_diplo_favor[0, 0])
@@ -1119,7 +1139,7 @@ def main() -> None:
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
     for _f in ("congress_sessions", "congress_active", "civ_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
-    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s6 = build(rules, path, steps=0)
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
@@ -1170,7 +1190,7 @@ def main() -> None:
 
     # the SLATE ROTATES: at Industrial three rows are eligible (UDT,
     # Patronage, Migration), and session 2 starts its window at rank 2
-    s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s7 = build(rules, path, steps=0)
     _era_ind = None
     for _t in range(s7.civ_techs.shape[2]):
         s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _t] = True
@@ -1195,7 +1215,7 @@ def main() -> None:
     assert s7.congress_active[0, 0, 1].tolist() == 0 and s7.congress_active[0, 0, 2].tolist() == 0
 
     # the DV resolution from Modern: the favor curve, the pile-on, the refunds
-    s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s8 = build(rules, path, steps=0)
     _era_mod = None
     for _t in range(s8.civ_techs.shape[2]):
         s8.civ_techs[:, 0].zero_(); s8.civ_techs[:, 0, _t] = True
@@ -1218,15 +1238,23 @@ def main() -> None:
     # What the two REGULAR resolutions pay is their own slate's business, so
     # measure it: a twin whose Modern gate can never open runs the identical
     # session (the session draws nothing) minus the DV resolution.
-    s8b = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    s8b._congress_dv_min = 99
-    s8b.civ_techs[:, 0].zero_(); s8b.civ_techs[:, 0, _era_mod] = True
-    s8b.turn = s8b._congress_interval
-    s8b.civ_diplo_points[:, 1] = 5
-    s8b.civ_diplo_favor[:, 0] = 65
-    s8b.civ_diplo_favor[:, 1] = 60
-    s8b.civ_diplo_favor[:, 2] = 0
-    s8b._world_congress()
+    #   ...on a base of its own (`slot=1`), because `s8` above is still live
+    #   and both are read side by side below.
+    s8b = build(rules, path, steps=0, slot=1)
+    # `_congress_dv_min` is a loaded scalar, not a `_MUTABLE` plane, so a
+    # restore would not undo this poke — put it back by hand.
+    _dv_min0 = s8b._congress_dv_min
+    try:
+        s8b._congress_dv_min = 99
+        s8b.civ_techs[:, 0].zero_(); s8b.civ_techs[:, 0, _era_mod] = True
+        s8b.turn = s8b._congress_interval
+        s8b.civ_diplo_points[:, 1] = 5
+        s8b.civ_diplo_favor[:, 0] = 65
+        s8b.civ_diplo_favor[:, 1] = 60
+        s8b.civ_diplo_favor[:, 2] = 0
+        s8b._world_congress()
+    finally:
+        s8b._congress_dv_min = _dv_min0
     assert s8b.congress_active[0, :, 0].tolist() == s8.congress_active[0, :, 0].tolist(), (
         "the twin must convene the same regular slate"
     )
@@ -1258,7 +1286,7 @@ def main() -> None:
         assert bool(s8._congress_holy_blocked().all()), "a HOLY_SITE ban refuses the worship faith-buy"
 
     # the victory check itself
-    s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s9 = build(rules, path, steps=0)
     s9.civ_diplo_points[:, 0] = s9._dvp_win - 1
     assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
     s9.civ_diplo_points[:, 0] = s9._dvp_win
