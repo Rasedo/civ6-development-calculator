@@ -24,7 +24,7 @@ side — by NAME, which is a heuristic and says so:
 
 A generic name (`cost`, `amount`, `v`) passes on both sides for the wrong
 reason; the census is a floor, not a proof. What it CAN show is a key no
-code names at all — that key is exported to nobody. `ALLOWLIST` names the
+code names at all — that key is exported to nobody. The ALLOWLIST table names the
 accepted orphans with a reason; `--strict` fails on any other.
 
 Groups are censused by SHAPE: a list of rows contributes its rows' keys
@@ -84,9 +84,9 @@ def read_sources(dirs: list[pathlib.Path], exts: tuple[str, ...]) -> str:
 
 def main(argv: list[str]) -> int:
     strict = "--strict" in argv
-    rules = json.loads(RULES.read_text(encoding="utf-8"))
+    wire = json.loads(RULES.read_text(encoding="utf-8"))
     paths: set[str] = set()
-    for g, v in rules.items():
+    for g, v in wire.items():
         if g in SKIP_GROUPS:
             continue
         if isinstance(v, (dict, list)):
@@ -110,7 +110,7 @@ def main(argv: list[str]) -> int:
             continue
         if leaf not in gpu_lits:
             no_gpu.append(p)
-    print(f"rules.json: {len(paths)} key paths over {len(rules)} groups")
+    print(f"rules.json: {len(paths)} key paths over {len(wire)} groups")
     print(f"  wire keys with NO GPU literal: {len(no_gpu)}")
     for p in no_gpu:
         print(f"    {p}")
