@@ -31,7 +31,8 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 
 | Open item | Weight | What is left |
 |---|---|---|
-| **A. Engine vs engine** | **0** | CLOSED — the gate is GREEN at 7bf089b2, 24 seeds to turn 250. A-3 ran six layers; A-4 ran three more, opened by B-67 changing WHICH TURN a district completes |
+| **A. Engine vs engine** | **1** | CLOSED — the gate is GREEN at 7bf089b2, 24 seeds to turn 250. A-3 ran six layers; A-4 ran three more, opened by B-67 changing WHICH TURN a district completes |
+| A-5 the applier's frozen ownership | 1 | `_apply_seat_unit_actions` tests a SNAPSHOT `own_tile` OR'd with live `tile_seat`; a Builder at a later rank is refused territory a settler founded this turn — the TS twin's read is unverified |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; every rhombus offered — a model choice, nothing to build until one is chosen |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' tourism and the Space Station's production rewards |
 | B-24r governor tails | 1 | the fourth card style SHIPPED and is measured; Foreign Investor and Affluence wait on C-38, four clauses on C-1/C-31 |
@@ -69,7 +70,7 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
 | C-80 constants vs the install | 3 | 67 ledger lines (docs/PROVENANCE.md) — catalog values the install contradicts, every one a FIX toward the install per the owner's 2026-09-14 ruling; two wait for the lab (purchase price, Pop Star); 58 census orphans (tools/gpu/rules_reader_census_baseline.txt) — exported keys or catalog columns no engine reads — to classify |
 | **C. Absent systems** | **24** | |
-| **OPEN, TOTAL** | **35** | |
+| **OPEN, TOTAL** | **36** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -702,6 +703,23 @@ the gate reaches is worth more here than one that re-reads the exporter.
   `movesLeft` are both compared, but once two engines put a unit on different
   tiles the row prints as GPU-ONLY / TS-ONLY and no field is compared at all.
   A keyed diff's silence about a field is not evidence that the field agrees.
+
+- **A-5. THE APPLIER'S FROZEN OWNERSHIP.** OPEN 2026-09-14, weight 1 —
+  seen by the order-applier perf agent (.claude/scratchpad/perf_orders_report.md).
+  `gpu/core/sim_orders.py:_apply_seat_unit_actions` takes `own_tile =
+  tile_seat == row` ONCE before its rank loop, while `techs` / `civics`
+  are live views; the improvement, road, rail and remove arms then test
+  `(own_tile | (tile_seat < 0))` at the unit's tile — frozen ownership OR'd
+  with the live plane in one clause. A settler founding at rank 2 widens
+  `tile_seat` but not `own_tile`, so a Builder at rank 9 is refused its
+  own new territory that turn. WHAT TO DO: print the TS applier's
+  ownership read beside it (memory same-step-both-engines) — if TS reads
+  live ownership the GPU must re-derive `own_tile` after any rank that
+  writes `tile_seat` (a founding, a capture, a culture bomb), and the
+  hunt that first pairs a founding with a Builder order in one seat turn
+  is the reachability proof; if TS also snapshots, record it as a shared
+  model line and close. Changing it moves a write, so it lands alone with
+  a hunt, never inside a perf round.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
