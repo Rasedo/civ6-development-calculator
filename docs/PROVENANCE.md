@@ -363,3 +363,37 @@ fixtures may move.
 9. CODE_OF_LAWS → CHIEFDOM has no PrereqCivic in the install (starting government) — not a defect; the tag stays as a pointer. Confirm and allowlist.
 
 Order of work: the ASK list goes to the owner first (one message); FIX lands as ONE batch with the per-line comments rewritten, a battery, and the fixture note; STYLIZED retags ride the same commit.
+
+## Wave 3, agent E report (2026-09-14) — civilizations.ts, the roster's modifier rows
+
+Complete: 93 row lists wrapped in `withSrc(rows, X_SRC)` (positional
+tables; LEGACY_RATE_ROWS by government name; `withSrc` throws on a length
+mismatch so a later row insertion cannot shift the tags), 13 exported
+scalars via srcConst, 100 catalogs in the dump. Checker on this slice:
+625 match, 0 mismatch, 1 unsourced, 48 lab/stylized/derived. The owning
+trait of all 263 modifier ids was verified against TraitModifiers; every
+`derived: 'zero — …'` claim re-derived from the trait's real modifiers.
+
+### MISMATCH — none.
+
+### UNSOURCED — 1
+- warBan.CANADA.ban (onCityState): the install has no row banning
+  DIPLOACTION_DECLARE_WAR_MINOR_CIV; its only banned-action modifiers are the
+  surprise-war pair. Left with the reason in a comment.
+
+### What the checker corrected in the draft
+- Mapuche governor XP (×2): the requirement set is on the modifier's OWNER
+  side (`OwnerRequirementSetId`) where its culture/production twins use the
+  subject side — a per-modifier fork; `mown()` helper added.
+- Two grant rows spell the install column `OwnerRequirementsetId` (lowercase
+  s) — the helper takes the column name.
+- Phoenicia's settler-only clauses are gated on the ABILITY's TypeTags class
+  (CLASS_SETTLER), not on the modifier.
+- The Saka horse archer's extra copy is a `UnitType`, no tag → derived.
+- "No surprise war on Canada" hangs on TRAIT_LEADER_MAJOR_CIV — every major
+  leader carries it.
+
+### Caveat — a kind the schema lacks
+Three facts live in the install's published TEXT, not a table: Toqui's and
+Eleanor's 9-tile loyalty radii, Qin's Ancient–Classical wonder band. Tagged
+`lab` as the least wrong; a `text` kind (with the LOC key) would be honest.
