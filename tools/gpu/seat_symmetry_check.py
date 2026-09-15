@@ -181,7 +181,7 @@ def _ts_code_lines(src: str) -> dict[int, str]:
 
 
 _TS_DECL = re.compile(
-    r"^(?:export\s+)?(?:async\s+)?(?:function\s+(?P<f>[A-Za-z_$][\w$]*)"
+    r"^(?:export\s+)?(?:async\s+)?(?:function\s*\*?\s*(?P<f>[A-Za-z_$][\w$]*)"
     r"|const\s+(?P<c>[A-Za-z_$][\w$]*)\s*[:=][^=]*?(?:=>|function))"
 )
 
@@ -763,7 +763,9 @@ def bad_gpromo_reads(channels: set[str]) -> list[tuple[str, int, str]]:
 # is a checker that cries wolf and gets switched off.
 # ---------------------------------------------------------------------------
 _TS_DECL_PATS = (
-    r"\b(?:function|const|let|var|class|interface|type|enum)\s+(\w{3,})",
+    # `function*` is a generator (`completedEffectsIn` in effects.ts); the
+    # star sits between the keyword and the name
+    r"\b(?:function\s*\*?\s*|(?:const|let|var|class|interface|type|enum)\s+)(\w{3,})",
     r"^\s+(\w{3,})\??\s*:",
     r"^\s+(?:async\s+)?(\w{3,})\s*\(",
     r"(?:const|let|var)\s*\{([^}]*)\}",
