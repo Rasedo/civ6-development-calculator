@@ -65,7 +65,7 @@ class SimPhase:
         Bn, Tn, dev2 = self.B, self.T, self.device
         if not bool(fire.any()):
             return
-        bidx = torch.arange(Bn, device=dev2)
+        bidx = self._bidx
         ctr = self.city_center[bidx, row, col].clamp(min=0)  # [B]
         # CIV6: the Encampment conducts a ranged strike of its OWN — the scan
         # measures from the district's tile, the centre's otherwise.
@@ -218,12 +218,17 @@ class SimPhase:
         for j in range(self.RC):
             if cact_any_l[j]:
                 sci_turn = torch.where(cact_all[:, j], sci_turn + total[:, j, 3], sci_turn)
+        # The SEAT halves of the per-city bodies, derived once above the walk
+        # and handed to every column: nothing in either reads a plane a column
+        # writes (see `_produce_pre` / `_loyalty_pre`).
+        prod_pre = self._produce_pre(row)
+        loy_pre = self._loyalty_pre(row)
         for j in range(self.RC):
             if not cact_any_l[j]:
                 continue
             cact = cact_all[:, j]
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j])
+            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], loy_pre)
             # The empire streams, in seatPhase's own order. ASSOCIATION
             # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
             # sciSum + (y.science + 0.7*pop) — the city term sums FIRST.
@@ -240,7 +245,7 @@ class SimPhase:
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
-            self._seat_city_produce(row, jc, cact, total[:, j, 1], sci_turn)
+            self._seat_city_produce(row, jc, cact, total[:, j, 1], sci_turn, prod_pre)
             self._seat_border_growth(row, jc, cact, cul_c)
             self._seat_city_fire_and_heal(row, jc, cact)
 
@@ -372,6 +377,38 @@ class SimPhase:
         governor and before any loyalty moves."""
         return self._governor_at(row) >= 0
 
+    def _gov_chan(self, row: int, kind: str, channel: str) -> torch.Tensor:
+        """`_governor_sum` / `_governor_mult` / `_governor_flag` for one seat
+        row, memoised under the IDENTITY of the promotion mask all three
+        derive from.
+
+        Each of the three is a pure function of `_governor_mask(row)` and a
+        catalog column, and the mask is itself memoised under an INPUT
+        FINGERPRINT — so the same mask OBJECT is by construction the same
+        answer, with no staleness left to reason about and no window in which
+        a mid-loop write could be missed (a write moves the fingerprint, the
+        mask is rebuilt, the object differs, this misses). The entry holds a
+        reference to the mask, so a freed tensor's id can never be reused
+        under a live key. The per-city walk asks four of these channels of
+        every column of every seat, and each one used to pay its own einsum or
+        product over [B, RC, NP] for an answer that moves a few times a game.
+
+        Callers never write into the returned tensor — the same object is
+        handed to every city."""
+        m = self._governor_mask(row)
+        cache = self.__dict__.get("_gov_chan_cache")
+        if cache is None:
+            cache = self._gov_chan_cache = {}
+        key = (row, kind, channel)
+        ent = cache.get(key)
+        if ent is not None and ent[0] is m:
+            return ent[1]
+        out = (self._governor_sum(row, channel) if kind == "sum"
+               else self._governor_mult(row, channel) if kind == "mult"
+               else self._governor_flag(row, channel))
+        cache[key] = (m, out)
+        return out
+
     def _granted_titles(self, row: int) -> torch.Tensor:
         """[B] long — CIV6 (Government Plaza, and every building in it):
         "Awards +1 Governor Title", over every city this seat holds. A pillaged
@@ -407,14 +444,58 @@ class SimPhase:
         slot = self.city_slot_at(row)
         return golden.unsqueeze(1) & (slot >= 0) & gov.gather(1, slot.clamp(min=0))
 
+    def _loyalty_pre(self, row: int) -> dict:
+        """The SEAT half of `_seat_city_loyalty`, built once above the per-city
+        walk.
+
+        Only planes the walk never writes are in here: the rules' own
+        constants, the alliance matrix (`_seat_war_peace_tail` ticks it after
+        the walk), the ages, the city CENTRES (a centre is written at
+        founding, and the walk founds nothing), the congress, the emergencies
+        and the Great Person per-city permanents (claimed in the research
+        tail). What the walk DOES move — every city's population, its
+        buildings, its own loyalty — is read live in the per-city body, one
+        column at a time, exactly as before."""
+        B, dev, F = self.B, self.device, torch.float64
+        nrow = self.n_majors
+        rr = self.rules.seats
+        keep = torch.ones(B, nrow, dtype=F, device=dev)
+        keep[:, row] = 0.0
+        # CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure
+        # on each other."
+        cul_ally = ((self.seat_alliance_type[:, row, :nrow] == 1)
+                    & (self.seat_ally_turns[:, row, :nrow] > 0))
+        _civ_i = self.row_civ[:, row].clamp(min=0)
+        _ph = ((self.row_civ[:, row] >= 0)
+               & self._coastal_home_loyal[_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))])
+        return {
+            "rng": int(rr.get("loyaltyRange", 9)),
+            "scale": float(rr.get("loyaltyScale", 20)),
+            "lmax": float(rr.get("loyaltyMax", 100)),
+            "keep": torch.where(cul_ally, torch.zeros_like(keep), keep),
+            "age_f": self._age_factor[self.civ_age[:, :nrow]],
+            "ctr": self.city_center[:, :nrow].reshape(B, -1).clamp(min=0),
+            "cong": self._congress_loyalty(row),
+            "emg": self._emergency_loyalty(row),
+            "gpp": self._gp_city_perm(row, "loyalty"),
+            # the Phoenician clause is keyed on the seat's CIVILIZATION; where
+            # no game plays one the per-city half is never asked
+            "phoen": _ph if bool(_ph.any()) else None,
+            # ...and whether the Audience Chamber clause exists at all is a
+            # CATALOG fact; the sum itself stays live in the walk, because a
+            # column ahead of this one may have just finished the building
+            "nogov_on": bool((self._b_loy_no_gov != 0).any()),
+            "z": torch.zeros(B, dtype=F, device=dev),
+        }
+
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
-                           tier: torch.Tensor, gov: torch.Tensor) -> torch.Tensor:
+                           tier: torch.Tensor, gov: torch.Tensor,
+                           pre: dict | None = None) -> torch.Tensor:
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
-        rr = self.rules.seats
-        rng = int(rr.get("loyaltyRange", 9))
-        scale = float(rr.get("loyaltyScale", 20))
-        lmax = float(rr.get("loyaltyMax", 100))
+        if pre is None:
+            pre = self._loyalty_pre(row)
+        rng, scale, lmax = pre["rng"], pre["scale"], pre["lmax"]
         # "somebody else holds a city": the majors that EXIST and hold one,
         # this row excluded.
         held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, n_majors]
@@ -423,22 +504,14 @@ class SimPhase:
         # ...or the Free Cities seat holds one (`cityHolders`)
         others = others | self.city_alive[:, self.FREE_ROW].any(dim=1)
         here = self.city_center[bidx, row, col].clamp(min=0)
-        loy_gov = self._ungoverned_loyalty(row)
-        ctr = self.city_center[:, :nrow].reshape(B, -1).clamp(min=0)
-        d = self.pair_dist[here.unsqueeze(1), ctr].to(F)
+        loy_gov = self._ungoverned_loyalty(row) if pre["nogov_on"] else pre["z"]
+        d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].to(F)
         w = ((rng + 1 - d).clamp(min=0)
              * self.city_pop[:, :nrow].reshape(B, -1).double()
              * self.city_alive[:, :nrow].reshape(B, -1).double())
-        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]
+        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * pre["age_f"]
         own = sub[:, row]
-        keep = torch.ones(B, nrow, dtype=F, device=dev)
-        keep[:, row] = 0.0
-        # CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure
-        # on each other."
-        cul_ally = ((self.seat_alliance_type[:, row, :nrow] == 1)
-                    & (self.seat_ally_turns[:, row, :nrow] > 0))
-        keep = torch.where(cul_ally, torch.zeros_like(keep), keep)
-        foreign = (sub * keep).sum(dim=1)
+        foreign = (sub * pre["keep"]).sum(dim=1)
         # CIV6: a Free City's citizens press on their neighbours like any other
         # city's; the Free Cities player has no age, so its factor is 1
         foreign = foreign + self._citizen_pressure_from(here, self.FREE_ROW)
@@ -447,10 +520,10 @@ class SimPhase:
         delta = (press
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
                  + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
-                 + self._congress_loyalty(row)
+                 + pre["cong"]
                  + self._standing_loyalty(row, bidx, col)
-                 + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1)
-                 + self._gp_city_perm(row, "loyalty").gather(1, col.unsqueeze(1)).squeeze(1).double()
+                 + pre["emg"].gather(1, col.unsqueeze(1)).squeeze(1)
+                 + pre["gpp"].gather(1, col.unsqueeze(1)).squeeze(1).double()
                  # CIV6 (Eleanor): "Great Works in Eleanor's cities each cause
                  # -1 Loyalty per turn in FOREIGN cities within 9 tiles"
                  + self._great_work_loyalty(row, here))
@@ -460,13 +533,11 @@ class SimPhase:
         # CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia
         # and located on the same continent as the Phoenician Capital are 100%
         # Loyal."
-        _civ_i = self.row_civ[:, row].clamp(min=0)
-        _phoen = ((self.row_civ[:, row] >= 0)
-                  & self._coastal_home_loyal[_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))]
-                  & self.coastal_land.gather(1, here.unsqueeze(1)).squeeze(1)
-                  & self._on_home_continent(row, here))
-        cap = (self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
-               | _phoen)
+        cap = self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
+        if pre["phoen"] is not None:
+            cap = cap | (pre["phoen"]
+                         & self.coastal_land.gather(1, here.unsqueeze(1)).squeeze(1)
+                         & self._on_home_continent(row, here))
         # f64 intermediates, stored at the PLANE's dtype (an f32 sim keeps an
         # f32 loyalty plane).
         self.city_loyalty[bidx, row, col] = torch.where(
@@ -610,8 +681,87 @@ class SimPhase:
                 if _w.numel():
                     self._log_pop(_w, row, col[_w], _t)
 
+    def _produce_pre(self, row: int) -> dict:
+        """The SEAT half of `_seat_city_produce`'s multiplier chain, built once
+        above the per-city loop and handed to every column.
+
+        Everything here reads the seat and nothing else: the government and
+        policy channels, the golden-age dedications, the congress treaty, and
+        the roster rows with the `_row_is` mask that decides whether each one
+        speaks at all. None of those planes is written by the city walk — the
+        roster is map generation, `_gov_mods` re-derives to the same OBJECT
+        when only `_eff_version` moved, a dedication is picked at an era
+        change and the congress resolves in its own phase — so a later column
+        reads exactly what the first one did. Everything that reads `cur`, the
+        column's plot, buildings, governor or queue stays per-city, in order.
+
+        Each `_row_is` mask used to be rebuilt, and its `.any()` synced, once
+        per ROW per CITY; each channel `.any()` once per city."""
+        pre: dict = {}
+        gm = self._gov_mods(row) if self._gov_has_effects else None
+        pre["gm"] = gm
+        pre["em"] = gm[5] if (gm is not None and self._encamp_didx >= 0) else None
+        pre["ta"] = self._golden_ded(row, self._ded_to_arms)
+        pre["ta_on"] = bool(pre["ta"].any())
+        pre["stm"] = self._golden_ded(row, self._ded_steam)
+        pre["stm_on"] = bool(pre["stm"].any())
+        pre["cp"] = self._congress_udt()[0]
+        # the two arms of `_prod_mult_rows`, split once: the building/district
+        # half above the unit half, each in the table's own order
+        brows, urows = [], []
+        for r in self._live_rows(row, self._prod_mult_rows):
+            who = self._row_is(row, r[0], r[1])
+            if not bool(who.any()):
+                continue
+            (urows if (r[4] >= 0 or r[8] >= 0 or r[7] == 2) else brows).append((r, who))
+        pre["brows"], pre["urows"] = brows, urows
+        fx = pre["fx"] = {}
+        if gm is not None:
+            _fxp = gm[12]
+            for _k in ("raiderprod", "landcost", "projprod"):
+                _v = _fxp[_k]
+                fx[_k] = _v if bool((_v != 1).any()) else None
+            pre["pb"] = _fxp["prod"]
+        else:
+            fx["raiderprod"] = fx["landcost"] = fx["projprod"] = None
+            pre["pb"] = None
+        _hk = None
+        if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
+            _hk = self._suz_effect(row, self._suz_c_proj_prod)[self._bidx]
+            if not bool(_hk.any()):
+                _hk = None
+        pre["hk"] = _hk
+        pre["plaza"] = [(_zp, self._row_is(row, _zc, _zl)[self._bidx])
+                        for _zc, _zl, _zp in self._live_rows(row, self._plaza_district_prod_rows)] \
+            if (self._plaza_district_prod_rows and self._govplaza_didx >= 0) else []
+        _hard = self._row_leads(row, "HARDRADA")
+        pre["hard"] = _hard if bool(_hard.any()) else None
+        _egypt = self._row_plays(row, "EGYPT")
+        pre["egypt"] = _egypt if bool(_egypt.any()) else None
+        we = []
+        for _fc, _fl, _fs, _fe, _fp in self._live_rows(row, self._wonder_era_prod_rows):
+            _fw = self._row_is(row, _fc, _fl)
+            if bool(_fw.any()) and _fs >= 0 and _fe >= 0:
+                we.append((_fs, _fe, _fp, _fw[self._bidx]))
+        pre["we"] = we
+        pre["river"] = [(_rk, _rp, self._row_is(row, _rc, _rl)[self._bidx])
+                        for _rc, _rl, _rk, _rp in self._live_rows(row, self._river_cross_prod_rows)] \
+            if self._river_cross_prod_rows else []
+        pre["settler_on"] = bool((self._b_settler_prod != 0).any())
+        pre["conq_on"] = bool((self._b_conquest_pct != 0).any())
+        _m2w = None
+        if self._al_m2_mil_prod_pct:
+            _m2 = self._allied_type(row, 3, 2)
+            if bool(_m2.any()):
+                _anyw = self.war.any(dim=2)                          # [B, NS]
+                _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
+        pre["m2w"] = _m2w
+        pre["warbuf"] = self._war_buff_prod_pct(row) if self._war_buff_rows else None
+        return pre
+
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
-                           prod: torch.Tensor, sci_turn: torch.Tensor | None = None) -> None:
+                           prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
+                           pre: dict | None = None) -> None:
         """The queue head's turn — the production add, the banked chop, the
         completion and every completion's payout. ONE body, every seat row, at
         the per-city seatPhase position (after growth, before border growth).
@@ -619,8 +769,13 @@ class SimPhase:
         Only the HEAD accrues — a deeper entry keeps whatever hammers it
         already holds and waits — and a completion SHIFTS the queue, so CIV6's
         overflow carries onto the item behind it. Nothing but an empty queue
-        banks: with somewhere item-shaped to put them, the hammers go there."""
+        banks: with somewhere item-shaped to put them, the hammers go there.
+
+        `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
+        a caller with one city (every direct test) may leave it out."""
         bidx = self._bidx
+        if pre is None:
+            pre = self._produce_pre(row)
         cur = self.city_current[bidx, row, col, 0].clone()
         # A FORMATION head is the unit's own column to every multiplier and to
         # the completion below — TS's `kind === 'unit'` tests cannot tell them
@@ -636,8 +791,8 @@ class SimPhase:
         # a military unit under To Arms AND a production card takes
         # `production * (a * b)`, never `(production * a) * b`.
         _emall = torch.ones_like(prod)
-        if self._gov_has_effects and self._encamp_didx >= 0:
-            em = self._gov_mods(row)[5]
+        em = pre["em"]
+        if em is not None:
             _bd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
             enc_i = (cur >= 0) & (cur < self.NB) & ((_bd == self._encamp_didx) | (_bd == self._harbor_didx))
             if self._encamp_si >= 0:
@@ -649,13 +804,13 @@ class SimPhase:
         # units." (Heartbeat of Steam, Golden face): "+10% Production toward
         # Industrial era and later wonders." Item classes are disjoint, so the
         # multiplier order is association-free.
-        ta = self._golden_ded(row, self._ded_to_arms)
-        if bool(ta.any()):
+        ta = pre["ta"]
+        if pre["ta_on"]:
             mil_i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
                 & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
             _emall = torch.where(ta & mil_i, _emall * self._to_arms_prod, _emall)
-        stm = self._golden_ded(row, self._ded_steam)
-        if bool(stm.any()):
+        stm = pre["stm"]
+        if pre["stm_on"]:
             nw = self._wonder_era.shape[0]
             wid = (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)
             won_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) \
@@ -664,7 +819,7 @@ class SimPhase:
         # CIV6 (Urban Development Treaty, outcome A): "+100% Production
         # towards buildings in this district." The x2 is exact in f64, so the
         # multiplier order against VETERANCY cannot re-associate anything.
-        _cp, _cb = self._congress_udt()
+        _cp = pre["cp"]
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
             & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
         _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
@@ -675,14 +830,11 @@ class SimPhase:
         # CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
         # the seat's home continent — its ORIGINAL capital's landmass
         # at THIS call's city column — `cur` is [B], one city per call, so a
-        # full-width read would broadcast against the wrong axis
-        _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._live_rows(row, self._prod_mult_rows):
-            if _rp >= 0 or _ru >= 0 or _rev == 2:
-                continue
-            _who = self._row_is(row, _rc, _rl)
-            if not bool(_who.any()):
-                continue
+        # full-width read would broadcast against the wrong axis. Nothing but
+        # such a row reads it, so it is derived on FIRST DEMAND rather than
+        # for every city of every seat.
+        _off_home = None
+        for (_rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho), _who in pre["brows"]:
             _is_b = (cur >= 0) & (cur < self.NB)
             if _rb >= 0:
                 _hit = cur == _rb
@@ -701,82 +853,83 @@ class SimPhase:
             else:
                 _hit = _is_b
             if _rho:
+                if _off_home is None:
+                    _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
                 _hit = _hit & _off_home
             _emall = torch.where(_hit & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
-        # Project."
+        # Project." The queue head is ONE item per game, so the projects the
+        # batch is actually building are read off it in one sync instead of
+        # asking every catalog row whether it is the one — a row nothing is
+        # building contributed no factor before and appears in no list now.
         if self._proj_rows:
             nP = len(self._proj_rows)
             pidx = cur - self.PROJECT_BASE
-            for _p in range(nP):
-                on = (pidx == _p)
-                if bool(on.any()):
+            _pon = (pidx >= 0) & (pidx < nP)
+            if bool(_pon.any()):
+                for _p in sorted({int(x) for x in pidx[_pon].tolist()}):
+                    on = (pidx == _p)
                     _emall = torch.where(on, _emall * self._congress_project_mult(_p), _emall)
         _is_unit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         _ut = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
         if self._gov_has_effects:
-            _fxp = self._gov_mods(row)[12]
+            _fx = pre["fx"]
             # CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
             # (Flower Power): land units other than Rock Bands cost double,
             # which this model pays as a slower fill rather than a moved cost.
-            _rp = _fxp["raiderprod"].to(_emall.dtype)
-            if bool((_rp != 1).any()):
+            # A channel standing at its identity 1 is carried as None by the
+            # prelude, and a `where` it would have run is a no-op anyway.
+            if _fx["raiderprod"] is not None:
+                _rp = _fx["raiderprod"].to(_emall.dtype)
                 _emall = torch.where(_is_unit & self._type_raider[_ut],
                                      _emall * _rp, _emall)
-            _lc = _fxp["landcost"].to(_emall.dtype)
-            if bool((_lc != 1).any()):
+            if _fx["landcost"] is not None:
+                _lc = _fx["landcost"].to(_emall.dtype)
                 _land = _is_unit & ~self.unit_naval[_ut] & (self._type_air[_ut] == 0) \
                     & (_ut != self._band_idx)
                 _emall = torch.where(_land, _emall / _lc, _emall)
             # CIV6 (Automated Workforce): "+20% Production towards city
             # projects."
-            _pp = _fxp["projprod"].to(_emall.dtype)
-            if bool((_pp != 1).any()) and self._proj_rows:
+            if _fx["projprod"] is not None and self._proj_rows:
+                _pp = _fx["projprod"].to(_emall.dtype)
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pp, _emall)
         # CIV6 (Zoning Commissioner): "+20% Production towards constructing
         # Districts in the city"; (Grants): "+30% Production towards City
         # Projects." The governor's are per CITY, not per seat.
         if self.n_governors and row < self.n_majors:
-            _dm = self._governor_mult(row, "districtProdMult")[bidx, col].to(_emall.dtype)
+            _dm = self._gov_chan(row, "mult", "districtProdMult")[bidx, col].to(_emall.dtype)
             if bool((_dm != 1).any()):
                 _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
                 _emall = torch.where(_dist_i, _emall * _dm, _emall)
-            _pm = self._governor_mult(row, "projectProdMult")[bidx, col].to(_emall.dtype)
+            _pm = self._gov_chan(row, "mult", "projectProdMult")[bidx, col].to(_emall.dtype)
 
             if bool((_pm != 1).any()) and self._proj_rows:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pm, _emall)
         # CIV6 (Hong Kong): "+20% Production towards city projects" — last of
         # the three project factors, the order TS composes them in.
-        if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
-            _hk = self._suz_effect(row, self._suz_c_proj_prod)[bidx]
-            if bool(_hk.any()):
-                _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-                _emall = torch.where(_proj_i & _hk,
-                                     _emall * (1.0 + self._suz_proj_pct / 100.0), _emall)
+        _hk = pre["hk"]
+        if _hk is not None:
+            _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
+            _emall = torch.where(_proj_i & _hk,
+                                 _emall * (1.0 + self._suz_proj_pct / 100.0), _emall)
         # CIV6 (Founder of Carthage): "+50% Production toward districts in the
         # city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
-        if self._plaza_district_prod_rows and self._govplaza_didx >= 0:
+        if pre["plaza"]:
             _pd_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _pz = self.city_dist_tile[bidx, row, col, self._govplaza_didx]
             _pz_ok = (_pz >= 0) & self.district_complete[bidx, _pz.clamp(min=0)]
-            for _zc, _zl, _zp in self._live_rows(row, self._plaza_district_prod_rows):
-                _zw = self._row_is(row, _zc, _zl)[bidx]
+            for _zp, _zw in pre["plaza"]:
                 _emall = torch.where(_pd_i & _pz_ok & _zw, _emall * (1.0 + _zp / 100.0), _emall)
         # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         # melee units."
-        _hard = self._row_leads(row, "HARDRADA")
-        if bool(_hard.any()):
+        _hard = pre["hard"]
+        if _hard is not None:
             _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
         # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         # a promotion class, ONE unit type (EFFECT_ADJUST_UNIT_PRODUCTION), or every unit
-        for _rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho in self._live_rows(row, self._prod_mult_rows):
-            if _rp < 0 and _ru < 0 and _rev != 2:
-                continue
-            _who = self._row_is(row, _rc, _rl)
-            if not bool(_who.any()):
-                continue
+        for (_rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho), _who in pre["urows"]:
             if _rp >= 0:
                 _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _rp)
             elif _ru >= 0:
@@ -784,12 +937,14 @@ class SimPhase:
             else:
                 _cls_i = _is_unit
             if _rho:
+                if _off_home is None:
+                    _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
                 _cls_i = _cls_i & _off_home
             _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
-        _egypt = self._row_plays(row, "EGYPT")
-        if bool(_egypt.any()):
+        _egypt = pre["egypt"]
+        if _egypt is not None:
             _nw = self._wonder_era.shape[0]
             _d_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _w_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
@@ -802,20 +957,17 @@ class SimPhase:
         # CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         # toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         # BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
-        for _fc, _fl, _fs, _fe, _fp in self._live_rows(row, self._wonder_era_prod_rows):
-            _fw = self._row_is(row, _fc, _fl)
-            if not bool(_fw.any()) or _fs < 0 or _fe < 0:
-                continue
+        for _fs, _fe, _fp, _fw in pre["we"]:
             _nw = self._wonder_era.shape[0]
             _wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(_nw - 1, 0))
             _isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
             _band = _isw & (self._wonder_era[_wid] >= _fs) & (self._wonder_era[_wid] <= _fe)
-            _emall = torch.where(_band & _fw[bidx], _emall * (1.0 + _fp / 100.0), _emall)
+            _emall = torch.where(_band & _fw, _emall * (1.0 + _fp / 100.0), _emall)
         # CIV6 (Pearl of the Danube): "+50% Production to Districts and
         # Buildings constructed ACROSS A RIVER from a City Center." A building
         # is built in its district, so its tile is that district's; a City
         # Center building never crosses a river from the centre it stands on.
-        if self._river_cross_prod_rows:
+        if pre["river"]:
             _hd = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _hb = (cur >= 0) & (cur < self.NB)
             _hbd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
@@ -828,8 +980,7 @@ class SimPhase:
             #  answers 0 or 1 as a LONG, not a bool
             _hcross = ((_hat >= 0) & (_hctr >= 0)
                        & (self._river_cross(_hctr.clamp(min=0), _hat.clamp(min=0)) != 0))
-            for _rc, _rl, _rk, _rp in self._live_rows(row, self._river_cross_prod_rows):
-                _rw = self._row_is(row, _rc, _rl)[bidx]
+            for _rk, _rp, _rw in pre["river"]:
                 _kind = _hd if _rk == 1 else (_hb & (_hbd >= 0))
                 _emall = torch.where(_hcross & _kind & _rw, _emall * (1.0 + _rp / 100.0), _emall)
         # The slotted production cards: CIV6 stacks production modifiers
@@ -837,7 +988,7 @@ class SimPhase:
         # percentages summed rather than compounded.
         _add = torch.zeros_like(prod)
         if self._gov_has_effects:
-            _pb = self._gov_mods(row)[12]["prod"]
+            _pb = pre["pb"]
             if _pb:
                 for _pact, _isw, _cmask, _eramax, _pct in _pb:
                     if _isw == 1:
@@ -870,28 +1021,27 @@ class SimPhase:
         # this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
         # bonus Production in all Cities for 5 turns". Percentages both, so
         # they join the SAME additive sum rather than compounding on it.
-        if bool((self._b_settler_prod != 0).any()):
+        if pre["settler_on"]:
             _stand_b = self.city_bldg[bidx, row, col] & ~self._bldg_dark(self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
             _sp = (_stand_b.double() * self._b_settler_prod.unsqueeze(0)).sum(dim=1) / 100
             _add = _add + torch.where(cur == self.SETTLER, _sp, torch.zeros_like(_sp)).to(_add.dtype)
-        if bool((self._b_conquest_pct != 0).any()):
+        if pre["conq_on"]:
+            # the seat's standing buildings, LIVE: a column earlier in this
+            # walk may have finished one
             _cqp = self._seat_building_sum(row, self._b_conquest_pct) / 100
             _add = _add + torch.where(self.conquest_turns[:, row] > 0,
                                       _cqp, torch.zeros_like(_cqp)).to(_add.dtype)
         # CIV6 (Military alliance 2): "+15% Production toward military units
         # when you or your ally are at war."
-        if self._al_m2_mil_prod_pct:
-            _m2 = self._allied_type(row, 3, 2)
-            if bool(_m2.any()):
-                _anyw = self.war.any(dim=2)                          # [B, NS]
-                _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
-                _m2i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
-                    & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
-                _add = _add + (_m2w & _m2i).to(_add.dtype) * (self._al_m2_mil_prod_pct / 100)
+        _m2w = pre["m2w"]
+        if _m2w is not None:
+            _m2i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
+                & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+            _add = _add + (_m2w & _m2i).to(_add.dtype) * (self._al_m2_mil_prod_pct / 100)
         # CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
         # a percent on every item for the turns after the declaration
-        if self._war_buff_rows:
-            _add = _add + (self._war_buff_prod_pct(row).to(_add.dtype) / 100)[bidx]
+        if pre["warbuf"] is not None:
+            _add = _add + (pre["warbuf"].to(_add.dtype) / 100)[bidx]
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
         _emall = _emall * (1 + _add)
@@ -943,7 +1093,7 @@ class SimPhase:
             pop = self.city_pop[bidx, row, col]
             # CIV6 (Provision): "Settlers trained in the city do not consume a
             # Population."
-            _free = self._governor_flag(row, "settlerFreePop")[bidx, col] if self.n_governors \
+            _free = self._gov_chan(row, "flag", "settlerFreePop")[bidx, col] if self.n_governors \
                 else torch.zeros_like(made_s)
             self.city_pop[bidx, row, col] = torch.where(made_s & ~_free, (pop - 1).clamp(min=1), pop)
             _sw = made_s.nonzero(as_tuple=True)[0]
@@ -959,7 +1109,7 @@ class SimPhase:
                 self.city_bldg[bidx, row, col, :] & ~self._bldg_dark(
                     self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col]),
                 ui, row, col)
-            fp = (self._governor_flag(row, "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)
+            fp = (self._gov_chan(row, "flag", "freePromoOnTrain").gather(1, col.unsqueeze(1)).squeeze(1)
                   if self.n_governors else torch.zeros_like(made_u))
             # CIV6 (Military alliance 3): "Units start with a free Promotion."
             fp = fp | self._allied_type(row, 3, 3).any(dim=1)
@@ -1248,8 +1398,8 @@ class SimPhase:
         district BOUGHT pays the governor exactly as one BUILT does."""
         if not self.n_governors or not bool(mask.any()):
             return
-        bidx = torch.arange(self.B, device=self.device)
-        _pct = self._governor_sum(row, "faithOnBuildPct")[bidx, col]
+        bidx = self._bidx
+        _pct = self._gov_chan(row, "sum", "faithOnBuildPct")[bidx, col]
         _pay = torch.floor(cost.double() * _pct / 100.0) * mask.double()
         self.civ_faith[:, row] = self.civ_faith[:, row] + torch.zeros_like(
             self.civ_faith[:, row]).index_add_(0, bidx, _pay.to(self.civ_faith.dtype))
@@ -1263,7 +1413,7 @@ class SimPhase:
         exactly as a district BUILT does; `dtile` [B] names the plot and
         `col` [B] the city, both read only where `made_d` is set.
         """
-        bidx = torch.arange(self.B, device=self.device)
+        bidx = self._bidx
         dr = made_d.nonzero(as_tuple=True)[0]
         dt = dtile[dr].clamp(min=0)
         self.district_complete[dr, dt] = True
@@ -1370,8 +1520,7 @@ class SimPhase:
         defenses are NOT on this gate: "once damaged, the outer defenses of a
         City Center or defensible district will not regenerate on their own",
         and come back only through the repair project."""
-        Bn, dev2 = self.B, self.device
-        bidx = torch.arange(Bn, device=dev2)
+        bidx = self._bidx
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
         ctr = self.city_center[bidx, row, col].clamp(min=0)
         nbh = self.neigh[ctr]
@@ -1383,16 +1532,18 @@ class SimPhase:
         _apc = self.rules_dev.u_promo_class[_at]
         _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege)) & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
         held = self._seats_hostile(int(self._ROW_SEAT[row]), _as) & (_am >= 0) & ~self._type_zoc_none[_at] & ~_no_ex
-        passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
+        # the OR runs over the six neighbours, not over the whole map: gather
+        # distributes over `|` exactly, and this is a per-city call
+        passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
         besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
         # CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
         # may close and the heal still runs. A governor seats in a major's city.
         if self.n_governors and row < self.n_majors:
-            besieged = besieged & ~self._governor_flag(row, "noSiege")[bidx, col]
+            besieged = besieged & ~self._gov_chan(row, "flag", "noSiege")[bidx, col]
         # CIV6: a City Center caught in a blast has its HP reduced to 0 and
-        # "Healing is impossible ... while the fallout lasts".
-        _fo = self._fallout()
-        ok = act & ~besieged & ~_fo[bidx, ctr]
+        # "Healing is impossible ... while the fallout lasts". `_fallout()` is
+        # the whole map; this asks about ONE tile per game.
+        ok = act & ~besieged & ~(self.tile_fallout[bidx, ctr] > 0)
         hp = self.city_hp[bidx, row, col]
         self.city_hp[bidx, row, col] = torch.where(
             ok, (hp + heal).clamp(max=int(self.rules.combat.get("cityMaxHp", 200))), hp)
@@ -1411,17 +1562,20 @@ class SimPhase:
         Real Civ 6 fires and heals a city in its OWNER's turn, once — and
         CIV6 (Embrasure) buys the city one more shot from each district that
         has one."""
-        Bn, dev2 = self.B, self.device
-        bidx = torch.arange(Bn, device=dev2)
+        bidx = self._bidx
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
         # CIV6: walls give a city its ranged strike, and once the Outer Defense
         # "has been completely destroyed, its ranged strike again becomes
         # unavailable". "Building any level of Walls in the city will supply
         # both" the centre and its Encampment — each with its OWN pool — so
         # the district strikes only while ITS defenses are still up.
-        walled = act & (self._walls_max_at(torch.full_like(col, row), col) > 0)
+        # The pool size is read ONCE: a city strike damages units and never
+        # captures, so nothing between here and the Encampment's own gate
+        # below can move this city's walls.
+        wmax = self._walls_max_at(torch.full_like(col, row), col)
+        walled = act & (wmax > 0)
         perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
-        extra = (self._governor_sum(row, "extraStrikes")[bidx, col].long()
+        extra = (self._gov_chan(row, "sum", "extraStrikes")[bidx, col].long()
                  if self.n_governors else torch.zeros_like(col))
         n_strike = 1 + int(extra.max())
         for _sk in range(n_strike):
@@ -1434,14 +1588,12 @@ class SimPhase:
             e0 = enc_reg.clamp(min=0)
             enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
             _eperim = walled & (torch.minimum(
-                self.encamp_outer_hp[bidx, e0],
-                self._walls_max_at(torch.full_like(col, row), col)) > 0)
+                self.encamp_outer_hp[bidx, e0], wmax) > 0)
             _efire = _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0)
             for _sk in range(n_strike):
                 self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk", origin=e0)
         ok = self._city_heal(row, col, act)
         if e0 is not None:
-            _fo = self._fallout()
             # "This is an automatic action, which happens if its tile is not
             # occupied" — an enemy standing on the district holds it silent.
             # `unitsAt(...).some(hostile)` on TS: every plane, the support one too
@@ -1450,8 +1602,10 @@ class SimPhase:
             _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
             _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
             occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)
+            # the fallout question is about the district's OWN tile, so it is
+            # asked there rather than over the whole map (`_fallout()`)
             rep = (ok & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0]
-                   & ~self.district_pillaged[bidx, e0] & ~_fo[bidx, e0])
+                   & ~self.district_pillaged[bidx, e0] & ~(self.tile_fallout[bidx, e0] > 0))
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 
@@ -1661,7 +1815,7 @@ class SimPhase:
             gov_tile=self._governor_tiles(row, gov),
             wonder_pct=self._wonder_tourism_pct(row),
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
-            gw_mult=js_round(self._governor_mult(row, "gwTourismMult")).long() if self.n_governors else None,
+            gw_mult=js_round(self._gov_chan(row, "mult", "gwTourismMult")).long() if self.n_governors else None,
         )
         _rel_t = self._tourism_religious_of(row)
         self.civ_tour_rate[:, row] = torch.where(active, (_nat_gen + _rel_t).long(), self.civ_tour_rate[:, row])
@@ -1805,7 +1959,7 @@ class SimPhase:
                 c2 = (hit & self.city_alive[:, row]).double() * float(self._al_c2_gpp)
         # CIV6 (Grants): "+100% Great People points generated per turn in
         # the city" — a PER-CITY factor over everything the city generates.
-        gm = (self._governor_mult(row, "gppMult") if self.n_governors
+        gm = (self._gov_chan(row, "mult", "gppMult") if self.n_governors
               else torch.ones(B, self.RC, dtype=torch.float64, device=dev))
         for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
