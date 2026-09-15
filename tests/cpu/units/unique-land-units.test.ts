@@ -18,7 +18,7 @@ import type { GameState, Unit } from '../../../cpu/core/types';
 
 /** id -> [civ, replaces|null, cost, moves, combat] straight off Units.xml. */
 const ROWS: readonly (readonly [string, string, string | null, number, number, number])[] = [
-  ['MAMLUK', 'ARABIA', 'KNIGHT', 180, 4, 50],
+  ['MAMLUK', 'ARABIA', 'KNIGHT', 220, 4, 50],
   ['MOUNTIE', 'CANADA', null, 290, 5, 62],
   ['CROUCHING_TIGER', 'CHINA', null, 140, 2, 30],
   ['OKIHTCITAW', 'CREE', 'SCOUT', 40, 3, 20],

@@ -396,7 +396,7 @@ const PROMO_SRC: Readonly<Record<string, SrcMap>> = {
   ARMOR_PIERCING: {
     cls: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_ARMOR_PIERCING', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
     tier: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_ARMOR_PIERCING', 'Level'),
-    requires: { derived: 'the UnitPromotionPrereqs rows of PROMOTION_ARMOR_PIERCING, read as an OR-list', inputs: [xml('UnitPromotionPrereqs', 'UnitPromotion=PROMOTION_ARMOR_PIERCING&PrereqUnitPromotion=PROMOTION_MARAUDING', 'PrereqUnitPromotion', { expect: 'PROMOTION_MARAUDING' }), xml('UnitPromotionPrereqs', 'UnitPromotion=PROMOTION_ARMOR_PIERCING&PrereqUnitPromotion=PROMOTION_ROUT', 'PrereqUnitPromotion', { expect: 'PROMOTION_ROUT' })] },
+    requires: { derived: 'the UnitPromotionPrereqs rows of PROMOTION_ARMOR_PIERCING, read as an OR-list', inputs: [xml('UnitPromotionPrereqs', 'UnitPromotion=PROMOTION_ARMOR_PIERCING&PrereqUnitPromotion=PROMOTION_MARAUDING', 'PrereqUnitPromotion', { expect: 'PROMOTION_MARAUDING' })] },
     'effects.0.v': xml('ModifierArguments', 'ModifierId=ARMOR_PIERCING_BONUS_VS_HEAVY_CAVALRY&Name=Amount', 'Value'),
   },
   REACTIVE_ARMOR: {
@@ -1046,7 +1046,9 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('BARDING', 'HEAVY_CAV', 1, [], cs('CS_DEF_RANGED', 7)),
   P('MARAUDING', 'HEAVY_CAV', 2, ['CHARGE', 'ROUT'], cs('CS_VS_IN_DISTRICT', 7)),
   P('ROUT', 'HEAVY_CAV', 2, ['BARDING', 'MARAUDING'], cs('CS_VS_DAMAGED', 5)),
-  P('ARMOR_PIERCING', 'HEAVY_CAV', 3, ['MARAUDING', 'ROUT'],
+  // UnitPromotionPrereqs writes PROMOTION_ARMOR_PIERCING ONE prereq row,
+  // PROMOTION_MARAUDING; there is no ROUT row.
+  P('ARMOR_PIERCING', 'HEAVY_CAV', 3, ['MARAUDING'],
     cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.HEAVY_CAV)),
   P('REACTIVE_ARMOR', 'HEAVY_CAV', 3, ['ROUT'],
     cs('CS_DEF_VS_CLASS', 7, CLASS_BIT.HEAVY_CAV | CLASS_BIT.ANTICAV)),
@@ -1093,7 +1095,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('MARTYR', 'APOSTLE', 0, [], { kind: 'MARTYR' }),
   P('ORATOR', 'APOSTLE', 0, [], cs('SPREAD_CHARGES', 2)),
   P('PILGRIM', 'APOSTLE', 0, [], cs('PILGRIM', 3)),
-  P('PROSELYTIZER', 'APOSTLE', 0, [], cs('PROSELYTIZER', 75)),
+  // ModifierArguments[APOSTLE_EVICT_ALL].Amount 50.
+  P('PROSELYTIZER', 'APOSTLE', 0, [], cs('PROSELYTIZER', 50)),
   P('TRANSLATOR', 'APOSTLE', 0, [], cs('TRANSLATOR', 3)),
 
   // ---- WARRIOR MONK ---------------------------------------------------

@@ -48,7 +48,7 @@ describe('wonder effects, sourced', () => {
     expect(BUILT_WONDERS.HERMITAGE.effects?.gpPoints?.ARTIST).toBe(3);
     expect(BUILT_WONDERS.BOLSHOI_THEATRE.effects?.gpPoints).toEqual({ WRITER: 2, MUSICIAN: 2 });
     expect(BUILT_WONDERS.OXFORD_UNIVERSITY.effects?.cityYieldMult?.science).toBe(1.2);
-    expect(BUILT_WONDERS.COLOSSEUM.effects?.regionalAmenities).toBe(3);
+    expect(BUILT_WONDERS.COLOSSEUM.effects?.regionalAmenities).toBe(2);
     expect(BUILT_WONDERS.POTALA_PALACE.cityYields).toEqual({ culture: 2, faith: 3 });
     expect(BUILT_WONDERS.UNIVERSITY_OF_SANKORE.cityYields?.science).toBe(3);
   });

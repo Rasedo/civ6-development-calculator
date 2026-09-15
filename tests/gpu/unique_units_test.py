@@ -26,7 +26,7 @@ from warmup import settle_all  # noqa: E402
 B0 = 0
 
 ROWS = {
-    "MAMLUK": ("ARABIA", "KNIGHT", 180, 4, 50),
+    "MAMLUK": ("ARABIA", "KNIGHT", 220, 4, 50),
     "MOUNTIE": ("CANADA", None, 290, 5, 62),
     "CROUCHING_TIGER": ("CHINA", None, 140, 2, 30),
     "OKIHTCITAW": ("CREE", "SCOUT", 40, 3, 20),
@@ -273,7 +273,10 @@ def main() -> int:
     assert 0 < int(_gb["cost"]) < int(_bank["cost"]), "the Grand Bazaar is not cheaper than the Bank"
     assert int(_gb["amenityPerLuxuryType"]) == 1 and int(_gb["strategicPerType"]) == 1
     _ef = _bvar[("FACTORY", "JAPAN")]
-    assert int(_ef["hasYields"]) == 1 and _ef["yields"][1] == 4, "the Electronics Factory pays no 4 Production"
+    # CIV6 (Building_YieldChanges): the Electronics Factory's base row is the
+    # Factory's 3; its extra is the POWERED half, BonusWithPower 5 vs the Factory's 3.
+    assert int(_ef["hasYields"]) == 1 and _ef["yields"][1] == 3, "the Electronics Factory pays no 3 Production"
+    assert int(_ef["hasPoweredYields"]) == 1 and _ef["poweredYields"][1] == 5, "the Electronics Factory pays no 5 Production when powered"
     assert int(_ef["cost"]) == -1, "the Electronics Factory names a price of its own"
     _tb = _bvar[("ZOO", "HUNGARY")]
     assert int(_tb["amenities"]) == 2 and int(_tb["amenitiesWithFeature"][1]) == 2

@@ -211,7 +211,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     placement: {},
     description: 'Founded with the city.',
     src: {
-      cost: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Cost'),
+      cost: { stylized: 'the City Center is FOUNDED, never produced: no production column ever offers it, so the install Cost 54 has nothing to charge' },
       countsTowardLimit: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'RequiresPopulation'),
       housing: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Maintenance'),
@@ -365,7 +365,9 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     civVariants: [{
       civ: 'GREECE', name: 'Acropolis', cost: 27, housing: 0, amenities: 0,
       adjacency: [
-        { source: 'BUILT_WONDER', amount: 1 },
+        // Adjacency_YieldChanges[Wonder_Culture].YieldChange 2 — the same row
+        // the plain Theater Square reads.
+        { source: 'BUILT_WONDER', amount: 2 },
         { source: 'DISTRICT', amount: 1 },
         { source: 'CITY_CENTER', amount: 1 },
         { source: 'GOV_PLAZA', amount: 1 },
@@ -786,7 +788,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     allowMultiple: true,
     adjacency: [],
-    housing: 0, // appeal-based (2-6), computed from the tile it sits on
+    // appeal-based (2-6), computed from the tile it sits on: `cityHousing`
+    // takes the NEIGHBORHOOD arm and never reads this column at all, and the
+    // Average band it lands in pays 4 — the install's Districts.Housing.
+    housing: 0,
     maintenance: 0,
     appealAdjacent: 0,
     placement: {},
@@ -794,7 +799,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     src: {
       cost: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Cost'),
       countsTowardLimit: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'RequiresPopulation'),
-      housing: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Housing'),
+      housing: { stylized: 'the appeal band pays it — cpu/core/city.ts:382 takes the NEIGHBORHOOD arm and never reads this column; its Average band pays 6-2 = 4, the install Districts.Housing' },
       maintenance: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Appeal'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
@@ -852,7 +857,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     adjacency: [],
     housing: 0,
-    maintenance: 1,
+    maintenance: 0,  // Districts.xml writes the Spaceport no Maintenance (schema default 0)
     appealAdjacent: -1,
     placement: { flatLand: true },
     description: 'Launch site for the Science Victory projects. Flat land only.',
@@ -992,7 +997,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     cost: 54,
     countsTowardLimit: true,
     adjacency: [],
-    housing: 0, // appeal-based, like the Neighborhood's
+    // appeal-based, like the Neighborhood's: `cityHousing` takes the
+    // `appealHousing` arm and never reads this column; PRESERVE_APPEAL_HOUSING's
+    // Average band pays 1, the install's Districts.Housing.
+    housing: 0,
     maintenance: 0,
     appealAdjacent: 1,
     appealHousing: true,
@@ -1002,7 +1010,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     src: {
       cost: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Cost'),
       countsTowardLimit: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'RequiresPopulation'),
-      housing: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Housing'),
+      housing: { stylized: 'the appeal band pays it — cpu/core/city.ts:384 takes the appealHousing arm and never reads this column; PRESERVE_APPEAL_HOUSING[2] (Average) is 1, the install Districts.Housing' },
       maintenance: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Appeal'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'PlunderType', { expect: 'PLUNDER_GOLD' }),

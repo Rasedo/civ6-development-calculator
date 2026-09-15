@@ -78,10 +78,10 @@ describe('effectiveBuilding merges a variant over the row it replaces', () => {
     expect(effectiveBuilding('ARABIA', 'UNIVERSITY')!.cost).toBe(BUILDINGS.UNIVERSITY.cost);
   });
 
-  it('prices the three cheaper rows off the install ratio', () => {
-    expect(effectiveBuilding('OTTOMAN', 'BANK')!.cost).toBe(sp(220));      // 290 x 220/290
-    expect(effectiveBuilding('HUNGARY', 'ZOO')!.cost).toBe(sp(291));       // 360 x 360/445
-    expect(effectiveBuilding('GEORGIA', 'RENAISSANCE_WALLS')!.cost).toBe(sp(256)); // 300 x 260/305
+  it("prices a variant off its OWN install row's Cost", () => {
+    expect(effectiveBuilding('OTTOMAN', 'BANK')!.cost).toBe(sp(220));      // BUILDING_GRAND_BAZAAR
+    expect(effectiveBuilding('HUNGARY', 'ZOO')!.cost).toBe(sp(360));       // BUILDING_THERMAL_BATH
+    expect(effectiveBuilding('GEORGIA', 'RENAISSANCE_WALLS')!.cost).toBe(sp(260)); // BUILDING_TSIKHE
     // and leaves the five that cost what they replace alone
     expect(effectiveBuilding('AMERICA', 'BROADCAST_CENTER')!.cost).toBe(BUILDINGS.BROADCAST_CENTER.cost);
     expect(effectiveBuilding('MONGOLIA', 'STABLE')!.cost).toBe(BUILDINGS.STABLE.cost);
@@ -101,9 +101,14 @@ describe('effectiveBuilding merges a variant over the row it replaces', () => {
     expect(buildingMaintenance('AMPHITHEATER', 'ROME')).toBe(1);
   });
 
-  it('pays the Electronics Factory a fourth Production, regionally', () => {
+  it('pays the Electronics Factory a fifth Production when POWERED, regionally', () => {
+    // Building_YieldChanges pays it the Factory's own 3;
+    // Building_YieldChangesBonusWithPower pays 5 where the Factory's pays 3.
     const v = effectiveBuilding('JAPAN', 'FACTORY')!;
-    expect(v.yields).toEqual({ production: 4 });
+    expect(v.yields).toEqual({ production: 3 });
+    expect(v.yields).toEqual(BUILDINGS.FACTORY.yields);
+    expect(v.poweredYields).toEqual({ production: 5 });
+    expect(BUILDINGS.FACTORY.poweredYields).toEqual({ production: 3 });
     expect(v.regional).toBe(true);
     expect(v.power).toBe(BUILDINGS.FACTORY.power);
   });

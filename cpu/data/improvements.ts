@@ -299,12 +299,13 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     name: 'Lumber Mill',
     code: 'Lu',
     plunder: { kind: 'gold', amount: 50 },
-    yields: { production: 1 },
-    // CIV6 (Lumber Mill): "+1 Production. +1 Production if adjacent to River."
+    // Improvement_YieldChanges (Expansion2_Improvements.xml): YIELD_PRODUCTION 2.
+    yields: { production: 2 },
+    // CIV6 (Lumber Mill): "+1 Production if adjacent to River."
     riverYields: { production: 1 },
     housing: 0,
     resourceOnly: false,
-    description: 'Woods. +1 production more on a river.',
+    description: 'Woods. +2 production, +1 more on a river.',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'PlunderAmount'),
@@ -754,12 +755,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     adjacency: [{ builtWonder: true, per: 1, yields: { faith: 2 } }],
     // CIV6 (SPHINX_FLOODPLAINS_CULTURE): "+1 Culture if built on Floodplains"
     featureYields: { features: ['FLOODPLAINS'], yields: { culture: 1 } },
-    // CIV6 (Improvements.xml, `Appeal="1"`): ONE, not the two an earlier
-    // round took off the civilopedia — the XML outranks the pedia.
-    appealAdjacent: 1,
+    // Improvements.xml (Expansion2_Improvements.xml): `Appeal="2"`. An earlier
+    // round wrote 1 here and a comment claiming the XML said so; it does not.
+    appealAdjacent: 2,
     tourismFrom: 'culture',
     tourismTech: 'FLIGHT',
-    description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +1 appeal around. Not beside another Sphinx.',
+    description: '+1 faith +1 culture, +2 faith beside a wonder, +1 culture on floodplains, +2 appeal around. Not beside another Sphinx.',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_SPHINX', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_SPHINX', 'PlunderAmount'),

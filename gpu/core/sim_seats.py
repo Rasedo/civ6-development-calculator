@@ -10464,7 +10464,7 @@ class SimSeats:
         """DESIGNATE a National Park — `naturalistPark`'s twin. The FIRST
         legal rhombus in the anchor's neighbour order (by TILE index, which is
         the order TS sorts them in) is taken, its four tiles join the park,
-        and the Naturalist is consumed."""
+        and the chassis spends a ParkCharge (consumed at 0)."""
         if not bool(mask.any()) or getattr(self, "_naturalist_idx", -1) < 0:
             return
         tc = tile.clamp(min=0).unsqueeze(1)                 # [B, 1]
@@ -10484,16 +10484,13 @@ class SimSeats:
         anchor = chosen[:, 0]                               # the cluster's name
         for k in range(chosen.shape[1]):
             self.park[rows, chosen[:, k]] = anchor
-        # CIV6 (Mountie, ParkCharges 2): a chassis that founds parks off its own
-        # charges spends ONE and rides on; the Naturalist is CONSUMED outright.
-        _pt = self.unit_type[rows, slot[rows]].clamp(min=0, max=self.NU - 1)
-        _keeps = self._type_park_builder[_pt]
+        # CIV6 (Units.ParkCharges — Naturalist 1, Mountie 2): ONE path for
+        # every park chassis, `naturalistPark`'s: the designation spends a
+        # charge and ends the turn; at 0 charges the unit is consumed.
         _left = (self.unit_charges[rows, slot[rows]] - 1).clamp(min=0)
-        self.unit_charges[rows, slot[rows]] = torch.where(
-            _keeps, _left, self.unit_charges[rows, slot[rows]])
-        self.unit_mp[rows, slot[rows]] = torch.where(
-            _keeps, torch.zeros_like(_left), self.unit_mp[rows, slot[rows]])
-        _dies = ~_keeps | (_left <= 0)
+        self.unit_charges[rows, slot[rows]] = _left
+        self.unit_mp[rows, slot[rows]] = torch.zeros_like(_left)
+        _dies = _left <= 0
         _dr = rows[_dies]
         if _dr.numel():
             self.unit_alive[_dr, slot[rows][_dies]] = False

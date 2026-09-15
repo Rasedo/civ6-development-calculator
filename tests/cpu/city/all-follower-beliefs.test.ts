@@ -61,7 +61,7 @@ describe('a city pays every present religion`s follower belief only for Dharma',
     expect(getModifiers(state, 0).allFollowerBeliefs).toBe(false);
     expect(followerReligionsForCity(getModifiers(state, 0), city)).toEqual([0]);
     const shrine = shrineOf(state);
-    expect(shrine.food).toBe(1);          // Feed the World, the followed one
+    expect(shrine.food).toBe(3);          // Feed the World, the followed one
     expect(shrine.culture ?? 0).toBe(0);  // and NOT the rival's Choral Music
   });
 
@@ -71,7 +71,7 @@ describe('a city pays every present religion`s follower belief only for Dharma',
     expect(getModifiers(state, 0).allFollowerBeliefs).toBe(true);
     expect(followerReligionsForCity(getModifiers(state, 0), city)).toEqual([0, 1]);
     const shrine = shrineOf(state);
-    expect(shrine.food).toBe(1);          // its own
+    expect(shrine.food).toBe(3);          // its own
     expect(shrine.culture).toBe(2);       // AND the rival's
   });
 
@@ -81,7 +81,7 @@ describe('a city pays every present religion`s follower belief only for Dharma',
     city.religionPressure = [10, 0];      // the rival has no follower here
     expect(religionsPresent(city)).toEqual([0]);
     const shrine = shrineOf(state);
-    expect(shrine.food).toBe(1);
+    expect(shrine.food).toBe(3);
     expect(shrine.culture ?? 0).toBe(0);
   });
 

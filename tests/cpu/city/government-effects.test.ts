@@ -55,7 +55,7 @@ describe('the sourced government rows', () => {
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
       { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
-    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 });
+    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5 }, wwCutPct: 20 });
     expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ governorPerCitizen: { production: 0.6 } });
     // CIV6 (Democracy, GS): "Your Trade Routes to an Ally or Suzerain's city
     // provide +4 Food and +4 Production for both cities. Alliance Points with
@@ -128,7 +128,7 @@ describe('the xpPct channel — "+20% Unit Experience"', () => {
   });
 });
 
-describe('FASCISM wwCutPct — "War Weariness reduced by 15%"', () => {
+describe('FASCISM wwCutPct — "War Weariness reduced by 20%"', () => {
   it("cuts the adopter's accrual and nobody else's", () => {
     // a same-seed twin with FASCISM's row stripped measures the uncut
     // amount — the adopter's base is its OWN era's, which the Modern civic
@@ -156,7 +156,7 @@ describe('FASCISM wwCutPct — "War Weariness reduced by 15%"', () => {
     const [uncut, foeBare] = battleWw(true);
     expect(foe).toBe(foeBare); // the foe's accrual never moves
     expect(uncut).toBeGreaterThan(0);
-    expect(cut).toBe(Math.floor((uncut * (100 - 15)) / 100));
+    expect(cut).toBe(Math.floor((uncut * (100 - 20)) / 100));
   });
 });
 
@@ -241,7 +241,7 @@ describe('the prodBoost targets', () => {
     const state = makeState();
     adopt(state, 'TOTALITARIANISM');
     const mods = getModifiers(state, 0);
-    expect(mods.wwCutPct).toBe(15);
+    expect(mods.wwCutPct).toBe(20);
     expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5 }]);
     // and NOT Fascism's legacy +50% toward units
     expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0);

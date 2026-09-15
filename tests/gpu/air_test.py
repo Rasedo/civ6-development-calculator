@@ -164,9 +164,9 @@ def main() -> None:
         sim.city_bldg[0, row, j, b] = True
     sim._eff_version += 1
     grown = int(sim._air_slots_at(row)[0, aero])
-    assert grown == 8 == sim._aerodrome_air_slots + int(sim._b_air_slots[hangars].sum()), (
-        f"CIV6 (Buildings.xml): the Hangar and the Airport grant 2 apiece over the "
-        f"Aerodrome's own 4, so a built one bases 8 — read {grown}")
+    assert grown == 6 == sim._aerodrome_air_slots + int(sim._b_air_slots[hangars].sum()), (
+        f"CIV6 (HANGAR_BONUS_AIR_SLOTS / AIRPORT_BONUS_AIR_SLOTS Amount 1): the Hangar and "
+        f"the Airport grant 1 apiece over the Aerodrome's own 4, so a built one bases 6 — read {grown}")
     sim.district_pillaged[0, aero] = True
     sim._eff_version += 1
     assert int(sim._air_slots_at(row)[0, aero]) == 0, "a wrecked base bases nothing"

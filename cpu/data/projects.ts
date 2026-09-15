@@ -268,10 +268,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // Global Warming Mitigation civic; repeatable, and the only thing that
     // takes carbon back out of the air.
     // CIV6 (Recommission Nuclear Reactor): available after Nuclear Fission to
-    // a city whose Industrial Zone holds a Nuclear Power Plant; completing it
-    // "resets the age of the reactor to 0". 400 Production, and the cost
-    // "does not scale with further research".
-    P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.',
+    // a city that holds a Nuclear Power Plant; completing it "resets the age of
+    // the reactor to 0". 400 Production, and the cost "does not scale with
+    // further research". The install's Projects row names NO PrereqDistrict, so
+    // it takes the district-free spelling the other ungated projects use.
+    P({ id: 'RECOMMISSION_REACTOR', name: 'Recommission Nuclear Reactor', district: 'CITY_CENTER', yield: null, gpClass: null, recommission: true, cost: 400, requiresTech: 'NUCLEAR_FISSION', description: 'Repeatable: resets this city reactor age to 0.',
       src: {
         district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'PrereqDistrict')] },
         cost: xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'Cost', { scale: GAME_SPEED }),

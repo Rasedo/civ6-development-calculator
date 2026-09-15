@@ -68,9 +68,9 @@ them and had drifted apart from them (B read 14 for 12, C read 31 for 21).
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is an ask |
 | C-78 unique UNITS absent | 1 | all 31 civilization uniques are built; the nine LEADER units are left, and two clauses wait on B-56r and C-79 |
 | C-79 unique INFRASTRUCTURE absent | 1 | every district, building and improvement is built; what is left is four clauses with no carrier |
-| C-80 constants vs the install | 3 | 67 ledger lines (docs/PROVENANCE.md) — catalog values the install contradicts, every one a FIX toward the install per the owner's 2026-09-14 ruling; two wait for the lab (purchase price, Pop Star); 58 census orphans (tools/gpu/rules_reader_census_baseline.txt) — exported keys or catalog columns no engine reads — to classify |
-| **C. Absent systems** | **24** | |
-| **OPEN, TOTAL** | **36** | |
+| C-80 constants vs the install | 2 | the #264 batch (2026-09-15) moved 65 of the 67 ledger lines to the install; LEFT: two lab lines (purchase price, Pop Star — SESSION2 scenes G/H), Religious Community's Gathering Storm clause (an effect kind neither engine has), and the six missing rules the reader census names |
+| **C. Absent systems** | **23** | |
+| **OPEN, TOTAL** | **35** | |
 
 ## The question ledger — owner asks, one line each
 
@@ -1448,7 +1448,7 @@ the gate reaches is worth more here than one that re-reads the exporter.
     Societies resource class this engine's map never places, so every
     `LeyLine_*` row on a unique district is unreachable.
 
-- **C-80. CONSTANTS VS THE INSTALL.** Weight 3.
+- **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
   - THE INSTRUMENTS EXIST (2026-09-14): every catalog constant carries a
     source tag (`cpu/data/provenance.ts`: XML row/column with `expect`,
     `scale`, `absent`; LAB; PEDIA; STYLIZED; DERIVED with inputs);
@@ -1459,26 +1459,30 @@ the gate reaches is worth more here than one that re-reads the exporter.
     census (`tools/gpu/rules_reader_census.py`) in stage 0 as RATCHETS
     against docs/PROVENANCE.md and the census baseline: a NEW disagreement
     or a NEW unread key is red; the known lists below are this entry.
-  - OPEN, the ledger: 67 lines in docs/PROVENANCE.md's authoritative
-    section (65 mismatch, 2 dangling) over 18 catalogs. The owner ruled
-    (2026-09-14): no constant was their choice, prefer Civ 6, fewer
-    stylizations — so every line moves to the install's value in ONE
-    fixture-moving batch (`.claude/scratchpad/provenance_fix_brief.md`
-    holds the per-line target), comments rewritten to cite the table, both
-    engines grepped for a hard-coded twin of the old literal, battery after.
-    The shape of them: Gathering Storm changes the catalogs never took
-    (River Goddess, Feed the World, Divine Inspiration, Tithe's shape, the
-    age thresholds 14/28, delegation 25 / embassy 50, the Colosseum's 2, the
-    Palace's 2 amenities, the Airport's slots), transcription slips (Mamluk,
-    Varu, Toa, Minas Geraes, Inquisitor, Proselytizer, Itinerant Preachers,
-    two follower-count divisors), three wrong upgrade rungs, two row
-    comments that invert the XML they cite (the Fort's tech, the Sphinx's
-    appeal), a building cost LADDER priced off a published table instead of
-    `Buildings.Cost`, four beliefs the install does not have at all (Oral
-    Tradition and Church Property deleted by the expansion; Crusade and
-    Messenger of the Gods nowhere), and two lines the lab must measure
-    first (the purchase price formula — SESSION2 scene G; the Pop Star's
-    percent — scene H).
+  - THE LEDGER IS CLOSED TO TWO LINES (#264, 2026-09-15): the owner
+    ruled (2026-09-14) no constant was their choice, prefer Civ 6, fewer
+    stylizations, so 65 of the 67 lines moved to the install in ONE
+    fixture-moving batch (58 values fixed, four beliefs Gathering Storm
+    does not have removed from the pools — Oral Tradition, Church Property,
+    Crusade, Messenger of the Gods — five retagged STYLIZED with the
+    reason: the Palace's and City Center's never-charged cost, the spy's
+    0 MP, Neighborhood and Preserve housing the appeal band pays; Chiefdom's
+    tag the absence shape). docs/PROVENANCE.md's authoritative block is
+    the two that wait for the live game: the purchase price formula
+    (SESSION2 scene G) and the Pop Star's percent (scene H).
+  - OPEN, a build: RELIGIOUS_COMMUNITY. Gathering Storm rewrote the
+    belief to +2 Gold on INTERNATIONAL Trade Routes from a city following
+    the religion, once per Holy Site / Shrine / Temple / tier-3 worship
+    building it holds (`RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}_TRADING_MODIFIER`,
+    MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL, Amount
+    2). Neither engine has the shape — the nearest, `tradeReligionYields`,
+    paid a DOMESTIC leg keyed on the destination's religion with no
+    per-building count — so the pre-GS housing clause stays in the catalog
+    with a comment naming the gap. The build: a follower-belief field and
+    wire column, the international leg of `cityTradeYields` (cpu/core/
+    trade.ts) and `_seat_route_income` (gpu/core/sim_seats.py) counting the
+    origin's worship buildings, a poke on both sides, the housing clause
+    deleted.
   - THE CENSUS IS CLASSIFIED (2026-09-14): of 59 orphan lines, 11 were
     dead exports (deleted — `cityState.meetRange`, `combat.unitHealPerTurn`,
     the scaffold's askable list, the goody kind weights, a duplicate settler

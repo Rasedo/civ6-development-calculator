@@ -1478,7 +1478,8 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
 /**
  * DESIGNATE a National Park. The Naturalist must stand on one of the
  * four tiles (real Civ 6: "they must be able to move onto one of its tiles"),
- * and is CONSUMED by the designation. The park pays its tourism and its
+ * and spends a ParkCharge on it (Units.ParkCharges: Naturalist 1, Mountie 2)
+ * — a chassis at 0 charges is consumed. The park pays its tourism and its
  * amenities from the tiles themselves, so nothing is stored on the city.
  */
 export function naturalistPark(state: GameState, unitId: number, seat: number): RuleResult {
@@ -1498,13 +1499,12 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
     // the cluster comes back SORTED, so its first tile is the anchor both
     // engines name the park by.
     for (const i of cluster) state.map.tiles[i].park = cluster[0];
-    if (pdef.parkBuilder) {
-      unit.charges = Math.max(0, (unit.charges ?? 0) - 1);
-      unit.movesLeft = 0;
-      if (unit.charges <= 0) disbandUnit(state, unit.id);
-    } else {
-      disbandUnit(state, unit.id);
-    }
+    // ONE path for every park chassis: the designation spends a charge and
+    // ends the turn; at 0 charges the unit is consumed (the Naturalist's
+    // single ParkCharge is what "consumed on designation" IS).
+    unit.charges = Math.max(0, (unit.charges ?? 0) - 1);
+    unit.movesLeft = 0;
+    if (unit.charges <= 0) disbandUnit(state, unit.id);
     state.eventLog.push('A National Park was designated.');
     return ok;
   }

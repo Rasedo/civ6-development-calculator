@@ -292,8 +292,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'GAMES_AND_RECREATION',
       placement: { flatOnly: true, adjacentDistrict: 'ENTERTAINMENT_COMPLEX' },
       cityYields: { culture: 2 },
-      effects: { regionalAmenities: 3 },
-      description: '+2 culture; +3 amenities to cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
+      effects: { regionalAmenities: 2 },  // Buildings.xml Entertainment 2
+      description: '+2 culture; +2 amenities to cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Cost', { scale: GAME_SPEED }),

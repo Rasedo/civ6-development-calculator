@@ -51,7 +51,7 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   pres[actor.seat] += lump;
   // CIV6 (Spread Religion): the spread itself "reduces total Religious
   // Pressure of all foreign religions in the city by 25%", and PROSELYTIZER
-  // raises the strip to its 75.
+  // raises the strip to its 50 (ModifierArguments APOSTLE_EVICT_ALL Amount 50).
   const strip = Math.max(25, promoValue(unit, 'PROSELYTIZER'));
   if (strip > 0) {
     for (let g = 0; g < pres.length; g++) {

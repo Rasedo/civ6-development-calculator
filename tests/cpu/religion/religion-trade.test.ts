@@ -92,10 +92,10 @@ describe('founding a religion', () => {
     const after = computeCityStats(state, city);
     // Choral Music: shrine +2c, temple +4c
     expect(after.breakdown.buildings.culture - before.breakdown.buildings.culture).toBe(6);
-    // Tithe: pop 1 -> 0 gold yet; grow the city artificially to 4 -> +1 gold in capital
-    city.population = 4;
+    // Tithe (GS, TITHE_GOLD_CITY_MODIFIER): +3 gold per CITY following the
+    // religion, not per follower — one city, so 3 in the capital at any pop.
     const withFollowers = computeCityStats(state, city);
-    expect(withFollowers.breakdown.bonuses.gold).toBeGreaterThanOrEqual(1);
+    expect(withFollowers.breakdown.bonuses.gold).toBeGreaterThanOrEqual(3);
     // Gurdwara buildable now (and only that worship building)
     const buildable = availableBuildings(state, city).map((b) => b.id);
     expect(buildable).toContain('GURDWARA');
@@ -108,7 +108,9 @@ describe('founding a religion', () => {
     foundReligion(state, {
       name: 'Shinto',
       follower: 'WORK_ETHIC',
-      founder: 'CHURCH_PROPERTY',
+      // PILGRIMAGE stands in for the deleted CHURCH_PROPERTY: the same
+      // `perCity` effect shape, and this lane asserts on Work Ethic alone.
+      founder: 'PILGRIMAGE',
       worship: 'MEETING_HOUSE',
     }, 0);
     // Work Ethic is a FOLLOWER belief — it applies to the city that
@@ -135,8 +137,10 @@ describe('founding a religion', () => {
     expect(canEnhanceReligion(state, 0).ok).toBe(true); // second prophet
 
     // a civ already holding an enhancer excludes it from the pool
-    state.claimedEnhancers = ['CRUSADE'];
-    expect(enhanceReligion(state, 'CRUSADE', 0).ok).toBe(false);
+    // JUST_WAR stands in for the deleted CRUSADE: this lane asserts the
+    // claimed-pool exclusion, not either belief's effect.
+    state.claimedEnhancers = ['JUST_WAR'];
+    expect(enhanceReligion(state, 'JUST_WAR', 0).ok).toBe(false);
     expect(enhanceReligion(state, 'ITINERANT_PREACHERS', 0).ok).toBe(true);
     expect(seatOf(state, 0)!.religion.enhancer).toBe('ITINERANT_PREACHERS');
     expect(state.claimedEnhancers).toContain('ITINERANT_PREACHERS');

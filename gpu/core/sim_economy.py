@@ -3930,7 +3930,7 @@ class SimEconomy:
         """The +generalAuraCs adder [B] (dtype) for own military near an own
         GENERAL (land) / ADMIRAL (naval|embarked); `seat` < 0 scores nothing.
         An INTEGER add joining the
-        quantized assembly (the JUST_WAR/CRUSADE pattern) — mirrors
+        quantized assembly (the JUST_WAR / DEFENDER_OF_THE_FAITH pattern) — mirrors
         combat.generalAuraCS.
 
         It joins every unit-vs-unit roll, every unit-vs-CITY roll (rcty/rctyc,

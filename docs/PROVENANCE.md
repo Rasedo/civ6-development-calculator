@@ -10,156 +10,23 @@ tag becomes STYLIZED with the ruling quoted.
     npm run export                       # writes seeder/worlds/provenance.json
     python tools/civ6lab/xml_check.py check
 
-## The checker's list — AUTHORITATIVE, regenerated (2026-09-14, modinfo load order)
+## The checker's list — AUTHORITATIVE, regenerated (2026-09-15, after #264's batch)
 
 The lines below are `xml_check.py check` verbatim; the agent reports further
-down are NOTES on them (classification, cause) and can name lines that no
-longer appear (the alphabetical load order produced artefacts — Isolationism,
-three unique units' resource bills, the Okihtcitaw's rung — and hid one, the
-Pike and Shot's maintenance). Task #264 works THIS list.
+down are the HISTORY of the 65 lines the batch closed (their notes name
+values that no longer exist in the catalogs). The battery's stage 0 runs
+`check --baseline docs/PROVENANCE.md`: a line here is KNOWN red, anything
+else is new and reds the run.
 
-    XML CHECK RED — 4775 match, 65 mismatch, 2 dangling, 204 unsourced, 812 derived, 3 lab (+0 unverifiable), 300 pedia, 378 stylized (312 install files)
+    XML CHECK OK against PROVENANCE.md — 0 new, 2 known, 65 fixed; 4826 match, 2 mismatch, 0 dangling, 195 unsourced, 816 derived, 3 lab (+0 unverifiable), 300 pedia, 383 stylized (312 install files)
 
-### units (15)
+Both remaining lines wait for the LIVE game (lab session 2, task #252,
+scenes G and H) — the install publishes an input, not the number:
 
-```
-MISMATCH units.NATURALIST.charges: catalog 0 vs install '1' [Units[UnitType=UNIT_NATURALIST].ParkCharges <- Units.xml]
-MISMATCH units.BATTERING_RAM.upgradesTo: catalog 'MEDIC' vs install 'UNIT_SIEGE_TOWER' [UnitUpgrades[Unit=UNIT_BATTERING_RAM].UpgradeUnit <- Expansion2_Units.xml]
-MISMATCH units.INQUISITOR.religiousStrength: catalog 70 vs install '75' [Units[UnitType=UNIT_INQUISITOR].ReligiousStrength <- Units.xml]
-MISMATCH units.PIKE_AND_SHOT.maintenance: catalog 4 vs install '3' [Units[UnitType=UNIT_PIKE_AND_SHOT].Maintenance <- Expansion1_Expansion2.xml]
-MISMATCH units.SPY.moves: catalog 0 vs install '1' [Units[UnitType=UNIT_SPY].BaseMoves <- Units.xml]
-MISMATCH units.MAMLUK.cost: catalog 108 vs install '132' [Units[UnitType=UNIT_ARABIAN_MAMLUK].Cost <- Expansion2_Units.xml]
-MISMATCH units.MAMLUK.maintenance: catalog 3 vs install '4' [Units[UnitType=UNIT_ARABIAN_MAMLUK].Maintenance <- Expansion2_Units.xml]
-MISMATCH units.VARU.maintenance: catalog 3 vs install '2' [Units[UnitType=UNIT_INDIAN_VARU].Maintenance <- Expansion2_Units.xml]
-MISMATCH units.VARU.upgradesTo: catalog 'TANK' vs install 'UNIT_CUIRASSIER' [UnitUpgrades[Unit=UNIT_INDIAN_VARU].UpgradeUnit <- Expansion2_Units.xml]
-MISMATCH units.TOA.maintenance: catalog 2 vs install '0' [Units[UnitType=UNIT_MAORI_TOA].Maintenance <- (schema DEFAULT)]
-MISMATCH units.TOA.requiresResource: catalog 'IRON' vs install None [Units[UnitType=UNIT_MAORI_TOA].StrategicResource <- (row found in Expansion2_Units_Major.xml, no column StrategicResource, no default)]
-MISMATCH units.MINAS_GERAES.antiAir: catalog 90 vs install '95' [Units[UnitType=UNIT_BRAZILIAN_MINAS_GERAES].AntiAirCombat <- Units.xml]
-MISMATCH units.U_BOAT.requiresResource: catalog 'OIL' vs install None [Units[UnitType=UNIT_GERMAN_UBOAT].StrategicResource <- (row found in Units.xml, no column StrategicResource, no default)]
-MISMATCH units.U_BOAT.resourceCost: catalog 1 vs install None [Units_XP2[UnitType=UNIT_GERMAN_UBOAT].ResourceCost <- (no such row)]
-MISMATCH units.U_BOAT.resourceUpkeep: catalog 1 vs install None [Units_XP2[UnitType=UNIT_GERMAN_UBOAT].ResourceMaintenanceAmount <- (no such row)]
-```
-
-### buildings (10)
+### promotions (1)
 
 ```
-MISMATCH buildings.PALACE.cost: catalog 0 vs install '1' [Buildings[BuildingType=BUILDING_PALACE].Cost <- Buildings.xml]
-MISMATCH buildings.PALACE.amenities: catalog 1 vs install '2' [Buildings[BuildingType=BUILDING_PALACE].Entertainment <- Expansion2_Buildings.xml]
-MISMATCH buildings.PAGODA.housing: catalog 1 vs install '0' [Buildings[BuildingType=BUILDING_PAGODA].Housing <- Expansion2_Buildings.xml]
-MISMATCH buildings.FACTORY.civVariants.0.yields.production: catalog 4 vs install '3' [Building_YieldChanges[BuildingType=BUILDING_ELECTRONICS_FACTORY&YieldType=YIELD_PRODUCTION].YieldChange <- Expansion2_Buildings.xml]
-MISMATCH buildings.HANGAR.airSlots: catalog 2 vs install '1' [ModifierArguments[ModifierId=HANGAR_BONUS_AIR_SLOTS&Name=Amount].Value <- Expansion2_Buildings.xml]
-MISMATCH buildings.AIRPORT.yields.production: catalog 3 vs install '4' [Building_YieldChanges[BuildingType=BUILDING_AIRPORT&YieldType=YIELD_PRODUCTION].YieldChange <- Expansion2_Buildings.xml]
-MISMATCH buildings.AIRPORT.airSlots: catalog 2 vs install '1' [ModifierArguments[ModifierId=AIRPORT_BONUS_AIR_SLOTS&Name=Amount].Value <- Expansion2_Buildings.xml]
-MISMATCH buildings.ZOO.civVariants.0.cost: catalog 175 vs install '216' [Buildings[BuildingType=BUILDING_THERMAL_BATH].Cost <- Expansion2_Buildings_Major.xml]
-MISMATCH buildings.RENAISSANCE_WALLS.civVariants.0.cost: catalog 154 vs install '156' [Buildings[BuildingType=BUILDING_TSIKHE].Cost <- Expansion1_Buildings_Major.xml]
-MISMATCH buildings.AQUATICS_CENTER.cost: catalog 396 vs install '288' [Buildings[BuildingType=BUILDING_AQUATICS_CENTER].Cost <- Expansion2_Buildings.xml]
-```
-
-### districts (5)
-
-```
-MISMATCH districts.CITY_CENTER.cost: catalog 0 vs install '54' [Districts[DistrictType=DISTRICT_CITY_CENTER].Cost <- Districts.xml]
-MISMATCH districts.THEATER_SQUARE.civVariants.0.adjacency.0.amount: catalog 1 vs install '2' [Adjacency_YieldChanges[ID=Wonder_Culture].YieldChange <- Expansion1_Districts.xml]
-MISMATCH districts.NEIGHBORHOOD.housing: catalog 0 vs install '4' [Districts[DistrictType=DISTRICT_NEIGHBORHOOD].Housing <- Districts.xml]
-MISMATCH districts.SPACEPORT.maintenance: catalog 1 vs install '0' [Districts[DistrictType=DISTRICT_SPACEPORT].Maintenance <- (schema DEFAULT)]
-MISMATCH districts.PRESERVE.housing: catalog 0 vs install '1' [Districts[DistrictType=DISTRICT_PRESERVE].Housing <- KublaiKhan_Vietnam_Districts.xml]
-```
-
-### improvements (2)
-
-```
-MISMATCH improvements.LUMBER_MILL.yields.production: catalog 1 vs install '2' [Improvement_YieldChanges[ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION].YieldChange <- Expansion2_Improvements.xml]
-MISMATCH improvements.SPHINX.appealAdjacent: catalog 1 vs install '2' [Improvements[ImprovementType=IMPROVEMENT_SPHINX].Appeal <- Expansion2_Improvements.xml]
-```
-
-### techs (7)
-
-```
-MISMATCH techs.MILITARY_ENGINEERING.effects.1.improvement: catalog 'FORT' vs install 'TECH_SIEGE_TACTICS' [Improvements[ImprovementType=IMPROVEMENT_FORT].PrereqTech <- Improvements.xml]
-MISMATCH techs.BANKING.effects.1.improvement: catalog 'QUARRY' vs install None [Improvement_BonusYieldChanges[ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_GOLD&PrereqTech=TECH_BANKING].ImprovementType <- (no such row)]
-MISMATCH techs.BANKING.effects.1.yields.gold: catalog 2 vs install None [Improvement_BonusYieldChanges[ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_GOLD&PrereqTech=TECH_BANKING].BonusYieldChange <- (no such row)]
-MISMATCH techs.STEEL.effects.0.improvement: catalog 'OIL_WELL' vs install 'TECH_REFINING' [Improvements[ImprovementType=IMPROVEMENT_OIL_WELL].PrereqTech <- Expansion2_Improvements.xml]
-MISMATCH techs.SYNTHETIC_MATERIALS.effects.1.yields.gold: catalog 1 vs install '2' [Improvement_BonusYieldChanges[ImprovementType=IMPROVEMENT_CAMP&YieldType=YIELD_GOLD&PrereqTech=TECH_SYNTHETIC_MATERIALS].BonusYieldChange <- Expansion2_Improvements.xml]
-MISMATCH techs.ROBOTICS.effects.0.improvement: catalog 'PASTURE' vs install None [Improvement_BonusYieldChanges[ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_ROBOTICS].ImprovementType <- (no such row)]
-MISMATCH techs.ROBOTICS.effects.0.yields.production: catalog 1 vs install None [Improvement_BonusYieldChanges[ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_ROBOTICS].BonusYieldChange <- (no such row)]
-```
-
-### civics (3)
-
-```
-MISMATCH civics.CODE_OF_LAWS.effects.0.government: catalog 'CHIEFDOM' vs install None [Governments[GovernmentType=GOVERNMENT_CHIEFDOM].PrereqCivic <- (row found in Expansion1_Governments.xml, no column PrereqCivic, no default)]
-MISMATCH civics.SUFFRAGE.effects.2.policy: catalog 'ECONOMIC_UNION' vs install 'CIVIC_IDEOLOGY' [Policies[PolicyType=POLICY_ECONOMIC_UNION].PrereqCivic <- Expansion2_Policies.xml]
-MISMATCH civics.CLASS_STRUGGLE.effects.1.policy: catalog 'FIVE_YEAR_PLAN' vs install 'CIVIC_IDEOLOGY' [Policies[PolicyType=POLICY_FIVE_YEAR_PLAN].PrereqCivic <- Expansion2_Policies.xml]
-```
-
-### projects (1)
-
-```
-MISMATCH projects.RECOMMISSION_REACTOR.district: catalog 'INDUSTRIAL_ZONE' but the input is absent and the tag says the catalog then holds 'CITY_CENTER'
-```
-
-### promotions (3)
-
-```
-DANGLING promotions.ARMOR_PIERCING.requires: derived 'the UnitPromotionPrereqs rows of PROMOTION_ARMOR_PIERCING, r' names UnitPromotionPrereqs[UnitPromotion=PROMOTION_ARMOR_PIERCING&PrereqUnitPromotion=PROMOTION_ROUT].PrereqUnitPromotion (no such row)
-MISMATCH promotions.PROSELYTIZER.effects.0.v: catalog 75 vs install '50' [ModifierArguments[ModifierId=APOSTLE_EVICT_ALL&Name=Amount].Value <- UnitPromotions.xml]
 MISMATCH promotions.POP_STAR.effects.0.v: catalog 25 vs install '-75' [ModifierArguments[ModifierId=ROCKBAND_POP&Name=Amount].Value <- Expansion2_UnitPromotions.xml]
-```
-
-### builtWonders (1)
-
-```
-MISMATCH builtWonders.COLOSSEUM.effects.regionalAmenities: catalog 3 vs install '2' [Buildings[BuildingType=BUILDING_COLOSSEUM].Entertainment <- Expansion1_Buildings.xml]
-```
-
-### policies (2)
-
-```
-DANGLING policies.LIBERALISM.obsoleteCivic: derived 'the PrereqCivic of the policy the install names in ObsoleteP' names ObsoletePolicies[PolicyType=POLICY_LIBERALISM].ObsoletePolicy (no such row)
-MISMATCH policies.LEGACY_FASCISM.effects.wwCutPct: catalog 15 vs install '20' [ModifierArguments[ModifierId=FASCISM_WAR_WEARINESS&Name=Amount].Value <- Expansion1_Governments.xml]
-```
-
-### governments (1)
-
-```
-MISMATCH governments.FASCISM.effects.wwCutPct: catalog 15 vs install '20' [ModifierArguments[ModifierId=FASCISM_WAR_WEARINESS&Name=Amount].Value <- Expansion1_Governments.xml]
-```
-
-### pantheons (2)
-
-```
-MISMATCH pantheons.RIVER_GODDESS.effects.riverCity.amenities: catalog 1 vs install '2' [ModifierArguments[ModifierId=RIVER_GODDESS_HOLY_SITE_AMENITIES_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
-MISMATCH pantheons.RIVER_GODDESS.effects.riverCity.housing: catalog 1 vs install '2' [ModifierArguments[ModifierId=RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
-```
-
-### followerBeliefs (3)
-
-```
-MISMATCH followerBeliefs.FEED_THE_WORLD.effects.buildingYields.SHRINE.food: catalog 1 vs install '3' [ModifierArguments[ModifierId=FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
-MISMATCH followerBeliefs.FEED_THE_WORLD.effects.buildingYields.TEMPLE.food: catalog 2 vs install '3' [ModifierArguments[ModifierId=FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
-MISMATCH followerBeliefs.DIVINE_INSPIRATION.effects.faithPerWonder: catalog 2 vs install '4' [ModifierArguments[ModifierId=DIVINE_INSPIRATION_WONDER_FAITH_MODIFIER&Name=Amount].Value <- Beliefs.xml]
-```
-
-### founderBeliefs (4)
-
-```
-MISMATCH founderBeliefs.TITHE.effects.perFollowers.per: catalog 4 vs install '1' [ModifierArguments[ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
-MISMATCH founderBeliefs.TITHE.effects.perFollowers.yields.gold: catalog 1 vs install '3' [ModifierArguments[ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=Amount].Value <- Expansion2_Beliefs.xml]
-MISMATCH founderBeliefs.WORLD_CHURCH.effects.perFollowers.per: catalog 5 vs install '4' [ModifierArguments[ModifierId=WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
-MISMATCH founderBeliefs.CROSS_CULTURAL_DIALOGUE.effects.perFollowers.per: catalog 5 vs install '4' [ModifierArguments[ModifierId=CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER&Name=PerXItems].Value <- Expansion2_Beliefs.xml]
-```
-
-### enhancerBeliefs (2)
-
-```
-MISMATCH enhancerBeliefs.ITINERANT_PREACHERS.effects.pressureRangeBonus: catalog 2 vs install '3' [ModifierArguments[ModifierId=ITINERANT_PREACHERS_SPREAD_DISTANCE&Name=DistanceChange].Value <- Beliefs.xml]
-MISMATCH enhancerBeliefs.SCRIPTURE.effects.spreadPressureMult: catalog 1.5 vs install '25' [ModifierArguments[ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier].Value <- Beliefs.xml]
-```
-
-### congressResolutions (1)
-
-```
-MISMATCH congressResolutions.WORLD_RELIGION.minEra: catalog 4 vs install None [Resolutions[ResolutionType=WC_RES_WORLD_RELIGION].EarliestEra <- (row found in Expansion2_Congress.xml, no column EarliestEra, no default)]
 ```
 
 ### scenario (1)
@@ -168,14 +35,43 @@ MISMATCH congressResolutions.WORLD_RELIGION.minEra: catalog 4 vs install None [R
 MISMATCH scenario.goldPurchaseMult: catalog 4 vs install '2' [GlobalParameters[Name=GOLD_PURCHASE_MULTIPLIER].Value <- GlobalParameters.xml]
 ```
 
-### eras (4)
+## The #264 batch (2026-09-15) — 65 lines closed, what each became
 
-```
-MISMATCH eras.darkT: catalog 12 vs install '14' [GlobalParameters[Name=DARK_AGE_SCORE_BASE_THRESHOLD].Value <- Expansion2_GlobalParameters.xml]
-MISMATCH eras.goldenT: catalog 24 vs install '28' [GlobalParameters[Name=GOLDEN_AGE_SCORE_BASE_THRESHOLD].Value <- Expansion2_GlobalParameters.xml]
-MISMATCH eras.delegationCost: catalog 10 vs install '25' [DiplomaticActions[DiplomaticActionType=DIPLOACTION_DIPLOMATIC_DELEGATION].Cost <- DiplomaticActions.xml]
-MISMATCH eras.embassyCost: catalog 25 vs install '50' [DiplomaticActions[DiplomaticActionType=DIPLOACTION_RESIDENT_EMBASSY].Cost <- DiplomaticActions.xml]
-```
+The owner ruled (2026-09-14): no constant was their choice, prefer Civ 6,
+fewer stylizations. Two agents moved the catalogs
+(`.claude/scratchpad/provenance_fix_A_report.md` — units, techs, civics,
+improvements, promotions, districts, wonders, policies, seats, projects;
+`provenance_fix_B_report.md` — buildings, religion); the maintainer folded
+the park verb, the GPU pins and the ledger. Per line, old -> new, the
+install cell in the reports:
+
+- FIXED TO THE INSTALL (58): every unit, building, district, wonder,
+  policy, belief, era and diplomacy magnitude the list named; the Fort
+  moved to Siege Tactics and the Oil Well to Refining; Banking's Quarry
+  gold is gone and Robotics' Pasture pays food with the production at
+  Replaceable Parts; Economic Union and the Five-Year Plan hang on
+  Ideology; World Religion runs THROUGH Industrial (the window was
+  inverted); Tithe is +3 gold per city; Scripture spreads x1.25 (a
+  percent) and grants no charge; the Lighthouse's flat food (a double
+  payment of LIGHTHOUSE_COAST_FOOD) and gold, the Cathedral's culture,
+  Liberalism's retirement and Armor Piercing's Rout prerequisite are gone;
+  the Naturalist carries ParkCharges 1 and both engines' park verb is ONE
+  path (spend a charge, consumed at 0).
+- REMOVED FROM THE POOLS (4): ORAL_TRADITION and CHURCH_PROPERTY (deleted
+  by Gathering Storm), CRUSADE and MESSENGER_OF_THE_GODS (nowhere in the
+  install). Their wire columns (`cvs`, `tradeRel`, `mchg`) stay with their
+  readers and read 0.
+- STYLIZED, retagged with the reason (5): PALACE.cost and CITY_CENTER.cost
+  (granted / founded, never produced), SPY.moves (the spy jumps),
+  NEIGHBORHOOD.housing and PRESERVE.housing (the appeal band pays them —
+  its AVERAGE rung equals the install's column).
+- NOT A DEFECT (1): CODE_OF_LAWS -> CHIEFDOM, the starting government has no
+  PrereqCivic; the tag is the absence shape.
+- STILL OPEN, not a mismatch line: RELIGIOUS_COMMUNITY's Gathering Storm
+  clause (+2 gold on INTERNATIONAL routes per Holy Site / Shrine / Temple /
+  tier-3 worship building in a following ORIGIN city — four
+  `..._TRADING_MODIFIER` rows) needs an effect kind neither engine has;
+  the pre-GS housing clause stays with a comment naming the gap (AUDIT).
 
 ## Wave 1, agent A report (2026-09-14) — units, techs, civics, improvements, promotions
 

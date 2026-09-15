@@ -81,8 +81,9 @@ function addWw(state: GameState, seat: number, other: number, amount: number): v
   (s.ww ??= {});
   (s.wwTurn ??= {});
   // CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage off
-  // everything this seat accrues from here on. CIV6 (Fascism): "War
-  // Weariness reduced by 15%" — the government's cut joins additively.
+  // everything this seat accrues from here on. CIV6 (Fascism,
+  // FASCISM_WAR_WEARINESS Amount 20): war weariness cut by 20% — the
+  // government's cut joins additively.
   const cut = Math.min(100, gpPermOf(s, 'warWearyPct')
     + (isCiv(seat) ? getModifiers(state, seat).wwCutPct : 0));
   // CIV6 (Satyagraha): "Opposing civilizations receive double the war

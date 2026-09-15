@@ -23,7 +23,11 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_CODE_OF_LAWS', 'EraType', { expect: 'ERA_ANCIENT' }),
     cost: xml('Civics', 'CivicType=CIVIC_CODE_OF_LAWS', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'a tree root: the install writes no CivicPrereqs row for CIVIC_CODE_OF_LAWS' },
-    'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_CHIEFDOM', 'PrereqCivic', { expect: 'CIVIC_CODE_OF_LAWS' }),
+    // THE STARTING GOVERNMENT has no gate: the install's GOVERNMENT_CHIEFDOM
+    // row carries NO PrereqCivic at all, so the absence is the fact and the
+    // engine hangs the unlock off the tree's ROOT civic — the one every seat
+    // holds from turn 1 — to have a single place that grants it.
+    'effects.0.government': { derived: 'CHIEFDOM where the install GOVERNMENT_CHIEFDOM row names NO PrereqCivic - the starting government is ungated, so the engine grants it at the civic tree root', inputs: [xml('Governments', 'GovernmentType=GOVERNMENT_CHIEFDOM', 'PrereqCivic')] },
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_URBAN_PLANNING', 'PrereqCivic', { expect: 'CIVIC_CODE_OF_LAWS' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_GOD_KING', 'PrereqCivic', { expect: 'CIVIC_CODE_OF_LAWS' }),
     'effects.3.policy': xml('Policies', 'PolicyType=POLICY_DISCIPLINE', 'PrereqCivic', { expect: 'CIVIC_CODE_OF_LAWS' }),
@@ -232,14 +236,12 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_SUFFRAGE&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_DEMOCRACY', 'PrereqCivic', { expect: 'CIVIC_SUFFRAGE' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_NEW_DEAL', 'PrereqCivic', { expect: 'CIVIC_SUFFRAGE' }),
-    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_ECONOMIC_UNION', 'PrereqCivic', { expect: 'CIVIC_SUFFRAGE' }),
   },
   CLASS_STRUGGLE: {
     era: xml('Civics', 'CivicType=CIVIC_CLASS_STRUGGLE', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_CLASS_STRUGGLE', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CLASS_STRUGGLE&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_COMMUNISM', 'PrereqCivic', { expect: 'CIVIC_CLASS_STRUGGLE' }),
-    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_FIVE_YEAR_PLAN', 'PrereqCivic', { expect: 'CIVIC_CLASS_STRUGGLE' }),
   },
   TOTALITARIANISM: {
     era: xml('Civics', 'CivicType=CIVIC_TOTALITARIANISM', 'EraType', { expect: 'ERA_MODERN' }),
@@ -311,6 +313,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_IDEOLOGY', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_IDEOLOGY', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_IDEOLOGY, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_IDEOLOGY&PrereqCivic=CIVIC_MASS_MEDIA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }), xml('CivicPrereqs', 'Civic=CIVIC_IDEOLOGY&PrereqCivic=CIVIC_MOBILIZATION', 'PrereqCivic', { expect: 'CIVIC_MOBILIZATION' })] },
+    'effects.0.policy': xml('Policies', 'PolicyType=POLICY_ECONOMIC_UNION', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_FIVE_YEAR_PLAN', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
   },
   NUCLEAR_PROGRAM: {
     era: xml('Civics', 'CivicType=CIVIC_NUCLEAR_PROGRAM', 'EraType', { expect: 'ERA_MODERN' }),
@@ -536,11 +540,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('SUFFRAGE', 'Suffrage', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'DEMOCRACY' },
       { kind: 'unlockPolicy', policy: 'NEW_DEAL' },
-      { kind: 'unlockPolicy', policy: 'ECONOMIC_UNION' },
     ]),
     C('CLASS_STRUGGLE', 'Class Struggle', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'COMMUNISM' },
-      { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
     ]),
     C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'FASCISM' },
@@ -579,7 +581,13 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('MOBILIZATION', 'Mobilization', 'Modern', 1540, ['URBANIZATION', 'SCORCHED_EARTH'], [
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
     ]),
-    C('IDEOLOGY', 'Ideology', 'Modern', 1640, ['MASS_MEDIA', 'MOBILIZATION']),
+    // Expansion2_Policies.xml: ECONOMIC_UNION and FIVE_YEAR_PLAN both carry
+    // PrereqCivic CIVIC_IDEOLOGY — not Suffrage and Class Struggle, where this
+    // catalog hung them until #264.
+    C('IDEOLOGY', 'Ideology', 'Modern', 1640, ['MASS_MEDIA', 'MOBILIZATION'], [
+      { kind: 'unlockPolicy', policy: 'ECONOMIC_UNION' },
+      { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
+    ]),
     C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1715, ['IDEOLOGY']),
     C('CAPITALISM', 'Capitalism', 'Modern', 1580, ['MASS_MEDIA']),
     C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Atomic', 1955, ['CONSERVATION']),

@@ -44,16 +44,17 @@ function airState() {
 describe('air bases and their slots', () => {
   it('each base type carries the count the source names', () => {
     // CIV6 (Districts.xml): a City Center bases 1 and an Aerodrome 4;
-    // (Buildings.xml) the Hangar and the Airport grant 2 apiece, so a fully
-    // built Aerodrome bases 8. An Aircraft Carrier carries its own 2.
+    // (ModifierArguments, HANGAR_BONUS_AIR_SLOTS / AIRPORT_BONUS_AIR_SLOTS
+    // Amount 1) the Hangar and the Airport grant 1 apiece, so a fully built
+    // Aerodrome bases 6. An Aircraft Carrier carries its own 2.
     const { state, city, pad, sea } = airState();
     expect(airSlotsAt(state, 0, city.centerIndex)).toBe(1);
     expect(airSlotsAt(state, 0, pad.index)).toBe(4);
     expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS);
 
     city.buildings.push('HANGAR', 'AIRPORT');
-    expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS + 4);
-    expect(airSlotsAt(state, 0, pad.index)).toBe(8);
+    expect(airSlotsAt(state, 0, pad.index)).toBe(AERODROME_AIR_SLOTS + 2);
+    expect(airSlotsAt(state, 0, pad.index)).toBe(6);
 
     pad.districtPillaged = true;
     expect(airSlotsAt(state, 0, pad.index)).toBe(0);

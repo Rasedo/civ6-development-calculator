@@ -53,24 +53,27 @@ describe('the Scottish Enlightenment', () => {
     const yieldsOf = (row: number, luxuries: number) => {
       const state = sceneAs(row);
       const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
-      city.population = 6; // needs 2 Amenities, so the luxuries decide the tier
+      // pop 6 needs 2 Amenities and the capital's PALACE pays exactly 2
+      // (Buildings.Entertainment), so every luxury here is pure SURPLUS and
+      // the count alone decides the tier
+      city.population = 6;
       city.buildings.push('LIBRARY'); // something to scale
       giveLuxuries(state, city, luxuries);
       const st = computeCityStats(state, city);
       return { tier: st.amenities.tier.name, science: st.total.science, production: st.total.production, gold: st.total.gold };
     };
-    const contentScot = yieldsOf(seatRow('SCOTLAND'), 1);
-    const contentPlain = yieldsOf(seatRow('AMERICA'), 1);
+    const contentScot = yieldsOf(seatRow('SCOTLAND'), 0);
+    const contentPlain = yieldsOf(seatRow('AMERICA'), 0);
     expect(contentScot.tier).toBe('Content');
     expect(contentScot.science).toBeCloseTo(contentPlain.science, 9);
-    const happyScot = yieldsOf(seatRow('SCOTLAND'), 2);
-    const happyPlain = yieldsOf(seatRow('AMERICA'), 2);
+    const happyScot = yieldsOf(seatRow('SCOTLAND'), 1);
+    const happyPlain = yieldsOf(seatRow('AMERICA'), 1);
     expect(happyScot.tier).toBe('Happy');
     expect(happyScot.science).toBeCloseTo(happyPlain.science * 1.05, 9);
     expect(happyScot.production).toBeCloseTo(happyPlain.production * 1.05, 9);
     expect(happyScot.gold).toBeCloseTo(happyPlain.gold, 9); // an unnamed yield is untouched
-    const ecstaticScot = yieldsOf(seatRow('SCOTLAND'), 4);
-    const ecstaticPlain = yieldsOf(seatRow('AMERICA'), 4);
+    const ecstaticScot = yieldsOf(seatRow('SCOTLAND'), 3);
+    const ecstaticPlain = yieldsOf(seatRow('AMERICA'), 3);
     expect(ecstaticScot.tier).toBe('Ecstatic');
     expect(ecstaticScot.science).toBeCloseTo(ecstaticPlain.science * 1.1, 9);
   });
@@ -80,7 +83,9 @@ describe('the Scottish Enlightenment', () => {
     const pointsOf = (row: number, luxuries: number): number => {
       const state = sceneAs(row);
       const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
-      city.population = 6; // needs 2 Amenities, so the luxuries decide the tier
+      // pop 6 needs 2 Amenities and the capital's PALACE pays exactly 2, so
+      // every luxury here is pure surplus and the count alone sets the tier
+      city.population = 6;
       const t = neighbors(state.map, state.map.tiles[city.centerIndex])[5];
       setTileOwner(t, 0, city.id);
       t.district = 'CAMPUS';
@@ -89,10 +94,10 @@ describe('the Scottish Enlightenment', () => {
       giveLuxuries(state, city, luxuries);
       return greatPersonPointsPerTurn(state, 0).SCIENTIST;
     };
-    const plain = pointsOf(seatRow('AMERICA'), 2);
-    expect(pointsOf(seatRow('SCOTLAND'), 2)).toBe(plain + 1);
-    expect(pointsOf(seatRow('SCOTLAND'), 4)).toBe(plain + 2);
-    expect(pointsOf(seatRow('SCOTLAND'), 1)).toBe(plain); // Content pays nothing
+    const plain = pointsOf(seatRow('AMERICA'), 1);
+    expect(pointsOf(seatRow('SCOTLAND'), 1)).toBe(plain + 1);   // Happy
+    expect(pointsOf(seatRow('SCOTLAND'), 3)).toBe(plain + 2);   // Ecstatic
+    expect(pointsOf(seatRow('SCOTLAND'), 0)).toBe(plain); // Content pays nothing
   });
 });
 

@@ -530,7 +530,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 // an own live GENERAL — or an own NAVAL/EMBARKED unit within range of an own
 // live ADMIRAL — gains +GENERAL_AURA_CS at every damage-roll site (attack AND
 // defense), an INTEGER add joining the quantized assembly (q=round(Δ·10)
-// preserved) exactly like the JUST_WAR/CRUSADE religion adders. "Own" = same
+// preserved) exactly like the JUST_WAR / DEFENDER_OF_THE_FAITH religion adders. "Own" = same
 // owner AND civId. The GENERAL/ADMIRAL units themselves are combat-0 civilians
 // and never trigger this on their own account.
 //

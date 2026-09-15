@@ -41,10 +41,18 @@ export interface BeliefEffects {
   perFollowers?: { per: number; yields: Partial<Yields> };
   perCity?: Partial<Yields>;
   pressureRangeBonus?: number;
+  /** NO BELIEF CARRIES THIS since MESSENGER_OF_THE_GODS left the pool (it has
+   *  no install row). The reader (cpu/core/trade.ts) and its wire field stay:
+   *  they read a FIELD, and this is the shape a per-route religion yield takes
+   *  when one is sourced. */
   tradeReligionYields?: Partial<Yields>;
   combatNearFollowing?: number;
   combatDefendFollowing?: number;
+  /** NO BELIEF CARRIES THIS since CRUSADE left the pool — see
+   *  `tradeReligionYields`; cpu/core/combat.ts still reads the field. */
   combatVsUnitInFollowing?: number;
+  /** NO BELIEF CARRIES THIS since GS's SCRIPTURE dropped the charge clause —
+   *  see `tradeReligionYields`; cpu/core/game.ts still reads the field. */
   missionaryChargeBonus?: number;
   spreadPressureMult?: number;
   missionaryCostMult?: number;
@@ -73,15 +81,18 @@ export interface BeliefDef {
  * DEFENDER_OF_THE_FAITH = BELIEF_DEFENDER_OF_FAITH,
  * FIRE_GODDESS = BELIEF_GODDESS_OF_FIRE, and the mapping lives in the tag.
  *
- * SIX rows have NO install source and stay untagged:
- * ORAL_TRADITION, GODDESS_OF_THE_HARVEST and CHURCH_PROPERTY are DELETED by
- * Gathering Storm (DLC/Expansion2/Data/Expansion2_RemoveData.xml deletes both
- * the Beliefs row and its BeliefModifiers), so the loaded install has no row to
- * read; CRUSADE and MESSENGER_OF_THE_GODS appear nowhere in the install at all;
- * RELIGIOUS_COMMUNITY's Beliefs row EXISTS but GS re-wrote it to "+2 Gold on
- * international Trade Routes" — the +1 Housing per Shrine/Temple this catalog
- * carries is the pre-GS clause, and GS's housing sits on FEED_THE_WORLD's own
- * modifiers at Amount 2.
+ * FOUR beliefs this catalog once fielded are GONE from the pools, because the
+ * install this engine mirrors has no row for them: ORAL_TRADITION and
+ * CHURCH_PROPERTY are DELETED by Gathering Storm
+ * (DLC/Expansion2/Data/Expansion2_RemoveData.xml drops both the Beliefs row
+ * and its BeliefModifiers), and CRUSADE and MESSENGER_OF_THE_GODS appear
+ * nowhere in the install at all. GODDESS_OF_THE_HARVEST is deleted the same
+ * way but stays: it is an INERT pantheon (empty effects) and the pool's size
+ * is all it contributes.
+ *
+ * RELIGIOUS_COMMUNITY's Beliefs row EXISTS but GS re-wrote it: its four
+ * BeliefModifiers are all ..._TRADING, not the pre-GS ..._HOUSING, and the
+ * housing clause this catalog still carries is the pre-GS one. See the row.
  */
 const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
   // ---- PANTHEONS ----
@@ -233,10 +244,10 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
 
   // ---- FOUNDER ----
   TITHE: {
-    'effects.perFollowers.per':
-      xml('ModifierArguments', 'ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=PerXItems', 'Value',
-        { note: "GS's Tithe is BELIEF_YIELD_PER_CITY, not per follower — the engine kept the pre-GS clause" }),
-    'effects.perFollowers.yields.gold':
+    // GS replaced the pre-GS TITHE_GOLD_FOLLOWER (BELIEF_YIELD_PER_FOLLOWER,
+    // 1 gold per 4) with TITHE_GOLD_CITY: BELIEF_YIELD_PER_CITY, Amount 3,
+    // PerXItems 1 — the same shape PILGRIMAGE's faith takes.
+    'effects.perCity.gold':
       xml('ModifierArguments', 'ModifierId=TITHE_GOLD_CITY_MODIFIER&Name=Amount', 'Value'),
   },
   WORLD_CHURCH: {
@@ -274,9 +285,10 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=ITINERANT_PREACHERS_SPREAD_DISTANCE&Name=DistanceChange', 'Value'),
   },
   SCRIPTURE: {
-    'effects.spreadPressureMult':
-      xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier', 'Value',
-        { note: "the install's SpreadMultiplier is a PERCENT (25), i.e. a x1.25 lump, not x1.5" }),
+    'effects.spreadPressureMult': {
+      derived: '1 + SpreadMultiplier/100 — the install writes the PERCENT (25), the catalog the multiplier',
+      inputs: [xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier', 'Value')],
+    },
   },
   JUST_WAR: {
     'effects.combatNearFollowing':
@@ -311,9 +323,6 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('STONE_CIRCLES', 'Stone Circles', '+2 faith from each Quarry.', {
       improvementYields: { QUARRY: { faith: 2 } },
     }),
-    B('ORAL_TRADITION', 'Oral Tradition', '+1 culture from each Plantation.', {
-      improvementYields: { PLANTATION: { culture: 1 } },
-    }),
     B('LADY_OF_THE_REEDS', 'Lady of the Reeds and Marshes', '+2 production from Marsh, Oasis and Floodplains tiles.', {
       featureYields: { MARSH: { production: 2 }, OASIS: { production: 2 }, FLOODPLAINS: { production: 2 } },
     }),
@@ -329,8 +338,8 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('DIVINE_SPARK', 'Divine Spark', '+1 great person point from Holy Sites (Prophet), Campuses (Scientist) and Theater Squares (Artist).', {
       gppFlat: { PROPHET: 1, SCIENTIST: 1, ARTIST: 1 },
     }),
-    B('RIVER_GODDESS', 'River Goddess', '+1 amenity and +1 housing in cities whose center is on a river.', {
-      riverCity: { amenities: 1, housing: 1 },
+    B('RIVER_GODDESS', 'River Goddess', '+2 amenities and +2 housing in cities whose center is on a river.', {
+      riverCity: { amenities: 2, housing: 2 },
     }),
     B('GODDESS_OF_FESTIVALS', 'Goddess of Festivals', '+1 culture from improved luxury resources.', {
       improvementOnResource: { category: 'luxury', yields: { culture: 1 } },
@@ -366,20 +375,31 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('WORK_ETHIC', 'Work Ethic', 'Holy Site adjacency bonus also provides production.', {
       workEthic: true,
     }),
-    B('FEED_THE_WORLD', 'Feed the World', 'Shrines +1 food, Temples +2 food.', {
-      buildingYields: { SHRINE: { food: 1 }, TEMPLE: { food: 2 } },
+    B('FEED_THE_WORLD', 'Feed the World', 'Shrines +3 food, Temples +3 food.', {
+      buildingYields: { SHRINE: { food: 3 }, TEMPLE: { food: 3 } },
     }),
     B('CHORAL_MUSIC', 'Choral Music', 'Shrines +2 culture, Temples +4 culture.', {
       buildingYields: { SHRINE: { culture: 2 }, TEMPLE: { culture: 4 } },
     }),
+    // GAP (maintainer build, both engines). GS re-wrote this belief: its four
+    // BeliefModifiers are RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}
+    // _TRADING, each a MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_
+    // INTERNATIONAL of YIELD_GOLD Amount 2, on a city that follows the
+    // religion, once per Holy Site / Shrine / Temple / Tier-3 worship building
+    // it holds. NO effect kind on either engine expresses that: the closest,
+    // `tradeReligionYields`, pays a flat amount on a DOMESTIC route keyed on
+    // the DESTINATION's religion (cpu/core/trade.ts), with no INTERNATIONAL
+    // qualifier and no per-building count in the ORIGIN. Until that effect
+    // exists the row keeps its PRE-GS clause (the RELIGIOUS_COMMUNITY_*_HOUSING
+    // modifiers Beliefs.xml still defines but GS no longer attaches).
     B('RELIGIOUS_COMMUNITY', 'Religious Community', '+1 housing from Shrines and Temples.', {
       buildingHousing: { SHRINE: 1, TEMPLE: 1 },
     }),
     B('ZEN_MEDITATION', 'Zen Meditation', '+1 amenity in cities with 2+ specialty districts.', {
       amenitiesIfSpecialty: { min: 2, amenities: 1 },
     }),
-    B('DIVINE_INSPIRATION', 'Divine Inspiration', '+2 faith from each world wonder in the city.', {
-      faithPerWonder: 2,
+    B('DIVINE_INSPIRATION', 'Divine Inspiration', '+4 faith from each world wonder in the city.', {
+      faithPerWonder: 4,
     }),
     B('JESUIT_EDUCATION', 'Jesuit Education', 'May purchase Campus and Theater Square buildings with faith.', {}),
     B('RELIQUARIES', 'Reliquaries', 'Triple faith and tourism from relics.', {}),
@@ -389,17 +409,14 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 
 export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
-    B('TITHE', 'Tithe', '+1 gold for every 4 followers.', {
-      perFollowers: { per: 4, yields: { gold: 1 } },
+    B('TITHE', 'Tithe', '+3 gold for each city following your religion.', {
+      perCity: { gold: 3 },
     }),
-    B('WORLD_CHURCH', 'World Church', '+1 culture for every 5 followers.', {
-      perFollowers: { per: 5, yields: { culture: 1 } },
+    B('WORLD_CHURCH', 'World Church', '+1 culture for every 4 followers.', {
+      perFollowers: { per: 4, yields: { culture: 1 } },
     }),
-    B('CROSS_CULTURAL_DIALOGUE', 'Cross-Cultural Dialogue', '+1 science for every 5 followers.', {
-      perFollowers: { per: 5, yields: { science: 1 } },
-    }),
-    B('CHURCH_PROPERTY', 'Church Property', '+2 gold for each city following your religion.', {
-      perCity: { gold: 2 },
+    B('CROSS_CULTURAL_DIALOGUE', 'Cross-Cultural Dialogue', '+1 science for every 4 followers.', {
+      perFollowers: { per: 4, yields: { science: 1 } },
     }),
     B('PILGRIMAGE', 'Pilgrimage', '+2 faith for each city following your religion.', {
       perCity: { faith: 2 },
@@ -418,20 +435,21 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 /**
  * Enhancer beliefs — the fifth belief slot, added when a founded
  * religion is ENHANCED (real Civ 6: spend a second Great Prophet / an
- * Apostle). Every real GS enhancer boosts a system this engine does not model
- * (religious pressure range, missionary/apostle spread & cost, theological or
- * territorial religious combat, faith-generating trade routes), so they land
- * INERT (empty effects). The slot, catalog and seat-0 choose-path exist; the
- * effects and seat enhancer claiming are deferred follow-ups.
+ * Apostle). Each of the five boosts a system this engine DOES model —
+ * pressure range, spread strength, missionary purchase cost, and the two
+ * religion-keyed combat adders — and every one of them is live.
  */
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
-    B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads two tiles further.', {
-      pressureRangeBonus: 2,
+    B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads three tiles further.', {
+      pressureRangeBonus: 3,
     }),
-    B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {
-      missionaryChargeBonus: 1,
-      spreadPressureMult: 1.5, // lump 10 → 15
+    // GS's SCRIPTURE_SPEAD_STRENGTH carries SpreadMultiplier 25 and nothing
+    // else that this catalog has a column for: no spread-charge argument
+    // anywhere in the install, so the +1 missionary charge this row used to
+    // grant is gone.
+    B('SCRIPTURE', 'Scripture', 'Religious spreads land 25% more pressure.', {
+      spreadPressureMult: 1.25, // lump 200 → 250
     }),
     B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {
       combatNearFollowing: 10, // within JUST_WAR_RANGE, unit-vs-unit
@@ -439,14 +457,8 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('DEFENDER_OF_THE_FAITH', 'Defender of the Faith', '+5 combat strength when defending in friendly-religion territory.', {
       combatDefendFollowing: 5,
     }),
-    B('CRUSADE', 'Crusade', '+10 combat strength against units in cities following your religion.', {
-      combatVsUnitInFollowing: 10,
-    }),
     B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
       missionaryCostMult: 0.7,
-    }),
-    B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {
-      tradeReligionYields: { gold: 2, faith: 2 },
     }),
   ].map((b) => [b.id, b]),
 );
@@ -501,7 +513,8 @@ export function routePressureShare(amount: number, turn: number): number {
 }
 
 /** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the lump a full-health
- * Spread lands on the target city; SCRIPTURE multiplies it x1.5 (300). */
+ * Spread lands on the target city; SCRIPTURE multiplies it x1.25 (250) —
+ * SCRIPTURE_SPEAD_STRENGTH's SpreadMultiplier is a PERCENT. */
 export const SPREAD_PRESSURE = 200;
 
 /** the religion a city FOLLOWS: the strongest pressure, when it holds more

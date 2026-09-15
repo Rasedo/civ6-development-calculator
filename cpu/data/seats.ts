@@ -54,9 +54,11 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 // at the definition: RELIC_*, TOURISM_PER_VISITOR_PER_CIV,
 // CULTURE_PER_DOMESTIC_TOURIST, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_*,
 // DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, DEDICATIONS, DED_EVENT_SCORE,
-// WAR_MIN_TURNS. The rest is deliberate model tuning, not Civ 6 values: the
-// aggression/settle cadence, the ERA_* thresholds (pinned to this model's own
-// measured distribution), the gang-up bar, and the governor constants.
+// WAR_MIN_TURNS, and the age bars ERA_DARK_T / ERA_GOLDEN_T, which are the
+// install's own DARK_AGE_SCORE_BASE_THRESHOLD and
+// GOLDEN_AGE_SCORE_BASE_THRESHOLD. The rest is deliberate model tuning, not
+// Civ 6 values: the aggression/settle cadence, the gang-up bar, and the
+// governor constants.
 //
 // SHIPPED-ONLY: DOW_PROXIMITY has no TypeScript reader. It exists to reach
 // rules.json, where the denounce decider reads it.
@@ -259,14 +261,15 @@ export const ERA_SCORE_GP = 1; // earned a Great Person
 export const ERA_SCORE_MOMENT_MIN = srcConst('eras.momentMin', 2,
   modArg('TAJ_MAHAL_EXTRA_ERA_SCORE', 'MinScore'));
 /** CIV6 (Ages): the era-score bars are PER CIV and MOVE — the Dark bar is
- *  "12 + city number when era begin - 5 * dark ages you entered before
- *  + 5 * golden/hero ages you entered before", the Golden bar the same
- *  with 24 (so the gap is a fixed 12). The score window resets each era
- *  here, which is the real game's cumulative "current points" term folded
- *  away. No speed scaling is published for either bar. */
-export const ERA_DARK_T = srcConst('eras.darkT', 12,
+ *  DARK_AGE_SCORE_BASE_THRESHOLD "+ city number when era begin - 5 * dark ages
+ *  you entered before + 5 * golden/hero ages you entered before", the Golden
+ *  bar the same off GOLDEN_AGE_SCORE_BASE_THRESHOLD (so the gap is a fixed 14).
+ *  The score window resets each era here, which is the real game's cumulative
+ *  "current points" term folded away. No speed scaling is published for either
+ *  bar; both numbers are GlobalParameters cells, not model tuning. */
+export const ERA_DARK_T = srcConst('eras.darkT', 14,
   gp('DARK_AGE_SCORE_BASE_THRESHOLD'));
-export const ERA_GOLDEN_T = srcConst('eras.goldenT', 24,
+export const ERA_GOLDEN_T = srcConst('eras.goldenT', 28,
   gp('GOLDEN_AGE_SCORE_BASE_THRESHOLD'));
 export const AGE_PREV_STEP = srcConst('eras.agePrevStep', 5,
   gp('THRESHOLD_SHIFT_PER_PAST_GOLDEN_AGE'));
@@ -448,8 +451,8 @@ const CONGRESS_SRC: Record<string, SrcMap> = {
   },
   WORLD_RELIGION: {
     target: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'TargetKind', { expect: 'RELIGION' }),
-    minEra: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'EarliestEra', { expect: 'ERA_INDUSTRIAL' }),
-    maxEra: { derived: '99 where the install row names no LatestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'LatestEra')] },
+    minEra: { derived: '0 where the install row names no EarliestEra', inputs: [xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'EarliestEra')] },
+    maxEra: xml('Resolutions', 'ResolutionType=WC_RES_WORLD_RELIGION', 'LatestEra', { expect: 'ERA_INDUSTRIAL' }),
   },
   ESPIONAGE_PACT: {
     target: xml('Resolutions', 'ResolutionType=WC_RES_ESPIONAGE_PACT', 'TargetKind', { expect: 'UNITOPERATION' }),
@@ -534,9 +537,10 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   { id: 'MILITARY_ADVISORY', name: 'Military Advisory', minEra: 0, maxEra: 6, target: 'promoClass' },
   // CIV6: "A: +10 Religious Combat Strength for all units of this Religion. /
   // B: Condemning a unit of this Religion yields 25 Diplomatic Favor."
-  // (Industrial+) A religion IS its founder's seat here, so the target space
-  // is the seat roster.
-  { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 4, maxEra: 99, target: 'religion' },
+  // CIV6 (Expansion2_Congress.xml): NO EarliestEra, LatestEra ERA_INDUSTRIAL —
+  // available from the start THROUGH the Industrial era, not from it. A
+  // religion IS its founder's seat here, so the target space is the seat roster.
+  { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 0, maxEra: 4, target: 'religion' },
   // CIV6: "A: Appointing and promoting a Governor of this type yields 15
   // Diplomatic Favor. / B: All active Governors of this type are neutralized
   // for 6 Turns." The published table gives it no era window.
@@ -1145,14 +1149,15 @@ export const COMPETITION_SPACE_STATION = 3;
 export const VISIBILITY_LEVELS = ['NONE', 'LIMITED', 'OPEN', 'SECRET', 'TOP_SECRET'] as const;
 export const VISIBILITY_MAX = srcConst('eras.visibilityMax', VISIBILITY_LEVELS.length - 1,
   { derived: 'VISIBILITY_LEVELS.length - 1 — CIV6 (Diplomatic Visibility and Gossip) names five levels: None, Limited, Open, Secret, Top Secret' });
-/** CIV6 (Delegations and Embassies): "Delegations cost 10 Gold and Embassies
- *  cost 25 Gold, which is paid to the other leader", each worth "1 level of
- *  Diplomatic Visibility". The Resident Embassy "replaces" the Delegation once
- *  its civic is in, so a seat holds ONE mission with another and pays whatever
- *  its own civics make that mission cost. */
-export const DELEGATION_COST = srcConst('eras.delegationCost', 10,
+/** CIV6 (Delegations and Embassies): DiplomaticActions.Cost prices the
+ *  Delegation at 25 Gold and the Resident Embassy at 50, "which is paid to the
+ *  other leader", each worth "1 level of Diplomatic Visibility". The Resident
+ *  Embassy "replaces" the Delegation once its civic is in, so a seat holds ONE
+ *  mission with another and pays whatever its own civics make that mission
+ *  cost. */
+export const DELEGATION_COST = srcConst('eras.delegationCost', 25,
   xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DIPLOMATIC_DELEGATION', 'Cost'));
-export const EMBASSY_COST = srcConst('eras.embassyCost', 25,
+export const EMBASSY_COST = srcConst('eras.embassyCost', 50,
   xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_RESIDENT_EMBASSY', 'Cost'));
 export const EMBASSY_CIVIC = srcConst('eras.embassyCivic', 'DIPLOMATIC_SERVICE',
   xml('Civics', 'CivicType=CIVIC_DIPLOMATIC_SERVICE', 'CivicType', { expect: 'CIVIC_DIPLOMATIC_SERVICE' }));

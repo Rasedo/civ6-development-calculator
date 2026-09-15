@@ -337,7 +337,6 @@ const POLICY_SRC: Record<string, SrcMap> = {
   },
   LIBERALISM: {
     kind: xml('Policies', 'PolicyType=POLICY_LIBERALISM', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
-    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_LIBERALISM', 'ObsoletePolicy')] },
     'effects.amenitiesIfSpecialty.amenities': xml('ModifierArguments', 'ModifierId=LIBERALISM_SPECIALTYAMENITY&Name=Amount', 'Value'),
   },
   NEW_DEAL: {
@@ -654,7 +653,8 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('FREE_MARKETS', 'Free Market', 'economic', '+100% gold from Commercial Hub buildings; +50% more at population 15+, +50% more at +4 adjacency.', undefined, {
       buildingYieldBoost: { district: 'COMMERCIAL_HUB', yield: 'gold', pct: 1, popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
     }),
-    P('LIBERALISM', 'Liberalism', 'economic', '+1 amenity in cities with 2+ specialty districts.', 'SUFFRAGE', {
+    // the install writes POLICY_LIBERALISM no ObsoletePolicies row: it never retires.
+    P('LIBERALISM', 'Liberalism', 'economic', '+1 amenity in cities with 2+ specialty districts.', undefined, {
       amenitiesIfSpecialty: { min: 2, amenities: 1 },
     }),
     P('NEW_DEAL', 'New Deal', 'economic', '+4 housing and +2 amenities in cities with 3+ specialty districts.', undefined, {
@@ -1105,10 +1105,10 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { governorPerCitizen: { production: 0.6 } },
       '+0.6 production per citizen in cities with governors.'),
     // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength. War
-    // Weariness reduced by 15%."
+    // Weariness reduced by 20%" — ModifierArguments[FASCISM_WAR_WEARINESS].Amount 20.
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
-      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 },
-      '+5 combat strength for all units; -15% war weariness.'),
+      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 20 },
+      '+5 combat strength for all units; -20% war weariness.'),
   ].map((g) => [g.id, { ...g, bonus: GOV_BONUS[g.id], src: GOVERNMENT_SRC[g.id] }]),
 );
 

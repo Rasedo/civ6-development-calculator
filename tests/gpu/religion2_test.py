@@ -17,17 +17,16 @@ Covered (all gate-unreachable):
      faith down by exactly that price; the base
      row has 3 charges.
   2. Missionary BUY pricing — HOLY_ORDER prices it 30% off (mcostMult row); SCRIPTURE
-     grants 4 charges (mchg row).
+     grants no extra charge (GS carries no mchg for it — the base 3).
   3. Missionary BUY gating — cap 2 (no third), no Shrine (no buy), incomplete /
      pillaged Holy Site (no buy).
   4. Missionary WALK — driver policy, not engine; only the SPREAD half is poked.
-  5. Missionary SPREAD — +10 lump (15 SCRIPTURE) into the target city's
+  5. Missionary SPREAD — the +200 lump (250 SCRIPTURE, x1.25) into the target city's
      accumulator for g, charge −1, and death (major_unit_alive False, tile cleared) at 0.
-  6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 2.
-  7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), CRUSADE onto following
-     territory (atk +10), DEFENDER of the faith on following territory (def +5).
-  8. MESSENGER_OF_THE_GODS — +2 gold +2 faith on a domestic route whose dest
-     follows this civ seat's religion.
+  6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 3.
+  7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), DEFENDER of the faith on
+     following territory (def +5). (CRUSADE and MESSENGER_OF_THE_GODS are not in
+     the install and left the pool with #264; their wire columns read 0.)
   9. Religious victor (direct) — seat 0 wins with 0, a civ seat wins with g, the
      not-every-seat refusal (-1), and the cityless-seat exclusion.
  10. Religious victor (through-step) — a step flips victory_type to 4 (religion)
@@ -87,12 +86,10 @@ def enh_rows(sim) -> dict:
 
     return {
         "ITINERANT": row(e["presR"] > 0),
-        "SCRIPTURE": row(e["mchg"] == 1),
+        "SCRIPTURE": row(e["mlump"] != e["mlump"][0]),
         "JUST_WAR": row(e["cnear"] != 0),
         "DEFENDER": row(e["cdef"] != 0),
-        "CRUSADE": row(e["cvs"] != 0),
         "HOLY_ORDER": row(e["mcostMult"] != float(e["mcostMult"][0])),
-        "MESSENGER": row(e["tradeRel"].abs().sum(dim=1) > 0),
     }
 
 
@@ -261,7 +258,7 @@ def poke_missionary_buy(rules, rj, path):
 def poke_missionary_pricing(rules, rj, path):
     """2. HOLY_ORDER prices the missionary 30% under the catalog base (mcostMult,
     CIV6 "Missionaries and Apostles are 30% cheaper to purchase"); SCRIPTURE
-    grants 4 charges (mchg row)."""
+    grants no extra charge in GS (mchg 0), so its missionary carries the base 3."""
     sim = build(rules, path)
     r, j = 0, 0
     E = enh_rows(sim)
@@ -272,7 +269,7 @@ def poke_missionary_pricing(rules, rj, path):
     ho = round(cost * float(mm))
     got = int(sim._unit_faith_cost(r + 1, sim._missionary_idx, mm)[0])
     assert got == ho, f"HOLY_ORDER missionary price must be {ho}, read {got}"
-    assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 1, "SCRIPTURE mchg row must be +1"
+    assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 0, "GS SCRIPTURE carries no charge bonus"
     assert int(sim._type_charges[sim._missionary_idx]) == 3, "base missionary charges must be 3"
 
     def one_buy(enh_idx: int, faith0: float):
@@ -306,7 +303,7 @@ def poke_missionary_pricing(rules, rj, path):
     assert len(ms) == 1, f"HOLY_ORDER founder with {ho} faith did not buy"
     assert abs(debit - ho) < 1e-6, f"HOLY_ORDER debit not {ho} ({debit})"
 
-    # SCRIPTURE: the bought missionary carries 4 charges (3 + mchg 1).
+    # SCRIPTURE: the bought missionary carries the base 3 charges (no mchg in GS).
     s2 = build(rules, path)
     E2 = enh_rows(s2)
     isolate_faith(s2, r)
@@ -323,8 +320,8 @@ def poke_missionary_pricing(rules, rj, path):
     s2._seat_phase()
     ms2 = live_missionaries(s2, r)
     assert len(ms2) == 1, "SCRIPTURE founder did not buy"
-    assert int(s2.major_unit_charges[0, ms2[0]]) == 4, f"SCRIPTURE missionary must carry 4 charges, got {int(s2.major_unit_charges[0, ms2[0]])}"
-    print(f"  2 missionary pricing OK (HOLY_ORDER -{ho} faith; SCRIPTURE 4 charges)")
+    assert int(s2.major_unit_charges[0, ms2[0]]) == 3, f"SCRIPTURE missionary must carry 3 charges, got {int(s2.major_unit_charges[0, ms2[0]])}"
+    print(f"  2 missionary pricing OK (HOLY_ORDER -{ho} faith; SCRIPTURE 3 charges)")
 
 
 def poke_missionary_gating(rules, rj, path):
@@ -404,8 +401,8 @@ def drive_spread(sim, r: int, u: int, target: int) -> None:
 
 
 def poke_missionary_spread(rules, rj, path):
-    """5. A missionary within 1 of a non-following target adds the lump (10 base,
-    15 SCRIPTURE) to that city's accumulator for g, spends a charge, and dies at
+    """5. A missionary within 1 of a non-following target adds the lump (200 base,
+    250 SCRIPTURE) to that city's accumulator for g, spends a charge, and dies at
     0 charges (tile cleared)."""
     def run(enh_idx, expect_lump, charges):
         sim = build(rules, path)
@@ -432,40 +429,40 @@ def poke_missionary_spread(rules, rj, path):
         return sim, u, nb
 
     # base lump 10, charges 2 -> survives at 1
-    # CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the full-health lump; Scripture x1.5
+    # CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the full-health lump; Scripture x1.25
     sim, u, nb = run(None, 200, charges=2)
     assert bool(sim.major_unit_alive[0, u]) and int(sim.major_unit_charges[0, u]) == 1, "spread must drop a charge and survive at 1"
 
-    # SCRIPTURE lump 300, charges 1 -> dies at 0
-    sim2, u2, nb2 = run("SCRIPTURE", 300, charges=1)
+    # SCRIPTURE lump 250 (SpreadMultiplier 25 is a percent), charges 1 -> dies at 0
+    sim2, u2, nb2 = run("SCRIPTURE", 250, charges=1)
     assert not bool(sim2.major_unit_alive[0, u2]), "missionary must die at 0 charges"
     assert int(sim2.civilian_at[0, nb2]) < 0, "dead missionary's tile must be cleared"
-    print("  5 missionary spread OK (+200 base / +300 SCRIPTURE, charge -1, death at 0)")
+    print("  5 missionary spread OK (+200 base / +250 SCRIPTURE, charge -1, death at 0)")
 
 
 def poke_presr(rules, rj, path):
     """6. ITINERANT_PREACHERS presR widens the religion's spread range by exactly
-    2: a city at distance base+2 receives pressure only with the enhancer, and a
-    city at base+3 never does."""
+    3: a city at distance base+3 receives pressure only with the enhancer, and a
+    city at base+4 never does."""
     sim = build(rules, path)
     r = 0
     g = r + 1
     E = enh_rows(sim)
     base = int(sim._pressure_range)
-    assert int(sim._enh["presR"][E["ITINERANT"] + 1]) == 2, "ITINERANT presR row must be 2"
+    assert int(sim._enh["presR"][E["ITINERANT"] + 1]) == 3, "ITINERANT presR row must be 3 (ITINERANT_PREACHERS_SPREAD_DISTANCE DistanceChange 3)"
 
-    # a holy tile A with receivers at exactly base+2 and base+3.
+    # a holy tile A with receivers at exactly base+3 and base+4.
     A = C2 = C3 = -1
     for cand in free_tiles(sim, 600):
         d = sim.pair_dist[cand]
-        has2 = bool((d == base + 2).any())
-        has3 = bool((d == base + 3).any())
+        has2 = bool((d == base + 3).any())
+        has3 = bool((d == base + 4).any())
         if has2 and has3:
             A = cand
-            C2 = int((d == base + 2).nonzero(as_tuple=True)[0][0])
-            C3 = int((d == base + 3).nonzero(as_tuple=True)[0][0])
+            C2 = int((d == base + 3).nonzero(as_tuple=True)[0][0])
+            C3 = int((d == base + 4).nonzero(as_tuple=True)[0][0])
             break
-    assert A >= 0, f"no holy tile with base+2 and base+3 receivers (base {base})"
+    assert A >= 0, f"no holy tile with base+3 and base+4 receivers (base {base})"
 
     # only religion g is founded; its HOLY CITY stands at A and FOLLOWS g (a
     # source presses only the religion it follows, the Holy City at x4), and
@@ -489,16 +486,16 @@ def poke_presr(rules, rj, path):
         sim._spread_religious_pressure()
         return int(sim.city_pressure[0, r + 1, S2, g]), int(sim.city_pressure[0, r + 1, S3, g])
 
-    # WITH ITINERANT: range base+2 -> receiver at base+2 gets the Holy City's step, base+3 nothing.
+    # WITH ITINERANT: range base+3 -> receiver at base+3 gets the Holy City's step, base+4 nothing.
     sim.civ_enhancer[:, r + 1] = E["ITINERANT"]
     p2, p3 = spread_get()
-    assert p2 == step and p3 == 0, f"ITINERANT range wrong (base+2 {p2}, base+3 {p3}, step {step})"
+    assert p2 == step and p3 == 0, f"ITINERANT range wrong (base+3 {p2}, base+4 {p3}, step {step})"
 
-    # WITHOUT the enhancer: range base -> the base+2 receiver gets nothing.
+    # WITHOUT the enhancer: range base -> the base+3 receiver gets nothing.
     sim.civ_enhancer[:, r + 1] = -1
     p2n, _ = spread_get()
-    assert p2n == 0, f"unenhanced religion reached base+2 ({p2n}) — presR leaked"
-    print(f"  6 ITINERANT presR OK (range {base} -> {base + 2}; base+2 in, base+3 out)")
+    assert p2n == 0, f"unenhanced religion reached base+3 ({p2n}) — presR leaked"
+    print(f"  6 ITINERANT presR OK (range {base} -> {base + 3}; base+3 in, base+4 out)")
 
 
 def poke_free_city_pressure(rules, rj, path):
@@ -568,9 +565,8 @@ def poke_free_city_pressure(rules, rj, path):
 
 def poke_combat_cs(rules, rj, path):
     """7. Enhancer combat CS adders, probed directly on hand-set planes:
-    JUST_WAR +10 near a following city (attacker AND defender), CRUSADE +10
-    attacking on following territory, DEFENDER +5 defending on following
-    territory."""
+    JUST_WAR +10 near a following city (attacker AND defender), DEFENDER +5
+    defending on following territory."""
     sim = build(rules, path)
     r = 0
     g = r + 1
@@ -592,10 +588,6 @@ def poke_combat_cs(rules, rj, path):
     dfn = float(sim._rel_def_cs(seat, bt)[0])
     assert atk == 10.0 and dfn == 10.0, f"JUST_WAR near adder wrong (atk {atk}, def {dfn})"
 
-    sim.civ_enhancer[:, r + 1] = E["CRUSADE"]
-    atk_c = float(sim._rel_atk_cs(seat, bt)[0])
-    assert atk_c == 10.0, f"CRUSADE attack-on-territory adder wrong ({atk_c})"
-
     sim.civ_enhancer[:, r + 1] = E["DEFENDER"]
     dfn_d = float(sim._rel_def_cs(seat, bt)[0])
     assert dfn_d == 5.0, f"DEFENDER defend-on-territory adder wrong ({dfn_d})"
@@ -612,55 +604,7 @@ def poke_combat_cs(rules, rj, path):
     sim.civ_enhancer[:, r + 1] = E["JUST_WAR"]
     z2 = float(sim._rel_atk_cs(seat, bt)[0])
     assert z2 == 0.0, f"unfounded religion must give no combat bonus ({z2})"
-    print("  7 enhancer combat CS OK (JUST_WAR +10 atk/def, CRUSADE +10 atk, DEFENDER +5 def)")
-
-
-def poke_messenger_route(rules, rj, path):
-    """8. MESSENGER_OF_THE_GODS adds +2 gold +2 faith to a domestic route whose
-    destination city follows this civ seat's religion (r+1), isolated by a
-    with-vs-without-enhancer diff on _seat_route_income."""
-    sim = build(rules, path)
-    r = 0
-    g = r + 1
-    E = enh_rows(sim)
-    sim.civ_religion_done[:, r + 1] = True
-    sim.war[:, 0, 1 + r] = sim.war[:, 1 + r, 0] = False
-    sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.barb_unit_alive[:] = False
-    sim.military_at[:] = -1  # no raiders left to suspend the route
-
-    # two dedicated civ-seat-r cities well apart; a single domestic route between.
-    FROM, DEST = 5, 6
-    tiles = free_tiles(sim, 2)
-    for s, ct in ((FROM, tiles[0]), (DEST, tiles[1])):
-        sim.city_alive[0, r + 1, s] = True
-        sim.city_center[0, r + 1, s] = ct
-        sim.city_dist_tile[0, r + 1, s] = -1  # no specialty districts -> per = 1
-    sim.city_id[0, r + 1, FROM] = 4100
-    sim.city_id[0, r + 1, DEST] = 4101
-    sim.city_followed[0, r + 1, DEST] = g  # destination follows this civ's religion
-    sim.seat_routes[:, r + 1] = -1
-    sim.seat_routes[0, r + 1, 0, 0] = 4100
-    sim.seat_routes[0, r + 1, 0, 1] = 4101
-
-    def income(enh_idx):
-        sim.civ_enhancer[:, r + 1] = enh_idx
-        sim._seat_route_cache = None
-        inc = sim._seat_route_income(r + 1)
-        assert inc is not None, "route income None with a live domestic route"
-        # engine yield order: food, prod, gold, sci, cul, faith
-        return float(inc[0, FROM, 2]), float(inc[0, FROM, 5])
-
-    g0, f0 = income(-1)
-    gM, fM = income(E["MESSENGER"])
-    assert abs((gM - g0) - 2.0) < 1e-9, f"MESSENGER gold term wrong (+{gM - g0})"
-    assert abs((fM - f0) - 2.0) < 1e-9, f"MESSENGER faith term wrong (+{fM - f0})"
-
-    # a destination NOT following g gets no Messenger term.
-    sim.city_followed[0, r + 1, DEST] = 0 if g != 0 else 1
-    g1, f1 = income(E["MESSENGER"])
-    assert abs(g1 - g0) < 1e-9 and abs(f1 - f0) < 1e-9, "Messenger term leaked to a non-following destination"
-    print("  8 MESSENGER route OK (+2 gold +2 faith on a following-dest domestic route)")
+    print("  7 enhancer combat CS OK (JUST_WAR +10 atk/def, DEFENDER +5 def)")
 
 
 def poke_victor_direct(rules, rj, path):
@@ -944,7 +888,6 @@ def main() -> None:
     poke_presr(rules, rj, path)
     poke_free_city_pressure(rules, rj, path)
     poke_combat_cs(rules, rj, path)
-    poke_messenger_route(rules, rj, path)
     poke_victor_direct(rules, rj, path)
     poke_victor_through_step(rules, rj, path)
     poke_theo_location(rules, rj, path)

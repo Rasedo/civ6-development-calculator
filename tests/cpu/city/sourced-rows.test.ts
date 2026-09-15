@@ -63,8 +63,10 @@ describe('the Lighthouse', () => {
     const worked = stats.workedTiles
       .filter((i) => state.map.tiles[i].terrain === 'COAST' || state.map.tiles[i].terrain === 'LAKE').length;
     expect(worked).toBe(2);
-    // the flat +1 rides the building's own yields; the tiles pay per worked one
-    expect(stats.total.food - before).toBeCloseTo(1 + worked, 6);
+    // LIGHTHOUSE_COAST_FOOD is the WHOLE of the Lighthouse's Food: the install
+    // writes it no Building_YieldChanges row, so the tiles pay per worked one
+    // and nothing rides the building's own yields.
+    expect(stats.total.food - before).toBeCloseTo(worked, 6);
   });
 });
 

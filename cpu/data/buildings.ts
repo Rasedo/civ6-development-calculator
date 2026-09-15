@@ -1,11 +1,14 @@
 /**
  * Buildings (base game, available to every civ; no wonders, no walls).
- * Costs + yields verified against civfanatics.com/civ6/info/building
- * — the real cost ladder 60/65/80/105/135/175/225/265/355/405/525.
- * Maintenance: every building carries the VERIFIED base-game upkeep
- * (civ6bbg.github.io/en_US/buildings_base_game.html); the
- * cost-tier heuristic in city.ts survives only as a fallback for future
- * unverified additions. Worship buildings stay 0 (faith-purchased).
+ * Every `cost` IS the install's `Buildings.Cost` for the row, through the
+ * GAME_SPEED scale the row builder at the foot of this file applies — a
+ * unique variant's `cost` is its OWN install row's Cost, never a ratio.
+ * Yields are the row's `Building_YieldChanges` rows and nothing else: a
+ * clause the install writes as a plot or city modifier (the Lighthouse's
+ * Coast Food) is a `special`, not a flat yield, so it is never paid twice.
+ * Maintenance is `Buildings.Maintenance`; the cost-tier heuristic in city.ts
+ * survives only as a fallback for future unsourced additions. Worship
+ * buildings stay 0 (faith-purchased).
  */
 
 import type { DistrictId, Yields } from '../core/types';
@@ -24,10 +27,9 @@ export interface BuildingVariant {
   name: string;
   /**
    * Every column below OVERRIDES the row it replaces; absent takes the base
-   * row's own. The install prices a unique building by its own `Cost`, but
-   * this catalog's costs come from the published ladder rather than the XML
-   * (see the file header), so a variant's cost is the install's RATIO applied
-   * to the base row's cost, and each row writes the arithmetic down.
+   * row's own. The install prices a unique building by its own `Cost`, and so
+   * does this catalog: a variant's `cost` is that row's `Buildings.Cost`,
+   * through the same GAME_SPEED scale the base row's takes.
    */
   cost?: number;
   yields?: Partial<Yields>;
@@ -235,9 +237,9 @@ export interface BuildingDef {
 }
 
 const rawList: BuildingDef[] = [
-  { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 1, autoCapital: true,
+  { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 2, autoCapital: true,
     src: {
-      cost: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Cost', { scale: GAME_SPEED }),
+      cost: { stylized: "the Palace is granted with the capital and never produced, so its price is never read; the install's Buildings.Cost 1 is a placeholder for a building nobody builds" },
       district: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       housing: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Housing'),
       amenities: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Entertainment'),
@@ -381,11 +383,17 @@ const rawList: BuildingDef[] = [
       'civVariants.0.coastResourceYields.production': xml('ModifierArguments', 'ModifierId=STAVECHURCH_SEARESOURCE_PRODUCTION&Name=Amount', 'Value'),
     },
   },
-  { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true,
+  // CIV6: the install writes the Cathedral ONE Building_YieldChanges row,
+  // YIELD_FAITH 3. There is no YIELD_CULTURE row — the Cathedral's Great Work
+  // of Art slot is what pays Culture, and this catalog has no column for it.
+  { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, worship: true,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_CATHEDRAL&YieldType=YIELD_FAITH', 'YieldChange'),
+      // documentary: the dump emits only columns the row HOLDS, so this tag is
+      // never checked — it records why there is no `yields.culture` to check.
+      'yields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_CATHEDRAL&YieldType=YIELD_CULTURE', 'YieldChange', { absent: true }),
       worship: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_CATHEDRAL', 'PrereqBuilding')] },
     },
@@ -410,7 +418,7 @@ const rawList: BuildingDef[] = [
       'yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEETING_HOUSE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
     },
   },
-  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 1, worship: true,
+  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 0, worship: true,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
@@ -523,14 +531,22 @@ const rawList: BuildingDef[] = [
     },
   },
 
-  // CIV6: "+1 Food. +1 Food in Coast and Lake tiles controlled by the city.
-  // +1 Gold. +1 Housing."
-  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, special: 'LIGHTHOUSE', maintenance: 0,
+  // CIV6: the install writes the Lighthouse NO Building_YieldChanges row at
+  // all. Its Food is the LIGHTHOUSE_COAST_FOOD plot modifier (YIELD_FOOD
+  // Amount 1 under PLOT_HAS_COAST_REQUIREMENTS) — the `special` below, paid
+  // per WORKED Coast/Lake tile in city.ts. The flat `food: 1` this row used to
+  // carry was that same fact a second time, and the `gold: 1` beside it had no
+  // install row of any kind.
+  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, special: 'LIGHTHOUSE', maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Maintenance'),
       housing: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Housing'),
+      // documentary: the dump emits only columns the row HOLDS, so these two
+      // are never checked — they record that the install has no such rows.
+      'yields.food': xml('Building_YieldChanges', 'BuildingType=BUILDING_LIGHTHOUSE&YieldType=YIELD_FOOD', 'YieldChange', { absent: true }),
+      'yields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_LIGHTHOUSE&YieldType=YIELD_GOLD', 'YieldChange', { absent: true }),
     },
   },
   { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'],
@@ -567,14 +583,16 @@ const rawList: BuildingDef[] = [
   },
   {
     id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, power: 2, poweredYields: { production: 3 }, regional: true, maintenance: 2,
-    // CIV6 (BUILDING_ELECTRONICS_FACTORY): Cost 390 against the Factory's
-    // 390 (no discount), Maintenance 2, RequiredPower 2, RegionalRange 6, and
-    // Production 4 where the Factory pays 3 — the regional row every city
-    // centre within six tiles is paid. Its "+4 Culture after Electricity"
-    // half is a TECH-gated building yield this catalog has no column for
-    // (recorded in docs/AUDIT.md).
+    // CIV6 (BUILDING_ELECTRONICS_FACTORY): Cost 330, Maintenance 2,
+    // RequiredPower 2, RegionalRange 6 — every column the Factory's own row
+    // carries, so the variant overrides none of them. Where it DOES differ is
+    // power: Building_YieldChanges pays the same Production 3 as the Factory,
+    // and Building_YieldChangesBonusWithPower pays 5 where the Factory's pays
+    // 3. The regional row every city centre within six tiles is paid. Its
+    // "+4 Culture after Electricity" half is a TECH-gated building yield this
+    // catalog has no column for (recorded in docs/AUDIT.md).
     civVariants: [{
-      civ: 'JAPAN', name: 'Electronics Factory', yields: { production: 4 },
+      civ: 'JAPAN', name: 'Electronics Factory', yields: { production: 3 }, poweredYields: { production: 5 },
     }],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_FACTORY', 'Cost', { scale: GAME_SPEED }),
@@ -586,6 +604,7 @@ const rawList: BuildingDef[] = [
       regional: { derived: 'true where the install row carries a RegionalRange', inputs: [xml('Buildings', 'BuildingType=BUILDING_FACTORY', 'RegionalRange')] },
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_FACTORY', 'PrereqBuilding')] },
       'civVariants.0.yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_ELECTRONICS_FACTORY&YieldType=YIELD_PRODUCTION', 'YieldChange'),
+      'civVariants.0.poweredYields.production': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_ELECTRONICS_FACTORY&YieldType=YIELD_PRODUCTION', 'YieldChange'),
     },
   },
   // THE THREE POWER PLANTS. CIV6 (GS): one per Industrial Zone, each
@@ -696,7 +715,7 @@ const rawList: BuildingDef[] = [
     },
   },
 
-  { id: 'HANGAR', name: 'Hangar', district: 'AERODROME', cost: 380, yields: { production: 2 }, maintenance: 1, airSlots: 2, trainXpPct: 25, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'],
+  { id: 'HANGAR', name: 'Hangar', district: 'AERODROME', cost: 380, yields: { production: 2 }, maintenance: 1, airSlots: 1, trainXpPct: 25, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_HANGAR', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_HANGAR', 'PrereqDistrict', { expect: 'DISTRICT_AERODROME' }),
@@ -707,7 +726,7 @@ const rawList: BuildingDef[] = [
       trainXpClasses: { derived: 'the promotion classes the install ability reaches, as engine class ids', inputs: [xml('Buildings', 'BuildingType=BUILDING_HANGAR', 'BuildingType')] },
     },
   },
-  { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 3 }, maintenance: 2, airSlots: 2, trainXpPct: 50, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'],
+  { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 4 }, maintenance: 2, airSlots: 1, trainXpPct: 50, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_AIRPORT', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_AIRPORT', 'PrereqDistrict', { expect: 'DISTRICT_AERODROME' }),
@@ -731,14 +750,14 @@ const rawList: BuildingDef[] = [
   },
   {
     id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2,
-    // CIV6 (BUILDING_THERMAL_BATH): Cost 360 against the Zoo's 445, so
-    // 360 x 360/445 = 291 here. Entertainment 2 against the Zoo's 1,
-    // Production 2 of its own, RegionalRange 6 — both reach every city centre
-    // within six tiles, as the Zoo's Amenity does. THERMALBATH_ADDAMENITIES
-    // pays +2 MORE Amenities while the city holds a Geothermal Fissure (its
-    // Tourism third is the channel docs/AUDIT.md records).
+    // CIV6 (BUILDING_THERMAL_BATH): Cost 360, the same price as the Zoo.
+    // Entertainment 2 against the Zoo's 1, Production 2 of its own,
+    // RegionalRange 6 — both reach every city centre within six tiles, as the
+    // Zoo's Amenity does. THERMALBATH_ADDAMENITIES pays +2 MORE Amenities
+    // while the city holds a Geothermal Fissure (its Tourism third is the
+    // channel docs/AUDIT.md records).
     civVariants: [{
-      civ: 'HUNGARY', name: 'Thermal Bath', cost: 291,
+      civ: 'HUNGARY', name: 'Thermal Bath', cost: 360,
       amenities: 2, yields: { production: 2 },
       amenitiesWithFeature: { feature: 'GEOTHERMAL_FISSURE', amount: 2 },
     }],
@@ -800,8 +819,8 @@ const rawList: BuildingDef[] = [
   },
   {
     id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true,
-    // CIV6 (BUILDING_TSIKHE): Cost 260 against the Star Fort's 305, so
-    // 300 x 260/305 = 256 here. OuterDefenseHitPoints 200 against the Star
+    // CIV6 (BUILDING_TSIKHE): Cost 260 against the Star Fort's 300.
+    // OuterDefenseHitPoints 200 against the Star
     // Fort's 100 — one tier's worth MORE perimeter, which puts a Georgian
     // city on the Urban Defenses pool while it keeps the Renaissance tier's
     // Combat Strength. Faith 4, paid again while the seat holds a Golden Age.
@@ -810,7 +829,7 @@ const rawList: BuildingDef[] = [
     // different BuildingType from the Star Fort, and Strength in Unity's
     // RENAISSANCE_WALLS row in `PROD_MULT_ROWS` already pays it here.
     civVariants: [{
-      civ: 'GEORGIA', name: 'Tsikhe', cost: 256,
+      civ: 'GEORGIA', name: 'Tsikhe', cost: 260,
       yields: { faith: 4 }, goldenAgeYields: { faith: 4 },
       wallsHpBonus: 100,
     }],
@@ -861,7 +880,7 @@ const rawList: BuildingDef[] = [
       regionalRange: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'RegionalRange'),
     },
   },
-  { id: 'AQUATICS_CENTER', name: 'Aquatics Center', district: 'WATER_PARK', cost: 660, requiresAny: ['AQUARIUM'], maintenance: 3, amenities: 1, poweredAmenities: 2, power: 2, regional: true, regionalRange: 9,
+  { id: 'AQUATICS_CENTER', name: 'Aquatics Center', district: 'WATER_PARK', cost: 480, requiresAny: ['AQUARIUM'], maintenance: 3, amenities: 1, poweredAmenities: 2, power: 2, regional: true, regionalRange: 9,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_AQUATICS_CENTER', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_AQUATICS_CENTER', 'PrereqDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),

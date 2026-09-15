@@ -188,7 +188,6 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Technologies', 'TechnologyType=TECH_MILITARY_ENGINEERING', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_MILITARY_ENGINEERING&PrereqTech=TECH_CONSTRUCTION', 'PrereqTech', { expect: 'TECH_CONSTRUCTION' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_ARMORY', 'PrereqTech', { expect: 'TECH_MILITARY_ENGINEERING' }),
-    'effects.1.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_FORT', 'PrereqTech', { expect: 'TECH_MILITARY_ENGINEERING' }),
   },
   EDUCATION: {
     era: xml('Technologies', 'TechnologyType=TECH_EDUCATION', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -201,8 +200,6 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Technologies', 'TechnologyType=TECH_BANKING', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the TechnologyPrereqs rows of TECH_BANKING, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_BANKING&PrereqTech=TECH_EDUCATION', 'PrereqTech', { expect: 'TECH_EDUCATION' }), xml('TechnologyPrereqs', 'Technology=TECH_BANKING&PrereqTech=TECH_STIRRUPS', 'PrereqTech', { expect: 'TECH_STIRRUPS' })] },
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_BANK', 'PrereqTech', { expect: 'TECH_BANKING' }),
-    'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_GOLD&PrereqTech=TECH_BANKING', 'ImprovementType', { expect: 'IMPROVEMENT_QUARRY' }),
-    'effects.1.yields.gold': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_GOLD&PrereqTech=TECH_BANKING', 'BonusYieldChange'),
   },
   MASS_PRODUCTION: {
     era: xml('Technologies', 'TechnologyType=TECH_MASS_PRODUCTION', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -275,14 +272,15 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_STEEL', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Technologies', 'TechnologyType=TECH_STEEL', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_STEEL&PrereqTech=TECH_RIFLING', 'PrereqTech', { expect: 'TECH_RIFLING' }),
-    'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_OIL_WELL', 'PrereqTech', { expect: 'TECH_STEEL' }),
-    'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_STEEL', 'ImprovementType', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
-    'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_STEEL', 'BonusYieldChange'),
+    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_STEEL', 'ImprovementType', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
+    'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_STEEL', 'BonusYieldChange'),
   },
   REPLACEABLE_PARTS: {
     era: xml('Technologies', 'TechnologyType=TECH_REPLACEABLE_PARTS', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Technologies', 'TechnologyType=TECH_REPLACEABLE_PARTS', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_REPLACEABLE_PARTS&PrereqTech=TECH_ECONOMICS', 'PrereqTech', { expect: 'TECH_ECONOMICS' }),
+    'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_REPLACEABLE_PARTS', 'ImprovementType', { expect: 'IMPROVEMENT_PASTURE' }),
+    'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_REPLACEABLE_PARTS', 'BonusYieldChange'),
   },
   IRON_WORKING: {
     era: xml('Technologies', 'TechnologyType=TECH_IRON_WORKING', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -355,6 +353,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Technologies', 'TechnologyType=TECH_SIEGE_TACTICS', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_SIEGE_TACTICS&PrereqTech=TECH_CASTLES', 'PrereqTech', { expect: 'TECH_CASTLES' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'PrereqTech', { expect: 'TECH_SIEGE_TACTICS' }),
+    'effects.1.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_FORT', 'PrereqTech', { expect: 'TECH_SIEGE_TACTICS' }),
   },
   STEAM_POWER: {
     era: xml('Technologies', 'TechnologyType=TECH_STEAM_POWER', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -387,6 +386,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_REFINING', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Technologies', 'TechnologyType=TECH_REFINING', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_REFINING&PrereqTech=TECH_RIFLING', 'PrereqTech', { expect: 'TECH_RIFLING' }),
+    'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_OIL_WELL', 'PrereqTech', { expect: 'TECH_REFINING' }),
   },
   PLASTICS: {
     era: xml('Technologies', 'TechnologyType=TECH_PLASTICS', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -480,8 +480,8 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_ROBOTICS', 'EraType', { expect: 'ERA_INFORMATION' }),
     cost: xml('Technologies', 'TechnologyType=TECH_ROBOTICS', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the TechnologyPrereqs rows of TECH_ROBOTICS, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_ROBOTICS&PrereqTech=TECH_COMPUTERS', 'PrereqTech', { expect: 'TECH_COMPUTERS' }), xml('TechnologyPrereqs', 'Technology=TECH_ROBOTICS&PrereqTech=TECH_SATELLITES', 'PrereqTech', { expect: 'TECH_SATELLITES' }), xml('TechnologyPrereqs', 'Technology=TECH_ROBOTICS&PrereqTech=TECH_GUIDANCE_SYSTEMS', 'PrereqTech', { expect: 'TECH_GUIDANCE_SYSTEMS' }), xml('TechnologyPrereqs', 'Technology=TECH_ROBOTICS&PrereqTech=TECH_LASERS', 'PrereqTech', { expect: 'TECH_LASERS' })] },
-    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_ROBOTICS', 'ImprovementType', { expect: 'IMPROVEMENT_PASTURE' }),
-    'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_ROBOTICS', 'BonusYieldChange'),
+    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_FOOD&PrereqTech=TECH_ROBOTICS', 'ImprovementType', { expect: 'IMPROVEMENT_PASTURE' }),
+    'effects.0.yields.food': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_FOOD&PrereqTech=TECH_ROBOTICS', 'BonusYieldChange'),
   },
   TELECOMMUNICATIONS: {
     era: xml('Technologies', 'TechnologyType=TECH_TELECOMMUNICATIONS', 'EraType', { expect: 'ERA_INFORMATION' }),
@@ -609,25 +609,15 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 390, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'ARMORY' },
-      // The FORT ships with its improvement def, its
-      // Military-Engineer-only placement rule, its +4 terrain defence and two
-      // constructed test lanes — but NO tech ever unlocked it, so
-      // `unlocks.improvements` never contained it and `unlocked('FORT')` was
-      // true only in sandbox. Neither seat could build one. MEASURED: across
-      // the 12-seed gate the seat production arm was reached 526 times (325 of
-      // them at war) and the FORT was never once unlocked. This — not the
-      // absent production policy — is why it was never reachable.
-      // Real Civ 6 unlocks the Fort with Military Engineering, the same tech
-      // that trains the Military Engineer.
-      { kind: 'unlockImprovement', improvement: 'FORT' },
     ]),
     T('EDUCATION', 'Education', 'Medieval', 390, ['APPRENTICESHIP', 'MATHEMATICS'], [
       { kind: 'unlockBuilding', building: 'UNIVERSITY' },
     ]),
     T('BANKING', 'Banking', 'Renaissance', 600, ['EDUCATION', 'STIRRUPS'], [
       { kind: 'unlockBuilding', building: 'BANK' },
-      // CIV6 (Quarry): "+2 Gold (requires Banking)".
-      { kind: 'improvementYields', improvement: 'QUARRY', yields: { gold: 2 } },
+      // no Quarry clause: Improvement_BonusYieldChanges has NO row for the
+      // Quarry at TECH_BANKING (its bonus rows are +1 Production at Gunpowder,
+      // Rocketry and Predictive Systems).
     ]),
 
     T('MASS_PRODUCTION', 'Mass Production', 'Renaissance', 600, ['EDUCATION', 'BUTTRESS', 'MILITARY_TACTICS'], [
@@ -668,12 +658,13 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'RESEARCH_LAB' },
     ]),
     T('STEEL', 'Steel', 'Modern', 1250, ['RIFLING'], [
-      { kind: 'unlockImprovement', improvement: 'OIL_WELL' },
       // CIV6 (Lumber Mill): "+1 Production (requires Steel)".
       { kind: 'improvementYields', improvement: 'LUMBER_MILL', yields: { production: 1 } },
     ]),
     T('REPLACEABLE_PARTS', 'Replaceable Parts', 'Modern', 1250, ['ECONOMICS'], [
       { kind: 'farmAdjacency' },
+      // Improvement_BonusYieldChanges row 232.
+      { kind: 'improvementYields', improvement: 'PASTURE', yields: { production: 1 } },
     ]),
 
 
@@ -703,6 +694,11 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 730, ['CARTOGRAPHY']),
     T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 730, ['CASTLES'], [
       { kind: 'unlockBuilding', building: 'RENAISSANCE_WALLS' },
+      // Improvements.xml: IMPROVEMENT_FORT's PrereqTech is TECH_SIEGE_TACTICS,
+      // NOT Military Engineering (which only trains the Military Engineer that
+      // places it). Until #264 the Fort hung off Military Engineering here and
+      // the row's comment asserted the install said so.
+      { kind: 'unlockImprovement', improvement: 'FORT' },
     ]),
 
     T('STEAM_POWER', 'Steam Power', 'Industrial', 1070, ['INDUSTRIALIZATION'], [
@@ -715,7 +711,11 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockImprovement', improvement: 'AIRSTRIP' },
     ]),
     T('COMBUSTION', 'Combustion', 'Modern', 1370, ['STEEL', 'REFINING']),
-    T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING']),
+    T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING'], [
+      // Expansion2_Improvements.xml: IMPROVEMENT_OIL_WELL's PrereqTech is
+      // TECH_REFINING (GS moved it off Steel).
+      { kind: 'unlockImprovement', improvement: 'OIL_WELL' },
+    ]),
     T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION'], [
       // CIV6 (Fishing Boats): "+1 Food (requires Plastics)".
       { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { food: 1 } },
@@ -738,8 +738,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ADVANCED_BALLISTICS', 'Advanced Ballistics', 'Atomic', 1480, ['REPLACEABLE_PARTS', 'STEEL']),
     T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS'], [
       { kind: 'unlockImprovement', improvement: 'GEOTHERMAL_PLANT' },
-      // CIV6 (Camp): "+1 Gold (requires Synthetic Materials)".
-      { kind: 'improvementYields', improvement: 'CAMP', yields: { gold: 1 } },
+      // Improvement_BonusYieldChanges row 225: the Camp's Synthetic Materials
+      // bonus is +2 Gold.
+      { kind: 'improvementYields', improvement: 'CAMP', yields: { gold: 2 } },
     ]),
     T('COMPOSITES', 'Composites', 'Information', 1850, ['SYNTHETIC_MATERIALS'], [
       { kind: 'unlockImprovement', improvement: 'WIND_FARM' },
@@ -754,8 +755,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('NANOTECHNOLOGY', 'Nanotechnology', 'Information', 2155, ['COMPOSITES']),
     T('NUCLEAR_FUSION', 'Nuclear Fusion', 'Information', 2155, ['LASERS']),
     T('ROBOTICS', 'Robotics', 'Information', 2155, ['COMPUTERS', 'SATELLITES', 'GUIDANCE_SYSTEMS', 'LASERS'], [
-      // CIV6 (Pasture): "+1 Production (requires Robotics)".
-      { kind: 'improvementYields', improvement: 'PASTURE', yields: { production: 1 } },
+      // Improvement_BonusYieldChanges row 233: the Pasture's Robotics bonus is
+      // +1 FOOD. Its +1 Production is row 232, at Replaceable Parts.
+      { kind: 'improvementYields', improvement: 'PASTURE', yields: { food: 1 } },
     ]),
     T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 1850, ['COMPUTERS']),
 

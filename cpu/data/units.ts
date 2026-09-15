@@ -898,10 +898,11 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         requiresCivic: xml('Units', 'UnitType=UNIT_TRADER', 'PrereqCivic', { expect: 'CIVIC_FOREIGN_TRADE' }),
       },
     }),
-    // The NATURALIST, sourced from the GS Civilopedia via the wiki — a MODERN
-    // civilian behind the CONSERVATION civic, 4 moves, bought with FAITH ONLY
-    // ("It can only be purchased with Faith in any city"), Cost 300 at GS
-    // (600 faith) and progressive, consumed when it designates a National Park.
+    // The NATURALIST — a MODERN civilian behind the CONSERVATION civic, 4
+    // moves, bought with FAITH ONLY ("It can only be purchased with Faith in
+    // any city"), Units.xml Cost 300 and progressive, and Units.xml
+    // ParkCharges 1: the one charge a National Park designation spends, so the
+    // unit is consumed by its single park.
     // APPENDED LAST (roster order is the GPU's unit index).
     U({
       id: 'NATURALIST',
@@ -911,7 +912,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian
-      charges: 0,
+      charges: 1,  // Units.xml ParkCharges
       naturalist: true,
       requiresCivic: 'CONSERVATION',
       description: 'Designates a National Park over four contiguous tiles (consumed).',
@@ -989,7 +990,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'BATTERING_RAM',
       support: true,   // FORMATION_CLASS_SUPPORT
       name: 'Battering Ram',
-      upgradesTo: 'MEDIC',
+      upgradesTo: 'SIEGE_TOWER',
       cost: 65,
       maintenance: 1,
       moves: 2,
@@ -1001,7 +1002,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       description: 'Adjacent melee and anti-cavalry attackers do full damage to Ancient Walls.',
       src: {
         support: xml('Units', 'UnitType=UNIT_BATTERING_RAM', 'FormationClass', { expect: 'FORMATION_CLASS_SUPPORT' }),
-        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_BATTERING_RAM', 'UpgradeUnit', { expect: 'UNIT_MEDIC' }),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_BATTERING_RAM', 'UpgradeUnit', { expect: 'UNIT_SIEGE_TOWER' }),
         cost: xml('Units', 'UnitType=UNIT_BATTERING_RAM', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_BATTERING_RAM', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_BATTERING_RAM', 'BaseMoves'),
@@ -1038,9 +1039,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       },
     }),
     // The INQUISITOR — appended LAST, because roster indices ARE the GPU's
-    // unit type ids. CIV6: 100 Faith (progressive), a Temple, 70 Religious
-    // Strength, 4 Movement, 3 charges of Remove Heresy, and it may only be
-    // bought once an Apostle has Launched an Inquisition in this seat's own
+    // unit type ids. CIV6: 100 Faith (progressive), a Temple, Units.xml
+    // ReligiousStrength 75, 4 Movement, 3 charges of Remove Heresy, and it may
+    // only be bought once an Apostle has Launched an Inquisition in this seat's own
     // territory. It is the ONE religious unit that "cannot enter another
     // civilization's territory without Open Borders".
     U({
@@ -1053,7 +1054,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 3,
       faithOnly: true,
-      religiousStrength: 70,
+      religiousStrength: 75,
       description: 'Removes other religions from a city and fights theological combat (faith purchase only).',
       src: {
         cost: xml('Units', 'UnitType=UNIT_INQUISITOR', 'Cost', { scale: GAME_SPEED }),
@@ -1198,7 +1199,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'PIKE_AND_SHOT',
       name: 'Pike and Shot',
       cost: 250,
-      maintenance: 4,
+      maintenance: 3,  // Units.xml Maintenance (Expansion1_Expansion2.xml)
       moves: 2,
       combat: 55,
       antiCavalry: true,
@@ -2243,6 +2244,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       name: 'Spy',
       cost: 225,
       maintenance: 4,
+      // the install's BaseMoves is 1, but this engine's spy never WALKS: it
+      // jumps city-to-city over a travel timer, so a movement pool would only
+      // hand the applier a unit to step (memory `zero-mp-chassis`).
       moves: 0,
       combat: 0,
       requiresCivic: 'DIPLOMATIC_SERVICE',
@@ -2252,7 +2256,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       src: {
         cost: xml('Units', 'UnitType=UNIT_SPY', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SPY', 'Maintenance'),
-        moves: xml('Units', 'UnitType=UNIT_SPY', 'BaseMoves'),
+        moves: { stylized: 'the spy JUMPS between cities on a travel timer, it never steps — a movement pool (install BaseMoves 1) would be spent by nothing' },
         combat: xml('Units', 'UnitType=UNIT_SPY', 'Combat'),
         requiresCivic: xml('CivicModifiers', 'CivicType=CIVIC_DIPLOMATIC_SERVICE&ModifierId=CIVIC_GRANT_SPY', 'ModifierId', { expect: 'CIVIC_GRANT_SPY', note: 'the install has no PrereqCivic on the Spy: the civic GRANTS the first spy' }),
         spy: xml('Units', 'UnitType=UNIT_SPY', 'PromotionClass', { expect: 'PROMOTION_CLASS_SPY' }),
@@ -2507,8 +2511,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'MAMLUK',
       name: 'Mamluk',
-      cost: 180,
-      maintenance: 3,
+      cost: 220,       // Units.xml Cost (raw, pre-GAME_SPEED)
+      maintenance: 4,  // Units.xml Maintenance
       moves: 4,
       combat: 50,
       cavalry: true,
@@ -2787,7 +2791,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'VARU',
       name: 'Varu',
       cost: 120,
-      maintenance: 3,
+      maintenance: 2,  // Units.xml Maintenance
       moves: 2,
       combat: 40,
       cavalry: true,
@@ -2796,7 +2800,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'HORSEBACK_RIDING',
       // CIV6 (ABILITY_VARU): "-5 Combat Strength to adjacent enemy units."
       adjacentEnemyCS: -5,
-      upgradesTo: 'TANK',
+      upgradesTo: 'CUIRASSIER',
       uniqueTo: 'INDIA',
       description: 'Indian war elephant; enemies beside it fight weaker.',
       src: {
@@ -2809,7 +2813,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         sight: xml('Units', 'UnitType=UNIT_INDIAN_VARU', 'BaseSightRange'),
         requiresTech: xml('Units', 'UnitType=UNIT_INDIAN_VARU', 'PrereqTech', { expect: 'TECH_HORSEBACK_RIDING' }),
         adjacentEnemyCS: xml('ModifierArguments', 'ModifierId=VARU_NEGATIVE_COMBAT_MODIFIER&Name=Amount', 'Value'),
-        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_INDIAN_VARU', 'UpgradeUnit', { expect: 'UNIT_TANK' }),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_INDIAN_VARU', 'UpgradeUnit', { expect: 'UNIT_CUIRASSIER' }),
         uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_UNIT_INDIAN_VARU', 'CivilizationType', { expect: 'CIVILIZATION_INDIA' }),
       },
     }),
@@ -2949,12 +2953,13 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'TOA',
       name: 'Toa',
       cost: 120,
-      maintenance: 2,
+      maintenance: 0,  // Units.xml Maintenance (schema default 0 — the row carries none)
       moves: 2,
       combat: 38,
       melee: true,
       requiresTech: 'CONSTRUCTION',
-      requiresResource: 'IRON',
+      // no `requiresResource`: the install's UNIT_MAORI_TOA row carries NO
+      // StrategicResource, so the unique is exempt from the Swordsman's iron.
       // CIV6 (ABILITY_TOA): "Adjacent enemy units receive -5 Combat Strength."
       // (Its Pā improvement waits on the unique-infrastructure roster.)
       adjacentEnemyCS: -5,
@@ -2969,7 +2974,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: xml('Units', 'UnitType=UNIT_MAORI_TOA', 'Combat'),
         melee: xml('Units', 'UnitType=UNIT_MAORI_TOA', 'PromotionClass', { expect: 'PROMOTION_CLASS_MELEE' }),
         requiresTech: xml('Units', 'UnitType=UNIT_MAORI_TOA', 'PrereqTech', { expect: 'TECH_CONSTRUCTION' }),
-        requiresResource: xml('Units', 'UnitType=UNIT_MAORI_TOA', 'StrategicResource', { expect: 'RESOURCE_IRON' }),
         adjacentEnemyCS: xml('ModifierArguments', 'ModifierId=TOA_NEGATIVE_COMBAT_MODIFIER&Name=Amount', 'Value'),
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_MAORI_TOA', 'UpgradeUnit', { expect: 'UNIT_MAN_AT_ARMS' }),
         uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_UNIT_MAORI_TOA', 'CivilizationType', { expect: 'CIVILIZATION_MAORI' }),
@@ -3256,7 +3260,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 5,
       combat: 70,
       ranged: { strength: 80, range: 3 },
-      antiAir: 90,
+      antiAir: 95,  // Units.xml AntiAirCombat
       naval: true,
       // the install gives it no ability row: it is the Battleship arriving a
       // whole era early, off a CIVIC, and stronger.
@@ -3338,9 +3342,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       revealStealth: true,
       sight: 3,
       requiresTech: 'ELECTRICITY',
-      requiresResource: 'OIL',
-      resourceCost: 1,
-      resourceUpkeep: 1,
+      // no strategic bill: the install's UNIT_GERMAN_UBOAT row carries no
+      // StrategicResource and Units_XP2 has no row for it, so the unique is
+      // exempt from the Submarine's oil (cost and upkeep alike).
       // CIV6 (ABILITY_UBOAT): "+10 Combat Strength in Ocean combat."
       oceanCS: 10,
       upgradesTo: 'NUCLEAR_SUBMARINE',
@@ -3360,9 +3364,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         revealStealth: xml('TypeTags', 'Type=UNIT_GERMAN_UBOAT&Tag=CLASS_REVEAL_STEALTH', 'Tag', { expect: 'CLASS_REVEAL_STEALTH' }),
         sight: xml('Units', 'UnitType=UNIT_GERMAN_UBOAT', 'BaseSightRange'),
         requiresTech: xml('Units', 'UnitType=UNIT_GERMAN_UBOAT', 'PrereqTech', { expect: 'TECH_ELECTRICITY' }),
-        requiresResource: xml('Units', 'UnitType=UNIT_GERMAN_UBOAT', 'StrategicResource', { expect: 'RESOURCE_OIL' }),
-        resourceCost: xml('Units_XP2', 'UnitType=UNIT_GERMAN_UBOAT', 'ResourceCost'),
-        resourceUpkeep: xml('Units_XP2', 'UnitType=UNIT_GERMAN_UBOAT', 'ResourceMaintenanceAmount'),
         oceanCS: xml('ModifierArguments', 'ModifierId=UBOAT_OCEAN_COMBAT&Name=Amount', 'Value'),
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_GERMAN_UBOAT', 'UpgradeUnit', { expect: 'UNIT_NUCLEAR_SUBMARINE' }),
         uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_UNIT_GERMAN_UBOAT', 'CivilizationType', { expect: 'CIVILIZATION_GERMANY' }),

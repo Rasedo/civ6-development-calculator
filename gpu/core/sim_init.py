@@ -710,8 +710,8 @@ class SimInit:
         self.civ_gov_turns = torch.zeros(B, self.n_majors, max(1, len(rules.governments or [])), dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
-        self._era_dark = int(_er.get("darkT", 12))
-        self._era_gold = int(_er.get("goldenT", 24))
+        self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
+        self._era_gold = int(_er["goldenT"])  # GOLDEN_AGE_SCORE_BASE_THRESHOLD
         self._age_step = int(_er.get("agePrevStep", 5))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
         # THE GOVERNOR CATALOG. `governors` order IS the governor index; the
@@ -1180,7 +1180,7 @@ class SimInit:
         # carries the BASE lump and a discount of 1, unlike the additive zero
         # pads of the other channels. The PRICE itself is `_unit_faith_cost`,
         # which charges the progression before this discount.
-        _mlump0 = int(_bl.get("spreadPressure", 10))
+        _mlump0 = int(_bl["spreadPressure"])
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
         self._apostle_idx = int(_bl.get("apostleIdx", -1))

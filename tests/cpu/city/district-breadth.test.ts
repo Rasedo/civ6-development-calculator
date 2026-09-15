@@ -52,8 +52,10 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     focus: 'balanced',
     queue: [],
     isCapital: true,
-    // the PALACE every real capital carries — its amenity keeps the city
-    // Content, so yield DELTAS are not damped by the displeasure multiplier
+    // the PALACE every real capital carries — its two Amenities (the
+    // install's Buildings.Entertainment) make a size-3 city HAPPY, so the
+    // TOTAL carries a contentment multiplier and yield deltas are read off
+    // the breakdown buckets instead
     buildings: ['PALACE'],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
@@ -124,11 +126,13 @@ describe('regional yield channel, via seatCityYields', () => {
     civ.cities.push(src);
 
     t6.districtComplete = true;
-    const prodIn = computeCityStats(state, receiver).total.production;
+    // the BUILDINGS bucket is the delivery; the TOTAL also carries the city's
+    // contentment multiplier, which scales it with everything else
+    const prodIn = computeCityStats(state, receiver).breakdown.buildings.production;
     // move the source IZ out to range 7 -> the receiver loses the delivery
     src.districts[0].tileIndex = t7.index;
     t7.districtComplete = true;
-    const prodOut = computeCityStats(state, receiver).total.production;
+    const prodOut = computeCityStats(state, receiver).breakdown.buildings.production;
     expect(prodIn - prodOut).toBe(3);
   });
 
@@ -144,13 +148,13 @@ describe('regional yield channel, via seatCityYields', () => {
     civ.cities.push(s1, s2);
     t6a.districtComplete = true;
     t6b.districtComplete = true;
-    const prodDedup = computeCityStats(state, receiver).total.production;
+    const prodDedup = computeCityStats(state, receiver).breakdown.buildings.production;
 
     // baseline with both sources pushed out of range
     s1.districts[0].tileIndex = t7.index;
     s2.districts[0].tileIndex = t7.index;
     t7.districtComplete = true;
-    const prodOut = computeCityStats(state, receiver).total.production;
+    const prodOut = computeCityStats(state, receiver).breakdown.buildings.production;
     expect(prodDedup - prodOut).toBe(3); // NOT +6
   });
 

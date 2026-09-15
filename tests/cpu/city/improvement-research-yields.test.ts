@@ -7,22 +7,21 @@ import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import type { GameState, Tile, YieldKey } from '../../../cpu/core/types';
 import type { ImprovementId } from '../../../cpu/core/types';
 
-// WHAT RESEARCH ADDS TO AN IMPROVEMENT'S OWN YIELDS. Every row is the
-// Civilopedia's own "(requires X)" line, and the Mine's two were the only
-// ones this engine carried.
+// WHAT RESEARCH ADDS TO AN IMPROVEMENT'S OWN YIELDS. Every row is one
+// Improvement_BonusYieldChanges row of the install.
 const ROWS: readonly [ImprovementId, 'tech' | 'civic', string, YieldKey, number][] = [
   ['MINE', 'tech', 'APPRENTICESHIP', 'production', 1],
   ['MINE', 'tech', 'INDUSTRIALIZATION', 'production', 1],
-  ['QUARRY', 'tech', 'BANKING', 'gold', 2],
   ['QUARRY', 'tech', 'ROCKETRY', 'production', 1],
   ['PLANTATION', 'tech', 'SCIENTIFIC_THEORY', 'food', 1],
   ['PLANTATION', 'civic', 'GLOBALIZATION', 'gold', 2],
   ['LUMBER_MILL', 'tech', 'STEEL', 'production', 1],
   ['PASTURE', 'tech', 'STIRRUPS', 'food', 1],
-  ['PASTURE', 'tech', 'ROBOTICS', 'production', 1],
+  ['PASTURE', 'tech', 'REPLACEABLE_PARTS', 'production', 1],
+  ['PASTURE', 'tech', 'ROBOTICS', 'food', 1],
   ['FISHING_BOATS', 'tech', 'CARTOGRAPHY', 'gold', 2],
   ['FISHING_BOATS', 'tech', 'PLASTICS', 'food', 1],
-  ['CAMP', 'tech', 'SYNTHETIC_MATERIALS', 'gold', 1],
+  ['CAMP', 'tech', 'SYNTHETIC_MATERIALS', 'gold', 2],
   ['CAMP', 'civic', 'MERCANTILISM', 'production', 1],
   ['CAMP', 'civic', 'MERCANTILISM', 'food', 1],
 ];
@@ -54,9 +53,9 @@ describe('research raises an improvement own yields', () => {
     t.feature = null;
     t.improvement = 'QUARRY';
     t.pillaged = true;
-    const before = readAt(state, t).gold;
-    grantTechs(state, 'BANKING');
-    expect(readAt(state, t).gold).toBe(before);
+    const before = readAt(state, t).production;
+    grantTechs(state, 'ROCKETRY');
+    expect(readAt(state, t).production).toBe(before);
   });
 
   it('...and the raise follows the improvement, not the plot', () => {
