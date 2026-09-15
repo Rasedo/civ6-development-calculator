@@ -42,6 +42,10 @@ def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
 
 
 class SimSeats:
+    # The hostility square's width: one column per SEAT ID (0 .. FREE_SEAT),
+    # plus one last column standing for "no seat" (-1). See `_hostile_table`.
+    HOST_N = FREE_SEAT + 2
+
     # ---------------------------------------------------------- the queue
     def _q_head(self, row: int) -> torch.Tensor:
         """[B, RC] — the code each of this row's cities is WORKING, -1 where the
@@ -273,6 +277,10 @@ class SimSeats:
         d_tech = [
             self._district_unlocked(row, _si) for _si in range(len(self._scaffold))
         ] if (self.districts_on and self._scaffold) else []
+        # ...and ONE host read of which of them any game holds: a district the
+        # seat has not unlocked lays an all-False column whatever the placement
+        # bodies answer, so the whole per-city scan for it is skipped below.
+        _d_live = (torch.stack(d_tech).any(dim=1).tolist() if d_tech else [])
         # FORMATION columns: the chassis gates are per SEAT (per unit row),
         # only the enabling building is per city. CIV6 (Military Academy,
         # Seaport): the building trains a Corps or Army (Fleet or Armada)
@@ -300,10 +308,53 @@ class SimSeats:
                 _m[:, _ui] = self.civ_stockpile[:, row, _sl] >= _c * self._form_res_mult[_fk]
             res_f.append(_m)
         w_okc: list[torch.Tensor | None] = []
-        for wi in range(nW_m):
-            unl_w = self._wonder_unlock_ok(row, wi)
-            okc_m = None if unl_w is None else unl_w & ~(self.built_wonder == wi).any(dim=1)
-            w_okc.append(okc_m if okc_m is not None and bool(okc_m.any()) else None)
+        if nW_m:
+            # ONE census of the wonders already standing and ONE host read of
+            # which columns survive: `(built_wonder == wi).any(dim=1)` was a
+            # [B, T] sweep per wonder and `bool(okc.any())` a host sync per
+            # wonder, where the whole table is one scatter and one reduction.
+            # The scatter's spare last column absorbs every -1 (and anything
+            # outside the catalog), so no live wonder shares a slot with it.
+            _bw = self.built_wonder
+            _built = torch.zeros(B, nW_m + 1, dtype=torch.bool, device=dev)
+            _built.scatter_(1, torch.where((_bw >= 0) & (_bw < nW_m), _bw,
+                                           torch.full_like(_bw, nW_m)),
+                            torch.ones_like(_bw, dtype=torch.bool))
+            _unl = [self._wonder_unlock_ok(row, wi) for wi in range(nW_m)]
+            _okc = torch.stack([ones_b if u is None else u for u in _unl], dim=1) & ~_built[:, :nW_m]
+            _live = _okc.any(dim=0).tolist()
+            w_okc = [_okc[:, wi] if (_unl[wi] is not None and _live[wi]) else None
+                     for wi in range(nW_m)]
+        # THE PROJECT chain, split once for the whole row: `_p_seat[pi]` holds
+        # every gate of `availableProjects` that names only the SEAT — the
+        # unique-civilization row, the one-time space step, the laser and WMD
+        # arms, and the civic — and `_p_city[pi]` names which ONE city-keyed arm
+        # the same if/elif ladder leaves for the per-city sweep (1 repair,
+        # 2 recommission, 3 competition, 0 none). Deciding the ladder here
+        # cannot change which arm a row takes: the ladder reads catalog keys,
+        # which do not move inside the sweep.
+        _p_seat: list[torch.Tensor] = []
+        _p_city: list[int] = []
+        for _pi, _prw in enumerate(self._proj_rows if self.districts_on else []):
+            _g = self._proj_seat_ok(row, _pi)
+            _city_arm = 0
+            if int(_prw.get("rep", 0)):
+                _city_arm = 1
+            elif int(_prw["one"]):
+                _g = _g & self._once_step_ok(row, _pi)
+            elif int(_prw.get("ls", 0)):
+                _g = _g & self._laser_project_ok(row, _pi)
+            elif int(_prw.get("wmd", 0)):
+                _g = _g & self._wmd_project_ok(row, _pi)
+            elif int(_prw.get("rec", 0)):
+                _city_arm = 2
+            elif int(_prw.get("ao", -1)) >= 0:
+                _city_arm = 3
+            _rv_p = int(_prw.get("rv", -1))
+            if _rv_p >= 0:
+                _g = _g & self.civ_civics[:, row, _rv_p]
+            _p_seat.append(_g)
+            _p_city.append(_city_arm)
         prod_cols = []
         for j in range(self.RC):
             # A city already building something offers no column at all: the
@@ -325,17 +376,26 @@ class SimSeats:
             for _ui, _gate in ovr:
                 ok_u[:, _ui] = tr_j[:, _ui] & _gate
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
-            if self.districts_on and self._scaffold:
+            if self.districts_on and self._scaffold and any(_d_live):
                 # CIV6 (Bi Sheng, Ada Lovelace): "one more district than the
                 # Population limit allows" — the per-city permanent raise
                 cap_max = self._district_cap(row, j)
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 site = self._district_elig_site(row, j)  # every type in this city shares it
                 for si, (di, _ut, _uc, plc, _fc) in enumerate(self._scaffold):
-                    not_owned = self._district_slot_free(row, j, di)
-                    under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else ones_b
-                    can_place = self._district_elig(row, j, di, plc, base=site).any(dim=1)
-                    ok_d[:, si] = d_tech[si] & not_owned & under_cap & can_place
+                    # The three CHEAP gates first: `&` is associative, so
+                    # `tech & free & cap & place` is the same column read in
+                    # this order, and a column already dead never pays
+                    # `_district_elig` — the most expensive body in the sweep.
+                    if not _d_live[si]:
+                        continue
+                    gate_d = d_tech[si] & self._district_slot_free(row, j, di)
+                    if bool(self._is_specialty[di]):
+                        gate_d = gate_d & (spec_cnt < cap_max)
+                    if not bool(gate_d.any()):
+                        continue
+                    ok_d[:, si] = gate_d & self._district_elig(
+                        row, j, di, plc, base=site).any(dim=1)
             base_j = torch.cat([ok_b, ok_s, ones_b.unsqueeze(1), ok_u, ok_d], dim=1)
             ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
             if nW_m > 0:
@@ -365,23 +425,20 @@ class SimSeats:
                     okp_m = ((regp_m >= 0)
                              & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
                              & ~self._fallout().gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1))
-                # a civilization-UNIQUE row is refused to every other seat
-                okp_m = okp_m & self._proj_seat_ok(row, pi_m)
-                if int(prow_m.get("rep", 0)):
+                # the SEAT half of the chain — the unique-civilization gate, the
+                # one-time step, the laser and WMD arms and the civic — folded
+                # once for the row (`_p_seat`), because none of them names the
+                # city. `&` is associative, so the fold is the same column.
+                okp_m = okp_m & _p_seat[pi_m]
+                # ...and the CITY half, whichever ONE arm of the chain this row
+                # takes (`_p_city`, the same if/elif ladder decided once).
+                _pc = _p_city[pi_m]
+                if _pc == 1:
                     okp_m = okp_m & self._repair_available(row, j)
-                elif int(prow_m["one"]):
-                    okp_m = okp_m & self._once_step_ok(row, pi_m)
-                elif int(prow_m.get("ls", 0)):
-                    okp_m = okp_m & self._laser_project_ok(row, pi_m)
-                elif int(prow_m.get("wmd", 0)):
-                    okp_m = okp_m & self._wmd_project_ok(row, pi_m)
-                elif int(prow_m.get("rec", 0)):
+                elif _pc == 2:
                     okp_m = okp_m & self._recommission_ok(row, j, pi_m)
-                elif int(prow_m.get("ao", -1)) >= 0:
+                elif _pc == 3:
                     okp_m = okp_m & self._competition_project_ok(row, j, pi_m)
-                _rv = int(prow_m.get("rv", -1))
-                if _rv >= 0:
-                    okp_m = okp_m & self.civ_civics[:, row, _rv]
                 ok_p[:, pi_m] = okp_m
             ok_f = torch.zeros(B, 2 * self.NU, dtype=torch.bool, device=dev)
             if self._ma_bidx >= 0 or self._seaport_bidx >= 0:
@@ -2797,12 +2854,23 @@ class SimSeats:
         nP_a = len(self._proj_rows) if self.districts_on else 0
         if dtile is not None and (dtile.dim() != 3 or int(dtile.shape[2]) != nS):
             raise AssertionError(f"production_tile must be [B, RC, {nS}], got {tuple(dtile.shape)}")
+        # The row is RC (24) columns wide however few cities stand on it, and
+        # every arm below is `act & …`: a column with no live city, or with no
+        # order for it, contributes nothing to any of them and writes nothing.
+        # The two reads that decide it come FIRST, so a dead column costs one
+        # reduction instead of seven code-range tests and their seven gates.
+        # `city_alive` is read LIVE, not off `alive_row`, because this walk is
+        # sequential and the snapshot above it is a different question.
         for j in range(min(int(production.shape[1]), self.RC)):
-            a = production[:, j].to(torch.long)
             alive_j = self.city_alive[:, row, j]
+            if not bool(alive_j.any()):
+                continue
+            a = production[:, j].to(torch.long)
             # No reorder arm: the queue is one deep, so an order given to a
             # busy city is refused rather than stacked behind the head.
             act = (a >= 0) & (a < self.PROD_W) & ext & alive_j & self._q_room(row)[:, j]
+            if not bool(act.any()):
+                continue
             is_b = act & (a >= 0) & (a < NBn)
             if bool(is_b.any()):
                 bi = a.clamp(min=0, max=NBn - 1)
@@ -7205,22 +7273,26 @@ class SimSeats:
         polY = self._mod_imp_yields(row)
         if not self._seat_has_beliefs(row):
             plane = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
+            # ONE live mask for all six generic adds — it is the same [B, T, 1]
+            # every term asked for, and building it per term rebuilt three
+            # planes and a dtype cast six times over.
+            _live = self._tile_add_live()
             if suz is not None:
-                plane = plane + suz * self._tile_add_live()
+                plane = plane + suz * _live
             if polY is not None:
-                plane = plane + self._imp_gather(polY) * self._tile_add_live()
+                plane = plane + self._imp_gather(polY) * _live
             riv = self._imp_river_plane()
             if riv is not None:
-                plane = plane + riv * self._tile_add_live()
+                plane = plane + riv * _live
             fy = self._imp_feat_plane()
             if fy is not None:
-                plane = plane + fy * self._tile_add_live()
+                plane = plane + fy * _live
             py = self._plot_yield_plane(row)
             if py is not None:
-                plane = plane + py * self._tile_add_live()
+                plane = plane + py * _live
             uq = self._imp_unique_plane(row)
             if uq is not None:
-                plane = plane + uq * self._tile_add_live()
+                plane = plane + uq * _live
             mty = self._mountain_yield_plane(row)
             if mty is not None:
                 plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
@@ -10500,38 +10572,65 @@ class SimSeats:
                                           torch.zeros_like(def_cs))
         return def_cs, wtier
 
+    def _hostile_table(self) -> torch.Tensor:
+        """[B, HOST_N, HOST_N] — `_seats_hostile` for EVERY (acting seat, other
+        seat) pair at once, the last index standing for "no seat" (-1).
+
+        The answer depends on the war matrix and the fixed seat classes and on
+        nothing else, so the twelve thousand per-unit-per-verb probes a turn
+        become one build per DECLARATION plus a gather each. The body below is
+        the tensor arm of `_seats_hostile`, evaluated over the whole seat
+        square: a seat is never hostile to itself, a Free City is hostile to
+        every other seat, a barbarian to every non-barbarian, and otherwise the
+        war matrix decides.
+
+        Cached on an INPUT FINGERPRINT — a CLONE of `self.war`, compared with
+        `torch.equal` — because `sync_war` writes the matrix in place, so a
+        held reference would compare equal to itself forever, and no version
+        counter tracks a declaration."""
+        w = self.war
+        c = getattr(self, "_host_tbl_cache", None)
+        if c is not None and torch.equal(c[0], w):
+            return c[1]
+        dev, N = self.device, self.HOST_N
+        ar = torch.arange(N, device=dev)
+        # seat -> war row, with the "no seat" slot on row 0 — which is exactly
+        # what the int arm's `max(int(a_seat), 0)` has always read for one.
+        rmap = torch.cat([self._seat_row, torch.zeros(1, dtype=torch.long, device=dev)])
+        wr = w[:, rmap][:, :, rmap]                              # [B, N, N]
+        barb, free = ar == BARB_SEAT, ar == FREE_SEAT
+        a_b, b_b = barb.unsqueeze(1), barb.unsqueeze(0)
+        a_f, b_f = free.unsqueeze(1), free.unsqueeze(0)
+        not_same = ~torch.eye(N, dtype=torch.bool, device=dev)
+        tbl = ((ar != N - 1) & not_same
+               & (a_f | b_f | (a_b ^ b_b) | (~a_b & ~b_b & wr)))
+        self._host_tbl_cache = (w.clone(), tbl)
+        return tbl
+
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
-        # A seat is never hostile to ITSELF, stated explicitly below: leaving it
-        # to the war matrix's unwritten diagonal would make the answer depend on
-        # a value nothing maintains.
+        # A seat is never hostile to ITSELF, stated explicitly in the table:
+        # leaving it to the war matrix's unwritten diagonal would make the
+        # answer depend on a value nothing maintains.
         # CIV6 (DIPLO_STATE_FREE_CITIES_NEUTRAL): a FREE CITY is at war with
         # nobody and anyone may attack it without a declaration — the
         # `alwaysHostile` bit of `SEAT_CAPS["free"]`, hostile to every other
         # seat on either side of the pair, barbarians included.
-        B = self.B
-        valid = b_plane >= 0
-        b_barb = b_plane == BARB_SEAT
-        b_free = b_plane == FREE_SEAT
-        rb = self._seat_row[b_plane.clamp(min=0)]
+        # Both arms are ONE gather out of `_hostile_table`, so the tensor and
+        # the int acting seat cannot answer differently.
+        B, N = self.B, self.HOST_N
+        tbl = self._hostile_table()
+        bi = torch.where(b_plane >= 0, b_plane, torch.full_like(b_plane, N - 1))
         if torch.is_tensor(a_seat):
             a = a_seat.reshape(B, 1)
-            ra = self._seat_row[a.clamp(min=0)]
-            at_war = self.war[self._bidx1, ra, rb]
-            a_barb = a == BARB_SEAT
-            a_free = a == FREE_SEAT
-            return valid & (a != b_plane) & (a_free | b_free | (a_barb ^ b_barb) | (~a_barb & ~b_barb & at_war))
+            ai = torch.where(a >= 0, a, torch.full_like(a, N - 1))
+            return tbl.reshape(B, -1).gather(
+                1, (ai * N + bi.reshape(B, -1))).reshape(b_plane.shape)
         # An INT acting seat is the common case (the walkers probe on behalf of
-        # one seat): one row of the war matrix gathered by the other side's row,
-        # with no [B, 1] fill and no advanced index. The two arms below are the
-        # tensor formula above with `a_barb` folded out.
-        not_same = b_plane != a_seat
-        if a_seat == FREE_SEAT:  # a Free City is hostile to everyone but itself
-            return valid & not_same
-        if a_seat == BARB_SEAT:  # a barbarian is hostile to every non-barbarian
-            return valid & not_same & ~b_barb
-        at_war = self.war[:, int(self._seat_row[max(int(a_seat), 0)])].gather(
-            1, rb.reshape(B, -1)).reshape(rb.shape)
-        return valid & not_same & (b_barb | b_free | at_war)
+        # one seat): one row of the table, with no [B, 1] fill and no advanced
+        # index.
+        ia = int(a_seat)
+        return tbl[:, ia if ia >= 0 else N - 1].gather(
+            1, bi.reshape(B, -1)).reshape(b_plane.shape)
 
     def _step_verb(
         self,
@@ -10588,38 +10687,47 @@ class SimSeats:
             _ut = u_type.clamp(min=0, max=self.NU - 1)
             naval = self.unit_naval[_ut]
             emb = self.unit_emb.gather(1, gs1).squeeze(1)
-            to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
+            dc1 = dest.clamp(min=0).unsqueeze(1)
+            to_water = self.wpass.gather(1, dc1).squeeze(1)
             # a hull in a Canal's passage pays the water step; a chassis water
-            # is ground to never transitions at all.
-            to_water = to_water | (naval & self._canal_pass().gather(
-                1, dest.clamp(min=0).unsqueeze(1)).squeeze(1))
+            # is ground to never transitions at all. With no HULL stepping the
+            # `naval &` term is False whatever the passage says, and
+            # `_canal_pass()` rebuilds a [B, T] plane to be asked.
+            if bool(naval.any()):
+                to_water = to_water | (naval & self._canal_pass().gather(1, dc1).squeeze(1))
             transition = (emb != to_water) & ~naval & ~self.unit_water_walk[_ut]
             base_step = torch.where(
                 to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
-            # A TRANSITION pays no river charge: a river is an edge between two
-            # LAND tiles, so stepping off the water crosses none. `land_cost`
-            # folds `riv` in for the ordinary land step, and reusing it on the
-            # disembark charged a crossing TS never charges — `moveCostInto` is
-            # terrain and road ALONE, and `riverCharge` rides only the
-            # non-transition arm (`stepUnit`).
-            trans_step = torch.where(
-                to_water, torch.full_like(land_cost, self._mp_scale),
-                self._mp_scale + terr)
-            w_end = torch.where(to_water, dest.clamp(min=0), hc)
-            l_end = torch.where(to_water, hc, dest.clamp(min=0))
-            easy_dock = (
-                (self.district.gather(1, w_end.unsqueeze(1)).squeeze(1) == self._harbor_didx)
-                | ((self.centre_slot_at.gather(1, l_end.unsqueeze(1)).squeeze(1) >= 0)
-                   & self.coastal_land.gather(1, l_end.unsqueeze(1)).squeeze(1))
-            )
-            cost = torch.where(
-                transition,
-                # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
-                # Mediterranean Colonies' Settlers. `seat` is the mover's row here.
-                trans_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
-                                         torch.full_like(land_cost, self._embark_transition_mp)),
-                base_step,
-            )
+            if bool(transition.any()):
+                # A TRANSITION pays no river charge: a river is an edge between
+                # two LAND tiles, so stepping off the water crosses none.
+                # `land_cost` folds `riv` in for the ordinary land step, and
+                # reusing it on the disembark charged a crossing TS never
+                # charges — `moveCostInto` is terrain and road ALONE, and
+                # `riverCharge` rides only the non-transition arm (`stepUnit`).
+                trans_step = torch.where(
+                    to_water, torch.full_like(land_cost, self._mp_scale),
+                    self._mp_scale + terr)
+                w_end = torch.where(to_water, dc1.squeeze(1), hc)
+                l_end = torch.where(to_water, hc, dc1.squeeze(1))
+                easy_dock = (
+                    (self.district.gather(1, w_end.unsqueeze(1)).squeeze(1) == self._harbor_didx)
+                    | ((self.centre_slot_at.gather(1, l_end.unsqueeze(1)).squeeze(1) >= 0)
+                       & self.coastal_land.gather(1, l_end.unsqueeze(1)).squeeze(1))
+                )
+                cost = torch.where(
+                    transition,
+                    # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
+                    # Mediterranean Colonies' Settlers. `seat` is the mover's row here.
+                    trans_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
+                                             torch.full_like(land_cost, self._embark_transition_mp)),
+                    base_step,
+                )
+            else:
+                # NOBODY crosses the shore this step, so the whole transition
+                # arm is dead weight: `torch.where(transition, …, base_step)`
+                # is `base_step` term for term when `transition` is empty.
+                cost = base_step
         else:
             cost = land_cost
         # THE FORMATION MOVES AS ONE — no further than its slowest member, and
@@ -10637,8 +10745,13 @@ class SimSeats:
         self._occ_clear(rows, here[rows], gs)
         self.unit_tile[rows, gs] = dest[rows]
         self._air_carry_with(moved, gslot, here, dest)
-        for _ri in range(rider.shape[1]):
-            self._escort_carry_with(moved, rider[:, _ri], rider_free, here, dest, cost)
+        # One read of "is anybody riding along": `_escort_rider` hands back an
+        # all -1 column set when no formation stands here, and every rider loop
+        # below is a no-op on it.
+        _riders = bool((rider >= 0).any())
+        if _riders:
+            for _ri in range(rider.shape[1]):
+                self._escort_carry_with(moved, rider[:, _ri], rider_free, here, dest, cost)
         # stepUnit's revealAround: EVERY hop lifts the mover's fog, at
         # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range".
         # Major seats only — revealAround gates to isCiv on TS the same way,
@@ -10657,8 +10770,9 @@ class SimSeats:
             # ...and the RIDER's own sight from the same tile: a formation
             # carries an Observation Balloon or a Drone precisely because it
             # sees further than the chassis dragging it, so the circle is the
-            # WIDEST of the formation's members.
-            for _ri in range(rider.shape[1]):
+            # WIDEST of the formation's members. With no rider every term is
+            # gated on `_rr >= 0` and leaves both answers untouched.
+            for _ri in range(rider.shape[1] if _riders else 0):
                 _rr = rider[:, _ri]
                 _rc = _rr.clamp(min=0)
                 _rs = self._unit_sight(
@@ -10698,9 +10812,10 @@ class SimSeats:
         # the moved-games subset, while the claim indexes by GAME. At B=1 the
         # two coincide, so every single-seed run passed and the battery's
         # B=3 shard raised IndexError on the first three-game move.
-        self._claim_goody_hut(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), gslot)
+        _mv_seat = self.unit_seat.gather(1, gs1).squeeze(1)
+        self._claim_goody_hut(moved, dest, _mv_seat, gslot)
         if clear_camp:
-            self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
+            self._clear_camp_at(moved, dest, _mv_seat, seat)
         spent = (mp - cost).clamp(min=0)
         if self._embark_live and bool((moved & transition).any()):
             # the transfer cap, and the stored full pool refreshed for the
@@ -10759,35 +10874,50 @@ class SimSeats:
         classes ignore it too); "Ranged and Bombard class units do not exert
         ZOC" unless SUPPRESSION hands it back; the two submarines additionally
         "do not exert zone of control"; an embarked unit exerts none; and a
-        river between the exerter and the entered tile blocks the halt."""
-        mil = self.military_at
+        river between the exerter and the entered tile blocks the halt.
+
+        The zone is read AT THE SIX NEIGHBOURS the halt asks about, never built
+        over the whole map: every term below is a function of the tile alone,
+        so gathering the ring first and asking the predicate there is the same
+        answer over 6 columns instead of T."""
+        dc = dest.clamp(min=0)
+        dn = self.neigh[dc]                                   # [B, 6]
+        dnc = dn.clamp(min=0)
+        mil = self.military_at.gather(1, dnc)
         here = mil >= 0
         mslot = mil.clamp(min=0)
         mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
         mseat = torch.where(here, self.unit_seat.gather(1, mslot), torch.full_like(mil, -1))
-        mpromos = self.unit_promos.gather(1, mslot)
         pc = self.rules_dev.u_promo_class[mtype]
-        no_exert_cls = ((pc == self._pc_ranged) | (pc == self._pc_siege))             & ~self._promo_flag(mtype, mpromos, "ZOC_EXERT")
+        no_exert_cls = (pc == self._pc_ranged) | (pc == self._pc_siege)
+        if bool(no_exert_cls.any()):
+            # SUPPRESSION hands the zone back; with no ranged/siege exerter in
+            # the ring the whole clause is False whatever the promotions say.
+            no_exert_cls = no_exert_cls & ~self._promo_flag(
+                mtype, self.unit_promos.gather(1, mslot), "ZOC_EXERT")
         exert = here & ~self.unit_emb.gather(1, mslot) & ~self._type_zoc_none[mtype] & ~no_exert_cls
         hostmil = exert & self._seats_hostile(seat, mseat)
         rel_mover = self._rel_strength[mover_type.clamp(min=0, max=self.NU - 1)] > 0
         if bool(rel_mover.any()):
             # the religious zone, off the CIVILIAN plane the religious units
             # stand in; an embarked one exerts none, exactly as ashore.
-            civ = self.civilian_at
+            civ = self.civilian_at.gather(1, dnc)
             cslot = civ.clamp(min=0)
             ctype = self.unit_type.gather(1, cslot).clamp(min=0, max=self.NU - 1)
             cseat = torch.where(civ >= 0, self.unit_seat.gather(1, cslot), torch.full_like(civ, -1))
             rel_here = (civ >= 0) & (self._rel_strength[ctype] > 0) & ~self.unit_emb.gather(1, cslot)
             hostrel = rel_here & self._seats_hostile(seat, cseat)
             hostmil = torch.where(rel_mover.reshape(-1, 1), hostrel, hostmil)
-        dn = self.neigh[dest.clamp(min=0)]
-        riv = (self.river_mask.gather(1, dest.clamp(min=0).unsqueeze(1))
+        riv = (self.river_mask.gather(1, dc.unsqueeze(1))
                >> torch.arange(6, device=self.device).unsqueeze(0)) & 1
-        halt = ((dn >= 0) & (riv == 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
+        halt = ((dn >= 0) & (riv == 0) & hostmil).any(dim=1)
         # CIV6 (ABILITY_IGNORE_ZOC): light, heavy and ranged cavalry — a chariot
-        # class is not on the list unless it carries the ability itself.
-        ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
+        # class is not on the list unless it carries the ability itself. The
+        # three catalog vectors are fixed at load, so the OR is built once.
+        ign = getattr(self, "_zoc_ign_cache", None)
+        if ign is None:
+            ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
+            self._zoc_ign_cache = ign
         return halt & ~ign[mover_type.clamp(min=0, max=self.NU - 1)]
 
     def _war_march_targets(self, hcs: torch.Tensor, row: int):
@@ -10810,7 +10940,13 @@ class SimSeats:
         """
         B, T, dev = self.B, self.T, self.device
         N = hcs.shape[1]
-        arangeT = torch.arange(T, device=dev)
+        no = torch.zeros(B, N, dtype=torch.bool, device=dev)
+        # A SEAT AT WAR WITH NOBODY marches nowhere: `at_war_t` is False on
+        # every tile and `_ca` on every city, so both scans — a [B, N, T] one
+        # among them — reduce to the two `torch.where`s at the bottom picking
+        # the stand itself.
+        if not bool(self.war[:, row].any()):
+            return hcs.clone(), no, no
         # AT WAR WITH THIS TILE'S OWNER — the TS `tOwned` term, for every
         # territorial owner alike. A barbarian tile is masked out by `owned`
         # before its seat can index the war row.
@@ -10818,17 +10954,29 @@ class SimSeats:
         owned = (_ts >= 0) & (_ts < BARB_SEAT)
         at_war_t = owned & self.war[:, row].gather(
             1, self._seat_row[torch.where(owned, _ts, torch.zeros_like(_ts))])
+        has_imp, imp_tgt = no, hcs
         if self.improvements_on or self.districts_on:
             imp_job = (self.improvement >= 0) & ~self.pillaged & at_war_t
             if self.districts_on:
                 imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & at_war_t)
-            d_imp = self.pair_dist[hcs.unsqueeze(2), arangeT.view(1, 1, T)].to(torch.long)
-            ikey = torch.where(imp_job.unsqueeze(1) & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
-            imp_min, imp_tgt = ikey.min(dim=2)
-            has_imp = imp_min < 10**9
-        else:
-            has_imp = torch.zeros(B, N, dtype=torch.bool, device=dev)
-            imp_tgt = hcs
+            # ONLY a tile carrying a job in SOME game can win the argmin: every
+            # other column of the scan is the 10**9 filler, so narrowing the
+            # sweep to those columns leaves both the minimum and the tile
+            # behind it untouched, and turns a [B, N, T] key into a [B, N, K]
+            # one. The key rides int32 — a distance under the map's diameter
+            # times (T + 1) plus a tile index is nowhere near 2**31, and the
+            # filler is 10**9.
+            cand = imp_job.any(dim=0).nonzero(as_tuple=True)[0]  # [K]
+            if int(cand.numel()):
+                d_s = self.pair_dist.index_select(1, cand).index_select(
+                    0, hcs.reshape(-1)).to(torch.int32).reshape(B, N, -1)
+                ikey = torch.where(
+                    imp_job.index_select(1, cand).unsqueeze(1) & (d_s < 13),
+                    d_s * (T + 1) + cand.to(torch.int32),
+                    torch.full_like(d_s, 10**9))
+                imp_min, _iwin = ikey.min(dim=2)
+                has_imp = imp_min < 10**9
+                imp_tgt = cand[_iwin]
         # THE CITY SCAN — one total order over every seat this one is at war
         # with, majors and city-states alike, on the TS key: distance, then the
         # seat id, then the centre tile. No seat is a separate arm and none
@@ -10839,18 +10987,20 @@ class SimSeats:
         _cc = self.city_center.reshape(B, -1).clamp(min=0)  # [B, M]
         _ca = (self.city_alive.reshape(B, -1)
                & self.war[:, row, :_CB].repeat_interleave(self.RC, dim=1))
-        _d2 = self.pair_dist[hcs.unsqueeze(2), _cc.unsqueeze(1)].to(torch.long)
-        _key = torch.where(_ca.unsqueeze(1), _d2 * (2048 * 256) + (self._march_seatkey + _cc).unsqueeze(1),
-                           torch.full_like(_d2, 10**18))
-        ckey_min, _cwin = _key.min(dim=2)
-        has_city = ckey_min < 10**18
-        city_tgt = torch.where(has_city, _cc.gather(1, _cwin), hcs)
+        has_city, city_tgt = no, hcs
+        if bool(_ca.any()):
+            _d2 = self.pair_dist[hcs.unsqueeze(2), _cc.unsqueeze(1)].to(torch.long)
+            _key = torch.where(_ca.unsqueeze(1), _d2 * (2048 * 256) + (self._march_seatkey + _cc).unsqueeze(1),
+                               torch.full_like(_d2, 10**18))
+            ckey_min, _cwin = _key.min(dim=2)
+            has_city = ckey_min < 10**18
+            city_tgt = torch.where(has_city, _cc.gather(1, _cwin), hcs)
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
         return tgt, has_imp, has_city
 
     def _war_march_target(self, hc: torch.Tensor, row: int):
         """One-stand [B] view of `_war_march_targets`."""
-        tgt, hi, hcty = self._war_march_targets(hc.unsqueeze(1), row)
+        tgt, hi, hcty = self._war_march_targets(hc.clamp(min=0).unsqueeze(1), row)
         return tgt.squeeze(1), hi.squeeze(1), hcty.squeeze(1)
 
     def _encamp_terms(self, tc: torch.Tensor):
@@ -11928,8 +12078,6 @@ class SimSeats:
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
-        atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
-                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_form = getattr(self, f"{atk_kind}_unit_formation")[:, u]
         a_lev = getattr(self, f"{atk_kind}_unit_levied")[:, u]
@@ -11984,24 +12132,32 @@ class SimSeats:
                                             torch.full_like(_chp, XP_CITY_ATTACK)))
         # A district's defenses answer next, before any unit on the tile: the
         # shelter rule makes the Encampment the target WHOEVER stands on it.
-        enc_att = att & ~city_att & self._encamp_block(ttc.unsqueeze(1), a_seat.unsqueeze(1)).squeeze(1)
-        if bool(enc_att.any()):
-            self._ranged_strike_encampment(
-                enc_att, ttc, atk_kind, u,
-                self._rel_atk_cs(a_seat, tgt) if self._city_rel_live else torch.zeros_like(a_hp),
-                "vrnge")
+        # EACH ARM BELOW IS A FALLBACK: a row the arm above it took can never
+        # fire here, so a shot the CITY arm resolved leaves every mask under it
+        # empty and its scan — the district block, the [B, T] city-state
+        # scatter, the target fold — has nothing to answer about.
+        _rest = att & ~city_att
+        enc_att = torch.zeros_like(att)
+        cs_att = torch.zeros_like(att)
+        unit_att = torch.zeros_like(att)
+        if bool(_rest.any()):
+            enc_att = _rest & self._encamp_block(ttc.unsqueeze(1), a_seat.unsqueeze(1)).squeeze(1)
+            if bool(enc_att.any()):
+                self._ranged_strike_encampment(
+                    enc_att, ttc, atk_kind, u,
+                    self._rel_atk_cs(a_seat, tgt) if self._city_rel_live else torch.zeros_like(a_hp),
+                    "vrnge")
+            _rest = _rest & ~enc_att
         # CIV6: a minor's city is a CITY to ranged fire too — a barbarian
         # (`alwaysHostile`) needs no war, a major's SNIPE asks
         # `cityStateAttackable`'s own clauses (a declared war, or a war with
         # its suzerain), the roll floors the minor at 1 HP.
-        cs_t = torch.zeros_like(att)
-        if self.S > 0:
+        if self.S > 0 and bool(_rest.any()):
             _cst = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
             _csgate = (self.citystate_alive[:, :self.S] if row is None
                        else self._citystate_target(row))
             _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), _csgate)
-            cs_t = _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
-        cs_att = att & ~city_att & ~enc_att & cs_t
+            cs_att = _rest & _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
@@ -12036,126 +12192,138 @@ class SimSeats:
                                 torch.where(_cshp <= 1,
                                             torch.full_like(_cshp, XP_CITY_FELLED),
                                             torch.full_like(_cshp, XP_CITY_ATTACK)))
-        mslot = self._visible_military_at(a_seat).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
-        neg = torch.full_like(mslot, -1)
-        m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-        c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-        # The two ATTACKER-DEPENDENT scope-outs: a barb is never hostile to a
-        # barb, and a civ ranged attacker never engages another civ's units.
-        elig_m = self._seats_hostile(a_seat.unsqueeze(1), m_seat.unsqueeze(1)).squeeze(1)
-        elig_c = self._seats_hostile(a_seat.unsqueeze(1), c_seat.unsqueeze(1)).squeeze(1)
-        mslot, m_seat, elig_m, cslot, c_seat, elig_c = self._stack_fold(
-            ttc, a_seat, mslot, m_seat, elig_m, cslot, c_seat, elig_c, ranged=True)
-        if not barb:
-            # `!(isCiv(attacker.seat) && isCiv(u.seat))` — a MAJOR's ranged
-            # strike does not engage another MAJOR's units at all, a scope-out
-            # ON TOP of hostility rather than instead of it. `isCiv` covers
-            # seat 0 (cpu/core/seats.ts: 0 <= seat < 100), so seat-0 units are
-            # inside the scope-out exactly as every civ's are.
-            _major_m = (m_seat >= 0) & (m_seat < 100)
-            _major_c = (c_seat >= 0) & (c_seat < 100)
-            elig_m = elig_m & ~_major_m
-            elig_c = elig_c & ~_major_c
-        d_is_mil = elig_m
-        civ_def = ~elig_m & elig_c
-        d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
-        d_seat = torch.where(elig_m, m_seat, torch.where(elig_c, c_seat, neg))
-        unit_att = att & ~city_att & ~enc_att & ~cs_att & (d_slot >= 0)
-        if bool(unit_att.any()):
-            ds0 = d_slot.clamp(min=0)
-            d_barb = d_seat == BARB_SEAT
-            d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            def_cs = self._type_combat[d_type]
-            d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)  # civilians hold 0
-            d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            def_cs = def_cs + self._tdef_g(ttc) + d_fort_t * 3
-            d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
-            if bool(d_emb.any()):
-                def_cs = torch.where(
-                    d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
-            def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
-            _t = torch.ones_like(mslot, dtype=torch.bool)
-            atk_e = atk_rs - self._wound(a_hp, ut0) + self._promo_cs(
-                ut0, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
-                foe_damaged=self._damaged(def_hp), foe_fortified=d_fort_t > 0,
-                foe_in_district=self._on_district(ttc), tile=a_tile)
-            def_e = def_cs - self._wound(def_hp, d_type)
-            # an embarked defender took the flat CS override, which replaces the
-            # promotions naming its terrain and its fortification
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
-                self._promo_cs(
-                    d_type, d_promos, attacking=~_t, ranged=_t, foe_type=ut0,
-                    foe_damaged=self._damaged(a_hp),
-                    foe_in_district=self._on_district(a_tile), tile=ttc)
-                + self._hold_the_line(d_seat, ttc, ut0, d_type)
-            ).to(def_e.dtype))
-            # "Ranged attacks ignore any Support received by the defender."
-            _cls = self._class_matchup_cs(ut0, d_type)
-            atk_e = atk_e + (_cls + self._gdr_naval_cs(ut0, d_type)).to(atk_e.dtype)
-            def_e = def_e + torch.where(
-                d_emb, torch.zeros_like(def_e),
-                self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
+        # THE UNIT ARM, the last fallback: with every row already resolved
+        # by a city, a district or a minor there is nobody left to shoot at,
+        # and the target fold below — two plane reads, two hostility probes
+        # and `_stack_fold` — answers about nothing.
+        _rest = _rest & ~cs_att
+        if bool(_rest.any()):
+            mslot = self._visible_military_at(a_seat).gather(1, ttc.unsqueeze(1)).squeeze(1)
+            cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
+            neg = torch.full_like(mslot, -1)
+            m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+            c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+            # The two ATTACKER-DEPENDENT scope-outs: a barb is never hostile to a
+            # barb, and a civ ranged attacker never engages another civ's units.
+            elig_m = self._seats_hostile(a_seat.unsqueeze(1), m_seat.unsqueeze(1)).squeeze(1)
+            elig_c = self._seats_hostile(a_seat.unsqueeze(1), c_seat.unsqueeze(1)).squeeze(1)
+            mslot, m_seat, elig_m, cslot, c_seat, elig_c = self._stack_fold(
+                ttc, a_seat, mslot, m_seat, elig_m, cslot, c_seat, elig_c, ranged=True)
             if not barb:
-                atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
-            # the attacker's own position clauses — a Varu or Toa beside the
-            # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, foe_type=d_type).to(atk_e.dtype)
-            if not barb:
-                atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
-            def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
-            def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
-            def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
-            def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
-            atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
-            def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
-            atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
-            def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False,
-                                            self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
-                                            self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
-            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False, a_form, a_lev).to(atk_e.dtype)
-            def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
-                             + self._gov_unit_cs(d_type, def_civ_u)
-                             + self._era_matchup_cs(def_civ_u, ut0)
-                             + self._gdr_armor_cs(d_type, def_civ_u, ut0)
-                             + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
-            atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
-                             + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
-            def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]
-            d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
-            g = unit_att.nonzero(as_tuple=True)[0]
-            ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
-            self.unit_hp[g, ds] -= d_def[g]
-            dead = self.unit_hp[g, ds] <= 0
-            gd, td = g[dead], ttc[g[dead]]
-            self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, d_seat[gd])
-            # Clearing both maps is branch-free and exact: only one of them is
-            # set on that tile.
-            self._occ_clear(gd, td, ds[dead])
-            self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
-                            self._row_of(d_seat), tgt,
-                            d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
-            self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
-                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
-                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
-            self._disciples_spread(
-                self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
-                d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
-            _hp_p[:, u] = self._heal_on_kill(
-                self._row_of(self._atk_seat(atk_kind, u)),
-                unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), _hp_p[:, u])
-            if bool((unit_att & civ_def).any()):
-                self._gen_ver += 1
-            self._award_pair_xp(
-                unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
-                d_slot=d_slot, d_type=d_type, d_is_barb=d_barb, ranged=True,
-                a_died=torch.zeros_like(unit_att),
-                d_died=unit_att & ((def_hp0 - d_def) <= 0))
+                # `!(isCiv(attacker.seat) && isCiv(u.seat))` — a MAJOR's ranged
+                # strike does not engage another MAJOR's units at all, a scope-out
+                # ON TOP of hostility rather than instead of it. `isCiv` covers
+                # seat 0 (cpu/core/seats.ts: 0 <= seat < 100), so seat-0 units are
+                # inside the scope-out exactly as every civ's are.
+                _major_m = (m_seat >= 0) & (m_seat < 100)
+                _major_c = (c_seat >= 0) & (c_seat < 100)
+                elig_m = elig_m & ~_major_m
+                elig_c = elig_c & ~_major_c
+            d_is_mil = elig_m
+            civ_def = ~elig_m & elig_c
+            d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
+            d_seat = torch.where(elig_m, m_seat, torch.where(elig_c, c_seat, neg))
+            unit_att = _rest & (d_slot >= 0)
+            if bool(unit_att.any()):
+                ds0 = d_slot.clamp(min=0)
+                d_barb = d_seat == BARB_SEAT
+                d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
+                def_cs = self._type_combat[d_type]
+                d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)  # civilians hold 0
+                d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
+                def_cs = def_cs + self._tdef_g(ttc) + d_fort_t * 3
+                d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
+                if bool(d_emb.any()):
+                    def_cs = torch.where(
+                        d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+                def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
+                def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
+                _t = torch.ones_like(mslot, dtype=torch.bool)
+                # the chassis' own ranged strength plus the four pool adders —
+                # assembled HERE because the city and city-state arms assemble
+                # their own (off `_city_ranged_strength`), so a shot that never
+                # reaches a unit paid for four helper calls it could not use.
+                atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
+                          + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
+                atk_e = atk_rs - self._wound(a_hp, ut0) + self._promo_cs(
+                    ut0, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
+                    foe_damaged=self._damaged(def_hp), foe_fortified=d_fort_t > 0,
+                    foe_in_district=self._on_district(ttc), tile=a_tile)
+                def_e = def_cs - self._wound(def_hp, d_type)
+                # an embarked defender took the flat CS override, which replaces the
+                # promotions naming its terrain and its fortification
+                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
+                    self._promo_cs(
+                        d_type, d_promos, attacking=~_t, ranged=_t, foe_type=ut0,
+                        foe_damaged=self._damaged(a_hp),
+                        foe_in_district=self._on_district(a_tile), tile=ttc)
+                    + self._hold_the_line(d_seat, ttc, ut0, d_type)
+                ).to(def_e.dtype))
+                # "Ranged attacks ignore any Support received by the defender."
+                _cls = self._class_matchup_cs(ut0, d_type)
+                atk_e = atk_e + (_cls + self._gdr_naval_cs(ut0, d_type)).to(atk_e.dtype)
+                def_e = def_e + torch.where(
+                    d_emb, torch.zeros_like(def_e),
+                    self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
+                if not barb:
+                    atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
+                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
+                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
+                # the attacker's own position clauses — a Varu or Toa beside the
+                # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
+                atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, foe_type=d_type).to(atk_e.dtype)
+                if not barb:
+                    atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
+                def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
+                def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
+                def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+                def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
+                atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
+                def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
+                atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
+                def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False,
+                                                self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
+                                                self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
+                atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False, a_form, a_lev).to(atk_e.dtype)
+                def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
+                                 + self._gov_unit_cs(d_type, def_civ_u)
+                                 + self._era_matchup_cs(def_civ_u, ut0)
+                                 + self._gdr_armor_cs(d_type, def_civ_u, ut0)
+                                 + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
+                atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
+                                 + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
+                def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]
+                d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
+                g = unit_att.nonzero(as_tuple=True)[0]
+                ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
+                self.unit_hp[g, ds] -= d_def[g]
+                dead = self.unit_hp[g, ds] <= 0
+                gd, td = g[dead], ttc[g[dead]]
+                self.unit_alive[gd, ds[dead]] = False
+                self._dig_at(gd, td, d_seat[gd])
+                # Clearing both maps is branch-free and exact: only one of them is
+                # set on that tile.
+                self._occ_clear(gd, td, ds[dead])
+                self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
+                                self._row_of(d_seat), tgt,
+                                d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+                self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
+                                      unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
+                                      vict_form=self._form_tier(d_slot), killer_promos=a_promos)
+                self._disciples_spread(
+                    self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
+                    d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+                _hp_p[:, u] = self._heal_on_kill(
+                    self._row_of(self._atk_seat(atk_kind, u)),
+                    unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), _hp_p[:, u])
+                if bool((unit_att & civ_def).any()):
+                    self._gen_ver += 1
+                self._award_pair_xp(
+                    unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
+                    d_slot=d_slot, d_type=d_type, d_is_barb=d_barb, ranged=True,
+                    a_died=torch.zeros_like(unit_att),
+                    d_died=unit_att & ((def_hp0 - d_def) <= 0))
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(city_att | cs_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, city_att | cs_att)
