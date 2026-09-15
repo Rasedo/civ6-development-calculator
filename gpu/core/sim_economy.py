@@ -732,6 +732,19 @@ class SimEconomy:
         tile = idx.gather(1, k.clamp(min=0, max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
         return has, tile
 
+    def _pick_live(self, mask_hit: torch.Tensor, cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`_pick_static` over a LIVE candidate mask [B, T]: the same draw and
+        the same k-th-candidate-in-tile-order arithmetic (`pick` over a
+        filtered tile list on TS), the candidate counted by cumsum instead of
+        a list built at load — for a set a mutable plane can shrink."""
+        cnt = cand.sum(dim=1)
+        has = mask_hit & (cnt > 0)
+        r = self._next_random(has)
+        k = torch.floor(r * cnt.to(torch.float64)).to(torch.long)
+        cum = cand.long().cumsum(dim=1)
+        tile = ((cum == (k + 1).unsqueeze(1)) & cand).long().argmax(dim=1)
+        return has, tile
+
     # ---- THE CLIMATE ARC -------------------------------------------------
 
     def _deforestation_level(self) -> torch.Tensor:
@@ -1107,9 +1120,17 @@ class SimEconomy:
             sp = self._severity_split([self._st_chance[a], self._st_chance[b]])
             chance[:, a] = sp[:, 0] * rate
             chance[:, b] = sp[:, 1] * rate
+        # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
+        # drowned the static per-family lists are the live sets; after a
+        # sea-level rise the pick counts the k-th candidate over the live
+        # mask, the same index arithmetic (one sync per phase, not per storm)
+        _drowned = bool(self.tile_submerged.any())
         for e in range(len(self._st_chance)):
             r = self._next_random(every)
-            hit, tile = self._pick_static(r < chance[:, e], self._storm_lists[self._st_family[e]])
+            if _drowned:
+                hit, tile = self._pick_live(r < chance[:, e], (self.storm_fam == int(self._st_family[e])) & ~self.tile_submerged)
+            else:
+                hit, tile = self._pick_static(r < chance[:, e], self._storm_lists[self._st_family[e]])
             # a centre already under a storm takes no second one
             busy = self.storm_left.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) > 0
             free = hit & ~busy
@@ -1139,9 +1160,17 @@ class SimEconomy:
             if bool(walk.any()):
                 centre = self._storm_walk(walk, centre, ev)
             self._storm_turn(hit_k & (age <= 1), centre, strip)
-        self.storm_left.copy_((self.storm_left - 1).clamp(min=0))
-        self.storm_event.copy_(torch.where(self.storm_left > 0, self.storm_event,
-                                           torch.full_like(self.storm_event, -1)))
+            # THIS storm's clock ticks before the next storm walks (TS's
+            # per-storm loop): a storm dissipating this turn frees its final
+            # tile for a later storm's walk in the same turn — seed 9222
+            # t181, a dust storm stepped onto where another had just died.
+            # A phase-end decrement over every tile kept that tile busy.
+            rows = hit_k.nonzero(as_tuple=True)[0]
+            c = centre[rows]
+            left_now = (self.storm_left[rows, c] - 1).clamp(min=0)
+            self.storm_left[rows, c] = left_now
+            self.storm_event[rows, c] = torch.where(
+                left_now > 0, self.storm_event[rows, c], torch.full_like(left_now, -1))
         self._eff_version += 1
 
     def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
@@ -1164,8 +1193,11 @@ class SimEconomy:
             d = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=5)
             dest = self.neigh[centre, d]  # [B], -1 off the map
             dc = dest.clamp(min=0)
+            # `stormFamilyAt` reads the LIVE tile: sea-level rise drowned a
+            # tile's family with it (seed 9222 t181), so the baked plane is
+            # masked by `tile_submerged` here and at the spawn pick
             ok = (walk & (dest >= 0) & (self.storm_fam[bidx, dc] == fam)
-                  & (self.storm_left[bidx, dc] == 0))
+                  & ~self.tile_submerged[bidx, dc] & (self.storm_left[bidx, dc] == 0))
             if bool(ok.any()):
                 rows = ok.nonzero(as_tuple=True)[0]
                 src, dst = centre[rows], dest[rows]
