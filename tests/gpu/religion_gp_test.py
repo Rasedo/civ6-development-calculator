@@ -58,13 +58,15 @@ def main() -> None:
     assert rr["prophetCls"] == 3, f"prophetCls must stay 3, got {rr['prophetCls']}"
 
     # --- belief catalog counts + Enhancer slot -----------------------------
-    assert rr["pantheonPool"] == 25, f"pantheons: {rr['pantheonPool']}"
+    # the pools after #264: Oral Tradition, Church Property, Crusade and
+    # Messenger of the Gods are not in the Gathering Storm install
+    assert rr["pantheonPool"] == 24, f"pantheons: {rr['pantheonPool']}"
     assert rr["followerPool"] == 9, f"followers: {rr['followerPool']}"
-    assert rr["founderPool"] == 8, f"founders: {rr['founderPool']}"
-    assert rr["enhancerPool"] == 7, f"enhancers: {rr['enhancerPool']}"
-    assert len(bl["pantheons"]) == 25 and len(bl["followers"]) == 9 and len(bl["founders"]) == 8
+    assert rr["founderPool"] == 7, f"founders: {rr['founderPool']}"
+    assert rr["enhancerPool"] == 5, f"enhancers: {rr['enhancerPool']}"
+    assert len(bl["pantheons"]) == 24 and len(bl["followers"]) == 9 and len(bl["founders"]) == 7
     # The enhancer effect table ships alongside the pool.
-    assert len(bl.get("enhancers", [])) == 7, "enhancer effect rows missing from export"
+    assert len(bl.get("enhancers", [])) == 5, "enhancer effect rows missing from export"
 
     # --- GPU side: tensors auto-extend to n_gp = 9 -------------------------
     paths = fixture_paths()
@@ -78,22 +80,22 @@ def main() -> None:
 
     # --- enhancer race state is wired (mirror of follower/founder) ---------
     assert sim._enh_any, "enhancer pool must be non-empty"
-    assert sim.enh_claimed.shape[1] == 7, f"enh pool mask width: {sim.enh_claimed.shape[1]}"
+    assert sim.enh_claimed.shape[1] == 5, f"enh pool mask width: {sim.enh_claimed.shape[1]}"
     assert sim.civ_enhancer[:, 1:].shape == sim.civ_follower[:, 1:].shape, "civ_only_enhancer must mirror civ_only_follower"
     assert sim.civ_enhancer_done[:, 1:].shape == sim.civ_religion_done[:, 1:].shape
     assert bool((sim.civ_enhancer[:, 1:] == -1).all()) and int(sim.claimed_e_n.sum()) == 0, "fresh: no enhancer claimed"
     # The k-th-open picker (the exact inline arithmetic of the enhancer claim):
-    # with idx 1 & 4 pre-claimed the open ids are {0,2,3,5,6}; a draw giving
-    # k = 2 selects the 3rd open id = idx 3.
+    # the pool is five rows after #264: with idx 1 & 4 pre-claimed the open
+    # ids are {0,2,3}; a draw giving k = 1 selects the 2nd open id = idx 2.
     ec = sim.enh_claimed.clone()
     ec[0, 1] = True
     ec[0, 4] = True
-    draw = torch.tensor([2.4 / 5.0], dtype=torch.float64)  # -> k = 2 (3rd open)
+    draw = torch.tensor([1.4 / 3.0], dtype=torch.float64)  # -> k = 1 (2nd open)
     n_open = (~ec).sum(dim=1)
     k = torch.floor(draw * n_open.to(torch.float64)).to(torch.long)
     cum = (~ec).long().cumsum(dim=1)
     sel = (~ec) & (cum == (k + 1).unsqueeze(1))
-    assert int(sel.long().argmax(dim=1)[0]) == 3, "enhancer k-th-open pick wrong"
+    assert int(sel.long().argmax(dim=1)[0]) == 2, "enhancer k-th-open pick wrong"
 
     # --- religious pressure spread (accumulate / tie / flip / KILL) --------
     assert sim.holy_tile.shape[1] == sim.n_majors and sim.n_majors == sim.n_majors
@@ -328,8 +330,9 @@ def main() -> None:
         assert bool((we[:, 1] == 1.0).all()), "WORK_ETHIC follower -> we = 1"
         assert bool((we[:, 2] == 0).all()), "no follower -> pad row we = 0"
         by = sim._fol_tab("bldgY", fid)  # [B, 3, NB, 6]
-        assert bool((by[:, 0, sh, 0] == 1.0).all()), "FEED_THE_WORLD SHRINE +1 food"
-        assert bool((by[:, 0, te, 0] == 2.0).all()), "FEED_THE_WORLD TEMPLE +2 food"
+        # CIV6 (FEED_THE_WORLD_SHRINE_FOOD3 / TEMPLE_FOOD3 Amount 3, GS)
+        assert bool((by[:, 0, sh, 0] == 3.0).all()), "FEED_THE_WORLD SHRINE +3 food"
+        assert bool((by[:, 0, te, 0] == 3.0).all()), "FEED_THE_WORLD TEMPLE +3 food"
         assert float(by[:, 1].abs().sum()) == 0.0, "WORK_ETHIC carries no building yields"
         # founder (Stewardship) stays per-civ: _bel_add_pf excludes the follower.
         pf = sim._bel_add_pf("bldgY", 0)  # [B, NB, 6]

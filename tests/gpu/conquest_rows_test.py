@@ -259,7 +259,9 @@ def test_turkish_bombard(rules, path) -> None:
     o_add, o_tier, o_loy = pair("OTTOMAN", False)
     p_add, p_tier, p_loy = pair(None, False)
     assert o_add == 1.0 and p_add == 0.0, f"the amenity add read {o_add} against {p_add}"
-    assert o_tier >= p_tier, f"the amenity tier fell, {o_tier} against {p_tier}"
+    # the tier INDEX counts down from Ecstatic (0): a better tier is a LOWER
+    # index, so "not fallen" is <= — the old >= only held while both were equal
+    assert o_tier <= p_tier, f"the amenity tier fell, {o_tier} against {p_tier}"
     assert o_loy == p_loy + 4, f"the loyalty read {o_loy} against {p_loy}"
     f_add, _f_tier, f_loy = pair("OTTOMAN", True)
     q_add, _q_tier, q_loy = pair(None, True)

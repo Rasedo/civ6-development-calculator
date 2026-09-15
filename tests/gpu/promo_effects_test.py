@@ -260,7 +260,8 @@ def test_spread_promos(sim) -> None:
     _c, ko, vo = col_with_kind(sim, "APOSTLE", "SPREAD_CHARGES")
     _c1, kt, vt = col_with_kind(sim, "APOSTLE", "TRANSLATOR")
     _c2, kp, vp = col_with_kind(sim, "APOSTLE", "PROSELYTIZER")
-    assert vt == 3 and vp == 75 and vo == 2, f"sourced values moved: {vo}/{vt}/{vp}"
+    # CIV6 (ModifierArguments APOSTLE_EVICT_ALL Amount 50): the Proselytizer strips 50%
+    assert vt == 3 and vp == 50 and vo == 2, f"sourced values moved: {vo}/{vt}/{vp}"
     sim.civ_religion_done[:, ROW] = True
 
     # ORATOR arrives with the CHOICE, at the PROMOTE column

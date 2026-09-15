@@ -2973,6 +2973,11 @@ class SimSeats:
                         has_pa = has_pa & self._laser_project_ok(row, pi_a)
                     elif int(prow_a.get("wmd", 0)):
                         has_pa = has_pa & self._wmd_project_ok(row, pi_a)
+                    elif int(prow_a.get("rec", 0)):
+                        # the reactor reset rides the City Center channel
+                        # (no PrereqDistrict in the install): its own gate is
+                        # the standing plant, re-asked here like the others
+                        has_pa = has_pa & self._recommission_ok(row, j, pi_a)
                     _rva = int(prow_a.get("rv", -1))
                     if _rva >= 0:
                         has_pa = has_pa & self.civ_civics[:, row, _rva]
