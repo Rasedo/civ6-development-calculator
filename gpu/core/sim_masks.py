@@ -958,8 +958,23 @@ class SimMasks:
         return torch.where(own_cs > 0, out.clamp(max=XP_BATTLE_CAP), torch.zeros_like(out))
 
     def _city_xp(self, base: torch.Tensor, pct: torch.Tensor, mult: torch.Tensor) -> torch.Tensor:
-        num = base * (100 + pct) * mult
-        return torch.div(2 * num + 100, 200, rounding_mode="floor")
+        """`cityXp` — a flat base, the percentage modifiers, the f64 multiplier
+        (`_xp_mult`, fractional for the Impi), floored as `Math.floor` does."""
+        num = (base * (100 + pct)).double() * mult.double()
+        return torch.floor((2 * num + 100) / 200).long()
+
+    def _xp_mult(self, seat: torch.Tensor, types: torch.Tensor, initiated: bool,
+                 rows: torch.Tensor | None = None) -> torch.Tensor:
+        """`xpMult` — f64, ONE composer for every award (the battle roll and
+        both city-strike awards): Survey's doubled recon XP, Kabul's double
+        for the INITIATOR only, and the chassis's own rate — CIV6 (Impi):
+        "Earns experience 25% faster". Seed 9274 t199: an Impi defending a
+        city strike banked 2 where TS banked 3, because the city awards
+        composed recon x Kabul without the chassis rate."""
+        mult = self._recon_xp_mult(seat, types, rows)
+        if initiated:
+            mult = mult * self._suz_xp_mult(seat, rows)
+        return mult.double() * self._type_xp_rate[types.clamp(min=0, max=self.NU - 1)]
 
     def _xp_strength(self, t: torch.Tensor, shooting: bool) -> torch.Tensor:
         """the strength a chassis brings to the XP ratio: its Ranged Strength
@@ -987,12 +1002,7 @@ class SimMasks:
         enough to put two games in one batch could show it."""
         own_cs = self._xp_strength(own_type, ranged and initiated)
         foe_cs = self._xp_strength(foe_type, ranged and not initiated)
-        mult = self._recon_xp_mult(own_seat, own_type, rows)
-        if initiated:
-            mult = mult * self._suz_xp_mult(own_seat, rows)
-        # CIV6 (Impi): "Earns experience 25% faster" — the chassis's own rate,
-        # a FRACTION, so the product leaves the integer lane here.
-        mult = mult.double() * self._type_xp_rate[own_type.clamp(min=0, max=self.NU - 1)]
+        mult = self._xp_mult(own_seat, own_type, initiated, rows)
         g = self._battle_xp(own_cs, foe_cs, foe_died=foe_died, ranged=ranged,
                             initiated=initiated, pct=own_pct, mult=mult)
         vet = foe_is_barb & (own_level >= 2)

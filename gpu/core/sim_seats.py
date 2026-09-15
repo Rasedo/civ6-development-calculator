@@ -11567,7 +11567,7 @@ class SimSeats:
         if not SEAT_CAPS[POOL_CLASS[a_kind]]["xp"]:
             return
         _pro, a_lvl, a_pct = self._promo_pool(a_kind)
-        mult = self._recon_xp_mult(a_seat, a_type) * self._suz_xp_mult(a_seat)
+        mult = self._xp_mult(a_seat, a_type, True)
         gain = self._city_xp(
             base, a_pct[:, u] + self._seat_xp_pct(a_type, a_seat), mult)
         ok = live & self._xp_eligible(a_type)
@@ -11584,7 +11584,7 @@ class SimSeats:
         ds = d_slot[rows]
         seat = self.unit_seat[rows, ds]
         types = self.unit_type[rows, ds]
-        mult = self._recon_xp_mult(seat, types, rows)
+        mult = self._xp_mult(seat, types, False, rows)
         base = torch.full_like(ds, XP_CITY_DEFEND)
         gain = self._city_xp(
             base,
