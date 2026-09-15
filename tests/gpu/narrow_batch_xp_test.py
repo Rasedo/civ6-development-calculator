@@ -120,10 +120,18 @@ def test_the_kabul_half_is_threaded_too(sim) -> None:
     import inspect
     src = inspect.signature(sim._suz_xp_mult)
     assert "rows" in src.parameters, "_suz_xp_mult takes no `rows`"
+    # the three multipliers compose in ONE place now (`_xp_mult`, shared by
+    # the battle roll and both city-strike awards); the battle path must hand
+    # it `rows`, and it must hand `rows` on to both gathers.
     src2 = inspect.getsource(type(sim)._battle_gain)
-    assert "_suz_xp_mult(own_seat, rows)" in src2, \
+    assert "_xp_mult(own_seat, own_type, initiated, rows)" in src2, \
+        "the battle roll's multiplier is not given `rows`"
+    src3 = inspect.getsource(type(sim)._xp_mult)
+    assert "_suz_xp_mult(seat, rows)" in src3, \
         "the initiator's Kabul multiplier is not given `rows`"
-    print("  5 the sibling OK — Kabul's half is threaded with Survey's")
+    assert "_recon_xp_mult(seat, types, rows)" in src3, \
+        "Survey's recon multiplier is not given `rows`"
+    print("  5 the sibling OK — Kabul's half is threaded with Survey's, in the one composer")
 
 
 def main() -> int:
