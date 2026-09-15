@@ -98,7 +98,10 @@ def print_hunt_reminder() -> None:
 # The TS children cost nothing: profiled at under 1% of the serve lane, whose
 # wall is the gate's own process — sim.step, the decide pass and the digest
 # extract — which is also why the gate runs as two processes at all.
-POKE_WORKERS = 6
+# Nine, measured against six at 8a0d6bb0 / b340b29b: the wall was 372 s
+# both ways (serve 352 vs 353) — the pool's contention no longer sets the
+# serve lane, so the pool may as well finish sooner (193 s vs 261 s).
+POKE_WORKERS = 9
 # Serve shards at full fan-out. A shard pays a fixed per-turn dispatch price
 # plus a per-seed one that is near-LINEAR in B (the driven games are
 # data-dependent Python loops), so 24 seeds over 12 two-seed shards beat 8
