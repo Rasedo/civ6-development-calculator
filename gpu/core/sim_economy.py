@@ -4696,18 +4696,20 @@ class SimEconomy:
         # PINNED citizens first, clamped to the open slots and to population.
         pin = self.city_spec_pin[:, row, sl].clamp(min=0)
         budget = pop.clamp(min=0) * alive.long()
-        spec = torch.zeros_like(slots)
-        for di in range(nDc):
-            tk = torch.minimum(torch.minimum(pin[:, :, di], slots[:, :, di]), budget)
-            spec[:, :, di] = tk
-            budget = budget - tk
+        # The catalog-order walk `take_i = min(cap_i, budget_i); budget_{i+1} =
+        # budget_i - take_i` over non-negative caps and budget is a
+        # WATER-FILLING: the running total is min(cumsum(cap), budget_0), so
+        # the two per-district loops (2 x nD x 3 dispatches a call, ~100 for
+        # thirteen districts) are two prefix-minimums. Same integers.
+        cap = torch.minimum(pin, slots)
+        run = torch.minimum(cap.cumsum(dim=2), budget.unsqueeze(2))
+        spec = run - torch.cat([torch.zeros_like(run[:, :, :1]), run[:, :, :-1]], dim=2)
+        budget = budget - run[:, :, -1]
         # then the OVERFLOW — what population is left over the workable pool —
         # spends itself on whatever slots are still free, in catalog order.
         rem = (budget - workable).clamp(min=0)
-        for di in range(nDc):
-            tk = torch.minimum(slots[:, :, di] - spec[:, :, di], rem)
-            spec[:, :, di] = spec[:, :, di] + tk
-            rem = rem - tk
+        run2 = torch.minimum((slots - spec).cumsum(dim=2), rem.unsqueeze(2))
+        spec = spec + run2 - torch.cat([torch.zeros_like(run2[:, :, :1]), run2[:, :, :-1]], dim=2)
         return spec
 
     def _worked_tiles(self, row: int) -> torch.Tensor:
