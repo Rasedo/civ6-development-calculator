@@ -368,6 +368,13 @@ for (let t = 0; t < N_TURNS; t++) {
           canBuildRoad(t, owns)
           || validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, builder: 'MILITARY_ENGINEER' }).length > 0
           || engineerFinishCity(state, seat, t.index) !== undefined));
+        // `_charge_jobs`'s twin: a job TAKEN by an earlier unit of the same
+        // type is masked out for the later ones — one set per type, as the
+        // GPU clones one plane per `_charge_jobs` call (Builders over the
+        // job mask, Engineers over theirs). Units walk in `state.units`
+        // order, which is the GPU's slot order.
+        const takenB = new Set<number>();
+        const takenE = new Set<number>();
         for (const u of state.units) {
           if (u.seat !== seat) continue;
           let jt = -1;
@@ -375,16 +382,20 @@ for (let t = 0; t < N_TURNS; t++) {
             const ut = state.map.tiles[u.tileIndex];
             let bk = Infinity;
             for (const t of jobTiles) {
+              if (takenB.has(t.index)) continue;
               const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
               if (k < bk) { bk = k; jt = t.index; }
             }
+            if (jt >= 0) takenB.add(jt);
           } else if (u.type === 'MILITARY_ENGINEER' && (u.charges ?? 0) > 0) {
             const ut = state.map.tiles[u.tileIndex];
             let bk = Infinity;
             for (const t of engTiles()) {
+              if (takenE.has(t.index)) continue;
               const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
               if (k < bk) { bk = k; jt = t.index; }
             }
+            if (jt >= 0) takenE.add(jt);
           }
           jr.push(jt);
           let st = -1;
