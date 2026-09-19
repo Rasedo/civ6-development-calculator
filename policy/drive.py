@@ -162,6 +162,11 @@ def _charge_jobs(sim, seat: int, idx: int, jobs: torch.Tensor,
         return out
     rows_all = present & (types.clamp(min=0, max=sim.NU - 1) == idx) & (charges > 0)
     arangeT = torch.arange(sim.T, device=sim.device)
+    # a job TAKEN by an earlier slot is masked out for the later ones, so two
+    # units of one type (on one tile, or with one nearest job) are not both
+    # sent to the same tile; the plane is cloned because the caller's is a
+    # cached mask
+    jobs = jobs.clone()
     for n in _acting_slots(rows_all):
         rows = rows_all[:, n]
         d = sim.pair_dist[tiles[:, n].clamp(min=0)].to(torch.long)
@@ -169,6 +174,9 @@ def _charge_jobs(sim, seat: int, idx: int, jobs: torch.Tensor,
         best = key.argmin(dim=1)
         has = rows & jobs.gather(1, best.unsqueeze(1)).squeeze(1)
         out[:, n] = torch.where(has, best, out[:, n])
+        if bool(has.any()):
+            _hr = has.nonzero(as_tuple=True)[0]
+            jobs[_hr, best[_hr]] = False
     return out
 
 
