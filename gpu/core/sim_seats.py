@@ -6489,6 +6489,17 @@ class SimSeats:
                     _one[b] = True
                     self._boost_random_civics(r, _one, _nb, int(row.get("boostLo", -1)),
                                               int(row.get("boostHi", -1)))
+                # CIV6 (WORLD_GAMES_*_TOURISM, ISS_*): the PERMANENT rewards ride
+                # the seat's perm run — the winner's own, then its tier's
+                _gpm = row.get("goldPerm") if rank == 0 else None
+                _tpm = (row.get("silverPerm") if rank < silver
+                        else row.get("bronzePerm") if rank < bronze else None)
+                for _pm in (_gpm, _tpm):
+                    if _pm and any(_pm):
+                        _n = min(len(_pm), self.civ_gp_perm.shape[2])
+                        self.civ_gp_perm[b, r, :_n] += torch.tensor(
+                            _pm[:_n], dtype=self.civ_gp_perm.dtype, device=self.device)
+                        self._eff_version += 1
 
     def _resolve_competition(self) -> None:
         """The turn's competition: score the field, run the clock down, pay the

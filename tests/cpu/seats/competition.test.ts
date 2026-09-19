@@ -28,6 +28,8 @@ import {
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
+import { gpPermOf } from '../../../cpu/data/greatPeople';
+import { gpDistrictTourism } from '../../../cpu/core/city';
 
 function addSeat(state: GameState, seat: number, col: number, row: number): Seat {
   const tile = tileAtCoords(state.map, col, row);
@@ -251,5 +253,59 @@ describe('the Space Station', () => {
     port.districtComplete = true;
     resolveCompetition(state);
     expect(c.score[0]).toBe(5);
+  });
+});
+
+// AUDIT B-22r: the World Games' and the Space Station's EXTRA rewards ride the
+// seat's permanent run — CIV6 (EmergencyRewards): the winner's own row, then
+// the top quarter's (the winner included) and the next quarter's.
+describe("the podium's permanent rewards", () => {
+  /** a field of three with the scores 9 / 5 / 1: gold is seat 0, the top
+   *  quarter (ceil 0.75 = 1) is seat 0 alone, the next (ceil 1.5 = 2) seat 1. */
+  function podium(kind: number): GameState {
+    const state = table();
+    startCompetition(state, kind, [0, 1, 2]);
+    const c = competitionOf(state)!;
+    c.score[0] = 9;
+    c.score[1] = 5;
+    c.score[2] = 1;
+    c.left = 1;
+    resolveCompetition(state);
+    expect(competitionOf(state)).toBeUndefined();
+    return state;
+  }
+
+  it('World Games: +2 Campus tourism to the winner, Stadium and Aquatics Center tourism to the tiers', () => {
+    const state = podium(COMPETITION_WORLD_GAMES);
+    const [a, b, d] = state.seats;
+    expect(gpPermOf(a, 'campusTourism')).toBe(2);
+    expect(gpPermOf(b, 'campusTourism')).toBe(0);
+    expect(gpPermOf(a, 'stadiumTourism')).toBe(2); // the winner sits in the top quarter too
+    expect(gpPermOf(a, 'aquaticsTourism')).toBe(2);
+    expect(gpPermOf(b, 'stadiumTourism')).toBe(1);
+    expect(gpPermOf(b, 'aquaticsTourism')).toBe(1);
+    expect(gpPermOf(d, 'stadiumTourism')).toBe(0);
+    // the READER: a Stadium on a complete Entertainment Complex pays the perm,
+    // a pillaged one does not
+    const city = a.cities[0];
+    const t = tileAtCoords(state.map, 4, 6);
+    t.district = 'ENTERTAINMENT_COMPLEX';
+    t.districtComplete = true;
+    city.districts.push({ type: 'ENTERTAINMENT_COMPLEX', tileIndex: t.index });
+    expect(gpDistrictTourism(state, 0, a.cities)).toBe(0);
+    city.buildings.push('STADIUM');
+    expect(gpDistrictTourism(state, 0, a.cities)).toBe(2);
+    city.pillagedBuildings = ['STADIUM'];
+    expect(gpDistrictTourism(state, 0, a.cities)).toBe(0);
+  });
+
+  it("Space Station: the winner's craft flies 3 farther, the tiers +40% / +20% space-race production", () => {
+    const state = podium(COMPETITION_SPACE_STATION);
+    const [a, b, d] = state.seats;
+    expect(gpPermOf(a, 'exoSpeed')).toBe(3);
+    expect(gpPermOf(b, 'exoSpeed')).toBe(0);
+    expect(gpPermOf(a, 'spaceProdPct')).toBe(40);
+    expect(gpPermOf(b, 'spaceProdPct')).toBe(20);
+    expect(gpPermOf(d, 'spaceProdPct')).toBe(0);
   });
 });

@@ -628,6 +628,13 @@ export const GP_PERM = [
   // embarked land unit still waits for Cartography.
   'navalOcean',
   'navalSight',
+  // CIV6 (World Games, EmergencyRewards): the podium's PERMANENT tourism per
+  // Stadium / Aquatics Center held — the same run a retired person writes.
+  'stadiumTourism',
+  'aquaticsTourism',
+  // CIV6 (Space Station, ISS_FIRST_PLACE_SPACESHIP_SPEED): +3 light-years per
+  // turn for the Exoplanet craft once launched.
+  'exoSpeed',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
@@ -655,6 +662,14 @@ export type GpTilePermKey = (typeof GP_TILE_PERM)[number];
 export const GP_ADJ_TOURISM_PCT: Partial<Record<string, number>> = {
   science: 100, culture: 100, production: 100, gold: 50, faith: 50,
 };
+
+/** CIV6 (WORLD_GAMES_{TOP,BOTTOM}_TIER_{STADIUMS,AQUATIC_CENTERS}_TOURISM):
+ *  a perm channel paid once per city holding the BUILDING on a complete,
+ *  unpillaged district of that type. */
+export const GP_BUILDING_TOURISM: readonly { perm: GpPermKey; building: string; district: DistrictId }[] = [
+  { perm: 'stadiumTourism', building: 'STADIUM', district: 'ENTERTAINMENT_COMPLEX' },
+  { perm: 'aquaticsTourism', building: 'AQUATICS_CENTER', district: 'WATER_PARK' },
+];
 
 export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
 

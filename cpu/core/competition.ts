@@ -17,7 +17,7 @@
  * `gpu/core/sim_seats.py`'s `_competition_*` are the twins.
  */
 import type { Competition, GameState, GreatPersonClass } from './types';
-import { boostRandom } from './gpAbility';
+import { addSeatPerm, boostRandom } from './gpAbility';
 import { ERAS } from '../data/techs';
 import type { Era } from '../data/techs';
 import {
@@ -154,6 +154,12 @@ function payPodium(state: GameState, c: Competition): void {
       boostRandom(state, field[r], 'civic', boosts,
         ERAS.indexOf(def.boostEras[0] as Era), ERAS.indexOf(def.boostEras[1] as Era));
     }
+    // CIV6 (WORLD_GAMES_*_TOURISM, ISS_*): the PERMANENT rewards ride the
+    // seat's perm run — the winner's own, then its tier's.
+    if (r === 0 && def.goldPerm) addSeatPerm(sx, def.goldPerm);
+    if (r < silver) {
+      if (def.silverPerm) addSeatPerm(sx, def.silverPerm);
+    } else if (r < bronze && def.bronzePerm) addSeatPerm(sx, def.bronzePerm);
   }
   state.eventLog.push(`${def.name}: ${seatOf(state, field[0])?.name ?? 'nobody'} takes the gold.`);
 }

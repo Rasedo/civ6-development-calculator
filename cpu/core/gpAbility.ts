@@ -175,6 +175,12 @@ function permAdd(target: { gpPerm?: number[] }, width: number, key: string, keys
   v[k] += n;
 }
 
+/** a PERMANENT per-seat run added from outside a spend — the scored
+ *  competitions' podium (CIV6 World Games, Space Station). */
+export function addSeatPerm(seat: { gpPerm?: number[] }, perm: Partial<Record<string, number>>): void {
+  for (const [k, n] of Object.entries(perm)) if (n) permAdd(seat, GP_PERM.length, k, GP_PERM, n);
+}
+
 /** the tiles a `perAdjacent` clause counts around (and, when `here`, on) the
  *  activation tile. */
 function perAdjacentCount(state: GameState, tile: Tile, fx: NonNullable<GpEffect['perAdjacent']>): number {

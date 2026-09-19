@@ -36,7 +36,7 @@ import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
-import { GP_ADJ_TOURISM_PCT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { irradiated } from './nuclear';
 export interface CityStats {
   city: City;
@@ -821,6 +821,10 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
       if (!tile.districtComplete || tile.districtPillaged) continue;
       if (d.type === 'CAMPUS') t += campus;
       else if (d.type === 'INDUSTRIAL_ZONE') t += iz;
+      // CIV6 (World Games): per Stadium / Aquatics Center standing on its district
+      for (const b of GP_BUILDING_TOURISM) {
+        if (d.type === b.district && c.buildings.includes(b.building) && !buildingPillaged(c, b.building)) t += gpPermOf(s, b.perm);
+      }
       const y = DISTRICTS[d.type].adjacencyYield;
       if (!adjPct || !y) continue;
       ctx ??= makeYieldCtx(state, seat);

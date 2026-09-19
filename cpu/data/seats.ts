@@ -1,3 +1,4 @@
+import type { GpPermKey } from './greatPeople';
 import { srcConst, xml, type SrcMap } from './provenance';
 
 /** shorthand: one `GlobalParameters` row's `Value` */
@@ -1071,6 +1072,13 @@ export interface CompetitionDef {
   bronzeBoosts?: number;
   /** the inclusive ERA window the boosts are drawn from. */
   boostEras?: readonly [string, string];
+  /** CIV6 (EmergencyRewards, the World Games' and Space Station's extra
+   *  rows): PERMANENT per-seat channels (`GP_PERM` keys) the podium adds —
+   *  the single winner's, the top quarter's (the winner included) and the
+   *  next quarter's. */
+  goldPerm?: Partial<Record<GpPermKey, number>>;
+  silverPerm?: Partial<Record<GpPermKey, number>>;
+  bronzePerm?: Partial<Record<GpPermKey, number>>;
 }
 /**
  * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
@@ -1121,6 +1129,11 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
       { source: 'building', amount: 1, of: 'AQUATICS_CENTER' },
     ],
     goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
+    // CIV6 (WORLD_GAMES_FIRST_PLACE_CAMPUS_TOURISM 2; _TOP_TIER_{STADIUMS,
+    // AQUATIC_CENTERS}_TOURISM 2; _BOTTOM_TIER_ 1): permanent district tourism
+    goldPerm: { campusTourism: 2 },
+    silverPerm: { stadiumTourism: 2, aquaticsTourism: 2 },
+    bronzePerm: { stadiumTourism: 1, aquaticsTourism: 1 },
   },
   // CIV6 (EMERGENCY_SPACE_STATION): Duration 29; scored 30 for "Completing
   // the Training Astronauts project", 5 per turn for "Maintaining Spaceport
@@ -1134,6 +1147,12 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
       { source: 'district', amount: 1, of: 'CAMPUS' },
     ],
     goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
+    // CIV6 (ISS_FIRST_PLACE_SPACESHIP_SPEED +3 light-years per turn once the
+    // expedition is launched; ISS_{TOP,BOTTOM}_TIER_SPACE_RACE_PRODUCTION
+    // +40% / +20%)
+    goldPerm: { exoSpeed: 3 },
+    silverPerm: { spaceProdPct: 40 },
+    bronzePerm: { spaceProdPct: 20 },
   },
 ];
 

@@ -36,7 +36,7 @@ re-adds them.
 | Open item | Weight | What is left |
 |---|---|---|
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; a model choice |
-| B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' and Space Station's extra rewards |
+| B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger) |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
@@ -99,7 +99,6 @@ close in the same commit.
   - ASK (not on the ledger — a model choice, no source will settle it): Civ 6 fixes the park rhombus's vertical; this hex frame has none, so every rhombus is offered. Nothing to build until a vertical is chosen.
 - **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 1.
   - BUILD — AID REQUEST, the one competition absent. Sourced: scores `FromGold` 1 per gold gifted, `FromProject` `PROJECT_SEND_AID` 200, `FromAtWar` -30, `FromBadCO2Footprint` -400; tiers 2 Diplomatic Victory points / 100 / 50 Favor. It needs a GOLD-GIFT verb (no engine can send gold to a named rival) and a disaster TRIGGER (the Congress does not vote it in).
-  - BUILD — the World Games' and the Space Station's EXTRA rewards, published and unmodelled: tourism onto a first-place Campus and onto each tier's Stadiums and Aquatics Centers (2/2/1); space-race project production (+40% top tier, +20% bottom) and a first-place spaceship speed. A reward channel each engine lacks.
   - The Nobel Prize competitions are Sweden-only (C-26).
 - **B-24r. GOVERNOR TAILS.** Weight 1.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.

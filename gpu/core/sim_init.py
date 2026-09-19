@@ -1408,6 +1408,8 @@ class SimInit:
         self._gp_tile_perm_names = list(rr.get("gpTilePermKeys", []))
         # CIV6 (Kenzo Tange): adjacency-as-tourism percent per yield, wire order
         self._gp_adj_tour_pct = [int(x) for x in rr.get("gpAdjTourismPct", [0] * 6)]
+        # CIV6 (World Games): (perm index, building index, district index) per row
+        self._gp_building_tourism = [tuple(int(x) for x in r) for r in rr.get("gpBuildingTourism", [])]
         # A Great Person's city APPEAL grant moves `_tile_appeal`, which is
         # `_eff_version`-cached — the claim has to say so, and only this
         # column can make it necessary.

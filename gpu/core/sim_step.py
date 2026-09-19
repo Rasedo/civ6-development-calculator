@@ -161,7 +161,9 @@ class SimStep:
         # and the victory_type guard keeps an already-won space game's victor.
         fly = self.space_ly >= 0  # [B, n_majors]
         if bool(fly.any()):
-            lz = torch.stack([self._laser_speed(r) for r in range(self.n_majors)], dim=1)
+            # ...plus CIV6 (ISS_FIRST_PLACE_SPACESHIP_SPEED) the Space Station winner's +3
+            lz = torch.stack([self._laser_speed(r) + self._gp_perm(r, "exoSpeed").long()
+                              for r in range(self.n_majors)], dim=1)
             self.space_ly.copy_(torch.where(fly, self.space_ly + 1 + lz, self.space_ly))
             arrive = fly & (self.space_ly >= int(self.rules.space_ly_target))
             landed = arrive.any(dim=1) & (self.victory_type != 3)

@@ -28,6 +28,7 @@ import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } f
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
+import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
@@ -1659,7 +1660,8 @@ export function endTurn(state: GameState): void {
   // lowest row, and an already-won space game keeps its victor.
   for (const s of state.seats) {
     if ((s.spaceLy ?? -1) < 0) continue;
-    s.spaceLy = (s.spaceLy ?? 0) + 1 + laserSpeed(state, s.seat);
+    // ...plus CIV6 (ISS_FIRST_PLACE_SPACESHIP_SPEED) the Space Station winner's +3
+    s.spaceLy = (s.spaceLy ?? 0) + 1 + laserSpeed(state, s.seat) + gpPermOf(s, 'exoSpeed');
     if (s.spaceLy >= SPACE_FLIGHT_LY && state.victoryType !== 3) {
       state.victoryType = 3;
       state.victoryRow = s.seat;

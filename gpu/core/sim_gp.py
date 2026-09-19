@@ -90,6 +90,16 @@ class SimGp:
             if di < 0 or not bool((per != 0).any()):
                 continue
             out = out + live(di).sum(dim=1) * per
+        # CIV6 (WORLD_GAMES_*_TIER_*_TOURISM): per Stadium / Aquatics Center
+        # standing on its complete, unpillaged district
+        for pk, bi, di in self._gp_building_tourism:
+            if pk < 0 or bi < 0 or di < 0 or pk >= self.civ_gp_perm.shape[2]:
+                continue
+            per = self.civ_gp_perm[:, row, pk].long()
+            if not bool((per != 0).any()):
+                continue
+            has = self.city_bldg[:, row, :, bi] & ~self.city_bldg_pillaged[:, row, :, bi]
+            out = out + (live(di) & has).sum(dim=1) * per
         adj = self._gp_city_perm(row, "adjTourism")         # [B, RC]
         if bool((adj != 0).any()):
             for di, dd in enumerate(self.districts_cat):
