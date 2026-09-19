@@ -1404,6 +1404,10 @@ class SimInit:
         self._gp_fx_names = list(rr.get("gpFx", []))
         self._gp_perm_names = list(rr.get("gpPermKeys", []))
         self._gp_city_perm_names = list(rr.get("gpCityPermKeys", []))
+        # ...and the per-TILE run (Tesla's / Paxton's district), the third tail
+        self._gp_tile_perm_names = list(rr.get("gpTilePermKeys", []))
+        # CIV6 (Kenzo Tange): adjacency-as-tourism percent per yield, wire order
+        self._gp_adj_tour_pct = [int(x) for x in rr.get("gpAdjTourismPct", [0] * 6)]
         # A Great Person's city APPEAL grant moves `_tile_appeal`, which is
         # `_eff_version`-cached — the claim has to say so, and only this
         # column can make it necessary.
@@ -1412,7 +1416,8 @@ class SimInit:
         self._GPFX = {n: i for i, n in enumerate(self._gp_fx_names)}
         self._GP_PERM0 = len(self._gp_fx_names)
         self._GP_CPERM0 = self._GP_PERM0 + len(self._gp_perm_names)
-        _fxw = self._GP_CPERM0 + len(self._gp_city_perm_names)
+        self._GP_TPERM0 = self._GP_CPERM0 + len(self._gp_city_perm_names)
+        _fxw = self._GP_TPERM0 + len(self._gp_tile_perm_names)
         gp_fx = rr.get("gpEffects", []) or [[[0] * max(1, _fxw)] * 4] * n_gp
         gp_ea = rr.get("gpEra", []) or [[0] * len(c) for c in gp_fx]
         _maxN = max(1, max(len(c) for c in gp_fx))
@@ -1633,6 +1638,10 @@ class SimInit:
         # CIV6 (Marina Raskova): the permanent "+1 air unit slots" a retired
         # general leaves on a district tile (`Tile.airSlotBonus`)
         self.tile_air_bonus = torch.zeros(B, T, dtype=torch.long, device=device)
+        # CIV6 (Tesla, Paxton): the permanent per-tile channels a retired
+        # engineer leaves on the DISTRICT it stood on (`Tile.gpPerm`,
+        # `GP_TILE_PERM` order: regional reach, production, amenities)
+        self.tile_gp_perm = torch.zeros(B, T, max(1, len(self._gp_tile_perm_names)), dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
         self._init_climate(fixtures)
 

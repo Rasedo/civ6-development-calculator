@@ -1450,13 +1450,20 @@ class SimMasks:
                 torch.where(take_c, e_seat, c_seat),
                 ok_c | e_pax)
 
-    def _unit_sight(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+    def _unit_sight(self, utype: torch.Tensor, promos: torch.Tensor,
+                    seat: torch.Tensor | None = None, b: torch.Tensor | None = None) -> torch.Tensor:
         """`unitSight`'s twin: the chassis's own SIGHT — 0 in the table means the
         SIGHT_RANGE default — plus what CIV6 (Spyglass / Rutter / Observation)
-        calls "+1 sight range"."""
-        base = self._type_sight[utype.clamp(min=0, max=self.NU - 1)]
-        return (torch.where(base > 0, base, torch.full_like(base, 2))
-                + self._promo_val(utype, promos, "SIGHT"))
+        calls "+1 sight range", plus CIV6 (Leif Erikson) "+1 sight range for
+        all naval units" of the owner named per element by `seat` (`b` its
+        batch row where the leading dim is not the batch)."""
+        ut = utype.clamp(min=0, max=self.NU - 1)
+        base = self._type_sight[ut]
+        out = (torch.where(base > 0, base, torch.full_like(base, 2))
+               + self._promo_val(utype, promos, "SIGHT"))
+        if seat is not None:
+            out = out + (self.unit_naval[ut] & (self._gp_perm_at(seat, "navalSight", b) > 0)).long()
+        return out
 
     def _stealth_hidden(self, seat, plane: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — does this tile hold a STEALTH unit `seat` cannot see?
@@ -1502,7 +1509,7 @@ class SimMasks:
         # CIV6 (Twilight Veil): "Only adjacent enemy units can reveal this
         # unit", so Reveal Stealth lengthens the look at a stealth CHASSIS and
         # at nothing else — the reach is a (viewer, hidden tile) pair.
-        far = self._unit_sight(utype, self.unit_promos).unsqueeze(2)
+        far = self._unit_sight(utype, self.unit_promos, self.unit_seat).unsqueeze(2)
         reach = torch.where(self._type_reveal[utype].unsqueeze(2) & chassis[:, tsel].unsqueeze(1),
                             far, torch.ones_like(far))
         mine = self.unit_alive & (self.unit_seat == sc)
@@ -2047,6 +2054,17 @@ class SimMasks:
         """[B] bool — `_ocean_open` for one seat row."""
         return self._ocean_open(torch.full((self.B,), row, dtype=torch.long, device=self.device))
 
+    def _ocean_open_leif(self, seat: torch.Tensor, b: torch.Tensor | None = None) -> torch.Tensor:
+        """bool — CIV6 (Leif Erikson): "All naval units can enter Ocean tiles"
+        for the seat named per element. The SEA domain alone: every caller
+        ANDs it with the mover being a hull, so an embarked land unit still
+        waits for Cartography (`waterEnterable`'s `UNITS[type].naval` arm)."""
+        return self._gp_perm_at(seat, "navalOcean", b) > 0
+
+    def _row_ocean_open_naval(self, row: int) -> torch.Tensor:
+        """[B] bool — the ocean gate a HULL of this row takes."""
+        return self._row_ocean_open(row) | (self._gp_perm(row, "navalOcean") > 0)
+
     def _gdr_has(self, utype: torch.Tensor, seat: torch.Tensor, k: int) -> torch.Tensor:
         """bool — `gdrHas`: the chassis is the robot AND its seat holds the
         Future-Era tech behind upgrade `k`. CIV6 (Giant Death Robot): the
@@ -2118,6 +2136,7 @@ class SimMasks:
         water_ok = self.wpass.gather(1, dc).squeeze(1) & (
             ~self.ocean_tile.gather(1, dc).squeeze(1)
             | self._ocean_open(u_seat)
+            | self._ocean_open_leif(u_seat)  # a HULL's advance: the naval arm applies
         )
         hull_ok = water_ok | self._canal_pass().gather(1, dc).squeeze(1)
         out = torch.where(self.unit_naval[ut], hull_ok, land_ok)
@@ -2354,7 +2373,7 @@ class SimMasks:
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
         no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
         naval_m = self.unit_naval[ti_n] & mask
-        cart = self._row_ocean_open(row) if self._cartography_tech >= 0 else None
+        cart = self._row_ocean_open_naval(row)
         found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                             sup_mask=self._type_support[type_idx.clamp(min=0)])
         if bool(no_hold.any()):
@@ -2390,7 +2409,8 @@ class SimMasks:
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
         self._reveal_around(rows, row, spot[rows],
-                            self._unit_sight(type_idx[rows], torch.zeros_like(slot)),
+                            self._unit_sight(type_idx[rows], torch.zeros_like(slot),
+                                             torch.full_like(slot, row), rows),
                             see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
@@ -3033,9 +3053,11 @@ class SimMasks:
         is_nav = self.unit_naval[ut].unsqueeze(2)
         cart = self._row_ocean_open(row).view(B, 1, 1)
         # a HULL floats over enterable water and through a Canal's passage;
-        # the OCEAN gate is the seat's Cartography and the passage asks none.
+        # the OCEAN gate is the seat's Cartography (or Leif Erikson's grant,
+        # hulls alone) and the passage asks none.
+        cart_nav = self._row_ocean_open_naval(row).view(B, 1, 1)
         hull = ((self.wpass.gather(1, nbc).reshape(B, N, 6)
-                 & (~self.ocean_tile.gather(1, nbc).reshape(B, N, 6) | cart))
+                 & (~self.ocean_tile.gather(1, nbc).reshape(B, N, 6) | cart_nav))
                 | self._canal_pass().gather(1, nbc).reshape(B, N, 6))
         if self._embark_live:
             ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0

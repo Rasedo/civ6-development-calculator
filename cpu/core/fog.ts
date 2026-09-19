@@ -10,14 +10,19 @@ import { promoValue, promoFlag } from './promotions';
 import { ELEVATION_SIGHT, FEATURE_SIGHT_THROUGH } from '../data/sight';
 import { DED_DRACONES, DRACONES_DISCOVERY_SCORE } from '../data/seats';
 import { UNITS } from '../data/units';
+import { gpPermOf } from '../data/greatPeople';
 
 export const SIGHT_RANGE = 2;
 
 /** How far this chassis SEES: `SIGHT_RANGE` unless the row names its own (the
  *  Destroyer's "Has Sight of 3"), plus what CIV6 (Spyglass / Rutter /
  *  Observation) calls "+1 sight range". Reveal Stealth reaches exactly here. */
-export function unitSight(u: { type: string; promos?: number }): number {
-  return (UNITS[u.type]?.sight ?? SIGHT_RANGE) + promoValue(u, 'SIGHT');
+export function unitSight(u: { type: string; promos?: number; seat?: number }, state?: GameState): number {
+  // CIV6 (Leif Erikson): "+1 sight range for all naval units" of the owner,
+  // permanent — read only where the caller has the state to name the owner.
+  const leif = state !== undefined && u.seat !== undefined && UNITS[u.type]?.naval
+    ? gpPermOf(seatOf(state, u.seat), 'navalSight') : 0;
+  return (UNITS[u.type]?.sight ?? SIGHT_RANGE) + promoValue(u, 'SIGHT') + leif;
 }
 
 /** The height a tile puts in the way of a look ACROSS it — CIV6
@@ -160,7 +165,7 @@ export function initFog(state: GameState): void {
       if (tileSeat(t) === s.seat) revealAround(state, s.seat, t.index, 1);
     }
     for (const c of citiesOf(state, s.seat)) revealAround(state, s.seat, c.centerIndex, 3);
-    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u), { seeThrough: unitSeesThrough(u) });
+    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }
 }
 

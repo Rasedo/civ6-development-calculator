@@ -61,6 +61,50 @@ class SimGp:
             return torch.where(ok, plane.gather(1, s0.reshape(self.B, -1)).reshape_as(seat), z)
         return torch.where(ok, plane[b.clamp(min=0, max=self.B - 1), s0], z)
 
+    def _gp_tile_perm(self, name: str) -> torch.Tensor:
+        """[B, T] long — one permanent per-TILE channel (`gpTilePermOf`)."""
+        k = self._gp_tile_perm_names.index(name) if name in self._gp_tile_perm_names else -1
+        if k < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        return self.tile_gp_perm[:, :, k]
+
+    def _gp_district_tourism(self, row: int) -> torch.Tensor:
+        """[B] long — `gpDistrictTourism`: CIV6 (Jamsetji Tata / Masaru Ibuka)
+        +10 Tourism per complete Campus / Industrial Zone the seat holds, and
+        (Kenzo Tange) a city's district ADJACENCY bonuses as Tourism at the
+        wire's percent per yield. A pillaged district is dark, as it is for
+        every district yield."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if row >= self.n_majors or not self.districts_on:
+            return out
+        alive = self.city_alive[:, row]                     # [B, RC]
+        dt_all = self.city_dist_tile[:, row]                # [B, RC, nD]
+
+        def live(di: int) -> torch.Tensor:
+            t = dt_all[:, :, di]
+            tc = t.clamp(min=0)
+            return alive & (t >= 0) & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc)
+
+        for di, key in ((self._campus_idx, "campusTourism"), (self._iz_idx, "izTourism")):
+            per = self._gp_perm(row, key).long()
+            if di < 0 or not bool((per != 0).any()):
+                continue
+            out = out + live(di).sum(dim=1) * per
+        adj = self._gp_city_perm(row, "adjTourism")         # [B, RC]
+        if bool((adj != 0).any()):
+            for di, dd in enumerate(self.districts_cat):
+                yc = int(dd.get("adjYield", -1))
+                pct = self._gp_adj_tour_pct[yc] if 0 <= yc < len(self._gp_adj_tour_pct) else 0
+                if pct == 0:
+                    continue
+                ok = live(di) & (adj != 0)
+                if not bool(ok.any()):
+                    continue
+                v = self._district_adj_seat(row, di).gather(1, dt_all[:, :, di].clamp(min=0)).double()
+                share = torch.floor(v * pct / 100)
+                out = out + torch.where(ok, share, torch.zeros_like(share)).long().sum(dim=1)
+        return out
+
     def _gp_city_perm(self, row: int, name: str) -> torch.Tensor:
         """[B, RC] — one permanent per-city channel."""
         k = self._gp_city_perm_names.index(name) if name in self._gp_city_perm_names else -1
@@ -334,6 +378,11 @@ class SimGp:
             if self._gp_appeal_col >= 0 and bool(
                     (_rowfx[_r, self._GP_CPERM0 + self._gp_appeal_col] != 0).any()):
                 self._eff_version += 1
+        # the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
+        _ntp = len(self._gp_tile_perm_names)
+        if _ntp and bool(m.any()):
+            _r = m.nonzero(as_tuple=True)[0]
+            self.tile_gp_perm[_r, hc[_r]] += _rowfx[_r, self._GP_TPERM0:self._GP_TPERM0 + _ntp].long()
 
         # ---- a PROPHET's charge is what founds a religion, not the recruit
         if self._prophet_cls >= 0:

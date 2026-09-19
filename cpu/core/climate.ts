@@ -212,6 +212,7 @@ export function submergeTile(state: GameState, tile: Tile): void {
   tile.antiquity = false;
   tile.locked = false;
   tile.airSlotBonus = undefined;
+  tile.gpPerm = undefined;
   tile.fertility = 0;
   tile.fertilityProd = 0;
   tile.droughtTurns = 0;

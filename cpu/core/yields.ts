@@ -14,6 +14,7 @@ import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
+import { gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 
@@ -663,7 +664,10 @@ export function regionalEffects(
       for (const id of other.buildings) {
         const def = effectiveBuilding(civOf(state, city.seat), id);
         if (!def || !def.regional || def.district !== inst.type) continue;
-        if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach)) continue;
+        // CIV6 (Tesla, Paxton): the SOURCE district's own reach bonus, on
+        // top of the row's range or the shared one
+        const _gpReach = gpTilePermOf(tile, 'regionalRange');
+        if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach) + _gpReach) continue;
         // CIV6 (Vertical Integration): "This city receives Production from any
         // number of Industrial Zones within 6 tiles, not just the first." The
         // promotion names ONE district, so no other regional line stacks.
@@ -672,6 +676,10 @@ export function regionalEffects(
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
           if (def.amenities) out.amenities += def.amenities;
+          // ...and each regional building of a Tesla / Paxton district
+          // carries the district's extra yield to the same receivers
+          out.yields.production += gpTilePermOf(tile, 'regionalProduction');
+          out.amenities += gpTilePermOf(tile, 'regionalAmenities');
         }
         if ((!def.poweredYields && !def.poweredAmenities) || (!every && seenPowered.has(id))) continue;
         if (!other.powered) continue;

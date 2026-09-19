@@ -971,7 +971,7 @@ class SimEconomy:
                        ("res_id", -1), ("res_cat", 0), ("res_priority", 0),
                        ("lux_id", -1), ("lux_req", -9), ("res_imp", -1),
                        ("tile_lowland", 0), ("encamp_hp", 0), ("encamp_outer_hp", 0),
-                       ("park", -1), ("tile_air_bonus", 0), ("fertility", 0),
+                       ("park", -1), ("tile_air_bonus", 0), ("tile_gp_perm", 0), ("fertility", 0),
                        ("fertility_prod", 0), ("drought", 0), ("wok", 0)):
             getattr(self, _p)[take] = _v
         self.tile_yields[take] = 0

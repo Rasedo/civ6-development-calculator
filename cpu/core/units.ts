@@ -133,13 +133,16 @@ export function canEmbark(
 export function waterEnterable(
   state: GameState,
   tile: Tile,
-  unit: { seat: number },
+  unit: { seat: number; type?: string },
 ): boolean {
   // CIV6 (Knarr): "Units gain the ability to enter Ocean tiles" at
   // Shipbuilding; (Mana) the Maori cross it from the first turn
   // (`OCEAN_ACCESS_ROWS`).
   if (tile.terrain === 'OCEAN') {
     if (ownerHasTech(state, unit, 'CARTOGRAPHY')) return true;
+    // CIV6 (Leif Erikson): "All naval units can enter Ocean tiles" — the
+    // SEA domain; an embarked land unit is not one.
+    if (unit.type !== undefined && UNITS[unit.type]?.naval && gpPermOf(seatOf(state, unit.seat), 'navalOcean') > 0) return true;
     for (const r of getModifiers(state, unit.seat).oceanAccess) {
       if (r.tech === null || ownerHasTech(state, unit, r.tech)) return true;
     }
@@ -477,7 +480,7 @@ export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean 
   for (const v of state.units) {
     if (v.seat !== seat) continue;
     const vt = state.map.tiles[v.tileIndex];
-    const reach = chassis && UNITS[v.type]?.revealStealth ? unitSight(v) : 1;
+    const reach = chassis && UNITS[v.type]?.revealStealth ? unitSight(v, state) : 1;
     if (hexDistance(vt.col, vt.row, t.col, t.row) <= reach) return true;
   }
   return false;
@@ -1093,10 +1096,10 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     // stands exactly where its escort does, so the circle is the WIDEST of
     // the formation's members — which is the whole reason a formation carries
     // an Observation Balloon or a Drone.
-    let sight = unitSight(unit);
+    let sight = unitSight(unit, state);
     let seeThrough = unitSeesThrough(unit);
     for (const rider of riders) {
-      sight = Math.max(sight, unitSight(rider));
+      sight = Math.max(sight, unitSight(rider, state));
       seeThrough = seeThrough || unitSeesThrough(rider);
     }
     revealAround(state, unit.seat, to.index, sight, { seeThrough });
@@ -1803,7 +1806,7 @@ export function spawnUnit(
     logXpWrite(state, unit, 'fp');
   }
   state.units.push(unit);
-  revealAround(state, seat, unit.tileIndex, unitSight(unit), { seeThrough: unitSeesThrough(unit) });
+  revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
   // Track the strongest MELEE unit each civ has ever fielded —
   // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
   // training, purchase, levies and seat production alike).

@@ -808,6 +808,9 @@ const TILE: Record<string, Extractor> = {
   water: overTiles((t) => (isWater(t) ? 1 : 0)),
   floodCount: overTiles((t) => t.floodCount ?? 0),
   airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),
+  gpRegRange: overTiles((t) => t.gpPerm?.[0] ?? 0),
+  gpRegProd: overTiles((t) => t.gpPerm?.[1] ?? 0),
+  gpRegAmen: overTiles((t) => t.gpPerm?.[2] ?? 0),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),
 };
 

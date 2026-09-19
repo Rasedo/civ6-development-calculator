@@ -209,6 +209,9 @@ export interface Tile {
   /** CIV6 (Marina Raskova): a permanent "+1 air unit slots" on this
    *  district tile, written at the general's retirement. */
   airSlotBonus?: number;
+  /** the permanent per-tile channels a Great Person left on this district
+   *  (`GP_TILE_PERM` order): Tesla's and Paxton's regional reach and yield. */
+  gpPerm?: number[];
   /** the COASTAL LOWLAND band, 1 (drowns first) to 3; absent = highland or
    *  inland, which the rising sea never reaches. Derived from the map at
    *  creation by `deriveLowlands`, never read off the world file. */

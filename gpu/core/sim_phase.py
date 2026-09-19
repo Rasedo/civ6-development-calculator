@@ -1814,7 +1814,7 @@ class SimPhase:
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
             wonder_pct=self._wonder_tourism_pct(row),
-            suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
+            suz_tour=self._suzerain_tourism(row, self.tile_seat == row) + self._gp_district_tourism(row),
             gw_mult=js_round(self._gov_chan(row, "mult", "gwTourismMult")).long() if self.n_governors else None,
         )
         _rel_t = self._tourism_religious_of(row)

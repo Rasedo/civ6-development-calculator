@@ -22,7 +22,7 @@ import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityS
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
-import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { GP_ADJ_TOURISM_PCT, GP_CITY_PERM, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
@@ -449,6 +449,7 @@ function gpFxRow(p: GreatPersonDef): number[] {
     ...GP_FX.map((k) => v[k] ?? 0),
     ...GP_PERM.map((k) => fx.perm?.[k] ?? 0),
     ...GP_CITY_PERM.map((k) => fx.cityPerm?.[k] ?? 0),
+    ...GP_TILE_PERM.map((k) => fx.tilePerm?.[k] ?? 0),
   ];
 }
 
@@ -933,6 +934,9 @@ export function buildRules() {
       gpFx: [...GP_FX],
       gpPermKeys: [...GP_PERM],
       gpCityPermKeys: [...GP_CITY_PERM],
+      gpTilePermKeys: [...GP_TILE_PERM],
+      // CIV6 (Kenzo Tange): the adjacency-as-tourism percent per yield, wire order
+      gpAdjTourismPct: YIELD_KEYS.map((k) => GP_ADJ_TOURISM_PCT[k] ?? 0),
       gpEffects: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpFxRow(p))),
       // the SITE a charge may be spent at, and which district when it names one
       gpSite: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => GP_SITES.indexOf(gpSiteOf(p).site))),

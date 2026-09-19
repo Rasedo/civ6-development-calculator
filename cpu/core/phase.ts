@@ -1891,7 +1891,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             && tileFreeForUnit(state, exit, unit.seat, unit)) {
           unit.tileIndex = exit;
           unit.movesLeft -= PORTAL_MP * MP_SCALE;
-          revealAround(state, unit.seat, exit, unitSight(unit), { seeThrough: unitSeesThrough(unit) });
+          revealAround(state, unit.seat, exit, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
         }
       }
     });

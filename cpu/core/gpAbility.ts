@@ -13,7 +13,7 @@ import { naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import {
-  GP_CITY_PERM, GP_CLASSES, GP_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
+  GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GreatPersonDef,
 } from '../data/greatPeople';
@@ -351,6 +351,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // PERMANENT CHANNELS.
   for (const [k, n] of Object.entries(fx.perm ?? {})) permAdd(owner, GP_PERM.length, k, GP_PERM, n);
   if (city) for (const [k, n] of Object.entries(fx.cityPerm ?? {})) permAdd(city, GP_CITY_PERM.length, k, GP_CITY_PERM, n);
+  // the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
+  for (const [k, n] of Object.entries(fx.tilePerm ?? {})) permAdd(tile, GP_TILE_PERM.length, k, GP_TILE_PERM, n);
 
   (owner.gpActivated ??= []).push(person.id);
   unit.charges = (unit.charges ?? 1) - 1;

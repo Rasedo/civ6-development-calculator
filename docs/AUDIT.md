@@ -43,9 +43,9 @@ re-adds them.
 | B-51r Encampment pool on capture | 1 | ask 2 |
 | B-54r unique-unit flank/support stacks | 1 | the Impi's and Hypaspist's own flank/support |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
-| B-61r Great Person clauses with no carrier | 2 | ten `unmodelled` persons in `cpu/data/greatPeople.ts` |
+| B-61r Great Person clauses with no carrier | 1 | three `unmodelled` persons in `cpu/data/greatPeople.ts` (Raffles, Boudica, Tupac Amaru) |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
-| **B. Fidelity vs real Civ 6** | **11** | |
+| **B. Fidelity vs real Civ 6** | **10** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
@@ -66,7 +66,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); four rules the reader census names |
 | **C. Absent systems** | **23** | |
-| **OPEN, TOTAL** | **34** | |
+| **OPEN, TOTAL** | **33** | |
 
 ## The question ledger — owner asks
 
@@ -119,8 +119,8 @@ close in the same commit.
   - BUILD: Zulu's Impi and Macedon's Hypaspist raise flanking or support for themselves alone; both chassis are seated (C-78), the per-chassis clause is not read.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
   - BLOCKER C-34: GROUND_CREWS — `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION` with no amount (the modifier type is the whole rule; the engine's own healing supplies the number) after a PATROL, which is no data row at all.
-- **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
-  - BUILD: ten persons marked `unmodelled` in `cpu/data/greatPeople.ts`, the class lump standing in for each — Tesla, Paxton, Kenzo Tange (tourism / regional range), Stamford Raffles (city-state absorption), Sarah Breedlove, Jamsetji Tata, Masaru Ibuka (tourism), Boudica (barbarian conversion), Tupac Amaru (a per-district grant walk), Leif Erikson (ocean passage). Each needs its carrier on both engines.
+- **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 1.
+  - BUILD: three persons marked `unmodelled` in `cpu/data/greatPeople.ts`, the class lump standing in for each — the VERBS: Stamford Raffles (absorb the city-state whose suzerain you are, `ActionRequiresSuzerainTerritory`, +10 loyalty per turn on the city), Boudica (every barbarian unit within 1 changes sides, `GREATPERSON_BOUDICA_ACTIVE`; the Heathen Conversion body), Tupac Amaru (`EFFECT_GRANT_UNIT_IN_EACH_DISTRICT` UNIT_MUSKETMAN, `ActionRequiresEnemyTerritory`, IgnoreDefensible). Each needs its verb on both engines.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
   - DLL: the PER-CITY war-weariness split. The install's numbers are `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0, NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`, `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`, `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200, TURN_AT_WAR 50}`, `_WARMONGER_BASE 16`; how the per-city rows compose is not published. The empire-wide rule ships (`warWearinessPenalty`).
   - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield and turn tables independently.

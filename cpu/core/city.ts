@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, buildingPillaged, effectiveAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -36,7 +36,7 @@ import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
-import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { GP_ADJ_TOURISM_PCT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { irradiated } from './nuclear';
 export interface CityStats {
   city: City;
@@ -804,6 +804,33 @@ function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
+/** The Great Person DISTRICT tourism: CIV6 (Jamsetji Tata / Masaru Ibuka)
+ *  +10 per complete Campus / Industrial Zone the seat holds, and (Kenzo
+ *  Tange) a city's district adjacency bonuses as Tourism. A pillaged
+ *  district is dark, as it is for every district yield. */
+export function gpDistrictTourism(state: GameState, seat: number, cities: readonly City[]): number {
+  const s = seatOf(state, seat);
+  const campus = gpPermOf(s, 'campusTourism');
+  const iz = gpPermOf(s, 'izTourism');
+  let t = 0;
+  let ctx: YieldCtx | undefined;
+  for (const c of cities) {
+    const adjPct = gpCityPermOf(c, 'adjTourism');
+    for (const d of c.districts) {
+      const tile = state.map.tiles[d.tileIndex];
+      if (!tile.districtComplete || tile.districtPillaged) continue;
+      if (d.type === 'CAMPUS') t += campus;
+      else if (d.type === 'INDUSTRIAL_ZONE') t += iz;
+      const y = DISTRICTS[d.type].adjacencyYield;
+      if (!adjPct || !y) continue;
+      ctx ??= makeYieldCtx(state, seat);
+      const adj = effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, c, d.type));
+      t += Math.floor((adj * (GP_ADJ_TOURISM_PCT[y] ?? 0)) / 100);
+    }
+  }
+  return t;
+}
+
 export function seatTourism(
   state: GameState,
   seat: number,
@@ -827,7 +854,7 @@ export function seatTourism(
   // same snapshot the loyalty payout used, taken before any loyalty moved.
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
-  return t + suzerainTourism(state, seat, owns)
+  return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities)
     + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null,
@@ -869,7 +896,8 @@ export function tourismIntlPct(state: GameState, from: number, to: number): numb
   let pct = 0;
   if (borderTurnsFrom(state, to, from) > 0) pct += TOURISM_OPEN_BORDERS_PCT;
   const routed = (seatOf(state, from)?.tradeRoutes ?? []).some((r) => r.toSeat === to);
-  if (routed) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus;
+  // CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
+  if (routed) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus + gpPermOf(seatOf(state, from), 'tourismRouteBonus');
   const ga = computeAdoption(seatOf(state, from)!.research).government;
   const gb = computeAdoption(seatOf(state, to)!.research).government;
   if (ga !== gb) {

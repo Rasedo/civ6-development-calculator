@@ -3268,7 +3268,8 @@ class SimSeats:
             wet_ok = (
                 self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1)
                 & (~self.ocean_tile.gather(1, dc.unsqueeze(1)).squeeze(1)
-                   | self._ocean_open(seat))
+                   | self._ocean_open(seat)
+                   | (r_naval & self._ocean_open_leif(seat)))
                 & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
             )
             # a hull comes ashore only in a Canal's passage, and a water-walking
@@ -4602,6 +4603,8 @@ class SimSeats:
         pct = pct + ob.long() * int(self.rules.seats.get("tourismOpenBordersPct", 25))
         routed = (self.seat_route_dseat[:, frm] == to).any(dim=1)
         extra = self._gov_mods(frm)[12]["tourroute"] if self._gov_has_effects else torch.zeros_like(pct)
+        # CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
+        extra = extra + self._gp_perm(frm, "tourismRouteBonus").long()
         pct = pct + routed.long() * (int(self.rules.seats.get("tourismRoutePct", 25)) + extra)
         ga, ha = self._adopted_gov(self._seat_civics(frm))
         gb, hb = self._adopted_gov(self._seat_civics(to))
@@ -8740,6 +8743,13 @@ class SimSeats:
         lit = None
         y6 = am = None
         bcol = self._b_cols(row)
+        # CIV6 (Tesla, Paxton): a SOURCE district's own reach bonus and the
+        # extra each of its regional buildings carries to the same receivers
+        _gp_on = bool((self.tile_gp_perm != 0).any())
+        if _gp_on:
+            _gp_rng = self._gp_tile_perm("regionalRange")
+            _gp_prod = self._gp_tile_perm("regionalProduction")
+            _gp_amen = self._gp_tile_perm("regionalAmenities")
         for n in self._reg_bidx:
             own_n = self.city_bldg[:, row, :cols, n] & alive
             if not bool(own_n.any()):
@@ -8755,16 +8765,33 @@ class SimSeats:
             # shared one, the suzerain bonus included.
             _rr = bcol["regionalRange"][:, n].long().reshape(B, 1, 1)
             reach_n = torch.where(_rr > 0, _rr, reach)
+            if _gp_on:
+                reach_n = reach_n + _gp_rng.gather(1, stc).unsqueeze(2)
             _in = ok.unsqueeze(2) & (dd <= reach_n)
             has = _in.any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
-            if every is not None and int(self._b_req_district[n]) == self._iz_idx:
+            _every_n = every is not None and int(self._b_req_district[n]) == self._iz_idx
+            if _every_n:
                 hf = torch.where(every, (_in.sum(dim=1) * alive).double(), hf)
             if y6 is None:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * bcol["yields"][:, n, :].reshape(B, 1, 6)
             am = am + hf * bcol["amenities"][:, n].reshape(B, 1)
+            if _gp_on:
+                # the extra is the PAYING source's: TS's `seen` set pays the first
+                # city it walks, which is the first in-range column here (argmax
+                # returns the first True); every source under Vertical Integration
+                _first = _in.long().argmax(dim=1)                       # [B, recv]
+                _xp = _gp_prod.gather(1, stc)                             # [B, src]
+                _xa = _gp_amen.gather(1, stc)
+                _xpf = torch.where(has, _xp.gather(1, _first), torch.zeros_like(_first)).double()
+                _xaf = torch.where(has, _xa.gather(1, _first), torch.zeros_like(_first)).double()
+                if _every_n:
+                    _xpf = torch.where(every, ((_in * _xp.unsqueeze(2)).sum(dim=1) * alive).double(), _xpf)
+                    _xaf = torch.where(every, ((_in * _xa.unsqueeze(2)).sum(dim=1) * alive).double(), _xaf)
+                y6[:, :, 1] = y6[:, :, 1] + _xpf
+                am = am + _xaf
             _pw = bcol["powY"][:, n, :]                              # [B, 6]
             if not bool((_pw != 0).any()) and float(self._b_pow_am[n]) == 0:
                 continue
@@ -10850,7 +10877,8 @@ class SimSeats:
             # hands `revealAround` at this same hop, and a chassis that carries
             # its own Sight (the Destroyer's 3, the Varu's 3, the Mountie's 4)
             # would otherwise walk half-blind here alone.
-            sight = self._unit_sight(u_type, u_promos)
+            sight = self._unit_sight(u_type, u_promos,
+                                     self.unit_seat.gather(1, gslot.clamp(min=0).unsqueeze(1)).squeeze(1))
             # ...and the look sees THROUGH features if any member is a Sentry
             # (CanSee) — `unitSeesThrough` ORed over the formation on TS too
             see_thr = self._promo_flag(u_type, u_promos, "SEE_THROUGH")
@@ -10864,7 +10892,8 @@ class SimSeats:
                 _rc = _rr.clamp(min=0)
                 _rs = self._unit_sight(
                     self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
-                    self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1))
+                    self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1),
+                    self.unit_seat.gather(1, _rc.unsqueeze(1)).squeeze(1))
                 sight = torch.where(_rr >= 0, torch.maximum(sight, _rs), sight)
                 see_thr = see_thr | ((_rr >= 0) & self._promo_flag(
                     self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),

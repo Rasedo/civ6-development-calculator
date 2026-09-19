@@ -613,12 +613,45 @@ export const GP_PERM = [
   // all other civilizations" — appended LAST: the wire ships this list and
   // the GPU plane indexes by position.
   'visibilityAll',
+  // CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes" — the Online
+  // Communities channel (`tourismRouteBonus`), percent.
+  'tourismRouteBonus',
+  // CIV6 (Jamsetji Tata / Masaru Ibuka): +10 Tourism from every Campus /
+  // Industrial Zone this seat holds (COLLECTION_PLAYER_DISTRICTS).
+  'campusTourism',
+  'izTourism',
+  // CIV6 (Leif Erikson): "All naval units can enter Ocean tiles" and
+  // "+1 sight range for all naval units" — the SEA domain alone, so an
+  // embarked land unit still waits for Cartography.
+  'navalOcean',
+  'navalSight',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
 /** PERMANENT per-city channels, same contract — the ACTIVATING city keeps them. */
-export const GP_CITY_PERM = ['housing', 'amenities', 'appeal', 'loyalty', 'districtLimit'] as const;
+export const GP_CITY_PERM = [
+  'housing', 'amenities', 'appeal', 'loyalty', 'districtLimit',
+  // CIV6 (Kenzo Tange): this city's district adjacency bonuses count as
+  // Tourism — Science, Culture and Production at 100%, Gold and Faith at 50%.
+  'adjTourism',
+] as const;
 export type GpCityPermKey = (typeof GP_CITY_PERM)[number];
+
+/** PERMANENT per-TILE channels, same contract — the DISTRICT the charge was
+ *  spent on keeps them (the install's ATTACHMENT_TARGET_DISTRICT_IN_TILE). */
+export const GP_TILE_PERM = [
+  'regionalRange',       // CIV6 (Tesla, Paxton): this district's regional buildings reach 3 tiles farther
+  'regionalProduction',  // CIV6 (Tesla): ...and each provides +2 Production
+  'regionalAmenities',   // CIV6 (Paxton): ...and each provides +1 Amenity
+] as const;
+export type GpTilePermKey = (typeof GP_TILE_PERM)[number];
+
+/** CIV6 (Kenzo Tange): the share of a district's ADJACENCY yield the city
+ *  counts as Tourism — Science, Culture and Production whole, Gold and
+ *  Faith half (`GREATPERSON_DISTRICT_*_ADJACENCY_AS_TOURISM` Amount 100 / 50). */
+export const GP_ADJ_TOURISM_PCT: Partial<Record<string, number>> = {
+  science: 100, culture: 100, production: 100, gold: 50, faith: 50,
+};
 
 export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
 
@@ -628,6 +661,10 @@ export function gpPermOf(seat: { gpPerm?: number[] } | undefined, key: GpPermKey
 
 export function gpCityPermOf(city: { gpPerm?: number[] } | undefined, key: GpCityPermKey): number {
   return city?.gpPerm?.[GP_CITY_PERM.indexOf(key)] ?? 0;
+}
+
+export function gpTilePermOf(tile: { gpPerm?: number[] } | undefined, key: GpTilePermKey): number {
+  return tile?.gpPerm?.[GP_TILE_PERM.indexOf(key)] ?? 0;
 }
 
 export interface GpEffect {
@@ -702,6 +739,8 @@ export interface GpEffect {
   airSlotBonus?: number;
   perm?: Partial<Record<GpPermKey, number>>;
   cityPerm?: Partial<Record<GpCityPermKey, number>>;
+  /** on the DISTRICT tile the charge is spent on. */
+  tilePerm?: Partial<Record<GpTilePermKey, number>>;
 }
 
 /**
@@ -794,14 +833,19 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_SHAH_JAHAN: { wonderBuyout: true },
   GP_ALVAR_AALTO: { cityPerm: { appeal: 1 } },
   GP_ROBERT_GODDARD: { eurekaTechs: ['ROCKETRY'], perm: { spaceProdPct: 20 } },
-  GP_NIKOLA_TESLA: { unmodelled: true },
+  // CIV6 (Nikola Tesla, DISTRICT_IN_TILE): this Industrial Zone's regional
+  // buildings reach 3 tiles farther and each provides +2 Production.
+  GP_NIKOLA_TESLA: { siteDistrict: 'INDUSTRIAL_ZONE', tilePerm: { regionalRange: 3, regionalProduction: 2 } },
   GP_JANE_DREW: { cityPerm: { housing: 4, amenities: 3 } },
   GP_JOHN_ROEBLING: { charges: 2, cityPerm: { housing: 2, amenities: 1 } },
   GP_SERGEI_KOROLEV: { spaceProduction: 1500 },
-  GP_JOSEPH_PAXTON: { unmodelled: true },
+  // CIV6 (Joseph Paxton): the same on an Entertainment Complex, +1 Amenity.
+  GP_JOSEPH_PAXTON: { siteDistrict: 'ENTERTAINMENT_COMPLEX', tilePerm: { regionalRange: 3, regionalAmenities: 1 } },
   GP_CHARLES_CORREA: { cityPerm: { appeal: 2 } },
   GP_WERNHER_VON_BRAUN: { perm: { spaceProdPct: 100 } },
-  GP_KENZO_TANGE: { unmodelled: true },
+  // CIV6 (Kenzo Tange, ATTACHMENT_TARGET_CITY, no district clause): the
+  // city's district adjacency as Tourism.
+  GP_KENZO_TANGE: { site: 'anywhere', cityPerm: { adjTourism: 1 } },
 
   // ---- MERCHANT: gold, envoys, trade capacity and invented luxuries ----
   GP_COLAEUS: { site: 'luxury', faith: 100, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
@@ -818,14 +862,14 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_JOHN_SPILSBURY: { luxuryCopies: 1, luxuryAmenities: 4 },
   GP_STAMFORD_RAFFLES: { unmodelled: true },
   GP_JOHN_ROCKEFELLER: { strategic: { resource: 'OIL', amount: 1 } },
-  GP_SARAH_BREEDLOVE: { unmodelled: true },
+  GP_SARAH_BREEDLOVE: { siteDistrict: 'COMMERCIAL_HUB', perm: { tourismRouteBonus: 25 } },
   GP_MARY_KATHERINE_GODDARD: { perm: { visibilityAll: 1 } },
   GP_HELENA_RUBINSTEIN: { luxuryCopies: 2, luxuryAmenities: 4 },
   GP_LEVI_STRAUSS: { luxuryCopies: 2, luxuryAmenities: 4 },
   GP_MELITTA_BENTZ: { perm: { tradeCapacity: 1 } },
   GP_ESTEE_LAUDER: { luxuryCopies: 2, luxuryAmenities: 6 },
-  GP_JAMSETJI_TATA: { siteDistrict: 'CAMPUS', unmodelled: true },
-  GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', unmodelled: true },
+  GP_JAMSETJI_TATA: { siteDistrict: 'CAMPUS', perm: { campusTourism: 10 } },
+  GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', perm: { izTourism: 10 } },
 
   // ---- GENERAL: promotions, free units, and the war-weariness cut ----
   GP_BOUDICA: { unmodelled: true },
@@ -861,7 +905,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_THEMISTOCLES: { unit: 'QUADRIREME' },
   GP_HANNO_THE_NAVIGATOR: { unit: 'GALLEY' },
   GP_HIMERIOS: { promotionLevels: 1, xpPct: 25 },
-  GP_LEIF_ERIKSON: { unmodelled: true },
+  GP_LEIF_ERIKSON: { perm: { navalOcean: 1, navalSight: 1 } },
   GP_RAJENDRA_CHOLA: { gold: 50 },
   GP_ZHENG_HE: { envoys: 1 },
   GP_FRANCIS_DRAKE: { gold: 75, perm: { routePlunderPct: 50 } },

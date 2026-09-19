@@ -966,6 +966,9 @@ TILE = {
     "water": lambda sim, b, rows: sim.water[b].long().numpy(),
     "floodCount": lambda sim, b, rows: sim.tile_flood_ct[b].numpy(),
     "airSlotBonus": lambda sim, b, rows: sim.tile_air_bonus[b].numpy(),
+    "gpRegRange": lambda sim, b, rows: sim.tile_gp_perm[b, :, 0].numpy(),
+    "gpRegProd": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(1, sim.tile_gp_perm.shape[2] - 1)].numpy(),
+    "gpRegAmen": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(2, sim.tile_gp_perm.shape[2] - 1)].numpy(),
     "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),
 }
 

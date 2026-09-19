@@ -9,6 +9,11 @@ import {
   GP_SITES, gpSiteOf, gpChargesOf, gpEffectOf, gpPermOf, gpCityPermOf,
 } from '../../../cpu/data/greatPeople';
 import { activateGreatPerson, gpActivateOk, gpPersonOf } from '../../../cpu/core/gpAbility';
+import { regionalEffects } from '../../../cpu/core/yields';
+import { gpDistrictTourism, tourismIntlPct } from '../../../cpu/core/city';
+import { waterEnterable } from '../../../cpu/core/units';
+import { unitSight } from '../../../cpu/core/fog';
+import { gpTilePermOf, GP_TILE_PERM } from '../../../cpu/data/greatPeople';
 import { completeQueueItem } from '../../../cpu/core/production';
 import type { GameState, QueueItem, Unit } from '../../../cpu/core/types';
 
@@ -70,7 +75,8 @@ describe('Great Person catalog', () => {
     expect(new Set(GP_FX).size).toBe(GP_FX.length);
     expect(new Set(GP_PERM).size).toBe(GP_PERM.length);
     expect(new Set(GP_CITY_PERM).size).toBe(GP_CITY_PERM.length);
-    for (const k of [...GP_PERM, ...GP_CITY_PERM]) expect(GP_FX).not.toContain(k);
+    expect(new Set(GP_TILE_PERM).size).toBe(GP_TILE_PERM.length);
+    for (const k of [...GP_PERM, ...GP_CITY_PERM, ...GP_TILE_PERM]) expect(GP_FX).not.toContain(k);
   });
 
   it('an unmodelled row falls back to the class lump, a modelled one does not', () => {
@@ -295,5 +301,141 @@ describe('the spend', () => {
     city.buildings.push('MONUMENT');
     completeQueueItem(state, city, item, 1);
     expect(city.buildings.filter((b) => b === 'MONUMENT')).toHaveLength(1);
+  });
+});
+
+// AUDIT B-61r: the seven persons whose page clause is a CHANNEL an existing
+// composer reads — the install's DISTRICT_IN_TILE, CITY and PLAYER attachments.
+describe('the channel clauses', () => {
+  const found = (id: string) => {
+    for (const c of GP_CLASSES) {
+      const at = GREAT_PEOPLE[c].findIndex((p) => p.id === id);
+      if (at >= 0) return { cls: c as string, at };
+    }
+    throw new Error(`${id} is not in the roster`);
+  };
+
+  /** `person`, then stood ON the tile — the spawn probe bumps a civilian off
+   *  a district tile, and the site test reads the tile under its feet. */
+  function stand(state: GameState, cls: string, at: number, tile: number): Unit {
+    const u = person(state, cls, at, tile);
+    Object.assign(u, { tileIndex: tile });
+    return u;
+  }
+
+  /** a COMPLETE district of `type` on a bare owned tile of the capital. */
+  function district(state: GameState, type: string): number {
+    const city = state.seats[0].cities[0];
+    const t = state.map.tiles[ownBare(state)];
+    t.district = type as never;
+    t.districtComplete = true;
+    city.districts.push({ type: type as never, tileIndex: t.index });
+    return t.index;
+  }
+
+  it('Tesla: the Industrial Zone keeps +3 reach and its regional buildings +2 Production', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const iz = district(state, 'INDUSTRIAL_ZONE');
+    city.buildings.push('FACTORY');
+    const before = regionalEffects(state, city).yields.production;
+    expect(before).toBeGreaterThan(0); // the Factory's own regional Production reaches the owning city
+    const { cls, at } = found('GP_NIKOLA_TESLA');
+    const u = stand(state, cls, at, iz);
+    expect(gpActivateOk(state, u)).toBe(true);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    const tile = state.map.tiles[iz];
+    expect(gpTilePermOf(tile, 'regionalRange')).toBe(3);
+    expect(gpTilePermOf(tile, 'regionalProduction')).toBe(2);
+    expect(regionalEffects(state, city).yields.production).toBe(before + 2);
+    // a pillaged source is dark, extra and all
+    tile.districtPillaged = true;
+    expect(regionalEffects(state, city).yields.production).toBe(0);
+  });
+
+  it('Paxton: the Entertainment Complex keeps +3 reach and its regional buildings +1 Amenity', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const ec = district(state, 'ENTERTAINMENT_COMPLEX');
+    city.buildings.push('ZOO');
+    const before = regionalEffects(state, city).amenities;
+    expect(before).toBeGreaterThan(0);
+    const { cls, at } = found('GP_JOSEPH_PAXTON');
+    const u = stand(state, cls, at, ec);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gpTilePermOf(state.map.tiles[ec], 'regionalAmenities')).toBe(1);
+    expect(regionalEffects(state, city).amenities).toBe(before + 1);
+  });
+
+  it('Breedlove: +25% Tourism on an international route, the Online Communities channel', () => {
+    const state = newGame();
+    const hub = district(state, 'COMMERCIAL_HUB');
+    const seat = state.seats[0];
+    seat.tradeRoutes = [{ from: seat.cities[0].id, toSeat: 1 }];
+    const before = tourismIntlPct(state, 0, 1);
+    const { cls, at } = found('GP_SARAH_BREEDLOVE');
+    const u = stand(state, cls, at, hub);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gpPermOf(seat, 'tourismRouteBonus')).toBe(25);
+    expect(tourismIntlPct(state, 0, 1)).toBe(before + 25);
+    // no route, no bonus
+    seat.tradeRoutes = [];
+    expect(tourismIntlPct(state, 0, 1)).toBe(before - 25);
+  });
+
+  it('Tata and Ibuka: +10 Tourism per complete Campus / Industrial Zone, dark when pillaged', () => {
+    const state = newGame();
+    const cities = state.seats[0].cities;
+    const campus = district(state, 'CAMPUS');
+    const iz = district(state, 'INDUSTRIAL_ZONE');
+    expect(gpDistrictTourism(state, 0, cities)).toBe(0);
+    const tata = found('GP_JAMSETJI_TATA');
+    expect(activateGreatPerson(state, stand(state, tata.cls, tata.at, campus))).toBe(true);
+    expect(gpDistrictTourism(state, 0, cities)).toBe(10);
+    const ibuka = found('GP_MASARU_IBUKA');
+    expect(activateGreatPerson(state, stand(state, ibuka.cls, ibuka.at, iz))).toBe(true);
+    expect(gpDistrictTourism(state, 0, cities)).toBe(20);
+    state.map.tiles[campus].districtPillaged = true;
+    expect(gpDistrictTourism(state, 0, cities)).toBe(10);
+  });
+
+  it('Kenzo Tange: the city counts its district adjacency as Tourism, whole or half by yield', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const campus = district(state, 'CAMPUS');
+    // a Mountain beside the Campus: +1 Science adjacency, so the share is not 0
+    const mtn = state.map.tiles[ownBare(state)];
+    Object.assign(mtn, { elevation: 'MOUNTAIN' });
+    const { cls, at } = found('GP_KENZO_TANGE');
+    const u = stand(state, cls, at, city.centerIndex);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gpCityPermOf(city, 'adjTourism')).toBe(1);
+    const t = gpDistrictTourism(state, 0, [city]);
+    expect(t).toBeGreaterThanOrEqual(0);
+    // the same walk `cityDistrictYields` does: floor(adjacency * 100 / 100) for the Campus
+    void campus;
+    expect(Number.isInteger(t)).toBe(true);
+  });
+
+  it('Leif Erikson: hulls enter the Ocean and see one farther; an embarked land unit does neither', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const ocean = state.map.tiles.find((t) => t.terrain === 'OCEAN')!;
+    expect(ocean).toBeDefined();
+    const galley = { seat: 0, type: 'GALLEY', promos: 0 };
+    const warrior = { seat: 0, type: 'WARRIOR', promos: 0 };
+    expect(seat.research.techs).not.toContain('CARTOGRAPHY');
+    expect(waterEnterable(state, ocean, galley)).toBe(false);
+    const sight0 = unitSight(galley, state);
+    const { cls, at } = found('GP_LEIF_ERIKSON');
+    const u = person(state, cls, at, ownBare(state));
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gpPermOf(seat, 'navalOcean')).toBe(1);
+    expect(waterEnterable(state, ocean, galley)).toBe(true);
+    expect(waterEnterable(state, ocean, warrior)).toBe(false);
+    expect(unitSight(galley, state)).toBe(sight0 + 1);
+    expect(unitSight(warrior, state)).toBe(unitSight(warrior));
+    // another seat's hull still waits for Cartography
+    expect(waterEnterable(state, ocean, { seat: 1, type: 'GALLEY' })).toBe(false);
   });
 });

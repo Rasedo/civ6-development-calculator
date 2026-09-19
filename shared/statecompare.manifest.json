@@ -2690,6 +2690,36 @@
           "planes": [
             "tile_air_bonus"
           ]
+        },
+        {
+          "name": "gpRegRange",
+          "compare": "exact",
+          "covers": [
+            "Tile.gpPerm[0]"
+          ],
+          "planes": [
+            "tile_gp_perm"
+          ]
+        },
+        {
+          "name": "gpRegProd",
+          "compare": "exact",
+          "covers": [
+            "Tile.gpPerm[1]"
+          ],
+          "planes": [
+            "tile_gp_perm"
+          ]
+        },
+        {
+          "name": "gpRegAmen",
+          "compare": "exact",
+          "covers": [
+            "Tile.gpPerm[2]"
+          ],
+          "planes": [
+            "tile_gp_perm"
+          ]
         }
       ]
     }
