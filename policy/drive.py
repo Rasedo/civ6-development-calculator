@@ -492,7 +492,12 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
                 dir_hit.float().argmax(dim=2) + 1,
             )
             valid_dir = (tiles == spread_t) | dir_hit.any(dim=2)
-            take_sp = close & valid_dir
+            # ...and the MASK column, like every other arm: the applier
+            # refuses a spread the mask does not offer (a target already
+            # following, a spent charge, a foreign border), so an order
+            # written off distance alone cost a refusal a turn.
+            _spcol = (A_SP + dcol).clamp(min=0, max=umW - 1).unsqueeze(2)
+            take_sp = close & valid_dir & um.gather(2, _spcol).squeeze(2)
             orders0 = torch.where(take_sp, A_SP + dcol, orders0)
     A_F = sim._A_FOUND
     if sim._settler_idx >= 0 and _live(A_F):
