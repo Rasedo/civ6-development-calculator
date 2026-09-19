@@ -67,11 +67,11 @@ install cell in the reports:
   its AVERAGE rung equals the install's column).
 - NOT A DEFECT (1): CODE_OF_LAWS -> CHIEFDOM, the starting government has no
   PrereqCivic; the tag is the absence shape.
-- STILL OPEN, not a mismatch line: RELIGIOUS_COMMUNITY's Gathering Storm
+- BUILT AFTER THE BATCH (2026-09-19): RELIGIOUS_COMMUNITY's Gathering Storm
   clause (+2 gold on INTERNATIONAL routes per Holy Site / Shrine / Temple /
-  tier-3 worship building in a following ORIGIN city — four
-  `..._TRADING_MODIFIER` rows) needs an effect kind neither engine has;
-  the pre-GS housing clause stays with a comment naming the gap (AUDIT).
+  worship building in a following ORIGIN city — four `..._TRADING_MODIFIER`
+  rows) as the follower field `intlRouteGoldPerWorship`, tagged on the
+  SHRINE modifier's Amount; the pre-GS housing clause is gone.
 
 ## Wave 1, agent A report (2026-09-14) — units, techs, civics, improvements, promotions
 

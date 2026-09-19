@@ -29,7 +29,7 @@ import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpPermOf } from '../data/greatPeople';
-import { getModifiers, progressAhead } from './effects';
+import { getModifiers, progressAhead, followerReligionsForCity, followerBeliefForReligion } from './effects';
 import { governorSum } from './governors';
 /**
  * CIV6: "The base range for land trade routes is 15 tiles ... The base range
@@ -524,6 +524,33 @@ function addRouteRows(
   }
 }
 
+/**
+ * CIV6 (Religious Community, GS): "+2 Gold on international Trade Routes"
+ * from a city following the religion, once per Holy Site / Shrine / Temple /
+ * worship building the ORIGIN holds
+ * (`RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}_TRADING_MODIFIER`,
+ * MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL Amount 2).
+ * The belief is the origin CITY's follower table (`followerReligionsForCity`
+ * — Dharma pays every present religion); the Holy Site counts COMPLETE, a
+ * building counts HELD (pillage aside, as the install's CITY_HAS_BUILDING
+ * requirements read). "International" is what every `_FOR_INTERNATIONAL`
+ * row is on this engine — a route to another MAJOR's city; the city-state
+ * leg pays none of them. The GPU twin sits in `_seat_route_income`.
+ */
+export function religiousCommunityGold(state: GameState, seat: number, origin: City): number {
+  let per = 0;
+  for (const g of followerReligionsForCity(getModifiers(state, seat), origin)) {
+    per += followerBeliefForReligion(state, g)?.effects.intlRouteGoldPerWorship ?? 0;
+  }
+  if (!per) return 0;
+  let n = 0;
+  if (origin.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete)) n += 1;
+  if (origin.buildings.includes('SHRINE')) n += 1;
+  if (origin.buildings.includes('TEMPLE')) n += 1;
+  if (origin.buildings.some((b) => BUILDINGS[b]?.worship)) n += 1;
+  return per * n;
+}
+
 /** CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold for every
  *  flat Desert tile in the ORIGIN city" — the international twin of the
  *  domestic per-terrain rows, counted on the origin the way
@@ -657,6 +684,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, city, civCity, seat));
+        // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
+        out.gold += religiousCommunityGold(state, seat, city);
         // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
         addYields(out, intlRouteTerrainYields(state, city, seat));
         // CIV6 (The Grand Embassy): "Receives Science or Culture from Trade

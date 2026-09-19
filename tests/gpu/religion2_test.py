@@ -27,6 +27,9 @@ Covered (all gate-unreachable):
   7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), DEFENDER of the faith on
      following territory (def +5). (CRUSADE and MESSENGER_OF_THE_GODS are not in
      the install and left the pool with #264; their wire columns read 0.)
+  8. RELIGIOUS_COMMUNITY (follower, GS) — +2 gold per Holy Site / Shrine /
+     Temple / worship building of a following ORIGIN city on an INTERNATIONAL
+     route; nothing on a domestic leg, nothing from a non-following origin.
   9. Religious victor (direct) — seat 0 wins with 0, a civ seat wins with g, the
      not-every-seat refusal (-1), and the cityless-seat exclusion.
  10. Religious victor (through-step) — a step flips victory_type to 4 (religion)
@@ -607,6 +610,87 @@ def poke_combat_cs(rules, rj, path):
     print("  7 enhancer combat CS OK (JUST_WAR +10 atk/def, DEFENDER +5 def)")
 
 
+def poke_religious_community(rules, rj, path):
+    """8. RELIGIOUS_COMMUNITY: a following origin city with a complete Holy
+    Site, a Shrine and a Temple pays +6 gold on its international route, +8
+    once a worship building stands; a domestic leg and a non-following origin
+    pay 0. Isolated by a with-vs-without-belief diff on _seat_route_income."""
+    sim = build(rules, path)
+    assert sim.n_majors >= 2, "need a foreign destination"
+    r, o = 0, 1
+    g = r + 1
+    tab = sim._bel["fol"]["intlWorship"]
+    live = [i - 1 for i in range(1, tab.shape[0]) if float(tab[i]) > 0]
+    assert len(live) == 1 and float(tab[live[0] + 1]) == 2.0, f"one follower belief pays 2 on the wire, read {live}"
+    RC_IDX = live[0]
+    sim.civ_religion_done[:, r + 1] = True
+    sim.war[:] = False
+    sim.sync_war()
+    sim.barb_unit_alive[:] = False
+    sim.military_at[:] = -1
+    FROM, DEST = 5, 5
+    tiles = free_tiles(sim, 3)
+    sim.city_alive[0, r + 1, FROM] = True
+    sim.city_center[0, r + 1, FROM] = tiles[0]
+    sim.city_dist_tile[0, r + 1, FROM] = -1
+    sim.city_id[0, r + 1, FROM] = 4200
+    sim.city_alive[0, o + 1, DEST] = True
+    sim.city_center[0, o + 1, DEST] = tiles[1]
+    sim.city_dist_tile[0, o + 1, DEST] = -1
+    sim.city_id[0, o + 1, DEST] = 4201
+    # the origin's worship: a COMPLETE Holy Site on a free tile, a Shrine, a Temple
+    hs = tiles[2]
+    sim.city_dist_tile[0, r + 1, FROM, sim._hs_idx] = hs
+    sim.district_complete[0, hs] = True
+    sim.city_bldg[0, r + 1, FROM] = False
+    sim.city_bldg[0, r + 1, FROM, sim._shrine_bidx] = True
+    sim.city_bldg[0, r + 1, FROM, sim._temple_bidx] = True
+    sim.city_followed[0, r + 1, FROM] = g
+    sim._eff_version += 1
+    sim.seat_routes[:, r + 1] = -1
+    sim.seat_route_dseat[:, r + 1] = -1
+    sim.seat_route_dcity[:, r + 1] = -1
+    sim.seat_routes[0, r + 1, 0, 0] = 4200
+    sim.seat_routes[0, r + 1, 0, 1] = -1_000_000  # not an own city: the leg is international
+    sim.seat_route_dseat[0, r + 1, 0] = o + 1
+    sim.seat_route_dcity[0, r + 1, 0] = 4201
+
+    def gold(fol_idx):
+        sim.civ_follower[:, r + 1] = fol_idx
+        sim._bel_version += 1
+        sim._seat_route_cache = None
+        inc = sim._seat_route_income(r + 1)
+        assert inc is not None, "route income None with a live international route"
+        return float(inc[0, FROM, 2])
+
+    g0 = gold(-1)
+    gR = gold(RC_IDX)
+    assert abs((gR - g0) - 6.0) < 1e-9, f"RELIGIOUS_COMMUNITY: Holy Site + Shrine + Temple must pay +6, read +{gR - g0}"
+    wb = int(sim._b_worship.nonzero()[0])
+    sim.city_bldg[0, r + 1, FROM, wb] = True
+    sim._eff_version += 1
+    assert abs((gold(RC_IDX) - g0) - 8.0) < 1e-9, "a worship building must make it +8"
+    # a non-following origin pays nothing
+    sim.city_followed[0, r + 1, FROM] = -1
+    sim._eff_version += 1
+    assert abs(gold(RC_IDX) - g0) < 1e-9, "a non-following origin took the belief's gold"
+    sim.city_followed[0, r + 1, FROM] = g
+    # a DOMESTIC leg pays nothing: point the same route at an own city
+    D2 = 6
+    sim.city_alive[0, r + 1, D2] = True
+    sim.city_center[0, r + 1, D2] = tiles[1]
+    sim.city_dist_tile[0, r + 1, D2] = -1
+    sim.city_id[0, r + 1, D2] = 4202
+    sim.city_alive[0, o + 1, DEST] = False
+    sim.seat_routes[0, r + 1, 0, 1] = 4202
+    sim.seat_route_dseat[0, r + 1, 0] = -1
+    sim.seat_route_dcity[0, r + 1, 0] = -1
+    sim._eff_version += 1
+    d0, dR = gold(-1), gold(RC_IDX)
+    assert abs(dR - d0) < 1e-9, f"the domestic leg took +{dR - d0}"
+    print("  8 RELIGIOUS_COMMUNITY OK (+6 then +8 on the international leg; 0 non-following, 0 domestic)")
+
+
 def poke_victor_direct(rules, rj, path):
     """9. _religious_victor direct: seat 0 wins (0), a civ seat wins (g), the
     not-every-seat refusal (-1), and the cityless-seat exclusion."""
@@ -888,6 +972,7 @@ def main() -> None:
     poke_presr(rules, rj, path)
     poke_free_city_pressure(rules, rj, path)
     poke_combat_cs(rules, rj, path)
+    poke_religious_community(rules, rj, path)
     poke_victor_direct(rules, rj, path)
     poke_victor_through_step(rules, rj, path)
     poke_theo_location(rules, rj, path)

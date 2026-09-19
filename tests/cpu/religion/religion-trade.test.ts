@@ -11,7 +11,7 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { tileYields } from '../../../cpu/core/yields';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
-import { tradeCapacity, addTradeRoute, routeYields, canAddTradeRoute } from '../../../cpu/core/trade';
+import { tradeCapacity, addTradeRoute, routeYields, canAddTradeRoute, religiousCommunityGold } from '../../../cpu/core/trade';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
 
 function sandboxCity() {
@@ -100,6 +100,25 @@ describe('founding a religion', () => {
     const buildable = availableBuildings(state, city).map((b) => b.id);
     expect(buildable).toContain('GURDWARA');
     expect(buildable).not.toContain('STUPA');
+  });
+
+  it('Religious Community pays international routes per worship building of the ORIGIN', () => {
+    const { state, city } = ready();  // a complete Holy Site, a Shrine, a Temple
+    expect(foundReligion(state, {
+      name: 'Community', follower: 'RELIGIOUS_COMMUNITY', founder: 'TITHE', worship: 'GURDWARA',
+    }, 0).ok).toBe(true);
+    // a city NOT following the religion pays nothing
+    city.followedReligion = null;
+    expect(religiousCommunityGold(state, 0, city)).toBe(0);
+    // the following city: 2 per Holy Site + Shrine + Temple
+    city.followedReligion = 0;
+    expect(religiousCommunityGold(state, 0, city)).toBe(6);
+    // ...and the worship building makes four (faith-bought in play; placed here)
+    city.buildings.push('GURDWARA');
+    expect(religiousCommunityGold(state, 0, city)).toBe(8);
+    // a follower belief without the clause pays nothing
+    seatOf(state, 0)!.religion.follower = 'CHORAL_MUSIC';
+    expect(religiousCommunityGold(state, 0, city)).toBe(0);
   });
 
   it('Work Ethic converts holy site adjacency into production', () => {

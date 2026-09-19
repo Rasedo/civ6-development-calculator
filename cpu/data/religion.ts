@@ -34,7 +34,18 @@ export interface BeliefEffects {
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   workEthic?: boolean;
   buildingYields?: Partial<Record<string, Partial<Yields>>>;
+  /** NO BELIEF CARRIES THIS since RELIGIOUS_COMMUNITY took its Gathering
+   *  Storm clause (the pre-GS housing modifiers exist in Beliefs.xml and are
+   *  attached to nothing). The reader (cpu/core/effects.ts) and the wire
+   *  column stay: they read a FIELD. */
   buildingHousing?: Partial<Record<string, number>>;
+  /** CIV6 (Religious Community, GS): Gold on INTERNATIONAL Trade Routes
+   *  from a city following the religion, once per Holy Site / Shrine /
+   *  Temple / worship building the ORIGIN city holds — four
+   *  MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL rows
+   *  of one Amount. Read by `religiousCommunityGold` (cpu/core/trade.ts)
+   *  and the GPU's international leg. */
+  intlRouteGoldPerWorship?: number;
   amenitiesIfSpecialty?: { min: number; amenities: number };
   riverCity?: { amenities: number; housing: number };
   faithPerWonder?: number;
@@ -90,9 +101,10 @@ export interface BeliefDef {
  * way but stays: it is an INERT pantheon (empty effects) and the pool's size
  * is all it contributes.
  *
- * RELIGIOUS_COMMUNITY's Beliefs row EXISTS but GS re-wrote it: its four
- * BeliefModifiers are all ..._TRADING, not the pre-GS ..._HOUSING, and the
- * housing clause this catalog still carries is the pre-GS one. See the row.
+ * RELIGIOUS_COMMUNITY's Beliefs row EXISTS and GS re-wrote it: its four
+ * BeliefModifiers are ..._TRADING (gold on international routes per
+ * worship building), not the pre-GS ..._HOUSING, and the row carries the
+ * GS clause.
  */
 const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
   // ---- PANTHEONS ----
@@ -222,6 +234,11 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER&Name=Amount', 'Value'),
     'effects.buildingYields.TEMPLE.food':
       xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER&Name=Amount', 'Value'),
+  },
+  RELIGIOUS_COMMUNITY: {
+    'effects.intlRouteGoldPerWorship':
+      xml('ModifierArguments', 'ModifierId=RELIGIOUS_COMMUNITY_SHRINE_TRADING_MODIFIER&Name=Amount', 'Value',
+        { note: 'the HOLY_SITE, TEMPLE and TIER3 _TRADING_MODIFIER rows carry the same Amount 2; one field, counted per building the origin holds' }),
   },
   CHORAL_MUSIC: {
     'effects.buildingYields.SHRINE.culture':
@@ -381,19 +398,15 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('CHORAL_MUSIC', 'Choral Music', 'Shrines +2 culture, Temples +4 culture.', {
       buildingYields: { SHRINE: { culture: 2 }, TEMPLE: { culture: 4 } },
     }),
-    // GAP (maintainer build, both engines). GS re-wrote this belief: its four
-    // BeliefModifiers are RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}
-    // _TRADING, each a MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_
-    // INTERNATIONAL of YIELD_GOLD Amount 2, on a city that follows the
-    // religion, once per Holy Site / Shrine / Temple / Tier-3 worship building
-    // it holds. NO effect kind on either engine expresses that: the closest,
-    // `tradeReligionYields`, pays a flat amount on a DOMESTIC route keyed on
-    // the DESTINATION's religion (cpu/core/trade.ts), with no INTERNATIONAL
-    // qualifier and no per-building count in the ORIGIN. Until that effect
-    // exists the row keeps its PRE-GS clause (the RELIGIOUS_COMMUNITY_*_HOUSING
-    // modifiers Beliefs.xml still defines but GS no longer attaches).
-    B('RELIGIOUS_COMMUNITY', 'Religious Community', '+1 housing from Shrines and Temples.', {
-      buildingHousing: { SHRINE: 1, TEMPLE: 1 },
+    // CIV6 (GS, Expansion2_Beliefs.xml): the four BeliefModifiers are
+    // RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}_TRADING, each a
+    // MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL of
+    // YIELD_GOLD Amount 2 on a city that follows the religion, gated on
+    // CITY_HAS_HOLY_SITE / BUILDING_IS_SHRINE / _TEMPLE_XP2 / _TIER3_HOLY_SITE.
+    // The pre-GS housing clause (RELIGIOUS_COMMUNITY_*_HOUSING) is defined
+    // in Beliefs.xml and attached to nothing in GS.
+    B('RELIGIOUS_COMMUNITY', 'Religious Community', '+2 gold on international trade routes from this city per Holy Site, Shrine, Temple and worship building it holds.', {
+      intlRouteGoldPerWorship: 2,
     }),
     B('ZEN_MEDITATION', 'Zen Meditation', '+1 amenity in cities with 2+ specialty districts.', {
       amenitiesIfSpecialty: { min: 2, amenities: 1 },

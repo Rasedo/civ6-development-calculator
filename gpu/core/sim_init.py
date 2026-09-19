@@ -1133,6 +1133,9 @@ class SimInit:
                 "featY": torch.tensor([[[0.0] * 6] * _nf] + [x["featY"] for x in _rows], dtype=torch.float64, device=device),
                 "bldgY": torch.tensor([[[0.0] * 6] * _nb] + [x["bldgY"] for x in _rows], dtype=torch.float64, device=device),
                 "bldgH": torch.tensor([[0.0] * _nb] + [x["bldgH"] for x in _rows], dtype=torch.float64, device=device),
+                # CIV6 (Religious Community, GS): gold per worship building on an
+                # international route out of a following ORIGIN city
+                "intlWorship": torch.tensor([0.0] + [float(x.get("intlWorship", 0)) for x in _rows], dtype=torch.float64, device=device),
                 "border": torch.tensor([1.0] + [x["border"] for x in _rows], dtype=torch.float64, device=device),
                 "growth": torch.tensor([1.0] + [x["growth"] for x in _rows], dtype=torch.float64, device=device),
                 "gpp": torch.tensor([[0] * _ng] + [x["gpp"] for x in _rows], dtype=torch.long, device=device),

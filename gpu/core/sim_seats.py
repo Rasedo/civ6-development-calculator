@@ -7833,6 +7833,25 @@ class SimSeats:
                 2, _col.unsqueeze(3).expand(B, K_i, 1, _nDr)).squeeze(2)  # [B, K, nD]
             intl6 = self._route_centre_intl.reshape(1, 1, 6) + _comp_d.double() @ self._route_intl_y  # [B, K, 6]
             gold_i = intl6[:, :, 2]
+            # CIV6 (Religious Community, GS): +2 Gold on an international
+            # route out of a city following the religion, once per Holy
+            # Site (complete) / Shrine / Temple / worship building the ORIGIN
+            # holds — `religiousCommunityGold`. The belief is the origin
+            # CITY's follower table (Dharma: every present religion).
+            if self._bel_any:
+                _rcw = self._fol_tab_for("intlWorship", row)[:, :self.RC]  # [B, RC]
+                if bool((_rcw != 0).any()):
+                    _rcc = self.RC
+                    _rheld = self.city_bldg[:, row, :_rcc]
+                    _rn = (_rheld & self._b_worship.reshape(1, 1, -1)).any(dim=2).long()
+                    if self._hs_idx >= 0:
+                        _rhs = self.city_dist_tile[:, row, :_rcc, self._hs_idx]
+                        _rn = _rn + ((_rhs >= 0) & self.district_complete.gather(1, _rhs.clamp(min=0))).long()
+                    if self._shrine_bidx >= 0:
+                        _rn = _rn + _rheld[:, :, self._shrine_bidx].long()
+                    if self._temple_bidx >= 0:
+                        _rn = _rn + _rheld[:, :, self._temple_bidx].long()
+                    gold_i = gold_i + (_rcw * _rn.double()).gather(1, from_j)
             # CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own
             # routes out; "+2 Food for them" on anyone's route in.
             gold_i = gold_i + self._cleo_intl_gold * self._row_leads(row, "CLEOPATRA").double().unsqueeze(1)

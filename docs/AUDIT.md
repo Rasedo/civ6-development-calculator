@@ -66,7 +66,7 @@ re-adds them.
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
 | C-78 unique UNITS absent | 1 | the four leader units the roster leaves blank; the Ngao Mbeba's see-through clause |
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
-| C-80 constants vs the install | 2 | Religious Community's GS clause (a build); two lab lines (purchase price, Pop Star); six rules the reader census names |
+| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); six rules the reader census names |
 | **C. Absent systems** | **23** | |
 | **OPEN, TOTAL** | **35** | |
 
@@ -210,7 +210,6 @@ the gate reaches is worth more here than one that re-reads the exporter.
   - Out of scope by construction: LEY LINE adjacency (a Secret Societies resource class this map never places).
 - **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
-  - BUILD: RELIGIOUS_COMMUNITY's Gathering Storm clause — +2 Gold on INTERNATIONAL Trade Routes from a city following the religion, once per Holy Site / Shrine / Temple / tier-3 worship building it holds (`RELIGIOUS_COMMUNITY_{HOLY_SITE,SHRINE,TEMPLE,TIER3}_TRADING_MODIFIER`, `MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL`, Amount 2). Neither engine has the shape; the pre-GS housing clause stays in `cpu/data/religion.ts` with a comment naming the gap. The build: a follower-belief field and wire column, the international leg of `cityTradeYields` and `_seat_route_income` counting the origin's worship buildings, a poke on both sides, the housing clause deleted.
   - LAB scenes G and H: the two ledger lines left in docs/PROVENANCE.md — `GOLD_PURCHASE_MULT` 4 against the install's `GOLD_PURCHASE_MULTIPLIER` 2 with `PURCHASE_DIVISOR` 5 (a DLL formula, measured from a city's price list; `FAITH_PURCHASE_MULT` 2 with it), and the Pop Star's 25 against `ROCKBAND_POP` Amount -75 (a Rock Band concert's gold).
   - BUILD, the SIX RULES the reader census names (their ten baseline lines stay red-listed until built):
     1. `amenitiesIfSpecialty` (Liberalism, +1 amenity at 2+ specialty districts): TS pays it, the GPU never loads the column — a PARITY defect no seed has reached.
