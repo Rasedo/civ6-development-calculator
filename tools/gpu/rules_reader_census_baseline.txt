@@ -1,10 +1,8 @@
 rules.json: 1517 key paths over 70 groups
   wire keys with NO GPU literal: 1
     civLevels[].canAnnexTilesWithReceivedInfluence
-provenance.json: 847 catalog columns
-  columns with NO TS property access: 4
+provenance.json: 845 catalog columns
+  columns with NO TS property access: 2
     civLevels.canAnnexTilesWithReceivedInfluence
-    improvements.damageAdjacent
-    improvements.damageEntering
     improvements.noSwap
 READER CENSUS REPORTED

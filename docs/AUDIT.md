@@ -61,8 +61,8 @@ re-adds them.
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-74 per-game counts over per-object rolls | 1 | ask 4 (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
-| C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
-| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); three rules the reader census names |
+| C-79 unique INFRASTRUCTURE absent | 1 | three clauses with no carrier (per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
+| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **22** | |
 | **OPEN, TOTAL** | **31** | |
 
@@ -191,15 +191,14 @@ close in the same commit.
   - Waiting on it: the mission's mark, DEMAND, DISCUSS, the promises and the Retribution casus belli (C-2); the agendas (C-26); the preference weights (C-67).
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
   Every district, building and improvement row is built.
-  - BUILD, four clauses with no carrier, each recorded on the column that names it: the Great Wall's and the Pā's `PLOT_DAMAGE_TO_WALKING_INTO` / `_ADJACENT` (10 each) — damage on ENTERING a tile is movement machinery no chapter owns; the Film Studio's "+100% Tourism pressure toward other civilizations in the Modern era" — a per-PAIR tourism pressure; the Electronics Factory's "+4 Culture after Electricity" — a TECH-gated building yield the catalog has no column for, and the Marae's and Thermal Bath's per-tile Tourism thirds with it; "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — no tile-swap verb exists to refuse.
+  - BUILD, three clauses with no carrier, each recorded on the column that names it: the Film Studio's "+100% Tourism pressure toward other civilizations in the Modern era" — a per-PAIR tourism pressure; the Electronics Factory's "+4 Culture after Electricity" — a TECH-gated building yield the catalog has no column for, and the Marae's and Thermal Bath's per-tile Tourism thirds with it; "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — no tile-swap verb exists to refuse.
   - DLL: the Stepwell's "+1 Faith beside a Holy Site, +1 Food beside a Farm" has no `Improvement_Adjacencies` row.
   - Out of scope by construction: LEY LINE adjacency (a Secret Societies resource class this map never places).
 - **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
   - LAB scenes G and H: the two ledger lines left in docs/PROVENANCE.md — `GOLD_PURCHASE_MULT` 4 against the install's `GOLD_PURCHASE_MULTIPLIER` 2 with `PURCHASE_DIVISOR` 5 (a DLL formula, measured from a city's price list; `FAITH_PURCHASE_MULT` 2 with it), and the Pop Star's 25 against `ROCKBAND_POP` Amount -75 (a Rock Band concert's gold).
-  - The THREE RULES the reader census names (their baseline lines stay red-listed until built):
+  - The TWO RULES the reader census names (their baseline lines stay red-listed until built):
     2. LAB (session 2 carry-over): `civLevels.canAnnexTilesWithReceivedInfluence` — a city-state takes ground from envoys spent on it, and the TILES PER ENVOY are not published; measured by sending envoys one at a time and counting the minor's tiles. The channel is built once the number is.
-    5. BUILD: `improvements.damageEntering` / `damageAdjacent`: C-79's damage-on-entry hook.
     6. BUILD: `improvements.noSwap`: C-79's tile-swap refusal.
 
 ## Harness — not weighted

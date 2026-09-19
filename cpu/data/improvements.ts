@@ -145,12 +145,6 @@ export interface ImprovementDef {
    *  be laid along the seat's own BORDER, each segment beside the last. */
   buildInLine?: boolean;
   buildOnFrontier?: boolean;
-  /** CIV6 (PLOT_DAMAGE_TO_WALKING_INTO / PLOT_DAMAGE_TO_WALKING_ADJACENT):
-   *  what an enemy unit takes for stepping onto the tile, and for walking
-   *  beside it. RECORDED, not read: this engine has no damage-on-entry hook,
-   *  which is unit-movement machinery. */
-  damageEntering?: number;
-  damageAdjacent?: number;
   /** CIV6 (`RequiresAdjacentBonusOrLuxury`): the row refuses a tile with no
    *  Bonus or Luxury resource beside it (the Chateau, the Mekewap). */
   requiresAdjacentResource?: boolean;
@@ -1012,8 +1006,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     defenseCS: 4,
     grantsFortification: 2,
     disasterResistant: true,
-    damageEntering: 10,
-    damageAdjacent: 10,
+    // (PLOT_DAMAGE_TO_WALKING_INTO / _ADJACENT 10 is the Zombie Defense game
+    // mode's TypeProperties row — DLC/Portugal/Data/Portugal_Improvements_MODE.xml —
+    // not the baseline ruleset's; the Great Wall damages nobody here.)
     // CIV6 (GreatWall_Gold at Masonry, GreatWall_Culture at Castles): per
     // adjacent SEGMENT, which is the row's own kind.
     adjacency: [
@@ -1141,7 +1136,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     elevations: ['HILLS'],
     defenseCS: 4,
     grantsFortification: 2,
-    damageEntering: 10,
     healsAfterAction: true,
     noPillage: true,
     description: 'Built by the Toa on a hill, inside or outside your borders. +4 defence and 2 turns of fortification to its occupant, and a Maori unit on one heals even after moving or attacking.',
