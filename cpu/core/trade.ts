@@ -618,6 +618,31 @@ export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
   return out;
 }
 
+/**
+ * CIV6 (Democracy): "Your Trade Routes to an Ally or Suzerain's city provide
+ * +4 Food and +4 Production for BOTH CITIES" — the DESTINATION's half. Every
+ * route INTO this city from a seat holding the government's row pays the
+ * sender's flat yields here too, on the sender's own qualifier: allied with
+ * this city's seat, or — this city a minor's — suzerain of it. The origin
+ * half sits in `cityTradeYields`' routes loop; the GPU twin is
+ * `_incoming_ally_route`, read for a major row inside `_seat_route_income`
+ * and for a minor row as its whole route income.
+ */
+export function incomingAllyRouteYields(state: GameState, city: City): Yields {
+  const out = emptyYields();
+  const cs = isCityStateSeat(city.seat) ? (seatOf(state, city.seat) as CityState | undefined) : undefined;
+  for (const s of state.seats) {
+    if (s.seat === city.seat || isCityStateSeat(s.seat) || isBarbSeat(s.seat)) continue;
+    const y = getModifiers(state, s.seat).allyRouteYield;
+    if (!y || !Object.values(y).some((v) => v)) continue;
+    if (cs ? !isSuzerain(state, cs, s.seat) : !seatsAllied(state, s.seat, city.seat)) continue;
+    for (const r of s.tradeRoutes ?? []) {
+      if (cs ? r.toCs === cs.id : (r.toSeat === city.seat && r.toSeatCity === city.id)) addYields(out, y);
+    }
+  }
+  return out;
+}
+
 /** `routeGold` is CARAVANSARIES' "+2 Gold from all Trade Routes" — the
  *  seat's own modifier, passed in because the yield walk already holds it. */
 export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
@@ -626,6 +651,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   // CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
   // civilization's route INTO this city.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD * incomingIntlRoutes(state, city);
+  // CIV6 (Democracy): the destination's half of an ally's or suzerain's route in
+  addYields(out, incomingAllyRouteYields(state, city));
   // CIV6 (Radio Oranje, EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS): "+2
   // Culture from each Trade Route another civilization sends to this one" —
   // the same FOREIGN count Cleopatra's gold reads (`INCOMING_ROUTE_YIELD_ROWS`)

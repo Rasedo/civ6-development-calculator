@@ -3,14 +3,16 @@
  * Suzerain's city provide +4 Food and +4 Production for both cities. Alliance
  * Points with all allies increase by an additional .25 per turn."
  *
- * The ORIGIN half is this seat's own and ships; the destination's half pays
- * another seat's city, which no channel here reaches (B-D). The quarter-point
- * is the unit the alliance store already keeps.
+ * The ORIGIN half rides the routes loop of `cityTradeYields`; the
+ * DESTINATION's half (`incomingAllyRouteYields`) pays the ally's city, or the
+ * minor's, for the same route in. The quarter-point is the unit the alliance
+ * store already keeps.
  */
 import { describe, it, expect } from 'vitest';
 import { grantCivics, makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, setAllianceTypeWith, setAllyTurnsWith } from '../../../cpu/core/seats';
-import { cityTradeYields } from '../../../cpu/core/trade';
+import { cityTradeYields, incomingAllyRouteYields } from '../../../cpu/core/trade';
+import { minorCity, placeCityStateAt, resolveSuzerains, setMet } from '../../../cpu/core/cityStates';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
 import { ALLIANCE_QP_TURN, AGREEMENT_TURNS, ALLIANCE_MILITARY } from '../../../cpu/data/seats';
 import type { GameState } from '../../../cpu/core/types';
@@ -60,6 +62,41 @@ describe("Democracy's ally and suzerain routes", () => {
     const demo = cityTradeYields(state, city, 0);
     expect(demo.food - before.food).toBe(DEM.allyRouteYield!.food);
     expect(demo.production - before.production).toBe(DEM.allyRouteYield!.production);
+  });
+
+  it("pays the DESTINATION city too — the ally's, on the sender's government alone", () => {
+    const { state } = scene();
+    const theirCity = seatOf(state, 1)!.cities[0];
+    // no government, no alliance: nothing
+    expect(incomingAllyRouteYields(state, theirCity)).toEqual(expect.objectContaining({ food: 0, production: 0 }));
+    // the alliance alone pays nothing; Democracy on the SENDER pays the receiver
+    setAllyTurnsWith(state, 0, 1, AGREEMENT_TURNS);
+    setAllianceTypeWith(state, 0, 1, ALLIANCE_MILITARY);
+    expect(incomingAllyRouteYields(state, theirCity).food).toBe(0);
+    adoptDemocracy(state);
+    const before = cityTradeYields(state, theirCity, 0);
+    expect(incomingAllyRouteYields(state, theirCity)).toEqual(expect.objectContaining(DEM.allyRouteYield));
+    // ...and it lands in the receiver's own trade yields, food and production
+    expect(before.food).toBeGreaterThanOrEqual(DEM.allyRouteYield!.food!);
+    expect(before.production).toBeGreaterThanOrEqual(DEM.allyRouteYield!.production!);
+    // the receiver's OWN government is not what pays it: strip the alliance, nothing
+    setAllyTurnsWith(state, 0, 1, 0);
+    expect(incomingAllyRouteYields(state, theirCity).food).toBe(0);
+  });
+
+  it("pays a MINOR's city on its suzerain's route in", () => {
+    const { state, mine } = scene();
+    adoptDemocracy(state);
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 5, 14).index);
+    setMet(cs, 0);
+    seatOf(state, 0)!.tradeRoutes = [{ from: mine, to: -1, toCs: cs.id, createdTurn: 0, expiresTurn: 50 }];
+    const city = minorCity(cs);
+    // met, routed, not suzerain: nothing
+    expect(incomingAllyRouteYields(state, city).food).toBe(0);
+    cs.envoys[0] = 3;
+    resolveSuzerains(state);
+    expect(incomingAllyRouteYields(state, city)).toEqual(expect.objectContaining(DEM.allyRouteYield));
+    expect(cityTradeYields(state, city, 0).food).toBeGreaterThanOrEqual(DEM.allyRouteYield!.food!);
   });
 
   it('pays nothing on a route to a seat that is not an ally', () => {

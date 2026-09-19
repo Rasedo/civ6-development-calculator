@@ -7620,6 +7620,53 @@ class SimSeats:
         arm adds the band on top of the roster row."""
         return ((self.work_ok | self.nwonder) & ~self.tile_submerged).unsqueeze(2).to(self.dtype)
 
+    def _incoming_ally_route(self, row: int) -> torch.Tensor | None:
+        """[B, RC, 6] double — CIV6 (Democracy): "Your Trade Routes to an Ally
+        or Suzerain's city provide +4 Food and +4 Production for BOTH CITIES",
+        the DESTINATION's half. Every route another major `r2` runs INTO a
+        city of this row pays r2's `allyroute` here when r2 is this row's ALLY
+        (a major row: `seat_route_dseat` / `_dcity` name the city) or its
+        SUZERAIN (a minor row: its one city is column 0 and a route to it is
+        coded -(2+s) in `seat_routes[..., 1]`). None when no sender holds the
+        row or none qualifies. `incomingAllyRouteYields` is the twin."""
+        if not self._gov_has_effects or self.n_majors < 2:
+            return None
+        B, cols, dev = self.B, self.RC, self.device
+        minor = self.n_majors <= row < self.FREE_ROW
+        s = row - self._CITY_MINOR0 if minor else -1
+        if minor and (self.S == 0 or s >= self.S):
+            return None
+        out = None
+        alive = self.city_alive[:, row, :cols].double()
+        for r2 in range(self.n_majors):
+            if r2 == row:
+                continue
+            _ar = self._gov_mods(r2)[12]["allyroute"].double()   # [B, 6]
+            if not bool((_ar != 0).any()):
+                continue
+            if minor:
+                _q = self._suzerain_mask(r2)[:, s]
+                if not bool(_q.any()):
+                    continue
+                _rr2 = self.seat_routes[:, r2]
+                _hit = (_rr2[:, :, 0] >= 0) & (_rr2[:, :, 1] == -(2 + s))   # [B, K]
+                _cnt = torch.zeros(B, cols, dtype=torch.float64, device=dev)
+                _cnt[:, 0] = _hit.sum(dim=1).double() * _q.double()
+            else:
+                _q = self.seat_ally_turns[:, r2, row] > 0
+                if not bool(_q.any()):
+                    continue
+                _cid = self.city_id[:, row, :cols]
+                _hit = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                        & (self.seat_route_dcity[:, r2].unsqueeze(2) == _cid.unsqueeze(1)))  # [B, K, cols]
+                _cnt = _hit.sum(dim=1).double() * _q.double().unsqueeze(1)
+            _cnt = _cnt * alive
+            if not bool((_cnt != 0).any()):
+                continue
+            add = _cnt.unsqueeze(2) * _ar.unsqueeze(1)                 # [B, cols, 6]
+            out = add if out is None else out + add
+        return out
+
     def _seat_route_income(self, row: int) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
         row's outgoing routes, [B, cols, 6] double in engine yield
@@ -7656,7 +7703,10 @@ class SimSeats:
         overwritten by a different row before the same row is re-requested.
         Consumers read one column, read-only."""
         if row >= self.n_majors:
-            return None  # a minor or the Free row sends no route and carries no roster row
+            # a minor or the Free row sends no route and carries no roster row;
+            # a MINOR's one city is still a destination — Democracy's "+4 Food
+            # and +4 Production for BOTH CITIES" on its suzerain's route in
+            return self._incoming_ally_route(row) if row < self.FREE_ROW else None
         key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_version)
         if self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
@@ -7670,10 +7720,12 @@ class SimSeats:
         # of the improvement rows. Naming only Cleopatra left Wilhelmina's +2
         # unpaid the turn her last outgoing route expired — TS pays it
         # regardless (seed 9001 t90, the whole of that hunt).
+        _ally_in = self._incoming_ally_route(row)   # Democracy's destination half, [B, cols, 6] or None
         _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").any())
                       or bool(self._live_rows(row, self._incoming_route_yield_rows))
                       or any(r[5] == 1
-                             for r in self._live_rows(row, self._route_improvement_rows)))
+                             for r in self._live_rows(row, self._route_improvement_rows))
+                      or _ally_in is not None)
         if not bool(act.any()) and not _dest_rows:
             self._seat_route_cache = (key, None)
             return None
@@ -8108,6 +8160,8 @@ class SimSeats:
                     _cnt_h = self._city_improvement_count(_ii)[:, row].double()
                     _addr[:, :, _iy] = _addr[:, :, _iy] + (_ia * _in_all * _cnt_h * _iw.double().unsqueeze(1)).to(inc.dtype)
             inc = inc + _addr.reshape(B, -1)
+        if _ally_in is not None:
+            inc = inc + _ally_in.reshape(B, -1)
         inc = inc.reshape(B, cols, 6)
         if self._gov_has_effects:
             # CIV6 (Letters of Marque): "Trade Route yields -50%."

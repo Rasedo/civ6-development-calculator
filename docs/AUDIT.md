@@ -44,7 +44,7 @@ re-adds them.
 | B-54r unique-unit flank/support stacks | 1 | the Impi's and Hypaspist's own flank/support |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
 | B-61r Great Person clauses with no carrier | 2 | ten `unmodelled` persons in `cpu/data/greatPeople.ts` |
-| B-D unsourced data values | 1 | Democracy's destination half; per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
+| B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
 | **B. Fidelity vs real Civ 6** | **11** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
@@ -122,7 +122,6 @@ close in the same commit.
 - **B-61r. GREAT PERSON CLAUSES WITH NO CARRIER.** Weight 2.
   - BUILD: ten persons marked `unmodelled` in `cpu/data/greatPeople.ts`, the class lump standing in for each — Tesla, Paxton, Kenzo Tange (tourism / regional range), Stamford Raffles (city-state absorption), Sarah Breedlove, Jamsetji Tata, Masaru Ibuka (tourism), Boudica (barbarian conversion), Tupac Amaru (a per-district grant walk), Leif Erikson (ocean passage). Each needs its carrier on both engines.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
-  - BUILD: DEMOCRACY'S ROUTE PAYS ONLY ITS OWN CITY. Sourced (GS): "+4 Food and +4 Production for BOTH CITIES" to an ally's or suzerain's city; the origin half ships, the destination's half pays another seat's city and no channel here pays a foreign city for an incoming route.
   - DLL: the PER-CITY war-weariness split. The install's numbers are `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0, NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`, `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`, `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200, TURN_AT_WAR 50}`, `_WARMONGER_BASE 16`; how the per-city rows compose is not published. The empire-wide rule ships (`warWearinessPenalty`).
   - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield and turn tables independently.
   - LAB scene G: the faith rate for a LAND COMBAT unit is inferred from the building rate (`FAITH_PURCHASE_MULT`, reused by `unitFaithCost` / `_seat_faith_unit_candidate`); no page states the unit one. Measured with the purchase price (C-80).

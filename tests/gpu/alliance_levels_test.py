@@ -34,7 +34,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
+import json
+
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from warmup import settle_all
 
 B0 = 0
@@ -151,6 +153,78 @@ def test_route_halves(rules, path) -> None:
     want = float(sim._al_route_from[RESEARCH])
     assert abs(got - want) < 1e-6, f"the receiver half paid {got}, wanted {want}"
     print("  3 routes OK — sender +4 gold, receiver +1 science")
+
+
+def test_democracy_destination_half(rules, path) -> None:
+    """CIV6 (Democracy): "Your Trade Routes to an Ally or Suzerain's city
+    provide +4 Food and +4 Production for BOTH CITIES" — the DESTINATION's
+    half (`_incoming_ally_route`): the ally's city takes the sender's +4/+4 on
+    the sender's government alone, and a minor's city takes it from its
+    suzerain's route in. Probed on `_seat_route_income` directly, before the
+    walk's happiness factor."""
+    rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    civ_idx = {c["id"]: i for i, c in enumerate(rj["civics"])}
+    gov_idx = {g["id"]: i for i, g in enumerate(rj["governments"])}
+    DEMO = ["CODE_OF_LAWS", "COLONIALISM", "ENLIGHTENMENT", "SUFFRAGE"]
+
+    def adopt_democracy(sim, row):
+        sim._gov_live = True
+        sim._gov_has_effects = True
+        sim.civ_civics[B0, row] = False
+        for c in DEMO:
+            sim.civ_civics[B0, row, civ_idx[c]] = True
+        sim._eff_version += 1
+        adopted, has = sim._adopted_gov(sim.civ_civics[:, row])
+        assert bool(has[B0]) and int(adopted[B0]) == gov_idx["DEMOCRACY"], "the civics must adopt DEMOCRACY"
+
+    def dest_food_prod(sim, row, col):
+        sim._eff_version += 1
+        sim._seat_route_cache = None
+        inc = sim._seat_route_income(row)
+        if inc is None:
+            return 0.0, 0.0
+        return float(inc[B0, col, 0]), float(inc[B0, col, 1])
+
+    # the ALLY's city: sender 0 is a Democracy, route 0 -> 1
+    sim = build(rules, path)
+    craft_intl_route(sim, 0, 1)
+    adopt_democracy(sim, 0)
+    f0, p0 = dest_food_prod(sim, 1, 0)
+    assert (f0, p0) == (0.0, 0.0), f"no alliance: the receiver took {f0}/{p0}"
+    ally_pair(sim, 0, 1, ECONOMIC)
+    f1, p1 = dest_food_prod(sim, 1, 0)
+    assert (f1, p1) == (4.0, 4.0), f"allied to a Democracy sender: the receiver must take +4/+4, read {f1}/{p1}"
+    # the receiver's OWN government does not pay it: swap roles, no route in
+    sim2 = build(rules, path)
+    craft_intl_route(sim2, 0, 1)
+    adopt_democracy(sim2, 1)
+    ally_pair(sim2, 0, 1, ECONOMIC)
+    f2, p2 = dest_food_prod(sim2, 1, 0)
+    assert (f2, p2) == (0.0, 0.0), f"a Democracy RECEIVER of a plain sender's route took {f2}/{p2}"
+
+    # the MINOR's city: the suzerain's route in
+    sim3 = build(rules, path)
+    if sim3.S == 0:
+        print("  D Democracy destination half OK (ally); no city-state on this fixture for the suzerain half")
+        return
+    s_cs = 0
+    assert bool(sim3.citystate_alive[B0, s_cs]), "the first city-state must be alive"
+    adopt_democracy(sim3, 0)
+    oid = int(sim3.city_id[B0, 0, 0])
+    sim3.seat_routes[B0, 0, 0, 0] = oid
+    sim3.seat_routes[B0, 0, 0, 1] = -(2 + s_cs)
+    sim3.seat_route_dseat[B0, 0, 0] = -1
+    sim3.seat_route_dcity[B0, 0, 0] = -1
+    sim3.seat_route_exp[B0, 0, 0] = int(sim3.turn) + 50
+    sim3.seat_route_born[B0, 0, 0] = int(sim3.turn)
+    mrow = sim3._CITY_MINOR0 + s_cs
+    sim3.seat_citystate_envoys[B0, :, s_cs] = 0
+    f3, p3 = dest_food_prod(sim3, mrow, 0)
+    assert (f3, p3) == (0.0, 0.0), f"routed but not suzerain: the minor took {f3}/{p3}"
+    sim3.seat_citystate_envoys[B0, 0, s_cs] = 3
+    f4, p4 = dest_food_prod(sim3, mrow, 0)
+    assert (f4, p4) == (4.0, 4.0), f"the suzerain's route in must pay the minor +4/+4, read {f4}/{p4}"
+    print("  D Democracy destination half OK — the ally's city +4/+4 on the sender's row, the minor +4/+4 from its suzerain")
 
 
 def test_combat_terms(rules, path) -> None:
@@ -409,6 +483,7 @@ def main() -> int:
     test_formation_and_expiry(rules, path)
     test_points_and_levels(rules, path)
     test_route_halves(rules, path)
+    test_democracy_destination_half(rules, path)
     test_combat_terms(rules, path)
     test_shared_visibility(rules, path)
     test_military_production(rules, path)
