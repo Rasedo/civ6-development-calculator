@@ -625,6 +625,7 @@ def main() -> int:
             *[[sh] for sh in _shards[1:]],
             [
                 ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),
+                ("applier_live_ownership", [py, "tests/gpu/applier_live_ownership_test.py"], 4),
                 ("war", [py, "tests/gpu/war_test.py"], 4),
                 ("ranged", [py, "tests/gpu/ranged_test.py"], 4),
                 ("combat_mod", [py, "tests/gpu/combat_mod_test.py"], 4),

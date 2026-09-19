@@ -35,8 +35,6 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| A-5 the applier's frozen ownership | 1 | `_apply_seat_unit_actions` snapshots `own_tile` before its rank loop; print the TS applier's read beside it, then re-derive or record |
-| **A. Engine vs engine** | **1** | |
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; a model choice |
 | B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger); the World Games' and Space Station's extra rewards |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
@@ -68,7 +66,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); six rules the reader census names |
 | **C. Absent systems** | **23** | |
-| **OPEN, TOTAL** | **35** | |
+| **OPEN, TOTAL** | **34** | |
 
 ## The question ledger — owner asks
 
@@ -92,12 +90,10 @@ scenes cite them), so the gaps are closed asks.
 
 ## A. Engine vs engine
 
-The digest is the only instrument for this class; a round that widens what
-the gate reaches is worth more here than one that re-reads the exporter.
-
-- **A-5. THE APPLIER'S FROZEN OWNERSHIP.** Weight 1.
-  - BUILD (a hunt of its own, never inside a perf round): `gpu/core/sim_orders.py:_apply_seat_unit_actions` takes `own_tile = tile_seat == row` ONCE before its rank loop while `techs` / `civics` are live views; the improvement, road, rail and remove arms test `(own_tile | (tile_seat < 0))` at the unit's tile. A settler founding at rank 2 widens `tile_seat` and not `own_tile`, so a Builder at rank 9 is refused its own new territory that turn. Print the TS applier's ownership read beside it: if TS reads live ownership, re-derive `own_tile` after any rank that writes `tile_seat` (a founding, a capture, a culture bomb) and let the first hunt that pairs a founding with a Builder order in one seat turn be the reachability proof; if TS also snapshots, record it as a shared model line and close.
-
+No open entry. The digest is the only instrument for this class; a round
+that widens what the gate reaches is worth more here than one that re-reads
+the exporter, and a hunt catch opens an entry here only when it cannot
+close in the same commit.
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
 - **B-20r. A PARK'S ORIENTATION.** Weight 1.

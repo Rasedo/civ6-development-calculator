@@ -24,7 +24,13 @@ class SimOrders:
         smap = self._seat_slot_map(row)
         ctl = self.seat_ext[:, row]
         techs, civics = self.civ_techs[:, row], self.civ_civics[:, row]
-        own_tile = self.tile_seat == row
+        # `own_tile` is derived INSIDE the rank loop, once per commanded rank:
+        # TS replays a seat's orders one unit at a time against LIVE state
+        # (`applySeatUnitOrders` -> `foundCity` writes `ownerSeat`, and the
+        # next unit's improvement verb reads it), so a founding, a culture
+        # bomb or a capture at rank k must be ownership at rank k+1. Read
+        # once before the loop it was not (AUDIT A-5; poke
+        # tests/gpu/applier_live_ownership_test.py).
         # Which RANKS are worth opening at all, decided once over the whole
         # [B, UNIT_SLOTS] block: the slot map and the action block are both
         # fixed for the call, so a rank no game commands can be skipped without
@@ -159,6 +165,7 @@ class SimOrders:
             act = present & (a >= 0) & (a != 12)
             if not bool(act.any()):
                 continue
+            own_tile = self.tile_seat == row   # live at THIS rank (see the head)
             here = self.unit_tile.gather(1, sc.unsqueeze(1)).squeeze(1)
             hc = here.clamp(min=0)
             utp = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1)
