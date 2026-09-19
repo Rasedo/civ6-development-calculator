@@ -547,6 +547,10 @@ export function diploVisibility(state: GameState, viewer: number, target: number
   if (vr.length) {
     const post = (seatOf(state, target)?.cities ?? []).some((c) => (sx.tradingPosts ?? []).includes(c.centerIndex));
     if (post) for (const r of vr) n += r.postLevels;
+    // CIV6 (Flying Squadron, UNIQUE_LEADER_ADD_VISIBILITY): "+1 level of
+    // Diplomatic Visibility with all civilizations" — the viewer's own
+    // flat level, target-blind like Goddard's charge
+    for (const r of vr) n += r.flatLevels;
   }
   return Math.min(VISIBILITY_MAX, n);
 }

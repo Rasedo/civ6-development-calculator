@@ -989,6 +989,22 @@ def poke_visibility(rules, path):
     assert int(v[0, b, a]) == 0, "the charge read back the other way"
     sim.civ_gp_perm[0, a, _kv] = 0
 
+    # CIV6 (Flying Squadron, UNIQUE_LEADER_ADD_VISIBILITY): Catherine de
+    # Medici's flat +1 with every civilization — the viewer's own row over
+    # every target column, like Goddard's charge (`flatLevels`, which the
+    # loader bound and no loop read until AUDIT C-80's census named it)
+    _cat = sim._pair_leader.index("CATHERINE_DE_MEDICI")
+    sim.row_leader[0, a] = _cat
+    sim.row_civ[0, a] = sim._pair_civ[_cat]
+    sim._eff_version += 1
+    v = sim._diplo_vis()
+    assert int(v[0, a, b]) == 3 and int(v[0, a, 0]) == 2, f"the flat level must pay EVERY column: {v[0, a].tolist()}"
+    assert int(v[0, b, a]) == 0, "the flat level read back the other way"
+    sim.row_leader[0, a] = -1
+    sim.row_civ[0, a] = -1
+    sim._eff_version += 1
+    assert int(sim._diplo_vis()[0, a, b]) == 2, "the flat level outlived the leader"
+
     # The post and the alliance do not stack.
     sim.seat_ally_turns[0, a, b] = sim.seat_ally_turns[0, b, a] = 20
     assert int(sim._diplo_vis()[0, a, b]) == 3

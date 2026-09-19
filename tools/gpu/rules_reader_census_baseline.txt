@@ -3,10 +3,9 @@ rules.json: 1504 key paths over 70 groups
     civLevels[].canAnnexTilesWithReceivedInfluence
     civLevels[].startingTilesForCity
 provenance.json: 840 catalog columns
-  columns with NO TS property access: 6
+  columns with NO TS property access: 5
     civLevels.canAnnexTilesWithReceivedInfluence
     civLevels.startingTilesForCity
-    diploVis.flatLevels
     improvements.damageAdjacent
     improvements.damageEntering
     improvements.noSwap

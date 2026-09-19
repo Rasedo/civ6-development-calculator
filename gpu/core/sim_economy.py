@@ -2639,6 +2639,12 @@ class SimEconomy:
         # CIV6 (Ortoo): "Receive an extra level of Diplomatic Visibility for
         # possessing a Trading Post in ANY city of a civilization"
         for _vc, _vl, _vp, _vcs, _vflat in self._diplo_vis_rows:
+            if _vflat:
+                # CIV6 (Flying Squadron, UNIQUE_LEADER_ADD_VISIBILITY): the
+                # viewer's own flat level over EVERY target column, like
+                # Goddard's charge (`diploVisibility`'s flatLevels term)
+                _fw = torch.stack([self._row_is(_r, _vc, _vl) for _r in range(NM)], dim=1)  # [B, NM]
+                out = out + _fw.long().unsqueeze(2) * int(_vflat)
             if _vp == 0:
                 continue
             # `trading_post` is per SEAT: [B, NM, T]. The question is whether

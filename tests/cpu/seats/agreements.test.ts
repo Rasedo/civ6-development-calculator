@@ -23,6 +23,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
+import { CIV_LEADERS } from '../../../cpu/data/seats';
 import {
   allyTurnsWith, borderTurnsFrom, delegationWith, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
   friendTurnsWith, seatsAllied, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom,
@@ -298,6 +299,17 @@ describe('diplomatic visibility', () => {
     expect(diploVisibility(state, 0, 1)).toBe(1);
     expect(diploVisibility(state, 0, 2)).toBe(0);
     expect(diploVisibility(state, 1, 0)).toBe(0);
+    // CIV6 (Flying Squadron, UNIQUE_LEADER_ADD_VISIBILITY): Catherine de
+    // Medici's flat +1 with every civilization — the viewer's own row,
+    // target-blind, and nothing the other way
+    const plainCiv = state.seats[0].civ;
+    state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.leader === 'CATHERINE_DE_MEDICI');
+    expect(state.seats[0].civ).toBeGreaterThanOrEqual(0);
+    expect(diploVisibility(state, 0, 1)).toBe(2);
+    expect(diploVisibility(state, 0, 2)).toBe(1);
+    expect(diploVisibility(state, 1, 0)).toBe(0);
+    state.seats[0].civ = plainCiv;
+    expect(diploVisibility(state, 0, 2)).toBe(0);
     // "...researching the Printing Press technology. This will increase your
     // visibility with ALL civilizations by one level."
     state.seats[0].research.techs.push(VISIBILITY_TECH);
