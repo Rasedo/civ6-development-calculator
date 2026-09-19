@@ -143,6 +143,17 @@ def test_mother_russia(rules, path) -> None:
 
     plain = owned(None)
     assert plain == 7, f"the baseline claimed {plain}, not the centre and its ring"
+    # CIV6 (StartingTilesForCity CITY_STATE 5): the fixture's minors arrive with
+    # their centre and five ring tiles (the wire's ownerSeatInit)
+    s0 = fresh(rules, path)
+    _lvl = {d["level"]: d for d in rules.civ_levels}
+    for s in range(s0.S):
+        if not bool(s0.citystate_alive[B0, s]):
+            continue
+        n_cs = int((s0.tile_seat[B0] == 100 + s).sum())
+        ring = int((s0.neigh[int(s0.citystate_center[B0, s])] >= 0).sum())
+        want = 1 + min(ring, int(_lvl["CITY_STATE"]["startingTilesForCity"]))
+        assert n_cs == want, f"city-state {s} owns {n_cs} tiles at t0, wanted {want}"
     assert owned("RUSSIA") == plain + 5, "Mother Russia claimed no extra territory"
     print(f"  3 Mother Russia OK — {plain + 5} tiles against {plain}")
 

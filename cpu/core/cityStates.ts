@@ -11,6 +11,7 @@ import { isWater, isImpassable, hasFreshWater, naturalWonderAt } from '../../wor
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
+import { CIV_LEVELS } from '../data/civLevels';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -87,8 +88,20 @@ export function placeCityStateAt(
     met: [],
     suzerain: -1,
   };
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (tileSeat(t) === NO_SEAT) setTileOwner(t, seatOfCityState(cityState.id));
+  // CIV6 (CivilizationLevels.StartingTilesForCity, CITY_STATE 5): a minor
+  // starts with FIVE of its six ring tiles. WHICH five the DLL does not
+  // publish; the ring is taken in ascending tile index, the order both
+  // engines already use for every founding extra (Mother Russia).
+  let want = CIV_LEVELS.CITY_STATE.startingTilesForCity;
+  const ring = tilesWithin(state.map, tile.col, tile.row, 1)
+    .filter((t) => t.index !== centerIndex)
+    .sort((a, b) => a.index - b.index);
+  for (const t of ring) {
+    if (want <= 0) break;
+    if (tileSeat(t) === NO_SEAT) {
+      setTileOwner(t, seatOfCityState(cityState.id));
+      want -= 1;
+    }
   }
   setTileOwner(tile, seatOfCityState(cityState.id));
   state.cityStates.push(cityState);

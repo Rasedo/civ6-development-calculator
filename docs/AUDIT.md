@@ -62,7 +62,7 @@ re-adds them.
 | C-74 per-game counts over per-object rolls | 1 | ask 4 (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
-| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); four rules the reader census names |
+| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); three rules the reader census names |
 | **C. Absent systems** | **22** | |
 | **OPEN, TOTAL** | **31** | |
 
@@ -197,11 +197,10 @@ close in the same commit.
 - **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
   - LAB scenes G and H: the two ledger lines left in docs/PROVENANCE.md — `GOLD_PURCHASE_MULT` 4 against the install's `GOLD_PURCHASE_MULTIPLIER` 2 with `PURCHASE_DIVISOR` 5 (a DLL formula, measured from a city's price list; `FAITH_PURCHASE_MULT` 2 with it), and the Pop Star's 25 against `ROCKBAND_POP` Amount -75 (a Rock Band concert's gold).
-  - BUILD, the FOUR RULES the reader census names (their six baseline lines stay red-listed until built):
-    2. `civLevels.canAnnexTilesWithReceivedInfluence`: a city-state grows its borders from envoys spent on it; neither engine has the channel.
-    3. `civLevels.startingTilesForCity` (6 / 5 / 0 by class): both engines found every city with the same centre-plus-ring claim.
-    5. `improvements.damageEntering` / `damageAdjacent`: C-79's damage-on-entry hook.
-    6. `improvements.noSwap`: C-79's tile-swap refusal.
+  - The THREE RULES the reader census names (their baseline lines stay red-listed until built):
+    2. LAB (session 2 carry-over): `civLevels.canAnnexTilesWithReceivedInfluence` — a city-state takes ground from envoys spent on it, and the TILES PER ENVOY are not published; measured by sending envoys one at a time and counting the minor's tiles. The channel is built once the number is.
+    5. BUILD: `improvements.damageEntering` / `damageAdjacent`: C-79's damage-on-entry hook.
+    6. BUILD: `improvements.noSwap`: C-79's tile-swap refusal.
 
 ## Harness — not weighted
 

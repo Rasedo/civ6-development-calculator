@@ -1,11 +1,9 @@
-rules.json: 1504 key paths over 70 groups
-  wire keys with NO GPU literal: 2
+rules.json: 1517 key paths over 70 groups
+  wire keys with NO GPU literal: 1
     civLevels[].canAnnexTilesWithReceivedInfluence
-    civLevels[].startingTilesForCity
-provenance.json: 840 catalog columns
-  columns with NO TS property access: 5
+provenance.json: 847 catalog columns
+  columns with NO TS property access: 4
     civLevels.canAnnexTilesWithReceivedInfluence
-    civLevels.startingTilesForCity
     improvements.damageAdjacent
     improvements.damageEntering
     improvements.noSwap

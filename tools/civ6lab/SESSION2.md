@@ -174,6 +174,10 @@ percentage.
   entry asks for; `escape_fit.py` fits them.
 * The counterspy term: one route with a counterspy in the target district,
   one without, same level — the difference is the term.
+* C-80 rule 2 — a city-state's tiles per ENVOY (`CanAnnexTilesWithReceivedInfluence`):
+  count a minor's owned plots, send one envoy from the socket, count again;
+  repeat to six envoys and past suzerainty. The slope is the channel's
+  magnitude; whether it caps, its cap.
 * Ask 9 — the city-state's buy rule: kill a minor's army from the socket
   and run `cs_probe.lua` every turn for 30 turns; the trigger count and
   the chassis bought are the magnitude C-38 lacks.

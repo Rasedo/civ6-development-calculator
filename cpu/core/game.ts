@@ -53,7 +53,7 @@ import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent } from './seats';
+import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -304,10 +304,20 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   markCityCentre(tile);
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
-  // Civ 6: a new city starts with its center plus the first ring only.
+  // CIV6 (CivilizationLevels.StartingTilesForCity, FULL_CIV 6): a new city
+  // starts with its centre plus the first ring — the class's count of it,
+  // in ascending tile index (the GPU's direction walk claims the same six).
   setTileOwner(tile, seat, id);
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (!tileClaimed(t)) setTileOwner(t, seat, id);
+  let want = civLevelOf(seat).startingTilesForCity;
+  const ring = tilesWithin(state.map, tile.col, tile.row, 1)
+    .filter((t) => t.index !== tile.index)
+    .sort((a, b) => a.index - b.index);
+  for (const t of ring) {
+    if (want <= 0) break;
+    if (!tileClaimed(t)) {
+      setTileOwner(t, seat, id);
+      want -= 1;
+    }
   }
   // CIV6 (Mother Russia): "Extra territory upon founding cities" — the
   // SECOND ring, `amount` of it, in ascending TILE INDEX so both engines
