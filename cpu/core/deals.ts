@@ -178,8 +178,8 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       const id = STRATEGIC_IDS[a];
       const room = Math.max(0, stockpileCap(state, receiver) - stockOf(state, receiver, id));
       const moved = Math.min(b, room);
-      spendStockpile(state, giver, id, moved);
-      grantStockpile(state, receiver, id, moved);
+      spendStockpile(state, giver, id, moved, 'dl');
+      grantStockpile(state, receiver, id, moved, 'dl');
       break;
     }
     case DEAL_GREAT_WORK: {
@@ -262,8 +262,8 @@ function endTerm(state: GameState, from: number, to: number, term: DealTerm): vo
     if (kind !== DEAL_RESOURCE) continue;
     const id = STRATEGIC_IDS[a];
     const back = Math.min(b, stockOf(state, to, id));
-    spendStockpile(state, to, id, back);
-    grantStockpile(state, from, id, back);
+    spendStockpile(state, to, id, back, 'de');
+    grantStockpile(state, from, id, back, 'de');
   }
 }
 
@@ -272,7 +272,18 @@ function endTerm(state: GameState, from: number, to: number, term: DealTerm): vo
  * 30-turn clock, and the offer that nobody answered.
  */
 export function dealPhase(state: GameState): void {
-  for (const [key, term] of Object.entries(state.dealTerms ?? {})) {
+  // THE ORDER IS THE PAIR'S, (from, to) ascending — never insertion order.
+  // Two terms between one pair can end on the same turn and move the same
+  // lump through a CAPPED bank in opposite directions, and the order decides
+  // where the bank sits when this turn's new deals land (seed 9261 t247: the
+  // GPU walks the pairs in index order and took seat 1's lump, insertion
+  // order here left seat 0 at its cap and took none).
+  const byPair = ([a]: [string, unknown], [b]: [string, unknown]): number => {
+    const [a0, a1] = a.split('>').map(Number);
+    const [b0, b1] = b.split('>').map(Number);
+    return a0 - b0 || a1 - b1;
+  };
+  for (const [key, term] of Object.entries(state.dealTerms ?? {}).sort(byPair)) {
     const [from, to] = key.split('>').map(Number);
     const gs = seatOf(state, from);
     const rs = seatOf(state, to);
@@ -291,7 +302,7 @@ export function dealPhase(state: GameState): void {
   // "All Deals, Demands, and Promises last for 30 turns" says nothing about how
   // long an OFFER waits, and a record is one turn's decision: an offer nobody
   // answered was priced against a state that no longer exists.
-  for (const [key, o] of Object.entries(state.dealOffers ?? {})) {
+  for (const [key, o] of Object.entries(state.dealOffers ?? {}).sort(byPair)) {
     o.left -= 1;
     if (o.left <= 0) delete state.dealOffers![key];
   }

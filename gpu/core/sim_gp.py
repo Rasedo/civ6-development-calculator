@@ -552,6 +552,7 @@ class SimGp:
                 hit, torch.minimum(self.civ_stockpile[:, row, s] + amt.to(self.civ_stockpile.dtype),
                                    cap.to(self.civ_stockpile.dtype)),
                 self.civ_stockpile[:, row, s])
+            self._log_stock(hit.nonzero(as_tuple=True)[0], row, s, "gp")
 
     def _gp_unit_grants(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                         at: torch.Tensor, hc: torch.Tensor) -> None:

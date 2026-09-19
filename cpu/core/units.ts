@@ -1368,7 +1368,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   const s = seatOf(state, seat)!;
   s.treasury -= upgradeGoldCost(state, seat, unit.type, !!unit.levied);
   const c = upgradeResourceCost(state, seat, unit.type);
-  if (c) spendStockpile(state, seat, c.id, c.n);
+  if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
   unit.type = next;
   unit.movesLeft = 0;
   unit.movesFull = unitFullMoves(state, unit);

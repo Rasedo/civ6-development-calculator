@@ -313,7 +313,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     }
   }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;
-  if (fx.strategic) grantStockpile(state, unit.seat, fx.strategic.resource, fx.strategic.amount);
+  if (fx.strategic) grantStockpile(state, unit.seat, fx.strategic.resource, fx.strategic.amount, 'gp');
 
   // THE UNIT ON THE TILE — a granted chassis, or a promotion for whoever is
   // already standing here.

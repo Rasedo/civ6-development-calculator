@@ -6,7 +6,7 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 # the kinds whose key carries its TURN as its third field
-_TURN_KINDS = ("st", "sp", "xp", "rg", "rc", "pop")
+_TURN_KINDS = ("st", "sp", "xp", "rg", "rc", "pop", "sk")
 
 
 def _trim_by_kind(lines: list[str], keep: int = 24) -> list[str]:
@@ -3586,6 +3586,7 @@ class SimSeats:
         if self._n_strategic:
             pay = (ok & want).long() * cost
             self.civ_stockpile[:, row].scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -pay.unsqueeze(1))
+            self._log_stock((ok & want).nonzero(as_tuple=True)[0], row, slot[ok & want], "ug")
         self.unit_type.scatter_(1, sc.unsqueeze(1),
                                 torch.where(ok, nc, utp).unsqueeze(1))
         self.unit_mp.scatter_(1, sc.unsqueeze(1),
@@ -3626,6 +3627,9 @@ class SimSeats:
                                       * self._power_cells(row))
         self.civ_fuel_short[:, row] = bill > stock
         stock.copy_((stock - bill).clamp(min=0))
+        if getattr(self, "_log_diff", False):
+            for _k in range(stock.shape[1]):
+                self._log_stock(range(self.B), row, _k, "up")
 
     def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int,
                               at: int | None = None,
@@ -3646,6 +3650,7 @@ class SimSeats:
             pay = js_round(pay * (100.0 - off) / 100.0)
         col = self.civ_stockpile[:, row, slot]
         col.copy_(torch.where(hit, (col - pay.to(col.dtype)).clamp(min=0), col))
+        self._log_stock(hit.nonzero(as_tuple=True)[0], row, slot, "uc")
 
     def _charge_project_resource(self, row: int, hit: torch.Tensor, pi: int) -> None:
         """`chargeProjectResource` — the Lagrange station's one-time Aluminum."""
@@ -3655,6 +3660,7 @@ class SimSeats:
             return
         col = self.civ_stockpile[:, row, rs]
         col.copy_(torch.where(hit, (col - rc).clamp(min=0), col))
+        self._log_stock(hit.nonzero(as_tuple=True)[0], row, rs, "pc")
 
     def _once_step_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START space-race step `pi` right now?
@@ -5881,7 +5887,9 @@ class SimSeats:
         elif pay == ch["favor"]:
             self.civ_diplo_favor[b, srow] += amt
         elif pay == ch["strategic"]:
-            self.civ_stockpile[b, srow, self._most_advanced_strategic(b, srow)] += amt
+            _gk = self._most_advanced_strategic(b, srow)
+            self.civ_stockpile[b, srow, _gk] += amt
+            self._log_stock([b], srow, _gk, "gh")
         else:
             raise AssertionError(f"goody payload {self._goody_payload_kinds[pay]} has no arm")
 
@@ -8481,6 +8489,7 @@ class SimSeats:
                 stock.scatter_add_(
                     1, best_slot.unsqueeze(1),
                     torch.where(pay, -best_cost, torch.zeros_like(best_cost)).unsqueeze(1))
+                self._log_stock(pay.nonzero(as_tuple=True)[0], row, best_slot[pay], "fu")
                 # CIV6 (Climate): the fuel a plant burns discharges carbon at
                 # its own published rate per unit (`plantCarbon`).
                 self._emit_carbon(row, torch.where(
@@ -8559,6 +8568,9 @@ class SimSeats:
                 self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
+        if getattr(self, "_log_diff", False):
+            for _k in range(bank.shape[1]):
+                self._log_stock(range(self.B), row, _k, "ac")
 
     def _city_has_feature(self, row: int, feat: int) -> torch.Tensor:
         """[B, RC] bool — CIV6 (REQUIREMENT_CITY_HAS_X_FEATURE_TYPE): does this
@@ -11363,6 +11375,23 @@ class SimSeats:
         self._occ_set(rows, tile, dst)
         cur[rows] += 1
         self._gen_ver += 1
+
+    def _log_stock(self, rows, row: int, slot, tag: str) -> None:
+        """`logStockWrite`'s twin — WHICH writer moved this seat's strategic
+        bank, keyed on the seat, the turn and the SLOT (the `rid` order both
+        engines share). `rows` are batch rows, `slot` one int or per-row."""
+        if not getattr(self, "_log_diff", False):
+            return
+        _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else list(rows)
+        _s = slot.reshape(-1).tolist() if torch.is_tensor(slot) else [int(slot)]
+        if len(_s) == 1 and len(_r) > 1:
+            _s = _s * len(_r)
+        for _b, _k in zip(_r, _s):
+            if _k < 0 or _k >= self.civ_stockpile.shape[2]:
+                continue
+            self._diff_events.setdefault(int(_b), []).append(
+                f"sk:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{int(_k)}:{tag}"
+                f" {int(self.civ_stockpile[_b, row, _k])}")
 
     def _log_pop(self, rows, row: int, cols, tag: str) -> None:
         """`logPopWrite`'s twin — WHICH writer moved this city's count, keyed

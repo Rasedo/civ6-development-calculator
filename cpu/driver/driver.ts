@@ -65,7 +65,7 @@ export interface DriverOpts {
  *  proportions, so the two sides end up holding different turns and nothing
  *  pairs. Each prefix keeps its own last `keep`; the GRANT lines keep all. */
 /** the kinds whose key carries its TURN as its third field */
-const TURN_KINDS = new Set(['st', 'sp', 'xp', 'rg', 'rc', 'pop']);
+const TURN_KINDS = new Set(['st', 'sp', 'xp', 'rg', 'rc', 'pop', 'sk']);
 
 function trimByKind(lines: readonly string[], keep = 24): string[] {
   const by = new Map<string, string[]>();

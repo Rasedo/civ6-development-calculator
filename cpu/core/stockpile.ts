@@ -6,6 +6,7 @@
  *
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
+import { logStockWrite } from './difflog';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile } from '../data/constants';
 import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
 import { PROJECTS } from '../data/projects';
@@ -129,16 +130,18 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   }
   const cap = stockpileCap(state, seat);
   for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;
+  for (let k = 0; k < bk.length; k++) logStockWrite(state.turn, seat, k, 'ac', bk[k]);
 }
 
 /** Put `n` of a strategic resource straight into the bank, under the same
  *  ceiling the per-turn accrual respects. */
-export function grantStockpile(state: GameState, seat: number, resourceId: string, n: number): void {
+export function grantStockpile(state: GameState, seat: number, resourceId: string, n: number, tag = 'gr'): void {
   const k = strategicSlot(resourceId);
   const s = seatOf(state, seat);
   if (k < 0 || !s || n <= 0) return;
   const bk = bank(s);
   bk[k] = Math.min(stockpileCap(state, seat), bk[k] + n);
+  logStockWrite(state.turn, seat, k, tag, bk[k]);
 }
 
 /** Can this seat pay `n` of `resourceId` right now? */
@@ -190,6 +193,7 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
     emitCarbon(state, seat, unitCarbon(k, def.resourceUpkeep, cells));
   }
   s.fuelShort = short;
+  for (let k = 0; k < bk.length; k++) logStockWrite(state.turn, seat, k, 'up', bk[k]);
 }
 
 /**
@@ -263,7 +267,7 @@ export function chargeUnitResource(state: GameState, seat: number, unitType: str
   if (!c) return;
   // CIV6 (Black Marketeer): "Strategic resources for units are discounted 80%."
   const off = city ? governorSum(state, city, (e) => e.resourceDiscountPct) : 0;
-  spendStockpile(state, seat, c.id, Math.round(c.n * (100 - Math.min(100, off)) / 100));
+  spendStockpile(state, seat, c.id, Math.round(c.n * (100 - Math.min(100, off)) / 100), 'uc');
 }
 
 /** The same charge for a PROJECT — the Lagrange station's one-time Aluminum. */
@@ -274,7 +278,7 @@ export function canRunProject(state: GameState, seat: number, projectId: string)
 
 export function chargeProjectResource(state: GameState, seat: number, projectId: string): void {
   const p = PROJECTS[projectId];
-  if (p?.resource) spendStockpile(state, seat, p.resource, p.resourceCost ?? 0);
+  if (p?.resource) spendStockpile(state, seat, p.resource, p.resourceCost ?? 0, 'pc');
 }
 
 /** Draw `n` down. The caller has already asked `canPayStockpile`; this clamps
@@ -288,7 +292,7 @@ export function chargeProjectResource(state: GameState, seat: number, projectId:
 export function layRailroad(state: GameState, seat: number, tile: Tile): boolean {
   for (const [id, n] of RAILROAD_COST) if (stockOf(state, seat, id) < n) return false;
   for (const [id, n] of RAILROAD_COST) {
-    spendStockpile(state, seat, id, n);
+    spendStockpile(state, seat, id, n, 'rr');
     const k = strategicSlot(id);
     if (k >= 0) emitCarbon(state, seat, n * (CARBON_PER_RESOURCE[k] ?? 0));
   }
@@ -296,13 +300,14 @@ export function layRailroad(state: GameState, seat: number, tile: Tile): boolean
   return true;
 }
 
-export function spendStockpile(state: GameState, seat: number, resourceId: string | undefined, n: number): void {
+export function spendStockpile(state: GameState, seat: number, resourceId: string | undefined, n: number, tag = 'sp'): void {
   if (!resourceId || n <= 0) return;
   const k = strategicSlot(resourceId);
   const s = seatOf(state, seat);
   if (k < 0 || !s) return;
   const bk = bank(s);
   bk[k] = Math.max(0, bk[k] - n);
+  logStockWrite(state.turn, seat, k, tag, bk[k]);
 }
 
 /**
@@ -354,7 +359,7 @@ export function resolveSeatPower(state: GameState, seat: number): void {
     const burn = bestFuel ? Math.ceil((p.demand - p.supply) / bestRate) : 0;
     city.powered = bestFuel !== undefined && bestStock >= burn;
     if (city.powered) {
-      spendStockpile(state, seat, bestFuel, burn);
+      spendStockpile(state, seat, bestFuel, burn, 'fu');
       emitCarbon(state, seat, plantCarbon(bestFuel!, bestRate, burn));
     }
   }

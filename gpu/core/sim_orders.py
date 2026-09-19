@@ -420,6 +420,7 @@ class SimOrders:
                     _r = _rrm.nonzero(as_tuple=True)[0]
                     for _sl, _cn in self._railroad_cost:
                         self.civ_stockpile[_r, row, _sl] -= _cn
+                        self._log_stock(_r, row, _sl, "rr")
                         self._emit_carbon(row, _rrm.double() * float(_cn * self._carbon_per_resource[_sl]))
                     self.railroad[_r, hc[_r]] = True
                     self.unit_mp[_r, sc[_r]] = 0

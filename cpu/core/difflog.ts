@@ -34,6 +34,8 @@
  *     `fi:` the turn's faith income, snapshot split from the roster tail
  *     `up:` unit upkeep, the CHARGE beside the unit COUNT
  *     `dm:` the minor's build — the only instrument on that path
+ *     `sk:` the strategic bank per WRITER (income, upkeep, burn, charge,
+ *           upgrade, deal lump and return, grant) — cracked 9261 t247
  *
  *   SCAFFOLDING is kept only while a hunt needs it and deleted when that
  *   hunt closes — eight kinds (the per-city yield buckets, the specialty
@@ -68,6 +70,15 @@ export function logDistrictCost(
 ): void {
   push(`dc:${seat}:${turn}:${id}`
     + ` b${base} d${disc} v${varied} g${add} t${varied + add}`);
+}
+
+/** WHICH writer last moved a seat's STRATEGIC bank, and to what — keyed on
+ *  the seat, the turn and the stockpile SLOT (the `rid` order both engines
+ *  share). Eight writers can move it (income, upkeep, a plant's burn, a
+ *  unit's or project's charge, an upgrade, a deal's lump and its return, a
+ *  Great Person's grant), so the tag is part of the key. */
+export function logStockWrite(turn: number, seat: number, slot: number, tag: string, value: number): void {
+  push(`sk:${seat}:${turn}:${slot}:${tag} ${value}`);
 }
 
 /** WHICH writer last moved a unit's experience pool. Seven of them can, and

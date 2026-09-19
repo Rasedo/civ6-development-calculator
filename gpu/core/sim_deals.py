@@ -152,6 +152,9 @@ class SimDeals:
             1, idx, (-moved).unsqueeze(1))
         self.civ_stockpile[:, taker] = self.civ_stockpile[:, taker].scatter_add(
             1, idx, moved.unsqueeze(1))
+        _dr = ok.nonzero(as_tuple=True)[0]
+        self._log_stock(_dr, giver, idx.squeeze(1)[ok], "dl")
+        self._log_stock(_dr, taker, idx.squeeze(1)[ok], "dl")
 
     # ------------------------------------------------------------ one bundle
     def _deal_bundle_ok(self, giver: int, taker: int, bundle: torch.Tensor,
@@ -309,5 +312,8 @@ class SimDeals:
             gain = torch.where(back > 0, room, torch.zeros_like(room))
             self.civ_stockpile[:, taker] = self.civ_stockpile[:, taker].scatter_add(1, idx, (-back).unsqueeze(1))
             self.civ_stockpile[:, giver] = self.civ_stockpile[:, giver].scatter_add(1, idx, gain.unsqueeze(1))
+            _er = sel.nonzero(as_tuple=True)[0]
+            self._log_stock(_er, taker, idx.squeeze(1)[sel], "de")
+            self._log_stock(_er, giver, idx.squeeze(1)[sel], "de")
         self.deal_term_item[:, giver, taker] = torch.where(
             done.reshape(-1, 1, 1), torch.full_like(items, -1), self.deal_term_item[:, giver, taker])
