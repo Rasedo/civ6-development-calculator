@@ -90,7 +90,7 @@ TS_FORK_ALLOW: dict[tuple[str, str], str] = {
     # `seatPhase` and `barbarianPhase` all read the roster, and the unit wire
     # has one schema for every row — the same shape `step()` has on the GPU.
     #
-    # READ THE CAUTION IN docs/AUDIT.md BEFORE ADDING ONE BACK: this class has been
+    # THE CAUTION BEFORE ADDING ONE BACK (the A-3/A-4 hunts, git log -S A-3): this class has been
     # declared closed three times on the strength of an instrument that only
     # matched what it had been taught, and each time the next pattern found
     # live divergences. An empty allowlist is a statement about these

@@ -63,7 +63,9 @@ RESULT (2026-09-13, 31 storms): one movement turn displaces the centre 4-8
 hexes in open water (1-5 against the ice), always along the storm's
 `PrevailingWinds` band, with off-axis wobble — eight unit steps, each drawn
 from the band; the dissipation turn displaces the record once more and adds
-no observed damage. Written up in `docs/AUDIT.md` under ask 16 / C-49.
+no observed damage. The model ships as `stormWalk` (cpu/core/disasters.ts)
+/ `_storm_walk` (gpu/core/sim_economy.py); the run files are
+`runs/storm_20260913T*.jsonl`.
 
 ### `spy_probe.lua` — the mission roll (InGame)
 
@@ -79,7 +81,9 @@ raised from the tuner.
 
 RESULT: one 3d6 roll against `BaseProbability - k`, six outcome bands by
 margin, k = 2 for a fresh spy, +2 under Gain Sources; district, pillage and
-garrison do not enter. Full table in `docs/AUDIT.md` under C-16.
+garrison do not enter. The band table ships as `missionOutcome`
+(cpu/core/espionage.ts) / `_mission_outcome`; the counterspy columns stay
+unmeasured (SESSION2 carry-over).
 
 BEWARE AUTOPLAY: it plays YOUR units too. The first spy left in a city came
 back nine turns later with a Gain Sources boost on that city and a mission

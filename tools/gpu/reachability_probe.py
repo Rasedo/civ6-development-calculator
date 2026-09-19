@@ -1,8 +1,8 @@
 """REACHABILITY — what a driven 250-turn game actually reaches.
 
 A green gate proves the two engines agree over the regime the scripted seeds
-enter. docs/AUDIT.md's "Reachability" section lists the mechanics believed to
-sit OUTSIDE that regime; every one of them was prose. This driver counts them.
+enter. Every docs/AUDIT.md entry names the lane that REACHES its mechanic;
+where none does, the claim was prose. This driver counts them.
 
 GPU-only and driven exactly as the serve gate drives it (the same
 `_decide_turn` over the same seat order), because reachability is a property
