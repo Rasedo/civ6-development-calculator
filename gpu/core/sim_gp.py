@@ -229,8 +229,19 @@ class SimGp:
         _own_nb = ((self.tile_seat == row).gather(1, _nb.clamp(min=0).reshape(tc.shape[0], -1))
                    .reshape_as(_nb) & (_nb >= 0)).any(dim=2)
         a_adj = (_ts_here < 0) & _own_nb
+        # 6 a city-state's territory this seat is Suzerain of (Raffles)
+        if self.S:
+            _s_here = (_ts_here - 100).clamp(min=0, max=self.S - 1)
+            a_suz = a_cs & self._suzerain_mask(row).gather(1, _s_here.reshape(self.B, -1)).reshape_as(a_cs)
+        else:
+            a_suz = torch.zeros_like(a_cs)
+        # 7 beside a barbarian unit (Boudica)
+        _bp = self._barb_unit_plane()
+        a_barb = (_bp.gather(1, _nb.clamp(min=0).reshape(tc.shape[0], -1)).reshape_as(_nb) & (_nb >= 0)).any(dim=2)
+        # 8 the territory of a seat at war with this one (Tupac Amaru)
+        a_enemy = self._enemy_ground(row, _ts_here)
 
-        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj], dim=0)
+        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj, a_suz, a_barb, a_enemy], dim=0)
         pick = arms.gather(0, site.clamp(min=0, max=arms.shape[0] - 1).unsqueeze(0)).squeeze(0)
         return ok & pick
 
@@ -365,6 +376,11 @@ class SimGp:
         # ---- the unit on the tile
         self._gp_unit_grants(row, m, cls, at, hc)
 
+        # ---- the verbs (Raffles moves the city the per-city run lands on)
+        ccol = self._gp_verbs(row, m, cls, at, hc, ccol)
+        has_city = m & (ccol >= 0)
+        cc = ccol.clamp(min=0)
+
         # ---- the permanent channels
         _rowfx = self._gp_row(cls, at)
         _np = len(self._gp_perm_names)
@@ -389,6 +405,73 @@ class SimGp:
             self.civ_prophets[:, row] = self.civ_prophets[:, row] + (m & (cls == self._prophet_cls)).long()
         self.civ_gp_used[:, row] = self.civ_gp_used[:, row] + m.long()
         self._eff_version += 1
+
+    # ---------------------------------------------------------------- the verbs
+    def _enemy_ground(self, row: int, ts: torch.Tensor) -> torch.Tensor:
+        """bool, `ts`'s shape — is the seat owning each tile AT WAR with row
+        `row`? A major by its row, a minor by its `n_majors + s` column of the
+        war plane; unclaimed ground and the row's own land are never enemy."""
+        idx = torch.where(ts >= 100, ts - 100 + self.n_majors, ts)
+        ok = (ts >= 0) & (ts < BARB_SEAT) & (ts != row) & (idx < self.NS)
+        w = self.war[:, row, :].gather(1, idx.clamp(min=0, max=self.NS - 1).reshape(self.B, -1)).reshape_as(ts)
+        return ok & w
+
+    def _enemy_district_tiles(self, b: int, hc: int) -> list[int]:
+        """`districtTilesOfOwner`: the district tiles of the city whose land
+        tile `hc` is, CITY CENTER included, ascending — the spawn order."""
+        ts = int(self.tile_seat[b, hc])
+        if ts < 0 or ts >= BARB_SEAT:
+            return []
+        if ts >= 100:
+            r2, col = self._CITY_MINOR0 + (ts - 100), 0
+        else:
+            r2, col = ts, int(self.city_slot_at(ts)[b, hc])
+        if col < 0 or not bool(self.city_alive[b, r2, col]):
+            return []
+        tiles = {int(self.city_center[b, r2, col])}
+        tiles |= {int(x) for x in self.city_dist_tile[b, r2, col].tolist() if x >= 0}
+        return sorted(tiles)
+
+    def _gp_verbs(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
+                  hc: torch.Tensor, ccol: torch.Tensor) -> torch.Tensor:
+        """the three VERB clauses, in `activateGreatPerson`'s order; returns
+        the city column the per-city run lands on (Raffles moves it to the
+        absorbed city)."""
+        dev = self.device
+        # CIV6 (Stamford Raffles): the city-state joins the empire — the
+        # conquest body (`captureCityStateFor` / `_capture_city_state`)
+        ab = m & (self._gp_fx(cls, at, "absorbCityState") > 0)
+        if bool(ab.any()) and self.S:
+            ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
+            s = ts - 100
+            ok = ab & (s >= 0) & (s < self.S)
+            sc = s.clamp(min=0, max=self.S - 1)
+            ok = ok & self.citystate_alive.gather(1, sc.unsqueeze(1)).squeeze(1)
+            if bool(ok.any()):
+                rows = ok.nonzero(as_tuple=True)[0]
+                c_t = self.citystate_center[rows, sc[rows]].clone()
+                self._capture_city_state(rows, sc, row)
+                # the absorbed city, unless the seat's cap razed it
+                col = self.centre_slot_at[rows, c_t]
+                took = (col >= 0) & (self.tile_seat[rows, c_t] == row)
+                ccol = ccol.clone()
+                ccol[rows] = torch.where(took, col, ccol[rows])
+        # CIV6 (Boudica): every barbarian unit within 1 changes sides, in ring
+        # order — Heathen Conversion's body
+        cb = m & (self._gp_fx(cls, at, "convertBarbarians") > 0)
+        if bool(cb.any()):
+            self._convert_ring(row, cb.nonzero(as_tuple=True)[0], hc)
+        # CIV6 (Tupac Amaru): the chassis once per district of the enemy city
+        # whose land this is, in tile order; the spawn probe finds each its spot
+        ue = self._gp_fx(cls, at, "unitEachDistrict").long()
+        te = m & (ue >= 0) & (ue < self.NU)
+        if bool(te.any()):
+            for b in te.nonzero(as_tuple=True)[0].tolist():
+                for t in self._enemy_district_tiles(b, int(hc[b])):
+                    one = torch.zeros(self.B, dtype=torch.bool, device=dev)
+                    one[b] = True
+                    self._spawn_unit(row, one, torch.full((self.B,), t, dtype=torch.long, device=dev), int(ue[b]))
+        return ccol
 
     # ---------------------------------------------------------------- research
     def _gp_named_eurekas(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor) -> None:

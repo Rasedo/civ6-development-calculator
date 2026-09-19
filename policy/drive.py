@@ -226,6 +226,20 @@ def _gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
         return (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
     if site == 4:  # an owned tile carrying a luxury
         return own & (sim.lux_id >= 0)
+    if site == 6:  # a city-state's territory this seat is Suzerain of (Raffles)
+        if sim.S == 0:
+            return torch.zeros_like(own)
+        cs = (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
+        s = (sim.tile_seat - 100).clamp(min=0, max=sim.S - 1)
+        return cs & sim._suzerain_mask(seat).gather(1, s)
+    if site == 7:  # beside a barbarian unit (Boudica)
+        bp = sim._barb_unit_plane()
+        nb7 = sim.neigh
+        near = (bp[:, nb7.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)
+                & (nb7 >= 0).unsqueeze(0)).any(dim=2)
+        return near & sim.passable
+    if site == 8:  # the territory of a seat at war with this one (Tupac Amaru)
+        return sim._enemy_ground(seat, sim.tile_seat)
     # 5: unclaimed ground next to this seat's territory
     nb = sim.neigh
     adj = (own[:, nb.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)

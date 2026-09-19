@@ -444,6 +444,9 @@ function gpFxRow(p: GreatPersonDef): number[] {
     formation: fx.formation ?? 0,
     formationNaval: fx.formationNaval ? 1 : 0,
     wonderBuyout: fx.wonderBuyout ? 1 : 0,
+    absorbCityState: fx.absorbCityState ? 1 : 0,
+    convertBarbarians: fx.convertBarbarians ? 1 : 0,
+    unitEachDistrict: fx.unitEachDistrict ? Object.values(UNITS).findIndex((u) => u.id === fx.unitEachDistrict) : -1,
   };
   return [
     ...GP_FX.map((k) => v[k] ?? 0),

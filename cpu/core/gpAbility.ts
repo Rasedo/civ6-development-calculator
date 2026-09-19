@@ -5,13 +5,15 @@
  * PERSON's own sourced row, `GP_ABILITY`.
  */
 
-import type { City, GameState, GreatPersonClass, Unit } from './types';
+import type { City, CityState, GameState, GreatPersonClass, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
-import { cityAtTile, citiesOf, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
+import { cityAtTile, citiesOf, civsAtWar, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
+import { captureCityStateFor } from './combat';
+import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
@@ -20,7 +22,7 @@ import {
 import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
-import { resolveSuzerains } from './cityStates';
+import { isSuzerain, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -88,7 +90,40 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
     case 'adjacentOwn':
       return tileSeat(tile) < 0
         && neighbors(state.map, tile).some((n) => tileOwnedByCiv(n, unit.seat));
+    case 'suzerainCityState': {
+      const cs = cityStateAtSeat(state, tileSeat(tile));
+      return !!cs && isSuzerain(state, cs, unit.seat);
+    }
+    case 'adjacentBarbarian':
+      return adjacentBarbarians(state, tile).length > 0;
+    case 'enemyTerritory': {
+      const ts = tileSeat(tile);
+      return ts >= 0 && ts !== unit.seat && civsAtWar(state, unit.seat, ts);
+    }
   }
+}
+
+function cityStateAtSeat(state: GameState, seat: number): CityState | undefined {
+  return isCityStateSeat(seat) ? (state.cityStates ?? []).find((c) => c.seat === seat) : undefined;
+}
+
+/** the district tiles of the city whose land `tile` is — a major's city by
+ *  its id on the tile, a minor's by its seat — CITY CENTER included, in
+ *  ascending tile order (the order both engines spawn in). */
+export function districtTilesOfOwner(state: GameState, tile: Tile): number[] {
+  const ts = tileSeat(tile);
+  const cs = cityStateAtSeat(state, ts);
+  const tiles = new Set<number>();
+  if (cs) {
+    tiles.add(cs.centerIndex);
+    for (const d of cs.districts ?? []) tiles.add(d.tileIndex);
+  } else {
+    const city = seatOf(state, ts)?.cities.find((c) => c.id === tile.ownerCity);
+    if (!city) return [];
+    tiles.add(city.centerIndex);
+    for (const d of city.districts) tiles.add(d.tileIndex);
+  }
+  return [...tiles].sort((a, b) => a - b);
 }
 
 /** one eureka/inspiration draw over the eras `lo`..`hi`, in the catalog order
@@ -161,7 +196,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   const owner = seatOf(state, unit.seat);
   if (!person || !owner || !gpActivateOk(state, unit)) return false;
   const tile = state.map.tiles[unit.tileIndex];
-  const city = gpCityAt(state, unit.seat, tile);
+  let city = gpCityAt(state, unit.seat, tile);
   const fx = gpEffectOf(person);
   const era = person.era;
 
@@ -346,6 +381,25 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       }
       if (fx.xpPct) target.xpPct = (target.xpPct ?? 0) + fx.xpPct;
     }
+  }
+
+  // THE VERBS.
+  // CIV6 (Stamford Raffles): the city-state joins the empire — the conquest
+  // body — and the row's per-city channel lands on the ABSORBED city.
+  if (fx.absorbCityState) {
+    const cs = cityStateAtSeat(state, tileSeat(tile));
+    if (cs) {
+      const before = owner.cities.length;
+      captureCityStateFor(state, owner, cs);
+      if (owner.cities.length > before) city = owner.cities[owner.cities.length - 1];
+    }
+  }
+  // CIV6 (Boudica): every barbarian unit within 1 changes sides, in ring order.
+  if (fx.convertBarbarians) convertAdjacentBarbarians(state, tile, unit.seat);
+  // CIV6 (Tupac Amaru): the chassis once per district of the enemy city
+  // whose land this is, in tile order; the spawn probe finds each its spot.
+  if (fx.unitEachDistrict && UNITS[fx.unitEachDistrict]) {
+    for (const t of districtTilesOfOwner(state, tile)) spawnUnit(state, fx.unitEachDistrict, t, unit.seat);
   }
 
   // PERMANENT CHANNELS.

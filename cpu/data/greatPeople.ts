@@ -594,7 +594,10 @@ export type GpSite =
   | 'gwSlot'       // a city of this seat with a free slot of the class's work kind
   | 'cityState'    // inside a city-state's territory
   | 'luxury'       // an owned tile carrying a luxury resource
-  | 'adjacentOwn'; // an unclaimed tile next to this seat's territory
+  | 'adjacentOwn'  // an unclaimed tile next to this seat's territory
+  | 'suzerainCityState' // inside the territory of a city-state this seat is Suzerain of
+  | 'adjacentBarbarian' // beside a barbarian unit
+  | 'enemyTerritory';   // inside the territory of a seat at war with this one
 
 /** PERMANENT per-seat channels a Great Person adds to. The array position is
  *  the wire index, so a new channel appends. */
@@ -737,6 +740,16 @@ export interface GpEffect {
   /** CIV6 (Marina Raskova): "District in this tile gains +1 air unit
    *  slots" — a permanent per-tile add on the activating tile. */
   airSlotBonus?: number;
+  /** CIV6 (Stamford Raffles, `EFFECT_UNIT_TRANSFER_CITY_AS_GIFT_AND_APPLY_MODIFIER`):
+   *  the city-state whose territory the merchant stands in — one this seat
+   *  is Suzerain of — joins the empire; `cityPerm` then lands on THAT city. */
+  absorbCityState?: boolean;
+  /** CIV6 (Boudica, `GREATPERSON_BOUDICA_ACTIVE`): every barbarian unit
+   *  within 1 changes sides — Heathen Conversion's body. */
+  convertBarbarians?: boolean;
+  /** CIV6 (Tupac Amaru, `EFFECT_GRANT_UNIT_IN_EACH_DISTRICT`): this chassis
+   *  once per district of the ENEMY city whose land the general stands on. */
+  unitEachDistrict?: string;
   perm?: Partial<Record<GpPermKey, number>>;
   cityPerm?: Partial<Record<GpCityPermKey, number>>;
   /** on the DISTRICT tile the charge is spent on. */
@@ -759,6 +772,7 @@ export const GP_FX = [
   'strategicSlot', 'strategicAmount',
   'artifactScience', 'airSlotBonus', 'suzerainSeize',
   'formation', 'formationNaval', 'wonderBuyout',
+  'absorbCityState', 'convertBarbarians', 'unitEachDistrict',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -769,6 +783,7 @@ export const GP_YIELD_KEYS: readonly GpYieldKey[] = ['science', 'culture', 'gold
 /** the ACTIVATION SITES, in the wire's own order. */
 export const GP_SITES: readonly GpSite[] = [
   'district', 'anywhere', 'gwSlot', 'cityState', 'luxury', 'adjacentOwn',
+  'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory',
 ];
 
 export interface GpAbility extends GpEffect {
@@ -860,7 +875,9 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ADAM_SMITH: { perm: { policySlotEconomic: 1 } },
   GP_JOHN_JACOB_ASTOR: { gold: 500, envoys: 2 },
   GP_JOHN_SPILSBURY: { luxuryCopies: 1, luxuryAmenities: 4 },
-  GP_STAMFORD_RAFFLES: { unmodelled: true },
+  // CIV6 (Stamford Raffles, `ActionRequiresSuzerainTerritory`): the city-state
+  // joins the empire and keeps +10 Loyalty per turn (the GS attachment).
+  GP_STAMFORD_RAFFLES: { site: 'suzerainCityState', absorbCityState: true, cityPerm: { loyalty: 10 } },
   GP_JOHN_ROCKEFELLER: { strategic: { resource: 'OIL', amount: 1 } },
   GP_SARAH_BREEDLOVE: { siteDistrict: 'COMMERCIAL_HUB', perm: { tourismRouteBonus: 25 } },
   GP_MARY_KATHERINE_GODDARD: { perm: { visibilityAll: 1 } },
@@ -872,7 +889,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', perm: { izTourism: 10 } },
 
   // ---- GENERAL: promotions, free units, and the war-weariness cut ----
-  GP_BOUDICA: { unmodelled: true },
+  GP_BOUDICA: { site: 'adjacentBarbarian', convertBarbarians: true },
   GP_HANNIBAL_BARCA: { promotionLevels: 1 },
   GP_SUN_TZU: { greatWorkKind: 0 }, // one Work of Writing (GREATWORK_SUN_TZU)
   GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
@@ -888,7 +905,9 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_JOSE_DE_SAN_MARTIN: { envoys: 2 },
   GP_NAPOLEON_BONAPARTE: { formation: 2 },
   GP_RANI_LAKSHMIBAI: { unit: 'CAVALRY', unitPromotions: 1 },
-  GP_TUPAC_AMARU: { unmodelled: true },
+  // CIV6 (Tupac Amaru, `ActionRequiresEnemyTerritory`, IgnoreDefensible): a
+  // Musketman in each district of the enemy city, the City Center included.
+  GP_TUPAC_AMARU: { site: 'enemyTerritory', unitEachDistrict: 'MUSKETMAN' },
   GP_JOHN_MONASH: { promotionLevels: 1, xpPct: 75 },
   GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', airSlotBonus: 1 },
   GP_SAMORI_TOURE: { unit: 'INFANTRY', unitPromotions: 1 },

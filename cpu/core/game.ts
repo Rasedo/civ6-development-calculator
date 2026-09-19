@@ -1069,16 +1069,28 @@ export function removeHeresy(state: GameState, unit: Unit): RuleResult {
  * the pooled twin appends them in that order, and an array-order walk that
  * disagreed would hand the next turn's orders to the wrong units.
  */
-export function convertHeathens(state: GameState, unit: Unit, actor: Seat): RuleResult {
-  if (!promoFlag(unit, 'HEATHEN')) return { ok: false, reason: 'No such promotion.' };
-  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
-  const here = state.map.tiles[unit.tileIndex];
+/** every barbarian unit in the ring around `here`, in NEIGHBOUR-RING order. */
+export function adjacentBarbarians(state: GameState, here: Tile): Unit[] {
   const got: Unit[] = [];
   for (const t of neighbors(state.map, here)) {
     for (const u of unitsAt(state, t.index)) if (isBarbSeat(u.seat)) got.push(u);
   }
-  if (got.length === 0) return { ok: false, reason: 'No Barbarians adjacent.' };
-  for (const u of got) reseatUnit(state, u, actor.seat);
+  return got;
+}
+
+/** the ring changes sides to `seat`, in that order — Heathen Conversion's
+ *  body, which CIV6 (Boudica) shares. Returns how many turned. */
+export function convertAdjacentBarbarians(state: GameState, here: Tile, seat: number): number {
+  const got = adjacentBarbarians(state, here);
+  for (const u of got) reseatUnit(state, u, seat);
+  return got.length;
+}
+
+export function convertHeathens(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (!promoFlag(unit, 'HEATHEN')) return { ok: false, reason: 'No such promotion.' };
+  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
+  const here = state.map.tiles[unit.tileIndex];
+  if (convertAdjacentBarbarians(state, here, actor.seat) === 0) return { ok: false, reason: 'No Barbarians adjacent.' };
   unit.charges = (unit.charges ?? 1) - 1;
   unit.movesLeft = 0;
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);

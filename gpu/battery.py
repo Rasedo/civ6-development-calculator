@@ -676,6 +676,7 @@ def main() -> int:
                 ("drive", [py, "tests/gpu/drive_test.py"], 4),  # the ladder DRIVES a seat for a whole game
                 ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
                 ("gp_channels", [py, "tests/gpu/gp_channels_test.py"], 4),  # the seven Great Person CHANNEL clauses (B-61r batch A)
+                ("gp_verbs", [py, "tests/gpu/gp_verbs_test.py"], 4),  # the three Great Person VERB clauses: Raffles, Boudica, Tupac Amaru
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
                 ("research_switch", [py, "tests/gpu/research_switch_test.py"], 4),  # switching research keeps the abandoned item's science

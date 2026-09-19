@@ -14,6 +14,11 @@ import { gpDistrictTourism, tourismIntlPct } from '../../../cpu/core/city';
 import { waterEnterable } from '../../../cpu/core/units';
 import { unitSight } from '../../../cpu/core/fog';
 import { gpTilePermOf, GP_TILE_PERM } from '../../../cpu/data/greatPeople';
+import { districtTilesOfOwner } from '../../../cpu/core/gpAbility';
+import { placeCityStateAt, resolveSuzerains, setMet } from '../../../cpu/core/cityStates';
+import { BARB_SEAT } from '../../../cpu/core/seats';
+import { neighbors, hexDistance } from '../../../world/hex';
+import { isWater, isImpassable } from '../../../world/query';
 import { completeQueueItem } from '../../../cpu/core/production';
 import type { GameState, QueueItem, Unit } from '../../../cpu/core/types';
 
@@ -437,5 +442,96 @@ describe('the channel clauses', () => {
     expect(unitSight(warrior, state)).toBe(unitSight(warrior));
     // another seat's hull still waits for Cartography
     expect(waterEnterable(state, ocean, { seat: 1, type: 'GALLEY' })).toBe(false);
+  });
+});
+
+// AUDIT B-61r: the three persons whose page clause is a VERB.
+describe('the verb clauses', () => {
+  const found = (id: string) => {
+    for (const c of GP_CLASSES) {
+      const at = GREAT_PEOPLE[c].findIndex((p) => p.id === id);
+      if (at >= 0) return { cls: c as string, at };
+    }
+    throw new Error(`${id} is not in the roster`);
+  };
+  /** `person` spawns on OWN bare ground (it claims the tile it lands on),
+   *  then steps onto `tile` — which may be another seat's. */
+  function stand(state: GameState, id: string, tile: number): Unit {
+    const { cls, at } = found(id);
+    const u = person(state, cls, at, ownBare(state));
+    Object.assign(u, { tileIndex: tile });
+    return u;
+  }
+  const dryFree = (state: GameState, t: { index: number; terrain: string; elevation: string; feature: string | null }) =>
+    !isWater(t as never) && !isImpassable(t as never) && !state.units.some((u) => u.tileIndex === t.index);
+
+  it('Raffles: the suzerained city-state joins the empire and keeps +10 Loyalty per turn', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const cap = state.map.tiles[seat.cities[0].centerIndex];
+    const spot = state.map.tiles.find((t) => tileSeat(t) < 0 && dryFree(state, t)
+      && hexDistance(t.col, t.row, cap.col, cap.row) >= 6)!;
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);
+    setMet(cs, 0);
+    const u = stand(state, 'GP_STAMFORD_RAFFLES', cs.centerIndex);
+    // met but not Suzerain: not his ground
+    expect(gpActivateOk(state, u)).toBe(false);
+    cs.envoys[0] = 3;
+    resolveSuzerains(state);
+    expect(gpActivateOk(state, u)).toBe(true);
+    const cities0 = seat.cities.length;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(state.cityStates.some((c) => c.id === cs.id)).toBe(false);
+    expect(seat.cities.length).toBe(cities0 + 1);
+    const city = seat.cities[seat.cities.length - 1];
+    expect(city.centerIndex).toBe(cs.centerIndex);
+    expect(gpCityPermOf(city, 'loyalty')).toBe(10);
+    expect(gpCityPermOf(seat.cities[0], 'loyalty')).toBe(0); // not the capital's
+  });
+
+  it('Boudica: every barbarian beside her changes sides, in ring order, with no moves left', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const here = state.map.tiles.find((t) => tileSeat(t) === 0 && t.index !== city.centerIndex
+      && !t.district && !t.builtWonder && dryFree(state, t)
+      && neighbors(state.map, t).filter((n) => dryFree(state, n) && !n.district).length >= 2)!;
+    expect(here).toBeDefined();
+    const nbs = neighbors(state.map, here).filter((n) => dryFree(state, n) && !n.district).slice(0, 2);
+    const u = stand(state, 'GP_BOUDICA', here.index);
+    expect(gpActivateOk(state, u)).toBe(false); // nobody to turn
+    const b1 = spawnUnit(state, 'WARRIOR', nbs[0].index, BARB_SEAT)!;
+    Object.assign(b1, { tileIndex: nbs[0].index });
+    const b2 = spawnUnit(state, 'WARRIOR', nbs[1].index, BARB_SEAT)!;
+    Object.assign(b2, { tileIndex: nbs[1].index });
+    expect(gpActivateOk(state, u)).toBe(true);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(b1.seat).toBe(0);
+    expect(b2.seat).toBe(0);
+    expect(b1.movesLeft).toBe(0);
+    // the converts go to the END of the array, in ring order (the pooled twin appends them so)
+    expect(state.units.slice(-2).map((x) => x.id)).toEqual([b1.id, b2.id]);
+  });
+
+  it('Tupac Amaru: a Musketman in each district of the enemy city, the City Center included', () => {
+    const state = newGame();
+    const cap = state.map.tiles[state.seats[0].cities[0].centerIndex];
+    const spot = state.map.tiles.find((t) => tileSeat(t) < 0 && dryFree(state, t)
+      && hexDistance(t.col, t.row, cap.col, cap.row) >= 6)!;
+    // the enemy is a CITY-STATE here — the minor branch of `districtTilesOfOwner`;
+    // the GPU poke takes a major's capital
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);
+    setMet(cs, 0);
+    const ground = state.map.tiles.find((t) => tileSeat(t) === cs.seat && t.index !== cs.centerIndex && dryFree(state, t))!;
+    expect(ground).toBeDefined();
+    const u = stand(state, 'GP_TUPAC_AMARU', ground.index);
+    expect(gpActivateOk(state, u)).toBe(false); // at peace: not ENEMY land
+    state.seats[0].wars.push(cs.seat);
+    expect(gpActivateOk(state, u)).toBe(true);
+    const tiles = districtTilesOfOwner(state, ground);
+    expect(tiles).toContain(cs.centerIndex);
+    const mine = () => state.units.filter((x) => x.seat === 0 && x.type === 'MUSKETMAN').length;
+    const m0 = mine();
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(mine() - m0).toBe(tiles.length);
   });
 });

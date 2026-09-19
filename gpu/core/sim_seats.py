@@ -10211,6 +10211,23 @@ class SimSeats:
         rows = act.nonzero(as_tuple=True)[0]
         if rows.numel() == 0:
             return
+        self._convert_ring(row, rows, here)
+        sc = slot[rows]
+        self.unit_charges[rows, sc] -= 1
+        self.unit_mp[rows, sc] = 0
+        spent = self.unit_charges[rows, sc] <= 0
+        if bool(spent.any()):
+            dr = rows[spent]
+            self.unit_alive[dr, sc[spent]] = False
+            self._occ_clear(dr, here[dr], sc[spent])
+        self._gen_ver += 1
+
+    def _convert_ring(self, row: int, rows: torch.Tensor, here: torch.Tensor) -> None:
+        """`convertAdjacentBarbarians`: every barbarian in the ring around
+        `here` joins seat row `row`, in NEIGHBOUR-RING order — Heathen
+        Conversion's body, which CIV6 (Boudica) shares."""
+        if rows.numel() == 0:
+            return
         nb6 = self.neigh[here[rows].clamp(min=0)]
         seat_col = torch.full((rows.numel(),), row, dtype=torch.long, device=self.device)
         for d in range(6):
@@ -10223,15 +10240,6 @@ class SimSeats:
                     continue
                 hr = rows[hit]
                 self._convert_unit(hr, src[hit], seat_col[hit], tgt[hit])
-        sc = slot[rows]
-        self.unit_charges[rows, sc] -= 1
-        self.unit_mp[rows, sc] = 0
-        spent = self.unit_charges[rows, sc] <= 0
-        if bool(spent.any()):
-            dr = rows[spent]
-            self.unit_alive[dr, sc[spent]] = False
-            self._occ_clear(dr, here[dr], sc[spent])
-        self._gen_ver += 1
 
     def _convert_unit(self, rows: torch.Tensor, src: torch.Tensor,
                       dst_seat: torch.Tensor, tile: torch.Tensor) -> None:
