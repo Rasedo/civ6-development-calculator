@@ -2179,6 +2179,11 @@ class SimInit:
             self._gov_nd_min = torch.tensor([int(x[0]) for x in _gnd], dtype=torch.long, device=device)
             self._gov_nd_house = torch.tensor([float(x[1]) for x in _gnd], dtype=dtype, device=device)
             self._gov_nd_amen = torch.tensor([float(x[2]) for x in _gnd], dtype=dtype, device=device)
+            # amenitiesIfSpecialty (Liberalism's shape, +1 amenity at 2+
+            # specialty districts): an amenity-only newDeal, keyed the same way
+            _gai = [g.get("amenitiesIfSpecialty", [-1, 0]) for g in _govs]
+            self._gov_ais_min = torch.tensor([int(x[0]) for x in _gai], dtype=torch.long, device=device)
+            self._gov_ais_amen = torch.tensor([float(x[1]) for x in _gai], dtype=dtype, device=device)
             # adjacencyMult: a MULTIPLIER on one district type's adjacency
             # bonus, per PLACEABLE district column. buildingYieldBoost: one
             # [district, yield, pct, popMin, popPct, adjMin, adjPct] row.
@@ -2266,6 +2271,12 @@ class SimInit:
             self._pol_nd_min = torch.tensor([int(x[0]) for x in _pnd], dtype=torch.long, device=device)
             self._pol_nd_house = torch.tensor([float(x[1]) for x in _pnd], dtype=dtype, device=device)
             self._pol_nd_amen = torch.tensor([float(x[2]) for x in _pnd], dtype=dtype, device=device)
+            # amenitiesIfSpecialty — LIBERALISM: TS pays it beside newDeal in
+            # `computeCityStats`; this loader skipped the column and no seed
+            # had reached the card with the districts (AUDIT C-80, census rule 1)
+            _pai = [p.get("amenitiesIfSpecialty", [-1, 0]) for p in _pols]
+            self._pol_ais_min = torch.tensor([int(x[0]) for x in _pai], dtype=torch.long, device=device)
+            self._pol_ais_amen = torch.tensor([float(x[1]) for x in _pai], dtype=dtype, device=device)
             _nd_pl = len(self.districts_cat)
             self._pol_adj_mult = torch.tensor(
                 [[float(x) for x in p.get("adjacencyMult", [1] * _nd_pl)] for p in _pols],

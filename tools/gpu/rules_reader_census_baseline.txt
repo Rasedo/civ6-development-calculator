@@ -1,10 +1,8 @@
-rules.json: 1500 key paths over 70 groups
-  wire keys with NO GPU literal: 4
+rules.json: 1504 key paths over 70 groups
+  wire keys with NO GPU literal: 2
     civLevels[].canAnnexTilesWithReceivedInfluence
     civLevels[].startingTilesForCity
-    governments[].amenitiesIfSpecialty[]
-    policies[].amenitiesIfSpecialty[]
-provenance.json: 844 catalog columns
+provenance.json: 840 catalog columns
   columns with NO TS property access: 6
     civLevels.canAnnexTilesWithReceivedInfluence
     civLevels.startingTilesForCity

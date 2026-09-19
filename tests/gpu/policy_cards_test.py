@@ -115,6 +115,27 @@ def main() -> None:
     assert float(gpp[0].sum()) == 2.0, f"STRATEGOS pays +2 General points, got {float(gpp[0].sum())}"
     print(f"  6 rxp {float(rxp[0])}, rplun {float(tw[0])}, envoy1 {bool(e1[0])}, gpp {float(gpp[0].sum())}")
 
+    # 6b) LIBERALISM's amenitiesIfSpecialty rides the district-conditional
+    #     applier as an amenity-only New Deal row (AUDIT C-80, census rule 1:
+    #     TS paid it in computeCityStats, the GPU never loaded the column).
+    # the greedy fill takes economic cards in table order (GOD_KING,
+    # RATIONALISM, FREE_MARKETS come before LIBERALISM), so a government
+    # with a fourth economic-capable slot is what reaches it: COMMUNISM
+    # (CLASS_STRUGGLE) slots it alone, DEMOCRACY (SUFFRAGE) with NEW_DEAL
+    lib_sets = [
+        ["CODE_OF_LAWS", "COLONIALISM", "EXPLORATION", "ENLIGHTENMENT", "CLASS_STRUGGLE"],
+        ["CODE_OF_LAWS", "COLONIALISM", "ENLIGHTENMENT", "SUFFRAGE"],
+    ]
+    lib_ids = next((ids for ids in lib_sets if bool(fx_of(ids)[4][0, pol_i["LIBERALISM"]])), None)
+    assert lib_ids is not None, "no candidate civic set slots LIBERALISM — extend lib_sets"
+    _nd_rows = [(int(mn[0]), float(hs[0]), float(am[0])) for mn, hs, am in fx_of(lib_ids)[9] if int(mn[0]) >= 0]
+    assert (2, 0.0, 1.0) in _nd_rows, f"LIBERALISM must add an amenity-only (2, 0, 1) row to the specialty applier, rows {_nd_rows}"
+    assert int(sim._pol_ais_min[pol_i["LIBERALISM"]]) == 2 and float(sim._pol_ais_amen[pol_i["LIBERALISM"]]) == 1.0
+    _spec = torch.tensor([[1, 2, 3]], dtype=torch.long)
+    _h, _a = sim._cond_house_amen([], [(torch.tensor([2]), torch.zeros(1, dtype=sim.dtype), torch.ones(1, dtype=sim.dtype))], _spec)
+    assert _a.tolist() == [[0.0, 1.0, 1.0]] and _h.tolist() == [[0.0, 0.0, 0.0]], f"the applier pays the amenity at 2+ specialty districts and no housing: {_a.tolist()} / {_h.tolist()}"
+    print(f"  6b LIBERALISM amenitiesIfSpecialty: (2, 0, 1) on the specialty applier, slotted by {lib_ids}")
+
     # 7) The two appliers with a direction.
     sim.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "STATE_WORKFORCE", "COLONIALISM"]))
     sim._slot_greedily(0)  # the store is the truth now; a hand-set scene fills it with the greedy reference

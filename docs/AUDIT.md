@@ -64,7 +64,7 @@ re-adds them.
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
 | C-78 unique UNITS absent | 1 | the four leader units the roster leaves blank; the Ngao Mbeba's see-through clause |
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
-| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); six rules the reader census names |
+| C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); five rules the reader census names |
 | **C. Absent systems** | **23** | |
 | **OPEN, TOTAL** | **34** | |
 
@@ -207,8 +207,7 @@ close in the same commit.
 - **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
   - LAB scenes G and H: the two ledger lines left in docs/PROVENANCE.md — `GOLD_PURCHASE_MULT` 4 against the install's `GOLD_PURCHASE_MULTIPLIER` 2 with `PURCHASE_DIVISOR` 5 (a DLL formula, measured from a city's price list; `FAITH_PURCHASE_MULT` 2 with it), and the Pop Star's 25 against `ROCKBAND_POP` Amount -75 (a Rock Band concert's gold).
-  - BUILD, the SIX RULES the reader census names (their ten baseline lines stay red-listed until built):
-    1. `amenitiesIfSpecialty` (Liberalism, +1 amenity at 2+ specialty districts): TS pays it, the GPU never loads the column — a PARITY defect no seed has reached.
+  - BUILD, the FIVE RULES the reader census names (their eight baseline lines stay red-listed until built):
     2. `civLevels.canAnnexTilesWithReceivedInfluence`: a city-state grows its borders from envoys spent on it; neither engine has the channel.
     3. `civLevels.startingTilesForCity` (6 / 5 / 0 by class): both engines found every city with the same centre-plus-ring claim.
     4. `diploVis.flatLevels` (Catherine de Medici's +1 visibility with everyone): reaches both engines and is read by neither (TS reads `postLevels` only; the GPU binds `_vflat` and uses it in no loop).

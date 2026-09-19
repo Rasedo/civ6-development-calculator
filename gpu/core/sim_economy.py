@@ -2240,6 +2240,9 @@ class SimEconomy:
         nd.append((torch.where(has_gov, self._gov_nd_min[adopted], _neg0),
                    torch.where(has_gov, self._gov_nd_house[adopted], _z0),
                    torch.where(has_gov, self._gov_nd_amen[adopted], _z0)))
+        # amenitiesIfSpecialty rides the same applier as an amenity-only row
+        nd.append((torch.where(has_gov, self._gov_ais_min[adopted], _neg0), _z0,
+                   torch.where(has_gov, self._gov_ais_amen[adopted], _z0)))
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         fx["govymul"] = torch.where(has_gov.unsqueeze(1), self._gov_gov_ymult[adopted], fx["govymul"])
@@ -2311,6 +2314,11 @@ class SimEconomy:
                 nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
                            torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
                            torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
+                if int(self._pol_ais_min[_pi]) >= 0:
+                    # amenitiesIfSpecialty (Liberalism): an amenity-only row on
+                    # the same specialty-count applier
+                    nd.append((torch.where(_on, self._pol_ais_min[_pi].expand(B), _neg), _z,
+                               torch.where(_on, self._pol_ais_amen[_pi].expand(B), _z)))
             emult = emult * torch.where(cards, self._pol_ehprod.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             tpmult = tpmult * torch.where(cards, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             adjm = adjm * torch.where(
