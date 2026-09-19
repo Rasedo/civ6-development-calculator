@@ -2695,7 +2695,7 @@
           "name": "gpRegRange",
           "compare": "exact",
           "covers": [
-            "Tile.gpPerm[0]"
+            "Tile.gpPerm"
           ],
           "planes": [
             "tile_gp_perm"
@@ -2705,7 +2705,7 @@
           "name": "gpRegProd",
           "compare": "exact",
           "covers": [
-            "Tile.gpPerm[1]"
+            "Tile.gpPerm"
           ],
           "planes": [
             "tile_gp_perm"
@@ -2715,7 +2715,7 @@
           "name": "gpRegAmen",
           "compare": "exact",
           "covers": [
-            "Tile.gpPerm[2]"
+            "Tile.gpPerm"
           ],
           "planes": [
             "tile_gp_perm"
