@@ -81,7 +81,8 @@ export function canSee(map: GameMap, from: Tile, to: Tile, seeThrough: boolean):
 /** CIV6 (Sentry, the install's SENTRY_SEE_THROUGH_FEATURES row, CanSee): this unit's look
  *  counts no feature's height. */
 export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
-  return promoFlag(u, 'SEE_THROUGH');
+  // Sentry's CanSee, or CIV6 (Ngao Mbeba) the chassis's own
+  return promoFlag(u, 'SEE_THROUGH') || !!UNITS[u.type]?.seesThrough;
 }
 
 export function fogActive(state: GameState): boolean {

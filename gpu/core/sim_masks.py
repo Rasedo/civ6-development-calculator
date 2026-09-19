@@ -1466,6 +1466,12 @@ class SimMasks:
             out = out + (self.unit_naval[ut] & (self._gp_perm_at(seat, "navalSight", b) > 0)).long()
         return out
 
+    def _sees_through(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+        """bool — `unitSeesThrough`: Sentry's CanSee on the promotion word, or
+        CIV6 (Ngao Mbeba) the chassis's own."""
+        return (self._promo_flag(utype, promos, "SEE_THROUGH")
+                | self._type_see_through[utype.clamp(min=0, max=self.NU - 1)])
+
     def _stealth_hidden(self, seat, plane: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — does this tile hold a STEALTH unit `seat` cannot see?
 
@@ -2412,7 +2418,7 @@ class SimMasks:
         self._reveal_around(rows, row, spot[rows],
                             self._unit_sight(type_idx[rows], torch.zeros_like(slot),
                                              torch.full_like(slot, row), rows),
-                            see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
+                            see_through=self._type_see_through[type_idx[rows].clamp(min=0, max=self.NU - 1)])
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1

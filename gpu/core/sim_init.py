@@ -3212,6 +3212,7 @@ class SimInit:
         self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
         self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)
+        self._type_see_through = _uc("seeThrough", bool, torch.bool)
         self._type_adj_same_cs = _uc("adjSameCs")
         self._type_adj_enemy_cs = _uc("adjEnemyCs")
         self._type_def_ranged_cs = _uc("defRangedCs")

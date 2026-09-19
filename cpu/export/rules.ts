@@ -1560,6 +1560,7 @@ export function buildRules() {
       noHillCost: u.ignoresHillCost ? 1 : 0,
       noWoodsCost: u.ignoresWoodsCost ? 1 : 0,
       ignoreShores: u.ignoresShores ? 1 : 0,
+      seeThrough: u.seesThrough ? 1 : 0,
       adjSameCs: u.adjacentSameCS ?? 0,
       adjEnemyCs: u.adjacentEnemyCS ?? 0,
       defRangedCs: u.defendRangedCS ?? 0,

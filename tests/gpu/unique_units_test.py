@@ -142,6 +142,11 @@ def main() -> int:
     assert int(col("_type_kill_culture_pct", "ROUGH_RIDER")) == 50 and bool(col("_type_kill_home_only", "ROUGH_RIDER"))
     assert int(col("_type_foreign_cont_cs", "REDCOAT")) == 10 and bool(col("_type_ignore_shores", "REDCOAT"))
     assert int(col("_type_adj_levy_cs", "BLACK_ARMY")) == 3
+    # CIV6 (NAGAO_FOREST_SIGHT): the Ngao Mbeba sees through features, a Warrior does not
+    assert bool(col("_type_see_through", "NGAO_MBEBA"))
+    _z = torch.zeros(1, dtype=torch.long)
+    assert bool(sim._sees_through(torch.tensor([idx["NGAO_MBEBA"]]), _z)[0])
+    assert not bool(sim._sees_through(torch.tensor([idx["WARRIOR"]]), _z)[0])
     # LEADER-scoped: Victoria's pair carries the Redcoat, the civilization table does not
     _vic = sim._pair_leader.index("VICTORIA")
     assert int(col("_type_uniq_leader", "REDCOAT")) == _vic

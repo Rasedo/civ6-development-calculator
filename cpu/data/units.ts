@@ -285,6 +285,9 @@ export interface UnitDef {
    *  named ground costs this chassis a plain move. */
   ignoresHillCost?: boolean;
   ignoresWoodsCost?: boolean;
+  /** CIV6 (Ngao Mbeba, MODIFIER_PLAYER_UNIT_ADJUST_SEE_THROUGH_FEATURES): the
+   *  chassis looks THROUGH features — Sentry's CanSee on a unit row. */
+  seesThrough?: boolean;
   /** CIV6 (Hoplite): "+10 Combat Strength if there is at least one Hoplite
    *  adjacent" — the SAME chassis, this seat's own. */
   adjacentSameCS?: number;
@@ -2977,11 +2980,11 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'IRON_WORKING',
       requiresResource: 'IRON',
       // CIV6 (ABILITY_NAGAO): "+10 Combat Strength when defending against
-      // ranged units" and "Can move through Woods and Rainforest without
-      // Movement penalty." (Its "can see through features" half waits on the
-      // sight-blocking this engine does not model yet.)
+      // ranged units", "Can move through Woods and Rainforest without
+      // Movement penalty" and NAGAO_FOREST_SIGHT — it sees through features.
       defendRangedCS: 10,
       ignoresWoodsCost: true,
+      seesThrough: true,
       upgradesTo: 'MAN_AT_ARMS',
       uniqueTo: 'KONGO',
       replaces: 'SWORDSMAN',
@@ -2996,6 +2999,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         requiresResource: xml('Units', 'UnitType=UNIT_KONGO_SHIELD_BEARER', 'StrategicResource', { expect: 'RESOURCE_IRON' }),
         defendRangedCS: xml('ModifierArguments', 'ModifierId=NAGAO_RANGED_DEFENSE&Name=Amount', 'Value'),
         ignoresWoodsCost: xml('ModifierArguments', 'ModifierId=NAGAO_FOREST_MOVEMENT&Name=Ignore', 'Value'),
+        seesThrough: xml('ModifierArguments', 'ModifierId=NAGAO_FOREST_SIGHT&Name=CanSee', 'Value'),
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_KONGO_SHIELD_BEARER', 'UpgradeUnit', { expect: 'UNIT_MAN_AT_ARMS' }),
         uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_UNIT_KONGO_SHIELD_BEARER', 'CivilizationType', { expect: 'CIVILIZATION_KONGO' }),
         replaces: xml('UnitReplaces', 'CivUniqueUnitType=UNIT_KONGO_SHIELD_BEARER', 'ReplacesUnitType', { expect: 'UNIT_SWORDSMAN' }),

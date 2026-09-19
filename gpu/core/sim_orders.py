@@ -524,7 +524,7 @@ class SimOrders:
                         self._reveal_around(_r, row, _dst,
                                             self._unit_sight(utp[_r], self.unit_promos[_r, sc[_r]],
                                                              torch.full_like(_r, row), _r),
-                                            see_through=self._promo_flag(utp[_r], self.unit_promos[_r, sc[_r]], "SEE_THROUGH"))
+                                            see_through=self._sees_through(utp[_r], self.unit_promos[_r, sc[_r]]))
 
             if _rk_wcharge[n] and _wcc >= 0 and self._builder_idx >= 0:
                 # CIV6 (The First Emperor): a charge into the queued WONDER
