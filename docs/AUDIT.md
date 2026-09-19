@@ -218,5 +218,4 @@ close in the same commit.
 ## Harness — not weighted
 
 - **THE DRIVER'S THREE ODD ARMS.** Each moves decisions, so each lands as its own driver commit with a hunt, never inside a perf round.
-  2. `_park_targets` walks naturalists with no `charges > 0` term where `_dig_targets` and `_charge_jobs` carry one: a spent naturalist keeps walking to an anchor it cannot use.
   3. `_charge_jobs`'s tie-break (`d * T + tile`) is computed per slot against the whole job plane, so two same-type charge units on one tile are sent to the same job and neither engine deconflicts them; masking the taken job out between slots is the fix.

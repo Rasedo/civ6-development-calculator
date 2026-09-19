@@ -393,7 +393,11 @@ def _park_targets(sim, seat: int, units=None) -> torch.Tensor:
         return out
     # the cluster legality below is a map-wide scan over every ring of four:
     # ask for the naturalist first, and a seat without one never runs it.
-    rows_all = present & (types.clamp(min=0, max=sim.NU - 1) == sim._naturalist_idx)
+    # a charge in hand, like `_dig_targets` and `_charge_jobs` (vacuous for
+    # the Naturalist since ParkCharges 1 consumes it at 0, kept so the three
+    # walks share one shape)
+    rows_all = (present & (types.clamp(min=0, max=sim.NU - 1) == sim._naturalist_idx)
+                & (_charges > 0))
     live_n = _acting_slots(rows_all)
     if not live_n:
         return out
