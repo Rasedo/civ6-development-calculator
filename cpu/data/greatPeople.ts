@@ -755,14 +755,14 @@ export interface GpEffect {
   /** CIV6 (Marina Raskova): "District in this tile gains +1 air unit
    *  slots" — a permanent per-tile add on the activating tile. */
   airSlotBonus?: number;
-  /** CIV6 (Stamford Raffles, `EFFECT_UNIT_TRANSFER_CITY_AS_GIFT_AND_APPLY_MODIFIER`):
+  /** CIV6 (Stamford Raffles, EFFECT_UNIT_TRANSFER_CITY_AS_GIFT_AND_APPLY_MODIFIER):
    *  the city-state whose territory the merchant stands in — one this seat
    *  is Suzerain of — joins the empire; `cityPerm` then lands on THAT city. */
   absorbCityState?: boolean;
-  /** CIV6 (Boudica, `GREATPERSON_BOUDICA_ACTIVE`): every barbarian unit
+  /** CIV6 (Boudica, GREATPERSON_BOUDICA_ACTIVE): every barbarian unit
    *  within 1 changes sides — Heathen Conversion's body. */
   convertBarbarians?: boolean;
-  /** CIV6 (Tupac Amaru, `EFFECT_GRANT_UNIT_IN_EACH_DISTRICT`): this chassis
+  /** CIV6 (Tupac Amaru, EFFECT_GRANT_UNIT_IN_EACH_DISTRICT): this chassis
    *  once per district of the ENEMY city whose land the general stands on. */
   unitEachDistrict?: string;
   perm?: Partial<Record<GpPermKey, number>>;
