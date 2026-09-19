@@ -3190,6 +3190,8 @@ class SimInit:
         # a unique carries): `_civ_unit_ok` hands each to its civilization.
         self._type_uniq = torch.tensor([int(u["uniq"]) for u in ru], dtype=torch.long, device=device)
         self._type_repl = torch.tensor([int(u["repl"]) for u in ru], dtype=torch.long, device=device)
+        # a LEADER unique's pair index (`uniqueLeader`), -1 for a civilization's
+        self._type_uniq_leader = torch.tensor([int(u["uniqLeader"]) for u in ru], dtype=torch.long, device=device)
         self._type_chariot = torch.tensor([bool(u["chariot"]) for u in ru], dtype=torch.bool, device=device)
         self._type_open_mp = torch.tensor([int(u["openMoves"]) for u in ru], dtype=torch.long, device=device)
         self._type_enemy_mp = torch.tensor([int(u["enemyMoves"]) for u in ru], dtype=torch.long, device=device)
@@ -3209,6 +3211,7 @@ class SimInit:
             [list(x) + [-1] * (_gfw - len(x)) for x in _gf], dtype=torch.long, device=device)
         self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
+        self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)
         self._type_adj_same_cs = _uc("adjSameCs")
         self._type_adj_enemy_cs = _uc("adjEnemyCs")
         self._type_def_ranged_cs = _uc("defRangedCs")
@@ -3218,6 +3221,8 @@ class SimInit:
         self._type_near_terr_cs = _uc("nearTerrCs")
         self._type_near_terr_rng = _uc("nearTerrRange")
         self._type_home_cont_cs = _uc("homeContCs")
+        self._type_foreign_cont_cs = _uc("foreignContCs")
+        self._type_adj_levy_cs = _uc("adjLevyCs")
         self._type_near_rel_cs = _uc("nearRelCs")
         self._type_near_park_cs = _uc("nearParkCs")
         self._type_heals_always = _uc("healsAlways", bool, torch.bool)
@@ -3229,6 +3234,8 @@ class SimInit:
         self._type_free_promos = _uc("freePromos")
         self._type_kill_gp_general = _uc("killGpGeneral")
         self._type_kill_gold_pct = _uc("killGoldPct")
+        self._type_kill_culture_pct = _uc("killCulturePct")
+        self._type_kill_home_only = _uc("killHomeOnly", bool, torch.bool)
         self._type_park_builder = _uc("parkBuilder", bool, torch.bool)
         self._type_escort_speed = _uc("escortSpeed", bool, torch.bool)
         self._type_pillage_cost = _uc("pillageCost")
@@ -3250,12 +3257,18 @@ class SimInit:
         _nc = len(self._civ_ids)
         self._civ_repl = torch.full((_nc + 1, self.NU), -1, dtype=torch.long, device=device)
         for _i, _u in enumerate(ru):
-            if int(_u["uniq"]) >= 0 and int(_u["repl"]) >= 0:
+            if int(_u["uniq"]) >= 0 and int(_u["repl"]) >= 0 and int(_u["uniqLeader"]) < 0:
                 self._civ_repl[int(_u["uniq"]), int(_u["repl"])] = _i
         # [B, NS] long — the roster ROW (`Seat.civ`) a seat plays per game, its
         # civilization and its leader; -1 plays nothing
         self._pair_leader: list[str] = list(_uq["leaders"])
         self._pair_civ: list[int] = [int(x) for x in _uq["pairCiv"]]
+        # a LEADER unique (Victoria's Redcoat, never Eleanor's England's) has
+        # its own table, row = pair index + 1; row 0 plays nobody
+        self._leader_repl = torch.full((len(self._pair_leader) + 1, self.NU), -1, dtype=torch.long, device=device)
+        for _i, _u in enumerate(ru):
+            if int(_u["uniqLeader"]) >= 0 and int(_u["repl"]) >= 0:
+                self._leader_repl[int(_u["uniqLeader"]) + 1, int(_u["repl"])] = _i
         self.row_leader = torch.tensor(_row_pair, dtype=torch.long, device=device)
         self.row_civ = torch.where(self.row_leader >= 0,
                                    torch.tensor(self._pair_civ + [-1], dtype=torch.long, device=device)[self.row_leader.clamp(min=0)],

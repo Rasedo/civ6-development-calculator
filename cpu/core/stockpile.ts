@@ -14,7 +14,7 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
-import { citiesOf, civOf, seatOf, tileOwnedByCiv } from './seats';
+import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv } from './seats';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
@@ -225,7 +225,7 @@ export function upgradeGoldCost(
   unitType: string,
   levied = false,
 ): number {
-  const next = civUpgradeTarget(civOf(state, seat), unitType);
+  const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
   if (!next) return 0;
   const raw = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
   if (!levied) return raw;
@@ -251,7 +251,7 @@ export function canPayUpgradeGold(
 /** what the UPGRADE draws out of the bank: the new chassis' own charge, or
  *  nothing at all when both rungs ask for the same resource. */
 export function upgradeResourceCost(state: GameState, seat: number, unitType: string): { id: string; n: number } | undefined {
-  const next = civUpgradeTarget(civOf(state, seat), unitType);
+  const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
   if (!next) return undefined;
   const c = unitResourceCost(next);
   return c && c.id !== UNITS[unitType]?.requiresResource ? c : undefined;

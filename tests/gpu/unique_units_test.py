@@ -38,6 +38,10 @@ ROWS = {
     "VARU": ("INDIA", None, 120, 2, 40),
     "SAMURAI": ("JAPAN", "MAN_AT_ARMS", 160, 2, 48),
     "NGAO_MBEBA": ("KONGO", "SWORDSMAN", 110, 2, 38),
+    # the LEADER uniques (TRAIT_LEADER_UNIT_*)
+    "ROUGH_RIDER": ("AMERICA", "CUIRASSIER", 385, 5, 67),
+    "REDCOAT": ("ENGLAND", "LINE_INFANTRY", 360, 2, 70),
+    "BLACK_ARMY": ("HUNGARY", "COURSER", 205, 5, 49),
     "HWACHA": ("KOREA", "FIELD_CANNON", 250, 2, 45),
     "MANDEKALU_CAVALRY": ("MALI", "KNIGHT", 220, 4, 55),
     "TOA": ("MAORI", "SWORDSMAN", 120, 2, 38),
@@ -133,6 +137,20 @@ def main() -> int:
     assert int(col("_type_district_atk_cs", "DE_ZEVEN_PROVINCIEN")) == 7
     assert bool(col("_type_raid_free", "BARBARY_CORSAIR"))
     assert bool(col("_type_capture_ships", "SEA_DOG"))
+    # the leader units' clauses
+    assert int(col("_type_ground_cs", "ROUGH_RIDER")) == 10 and bool(col("_type_ground_hills", "ROUGH_RIDER"))
+    assert int(col("_type_kill_culture_pct", "ROUGH_RIDER")) == 50 and bool(col("_type_kill_home_only", "ROUGH_RIDER"))
+    assert int(col("_type_foreign_cont_cs", "REDCOAT")) == 10 and bool(col("_type_ignore_shores", "REDCOAT"))
+    assert int(col("_type_adj_levy_cs", "BLACK_ARMY")) == 3
+    # LEADER-scoped: Victoria's pair carries the Redcoat, the civilization table does not
+    _vic = sim._pair_leader.index("VICTORIA")
+    assert int(col("_type_uniq_leader", "REDCOAT")) == _vic
+    assert int(sim._leader_repl[_vic + 1, idx["LINE_INFANTRY"]]) == idx["REDCOAT"]
+    assert int(sim._civ_repl[civs.index("ENGLAND"), idx["LINE_INFANTRY"]]) == -1
+    if "ELEANOR_ENGLAND" in sim._pair_leader:
+        _ele = sim._pair_leader.index("ELEANOR_ENGLAND")
+        assert int(sim._leader_repl[_ele + 1, idx["LINE_INFANTRY"]]) == -1, "Eleanor's England trains no Redcoat"
+    assert int(col("_type_uniq_leader", "SEA_DOG")) == -1, "a civilization's unique names no leader"
     assert int(col("_type_guards_traders", "BIREME")) == 2, "the Bireme guards WATER"
     assert int(col("_type_guards_traders", "MANDEKALU_CAVALRY")) == 1, "the Mandekalu guards LAND"
     assert int(col("_type_free_promos", "JANISSARY")) == 1

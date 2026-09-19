@@ -1541,6 +1541,8 @@ export function buildRules() {
       // the UNIQUE UNIT wire (`civUnitAllowed` / `civUpgradeTarget` / the
       // start-tile Movement and the Berserker's two CS terms)
       uniq: u.uniqueTo ? CIV_IDS.indexOf(u.uniqueTo) : -1,
+      // a LEADER unique's pair index (CIV_LEADERS order), -1 for a civilization's
+      uniqLeader: u.uniqueLeader ? CIV_LEADERS.findIndex((l) => l.leader === u.uniqueLeader) : -1,
       repl: u.replaces ? Object.keys(UNITS).indexOf(u.replaces) : -1,
       chariot: u.chariot ? 1 : 0,
       openMoves: u.openTerrainMoves ?? 0,
@@ -1557,6 +1559,7 @@ export function buildRules() {
       groundFeat: (u.groundCS?.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
       noHillCost: u.ignoresHillCost ? 1 : 0,
       noWoodsCost: u.ignoresWoodsCost ? 1 : 0,
+      ignoreShores: u.ignoresShores ? 1 : 0,
       adjSameCs: u.adjacentSameCS ?? 0,
       adjEnemyCs: u.adjacentEnemyCS ?? 0,
       defRangedCs: u.defendRangedCS ?? 0,
@@ -1566,6 +1569,8 @@ export function buildRules() {
       nearTerrCs: u.nearTerritoryCS?.amount ?? 0,
       nearTerrRange: u.nearTerritoryCS?.range ?? 0,
       homeContCs: u.homeContinentCS ?? 0,
+      foreignContCs: u.foreignContinentCS ?? 0,
+      adjLevyCs: u.adjacentLeviedCS ?? 0,
       nearRelCs: u.nearReligiousCS ?? 0,
       nearParkCs: u.nearParkCS ?? 0,
       healsAlways: u.healsAlways ? 1 : 0,
@@ -1577,6 +1582,8 @@ export function buildRules() {
       freePromos: u.freePromotions ?? 0,
       killGpGeneral: u.generalPointsOnKill ?? 0,
       killGoldPct: u.killGoldPct ?? 0,
+      killCulturePct: u.killCulturePct ?? 0,
+      killHomeOnly: u.killYieldHomeOnly ? 1 : 0,
       parkBuilder: u.parkBuilder ? 1 : 0,
       escortSpeed: u.escortSpeed ? 1 : 0,
       pillageCost: u.pillageCost ?? 0,

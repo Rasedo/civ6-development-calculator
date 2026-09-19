@@ -1285,7 +1285,8 @@ class SimMasks:
 
     def _ignore_shores(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """bool — `ignoresShores`: no embark/disembark penalty for this unit."""
-        out = torch.zeros(utype.shape, dtype=torch.bool, device=self.device)
+        # CIV6 (Redcoat): the chassis's own clause, beside the roster rows
+        out = self._type_ignore_shores[utype.clamp(min=0, max=self.NU - 1)].clone()
         for civ, lead, settler in self._ignore_shores_rows:
             who = self._seat_is(seat, civ, lead)
             if settler:

@@ -76,6 +76,9 @@ ALLOWLIST: dict[str, str] = {
                   "cpu/core/units.ts:1352 and cpu/core/stockpile.ts:224",
     "cavalryTag": "TS reads it in isLightCavalry (cpu/data/units.ts:3573), called from "
                   "cpu/core/production.ts:385",
+    "uniqueLeader": "TS reads it in civUnitAllowed / civReplacement (cpu/data/units.ts:3665, :3673), "
+                    "called from cpu/core/units.ts:1282 and cpu/core/stockpile.ts; the GPU reads the wire's "
+                    "`uniqLeader` (gpu/core/sim_init.py, `_type_uniq_leader`)",
     "defenseCS": "TS reads it in improvementDefenseCS (cpu/data/improvements.ts:1500), called "
                  "from cpu/core/combat.ts:108 and :655; the GPU reads the wire's `defCs` "
                  "(gpu/core/sim_init.py:1855)",

@@ -64,7 +64,7 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
+import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -287,6 +287,8 @@ export function rosterEmbarkMoves(state: GameState, unit: { type: string; seat: 
  *  embarking and disembarking" — the Knarr's every unit, the Mediterranean
  *  Colonies' Settlers (`IGNORE_SHORES_ROWS`). */
 export function ignoresShores(state: GameState, unit: { type: string; seat: number }): boolean {
+  // CIV6 (Redcoat): the chassis's own clause, beside the roster rows
+  if (UNITS[unit.type]?.ignoresShores) return true;
   return getModifiers(state, unit.seat).ignoreShores.some((r) => !r.settlerOnly || unit.type === 'SETTLER');
 }
 
@@ -1277,7 +1279,7 @@ export function trainableUnits(
     // The SETTLER trains through its own escalating-cost column
     // (queueSettler/purchaseSettler), never the generic unit columns.
     if (d.settler) return false;
-    if (!civUnitAllowed(civOf(state, seat), d.id)) return false;
+    if (!civUnitAllowed(civOf(state, seat), d.id, leaderOf(state, seat))) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
     if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic, seat)) return false;
     // An ARCHAEOLOGIST may only be trained where its city still has an open
@@ -1352,7 +1354,7 @@ export function goldBuyableUnits(state: GameState, seat: number): UnitDef[] {
  * this spends the rest of the turn, like every other verb here.
  */
 export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): boolean {
-  const next = civUpgradeTarget(civOf(state, seat), unit.type);
+  const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat));
   if (!next || unit.seat !== seat || unit.movesLeft <= 0) return false;
   const def = UNITS[next];
   if (!def) return false;
@@ -1367,7 +1369,7 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
 
 export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleResult {
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
-  const next = civUpgradeTarget(civOf(state, seat), unit.type)!;
+  const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat))!;
   const s = seatOf(state, seat)!;
   s.treasury -= upgradeGoldCost(state, seat, unit.type, !!unit.levied);
   const c = upgradeResourceCost(state, seat, unit.type);

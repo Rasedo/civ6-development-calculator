@@ -196,6 +196,18 @@ export function chassisAbilityCS(
   // CIV6 (Garde Impériale): "+10 Combat Strength when on the same continent as
   // the Capital."
   if (def.homeContinentCS && onHomeContinent(state, u.seat, atTile)) out += def.homeContinentCS;
+  // CIV6 (Redcoat): "+10 Combat Strength when fighting on a continent other
+  // than the capital's" — REQUIREMENT_UNIT_ON_HOME_CONTINENT inverted.
+  if (def.foreignContinentCS && !onHomeContinent(state, u.seat, atTile)) out += def.foreignContinentCS;
+  // CIV6 (Black Army): "+3 Combat Strength for each adjacent levied unit" —
+  // this seat's own, one term per unit standing there.
+  if (def.adjacentLeviedCS) {
+    for (const n of neighbors(state.map, tile)) {
+      for (const o of state.units) {
+        if (o.tileIndex === n.index && o.seat === u.seat && o.levied && o.hp > 0) out += def.adjacentLeviedCS;
+      }
+    }
+  }
   // CIV6 (Conquistador): "+10 Combat Strength when there is a religious unit
   // within one hex" — this seat's own missionary, apostle or inquisitor.
   if (def.nearReligiousCS) {

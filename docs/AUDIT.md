@@ -61,7 +61,7 @@ re-adds them.
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-74 per-game counts over per-object rolls | 1 | ask 4 (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
-| C-78 unique UNITS absent | 1 | the four leader units the roster leaves blank; the Ngao Mbeba's see-through clause |
+| C-78 unique UNITS absent | 1 | the Ngao Mbeba's see-through clause |
 | C-79 unique INFRASTRUCTURE absent | 1 | four clauses with no carrier (damage on entry, per-pair tourism pressure, a tech-gated building yield, a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); four rules the reader census names |
 | **C. Absent systems** | **23** | |
@@ -192,7 +192,6 @@ close in the same commit.
   - Waiting on it: the mission's mark, DEMAND, DISCUSS, the promises and the Retribution casus belli (C-2); the agendas (C-26); the preference weights (C-67).
 - **C-78. UNIQUE UNITS ABSENT.** Weight 1.
   All 34 civilizations' unique chassis are built with their abilities and pins.
-  - BUILD: the LEADER units whose `docs/ROSTER.md` rows are blank — the Rough Rider, the Redcoat, the Black Army, the Longship.
   - BUILD: the Ngao Mbeba's "can see through features" — the sight model ships as occlusion (`canSee` / `_los_disk`), so the clause is the SEE_THROUGH kind Sentry already carries, on a chassis instead of a promotion.
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
   Every district, building and improvement row is built.

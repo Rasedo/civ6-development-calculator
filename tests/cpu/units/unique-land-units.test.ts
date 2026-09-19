@@ -6,12 +6,12 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
-import { spawnUnit, terrainMp } from '../../../cpu/core/units';
+import { spawnUnit, terrainMp, ignoresShores } from '../../../cpu/core/units';
 import { chassisAbilityCS, chassisFlankMult, woundPenalty, siegeMayShoot, defenderCS } from '../../../cpu/core/combat';
 import { attacksPerTurn } from '../../../cpu/core/promotions';
 import { routePlunderer } from '../../../cpu/core/trade';
 import { unitKillEvent } from '../../../cpu/core/eras';
-import { UNITS, UNIT_HP } from '../../../cpu/data/units';
+import { UNITS, UNIT_HP, civUnitAllowed, civReplacement, civUpgradeTarget } from '../../../cpu/data/units';
 import { GAME_SPEED } from '../../../cpu/data/constants';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import type { GameState, Unit } from '../../../cpu/core/types';
@@ -40,6 +40,10 @@ const ROWS: readonly (readonly [string, string, string | null, number, number, n
   ['CONQUISTADOR', 'SPAIN', 'MUSKETMAN', 250, 2, 58],
   ['CAROLEAN', 'SWEDEN', 'PIKE_AND_SHOT', 250, 3, 55],
   ['IMPI', 'ZULU', 'PIKEMAN', 125, 2, 45],
+  // the LEADER uniques (TRAIT_LEADER_UNIT_*)
+  ['ROUGH_RIDER', 'AMERICA', 'CUIRASSIER', 385, 5, 67],
+  ['REDCOAT', 'ENGLAND', 'LINE_INFANTRY', 360, 2, 70],
+  ['BLACK_ARMY', 'HUNGARY', 'COURSER', 205, 5, 49],
 ] as const;
 
 function scene(): GameState {
@@ -272,5 +276,67 @@ describe('the defender takes its chassis clauses', () => {
     const kh2 = put(state, 'KHEVSURETI', 12, 12);
     expect(defenderCS(state, kh, hill.index) - defenderCS(state, kh2, flatTile.index))
       .toBe(7 + (hill.elevation === 'HILLS' ? 3 : 0) - 0);
+  });
+});
+
+// AUDIT C-78: the three LEADER units — a leader's, not the civilization's.
+describe('the leader units', () => {
+  it('a leader unique trains for its leader alone, and stands in for the chassis there', () => {
+    expect(civUnitAllowed('ENGLAND', 'REDCOAT', 'VICTORIA')).toBe(true);
+    expect(civUnitAllowed('ENGLAND', 'REDCOAT', 'ELEANOR_ENGLAND')).toBe(false);
+    expect(civUnitAllowed('ENGLAND', 'LINE_INFANTRY', 'VICTORIA')).toBe(false);
+    expect(civUnitAllowed('ENGLAND', 'LINE_INFANTRY', 'ELEANOR_ENGLAND')).toBe(true);
+    expect(civReplacement('ENGLAND', 'LINE_INFANTRY', 'VICTORIA')).toBe('REDCOAT');
+    expect(civReplacement('ENGLAND', 'LINE_INFANTRY', 'ELEANOR_ENGLAND')).toBeUndefined();
+    expect(civUpgradeTarget('ENGLAND', 'MUSKETMAN', 'VICTORIA')).toBe('REDCOAT');
+    expect(civUpgradeTarget('ENGLAND', 'MUSKETMAN', 'ELEANOR_ENGLAND')).toBe('LINE_INFANTRY');
+    expect(civUpgradeTarget('AMERICA', 'KNIGHT', 'T_ROOSEVELT')).toBe('ROUGH_RIDER'); // the Knight's successor, replaced for Teddy
+    expect(civReplacement('AMERICA', 'CUIRASSIER', 'T_ROOSEVELT')).toBe('ROUGH_RIDER');
+    expect(civReplacement('HUNGARY', 'COURSER', 'MATTHIAS_CORVINUS')).toBe('BLACK_ARMY');
+  });
+
+  it('Rough Rider: +10 on Hills, and Culture from a kill on the capital’s continent', () => {
+    const state = scene();
+    settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
+    const r = put(state, 'ROUGH_RIDER', 7, 6);
+    const here = state.map.tiles[r.tileIndex];
+    expect(chassisAbilityCS(state, r, r.tileIndex)).toBe(0);
+    here.elevation = 'HILLS';
+    expect(chassisAbilityCS(state, r, r.tileIndex)).toBe(10);
+    const me = seatOf(state, 0)!;
+    const c0 = me.research.civicProgress;
+    unitKillEvent(state, 0, { type: 'ROUGH_RIDER', tileIndex: r.tileIndex }, { type: 'WARRIOR', seat: 1 });
+    expect(me.research.civicProgress - c0).toBe(Math.floor((UNITS.WARRIOR.combat * 50) / 100));
+    // off the capital's continent the kill pays nothing
+    const far = tileAtCoords(state.map, 20, 20);
+    far.continent = (state.map.tiles[me.cities[0].centerIndex].continent ?? 0) + 1;
+    const c1 = me.research.civicProgress;
+    unitKillEvent(state, 0, { type: 'ROUGH_RIDER', tileIndex: far.index }, { type: 'WARRIOR', seat: 1 });
+    expect(me.research.civicProgress).toBe(c1);
+  });
+
+  it('Redcoat: +10 on a foreign continent, and no shore penalty', () => {
+    const state = scene();
+    settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
+    const r = put(state, 'REDCOAT', 7, 6);
+    expect(chassisAbilityCS(state, r, r.tileIndex)).toBe(0); // home
+    const here = state.map.tiles[r.tileIndex];
+    here.continent = (here.continent ?? 0) + 1;
+    expect(chassisAbilityCS(state, r, r.tileIndex)).toBe(10);
+    expect(ignoresShores(state, r)).toBe(true);
+    expect(ignoresShores(state, put(state, 'WARRIOR', 8, 6))).toBe(false);
+  });
+
+  it('Black Army: +3 per adjacent levied unit of its own', () => {
+    const state = scene();
+    const b = put(state, 'BLACK_ARMY', 6, 6);
+    expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(0);
+    const w1 = put(state, 'WARRIOR', 7, 6);
+    expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(0); // a plain neighbour is no levy
+    w1.levied = true;
+    expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(3);
+    const w2 = put(state, 'WARRIOR', 5, 6);
+    w2.levied = true;
+    expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(6);
   });
 });

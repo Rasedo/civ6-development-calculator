@@ -1742,15 +1742,26 @@ class SimSeats:
         chassis it replaces there; a seat playing no civilization trains no
         unique."""
         civ = self.row_civ[:, row]  # [B]
-        own = (self._type_uniq < 0).unsqueeze(0) | (self._type_uniq.unsqueeze(0) == civ.unsqueeze(1))
-        return own & (self._civ_repl[self._row_civ_or_none(row)] < 0)
+        lead = self.row_leader[:, row]
+        own = (self._type_uniq < 0).unsqueeze(0) | (
+            (self._type_uniq.unsqueeze(0) == civ.unsqueeze(1))
+            & ((self._type_uniq_leader < 0).unsqueeze(0) | (self._type_uniq_leader.unsqueeze(0) == lead.unsqueeze(1))))
+        return own & (self._row_repl(row) < 0)
+
+    def _row_repl(self, row: int) -> torch.Tensor:
+        """[B, NU] long `civReplacement` per game — the civilization's unique
+        standing in for each chassis, or the LEADER's where this row's leader
+        has one of its own."""
+        civ_part = self._civ_repl[self._row_civ_or_none(row)]
+        lead_part = self._leader_repl[self.row_leader[:, row].clamp(min=-1) + 1]
+        return torch.where(lead_part >= 0, lead_part, civ_part)
 
     def _up_to_row(self, row: int) -> torch.Tensor:
         """[B, NU] long `civUpgradeTarget` — what each chassis upgrades INTO
         for this seat, per game: the catalog's successor, or the
         civilization's unique standing in for it."""
         up = self._type_up_to
-        rep = self._civ_repl[self._row_civ_or_none(row)].gather(1, up.clamp(min=0).unsqueeze(0).expand(self.B, -1))
+        rep = self._row_repl(row).gather(1, up.clamp(min=0).unsqueeze(0).expand(self.B, -1))
         return torch.where((up >= 0).unsqueeze(0) & (rep >= 0), rep, up.unsqueeze(0).expand(self.B, -1))
 
     def _up_to_of(self, row: int, utype: torch.Tensor) -> torch.Tensor:
@@ -3535,7 +3546,8 @@ class SimSeats:
             self._dig_at(gd, td, d_seat[gd])
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0,
-                                  vict_form=self._form_tier(ds0), killer_promos=a_promos)
+                                  vict_form=self._form_tier(ds0), killer_promos=a_promos,
+                                  killer_tile=a_tile)
             self._gen_ver += 1
         _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died, _hp_p[:, u])
 
@@ -4906,6 +4918,26 @@ class SimSeats:
             if bool(on.any()):
                 out = out + torch.where(on & self._seat_on_home_continent(seat, tl),
                                         a, torch.zeros_like(a))
+        # CIV6 (Redcoat): "on a continent other than the capital's" — the home
+        # requirement inverted.
+        if bool((self._type_foreign_cont_cs != 0).any()):
+            a = self._type_foreign_cont_cs[ti]
+            on = live & (a != 0)
+            if bool(on.any()):
+                out = out + torch.where(on & ~self._seat_on_home_continent(seat, tl),
+                                        a, torch.zeros_like(a))
+        # CIV6 (Black Army): "for each adjacent levied unit" — this seat's own,
+        # one term per unit standing there.
+        if bool((self._type_adj_levy_cs != 0).any()):
+            a = self._type_adj_levy_cs[ti]
+            on = live & (a != 0)
+            if bool(on.any()):
+                _nb = self.neigh[tl]                                   # [B, 6]
+                _occ = self.military_at.gather(1, _nb.clamp(min=0))
+                _oc = _occ.clamp(min=0)
+                _lv = ((_nb >= 0) & (_occ >= 0) & self.unit_levied.gather(1, _oc)
+                       & (self.unit_seat.gather(1, _oc) == seat.unsqueeze(1)))
+                out = out + torch.where(on, a * _lv.sum(dim=1), torch.zeros_like(a))
         # CIV6 (Conquistador): "a religious unit within one hex" — its own.
         if bool((self._type_near_rel_cs != 0).any()):
             a = self._type_near_rel_cs[ti]
@@ -4983,7 +5015,8 @@ class SimSeats:
     def _unit_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor,
                          killed: torch.Tensor, killer_type: torch.Tensor | None = None,
                          vict_form: torch.Tensor | None = None,
-                         killer_promos: torch.Tensor | None = None) -> None:
+                         killer_promos: torch.Tensor | None = None,
+                         killer_tile: torch.Tensor | None = None) -> None:
         """`unitKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
         Era Score each time you kill a non-Barbarian naval unit in combat";
         (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
@@ -5013,6 +5046,25 @@ class SimSeats:
                     if self._general_cls >= 0:
                         self.civ_gpp[:, g, self._general_cls] += (
                             _m.long() * _ggp).to(self.civ_gpp.dtype)
+        # CIV6 (Rough Rider): Culture worth 50% of the defeated unit's strength,
+        # "when on the capital's continent" — the killer's own tile decides
+        if killer_type is not None and killer_tile is not None:
+            _kt2 = killer_type.clamp(min=0, max=self.NU - 1)
+            _cpct = self._type_kill_culture_pct[_kt2]
+            if bool((_cpct != 0).any()):
+                _kseat = (killer if not isinstance(killer, int)
+                          else torch.full_like(killed, int(self._ROW_SEAT[killer]), dtype=torch.long))
+                _home = self._seat_on_home_continent(_kseat, killer_tile.clamp(min=0))
+                _gate = torch.where(self._type_kill_home_only[_kt2], _home, torch.ones_like(_home))
+                _clump = torch.div(self._type_combat[vict_type.clamp(min=0)] * _cpct, 100, rounding_mode="floor")
+                _cpay = killed & (vict_type >= 0) & _gate & (_clump > 0)
+                if bool(_cpay.any()):
+                    for g in range(self.n_majors):
+                        _m = _cpay & ((killer == g) if not isinstance(killer, int)
+                                      else torch.full_like(_cpay, killer == g))
+                        if not bool(_m.any()):
+                            continue
+                        self.civ_civic_prog[:, g] += (_m.long() * _clump).to(self.civ_civic_prog.dtype)
         # CIV6 (Boarding): "Obtain Gold from naval victories" —
         # BOARDING_GOLD_FROM_NAVAL_VICTORY, PercentDefeatedStrength 100,
         # YIELD_GOLD, and only against an opponent of DOMAIN_SEA. The KILLER's
@@ -10140,12 +10192,13 @@ class SimSeats:
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
                 ranged=False, a_died=atk_raw, d_died=def_dead | captured)
             self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
-                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
+                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos,
+                                  killer_tile=here)
             self._disciples_spread(a_seat[:, u], a_type[:, u], a_promos, def_is_barb,
                                    tgt, def_dead)
             self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type,
                                   vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                  killer_promos=d_promos)
+                                  killer_promos=d_promos, killer_tile=ttc)
             self._disciples_spread(d_seat_m, d_type, d_promos,
                                    a_seat[:, u] == BARB_SEAT, tgt, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),

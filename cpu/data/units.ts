@@ -252,6 +252,9 @@ export interface UnitDef {
    *  civilization alone, standing in place of `replaces` where it names
    *  a chassis (`civUnitAllowed`, `civUpgradeTarget`). */
   uniqueTo?: CivId;
+  /** ...and, for a LEADER unique (TRAIT_LEADER_UNIT_*), the leader alone:
+   *  Victoria's Redcoat is not Eleanor's England's. */
+  uniqueLeader?: string;
   replaces?: string;
   /** CIV6 (CLASS_HEAVY_CHARIOT / CLASS_LIGHT_CHARIOT): a chariot is
    *  cavalry for its promotion class and the production cards, but the
@@ -335,6 +338,18 @@ export interface UnitDef {
   /** CIV6 (Mandekalu Cavalry): on a kill, "Gain Gold equal to 100% that
    *  unit's base Combat Strength." */
   killGoldPct?: number;
+  /** CIV6 (Rough Rider, EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): Culture worth
+   *  this percent of a defeated unit's strength — `killYieldHomeOnly` gates
+   *  it on the killer standing on the capital's continent. */
+  killCulturePct?: number;
+  killYieldHomeOnly?: boolean;
+  /** CIV6 (Redcoat): Combat Strength on a continent OTHER than the capital's. */
+  foreignContinentCS?: number;
+  /** CIV6 (Black Army): Combat Strength per adjacent LEVIED unit of this seat. */
+  adjacentLeviedCS?: number;
+  /** CIV6 (Redcoat, EFFECT_ADJUST_UNIT_IGNORE_SHORES): no embark or
+   *  disembark penalty, the Amphibious promotion's shore half on a chassis. */
+  ignoresShores?: boolean;
   /** CIV6 (Mountie, ParkCharges): this chassis founds National Parks, the
    *  Naturalist's own verb, off its own `charges` — the Legion's shape. */
   parkBuilder?: boolean;
@@ -2453,6 +2468,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'SAILING',
       upgradesTo: 'CARAVEL',
       uniqueTo: 'NORWAY',
+      uniqueLeader: 'HARDRADA',
       replaces: 'GALLEY',
       description: 'Norwegian naval melee unit.',
       src: {
@@ -2467,6 +2483,108 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_NORWEGIAN_LONGSHIP', 'UpgradeUnit', { expect: 'UNIT_CARAVEL' }),
         uniqueTo: xml('CivilizationLeaders', 'LeaderType=LEADER_HARDRADA', 'CivilizationType', { expect: 'CIVILIZATION_NORWAY', note: 'a LEADER unique (TRAIT_LEADER_UNIT_NORWEGIAN_LONGSHIP); the civilization is the leader’s' }),
         replaces: xml('UnitReplaces', 'CivUniqueUnitType=UNIT_NORWEGIAN_LONGSHIP', 'ReplacesUnitType', { expect: 'UNIT_GALLEY' }),
+      },
+    }),
+    U({
+      id: 'ROUGH_RIDER',
+      name: 'Rough Rider',
+      cost: 385,
+      maintenance: 2,
+      moves: 5,
+      combat: 67,
+      cavalry: true,
+      cavalryTag: 'heavy',
+      requiresTech: 'BALLISTICS',
+      // CIV6 (ABILITY_ROUGH_RIDER): +10 Combat Strength on Hills, and Culture
+      // worth 50% of a defeated unit's strength "when on the capital's continent".
+      groundCS: { amount: 10, hills: true },
+      killCulturePct: 50,
+      killYieldHomeOnly: true,
+      upgradesTo: 'TANK',
+      uniqueTo: 'AMERICA',
+      uniqueLeader: 'T_ROOSEVELT',
+      replaces: 'CUIRASSIER',
+      description: "Teddy Roosevelt's heavy cavalry — no Iron asked.",
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'Combat'),
+        cavalry: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
+        cavalryTag: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
+        requiresTech: xml('Units', 'UnitType=UNIT_AMERICAN_ROUGH_RIDER', 'PrereqTech', { expect: 'TECH_BALLISTICS' }),
+        'groundCS.amount': xml('ModifierArguments', 'ModifierId=ROUGH_RIDER_BONUS_ON_HILLS&Name=Amount', 'Value'),
+        killCulturePct: xml('ModifierArguments', 'ModifierId=ROUGH_RIDER_POST_COMBAT_CULTURE&Name=PercentDefeatedStrength', 'Value'),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_AMERICAN_ROUGH_RIDER', 'UpgradeUnit', { expect: 'UNIT_TANK' }),
+        uniqueTo: xml('CivilizationLeaders', 'LeaderType=LEADER_T_ROOSEVELT_ROUGHRIDER', 'CivilizationType', { expect: 'CIVILIZATION_AMERICA', note: 'a LEADER unique (TRAIT_LEADER_UNIT_AMERICAN_ROUGH_RIDER); the engine’s T_ROOSEVELT is the install’s ROUGHRIDER persona' }),
+        replaces: xml('UnitReplaces', 'CivUniqueUnitType=UNIT_AMERICAN_ROUGH_RIDER', 'ReplacesUnitType', { expect: 'UNIT_CUIRASSIER' }),
+      },
+    }),
+    U({
+      id: 'REDCOAT',
+      name: 'Redcoat',
+      cost: 360,
+      maintenance: 5,
+      moves: 2,
+      combat: 70,
+      melee: true,
+      requiresTech: 'MILITARY_SCIENCE',
+      requiresResource: 'NITER',
+      // CIV6 (ABILITY_REDCOAT): "+10 Combat Strength when fighting on a
+      // continent other than the capital's", and no disembarking penalty.
+      foreignContinentCS: 10,
+      ignoresShores: true,
+      upgradesTo: 'INFANTRY',
+      uniqueTo: 'ENGLAND',
+      uniqueLeader: 'VICTORIA',
+      replaces: 'LINE_INFANTRY',
+      description: "Victoria's line infantry, at home on foreign shores.",
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'Combat'),
+        melee: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'PromotionClass', { expect: 'PROMOTION_CLASS_MELEE' }),
+        requiresTech: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'PrereqTech', { expect: 'TECH_MILITARY_SCIENCE' }),
+        requiresResource: xml('Units', 'UnitType=UNIT_ENGLISH_REDCOAT', 'StrategicResource', { expect: 'RESOURCE_NITER' }),
+        foreignContinentCS: xml('ModifierArguments', 'ModifierId=REDCOAT_FOREIGN_COMBAT&Name=Amount', 'Value'),
+        ignoresShores: xml('ModifierArguments', 'ModifierId=REDCOAT_DISEMBARK&Name=Ignore', 'Value'),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_ENGLISH_REDCOAT', 'UpgradeUnit', { expect: 'UNIT_INFANTRY' }),
+        uniqueTo: xml('CivilizationLeaders', 'LeaderType=LEADER_VICTORIA', 'CivilizationType', { expect: 'CIVILIZATION_ENGLAND', note: 'a LEADER unique (TRAIT_LEADER_UNIT_ENGLISH_REDCOAT); Eleanor’s England trains none' }),
+        replaces: xml('UnitReplaces', 'CivUniqueUnitType=UNIT_ENGLISH_REDCOAT', 'ReplacesUnitType', { expect: 'UNIT_LINE_INFANTRY' }),
+      },
+    }),
+    U({
+      id: 'BLACK_ARMY',
+      name: 'Black Army',
+      cost: 205,
+      maintenance: 3,
+      moves: 5,
+      combat: 49,
+      cavalry: true,
+      cavalryTag: 'light',
+      requiresTech: 'CASTLES',
+      requiresResource: 'HORSES',
+      // CIV6 (ABILITY_BLACK_ARMY): "+3 Combat Strength for each adjacent levied unit."
+      adjacentLeviedCS: 3,
+      upgradesTo: 'CAVALRY',
+      uniqueTo: 'HUNGARY',
+      uniqueLeader: 'MATTHIAS_CORVINUS',
+      replaces: 'COURSER',
+      description: "Matthias Corvinus's light cavalry, strongest beside the levy.",
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'Combat'),
+        cavalry: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'PromotionClass', { expect: 'PROMOTION_CLASS_LIGHT_CAVALRY' }),
+        cavalryTag: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'PromotionClass', { expect: 'PROMOTION_CLASS_LIGHT_CAVALRY' }),
+        requiresTech: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'PrereqTech', { expect: 'TECH_CASTLES' }),
+        requiresResource: xml('Units', 'UnitType=UNIT_HUNGARY_BLACK_ARMY', 'StrategicResource', { expect: 'RESOURCE_HORSES' }),
+        adjacentLeviedCS: xml('ModifierArguments', 'ModifierId=BLACK_ARMY_ADJACENT_LEVY&Name=Amount', 'Value'),
+        upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_HUNGARY_BLACK_ARMY', 'UpgradeUnit', { expect: 'UNIT_CAVALRY' }),
+        uniqueTo: xml('CivilizationLeaders', 'LeaderType=LEADER_MATTHIAS_CORVINUS', 'CivilizationType', { expect: 'CIVILIZATION_HUNGARY', note: 'a LEADER unique (TRAIT_LEADER_UNIT_MATTHIAS_BLACK_ARMY)' }),
+        replaces: xml('UnitReplaces', 'CivUniqueUnitType=UNIT_HUNGARY_BLACK_ARMY', 'ReplacesUnitType', { expect: 'UNIT_COURSER' }),
       },
     }),
     U({
@@ -3544,28 +3662,28 @@ export const OPEN_TERRAINS: readonly string[] = ['DESERT', 'PLAINS', 'GRASSLAND'
 
 /** may this civilization train the chassis? A unique unit trains for its
  *  civilization alone, and the chassis it replaces is gone there. */
-export function civUnitAllowed(civ: string | null, id: string): boolean {
+export function civUnitAllowed(civ: string | null, id: string, leader: string | null = null): boolean {
   const d = UNITS[id];
   if (!d) return false;
-  if (d.uniqueTo) return d.uniqueTo === civ;
-  return !civReplacement(civ, id);
+  if (d.uniqueTo) return d.uniqueTo === civ && (!d.uniqueLeader || d.uniqueLeader === leader);
+  return !civReplacement(civ, id, leader);
 }
 
 /** the civilization's unique standing in for a base chassis, if any */
-export function civReplacement(civ: string | null, id: string): string | undefined {
+export function civReplacement(civ: string | null, id: string, leader: string | null = null): string | undefined {
   if (!civ) return undefined;
   for (const u of Object.values(UNITS)) {
-    if (u.uniqueTo === civ && u.replaces === id) return u.id;
+    if (u.uniqueTo === civ && u.replaces === id && (!u.uniqueLeader || u.uniqueLeader === leader)) return u.id;
   }
   return undefined;
 }
 
 /** what the chassis upgrades INTO for this civilization: the catalog's
  *  successor, or the civilization's unique standing in for it. */
-export function civUpgradeTarget(civ: string | null, id: string): string | undefined {
+export function civUpgradeTarget(civ: string | null, id: string, leader: string | null = null): string | undefined {
   const next = UNITS[id]?.upgradesTo;
   if (!next) return undefined;
-  return civReplacement(civ, next) ?? next;
+  return civReplacement(civ, next, leader) ?? next;
 }
 
 /** CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): the ONE reader of `cavalryTag` for

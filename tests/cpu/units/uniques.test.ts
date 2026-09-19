@@ -38,8 +38,9 @@ describe('the seat plays a civilization', () => {
     expect(civUnitAllowed('EGYPT', 'SWORDSMAN')).toBe(true);
     expect(civUnitAllowed('EGYPT', 'LEGION')).toBe(false);
     expect(civUnitAllowed('EGYPT', 'MARYANNU_CHARIOT_ARCHER')).toBe(true);
-    expect(civUnitAllowed('NORWAY', 'LONGSHIP')).toBe(true);
-    expect(civUnitAllowed('NORWAY', 'GALLEY')).toBe(false);
+    expect(civUnitAllowed('NORWAY', 'LONGSHIP', 'HARDRADA')).toBe(true); // Harald's LEADER unique
+    expect(civUnitAllowed('NORWAY', 'LONGSHIP')).toBe(false);
+    expect(civUnitAllowed('NORWAY', 'GALLEY', 'HARDRADA')).toBe(false);
     expect(civUnitAllowed('NORWAY', 'BERSERKER')).toBe(true);
     expect(civUnitAllowed('NORWAY', 'MAN_AT_ARMS')).toBe(false);
     expect(civUnitAllowed('SUMERIA', 'WAR_CART')).toBe(true);

@@ -1,6 +1,6 @@
 import type { GameState } from './types';
 import { civEraIndex } from './city';
-import { seatOf, citiesOf, isBarbSeat, isCiv } from './seats';
+import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv } from './seats';
 import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
@@ -144,7 +144,7 @@ export function buildingDedications(state: GameState, seat: number, buildingId: 
 export function unitKillEvent(
   state: GameState,
   killerSeat: number,
-  killer: { type: string; promos?: number } | undefined,
+  killer: { type: string; promos?: number; tileIndex?: number } | undefined,
   victim: { type: string; seat: number; formation?: number },
 ): void {
   if (!isCiv(killerSeat)) return;
@@ -163,6 +163,12 @@ export function unitKillEvent(
       }
       if (kd.generalPointsOnKill) {
         ks.gpp.GENERAL = (ks.gpp.GENERAL ?? 0) + kd.generalPointsOnKill;
+      }
+      // CIV6 (Rough Rider): Culture worth 50% of the defeated unit's strength,
+      // "when on the capital's continent" — the killer's own tile decides.
+      if (kd.killCulturePct && (!kd.killYieldHomeOnly
+        || (killer.tileIndex !== undefined && onHomeContinent(state, killerSeat, killer.tileIndex)))) {
+        ks.research.civicProgress += Math.floor(((UNITS[victim.type]?.combat ?? 0) * kd.killCulturePct) / 100);
       }
     }
   }
