@@ -201,6 +201,7 @@ def test_stockpile_rate(rules, path) -> None:
         sim.res_imp[B0, t] = mine
         sim.improvement[B0, t] = mine
         sim.pillaged[B0, t] = False
+        sim.civ_techs[B0, 0, int(sim._res_reveal_tech[rid])] = True   # CIV6: seen before it accrues
         sim.civ_stockpile[B0, 0, :] = 0
         sim._seat_accrue_stockpile(0)
         return int(sim.civ_stockpile[B0, 0, k])

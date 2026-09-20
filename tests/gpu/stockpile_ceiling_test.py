@@ -149,6 +149,63 @@ def test_no_bank_ever_stands_above_its_ceiling(rules, path) -> None:
     print(f"  5 invariant OK — {sim.n_majors} seats under their ceiling for {int(sim.turn)} turns")
 
 
+def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
+    """CIV6 (Resources.PrereqTech): a strategic resource is INVISIBLE until
+    its revealing technology — its tile pays the seat no resource yield, it
+    accrues nothing under its own improvement, and no unit has access to it;
+    the technology turns all three on. `_res_hidden`'s poke."""
+    sim = build(rules, path)
+    B0, row = 0, 0
+    ks = [k for k, rid in enumerate(sim._strat_rid) if int(sim._res_reveal_tech[rid]) >= 0]
+    assert len(ks) == 7, f"seven strategics carry a reveal tech, not {len(ks)}"
+    k = ks[0]
+    rid = int(sim._strat_rid[k])
+    tech = int(sim._res_reveal_tech[rid])
+    imp = int(sim._res_harvest_imp[rid])
+    own = ((sim.tile_seat[B0] == int(sim._ROW_SEAT[row])) & ~sim.water[B0] & (sim.improvement[B0] < 0)
+           & (sim.district[B0] < 0) & (sim.res_id[B0] < 0) & (sim.centre_slot_at[B0] < 0) & sim.passable[B0])
+    t = int(own.nonzero(as_tuple=True)[0][0])
+    sim.res_id[B0, t] = rid
+    sim.res_yields[B0, t] = sim._res_y6[rid]      # the static plane bakes a resource's yields; a plant writes both
+    sim.tile_yields[B0, t] += sim._res_y6[rid].to(sim.tile_yields.dtype)
+    sim.res_stripped[B0, t] = False
+    sim.res_imp[B0, t] = imp
+    sim.res_priority[B0, t] = 2
+    sim.res_cat[B0, t] = 2
+    sim.improvement[B0, t] = imp
+    sim.pillaged[B0, t] = False
+    sim.civ_techs[:, row, tech] = False
+    sim._eff_version += 1
+    assert bool(sim._res_hidden(row)[B0, t]), "the planted strategic is not hidden before its tech"
+    hidden_add = sim._seat_tile_add(row)[B0, t].clone()
+    bank0 = float(sim.civ_stockpile[B0, row, k])
+    sim._seat_accrue_stockpile(row)
+    assert float(sim.civ_stockpile[B0, row, k]) == bank0, "accrued from a resource the seat cannot see"
+    unit = next((u for u, r in sim._res_unit_pairs if int(r) == rid), None)
+
+    def access() -> bool:
+        # the mask ANDs the STOCKPILE's half; a full bank isolates the ACCESS half
+        held = sim.civ_stockpile[B0, row, k].item()
+        sim.civ_stockpile[B0, row, k] = 10 ** 6
+        got = bool(sim._res_avail_mask(sim.tile_seat == row, row)[B0, unit])
+        sim.civ_stockpile[B0, row, k] = held
+        return got
+
+    if unit is not None:
+        assert not access(), "access to an unseen resource"
+    sim.civ_techs[:, row, tech] = True
+    sim._eff_version += 1
+    assert not bool(sim._res_hidden(row)[B0, t]), "the tech did not reveal it"
+    seen_add = sim._seat_tile_add(row)[B0, t]
+    assert torch.allclose(seen_add - hidden_add, sim.res_yields[B0, t]), (seen_add, hidden_add, sim.res_yields[B0, t])
+    assert float(sim.res_yields[B0, t].abs().sum()) > 0, "the resource's own yields are on the plane"
+    sim._seat_accrue_stockpile(row)
+    assert float(sim.civ_stockpile[B0, row, k]) > bank0, "the revealed resource did not accrue"
+    if unit is not None:
+        assert access(), "the revealed resource gives no access"
+    print(f"  6 visibility OK — strategic {rid} hidden before tech {tech}: no yield, no accrual, no access; all three after")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -157,6 +214,7 @@ def main() -> int:
     test_the_taker_returns_only_what_it_holds(rules, path)
     test_an_encampment_building_raises_the_ceiling(rules, path)
     test_no_bank_ever_stands_above_its_ceiling(rules, path)
+    test_a_hidden_strategic_is_not_there_yet(rules, path)
     print("BATTERY OK stockpile_ceiling")
     return 0
 

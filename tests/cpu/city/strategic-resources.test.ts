@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { UNITS, UNIT_ERA_INDEX } from '../../../cpu/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
+import { RESOURCES } from '../../../world/resources';
 import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit, refreshUnits, spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
@@ -22,6 +23,10 @@ function resState(resource: string, improvement: string | null, ...techs: string
   tile.resource = resource;
   tile.elevation = resource === 'IRON' ? 'HILLS' : 'FLAT';
   tile.improvement = improvement;
+  // CIV6 (Resources.PrereqTech): a strategic is invisible — no access, no
+  // accrual — until its revealing technology; every seat here can see it
+  const reveal = RESOURCES[resource]!.revealTech!;
+  for (const s of state.seats) if (!s.research.techs.includes(reveal)) s.research.techs.push(reveal);
   // ACCESS is what these cases are about; the STOCKPILE has its own block
   // below, so every seat here starts able to pay.
   seatOf(state, 0)!.stockpile = STRATEGIC_IDS.map(() => 99);

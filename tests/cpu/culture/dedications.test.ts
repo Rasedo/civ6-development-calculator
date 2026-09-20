@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { archaeologistExcavate, spawnUnit, unitIsMilitary } from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
@@ -333,6 +333,7 @@ describe('the three late-era dedications', () => {
     setTileOwner(mine, 0, city.id);
     mine.resource = 'ALUMINUM';
     mine.improvement = RESOURCES.ALUMINUM.improvement;
+    grantTechs(state, RESOURCES.ALUMINUM.revealTech!); // CIV6: Aluminum is seen at Radio
     const k = strategicSlot('ALUMINUM');
     commit(state, 0, DED_MONUMENTALITY, true);
     seatOf(state, 0)!.stockpile = emptyStockpile();
@@ -407,6 +408,7 @@ describe('the three late-era dedications', () => {
     setTileOwner(mine, 0, city.id);
     mine.resource = 'URANIUM';
     mine.improvement = RESOURCES.URANIUM.improvement;
+    grantTechs(state, RESOURCES.URANIUM.revealTech!); // CIV6: Uranium is seen at Combined Arms
     seatOf(state, 0)!.stockpile = emptyStockpile();
     accrueStockpiles(state, 0);
     const mined = seatOf(state, 0)!.stockpile![k];

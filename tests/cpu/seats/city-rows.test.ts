@@ -125,6 +125,7 @@ describe('Workshop of the World', () => {
       setTileOwner(t, 0, city.id);
       t.resource = resource;
       t.improvement = 'MINE';
+      grantTechs(state, resource === 'IRON' ? 'BRONZE_WORKING' : 'INDUSTRIALIZATION'); // the resource must be VISIBLE
       accrueStockpiles(state, 0);
       return state.seats[0].stockpile![STRATEGIC_IDS.indexOf(resource)];
     };

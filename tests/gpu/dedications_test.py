@@ -354,6 +354,7 @@ def main() -> None:
         sim.civ_stockpile[:, row] = 0
         if mine_rid is not None:
             sim.res_id[0, mtile] = mine_rid
+            sim.civ_techs[0, row, int(sim._res_reveal_tech[mine_rid])] = True   # CIV6: seen before it accrues
             sim.res_imp[0, mtile] = 3
             sim.improvement[0, mtile] = 3
             sim.pillaged[0, mtile] = False

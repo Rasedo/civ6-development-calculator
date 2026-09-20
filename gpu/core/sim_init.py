@@ -2848,6 +2848,15 @@ class SimInit:
             [int(x) for x in _rsc.get("harvestAmount", [])] or [0], dtype=torch.long, device=device)
         self._res_harvest_imp = torch.tensor(
             [int(x) for x in _rsc.get("improvement", [])] or [-1], dtype=torch.long, device=device)
+        # CIV6 (Resources.PrereqTech): the technology that REVEALS a resource
+        # (-1 = always visible), and every resource's own tile yields — the
+        # part of the static plane a seat that cannot see the resource is not
+        # paid (`_res_hidden`, subtracted in `_seat_tile_add`)
+        self._res_reveal_tech = torch.tensor([int(x) for x in _rsc["revealTech"]], dtype=torch.long, device=device)
+        self._res_y6 = torch.tensor([[float(v) for v in r] for r in _rsc["yields"]], dtype=self.dtype, device=device)
+        # per tile, off the fixture's resource ids; a poke that PLANTS a resource
+        # writes this plane too (the fixture's static yield plane bakes it)
+        self.res_yields = self._res_y6[self.res_id.clamp(min=0)] * (self.res_id >= 0).unsqueeze(2).to(self.dtype)
         self._strat_rid = [int(x) for x in _st["rid"]]
         self._strat_rate = [int(x) for x in _st["rate"]]
         self._n_strategic = len(self._strat_rid)

@@ -969,6 +969,9 @@ class SimOrders:
                     & _paved
                 )
                 _rq = self.res_imp.gather(1, hc.unsqueeze(1)).squeeze(1)
+                # an unseen strategic forces nothing (`_res_hidden`, the mask's clause)
+                _rq = torch.where(self._res_hidden(row).gather(1, hc.unsqueeze(1)).squeeze(1),
+                                  torch.full_like(_rq, -1), _rq)
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
                 for _k in range(self._imp_unlock.numel()):
                     _col = self._A_IMP[_k] if _k < len(self._A_IMP) else -1

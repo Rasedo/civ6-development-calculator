@@ -14,7 +14,7 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
-import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv } from './seats';
+import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, hiddenResourcesFor } from './seats';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
@@ -82,8 +82,11 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   if (!s) return;
   const bk = bank(s);
   const rate = getModifiers(state, seat).stockpileRate;
+  // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see
+  // yet accrues nothing, whatever improvement stands on its tile
+  const hidden = hiddenResourcesFor(state, seat);
   for (const t of state.map.tiles) {
-    if (!t.resource || t.pillaged) continue;
+    if (!t.resource || t.pillaged || hidden.has(t.resource)) continue;
     const k = strategicSlot(t.resource);
     if (k < 0 || t.improvement !== RESOURCES[t.resource]?.improvement) continue;
     if (!tileOwnedByCiv(t, seat)) continue;

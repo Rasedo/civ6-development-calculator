@@ -26,7 +26,7 @@ import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, PILLAGE_BUILDING_REPAIR_PERCENT, maxSpecialtyDistricts } from '../data/constants';
 import { buildingPillaged } from './yields';
 import { gpCityPermOf } from '../data/greatPeople';
-import { campTiles, cityHolders, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
+import { campTiles, cityHolders, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat, hiddenResourcesFor } from './seats';
 import { getModifiers } from './effects';
 import { irradiated } from './nuclear';
 
@@ -258,6 +258,10 @@ export function validImprovementsIn(
     /** the roster's extra Farm ground (`FARM_TERRAIN_ROWS`) and the civics that gate it */
     farmTerrain?: readonly { terrain: TerrainId; hills: boolean; civic?: string }[];
     civics?: readonly string[];
+    /** CIV6 (Resources.PrereqTech): the resources this seat cannot see yet —
+     *  their tiles force and offer nothing, the plain ground rules apply
+     *  (`hiddenResourcesFor`). Absent hides nothing. */
+    hidden?: ReadonlySet<string>;
     /** CIV6 (`OnePerCity`): the rows the CITY that owns this tile already
      *  holds one of. The city walk lives with the caller, which is the only
      *  place a city is in hand; an absent set offers every row. */
@@ -326,7 +330,7 @@ export function validImprovementsIn(
   // Missionary/Apostle must refuse here exactly as the GPU improvement arm
   // does with its builder-type gate — a wire order for any other unit no-ops.
   if (opts.builder !== undefined && opts.builder !== 'BUILDER') return [];
-  if (tile.resource) {
+  if (tile.resource && !opts.hidden?.has(tile.resource)) {
     const imp = RESOURCES[tile.resource].improvement;
     return unlocked(imp) ? [imp] : [];
   }
@@ -445,6 +449,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     civ: civOf(state, seat),
     farmTerrain: getModifiers(state, seat).farmTerrain,
     civics: seatOf(state, seat)?.research.civics,
+    hidden: hiddenResourcesFor(state, seat),
     // the OWNING city's governor promotions, the gate the two governor
     // improvements read. The applier computes this from the city it already
     // holds; here the tile names it.

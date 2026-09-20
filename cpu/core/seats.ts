@@ -88,9 +88,32 @@ export function tileForeignTo(t: Tile, civ: number): boolean {
  * No stockpile, count or maintenance draw: access is a pure boolean gate on
  * build and purchase. Mirrors the GPU res_id/res_imp/improvement scan.
  */
+/** CIV6 (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): the
+ *  resources this seat cannot yet SEE — a strategic resource is invisible
+ *  until its revealing technology, and until then the tile is plain ground
+ *  to this seat: no tile yield from it, no improvement forced or offered by
+ *  it, no access, no accrual. Every reader that means "this seat's
+ *  resource" asks this set; the GPU twin is `_res_hidden(row)`. A city-state
+ *  is a player too and reads its own research; a seat with no research (the
+ *  Free Cities) sees none of them; a seat with no record here at all (a
+ *  test's phantom owner) hides nothing. */
+export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<string> {
+  const s = seatOf(state, seat);
+  if (!s) return NOTHING_HIDDEN;
+  const techs = s.research?.techs ?? [];
+  const out = new Set<string>();
+  for (const def of Object.values(RESOURCES)) {
+    if (def.revealTech && !techs.includes(def.revealTech)) out.add(def.id);
+  }
+  return out;
+}
+
+const NOTHING_HIDDEN: ReadonlySet<string> = new Set<string>();
+
 export function civHasStrategic(state: GameState, civ: number, resourceId: string): boolean {
   const imp = RESOURCES[resourceId]?.improvement;
   if (!imp) return false;
+  if (hiddenResourcesFor(state, civ).has(resourceId)) return false; // CIV6: no access to what you cannot see
   for (const t of state.map.tiles) {
     if (t.resource !== resourceId || t.pillaged || t.improvement !== imp) continue;
     if (tileOwnedByCiv(t, civ)) return true;

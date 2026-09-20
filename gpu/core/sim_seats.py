@@ -7395,7 +7395,9 @@ class SimSeats:
         bump _bel_version at claims/restore; tile inputs (feat_id/feat_stripped/
         improvement/pillaged/res_stripped/res_priority) bump _eff_version at their
         mutation sites. All consumers read-only."""
-        key = (row, self._eff_version, self._bel_version)
+        # ...and the row's TECHS: a revealed resource starts paying its yield
+        # (`_res_hidden`); the plane's version counter is the stamp
+        key = (row, self._eff_version, self._bel_version, self.civ_techs._version)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -7431,6 +7433,7 @@ class SimSeats:
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
+            plane = plane - self.res_yields * self._res_hidden(row).unsqueeze(2).to(self.dtype)
             self._belief_feat_cache = (key, plane)
             return plane
         featA = self._bel_add("featY", row)
@@ -7438,8 +7441,9 @@ class SimSeats:
         live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
         plane = plane * live
         impA = self._bel_add("impRes", row)
+        _hid = self._res_hidden(row)   # an unseen strategic is no resource to this row
         cat = torch.where(
-            (self.improvement >= 0) & ~self.pillaged & ~self.res_stripped,
+            (self.improvement >= 0) & ~self.pillaged & ~self.res_stripped & ~_hid,
             self.res_priority.clamp(max=3),
             torch.zeros_like(self.res_priority),
         )
@@ -7470,6 +7474,9 @@ class SimSeats:
         pres = self._preserve_plane(row)
         if pres is not None:
             plane = plane + pres * self._preserve_live()
+        # CIV6 (Resources.PrereqTech): the static plane bakes every resource's
+        # yield; a resource this row cannot see yet pays it nothing
+        plane = plane - self.res_yields * _hid.unsqueeze(2).to(self.dtype)
         self._belief_feat_cache = (key, plane)
         return plane
 
@@ -8696,7 +8703,10 @@ class SimSeats:
         clamped to `_stockpile_cap`."""
         if self._n_strategic == 0:
             return
-        owned = (self.tile_seat == int(self._ROW_SEAT[row])) & ~self.pillaged & (self.improvement == self.res_imp)
+        # CIV6 (Resources.PrereqTech): a strategic the seat cannot see yet
+        # accrues nothing, whatever improvement stands on its tile
+        owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & ~self.pillaged
+                 & (self.improvement == self.res_imp) & ~self._res_hidden(row))
         bank = self.civ_stockpile[:, row]
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
             here = owned & (self.res_id == rid)
@@ -8783,7 +8793,7 @@ class SimSeats:
         (`cityImprovedResourceKinds`)."""
         cols = self.RC
         out = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
-        ok = ((self.res_cat == cat) & ~self.pillaged
+        ok = ((self.res_cat == cat) & ~self.pillaged & ~self._res_hidden(row)
               & (self.improvement >= 0) & (self.improvement == self.res_imp))
         if not bool(ok.any()):
             return out

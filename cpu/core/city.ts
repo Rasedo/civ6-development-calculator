@@ -32,6 +32,7 @@ import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, 
 import { RESOURCES } from '../../world/resources';
 import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
+import { hiddenResourcesFor } from './seats';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
@@ -1061,11 +1062,13 @@ export function computeCityStats(
   const hasLighthouse = city.buildings.includes('LIGHTHOUSE');
   const lighthouseBonus = (t: Tile) => {
     if (hasLighthouse && (t.terrain === 'COAST' || t.terrain === 'LAKE')) tiles.food += 1;
-    // CIV6 (Stave Church): "+1 Production to each coastal resource tile in
-    // this city" — a Coast tile carrying a resource, the same way.
-    if (coastResY && t.terrain === 'COAST' && t.resource !== null) addYields(tiles, coastResY);
+    // CIV6 (Stave Church, REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): "+1 Production
+    // to each coastal resource tile in this city" — a Coast tile carrying a
+    // resource the city's owner can SEE, the same way.
+    if (coastResY && t.terrain === 'COAST' && t.resource !== null && !hiddenRes.has(t.resource)) addYields(tiles, coastResY);
   };
   const coastResY = buildingVariantCoastYields(state, city);
+  const hiddenRes = hiddenResourcesFor(state, city.seat);
   // CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with a
   // passable feature or natural wonder" — a plot yield, so only a WORKED tile
   // materializes it, exactly as the Lighthouse's Food does.

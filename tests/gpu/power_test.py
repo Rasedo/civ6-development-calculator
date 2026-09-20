@@ -278,6 +278,11 @@ def a_source(sim, row: int, rid: int = -1) -> tuple[int, int]:
     sim.improvement[0, t] = sim.res_imp[0, t]
     sim.pillaged[0, t] = False
     sim._tile_owner_ver += 1
+    # CIV6 (Resources.PrereqTech): the row must SEE the resource to accrue it
+    _rt = int(sim._res_reveal_tech[int(sim.res_id[0, t])])
+    if _rt >= 0:
+        sim.civ_techs[0, row, _rt] = True
+        sim._eff_version += 1
     return t, strat[int(sim.res_id[0, t])]
 
 

@@ -3255,6 +3255,9 @@ class SimMasks:
         _res_cols: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
             _rq = self.res_imp.gather(1, tc)
+            # CIV6 (Resources.PrereqTech): a strategic this row cannot see yet
+            # forces nothing — the tile offers its plain ground
+            _rq = torch.where(self._res_hidden(row).gather(1, tc), torch.full_like(_rq, -1), _rq)
             # WHICH BASE EACH ROW RIDES, decided once over the whole rank
             # block. Every column below is `base & <the row's own clauses>`,
             # and an empty base makes the column empty whatever those clauses

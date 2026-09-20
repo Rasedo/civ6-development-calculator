@@ -76,6 +76,7 @@ describe('the chassis itself', () => {
     // "won't be able to Heal" — that bar is not the one under test here.
     home.resource = 'URANIUM';
     home.improvement = RESOURCES.URANIUM.improvement;
+    grantTechs(state, RESOURCES.URANIUM.revealTech!); // CIV6: Uranium is seen at Combined Arms
     const mine = bot(state, 10, 8);
     const out = bot(state, 12, 8);
     expect(tileSeat(away)).not.toBe(0);

@@ -51,6 +51,7 @@ function grantStrategic(state: GameState, city: { id: number; seat: number }, ty
   t.resource = need;
   t.improvement = RESOURCES[need]!.improvement!;
   t.pillaged = false;
+  grantTechs(state, RESOURCES[need]!.revealTech!); // CIV6: no access to a resource the seat cannot see
 }
 
 /** A units-mode game with the capital at (8,8), an Aerodrome beside it and a

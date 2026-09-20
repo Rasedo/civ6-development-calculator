@@ -179,6 +179,8 @@ def test_the_order_charges_the_tier_s_resource(rules, path) -> None:
     sim.res_imp[B0, t] = 3
     sim.improvement[B0, t] = 3
     sim.pillaged[B0, t] = False
+    if int(sim._res_reveal_tech[res]) >= 0:   # CIV6: no access to a resource the seat cannot see
+        sim.civ_techs[B0, ROW, int(sim._res_reveal_tech[res])] = True
     sim.civ_stockpile[B0, ROW, slot] = cost * 10
     sim._eff_version += 1
     assert bool(sim._trainable_units(ROW)[B0, j, ui]), (

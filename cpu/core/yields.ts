@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, civOf, seatOf, tileBelongsTo, civVariantOf } from './seats';
+import { citiesOf, civOf, seatOf, tileBelongsTo, civVariantOf, hiddenResourcesFor } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
@@ -115,7 +115,10 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     const beliefBonus = ctx.mods.featureYields[tile.feature];
     if (beliefBonus) addYields(out, beliefBonus);
   }
-  if (tile.resource) addYields(out, RESOURCES[tile.resource].yields);
+  // CIV6 (Resources.PrereqTech): a resource the seat cannot see yet is
+  // plain ground to it — no yield until the revealing technology
+  const seen = tile.resource !== null && !ctx.hiddenResources?.has(tile.resource);
+  if (tile.resource && seen) addYields(out, RESOURCES[tile.resource].yields);
 
   // CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows — the seat's
   // civilization or leader pays a flat yield where the plot matches.
@@ -147,7 +150,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile, ctx.camps, ctx.gpAppeal));
     const boost = ctx.mods.improvementYields[imp];
     if (boost) addYields(out, boost);
-    if (tile.resource) {
+    if (tile.resource && seen) {
       const cat = RESOURCES[tile.resource].category;
       for (const rule of ctx.mods.improvementOnResource) {
         if (rule.category === cat) addYields(out, rule.yields);
@@ -525,8 +528,9 @@ export function cityImprovedResourceKinds(
   state: GameState, city: City, category: 'luxury' | 'strategic',
 ): Set<string> {
   const out = new Set<string>();
+  const hidden = hiddenResourcesFor(state, city.seat); // CIV6: an unseen strategic is not improved, whatever stands on it
   for (const t of state.map.tiles) {
-    if (!t.resource || t.pillaged || !tileBelongsTo(t, city)) continue;
+    if (!t.resource || t.pillaged || hidden.has(t.resource) || !tileBelongsTo(t, city)) continue;
     const def = RESOURCES[t.resource];
     if (def?.category === category && t.improvement === def.improvement) out.add(t.resource);
   }

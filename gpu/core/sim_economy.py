@@ -2996,6 +2996,24 @@ class SimEconomy:
         paved. Every reader that means "has a resource" comes here."""
         return (self.res_id >= 0) & ~self.res_stripped
 
+    def _res_hidden(self, row: int) -> torch.Tensor:
+        """[B, T] bool — a LIVE resource this row cannot yet SEE. CIV6
+        (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): a strategic
+        resource is invisible until its revealing technology, and until then
+        the tile is plain ground to that seat — no tile yield from it, no
+        improvement forced or offered by it, no access, no accrual. Every
+        reader that means "this seat's resource" ANDs the complement.
+        `hiddenResourcesFor`'s twin: the row's own techs — a major's, a
+        city-state's (`citystate_techs`, compared like a major's; 9001 t1
+        had a minor working Horses it could not yet see), and the Free row's
+        none (it holds no research)."""
+        rt = self._res_reveal_tech[self.res_id.clamp(min=0)]
+        gated = (rt >= 0) & self._res_live()
+        if not bool(gated.any()):
+            return gated
+        have = self._seat_techs(row).gather(1, rt.clamp(min=0))
+        return gated & ~have
+
     def _adj_source_plane(self, src: int) -> torch.Tensor:
         """[B, T] — how much ONE adjacency source answers at each tile, in the
         district walk's own units. `districtAdjacency`'s `matchesAdjacency`
@@ -4128,6 +4146,8 @@ class SimEconomy:
         provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged
         rows = torch.arange(self.n_majors, device=self.device).reshape(1, -1, 1)
         mine = self.tile_seat.unsqueeze(1) == rows                     # [B, majors, T]
+        # CIV6: no access to a resource the seat cannot see yet
+        mine = mine & ~torch.stack([self._res_hidden(r) for r in range(self.n_majors)], dim=1)
         acc: dict[int, torch.Tensor] = {}
         for u_idx, res_idx in self._res_unit_pairs:
             want = (typ == u_idx) & (seat >= 0) & (seat < self.n_majors)
@@ -5091,7 +5111,7 @@ class SimEconomy:
             # CIV6 (Stave Church): "+1 Production to each coastal RESOURCE
             # tile" — and a Harbor or Water Park paves a bonus SEA resource
             # away, so the tile stops carrying one (`t.resource !== null`).
-            _rlive = self._res_live()
+            _rlive = self._res_live() & ~self._res_hidden(row)   # REQUIRES_PLOT_HAS_VISIBLE_RESOURCE
             _rw = _rlive.gather(1, stf).reshape(B, n, M)
             _tc = self.terrain.gather(1, ctr)
             _rc = _rlive.gather(1, ctr)
@@ -5733,6 +5753,8 @@ class SimEconomy:
         if not self._res_unit_pairs:
             return out
         provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged & owned
+        if row >= 0:
+            provides = provides & ~self._res_hidden(row)   # CIV6: no access to what you cannot see
         # one [B, P, T] test over the P (unit, resource) pairs — each unit
         # names at most one resource, so the pair rows write distinct columns
         u_vec, r_vec = self._res_pair_vecs

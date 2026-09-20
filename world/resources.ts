@@ -31,6 +31,11 @@ export interface ResourceDef {
   okFeatures?: string[];
   /** If set, resource never spawns on a feature. */
   noFeature?: boolean;
+  /** CIV6 (Resources.PrereqTech): the technology that REVEALS the resource.
+   *  Until a civilization holds it the tile is plain ground to that
+   *  civilization — no yield, no improvement, no access, no accrual
+   *  (`hiddenResourcesFor` / `_res_hidden`). Only the strategics carry one. */
+  revealTech?: string;
   /**
    * Yield granted (era-scaled lump) when a builder harvests it in units
    * mode, removing the resource. Only some bonus resources, as in Civ 6.
@@ -61,13 +66,13 @@ export const RESOURCES: Record<string, ResourceDef> = {
   CRABS: { id: 'CRABS', name: 'Crabs', category: 'bonus', yields: { gold: 2 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT, harvestAmount: 40, harvestYield: 'gold' },
   COPPER: { id: 'COPPER', name: 'Copper', category: 'bonus', yields: { gold: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true, harvestAmount: 40, harvestYield: 'gold' },
 
-  HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
-  IRON: { id: 'IRON', name: 'Iron', category: 'strategic', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },
-  NITER: { id: 'NITER', name: 'Niter', category: 'strategic', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, noFeature: true },
-  COAL: { id: 'COAL', name: 'Coal', category: 'strategic', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS'], elevations: HILLS, noFeature: true },
-  OIL: { id: 'OIL', name: 'Oil', category: 'strategic', yields: { production: 3 }, improvement: 'OIL_WELL', terrains: ['DESERT', 'TUNDRA', 'SNOW'], elevations: FLAT, noFeature: true },
-  ALUMINUM: { id: 'ALUMINUM', name: 'Aluminum', category: 'strategic', yields: { science: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS'], elevations: HILLS, noFeature: true },
-  URANIUM: { id: 'URANIUM', name: 'Uranium', category: 'strategic', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: ANY, noFeature: true },
+  HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', revealTech: 'ANIMAL_HUSBANDRY', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
+  IRON: { id: 'IRON', name: 'Iron', category: 'strategic', revealTech: 'BRONZE_WORKING', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },
+  NITER: { id: 'NITER', name: 'Niter', category: 'strategic', revealTech: 'MILITARY_ENGINEERING', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, noFeature: true },
+  COAL: { id: 'COAL', name: 'Coal', category: 'strategic', revealTech: 'INDUSTRIALIZATION', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS'], elevations: HILLS, noFeature: true },
+  OIL: { id: 'OIL', name: 'Oil', category: 'strategic', revealTech: 'REFINING', yields: { production: 3 }, improvement: 'OIL_WELL', terrains: ['DESERT', 'TUNDRA', 'SNOW'], elevations: FLAT, noFeature: true },
+  ALUMINUM: { id: 'ALUMINUM', name: 'Aluminum', category: 'strategic', revealTech: 'RADIO', yields: { science: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS'], elevations: HILLS, noFeature: true },
+  URANIUM: { id: 'URANIUM', name: 'Uranium', category: 'strategic', revealTech: 'COMBINED_ARMS', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: ANY, noFeature: true },
 
   WINE: { id: 'WINE', name: 'Wine', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   COTTON: { id: 'COTTON', name: 'Cotton', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },

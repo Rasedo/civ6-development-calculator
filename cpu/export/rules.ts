@@ -1198,6 +1198,14 @@ export function buildRules() {
         return k ? YIELD_KEYS.indexOf(k) : -1;
       }),
       harvestAmount: RESOURCE_IDS.map((id) => RESOURCES[id]?.harvestAmount ?? 0),
+      // CIV6 (Resources.PrereqTech): the technology that REVEALS the resource
+      // (-1 = always visible), and every resource's own tile yields — what a
+      // hidden one withholds from the seat that cannot see it (`_res_hidden`)
+      revealTech: RESOURCE_IDS.map((id) => {
+        const t = RESOURCES[id]?.revealTech;
+        return t ? techIdx.get(t) ?? -1 : -1;
+      }),
+      yields: RESOURCE_IDS.map((id) => YIELD_KEYS.map((k) => RESOURCES[id]?.yields?.[k] ?? 0)),
       improvement: RESOURCE_IDS.map((id) => {
         const imp = RESOURCES[id]?.improvement;
         return imp ? IMPROVEMENT_IDS.indexOf(imp) : -1;
