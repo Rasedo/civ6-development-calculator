@@ -4548,6 +4548,39 @@ class SimEconomy:
             t = t + holds.long() * self._holy_city_tour
         return t
 
+    def _building_tourism(self, row: int) -> torch.Tensor:
+        """[B] long — `buildingTourism`: CIV6 (Marae, MARAE_TOURISM_FEATURES)
+        Tourism per owned tile carrying a feature once Flight is held;
+        (Thermal Bath, THERMALBATH_ADDTOURISM) Tourism while the border holds a
+        Geothermal Fissure. A dark building pays nothing."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if row >= self.n_majors or (not self._bvar_tour_feat and not self._bvar_tour_with_feat):
+            return out
+        cols = self.RC
+        dreg = self.city_dist_tile[:, row, :cols]
+        held = (self.city_bldg[:, row, :cols]
+                & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
+                & self.city_alive[:, row, :cols].unsqueeze(2))
+        feat_cnt = None
+        for (bi, c), (amt, tech) in self._bvar_tour_feat.items():
+            w = self._row_plays_idx(row, c)
+            if tech >= 0:
+                w = w & self.civ_techs[:, row, tech]
+            if not bool(w.any()):
+                continue
+            if feat_cnt is None:
+                feat_ok = (self.feat_id >= 0) & ~self.feat_stripped
+                sl = torch.where(feat_ok, self.city_slot_at(row), torch.full_like(self.feat_id, -1))
+                feat_cnt = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
+                feat_cnt.scatter_add_(1, sl.clamp(min=0, max=cols - 1), (sl >= 0).long())
+            out = out + ((held[:, :, bi] & w.unsqueeze(1)).long() * feat_cnt).sum(dim=1) * amt
+        for (bi, c), (feat, amt) in self._bvar_tour_with_feat.items():
+            w = self._row_plays_idx(row, c)
+            if not bool(w.any()):
+                continue
+            out = out + (held[:, :, bi] & w.unsqueeze(1) & self._city_has_feature(row, feat)).long().sum(dim=1) * amt
+        return out
+
     def _suzerain_tourism(self, row: int, own: torch.Tensor) -> torch.Tensor:
         """[B] — CIV6: the Batey "provides Tourism after researching Flight"
         and the Colossal Heads "provide Tourism from Faith after researching

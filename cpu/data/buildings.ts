@@ -75,6 +75,15 @@ export interface BuildingVariant {
   /** CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES Amount 2): Amenities this
    *  row pays ON TOP while its city holds at least one tile of this feature. */
   amenitiesWithFeature?: { feature: FeatureId; amount: number };
+  /** CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): yields the row
+   *  pays once its owner holds `tech`. */
+  techYields?: { tech: string; yields: Partial<Yields> };
+  /** CIV6 (Marae, MARAE_TOURISM_FEATURES): Tourism per tile of the city
+   *  carrying a feature, once `tech` (Flight) is held. */
+  tourismPerFeature?: { amount: number; tech?: string };
+  /** CIV6 (Thermal Bath, THERMALBATH_ADDTOURISM): Tourism while the city's
+   *  border holds a tile of one feature. */
+  tourismWithFeature?: { feature: FeatureId; amount: number };
   /** CIV6 (Madrasa, OldYieldType SCIENCE -> NewYieldType FAITH): the row pays
    *  FAITH equal to its district's own adjacency bonus, beside the Science
    *  that bonus already pays. */
@@ -444,11 +453,12 @@ const rawList: BuildingDef[] = [
     // CIV6 (BUILDING_MARAE): Cost 150 against the Amphitheater's 150, NO
     // Maintenance column and no `Building_GreatWorks` row at all. Its
     // modifiers pay +1 Culture and +1 Faith on every passable-feature tile of
-    // the city; the Tourism third is a per-tile tourism channel this engine
-    // has no carrier for (recorded in docs/AUDIT.md).
+    // the city, and MARAE_TOURISM_FEATURES +1 Tourism per feature tile after
+    // Flight (`tourismPerFeature`).
     civVariants: [{
       civ: 'MAORI', name: 'Marae', maintenance: 0, noGreatWorks: true,
       featureTileYields: { culture: 1, faith: 1 },
+      tourismPerFeature: { amount: 1, tech: 'FLIGHT' },
     }],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_AMPHITHEATER', 'Cost', { scale: GAME_SPEED }),
@@ -459,6 +469,7 @@ const rawList: BuildingDef[] = [
       'civVariants.0.noGreatWorks': { derived: 'true where the install gives the unique row NO Building_GreatWorks row at all', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MARAE', 'NumSlots')] },
       'civVariants.0.featureTileYields.culture': xml('ModifierArguments', 'ModifierId=MARAE_CULTURE_FEATURES&Name=Amount', 'Value'),
       'civVariants.0.featureTileYields.faith': xml('ModifierArguments', 'ModifierId=MARAE_FAITH_FEATURES&Name=Amount', 'Value'),
+      'civVariants.0.tourismPerFeature.amount': xml('ModifierArguments', 'ModifierId=MARAE_TOURISM_FEATURES&Name=Amount', 'Value'),
     },
   },
   { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 290, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['ARCHAEOLOGICAL_MUSEUM'], yields: { culture: 2 }, maintenance: 2,
@@ -588,11 +599,11 @@ const rawList: BuildingDef[] = [
     // carries, so the variant overrides none of them. Where it DOES differ is
     // power: Building_YieldChanges pays the same Production 3 as the Factory,
     // and Building_YieldChangesBonusWithPower pays 5 where the Factory's pays
-    // 3. The regional row every city centre within six tiles is paid. Its
-    // "+4 Culture after Electricity" half is a TECH-gated building yield this
-    // catalog has no column for (recorded in docs/AUDIT.md).
+    // 3. The regional row every city centre within six tiles is paid, and
+    // ELECTRONICSFACTORY_CULTURE +4 once ELECTRICITY is held (`techYields`).
     civVariants: [{
       civ: 'JAPAN', name: 'Electronics Factory', yields: { production: 3 }, poweredYields: { production: 5 },
+      techYields: { tech: 'ELECTRICITY', yields: { culture: 4 } },
     }],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_FACTORY', 'Cost', { scale: GAME_SPEED }),
@@ -605,6 +616,7 @@ const rawList: BuildingDef[] = [
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_FACTORY', 'PrereqBuilding')] },
       'civVariants.0.yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_ELECTRONICS_FACTORY&YieldType=YIELD_PRODUCTION', 'YieldChange'),
       'civVariants.0.poweredYields.production': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_ELECTRONICS_FACTORY&YieldType=YIELD_PRODUCTION', 'YieldChange'),
+      'civVariants.0.techYields.yields.culture': xml('ModifierArguments', 'ModifierId=ELECTRONICSFACTORY_CULTURE&Name=Amount', 'Value'),
     },
   },
   // THE THREE POWER PLANTS. CIV6 (GS): one per Industrial Zone, each
@@ -754,12 +766,13 @@ const rawList: BuildingDef[] = [
     // Entertainment 2 against the Zoo's 1, Production 2 of its own,
     // RegionalRange 6 — both reach every city centre within six tiles, as the
     // Zoo's Amenity does. THERMALBATH_ADDAMENITIES pays +2 MORE Amenities
-    // while the city holds a Geothermal Fissure (its Tourism third is the
-    // channel docs/AUDIT.md records).
+    // and THERMALBATH_ADDTOURISM +3 Tourism while the city holds a Geothermal
+    // Fissure (`tourismWithFeature`).
     civVariants: [{
       civ: 'HUNGARY', name: 'Thermal Bath', cost: 360,
       amenities: 2, yields: { production: 2 },
       amenitiesWithFeature: { feature: 'GEOTHERMAL_FISSURE', amount: 2 },
+      tourismWithFeature: { feature: 'GEOTHERMAL_FISSURE', amount: 3 },
     }],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_ZOO', 'Cost', { scale: GAME_SPEED }),
@@ -771,6 +784,7 @@ const rawList: BuildingDef[] = [
       'civVariants.0.cost': xml('Buildings', 'BuildingType=BUILDING_THERMAL_BATH', 'Cost', { scale: GAME_SPEED }),
       'civVariants.0.amenities': xml('Buildings', 'BuildingType=BUILDING_THERMAL_BATH', 'Entertainment'),
       'civVariants.0.yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_THERMAL_BATH&YieldType=YIELD_PRODUCTION', 'YieldChange'),
+      'civVariants.0.tourismWithFeature.amount': xml('ModifierArguments', 'ModifierId=THERMALBATH_ADDTOURISM&Name=Amount', 'Value'),
       'civVariants.0.amenitiesWithFeature.amount': xml('ModifierArguments', 'ModifierId=THERMALBATH_ADDAMENITIES&Name=Amount', 'Value'),
     },
   },

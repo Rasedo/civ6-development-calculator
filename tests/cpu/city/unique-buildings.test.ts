@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs, grantCivics } from '../helpers';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding } from '../../../cpu/data/buildings';
 import { BUILDING_PREREQ_ROWS } from '../../../cpu/data/civilizations';
-import { buildingMaintenance } from '../../../cpu/core/city';
+import { buildingMaintenance, buildingTourism } from '../../../cpu/core/city';
+import { regionalEffects } from '../../../cpu/core/yields';
 import { buildingCostIn, wallsMax } from '../../../cpu/core/rules';
 import { computeUnlocksIn } from '../../../cpu/core/effects';
 import { workContext } from '../../../cpu/core/greatWorks';
@@ -139,6 +140,73 @@ describe('the clauses a variant carries that are not columns', () => {
     const v = buildingVariantFor('GEORGIA', 'RENAISSANCE_WALLS')!;
     expect(v.goldenAgeYields).toEqual({ faith: 4 });
     expect(effectiveBuilding('GEORGIA', 'RENAISSANCE_WALLS')!.yields).toEqual({ faith: 4 });
+  });
+
+  it('pays the Electronics Factory +4 Culture after Electricity, on the same reach as its Production', () => {
+    // CIV6 (ELECTRONICSFACTORY_CULTURE): EFFECT_ADJUST_BUILDING_YIELD_CHANGE
+    // +4 YIELD_CULTURE behind REQUIREMENT_PLAYER_HAS_TECHNOLOGY TECH_ELECTRICITY
+    // — a building yield, so the REGIONAL row carries it to every centre it reaches
+    expect(buildingVariantFor('JAPAN', 'FACTORY')!.techYields).toEqual({ tech: 'ELECTRICITY', yields: { culture: 4 } });
+    const factory = (s: { state: GameState; city: City }) => {
+      const iz = tileAtCoords(s.state.map, 9, 8);
+      expect(iz.ownerCity).toBe(s.city.id);
+      iz.district = 'INDUSTRIAL_ZONE';
+      iz.districtComplete = true;
+      s.city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: iz.index });
+      s.city.buildings.push('FACTORY');
+    };
+    const j = scene('JAPAN');
+    factory(j);
+    expect(regionalEffects(j.state, j.city).yields.culture).toBe(0);
+    expect(regionalEffects(j.state, j.city).yields.production).toBe(3);
+    grantTechs(j.state, 'ELECTRICITY');
+    expect(regionalEffects(j.state, j.city).yields.culture).toBe(4);
+    expect(regionalEffects(j.state, j.city).yields.production).toBe(3);
+    const r = scene('ROME');
+    factory(r);
+    grantTechs(r.state, 'ELECTRICITY');
+    expect(regionalEffects(r.state, r.city).yields.culture).toBe(0);
+  });
+
+  it('pays the Marae one Tourism per feature tile of its city once Flight is held', () => {
+    // CIV6 (MARAE_TOURISM_FEATURES): EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE
+    // Amount 1 behind REQUIREMENT_PLAYER_HAS_TECHNOLOGY TECH_FLIGHT
+    expect(buildingVariantFor('MAORI', 'AMPHITHEATER')!.tourismPerFeature).toEqual({ amount: 1, tech: 'FLIGHT' });
+    const plant = (s: { state: GameState; city: City }) => {
+      s.city.buildings.push('AMPHITHEATER');
+      const own = s.state.map.tiles.filter((t) => t.ownerCity === s.city.id && t.index !== s.city.centerIndex);
+      expect(own.length).toBeGreaterThanOrEqual(3);
+      own[0]!.feature = 'WOODS';
+      own[1]!.feature = 'MARSH';
+      own[2]!.feature = 'ICE'; // a feature is a feature: the clause names no passability
+    };
+    const m = scene('MAORI');
+    plant(m);
+    expect(buildingTourism(m.state, 0, [m.city])).toBe(0);
+    grantTechs(m.state, 'FLIGHT');
+    expect(buildingTourism(m.state, 0, [m.city])).toBe(3);
+    const r = scene('ROME');
+    plant(r);
+    grantTechs(r.state, 'FLIGHT');
+    expect(buildingTourism(r.state, 0, [r.city])).toBe(0);
+  });
+
+  it('pays the Thermal Bath 3 Tourism while its city holds a Geothermal Fissure', () => {
+    // CIV6 (THERMALBATH_ADDTOURISM): EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE
+    // Amount 3 behind REQUIREMENT_CITY_HAS_X_FEATURE_TYPE FEATURE_GEOTHERMAL_FISSURE 1
+    expect(buildingVariantFor('HUNGARY', 'ZOO')!.tourismWithFeature).toEqual({ feature: 'GEOTHERMAL_FISSURE', amount: 3 });
+    const h = scene('HUNGARY');
+    h.city.buildings.push('ZOO');
+    expect(buildingTourism(h.state, 0, [h.city])).toBe(0);
+    const own = h.state.map.tiles.filter((t) => t.ownerCity === h.city.id && t.index !== h.city.centerIndex);
+    own[0]!.feature = 'GEOTHERMAL_FISSURE';
+    expect(buildingTourism(h.state, 0, [h.city])).toBe(3);
+    own[1]!.feature = 'GEOTHERMAL_FISSURE'; // "1 or more": a second fissure pays nothing more
+    expect(buildingTourism(h.state, 0, [h.city])).toBe(3);
+    const r = scene('ROME');
+    r.city.buildings.push('ZOO');
+    r.state.map.tiles.find((t) => t.ownerCity === r.city.id && t.index !== r.city.centerIndex)!.feature = 'GEOTHERMAL_FISSURE';
+    expect(buildingTourism(r.state, 0, [r.city])).toBe(0);
   });
 
   it('takes the Marae off the Amphitheater’s Great Work slots', () => {

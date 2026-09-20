@@ -2148,6 +2148,12 @@ export function buildRules() {
         trainMovementClasses: (v.trainMovementClasses ?? []).map((c) => PROMO_CLASSES.indexOf(c)),
         amenitiesWithFeature: v.amenitiesWithFeature
           ? [featIdx.get(v.amenitiesWithFeature.feature) ?? -1, v.amenitiesWithFeature.amount] : [-1, 0],
+        techYieldTech: v.techYields ? techIdx.get(v.techYields.tech) ?? -1 : -1,
+        techYields: YIELD_KEYS.map((k) => v.techYields?.yields[k] ?? 0),
+        tourPerFeat: v.tourismPerFeature?.amount ?? 0,
+        tourPerFeatTech: v.tourismPerFeature?.tech ? techIdx.get(v.tourismPerFeature.tech) ?? -1 : -1,
+        tourismWithFeature: v.tourismWithFeature
+          ? [featIdx.get(v.tourismWithFeature.feature) ?? -1, v.tourismWithFeature.amount] : [-1, 0],
         districtAdjacencyAsFaith: v.districtAdjacencyAsFaith ? 1 : 0,
       })),
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror

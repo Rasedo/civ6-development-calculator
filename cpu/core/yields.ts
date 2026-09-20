@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, civOf, seatOf, tileBelongsTo , civVariantOf } from './seats';
+import { citiesOf, civOf, seatOf, tileBelongsTo, civVariantOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
@@ -657,12 +657,14 @@ export function regionalEffects(
   // POWERED pays it, whether or not the source that paid the base was.
   const seenPowered = new Set<string>();
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
+  const civ = civOf(state, city.seat);
+  const techs = seatOf(state, city.seat)?.research.techs ?? [];
   for (const other of citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged source is dark
       for (const id of other.buildings) {
-        const def = effectiveBuilding(civOf(state, city.seat), id);
+        const def = effectiveBuilding(civ, id);
         if (!def || !def.regional || def.district !== inst.type) continue;
         // CIV6 (Tesla, Paxton): the SOURCE district's own reach bonus, on
         // top of the row's range or the shared one
@@ -675,6 +677,11 @@ export function regionalEffects(
         if (every || !seen.has(id)) {
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
+          // CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
+          // yields the row pays once its owner holds the technology ride
+          // the same reach as its own
+          const ty = buildingVariantFor(civ, id)?.techYields;
+          if (ty && techs.includes(ty.tech)) addYields(out.yields, ty.yields);
           if (def.amenities) out.amenities += def.amenities;
           // ...and each regional building of a Tesla / Paxton district
           // carries the district's extra yield to the same receivers

@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -835,6 +835,38 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
   return t;
 }
 
+/** CIV6 (Marae, MARAE_TOURISM_FEATURES; Thermal Bath, THERMALBATH_ADDTOURISM):
+ *  the Tourism a unique building pays its city — per owned tile carrying a
+ *  feature (EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE names no passability)
+ *  once Flight is held, or flat while the border holds a Geothermal
+ *  Fissure. A dark building (its district or itself pillaged) pays
+ *  nothing. */
+export function buildingTourism(state: GameState, seat: number, cities: readonly City[]): number {
+  const civ = civOf(state, seat);
+  const techs = seatOf(state, seat)?.research.techs ?? [];
+  let t = 0;
+  for (const c of cities) {
+    const dark = darkBuildings(state.map, c);
+    for (const id of c.buildings) {
+      if (dark.has(id)) continue;
+      const bv = buildingVariantFor(civ, id);
+      if (!bv) continue;
+      const pf = bv.tourismPerFeature;
+      if (pf && (!pf.tech || techs.includes(pf.tech))) {
+        let n = 0;
+        for (const tile of state.map.tiles) {
+          if (tileSeat(tile) !== seat || tile.ownerCity !== c.id) continue;
+          if (tile.feature !== null) n += 1;
+        }
+        t += pf.amount * n;
+      }
+      const wf = bv.tourismWithFeature;
+      if (wf && cityHasFeature(state, c, wf.feature)) t += wf.amount;
+    }
+  }
+  return t;
+}
+
 export function seatTourism(
   state: GameState,
   seat: number,
@@ -858,7 +890,7 @@ export function seatTourism(
   // same snapshot the loyalty payout used, taken before any loyalty moved.
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
-  return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities)
+  return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities) + buildingTourism(state, seat, cities)
     + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null,

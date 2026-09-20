@@ -15,10 +15,14 @@ Checks:
      row playing Rome, nothing for another row; the queue price halves.
   D. the Stave Church: the Holy Site's adjacency gains +1 per Woods where
      Norway's city holds the Temple; the coast-resource Production term.
+  E. the tourism trio: the Electronics Factory's regional Culture after
+     Electricity (`_seat_regional`), the Marae's Tourism per feature tile
+     after Flight and the Thermal Bath's on a fissure (`_building_tourism`).
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -314,6 +318,97 @@ def main() -> None:
         print(f"  D Stave Church OK (adjacency {base} -> {stave}; coast production +{d})")
     else:
         print(f"  D Stave Church OK (adjacency {base} -> {stave}; no coast beside the capital)")
+    # -- E: the tourism trio ------------------------------------------------
+    _bids = [b["id"] for b in rules.buildings]
+    _tids = [t["id"] for t in json.loads((Path(__file__).resolve().parent.parent.parent
+                                         / "seeder" / "worlds" / "rules.json").read_text())["techs"]]
+    fac, amph, zoo = (_bids.index(x) for x in ("FACTORY", "AMPHITHEATER", "ZOO"))
+    elec, flight = _tids.index("ELECTRICITY"), _tids.index("FLIGHT")
+
+    def bump(sim):
+        sim._eff_version += 1
+        sim._gen_ver += 1
+        sim._bldg_version += 1
+
+    # the Electronics Factory: +4 Culture after Electricity, on the REGIONAL reach
+    sim = fresh(rules, path)
+    play(sim, rome, "JAPAN")
+    iz = sim._iz_idx
+    assert iz >= 0
+    ctr = int(sim.city_center[0, rome, 0])
+    site = next(int(x) for x in sim.neigh[ctr].tolist()
+                if x >= 0 and int(sim.tile_seat[0, x]) == rome and not bool(sim.water[0, x])
+                and int(sim.district[0, x]) < 0)
+    clear_tile(sim, site)
+    sim.district[0, site] = iz
+    sim.district_complete[0, site] = True
+    sim.city_dist_tile[0, rome, 0, iz] = site
+    sim.city_bldg[0, rome, 0, fac] = True
+    bump(sim)
+    reg = sim._seat_regional(rome)
+    assert reg is not None, "a Factory is a regional row"
+    y0 = reg[0][0, 0].tolist()
+    assert y0[1] == 3.0 and y0[4] == 0.0, f"before Electricity: {y0}"
+    sim.civ_techs[0, rome, elec] = True
+    bump(sim)
+    y1 = sim._seat_regional(rome)[0][0, 0].tolist()
+    assert y1[1] == 3.0 and y1[4] == 4.0, f"CIV6 (ELECTRONICSFACTORY_CULTURE): +4 Culture after Electricity, got {y1}"
+    play(sim, rome, "ROME")
+    y2 = sim._seat_regional(rome)[0][0, 0].tolist()
+    assert y2[1] == 3.0 and y2[4] == 0.0, f"another civilization's Factory reads no tech: {y2}"
+    print("  E Electronics Factory OK (regional Culture 0 -> 4 on Electricity)")
+
+    # the Marae: a Tourism per feature tile of the city after Flight
+    sim = fresh(rules, path)
+    play(sim, rome, "MAORI")
+    sim.city_bldg[0, rome, 0, amph] = True
+    bump(sim)
+    sl = sim.city_slot_at(rome)[0]
+    owned = (sl == 0).nonzero().flatten().tolist()
+    assert len(owned) >= 3
+    # two Woods planted on owned ground (over whatever stood there): the
+    # count below reads the tiles as they are, so the scene needs no bare tile
+    bare = [x for x in owned if x != int(sim.city_center[0, rome, 0])][:2]
+    assert len(bare) == 2, "the scene wants two owned tiles beside the centre"
+    for x in bare:
+        sim.feat_id[0, x] = sim._woods_feat
+        sim.feat_stripped[0, x] = False
+    n_feat = sum(1 for x in owned if int(sim.feat_id[0, x]) >= 0 and not bool(sim.feat_stripped[0, x]))
+    assert n_feat >= 2
+    assert int(sim._building_tourism(rome)[0]) == 0, "the Marae's Tourism waits on Flight"
+    sim.civ_techs[0, rome, flight] = True
+    bump(sim)
+    got = int(sim._building_tourism(rome)[0])
+    assert got == n_feat, f"CIV6 (MARAE_TOURISM_FEATURES): 1 per feature tile ({n_feat}), got {got}"
+    play(sim, rome, "ROME")
+    assert int(sim._building_tourism(rome)[0]) == 0, "another civilization's Amphitheater pays none"
+    print(f"  E Marae OK ({n_feat} feature tiles -> {got} Tourism after Flight)")
+
+    # the Thermal Bath: 3 Tourism while the city holds a Geothermal Fissure
+    sim = fresh(rules, path)
+    play(sim, rome, "HUNGARY")
+    _zv = next(v for v in rules.buildings[zoo]["variants"] if int(v["civ"]) == C["HUNGARY"])
+    geo, amt = int(_zv["tourismWithFeature"][0]), int(_zv["tourismWithFeature"][1])
+    assert geo >= 0 and geo == int(_zv["amenitiesWithFeature"][0]) and amt == 3
+    sim.city_bldg[0, rome, 0, zoo] = True
+    bump(sim)
+    sl = sim.city_slot_at(rome)[0]
+    owned = [x for x in (sl == 0).nonzero().flatten().tolist() if x != int(sim.city_center[0, rome, 0])]
+    for x in owned:
+        if int(sim.feat_id[0, x]) == geo:
+            sim.feat_id[0, x] = -1
+    assert len(owned) >= 2
+    assert int(sim._building_tourism(rome)[0]) == 0, "no fissure, no Tourism"
+    x = owned[0]
+    sim.feat_id[0, x] = geo
+    sim.feat_stripped[0, x] = False
+    assert int(sim._building_tourism(rome)[0]) == amt, "CIV6 (THERMALBATH_ADDTOURISM): +3 while the city holds a fissure"
+    y = owned[1]
+    sim.feat_id[0, y] = geo
+    assert int(sim._building_tourism(rome)[0]) == amt, "'1 or more': a second fissure pays nothing more"
+    play(sim, rome, "ROME")
+    assert int(sim._building_tourism(rome)[0]) == 0, "another civilization's Zoo pays none"
+    print("  E Thermal Bath OK (3 Tourism on a fissure, once)")
     print("UNIQUE INFRASTRUCTURE OK")
 
 

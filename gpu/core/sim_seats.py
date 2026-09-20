@@ -8840,6 +8840,16 @@ class SimSeats:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * bcol["yields"][:, n, :].reshape(B, 1, 6)
+            # CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
+            # yields the row pays once its owner holds the technology ride
+            # the same reach as its own
+            if row < self.n_majors:
+                for (_tbi, _tciv), (_tt, _ty) in self._bvar_tech_y.items():
+                    if _tbi != n:
+                        continue
+                    _tw = self._row_plays_idx(row, _tciv) & self.civ_techs[:, row, _tt]
+                    if bool(_tw.any()):
+                        y6 = y6 + (hf * _tw.double().unsqueeze(1)).unsqueeze(2) * _ty.double().reshape(1, 1, 6)
             am = am + hf * bcol["amenities"][:, n].reshape(B, 1)
             if _gp_on:
                 # the extra is the PAYING source's: TS's `seen` set pays the first

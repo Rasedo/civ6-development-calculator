@@ -2920,6 +2920,15 @@ class SimInit:
         self._bvar_amen_feat = {(bi, c): (int(v["amenitiesWithFeature"][0]), float(v["amenitiesWithFeature"][1]))
                                 for bi, c, v in self._bvar_cols if int(v["amenitiesWithFeature"][0]) >= 0}
         self._bvar_adj_faith = {(bi, c) for bi, c, v in self._bvar_cols if int(v["districtAdjacencyAsFaith"])}
+        # CIV6 (Electronics Factory): yields once the owner holds a technology
+        self._bvar_tech_y = {(bi, c): (int(v["techYieldTech"]), torch.tensor([float(x) for x in v["techYields"]], dtype=dtype, device=device))
+                             for bi, c, v in self._bvar_cols if int(v["techYieldTech"]) >= 0}
+        # CIV6 (Marae): Tourism per passable-feature tile of the city, behind a technology
+        self._bvar_tour_feat = {(bi, c): (int(v["tourPerFeat"]), int(v["tourPerFeatTech"]))
+                                for bi, c, v in self._bvar_cols if int(v["tourPerFeat"]) != 0}
+        # CIV6 (Thermal Bath): Tourism while the border holds a tile of one feature
+        self._bvar_tour_with_feat = {(bi, c): (int(v["tourismWithFeature"][0]), int(v["tourismWithFeature"][1]))
+                                     for bi, c, v in self._bvar_cols if int(v["tourismWithFeature"][0]) >= 0}
         self._bvar_no_gw = {(bi, c) for bi, c, v in self._bvar_cols if int(v["noGreatWorks"])}
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
