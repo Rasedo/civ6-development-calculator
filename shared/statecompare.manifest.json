@@ -2728,6 +2728,10 @@
   "exclusions": {
     "ts": [
       {
+        "path": "GameState.aidHit",
+        "why": "a within-phase transient: the seats whose city lost population to a random event THIS disaster phase, read and cleared at the phase's end (the Aid Request trigger). The GPU's `_aid_hit` lives and dies inside `_disaster_phase` the same way; neither survives to a compare point."
+      },
+      {
         "path": "GameState.map",
         "why": "the map's dynamic surface is the `tile` group; the container itself holds nothing else."
       },
