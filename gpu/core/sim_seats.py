@@ -6606,10 +6606,14 @@ class SimSeats:
             done = run & (self.comp_left <= 0)
             if bool(done.any()):
                 self._competition_podium(done)
+                # the TS drops the RECORD (`state.competition = undefined`),
+                # so every plane of the slot reads as no competition —
+                # the target too (9248 t72: an ended Aid Request left it)
                 self.comp_kind[done] = -1
                 self.comp_left[done] = 0
                 self.comp_member[done] = False
                 self.comp_score[done] = 0
+                self.comp_target[done] = -1
         self.civ_co2_turn[:] = 0
         self.civ_gpp_turn[:] = 0
 

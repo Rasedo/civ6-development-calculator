@@ -154,7 +154,12 @@ def main() -> int:
     assert float(sim.civ_diplo_points[B0, 0]) - dv0[0] == 2.0, "2 Diplomatic Victory points to the winner"
     assert float(sim.civ_diplo_favor[B0, 0]) - fv[0] == 100.0 and float(sim.civ_diplo_favor[B0, 2]) - fv[2] == 0.0
     assert float(sim.civ_diplo_points[B0, 1]) == dv0[1] and float(sim.civ_diplo_favor[B0, 1]) == fv[1], "the target takes nothing"
-    sim.comp_kind[B0] = -1
+    # the END through the real path: the slot reads as no competition on
+    # every plane, the target included (the TS drops the record whole; 9248 t72)
+    sim.comp_left[B0] = 1
+    sim._resolve_competition()
+    assert int(sim.comp_kind[B0]) == -1 and int(sim.comp_target[B0]) == -1 and int(sim.comp_left[B0]) == 0
+    assert not bool(sim.comp_member[B0].any()) and float(sim.comp_score[B0].abs().sum()) == 0.0
     print("  3 Aid Request OK — triggered against the lowest victim, gold / project / war / pollution scored, 2 DVP + 100 Favor to the winner")
     print("COMPETITION REWARDS OK")
     return 0
