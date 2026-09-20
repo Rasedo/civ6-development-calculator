@@ -7967,7 +7967,10 @@ class SimSeats:
             kum = self._suz_effect(row, self._suz_c_route)
             if bool(kum.any()):
                 spec_o = self._district_counts(row)[1].gather(1, from_j).double()
-                kf = kum.double().unsqueeze(1) * pc * spec_o
+                # the PAYING leg, not `pc`: Sovereignty doubles what the MINOR
+                # pays the route, never the suzerain's own bonus (9170 t240:
+                # three districts paid 12 culture here and 6 on TS)
+                kf = kum.double().unsqueeze(1) * pays_c.double() * spec_o
                 inc.scatter_add_(1, from_j * 6 + 4, self._suz_route_cul * kf)
                 inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
             # the destination's Trading Post gold (`_route_post_gold`) —

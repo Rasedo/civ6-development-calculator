@@ -128,6 +128,22 @@ def main() -> None:
     cul_0, gold_0 = float(inc0[0, col, 4]), float(inc0[0, col, 2])
     assert abs((cul_s - cul_0) - sim._suz_route_cul * 1) < 1e-9, (cul_s, cul_0)
     assert abs((gold_s - gold_0) - sim._suz_route_gold * 1) < 1e-9, (gold_s, gold_0)
+    # SOVEREIGNTY outcome A on this minor's TYPE doubles what the MINOR pays
+    # the route, never Kumasi's own term (9170 t240: the GPU paid 12 for 6)
+    sov = sim._congress_at.get("SOVEREIGNTY", -1)
+    if sov >= 0:
+        saved_ca = sim.congress_active.clone()
+        sim.congress_active[0, 0] = torch.tensor([sov, 0, int(sim.citystate_type[0, 0])], device=sim.device)
+        hold(sim, 0, sim._suz_c_route)
+        inc2 = sim._seat_route_income(0)
+        drop(sim)
+        inc3 = sim._seat_route_income(0)
+        assert inc2 is not None and inc3 is not None
+        assert abs((float(inc2[0, col, 4]) - float(inc3[0, col, 4])) - sim._suz_route_cul) < 1e-9, "Sovereignty scaled Kumasi's culture"
+        assert abs((float(inc2[0, col, 2]) - float(inc3[0, col, 2])) - sim._suz_route_gold) < 1e-9, "Sovereignty scaled Kumasi's gold"
+        assert float(inc3[0, col, 2]) > gold_0, "the minor's own route gold was not doubled"
+        sim.congress_active.copy_(saved_ca)
+        sim._eff_version += 1
     sim.seat_routes[0, 0, 0, :] = -1
     sim._eff_version += 1
     print("kumasi ok")

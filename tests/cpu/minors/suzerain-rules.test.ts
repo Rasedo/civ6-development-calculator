@@ -15,7 +15,9 @@ import {
   ANSHAN_RELIC_SCIENCE,
   KUMASI_ROUTE_CULTURE,
   KUMASI_ROUTE_GOLD,
+  CITY_STATE_TYPES,
 } from '../../../cpu/data/cityStates';
+import { CONGRESS_SOVEREIGNTY } from '../../../cpu/data/seats';
 import { REGIONAL_RANGE } from '../../../cpu/data/constants';
 import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT } from '../../../cpu/data/religion';
 import { tilesWithin } from '../../../world/hex';
@@ -127,6 +129,16 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     const without = cityTradeYields(state, city, 0);
     expect(withSuz.culture - without.culture).toBe(KUMASI_ROUTE_CULTURE * 2);
     expect(withSuz.gold - without.gold).toBe(KUMASI_ROUTE_GOLD * 2);
+    // SOVEREIGNTY outcome A on Kumasi's TYPE doubles what the MINOR pays the
+    // route, never Kumasi's own term (9170 t240: the GPU had scaled it)
+    state.congress = [{ res: CONGRESS_SOVEREIGNTY, outcome: 0, target: CITY_STATE_TYPES.indexOf('cultural') }];
+    kumasi.envoys = { 0: 3 };
+    const sovWith = cityTradeYields(state, city, 0);
+    kumasi.envoys = {};
+    const sovWithout = cityTradeYields(state, city, 0);
+    expect(sovWith.culture - sovWithout.culture).toBe(KUMASI_ROUTE_CULTURE * 2);
+    expect(sovWith.gold - sovWithout.gold).toBe(KUMASI_ROUTE_GOLD * 2);
+    expect(sovWithout.gold).toBeGreaterThan(without.gold); // the minor's own yield IS doubled
   });
 
   it('Jerusalem: completed-Holy-Site cities exert pressure like the Holy City', () => {
