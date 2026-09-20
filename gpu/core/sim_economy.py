@@ -3817,9 +3817,12 @@ class SimEconomy:
         """(near3, terr) — [B, O, T] bool planes for the enhancer combat
         adders. terr[b, g, t] = tile t is OWNED by a city following religion g;
         near3[b, g, t] = some city following g has its CENTER within
-        justWarRange of t. ONE derivation per plane over rows 0..n_majors-1 of the merged
-        city block — `tile_city` holds PERSISTENT ids for every seat, so one
-        id match answers for every row. Keyed (turn, _eff_version):
+        justWarRange of t. `terr` is derived over the majors' rows AND the Free
+        Cities row (TS's `cityAtTile` resolves a Free City through
+        `seatOf(FREE_SEAT)`; a city-state's tile answers nobody on either
+        engine); `near3` over the majors alone (TS's `allCities` is
+        `state.seats`). `tile_city` holds PERSISTENT ids for every seat, so
+        one id match answers for every row. Keyed (turn, _eff_version):
         followedReligion moves once per turn (_spread_religious_pressure) and
         every city-set/ownership change (founding, capture, transfer, claim,
         compaction) bumps _eff_version — so the keyed cache IS the TS live
@@ -3832,22 +3835,23 @@ class SimEconomy:
         nrow, RC = self.n_majors, self.RC
         alive = self.city_alive[:, :nrow]                  # [B, n_majors, RC]
         fol = self.city_followed[:, :nrow, :RC]            # [B, n_majors, RC]
-        ids = self.city_id[:, :nrow, :RC]                  # [B, n_majors, RC]
         # per-tile followed religion of the OWNING city (-1 none). `tile_seat`
-        # names the row and `tile_city` the id within it; ids are per-seat
-        # monotonic, so the ALIVE match is unique.
+        # names the SEAT (a major's row, or FREE_SEAT for the free row) and
+        # `tile_city` the id within it; ids are per-seat monotonic, so the
+        # ALIVE match is unique. The free row rides along (9157 t215: a
+        # defender on a Free City's tile took Holy Ground on TS alone).
         tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        for row in range(nrow):
-            mine = self.tile_seat == row
+        for row, seat in [(r, r) for r in range(nrow)] + [(self.FREE_ROW, FREE_SEAT)]:
+            mine = self.tile_seat == seat
             if not bool(mine.any()):
                 continue
             hit = (
                 mine.unsqueeze(2)
-                & (self.tile_city.unsqueeze(2) == ids[:, row].unsqueeze(1))
-                & alive[:, row].unsqueeze(1)
+                & (self.tile_city.unsqueeze(2) == self.city_id[:, row, :RC].unsqueeze(1))
+                & self.city_alive[:, row, :RC].unsqueeze(1)
             )
             tfol = torch.where(
-                hit.any(dim=2), fol[:, row].gather(1, hit.long().argmax(dim=2)), tfol
+                hit.any(dim=2), self.city_followed[:, row, :RC].gather(1, hit.long().argmax(dim=2)), tfol
             )
         terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).reshape(1, O, 1)  # [B, O, T]
         # near3: dilate FOLLOWING city centers by justWarRange (scatter_add

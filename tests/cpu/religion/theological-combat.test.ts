@@ -6,7 +6,7 @@ import { makeYieldCtx } from '../../../cpu/core/effects';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
 import { endTurn } from '../../../cpu/core/game';
-import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
+import { emptySeat, setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
 import { UNITS } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
@@ -142,6 +142,23 @@ describe('theological combat: location, flanking and the advance', () => {
     tile.elevation = 'HILLS';
     expect(theoDefenseStrength(state, def, tile))
       .toBe(THEO_HOLY_GROUND_STRENGTH + THEO_HOLY_CITY_STRENGTH + FORT_DEFENSE_CS);
+  });
+
+  it('a FREE CITY\'s territory pays Holy Ground too', () => {
+    // the Free Cities are a foreign player: `cityAtTile` resolves them through
+    // `seatOf(FREE_SEAT)`, and the GPU's territory plane carries the free row
+    // (9157 t215 paid the +5 on one engine only)
+    const { state, def, city, seat1 } = holyScene();
+    const tile = state.map.tiles[def.tileIndex];
+    const free = freeSeatOf(state);
+    state.seats[0]!.cities = state.seats[0]!.cities.filter((c) => c !== city);
+    city.seat = FREE_SEAT;
+    free.cities.push(city);
+    setTileOwner(tile, FREE_SEAT, city.id);
+    city.followedReligion = seat1.seat;
+    expect(theoDefenseStrength(state, def, tile)).toBe(THEO_HOLY_GROUND_STRENGTH);
+    city.followedReligion = null;
+    expect(theoDefenseStrength(state, def, tile)).toBe(0);
   });
 
   it('the attacker enters the tile of the defender it kills', () => {

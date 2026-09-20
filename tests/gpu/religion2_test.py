@@ -837,6 +837,24 @@ def poke_theo_location(rules, rj, path):
         assert int(sim._theo_def_strength(seat, tile)[0]) == both + sim._fort_def_cs, \
             "a FORT is an improvement and does count"
         sim.improvement[0, ctr] = -1
+    # a FREE CITY's territory pays Holy Ground too: TS's `cityAtTile` resolves
+    # the free seat, so the `terr` plane carries the free row (9157 t215)
+    fr = sim.FREE_ROW
+    free_seat = int(sim._ROW_SEAT[fr])
+    t2 = next(t for t in range(sim.T) if int(sim.tile_seat[0, t]) < 0 and not bool(sim.water[0, t]))
+    sim.holy_tile[0, g] = -1
+    sim.city_alive[0, fr, 0] = True
+    sim.city_id[0, fr, 0] = 7
+    sim.city_followed[0, fr, 0] = g
+    sim.tile_seat[0, t2] = free_seat
+    sim.tile_city[0, t2] = 7
+    sim._rel_planes_cache = None
+    sim._eff_version += 1
+    assert int(sim._theo_def_strength(seat, torch.tensor([t2]))[0]) == sim._theo_holy_ground, \
+        "a defender on a Free City's tile following the religion takes Holy Ground"
+    sim.city_followed[0, fr, 0] = -1
+    sim._rel_planes_cache = None
+    assert int(sim._theo_def_strength(seat, torch.tensor([t2]))[0]) == 0, "...and none when it follows nothing"
 
     # a seat with no religion of its own reads nothing
     assert int(sim._theo_def_strength(torch.tensor([200]), tile)[0]) == 0
