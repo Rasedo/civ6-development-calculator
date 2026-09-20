@@ -52,9 +52,11 @@ export const MASK_AIR = CLASS_BIT.AIR_FIGHTER | CLASS_BIT.AIR_BOMBER;
 
 /** CIV6 (Rock Band promotions, Expansion2_UnitPromotions): the VENUE KINDS
  *  the band's rows name — the bit a concert tile presents to a `BAND_LEVEL`
- *  or `BAND_VENUE` mask. A district counts only complete. The Street
- *  Carnival, Acropolis, Royal Navy Dockyard and Water Street Carnival
- *  clauses arrive with the unique districts. */
+ *  or `BAND_VENUE` mask. A district counts only complete. The install's
+ *  per-variant rows (ROCKBAND_ARENA_ROCK_CARNIVAL, _REGGAE_ROCK_CARNIVAL,
+ *  _GLAM_ROCK_ACROPOLIS, _SURF_ROCK_ROYAL_NAVY_DOCKYARD / _COTHON) need no
+ *  bit of their own: a unique district is a `civVariants` entry on its base
+ *  row and its tile keeps the base id, so the base bit answers for it. */
 export const BAND_VENUE_BIT = {
   WONDER: 1, ENTERTAINMENT_COMPLEX: 2, THEATER_SQUARE: 4, WATER_PARK: 8,
   NATIONAL_PARK: 16, NATURAL_WONDER: 32, SPACEPORT: 64, CAMPUS: 128,

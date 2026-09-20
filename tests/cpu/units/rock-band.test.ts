@@ -6,7 +6,10 @@ import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { spawnUnit, concertVenue, concertVenueBits, performConcert, unitFullMoves } from '../../../cpu/core/units';
 import { purchaseRockBand, rockBandCost } from '../../../cpu/core/game';
 import { nextRandom } from '../../../cpu/core/rand';
-import { promoCount, promoReady, unitPromoRows } from '../../../cpu/core/promotions';
+import { promoCount, promoReady, unitPromoRows, promoValueFor } from '../../../cpu/core/promotions';
+import { civVariantOf } from '../../../cpu/core/seats';
+import { DISTRICTS } from '../../../cpu/data/districts';
+import { CIV_LEADERS } from '../../../world/roster';
 import {
   BAND_VENUE_BIT, CONCERT_SHARE_RANGE, PROMO_OFFER_DRAW, ROCK_BAND_MAX_PROMOTIONS,
 } from '../../../cpu/data/promotions';
@@ -167,6 +170,26 @@ describe('the venue read', () => {
     state.map.tiles[w].builtWonder = 'PYRAMIDS';
     state.map.tiles[w].builtWonderComplete = true;
     expect(concertVenueBits(state, w)).toBe(BAND_VENUE_BIT.WONDER);
+  });
+
+  it('a unique district keeps its base id, so the venue promotions cover the Street Carnival, Copacabana, Acropolis and Royal Navy Dockyard', () => {
+    // CIV6 (ROCKBAND_ARENA_ROCK_CARNIVAL, _REGGAE_ROCK_CARNIVAL,
+    // _GLAM_ROCK_ACROPOLIS, _SURF_ROCK_ROYAL_NAVY_DOCKYARD): the install writes
+    // one row per unique district; here a unique district is its base row's
+    // `civVariants` entry and the tile carries the base id the bit reads
+    const { state, theirs } = twoSeatGame();
+    seatOf(state, 1)!.civ = CIV_LEADERS.findIndex((r) => r.civ === 'BRAZIL');
+    expect(civVariantOf(state, 1, DISTRICTS.ENTERTAINMENT_COMPLEX.civVariants)?.name).toBe('Street Carnival');
+    const carnival = venueTile(state, theirs, 'ARENA');
+    expect(state.map.tiles[carnival].district).toBe('ENTERTAINMENT_COMPLEX');
+    const bits = concertVenueBits(state, carnival);
+    expect(bits).toBe(BAND_VENUE_BIT.ENTERTAINMENT_COMPLEX);
+    expect(promoValueFor(band(state, carnival, 0, ['ARENA_ROCK']), 'BAND_LEVEL', bits)).toBe(2);
+    expect(promoValueFor(band(state, carnival, 0, ['GLAM_ROCK']), 'BAND_LEVEL', bits)).toBe(0);
+    // the other three are the same construction
+    expect(DISTRICTS.WATER_PARK.civVariants?.some((v) => v.civ === 'BRAZIL')).toBe(true);
+    expect(DISTRICTS.THEATER_SQUARE.civVariants?.some((v) => v.civ === 'GREECE')).toBe(true);
+    expect(DISTRICTS.HARBOR.civVariants?.some((v) => v.civ === 'ENGLAND')).toBe(true);
   });
 
   it('an UNFINISHED district and a bare tile are both worth nothing', () => {

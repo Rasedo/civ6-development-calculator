@@ -47,7 +47,7 @@ re-adds them.
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
-| C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, the Rock Band's venue bits, resource visibility |
+| C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, resource visibility |
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's threshold (on C-34's damage); citizens killed per ring and a wonder in the blast (ask 5) |
 | C-34 air combat's second half | 2 | fighter interception (unsourced roll); Patrol and Priority Target carry no data |
 | C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
@@ -133,7 +133,6 @@ close in the same commit.
   The census is `docs/ROSTER.md` against `docs/roster_ledger.json` (`shipped` on 338 of 343 modifiers, `open: <item>` on 5 under C-64 and C-67). Unique units are C-78, unique infrastructure C-79.
   - BLOCKER C-76: the AGENDAS, DLL-scored against an opinion scale neither engine has.
   - DLL, recorded: whether Trajan's grant fires on a CONQUERED city (founding ships); whether Iteru's flood avoid also skips the fertility half; whether the Knarr's Ocean clause reaches a Trader's course (`tradeWaterLevel` stays Cartography-gated); the Great Turkish Bombard's strike on a city.
-  - BUILD: the ROCK BAND's four venue clauses (`Expansion2_UnitPromotions.xml`: Arena Rock / Street Carnival, Reggae Rock / Copacabana, Glam Rock / Acropolis, Surf Band / Royal Navy Dockyard) — the venues are built; the promotion's own venue bit is not read.
   - BUILD: the engine has no resource VISIBILITY, so the Stave Church counts every coastal resource where the install counts the visible ones.
   - Recorded allowlist: a CITY's own ranged strike composes its defender without the roster's rows (`cityStrikeStrength`'s block in `seatPhase`; the site census in `combat-rows.test.ts` / `combat_rows_test.py` names it).
 - **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 1.
