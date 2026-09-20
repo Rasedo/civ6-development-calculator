@@ -496,7 +496,8 @@ def main() -> int:
                 f"at 5."
             )
             print("Per-commit bar: compile bar + single-seed smoke serve "
-                  "(python gpu/serve_gate.py --batched --seeds <s> --turns 250).")
+                  "(python gpu/battery.py --seeds <s> --ckpt-every 20 — hunt mode, "
+                  "no verdict recorded).")
             return 2
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"

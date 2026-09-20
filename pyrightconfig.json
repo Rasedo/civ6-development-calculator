@@ -6,8 +6,6 @@
   ],
   "exclude": [
     "**/__pycache__",
-    "gpu/fixtures",
-    "gpu/fixtures_o4",
     "gpu/runs",
     ".venv"
   ],

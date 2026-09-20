@@ -6,7 +6,7 @@
  * engine has to reach the same state from the same file.
  *
  * These tests pin the contract: given a record, `seatPhase` applies it and does
- * NOT run its own ladder. The column layout comes from `src/core/prodLayout.ts`,
+ * NOT run its own ladder. The column layout comes from `cpu/core/prodLayout.ts`,
  * which the exporter also imports — one derivation, so the file format cannot
  * rot the way the civ mask rotted five units behind the picker.
  */

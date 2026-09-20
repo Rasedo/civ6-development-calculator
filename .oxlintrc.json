@@ -21,7 +21,6 @@
   },
   "ignorePatterns": [
     "dist",
-    "node_modules",
-    "gpu/fixtures"
+    "node_modules"
   ]
 }

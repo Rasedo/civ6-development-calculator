@@ -1,7 +1,7 @@
 /**
- * Tile improvements (9 total). In units mode a builder places these, spending
+ * Tile improvements. In units mode a builder places these, spending
  * one of its finite charges, and only where research allows: validImprovementsIn
- * (src/core/rules.ts) gates each on unlocks.improvements plus the hillFarms civic
+ * (cpu/core/rules.ts) gates each on unlocks.improvements plus the hillFarms civic
  * for hill farms. Sandbox mode is the exception — it bypasses all research gating.
  * Yields are base Civ 6 values (pre-tech-boost), every one sourced against the
  * Gathering Storm CIVILOPEDIA. No `eyeballed`/`approximate` markers remain.

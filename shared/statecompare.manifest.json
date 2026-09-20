@@ -3011,7 +3011,7 @@
       },
       {
         "plane": "winner",
-        "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
+        "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache would mean recomputing that derivation in the adapter. The manifest describes STATE; a derived quantity is compared through the observation that reads it."
       },
       {
         "plane": "centre_slot_at",

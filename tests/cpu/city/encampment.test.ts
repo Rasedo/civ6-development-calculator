@@ -9,8 +9,8 @@ import { citySpecialistSlots } from '../../../cpu/core/city';
 import { SPECIALIST_YIELDS } from '../../../cpu/data/greatPeople';
 import { EMERGENCY_TARGET_STRIKE_CS } from '../../../cpu/data/seats';
 
-// Encampment residuals — the TS twin of gpu/encampment_test.py.
-// Scripted parity (gpu/parity_test.py, 24 seeds) is the primary correctness
+// Encampment residuals — the TS twin of tests/gpu/encampment_test.py.
+// The battery's serve gate (24 seeds to turn 250) is the primary correctness
 // bar; these pin the three ruled items on the TS engine directly.
 
 function battlefield() {
