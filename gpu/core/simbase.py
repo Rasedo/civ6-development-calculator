@@ -492,7 +492,11 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         woods_feature=int(_P["woodsFeature"]),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
-        workshop_bidx=int(r.get("workshopBidx", -1)),
+        # a HARD read at the path the exporter writes (`seats.workshopBidx`):
+        # `r.get("workshopBidx", -1)` at the top level defaulted to -1 for
+        # every game and Leonardo's +3 Culture per Workshop paid nobody on this
+        # engine (9209 t246)
+        workshop_bidx=int(r["seats"]["workshopBidx"]),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
         shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),

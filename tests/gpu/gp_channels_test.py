@@ -226,6 +226,31 @@ def main() -> None:
     sim.tile_gp_perm[B0, t_iz] = 0
     sim.restore(snap)
     assert sim.tile_gp_perm[B0, t_iz].tolist() == [3, 2, 0], "tile_gp_perm must be in _MUTABLE"
+
+    # ---- 8. Leonardo da Vinci: "+3 Culture per Workshop" — the loader read
+    # `workshopBidx` off the TOP level of rules.json while the exporter writes
+    # it under `seats`, so the index was -1 in every game and the channel
+    # paid nobody on this engine (9209 t246)
+    assert sim._workshop_bidx == bidx["WORKSHOP"], f"the Workshop index must load: {sim._workshop_bidx}"
+    leo = find_person({col("perm", "workshopCulture"): 3.0})
+    sim.city_bldg[B0, 0, 0, bidx["WORKSHOP"]] = True
+    sim._bldg_version += 1
+    sim._eff_version += 1
+    _yf = sim._seat_amenity(0)[2][:, 0:1]
+    c0 = float(sim._seat_city_walk(0, 0, amen_yf=_yf)[B0, 0, 4])
+    spend(*leo, cap)
+    assert float(sim._gp_perm(0, "workshopCulture")[B0]) == 3.0
+    sim._eff_version += 1
+    c1 = float(sim._seat_city_walk(0, 0, amen_yf=_yf)[B0, 0, 4])
+    # +3 through the walk's own scalings (the amenity factor, then the seat's
+    # percent multipliers): the delta is 3 x a percent-shaped multiplier
+    _d = (c1 - c0) / (3.0 * float(_yf[B0, 0]))
+    assert _d >= 1.0 - 1e-9 and abs(_d - round(_d, 2)) < 1e-9, f"Leonardo: a standing Workshop must pay +3 Culture, {c0} -> {c1}"
+    sim.city_bldg[B0, 0, 0, bidx["WORKSHOP"]] = False
+    sim._bldg_version += 1
+    sim._eff_version += 1
+    assert float(sim._seat_city_walk(0, 0, amen_yf=_yf)[B0, 0, 4]) == c0, "no Workshop, no Culture"
+    print("  8 Leonardo OK — the Workshop index loads and +3 Culture rides each standing Workshop")
     print("gp_channels OK")
 
 
