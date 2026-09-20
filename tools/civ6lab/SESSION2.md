@@ -2,9 +2,11 @@
 
 Written 2026-09-14. The ledger's eight "ruling" lines were classified against
 the INSTALL on 2026-09-09; the live-game oracle came up on 2026-09-13, after
-that pass, and seven of the eight are facts the game will state when asked.
-This is the order to ask them in, one scene each, highest yield per minute
-first. The carry-overs from session 1 close the list.
+that pass, and six of the eight are facts the game will state when asked
+(the seventh, ask 6's opinion deltas, left the list on 2026-09-20: the
+opinion scale is the game's AI, not its engine). This is the order to ask
+them in, one scene each, highest yield per minute first. The carry-overs
+from session 1 close the list.
 
 Every Lua call named below is the panel's spelling as far as the first
 session used it; anything not exercised on 2026-09-13 is marked VERIFY and

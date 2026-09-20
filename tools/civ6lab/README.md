@@ -37,10 +37,11 @@ names its state and shows working calls.
 
 ## Experiments
 
-The SECOND session's scene list is `SESSION2.md`: the seven ledger lines
-the game can state (asks 2, 3, 5, 6, 10, 12, 13), ask 4's measurable half,
-and the carry-overs (the escape with TRAINED spies, the counterspy term,
-ask 9's longer watch).
+The SECOND session's scene list is `SESSION2.md`: the six ledger lines
+the game can state (asks 2, 3, 5, 10, 12, 13), ask 4's measurable half,
+the two provenance scenes (the purchase price, the Pop Star) and the
+research agreement's clock, and the carry-overs (the escape with TRAINED
+spies, the counterspy term, C-80 rule 2, ask 9's longer watch).
 
 ### `storm` — ASK 16, the storm walk
 
@@ -172,7 +173,5 @@ modifier's arguments and what attaches it.
     python tools/civ6lab/lab.py lua "print(GameClimate.GetNumActiveStorms())"
     python tools/civ6lab/lab.py lua --state InGame "print(Game.GetLocalPlayer())"
 
-The next asks in line: ASK 14 spy odds via
-`UnitManager.GetResultProbability(op, spy, plot)` (InGame; the UI reads its
-percentages from this call), and the district/unit cost progressions via
-`GetDistrictCost` / `GetUnitCost` under controlled tech and district counts.
+What to ask next is `SESSION2.md`, scene by scene — it is the live list,
+in the order the scenes pay.

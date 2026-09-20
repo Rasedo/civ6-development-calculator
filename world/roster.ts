@@ -1,8 +1,8 @@
 /** The roster: every civilization-leader pair the install ships, one row
  *  each. The seeder draws a world's trio from it, so it lives in world/. */
 
-/** CIV6 (Civilizations.xml): the install's civilizations — the first four
- *  are the developed ones, the rest wait on docs/ROSTER.md's clauses. */
+/** CIV6 (Civilizations.xml): the install's civilizations — every seat's
+ *  trait modifiers are paid but five; docs/ROSTER.md names those five. */
 export type CivId = 'ROME' | 'EGYPT' | 'NORWAY' | 'SUMERIA' | 'AMERICA' | 'ARABIA' | 'BRAZIL' | 'CANADA' | 'CHINA' | 'CREE' | 'ENGLAND' | 'FRANCE' | 'GEORGIA' | 'GERMANY' | 'GREECE' | 'HUNGARY' | 'INCA' | 'INDIA' | 'JAPAN' | 'KONGO' | 'KOREA' | 'MALI' | 'MAORI' | 'MAPUCHE' | 'MONGOLIA' | 'NETHERLANDS' | 'OTTOMAN' | 'PHOENICIA' | 'RUSSIA' | 'SCOTLAND' | 'SCYTHIA' | 'SPAIN' | 'SWEDEN' | 'ZULU';
 export const CIV_IDS: readonly CivId[] = ['ROME', 'EGYPT', 'NORWAY', 'SUMERIA', 'AMERICA', 'ARABIA', 'BRAZIL', 'CANADA', 'CHINA', 'CREE', 'ENGLAND', 'FRANCE', 'GEORGIA', 'GERMANY', 'GREECE', 'HUNGARY', 'INCA', 'INDIA', 'JAPAN', 'KONGO', 'KOREA', 'MALI', 'MAORI', 'MAPUCHE', 'MONGOLIA', 'NETHERLANDS', 'OTTOMAN', 'PHOENICIA', 'RUSSIA', 'SCOTLAND', 'SCYTHIA', 'SPAIN', 'SWEDEN', 'ZULU'];
 /** CIV6 (Leaders.xml): the leader each roster row plays — its leader

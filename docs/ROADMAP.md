@@ -12,24 +12,31 @@ Both engines are seat-symmetric: every actor is a seat (0 and the civ
 seats are the same kind of actor; city-states 100+; barbarians 200), all
 decisions ride one wire record schema computed once per (turn, seat) by
 `policy/drive.py`, and every fact has one seat-indexed storage base with
-row views. The serve gate (`gpu/serve_gate.py --batched`) is the parity
-instrument: obs equality, shared decisions, per-turn state digests over
-`shared/statecompare.manifest.json`.
+row views.
 
-Current phase: **AUDIT burn-down.** The next `npm run seed && npm run
-export` + serve run is the behavioural test for everything landed behind
-the freeze (wire verbs #104/#107, protagonist #75, the storage
-renumbering, the city-block unification #109, the vocabulary purge) and
-opens the hunt. After that, the open engine work in rough order:
+The parity instrument is the battery, `python gpu/battery.py`: the static
+gates, then seed and export, then the decision-server gate sharded over
+every fixture seed to turn 250 — obs equality, shared decisions, per-turn
+state digests over `shared/statecompare.manifest.json` — beside the TS
+suite and the gpu poke lanes. The gate is never run on its own; a green is
+the step count and head sha recorded in `stats/battery.jsonl`, never an
+exit code.
 
-- The one-galley naval column — drop `~unit_naval` and let the capability
-  gate both engines already agree on answer (task #121).
-- #73 seat-0 pantheon founding (GPU twin; storage rows are ready),
-  #74 seat-0 pool embark.
-- #97 district-placement fidelity + the tile choice onto the wire.
-- #108 driven unit-policy residuals; #83 projects/wonders action columns.
-- #72 switchable research (ships alone, re-baselines).
-- #76 AUDIT long tails (B-24 Ages/governors, B-22 Congress).
+Current phase: **AUDIT burn-down**, and what is left there is owner-shaped
+rather than a build queue:
+
+- **The question ledger** (`docs/AUDIT.md`) — the asks the source
+  under-determines. Neither engine ships a branch until the owner rules or
+  the live game answers.
+- **The live-game lab** — `tools/civ6lab/SESSION2.md` is the scene list
+  for the ledger lines the running game will state when asked; the lab
+  itself is `tools/civ6lab/README.md`.
+- **Two decisions only the owner can make** — whether this engine mirrors
+  the install's PER-GAME event counts or keeps rolling per object (ask 4),
+  and whether the diplomatic promises are worth a driver arm (C-2). Both
+  are written out in `docs/AUDIT.md`.
+
+P8 training stays parked until that file is empty.
 
 ## RL program (parked until the owner is satisfied with the engine)
 
@@ -49,8 +56,11 @@ Decisions bought with runs (do not re-litigate without new evidence):
   optionally sparse win/objective later.
 - **League telemetry**: CCE via α-Rank, not Nash (PPAD-complete,
   ill-posed selection).
-- The old scripted policy survives as the parity anchor and the
-  league's baseline opponent.
+- The scripted policy (`policy/drive.py`, `policy/ladder.py`) survives as
+  the parity anchor and the league's baseline opponent. It is our own AI,
+  not Civ 6's: the engine is what this program models, so the game's
+  opinion scale, agendas and preference weights are out of scope
+  (owner ruling 2026-09-20).
 - **Search verdict**: a 1-ply value-leaf search cannot beat a strong
   net's own greedy at any sampling temperature. The open lever is
   **M3** — train the value head on search-improved targets and batch
@@ -66,17 +76,20 @@ Decisions bought with runs (do not re-litigate without new evidence):
 
 ## Perf
 
-#81: cut GPU op COUNT — at B=12, ~83% of a step is fixed dispatch
-overhead, so fewer/larger ops beat faster ops. The measured half is
-blocked on the freeze. Standing discipline: every perf change is a
-bit-identical refactor (same values, same draw order, same float
-association); BLAS association is batch-shape-dependent so
-gate-equivalence is the bar; never read numbers off a contended box;
-one battery per stage. Drivers: `tools/cpu/perf-turns.ts` and the gpu
-profiling driver.
+The battery's wall is the bar, and the campaign that cut it (clean 650 s →
+344 s over six parity-verified rounds, closed 2026-09-15) bought it from
+WORK, not from lanes: fingerprint memos over recomputed planes, per-seat
+preludes, demoting poke lanes that never catch anything, and the TS
+composer memo. Narrower shards and fewer workers bought nothing — the box
+is 12 physical cores under 24 logical ones, so the wall is total CPU work
+divided by 12 and every lane's second is contention on the serve shards.
 
-## Training log convention
-
-When P8 opens, each rung's record (what changed, WHY — mechanism, not
-numbers — and the next rung) is appended under a `## Training log`
-heading in this file. Prior nets are disposable history.
+Standing discipline: every perf change is a bit-identical refactor (same
+values, same draw order, same float association); BLAS association is
+batch-shape-dependent, so gate-equivalence is the bar; never read numbers
+off a contended box — a measurement run is asked for, and labelled clean
+or contended; an optimisation never earns a run of its own, it lands on
+the next run that was wanted anyway. Instruments: the gate's own
+`--profile` / `--cprofile` split in the battery's hunt mode,
+`tools/gpu/profile_step.py`, `tools/gpu/bench.py` and
+`tools/cpu/perf-turns.ts`.
