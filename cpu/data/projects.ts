@@ -431,6 +431,15 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_TRAIN_ASTRONAUTS', 'ProjectType')] },
       },
     }),
+    // CIV6 (PROJECT_SEND_AID): Cost 200, no PrereqDistrict; open while the
+    // Aid Request runs, repeatable, scores 200 for the seat. APPENDED LAST.
+    P({ id: 'SEND_AID', name: 'Send Aid', district: 'CITY_CENTER', yield: null, gpClass: null, cost: 200, competitionOnly: 'AID_REQUEST', description: 'Repeatable while an Aid Request runs: scores 200 for this seat.',
+      src: {
+        district: { derived: 'CITY_CENTER where the install row names NO PrereqDistrict - the engine runs a district-free project in the one district every city has', inputs: [xml('Projects', 'ProjectType=PROJECT_SEND_AID', 'PrereqDistrict')] },
+        cost: xml('Projects', 'ProjectType=PROJECT_SEND_AID', 'Cost', { scale: GAME_SPEED }),
+        competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_SEND_AID', 'ProjectType')] },
+      },
+    }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
 

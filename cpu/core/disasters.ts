@@ -6,7 +6,8 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv } from './seats';
+import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -231,6 +232,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
       if (home && home.population > 1) {
         home.population -= 1;
         logPopWrite(state, home, 'ds');
+        (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
       }
     }
   }
@@ -322,6 +324,13 @@ export function disasterPhase(state: GameState): void {
     center.stormTurns = (center.stormTurns ?? 0) - 1;
     if (center.stormTurns <= 0) center.stormEvent = -1;
   }
+  // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
+  // phase's LOWEST victim civilization asks for aid — resolved once at the
+  // end, so the order the two engines walk the turn's events cannot pick a
+  // different victim; a city-state's or Free City's loss raises nothing
+  const hits = (state.aidHit ?? []).filter((s) => isCiv(s));
+  if (hits.length) raiseAidRequest(state, Math.min(...hits));
+  state.aidHit = undefined;
 }
 
 /**
@@ -452,6 +461,7 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
     if (home && home.population > 1) {
       home.population -= 1;
       logPopWrite(state, home, 'ds');
+      (state.aidHit ??= []).push(owner);  // CIV6 (Aid Request trigger)
     }
   }
   const landHit = rLand < ev.landP;

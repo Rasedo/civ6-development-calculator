@@ -1023,6 +1023,7 @@ DEAL_FAVOR_LOT = 5
 DEAL_FAVOR_PRICE = 20
 DEAL_FAVOR_SPARE = 10
 DEAL_BORDERS_PRICE = 20
+DEAL_AID_GIFT = 50      # what a member of an Aid Request sends its target
 
 
 def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
@@ -1071,6 +1072,12 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
             _put(a, b, losing, [_item(sim._deal_k_gold, DEAL_TRIBUTE)], [])
             quiet = (pair & ~sim.war[:, a, b] & ~sim._denounce_active(a, b)
                      & ~sim._denounce_active(b, a) & (sim.deal_offer_left[:, a, b] == 0))
+            # AID: while an Aid Request runs, a member with a purse to spare
+            # gifts the victim gold — the only one-sided table on the list
+            if sim._comp_aid >= 0:
+                aid = ((sim.comp_kind == sim._comp_aid) & (sim.comp_target == b)
+                       & sim.comp_member[:, a] & (gold >= DEAL_AID_GIFT * 2))
+                _put(a, b, quiet & aid, [_item(sim._deal_k_gold, DEAL_AID_GIFT)], [])
             # A PRISONER goes home for a price.
             _put(a, b, quiet & (sim.seat_spy_held[:, b, a].sum(dim=1) > 0),
                  [_item(sim._deal_k_spy)], [_item(sim._deal_k_gold, DEAL_SPY_PRICE)])

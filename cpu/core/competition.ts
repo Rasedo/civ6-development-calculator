@@ -23,7 +23,7 @@ import type { Era } from '../data/techs';
 import {
   COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_SILVER_PCT, COMPETITION_TURNS,
 } from '../data/seats';
-import { isCiv, seatOf } from './seats';
+import { civsAtWar, isCiv, seatOf } from './seats';
 import { getModifiers } from './effects';
 
 /** The competition running right now, if any. */
@@ -39,7 +39,7 @@ export function competitionOf(state: GameState): Competition | undefined {
  * ONE at a time. Real Civ 6 bounds nothing here; both engines carry a single
  * slot, which is what makes the score table a fixed plane.
  */
-export function startCompetition(state: GameState, kind: number, field: readonly number[]): void {
+export function startCompetition(state: GameState, kind: number, field: readonly number[], target = -1): void {
   if (kind < 0 || kind >= COMPETITIONS.length) return;
   const n = state.seats.length;
   const member = Array.from({ length: n }, () => 0);
@@ -47,7 +47,31 @@ export function startCompetition(state: GameState, kind: number, field: readonly
     const sx = seatOf(state, s);
     if (sx && isCiv(s) && sx.cities.length > 0) member[s] = 1;
   }
-  state.competition = { kind, left: COMPETITION_TURNS, score: Array.from({ length: n }, () => 0), member };
+  state.competition = { kind, left: COMPETITION_TURNS, score: Array.from({ length: n }, () => 0), member, target };
+}
+
+/** CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): a
+ *  civilization whose city lost population to a random event becomes the
+ *  TARGET of an Aid Request; every other civilization is its field. Nothing
+ *  is voted. ONE slot on both engines, so a running competition (voted or
+ *  triggered) leaves the request unraised. */
+export function raiseAidRequest(state: GameState, victim: number): void {
+  if (state.competition || !isCiv(victim)) return;
+  const kind = COMPETITIONS.findIndex((c) => c.triggered && c.id === 'AID_REQUEST');
+  if (kind < 0) return;
+  startCompetition(state, kind, state.seats.map((s) => s.seat).filter((s) => s !== victim), victim);
+  state.eventLog.push(`Aid Request: ${seatOf(state, victim)?.name ?? 'a civilization'} asks the world for help.`);
+}
+
+/** CIV6 (`FromGold`): "1 per gold gifted" — a member's gold reaching the
+ *  TARGET through a deal (a lump at acceptance, a per-turn payment at its
+ *  tick) scores per gold. */
+export function scoreGoldGift(state: GameState, giver: number, receiver: number, amount: number): void {
+  const c = state.competition;
+  if (!c || (c.target ?? -1) !== receiver || !c.member[giver] || amount <= 0) return;
+  for (const row of COMPETITIONS[c.kind]?.scored ?? []) {
+    if (row.source === 'gold') c.score[giver] += row.amount * amount;
+  }
 }
 
 /**
@@ -93,8 +117,17 @@ function scoreTurn(state: GameState, c: Competition): void {
             }
           }
           break;
+        // CIV6 (`FromAtWar`): every turn a member spends at war with the target
+        case 'atWar':
+          if ((c.target ?? -1) >= 0 && civsAtWar(state, i, c.target!)) gain += row.amount;
+          break;
+        // CIV6 (`FromBadCO2Footprint`): the WORLD's biggest polluter this turn
+        // (a tie shares it); nobody is bad in a world that emits nothing
+        case 'co2Top':
+          if (top > 0 && (sx.co2Turn ?? 0) === top) gain += row.amount;
+          break;
         default:
-          break;  // 'project' is an event, paid by `scoreProject`
+          break;  // 'project' and 'gold' are events, paid by `scoreProject` / `scoreGoldGift`
       }
     }
     c.score[i] += gain;

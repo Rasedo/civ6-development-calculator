@@ -104,6 +104,7 @@ class SimDeals:
             paid = torch.where(ok, va.to(self.civ_treasury.dtype), torch.zeros_like(self.civ_treasury[:, giver]))
             self.civ_treasury[:, giver] = self.civ_treasury[:, giver] - paid
             self.civ_treasury[:, taker] = self.civ_treasury[:, taker] + paid
+            self._score_gold_gift(giver, taker, paid)   # CIV6 (Aid Request, FromGold)
         elif kind == self._deal_k_gpt:
             pass  # the term pays it; accepting only starts the clock
         elif kind == self._deal_k_favor:
@@ -279,6 +280,7 @@ class SimDeals:
                                               torch.zeros_like(self.civ_treasury[:, a]))
                             self.civ_treasury[:, a] = self.civ_treasury[:, a] - amt
                             self.civ_treasury[:, b] = self.civ_treasury[:, b] + amt
+                            self._score_gold_gift(a, b, amt)   # CIV6 (Aid Request, FromGold)
                     self.deal_term_left[:, a, b] = torch.where(run, left - 1, left)
                     done = run & (self.deal_term_left[:, a, b] <= 0)
                     if bool(done.any()):

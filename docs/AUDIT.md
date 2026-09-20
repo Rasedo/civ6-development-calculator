@@ -36,7 +36,6 @@ re-adds them.
 | Open item | Weight | What is left |
 |---|---|---|
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; a model choice |
-| B-22r World Congress competitions | 1 | Aid Request (a gold-gift verb and a disaster trigger) |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
@@ -44,7 +43,7 @@ re-adds them.
 | B-54r unique-unit flank/support stacks | 1 | the Impi's and Hypaspist's own flank/support |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
-| **B. Fidelity vs real Civ 6** | **9** | |
+| **B. Fidelity vs real Civ 6** | **8** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
@@ -64,7 +63,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **31** | |
+| **OPEN, TOTAL** | **30** | |
 
 ## The question ledger — owner asks
 
@@ -96,9 +95,6 @@ close in the same commit.
 
 - **B-20r. A PARK'S ORIENTATION.** Weight 1.
   - ASK (not on the ledger — a model choice, no source will settle it): Civ 6 fixes the park rhombus's vertical; this hex frame has none, so every rhombus is offered. Nothing to build until a vertical is chosen.
-- **B-22r. WORLD CONGRESS COMPETITIONS.** Weight 1.
-  - BUILD — AID REQUEST, the one competition absent. Sourced: scores `FromGold` 1 per gold gifted, `FromProject` `PROJECT_SEND_AID` 200, `FromAtWar` -30, `FromBadCO2Footprint` -400; tiers 2 Diplomatic Victory points / 100 / 50 Favor. It needs a GOLD-GIFT verb (no engine can send gold to a named rival) and a disaster TRIGGER (the Congress does not vote it in).
-  - The Nobel Prize competitions are Sweden-only (C-26).
 - **B-24r. GOVERNOR TAILS.** Weight 1.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.
   - BLOCKER C-1: Renewable Subsidizer and Industrialist wait on the plants.

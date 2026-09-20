@@ -6108,7 +6108,7 @@ class SimSeats:
         if kind == 14:
             return max(1, len(self._spy_offensive))
         if kind == 15:
-            return max(1, len(self._comps))
+            return max(1, self._comp_voted_n)   # a triggered row is never on the ballot
         if kind == 16:
             return max(1, self._n_lux)
         return self.n_majors
@@ -6404,7 +6404,7 @@ class SimSeats:
                                          self.civ_wmd[:, r]))
 
     def _start_competition(self, fire: torch.Tensor, kind: torch.Tensor,
-                           field: torch.Tensor) -> None:
+                           field: torch.Tensor, target: torch.Tensor | None = None) -> None:
         """Enact one. CIV6: "players who vote in favor of the Scored
         Competition will compete to contribute to the cause", so the field is
         the A voters, and a seat with no city is not in the world to compete.
@@ -6417,6 +6417,38 @@ class SimSeats:
         self.comp_left[fire] = self._comp_turns
         self.comp_score[fire] = 0
         self.comp_member[fire] = (field & live)[fire]
+        self.comp_target[fire] = target[fire] if target is not None else -1
+
+    def _raise_aid_request(self, hit: torch.Tensor) -> None:
+        """`raiseAidRequest`'s twin — CIV6 (EMERGENCY_SEND_AID, Trigger
+        PLAYER_LOSES_POP_TO_RANDOM_EVENT): `hit` [B, n_majors] marks the rows
+        whose city lost population to a random event this phase; the LOWEST
+        becomes the target (TS takes the min of its list), every other living
+        civilization the field. One slot: a running competition leaves it."""
+        if self._comp_aid < 0:
+            return
+        fire = hit.any(dim=1) & (self.comp_kind < 0)
+        if not bool(fire.any()):
+            return
+        victim = hit.long().argmax(dim=1)                      # the first True = the lowest row
+        rows = torch.arange(self.n_majors, device=self.device).unsqueeze(0)
+        field = rows != victim.unsqueeze(1)
+        kind = torch.full((self.B,), self._comp_aid, dtype=torch.long, device=self.device)
+        self._start_competition(fire, kind, field, victim)
+
+    def _score_gold_gift(self, giver: int, taker: int, paid: torch.Tensor) -> None:
+        """`scoreGoldGift`'s twin — CIV6 (FromGold): a member's gold reaching the
+        TARGET through a deal scores per gold. `paid` [B] is what moved."""
+        if self._comp_aid < 0 or giver >= self.n_majors or taker >= self.n_majors:
+            return
+        for k, rows in enumerate(self._comp_scored):
+            amt = sum(a for kind, a, of in rows if kind == simbase.SCORE_GOLD)
+            if not amt:
+                continue
+            pay = (self.comp_kind == k) & (self.comp_target == taker) & self.comp_member[:, giver] & (paid > 0)
+            if bool(pay.any()):
+                self.comp_score[:, giver] += torch.where(
+                    pay, paid.to(self.comp_score.dtype) * amt, torch.zeros_like(self.comp_score[:, giver]))
 
     def _competition_score(self) -> None:
         """THE TURN'S SCORE, one <EmergencyScoreSources> row at a time —
@@ -6455,6 +6487,16 @@ class SimSeats:
                                 & self.district_complete.gather(1, reg.clamp(min=0))
                                 & self.city_alive[:, r])
                         gain[:, r] += amount * live.sum(dim=1).double()
+                elif kind == simbase.SCORE_AT_WAR:
+                    # CIV6 (FromAtWar): every turn a member spends at war with the target
+                    tgt = self.comp_target.clamp(min=0)
+                    _bi = torch.arange(self.B, device=self.device)
+                    for r in range(self.n_majors):
+                        gain[:, r] += amount * (self.war[_bi, r, tgt] & (self.comp_target >= 0)).double()
+                elif kind == simbase.SCORE_CO2_TOP:
+                    # CIV6 (FromBadCO2Footprint): the WORLD's biggest polluter this
+                    # turn (a tie shares it); nobody is bad in a world emitting nothing
+                    gain += amount * ((emit == top) & (top > 0)).double()
             self.comp_score += torch.where(add, gain, torch.zeros_like(gain)).to(self.comp_score.dtype)
 
     def _score_project(self, row: int, hit: torch.Tensor, pi: int) -> None:

@@ -254,7 +254,7 @@ GAME = {
     # claimed list). Found 2026-09-14 when the vector fold refused a 1-row
     # group; `fold_rows` now refuses the shape on both engines.
     "competition": lambda sim, b, rows: [(
-        [int(sim.comp_kind[b]), int(sim.comp_left[b])]
+        [int(sim.comp_kind[b]), int(sim.comp_left[b]), int(sim.comp_target[b])]
         + [float(sim.comp_score[b, r]) for r in range(sim.n_majors)]
         + [int(bool(sim.comp_member[b, r])) for r in range(sim.n_majors)])],
     "congressActive": lambda sim, b, rows: [[int(x) for x in sim.congress_active[b].reshape(-1).tolist()]],

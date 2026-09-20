@@ -474,7 +474,8 @@ def main() -> None:
     nrow = simC.n_majors
     assert nrow >= 3, "the podium's two quarters need three in the field"
     ci = simC._congress_at["SCORED_COMPETITION"]
-    assert simC._congress_space(simC._congress_res[ci]["t"]) == len(simC._comps), (
+    # the VOTED rows: a triggered competition (the Aid Request) is never on the ballot
+    assert simC._congress_space(simC._congress_res[ci]["t"]) == simC._comp_voted_n == len(simC._comps) - 1, (
         "the target space and the competition catalog disagree"
     )
     simC._congress_dv_min = 99

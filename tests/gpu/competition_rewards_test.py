@@ -110,6 +110,52 @@ def main() -> int:
     assert perm(0, "exoSpeed") == 3 and perm(1, "exoSpeed") == 0
     assert perm(0, "spaceProdPct") == 40 and perm(1, "spaceProdPct") == 20 and perm(2, "spaceProdPct") == 0
     print("  2 Space Station OK — exoSpeed 3 to the winner, space-race +40% / +20% to the tiers")
+
+    # ---- 3. the Aid Request: triggered, targeted, scored per gold / war / pollution
+    k = cids.index("AID_REQUEST")
+    assert int(sim._comps[k].get("triggered", 0)) == 1 and k == len(cids) - 1, "the Aid Request is triggered and LAST"
+    assert sim._comp_aid == k and sim._comp_voted_n == len(cids) - 1
+    assert sim._congress_space(15) == len(cids) - 1, "the ballot never offers the triggered row"
+    sim.comp_kind[B0] = -1
+    hit = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool)
+    hit[B0, 1] = True
+    hit[B0, 2] = True                       # two victims: the LOWEST row is the target
+    sim._raise_aid_request(hit)
+    assert int(sim.comp_kind[B0]) == k and int(sim.comp_target[B0]) == 1
+    assert sim.comp_member[B0, :3].tolist() == [True, False, True], "the target is out of the field"
+    assert int(sim.comp_left[B0]) == sim._comp_turns
+    hit2 = torch.zeros_like(hit)
+    hit2[B0, 2] = True
+    sim._raise_aid_request(hit2)            # one slot: nothing changes
+    assert int(sim.comp_target[B0]) == 1
+    sim.comp_score[B0] = 0
+    forty = torch.full((sim.B,), 40.0, dtype=sim.civ_treasury.dtype)
+    sim._score_gold_gift(0, 1, forty)       # a member's gold to the target
+    sim._score_gold_gift(2, 0, forty)       # to somebody else: nothing
+    sim._score_gold_gift(1, 0, forty)       # the target gives: not a member
+    assert sim.comp_score[B0, :3].tolist() == [40.0, 0.0, 0.0], sim.comp_score[B0, :3].tolist()
+    sim.war[B0, 2, 1] = True
+    sim.war[B0, 1, 2] = True
+    sim.civ_co2_turn[B0] = 0
+    sim.civ_co2_turn[B0, 2] = 7             # seat 2: the world's top polluter, at war with the target
+    sim._competition_score()
+    assert sim.comp_score[B0, :3].tolist() == [40.0, 0.0, -430.0], sim.comp_score[B0, :3].tolist()
+    sim.civ_co2_turn[B0] = 0                # nobody emits: nobody is bad
+    sim._competition_score()
+    assert sim.comp_score[B0, :3].tolist() == [40.0, 0.0, -460.0], sim.comp_score[B0, :3].tolist()
+    sim.war[B0, 2, 1] = False
+    sim.war[B0, 1, 2] = False
+    # the podium: 2 DVP and 100 Favor to the winner; a TWO-seat field (everyone
+    # but the target) has no bronze quarter (ceil 0.5 = ceil 1.0 = 1); the target untouched
+    dv0, fv = [float(x) for x in sim.civ_diplo_points[B0, :3]], [float(x) for x in sim.civ_diplo_favor[B0, :3]]
+    sim.comp_score[B0, 0], sim.comp_score[B0, 2] = 9.0, 1.0
+    sim.comp_left[B0] = 0
+    sim._competition_podium(torch.tensor([True]))
+    assert float(sim.civ_diplo_points[B0, 0]) - dv0[0] == 2.0, "2 Diplomatic Victory points to the winner"
+    assert float(sim.civ_diplo_favor[B0, 0]) - fv[0] == 100.0 and float(sim.civ_diplo_favor[B0, 2]) - fv[2] == 0.0
+    assert float(sim.civ_diplo_points[B0, 1]) == dv0[1] and float(sim.civ_diplo_favor[B0, 1]) == fv[1], "the target takes nothing"
+    sim.comp_kind[B0] = -1
+    print("  3 Aid Request OK — triggered against the lowest victim, gold / project / war / pollution scored, 2 DVP + 100 Favor to the winner")
     print("COMPETITION REWARDS OK")
     return 0
 

@@ -1040,7 +1040,7 @@ export const COMPETITION_BRONZE_PCT = srcConst('eras.competitionBronzePct', 50,
  * install's other four; they belong to the Aid Request, which needs a
  * gold-gift verb this engine does not have yet.
  */
-export type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district';
+export type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district' | 'gold' | 'atWar' | 'co2Top';
 export interface ScoreRow {
   source: ScoreSource;
   amount: number;
@@ -1079,6 +1079,10 @@ export interface CompetitionDef {
   goldPerm?: Partial<Record<GpPermKey, number>>;
   silverPerm?: Partial<Record<GpPermKey, number>>;
   bronzePerm?: Partial<Record<GpPermKey, number>>;
+  /** CIV6 (EmergencyAlliances.Trigger): a competition the CONGRESS never
+   *  votes in — a game event starts it, against a TARGET seat. Kept LAST
+   *  in the list: the ballot's target space is the rows before it. */
+  triggered?: boolean;
 }
 /**
  * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
@@ -1154,12 +1158,33 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
     silverPerm: { spaceProdPct: 40 },
     bronzePerm: { spaceProdPct: 20 },
   },
+  // CIV6 (EMERGENCY_SEND_AID, EmergencyAlliances): Duration 30, Trigger
+  // EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT, no war on the target;
+  // scored (EmergencyScoreSources) FromGold 1 per gold the target is given,
+  // FromProject PROJECT_SEND_AID 200, FromAtWar -30, FromBadCO2Footprint
+  // -400; rewards (EmergencyRewards) AID_REQUEST_FIRST_PLACE_VICTORY_POINT 2
+  // Diplomatic Victory points, TOP_TIER 100 Favor, BOTTOM_TIER 50 Favor.
+  // TRIGGERED: a major's city losing population to a random event starts it
+  // (when no competition runs — both engines carry ONE slot), the victim is
+  // its target and every other living civilization its field.
+  {
+    id: 'AID_REQUEST', name: 'Aid Request',
+    scored: [
+      { source: 'gold', amount: 1 },
+      { source: 'project', amount: 200, of: 'SEND_AID' },
+      { source: 'atWar', amount: -30 },
+      { source: 'co2Top', amount: -400 },
+    ],
+    goldPoints: 2, silverFavor: 100, bronzeFavor: 50,
+    triggered: true,
+  },
 ];
 
 export const COMPETITION_CLIMATE = 0;
 export const COMPETITION_WORLDS_FAIR = 1;
 export const COMPETITION_WORLD_GAMES = 2;
 export const COMPETITION_SPACE_STATION = 3;
+export const COMPETITION_AID_REQUEST = 4;
 
 
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic

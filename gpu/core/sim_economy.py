@@ -1069,6 +1069,8 @@ class SimEconomy:
         # storms and droughts take fertility off instead of laying it down.
         rate = self._disaster_rate()
         strip = self._desertification_live()
+        # CIV6 (Aid Request trigger): the rows whose city loses population this phase
+        self._aid_hit = torch.zeros(B, self.n_majors, dtype=torch.bool, device=dev)
 
         r = self._next_random(every)
         hit, tile = self._pick_static(r < self._flood_chance * rate, self._flood_list)
@@ -1171,6 +1173,9 @@ class SimEconomy:
             self.storm_left[rows, c] = left_now
             self.storm_event[rows, c] = torch.where(
                 left_now > 0, self.storm_event[rows, c], torch.full_like(left_now, -1))
+        # CIV6 (EMERGENCY_SEND_AID): the phase's lowest victim asks for aid, once
+        self._raise_aid_request(self._aid_hit)
+        self._aid_hit = None
         self._eff_version += 1
 
     def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
@@ -1321,6 +1326,8 @@ class SimEconomy:
                 pop = self.city_pop[sel, _r, sl]
                 self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
                 self._log_pop(sel, _r, sl, "ds")
+                if _r < self.n_majors and getattr(self, "_aid_hit", None) is not None:
+                    self._aid_hit[sel[pop > 1], _r] = True   # CIV6 (Aid Request trigger)
         # UNITS: one share roll per domain, one HP band per tile
         land_hit = hit & (r_land < self._st_land_p[ev])
         naval_hit = hit & (r_naval < self._st_naval_p[ev])
@@ -1557,6 +1564,8 @@ class SimEconomy:
                 pop = self.city_pop[sel, _r, sl]
                 self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
                 self._log_pop(sel, _r, sl, "ds")
+                if _r < self.n_majors and getattr(self, "_aid_hit", None) is not None:
+                    self._aid_hit[sel[pop > 1], _r] = True   # CIV6 (Aid Request trigger)
         # FERTILIZATION. Each yield is its own roll, so one flood may pay both.
         # A mitigated river still silts, at half the rate.
         col = self._flood_fert_col[self.terrain.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)]

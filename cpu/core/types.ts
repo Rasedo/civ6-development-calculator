@@ -298,6 +298,8 @@ export interface Competition {
   left: number;
   score: number[];
   member: number[];
+  /** the seat a TRIGGERED competition (the Aid Request) is held for; -1 for a voted one */
+  target?: number;
 }
 
 /** One emergency's record; `cpu/core/emergency.ts` owns the phases. */
@@ -331,6 +333,9 @@ export interface GameState {
   /** The SCORED COMPETITION running right now. One at a time; real Civ 6
    *  bounds nothing here, and a single slot is what makes the score a plane. */
   competition?: Competition;
+  /** the seats whose city lost population to a random event THIS disaster
+   *  phase; the phase's end raises the Aid Request for the lowest and clears it */
+  aidHit?: number[];
   /** The turn the Congress last sat, Regular or Special. A Special Session
    * needs SPECIAL_SESSION_GAP turns of quiet before it may be called. */
   lastSessionTurn?: number;

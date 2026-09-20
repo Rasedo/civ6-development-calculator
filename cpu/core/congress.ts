@@ -340,7 +340,8 @@ export function targetSpaceSize(state: GameState, res: number): number {
     case 'promoClass': return PROMO_CLASSES.length;
     case 'governor': return GOVERNORS.length;
     case 'spyMission': return SPY_OFFENSIVE_MISSIONS.length;
-    case 'competition': return COMPETITIONS.length;
+    // a TRIGGERED row (the Aid Request) is never on the ballot; it sits last
+    case 'competition': return COMPETITIONS.filter((c) => !c.triggered).length;
     case 'luxury': return LUXURY_IDS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;

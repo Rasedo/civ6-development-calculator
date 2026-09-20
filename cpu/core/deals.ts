@@ -12,6 +12,7 @@
  * was priced against has moved on by then.
  */
 import type { City, DealItem, DealOffer, DealTerm, GameState } from './types';
+import { scoreGoldGift } from './competition';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN,
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
@@ -166,6 +167,7 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
     case DEAL_GOLD:
       gs.treasury -= a;
       rs.treasury += a;
+      scoreGoldGift(state, giver, receiver, a);  // CIV6 (Aid Request, FromGold)
       break;
     case DEAL_GOLD_PER_TURN:
       // The term pays it; accepting only starts the clock.
@@ -292,6 +294,7 @@ export function dealPhase(state: GameState): void {
       if (kind !== DEAL_GOLD_PER_TURN) continue;
       gs.treasury -= a;
       rs.treasury += a;
+      scoreGoldGift(state, from, to, a);  // CIV6 (Aid Request, FromGold)
     }
     term.left -= 1;
     if (term.left <= 0) {

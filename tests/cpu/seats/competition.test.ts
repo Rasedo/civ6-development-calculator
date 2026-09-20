@@ -20,11 +20,13 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { resolveCompetition, startCompetition, competitionOf, scoreProject } from '../../../cpu/core/competition';
+import { resolveCompetition, startCompetition, competitionOf, scoreProject, raiseAidRequest, scoreGoldGift } from '../../../cpu/core/competition';
+import { targetSpaceSize } from '../../../cpu/core/congress';
+import { PROJECTS } from '../../../cpu/data/projects';
 import { emitCarbon } from '../../../cpu/core/climate';
 import {
   COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS, COMPETITION_WORLDS_FAIR,
-  COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION,
+  COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION, COMPETITION_AID_REQUEST, CONGRESS_COMPETITION,
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
@@ -307,5 +309,79 @@ describe("the podium's permanent rewards", () => {
     expect(gpPermOf(a, 'spaceProdPct')).toBe(40);
     expect(gpPermOf(b, 'spaceProdPct')).toBe(20);
     expect(gpPermOf(d, 'spaceProdPct')).toBe(0);
+  });
+});
+
+describe('the Aid Request', () => {
+  // CIV6 (EMERGENCY_SEND_AID): Duration 30, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT;
+  // FromGold 1, FromProject PROJECT_SEND_AID 200, FromAtWar -30, FromBadCO2Footprint
+  // -400; 2 Diplomatic Victory points / 100 / 50 Favor
+  const AID = COMPETITIONS[COMPETITION_AID_REQUEST];
+
+  it('carries the install rows and is TRIGGERED, never on the ballot', () => {
+    expect(AID.id).toBe('AID_REQUEST');
+    expect(AID.triggered).toBe(true);
+    expect(AID.scored).toEqual([
+      { source: 'gold', amount: 1 },
+      { source: 'project', amount: 200, of: 'SEND_AID' },
+      { source: 'atWar', amount: -30 },
+      { source: 'co2Top', amount: -400 },
+    ]);
+    expect(AID.goldPoints).toBe(2);
+    expect(AID.silverFavor).toBe(100);
+    expect(AID.bronzeFavor).toBe(50);
+    expect(COMPETITIONS.indexOf(AID)).toBe(COMPETITIONS.length - 1); // last: the ballot's rows come first
+    const state = table();
+    expect(targetSpaceSize(state, CONGRESS_COMPETITION)).toBe(COMPETITIONS.length - 1);
+    expect(PROJECTS.SEND_AID!.competitionOnly).toBe('AID_REQUEST');
+  });
+
+  it('a random-event population loss raises it against the victim, and a running competition blocks it', () => {
+    const state = table();
+    raiseAidRequest(state, 1);
+    const c = competitionOf(state)!;
+    expect(c.kind).toBe(COMPETITION_AID_REQUEST);
+    expect(c.target).toBe(1);
+    expect(c.member).toEqual([1, 0, 1]);
+    expect(c.left).toBe(COMPETITION_TURNS);
+    raiseAidRequest(state, 2); // one slot: nothing changes
+    expect(competitionOf(state)!.target).toBe(1);
+  });
+
+  it('scores gold reaching the target, the project, war with the target and the top polluter', () => {
+    const state = table();
+    raiseAidRequest(state, 1);
+    const c = competitionOf(state)!;
+    scoreGoldGift(state, 0, 1, 40);   // a member's gold to the target
+    scoreGoldGift(state, 2, 0, 40);   // ...to somebody else: nothing
+    scoreGoldGift(state, 1, 0, 40);   // the target gives: nothing (not a member)
+    expect(c.score).toEqual([40, 0, 0]);
+    scoreProject(state, 2, 'SEND_AID');
+    expect(c.score).toEqual([40, 0, 200]);
+    state.seats[2]!.wars.push(1);
+    state.seats[1]!.wars.push(2);
+    burn(state, [0, 0, 7]);           // seat 2 is the world's top polluter AND at war with the target
+    expect(c.score).toEqual([40, 0, 200 - 30 - 400]);
+    burn(state, [0, 0, 0]);           // nobody emits: nobody is bad
+    expect(c.score).toEqual([40, 0, 200 - 60 - 400]);
+  });
+
+  it('pays 2 Diplomatic Victory points and 100 Favor to the winner; a two-seat field has no bronze quarter', () => {
+    const state = table();
+    raiseAidRequest(state, 1);
+    const c = competitionOf(state)!;
+    c.score[0] = 9;
+    c.score[2] = 1;
+    c.left = 1;
+    resolveCompetition(state);
+    expect(competitionOf(state)).toBeUndefined();
+    expect(state.seats[0]!.diplomaticPoints ?? 0).toBe(2);
+    expect(state.seats[0]!.diplomaticFavor ?? 0).toBe(100);
+    // the field is everyone but the target — two seats: the top quarter
+    // (ceil 0.5 = 1) is the winner and the next quarter (ceil 1.0 = 1) is
+    // the same rank, so the second takes nothing — the published quarters
+    expect(state.seats[2]!.diplomaticFavor ?? 0).toBe(0);
+    expect(state.seats[1]!.diplomaticPoints ?? 0).toBe(0); // the target is not in the field
+    expect(state.seats[1]!.diplomaticFavor ?? 0).toBe(0);
   });
 });

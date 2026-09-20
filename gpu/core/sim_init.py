@@ -493,6 +493,8 @@ class SimInit:
         self.comp_left = torch.zeros(B, dtype=torch.long, device=device)
         self.comp_score = torch.zeros(B, _pw, dtype=dtype, device=device)
         self.comp_member = torch.zeros(B, _pw, dtype=torch.bool, device=device)
+        # the seat a TRIGGERED competition (the Aid Request) is held for; -1 for a voted one
+        self.comp_target = torch.full((B,), -1, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # the ANNOUNCED slate for the next Regular Session (resolution
         # indices; -1 = empty slot), drawn at the previous session's close.
@@ -650,6 +652,11 @@ class SimInit:
         _cids = [c["id"] for c in self._comps]
         self._comp_climate = _cids.index("CLIMATE_ACCORDS")
         self._comp_fair = _cids.index("WORLDS_FAIR") if "WORLDS_FAIR" in _cids else -1
+        # the Aid Request: TRIGGERED, never on the ballot — the ballot's target
+        # space is the VOTED rows, which the catalog keeps first
+        self._comp_aid = _cids.index("AID_REQUEST") if "AID_REQUEST" in _cids else -1
+        self._comp_voted_n = sum(1 for c in self._comps if not int(c.get("triggered", 0)))
+        assert all(int(c.get("triggered", 0)) == 0 for c in self._comps[:self._comp_voted_n]), "a triggered competition must sit LAST"
         # ONE <EmergencyScoreSources> table per competition, as [kind, amount,
         # of] rows: kind indexes the SCORE_* constants, `of` names the Great
         # Person class / project / building / district the kind reads, and -1

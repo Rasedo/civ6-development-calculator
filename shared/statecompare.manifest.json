@@ -113,10 +113,11 @@
           "planes": [
             "comp_kind",
             "comp_left",
+            "comp_target",
             "comp_score",
             "comp_member"
           ],
-          "note": "The running scored competition, flat: [kind, turnsLeft, score per civ seat, membership per civ seat]. -1 kind = none."
+          "note": "The running scored competition, flat: [kind, turnsLeft, target (-1 for a voted one), score per civ seat, membership per civ seat]. -1 kind = none."
         },
         {
           "name": "congressActive",

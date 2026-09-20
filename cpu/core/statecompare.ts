@@ -338,7 +338,7 @@ const GAME: Record<string, Extractor> = {
     const c = s.competition;
     // ONE row, so ONE outer array (the game group has a single row and
     // foldRows reads vals[0]; flat, only the kind was ever compared)
-    return [[c?.kind ?? -1, c?.left ?? 0,
+    return [[c?.kind ?? -1, c?.left ?? 0, c?.target ?? -1,
       ...civs.map((j) => c?.score[j] ?? 0),
       ...civs.map((j) => (c?.member[j] ? 1 : 0))]];
   },
