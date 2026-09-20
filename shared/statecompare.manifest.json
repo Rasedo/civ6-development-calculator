@@ -1261,6 +1261,18 @@
           "note": "DIRECTED giver -> receiver: what a running deal still owes, and the turns left on its 30."
         },
         {
+          "name": "researchPacts",
+          "compare": "milli",
+          "covers": [
+            "GameState.researchPacts"
+          ],
+          "planes": [
+            "ra_tech",
+            "ra_prog"
+          ],
+          "note": "ONE per pair, symmetric on the GPU: [otherSeat, target tech, science banked] over the pairs this seat runs a Research Agreement with."
+        },
+        {
           "name": "co2",
           "compare": "milli",
           "covers": [

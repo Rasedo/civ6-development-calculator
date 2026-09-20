@@ -166,6 +166,25 @@ promotion, one concert at a foreign wonder: read the gold the concert pays
 against the same concert without the promotion. Two draws is enough for a
 percentage.
 
+## Scene I — the Research Agreement's clock (InGame), from AUDIT C-2
+
+Both engines bank `DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE` (10) of the
+two parties' combined science per turn against the target technology's
+cost — a READING of "The more expensive the technology, the longer the
+agreement will take"; the install publishes no duration.
+
+* Two civilizations past Scientific Theory, Declared Friends. Open the deal
+  screen, add a Research Agreement, pick a target technology: the screen
+  states the number of TURNS. Record (target tech, its cost at this speed,
+  player science/turn, partner science/turn, turns shown).
+* Repeat with a dearer target and with a partner of very different science
+  (the two readings the formula must separate: combined science, or the
+  initiator's alone; a percentage of the cost per turn, or of the science).
+* Accept one and count the turns to the "scientific breakthrough" notice;
+  confirm both parties received the Eureka (VERIFY: `pPlayer:GetTechs():HasBoostBeenTriggered(techIndex)`).
+* Record to `runs/research_agreement_<stamp>.jsonl`; a fit closes or
+  corrects `RESEARCH_AGREEMENT_PCT`'s reading on both engines.
+
 ## Carry-overs from session 1
 
 * Ask 14 — the escape roll's scale: spies TRAINED in a city, travelled in,

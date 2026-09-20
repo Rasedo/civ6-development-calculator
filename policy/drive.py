@@ -1089,6 +1089,17 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
                               & sim._denounce_active(a, x) & sim._denounce_active(b, x)
                               & sim._joint_war_open(a, x) & sim._joint_war_open(b, x))
                     _put(a, b, grudge, [_item(sim._deal_k_joint, x)], [])
+            # A RESEARCH AGREEMENT: two friends or allies past Scientific Theory
+            # with no pact running pool their science on the cheapest technology
+            # neither holds (CIV6 DIPLOACTION_RESEARCH_AGREEMENT)
+            if 0 <= sim._ra_tech < sim.civ_techs.shape[2]:
+                cand = ~sim.civ_techs[:, a] & ~sim.civ_techs[:, b]
+                cost = sim.rules_dev.t_cost.to(torch.float64).unsqueeze(0).expand(B, -1)
+                pick = torch.where(cand, cost, torch.full_like(cost, float("inf"))).argmin(dim=1)
+                bound = (sim.seat_friend_turns[:, a, b] > 0) | (sim.seat_ally_turns[:, a, b] > 0)
+                pact = (quiet & bound & cand.any(dim=1) & (sim.ra_tech[:, a, b] < 0)
+                        & sim.civ_techs[:, a, sim._ra_tech] & sim.civ_techs[:, b, sim._ra_tech])
+                _put(a, b, pact, [(_lit(sim._deal_k_ra), pick, _lit(0))], [])
             # A PRISONER goes home for a price.
             _put(a, b, quiet & (sim.seat_spy_held[:, b, a].sum(dim=1) > 0),
                  [_item(sim._deal_k_spy)], [_item(sim._deal_k_gold, DEAL_SPY_PRICE)])

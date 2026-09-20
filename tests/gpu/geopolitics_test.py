@@ -1057,6 +1057,63 @@ def poke_visibility(rules, path):
     print("  j visibility OK (five levels, one per source, post-or-alliance, the intel bonus)")
 
 
+def poke_research_agreement(rules, path):
+    """n. CIV6 (DIPLOACTION_RESEARCH_AGREEMENT): Scientific Theory on both
+    sides, friends or allies, one pact per pair, a technology neither holds;
+    the pact banks DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE (10) of the
+    two sciences a turn against the target's cost and pays both the Eureka;
+    a party researching the target alone ends it unpaid."""
+    sim = controlled_pair(rules, path, extra_for_a=False)[0]
+    a, b = 1, 2
+    T, KR = sim._ra_tech, sim._deal_k_ra
+    nt = sim.civ_techs.shape[2]
+    assert 0 <= T < nt and sim._ra_pct == 10, (T, sim._ra_pct)
+    cand = (~sim.civ_techs[0, a] & ~sim.civ_techs[0, b]).nonzero(as_tuple=True)[0].tolist()
+    tech, tech2 = int(cand[0]), int(cand[1])
+    cost = float(sim.rules_dev.t_cost[tech])
+    va = torch.full((sim.B,), tech, dtype=torch.long, device=sim.device)
+    vb = torch.zeros_like(va)
+
+    def ok(g, t, v) -> bool:
+        return bool(sim._deal_kind_ok(KR, g, t, v, vb)[0])
+
+    sim.civ_techs[:, a, T] = True
+    sim.civ_techs[:, b, T] = False
+    sim.seat_friend_turns[:, a, b] = 0
+    sim.seat_friend_turns[:, b, a] = 0
+    assert not ok(a, b, va), "one side without Scientific Theory"
+    sim.civ_techs[:, b, T] = True
+    assert not ok(a, b, va), "a pair neither friends nor allies"
+    sim.seat_friend_turns[:, a, b] = 20
+    sim.seat_friend_turns[:, b, a] = 20
+    assert ok(a, b, va), "friends past Scientific Theory may agree"
+    assert not ok(a, b, torch.full_like(va, nt)), "a tech index off the table"
+    held = int(sim.civ_techs[0, a].nonzero(as_tuple=True)[0][0])
+    assert not ok(a, b, torch.full_like(va, held)), "a technology one party holds"
+    for r in (a, b):
+        sim.civ_tech_boosted[:, r, tech] = False
+        sim.civ_tech_boosted[:, r, tech2] = False
+    sim.civ_sci_rate[:, a] = cost * 4      # (4c + 1c) * 10% = c/2 a turn: two ticks
+    sim.civ_sci_rate[:, b] = cost
+    deal(sim, a, b, [[KR, tech, 0]], [])
+    assert int(sim.ra_tech[0, a, b]) == tech and int(sim.ra_tech[0, b, a]) == tech, "the pact did not open on both cells"
+    assert float(sim.ra_prog[0, a, b]) == 0.0
+    assert not ok(a, b, torch.full_like(va, tech2)), "one pact per pair"
+    sim._research_pacts_tick()
+    assert abs(float(sim.ra_prog[0, a, b]) - cost * 5 * 10 / 100) < 1e-9 and int(sim.ra_tech[0, a, b]) == tech
+    assert not bool(sim.civ_tech_boosted[0, a, tech]), "paid before the clock ran out"
+    sim._research_pacts_tick()
+    assert int(sim.ra_tech[0, a, b]) == -1 and int(sim.ra_tech[0, b, a]) == -1 and float(sim.ra_prog[0, a, b]) == 0.0
+    assert bool(sim.civ_tech_boosted[0, a, tech]) and bool(sim.civ_tech_boosted[0, b, tech]), "both parties earn the Boost"
+    # a party that researches the target on its own ends the pact, unpaid
+    deal(sim, a, b, [[KR, tech2, 0]], [])
+    assert int(sim.ra_tech[0, a, b]) == tech2
+    sim.civ_techs[:, a, tech2] = True
+    sim._research_pacts_tick()
+    assert int(sim.ra_tech[0, a, b]) == -1 and not bool(sim.civ_tech_boosted[0, b, tech2])
+    print(f"  n research agreement OK (tech gate {T}, deal kind {KR}, {sim._ra_pct}% of both sciences a turn against cost {cost:g})")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -1077,6 +1134,7 @@ def main() -> None:
     poke_float32(rules, path)
     poke_delegation(rules, path)
     poke_deal(rules, path)
+    poke_research_agreement(rules, path)
     poke_visibility(rules, path)
     print("GEOPOLITICS POKES OK")
 

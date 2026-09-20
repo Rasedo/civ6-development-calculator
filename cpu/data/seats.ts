@@ -1220,6 +1220,9 @@ export const DEAL_ITEM_KINDS = [
   /** CIV6 (DIPLOACTION_JOINT_WAR): an agreement — `a` is the TARGET row;
    *  accepting it declares the war for BOTH parties (`jointWarPayable`) */
   'JOINT_WAR',
+  /** CIV6 (DIPLOACTION_RESEARCH_AGREEMENT): `a` is the TARGET technology's
+   *  catalog index; the pair banks science against it (`researchPactsTick`) */
+  'RESEARCH_AGREEMENT',
 ] as const;
 export type DealItemKind = typeof DEAL_ITEM_KINDS[number];
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
@@ -1231,6 +1234,7 @@ export const DEAL_CITY = DEAL_ITEM_KINDS.indexOf('CITY');
 export const DEAL_SPY = DEAL_ITEM_KINDS.indexOf('SPY');
 export const DEAL_OPEN_BORDERS = DEAL_ITEM_KINDS.indexOf('OPEN_BORDERS');
 export const DEAL_JOINT_WAR = DEAL_ITEM_KINDS.indexOf('JOINT_WAR');
+export const DEAL_RESEARCH_AGREEMENT = DEAL_ITEM_KINDS.indexOf('RESEARCH_AGREEMENT');
 
 /**
  * CIV6: "Sums of Gold, Great Works, Relics, Artifacts, and captured Spies are
@@ -1289,6 +1293,19 @@ export const OPEN_BORDERS_CIVIC = srcConst('seats.openBordersCivic', 'EARLY_EMPI
 export const JOINT_WAR_CIVIC = srcConst('seats.jointWarCivic', 'FOREIGN_TRADE',
   xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_JOINT_WAR', 'InitiatorPrereqCivic',
     { expect: 'CIVIC_FOREIGN_TRADE' }));
+/** CIV6 (DiplomaticActions.xml, DIPLOACTION_RESEARCH_AGREEMENT):
+ *  `InitiatorPrereqTech` / `TargetPrereqTech` TECH_SCIENTIFIC_THEORY — the
+ *  technology BOTH parties must hold. */
+export const RESEARCH_AGREEMENT_TECH = srcConst('seats.researchAgreementTech', 'SCIENTIFIC_THEORY',
+  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_RESEARCH_AGREEMENT', 'InitiatorPrereqTech',
+    { expect: 'TECH_SCIENTIFIC_THEORY' }));
+/** CIV6 (GlobalParameters): DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE — the
+ *  ONE number the install publishes for the agreement's clock ("The more
+ *  expensive the technology, the longer the agreement will take"), read as
+ *  the share of the two parties' combined science per turn banked against
+ *  the target's cost (`researchPactsTick`; docs/AUDIT.md C-2 measures it). */
+export const RESEARCH_AGREEMENT_PCT = srcConst('seats.researchAgreementPct', 10,
+  gp('DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE'));
 export const ALLIANCE_CIVIC = srcConst('seats.allianceCivic', 'CIVIL_SERVICE',
   xml('Civics', 'CivicType=CIVIC_CIVIL_SERVICE', 'CivicType', { expect: 'CIVIC_CIVIL_SERVICE' }));
 

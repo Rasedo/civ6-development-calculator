@@ -425,6 +425,19 @@ def _deal_line(clock: str, planes: tuple):
     return get
 
 
+def _research_pact_line(sim, b, rows):
+    """[otherRow, target tech, science banked] for every pair this row runs a
+    Research Agreement with, ascending. `researchPactLine`'s twin."""
+    out = []
+    for c in rows:
+        line: list[float] = []
+        for j in range(sim.n_majors):
+            if j != c and int(sim.ra_tech[b, c, j]) >= 0:
+                line += [j, int(sim.ra_tech[b, c, j]), float(sim.ra_prog[b, c, j])]
+        out.append(line)
+    return out
+
+
 def _seat_pair_clock(plane: str):
     """A DIPLOMATIC AGREEMENT clock read the flat way the war and treaty clocks
     are: [opponentSeat, turnsLeft, ...] over the majors it still runs with, in
@@ -649,6 +662,7 @@ SEAT = {
     "spyHeldLevels": _spy_held_levels,
     "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),
     "dealTerms": _deal_line("deal_term_left", ("deal_term_item",)),
+    "researchPacts": _research_pact_line,
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 

@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
-import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
+import { dealOfferOf, dealTermOf, researchPactOf, spyHeldWith, spyLevelsHeld } from './deals';
 import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith } from './grievance';
 import { isWater } from '../../world/query';
@@ -306,6 +306,17 @@ const dealTermLine = (state: GameState, seat: number): Val => {
     if (!d || d.left <= 0) continue;
     out.push(other, d.left);
     dealSlots(out, d.items);
+  }
+  return out;
+};
+
+/** [otherSeat, tech, progress] for every research pact this seat runs, in
+ *  ascending seat order — `_research_pact_line`'s twin. */
+const researchPactLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const p = researchPactOf(state, seat, other);
+    if (p) out.push(other, p.tech, p.progress);
   }
   return out;
 };
@@ -596,6 +607,7 @@ const SEAT: Record<string, Extractor> = {
   }),
   dealOffers: overSeats((s, state) => dealOfferLine(state, s.seat)),
   dealTerms: overSeats((s, state) => dealTermLine(state, s.seat)),
+  researchPacts: overSeats((s, state) => researchPactLine(state, s.seat)),
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 
