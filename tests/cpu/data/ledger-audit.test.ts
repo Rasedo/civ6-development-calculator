@@ -31,7 +31,9 @@ const openRows = Object.entries(ledger).filter(([, v]) => v.startsWith('open'));
 
 describe('the roster ledger and the audit agree', () => {
   it('has items to check at all', () => {
-    expect(itemIds.size).toBeGreaterThan(20);
+    // a floor of ONE: the AUDIT shrinks by design (training waits on an empty
+    // file), and this guard is against a parse that found nothing, not a size
+    expect(itemIds.size).toBeGreaterThan(0);
     expect(openRows.length).toBeGreaterThan(0);
   });
 

@@ -17,6 +17,7 @@ const ARTIFACT_SLOTS = 3;
 const ARTIFACT_TOURISM = GWO_TOURISM[GWO_ARTIFACT]!;
 const MUSEUM = GW_HOLDERS.findIndex((h) => h.id === ARTIFACT_BUILDING);
 import { PARK_MIN_APPEAL, PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../../../cpu/data/improvements';
+import { neighborTile, DIR_NE, DIR_NW, DIR_SE, DIR_SW, DIR_W } from '../../../world/hex';
 import { UNITS } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
 
@@ -85,18 +86,25 @@ describe('the Naturalist and the National Park', () => {
     expect(state.units.some((u) => u.type === 'NATURALIST' && u.seat === 0)).toBe(true);
   });
 
-  it('the cluster is the hex rhombus: a pair plus the two tiles adjacent to both', () => {
+  it('the cluster is the VERTICAL diamond: an E-W pair plus the tile above and the tile below', () => {
     const state = makeState();
     const a = tileAtCoords(state.map, 5, 5).index;
-    const b = state.map.tiles[a].index;
-    void b;
-    const nb = tileAtCoords(state.map, 6, 5).index;
+    const ta = state.map.tiles[a];
+    const nb = tileAtCoords(state.map, 6, 5).index; // the E neighbour, same row
     const cluster = parkCluster(state, a, nb);
     expect(cluster.length).toBe(4);
     expect(cluster).toContain(a);
     expect(cluster).toContain(nb);
+    // the other two are the tiles above and below the shared edge
+    expect(cluster).toContain(neighborTile(state.map, ta, DIR_NE)!.index);
+    expect(cluster).toContain(neighborTile(state.map, ta, DIR_SE)!.index);
     // sorted, so both engines name the same anchor
     expect([...cluster].sort((x, y) => x - y)).toEqual(cluster);
+    // the W pair is the other vertical diamond; the four tilted pairs are none
+    expect(parkCluster(state, a, neighborTile(state.map, ta, DIR_W)!.index).length).toBe(4);
+    for (const d of [DIR_NE, DIR_NW, DIR_SW, DIR_SE]) {
+      expect(parkCluster(state, a, neighborTile(state.map, ta, d)!.index)).toEqual([]);
+    }
     // a non-adjacent pair is no cluster at all
     expect(parkCluster(state, a, tileAtCoords(state.map, 9, 9).index)).toEqual([]);
   });

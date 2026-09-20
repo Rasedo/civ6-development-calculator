@@ -21,7 +21,7 @@ export function formationCS(unit: Unit): number {
 /** CIV6: fortification tops out at two turns dug in. */
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
-import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
+import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -1446,7 +1446,12 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
 
 /** the four tiles a National Park would cover if it were anchored on
  *  `a` toward its neighbour `b`: the pair itself plus the two tiles adjacent
- *  to BOTH — the hex rhombus real Civ 6 outlines. Empty when the pair has no
+ *  to BOTH. CIV6 (Civilopedia_Concepts_Text, TOURISM_4 PARA_2: "The tiles
+ *  must be contiguous and form a vertical diamond shape"), and this
+ *  frame is the game's own (pointy-top, odd-r — world/hex.ts), so the pair
+ *  in the middle lies E-W and the other two are the tile above and the tile
+ *  below; a pair along any other direction is the same rhombus tilted, which
+ *  the game never offers. Empty for such a pair, and when the pair has no
  *  two shared neighbours (a map edge). */
 export function parkCluster(state: GameState, a: number, b: number): number[] {
   const ta = state.map.tiles[a];
@@ -1454,6 +1459,7 @@ export function parkCluster(state: GameState, a: number, b: number): number[] {
   if (!ta || !tb) return [];
   const na = new Set(neighbors(state.map, ta).map((t) => t.index));
   if (!na.has(b)) return [];
+  if (neighborTile(state.map, ta, DIR_E)?.index !== b && neighborTile(state.map, ta, DIR_W)?.index !== b) return [];
   const shared = neighbors(state.map, tb)
     .map((t) => t.index)
     .filter((i) => na.has(i))
@@ -1462,9 +1468,10 @@ export function parkCluster(state: GameState, a: number, b: number): number[] {
   return [a, b, shared[0], shared[1]].sort((x, y) => x - y);
 }
 
-/** may these four tiles become a National Park for `seat`? Real Civ 6:
- *  every tile Charming or better, all four owned by ONE city of the seat, and
- *  no improvement, district or wonder on any of them. */
+/** may these four tiles become a National Park for `seat`? CIV6 (the same
+ *  Civilopedia list): "natural wonders, mountains, or a tile with an Appeal
+ *  of Charming or better", all four owned by ONE city of the seat, and no
+ *  improvement or district on any of them (a wonder is built ground too). */
 export function parkClusterLegal(state: GameState, cluster: number[], seat: number): boolean {
   if (cluster.length !== 4) return false;
   const camps = campTiles(state);
@@ -1475,7 +1482,8 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
     if (tileSeat(t) !== seat) return false;
     if (city < 0) city = t.ownerCity;
     else if (t.ownerCity !== city) return false;
-    if (tileAppeal(state.map, t, camps, cityAppealResolver(state)) < PARK_MIN_APPEAL) return false;
+    if (!isMountain(t) && !naturalWonderAt(t)
+      && tileAppeal(state.map, t, camps, cityAppealResolver(state)) < PARK_MIN_APPEAL) return false;
   }
   return city >= 0;
 }
@@ -1496,7 +1504,8 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
   if (!pdef?.naturalist && !pdef?.parkBuilder) return no('This unit cannot designate a park.');
   const here = state.map.tiles[unit.tileIndex];
   if (!here) return no('No such tile.');
-  // The anchor's own neighbours, in TILE order, are the candidate partners;
+  // The anchor's own neighbours, in TILE order, are the candidate partners
+  // (`parkCluster` keeps only the E and W ones — the vertical diamond);
   // the FIRST legal rhombus is taken, so both engines pick the same four.
   for (const nb of neighbors(state.map, here).slice().sort((x, y) => x.index - y.index)) {
     const cluster = parkCluster(state, unit.tileIndex, nb.index);

@@ -92,6 +92,11 @@ def main() -> None:
         assert len(set(q.tolist())) == 4, "four DISTINCT tiles"
         assert list(q.tolist()) == sorted(q.tolist()), "sorted, so the anchor is q[0]"
         assert anchor in q.tolist(), "the anchor is in its own cluster"
+    # CIV6: the park is a VERTICAL diamond — only the E (0) and W (3) pairs
+    # make one; the four tilted pairs are refused before legality is asked
+    for d in (1, 2, 4, 5):
+        assert int(quad[0, 0, d, 0]) < 0, f"direction {d} is a tilted rhombus, not a park"
+    assert any(int(quad[0, 0, d, 0]) >= 0 for d in (0, 3)), "an E or W pair off the edge makes the diamond"
     print("rhombus ok")
 
     # --- 3) legality, the designation, and what a park pays ----------------

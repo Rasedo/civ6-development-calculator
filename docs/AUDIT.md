@@ -35,13 +35,12 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| B-20r park orientation | 1 | no canonical vertical in this hex frame; a model choice |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-51r Encampment pool on capture | 1 | ask 2 |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
-| **B. Fidelity vs real Civ 6** | **6** | |
+| **B. Fidelity vs real Civ 6** | **5** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | the research agreement's clock (LAB); the promises (ASK) |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
@@ -59,7 +58,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **18** | |
-| **OPEN, TOTAL** | **24** | |
+| **OPEN, TOTAL** | **23** | |
 
 ## The question ledger — owner asks
 
@@ -88,8 +87,6 @@ the exporter, and a hunt catch opens an entry here only when it cannot
 close in the same commit.
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
-- **B-20r. A PARK'S ORIENTATION.** Weight 1.
-  - ASK (not on the ledger — a model choice, no source will settle it): Civ 6 fixes the park rhombus's vertical; this hex frame has none, so every rhombus is offered. Nothing to build until a vertical is chosen.
 - **B-24r. GOVERNOR TAILS.** Weight 1.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.
   - BLOCKER C-1: Renewable Subsidizer and Industrialist wait on the plants.

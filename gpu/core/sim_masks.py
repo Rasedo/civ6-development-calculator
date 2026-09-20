@@ -2662,8 +2662,12 @@ class SimMasks:
         """[B, N, 6, 4] long — for each unit tile and each neighbour
         direction, the four tiles of the rhombus that pair anchors: the pair
         itself plus the two tiles adjacent to BOTH. -1 where the pair has
-        fewer than two shared neighbours (a map edge). `parkCluster`'s twin,
-        and like it the four come back SORTED so both engines name one set."""
+        fewer than two shared neighbours (a map edge), and -1 for every
+        direction but E (0) and W (3): CIV6's park is a VERTICAL diamond,
+        and in this odd-r frame (`neighbor_table`, the TS direction order)
+        that is the E-W pair with the tile above and the tile below.
+        `parkCluster`'s twin, and like it the four come back SORTED so both
+        engines name one set."""
         B, N = tc.shape
         nb = self.neigh[tc]                                  # [B, N, 6]
         nb_of_nb = self.neigh[nb.clamp(min=0)]               # [B, N, 6, 6]
@@ -2674,6 +2678,10 @@ class SimMasks:
         srt, _ = cand.sort(dim=3)
         s0, s1 = srt[:, :, :, 0], srt[:, :, :, 1]
         ok = (nb >= 0) & (s1 < (1 << 30))
+        vert = torch.zeros(6, dtype=torch.bool, device=tc.device)
+        vert[0] = True
+        vert[3] = True
+        ok = ok & vert.reshape(1, 1, 6)
         quad = torch.stack([tc.unsqueeze(2).expand(B, N, 6), nb, s0, s1], dim=3)
         quad = torch.where(ok.unsqueeze(3), quad, torch.full_like(quad, -1))
         quad, _ = quad.sort(dim=3)
@@ -2681,8 +2689,9 @@ class SimMasks:
 
     def _park_cluster_legal(self, row: int, quad: torch.Tensor) -> torch.Tensor:
         """[B, N, 6] bool — may this rhombus become a park?
-        `parkClusterLegal`'s twin: every tile Charming or better, all four in
-        ONE city of this seat, and nothing built on any of them.
+        `parkClusterLegal`'s twin. CIV6 (the Civilopedia's list): every tile a
+        natural wonder, a mountain, or Charming or better; all four in ONE
+        city of this seat; nothing built on any of them.
 
         A CITY CENTRE is one of the things built on them: `foundCity` sets
         `tile.district = 'CITY_CENTER'` and both capture paths keep it, so TS
@@ -2700,7 +2709,8 @@ class SimMasks:
             & (self.district.gather(1, q) < 0)
             & (self.centre_slot_at.gather(1, q) < 0)
             & (self.built_wonder.gather(1, q) < 0)
-            & (self._tile_appeal().gather(1, q) >= self._park_min_appeal)
+            & ((self._tile_appeal().gather(1, q) >= self._park_min_appeal)
+               | self.tile_mountain.gather(1, q) | self.nwonder.gather(1, q))
         ).reshape(B, N, D, 4)
         city = self.city_slot_at(row).gather(1, q).reshape(B, N, D, 4)
         one_city = (city == city[:, :, :, :1]).all(dim=3) & (city[:, :, :, 0] >= 0)
