@@ -1,6 +1,6 @@
 # THE ROSTER CENSUS — the owner's install, off its XML
 
-34 civilizations, 38 civilization-leader pairs. Each line is a trait's modifiers by EFFECT TYPE with its arguments; agendas are omitted (DLL-scored, no opinion scale on either engine). A modifier reads `[x]` when both engines ship it (docs/roster_ledger.json), `[~item]` when it waits on an AUDIT item, `[ ]` when nothing pays it yet.
+34 civilizations, 38 civilization-leader pairs — the base game, Rise and Fall and Gathering Storm. The standalone DLC packs' civilizations (Persia and Macedon, Nubia, Poland, Australia, Khmer and Indonesia, and the New Frontier passes) have no seat here, so their uniques have no row: a Hypaspist or an Immortal is out of scope by construction, not an open item. Each line is a trait's modifiers by EFFECT TYPE with its arguments; agendas are omitted (DLL-scored, no opinion scale on either engine). A modifier reads `[x]` when both engines ship it (docs/roster_ledger.json), `[~item]` when it waits on an AUDIT item, `[ ]` when nothing pays it yet.
 
 REFRESHED 2026-09-08 against the ledger: 338 of 343 modifiers shipped, 5 open. The five are the only `[~]` marks left — three on a seat's majority religion and two on a diplomatic-action preference — and every other mark this file carried had gone stale behind the rounds that shipped its row.
 

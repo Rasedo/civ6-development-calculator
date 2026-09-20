@@ -40,10 +40,9 @@ re-adds them.
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask 2 |
-| B-54r unique-unit flank/support stacks | 1 | the Impi's and Hypaspist's own flank/support |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
-| **B. Fidelity vs real Civ 6** | **8** | |
+| **B. Fidelity vs real Civ 6** | **7** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
@@ -63,7 +62,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **30** | |
+| **OPEN, TOTAL** | **29** | |
 
 ## The question ledger — owner asks
 
@@ -108,8 +107,6 @@ close in the same commit.
   - BLOCKER C-26: the Egyptian ability's flood half; the Soothsayer's is an absent chassis'.
 - **B-51r. THE ENCAMPMENT'S POOL ON CAPTURE.** Weight 1.
   - ASK 2.
-- **B-54r. UNIQUE-UNIT FLANK AND SUPPORT STACKS.** Weight 1.
-  - BUILD: Zulu's Impi and Macedon's Hypaspist raise flanking or support for themselves alone; both chassis are seated, the per-chassis clause is not read.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
   - BLOCKER C-34: GROUND_CREWS — `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION` with no amount (the modifier type is the whole rule; the engine's own healing supplies the number) after a PATROL, which is no data row at all.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
