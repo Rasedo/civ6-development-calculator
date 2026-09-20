@@ -89,7 +89,31 @@ class SimDeals:
             return self.seat_spy_held[:, taker, giver].sum(dim=1) > 0
         if kind == self._deal_k_borders:
             return ~z
+        if kind == self._deal_k_joint:
+            # CIV6 (DIPLOACTION_JOINT_WAR): the GIVER's Foreign Trade, a third
+            # living major as the target, and both parties still free to
+            # declare on it. `jointWarPayable`'s twin.
+            out = z.clone()
+            if self._joint_war_civic < 0:
+                return out
+            civic = self.civ_civics[:, giver, self._joint_war_civic]
+            for x in range(self.n_majors):
+                if x in (giver, taker):
+                    continue
+                sel = va == x
+                if bool(sel.any()):
+                    out |= (sel & civic & self.city_alive[:, x].any(dim=1)
+                            & self._joint_war_open(giver, x) & self._joint_war_open(taker, x))
+            return out
         return z
+
+    def _joint_war_open(self, p: int, x: int) -> torch.Tensor:
+        """[B] — may `p` still declare on `x` at all? `declareWar`'s own early
+        returns (at war already, allied or friends, a peace treaty binding),
+        which `_declare_war_major` leaves to its caller. The joint item's
+        validator AND its mover read this one predicate."""
+        return (~self.war[:, p, x] & (self.seat_ally_turns[:, p, x] == 0)
+                & (self.seat_friend_turns[:, p, x] == 0) & (self.treaty_turns[:, p, x] == 0))
 
     def _deal_city_cell(self, row: int, centre: torch.Tensor) -> torch.Tensor:
         """[B, RC] — that row's live city standing on `centre`, if any."""
@@ -139,6 +163,21 @@ class SimDeals:
             self.seat_borders_turns[:, giver, taker] = torch.where(
                 ok, torch.full_like(self.seat_borders_turns[:, giver, taker], self._agreement_turns),
                 self.seat_borders_turns[:, giver, taker])
+        elif kind == self._deal_k_joint:
+            # CIV6 (Joint War): the war begins as the deal is accepted — BOTH
+            # parties declare on the target now, the giver first, under the
+            # joint kind; the agreement is its casus belli (`agreed`). Each
+            # declaration keeps `declareWar`'s gates (`_joint_war_open`): a
+            # party already at war with the target has nothing to declare.
+            kind_vec = torch.full((self.B,), self._war_k_joint, dtype=torch.long, device=self.device)
+            for x in range(self.n_majors):
+                if x in (giver, taker):
+                    continue
+                sel = ok & (va == x)
+                if not bool(sel.any()):
+                    continue
+                for p in (giver, taker):
+                    self._declare_war_major(p, x, sel & self._joint_war_open(p, x), kind_vec, agreed=True)
 
     def _deal_move_res(self, giver: int, taker: int, va: torch.Tensor,
                        vb: torch.Tensor, ok: torch.Tensor) -> None:

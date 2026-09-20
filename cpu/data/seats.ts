@@ -1217,6 +1217,9 @@ export const EMBASSY_CIVIC = srcConst('eras.embassyCivic', 'DIPLOMATIC_SERVICE',
  */
 export const DEAL_ITEM_KINDS = [
   'GOLD', 'GOLD_PER_TURN', 'FAVOR', 'RESOURCE', 'GREAT_WORK', 'CITY', 'SPY', 'OPEN_BORDERS',
+  /** CIV6 (DIPLOACTION_JOINT_WAR): an agreement — `a` is the TARGET row;
+   *  accepting it declares the war for BOTH parties (`jointWarPayable`) */
+  'JOINT_WAR',
 ] as const;
 export type DealItemKind = typeof DEAL_ITEM_KINDS[number];
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
@@ -1227,6 +1230,7 @@ export const DEAL_GREAT_WORK = DEAL_ITEM_KINDS.indexOf('GREAT_WORK');
 export const DEAL_CITY = DEAL_ITEM_KINDS.indexOf('CITY');
 export const DEAL_SPY = DEAL_ITEM_KINDS.indexOf('SPY');
 export const DEAL_OPEN_BORDERS = DEAL_ITEM_KINDS.indexOf('OPEN_BORDERS');
+export const DEAL_JOINT_WAR = DEAL_ITEM_KINDS.indexOf('JOINT_WAR');
 
 /**
  * CIV6: "Sums of Gold, Great Works, Relics, Artifacts, and captured Spies are
@@ -1279,6 +1283,12 @@ export const VISIBILITY_CS_PER_LEVEL = srcConst('eras.visibilityCsPerLevel', 3,
  */
 export const OPEN_BORDERS_CIVIC = srcConst('seats.openBordersCivic', 'EARLY_EMPIRE',
   xml('Civics', 'CivicType=CIVIC_EARLY_EMPIRE', 'CivicType', { expect: 'CIVIC_EARLY_EMPIRE' }));
+/** CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR):
+ *  `InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE — the civic the seat PROPOSING
+ *  a joint war must hold; the partner needs none. */
+export const JOINT_WAR_CIVIC = srcConst('seats.jointWarCivic', 'FOREIGN_TRADE',
+  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_JOINT_WAR', 'InitiatorPrereqCivic',
+    { expect: 'CIVIC_FOREIGN_TRADE' }));
 export const ALLIANCE_CIVIC = srcConst('seats.allianceCivic', 'CIVIL_SERVICE',
   xml('Civics', 'CivicType=CIVIC_CIVIL_SERVICE', 'CivicType', { expect: 'CIVIC_CIVIL_SERVICE' }));
 

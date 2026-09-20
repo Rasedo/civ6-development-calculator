@@ -32,11 +32,14 @@
  * 100 / 100 / 300. In this engine a war kind IS a gate plus a percent
  * triple, so the row belongs here.
  *
- * JOINT WAR is NOT a row. Its columns are identical to Third Party War's, and
- * the only thing that separates them is that its target is not yet at war —
- * which needs a two-sided agreement object the deal table does not carry
- * (docs/AUDIT.md). A row for it would be a duplicate of the row below
- * with no condition of its own.
+ * JOINT WAR (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR) is the
+ * LAST row: Third Party War's columns (`InitiatorPrereqCivic`
+ * CIVIC_FOREIGN_TRADE, no denouncement, 100 / 100 / 300) reached through an
+ * AGREEMENT — a deal item (`DEAL_JOINT_WAR`) whose acceptance declares the
+ * war for BOTH parties at once. The civic is the DEAL's gate (the
+ * initiator's — `jointWarPayable`), so the row carries none; its condition
+ * `jointAgreed` is met by nothing but the agreement itself
+ * (`warKindAllowed`'s `agreed`), which keeps it out of every default pick.
  */
 import { srcConst, xml } from './provenance';
 
@@ -49,7 +52,7 @@ export const FORMAL_WAR_MIN_TURNS = srcConst('seats.formalWarMinTurns', 5,
 export type WarKindId =
   | 'surprise' | 'formal' | 'holy' | 'liberation' | 'reconquest' | 'protectorate'
   | 'colonial' | 'territorial' | 'golden' | 'retribution' | 'ideological'
-  | 'thirdParty';
+  | 'thirdParty' | 'joint';
 
 /** The requirement column a kind reads, beyond its civic and denouncement. */
 export type WarCondition =
@@ -83,13 +86,16 @@ export type WarCondition =
    *  install itself attaches to this situation when it writes Enkidu's trait
    *  as "anyone at war with their allies". A READING, recorded in docs/AUDIT.md, and
    *  the conservative one: it can only make the kind rarer. */
-  | 'allyAtWarWith';
+  | 'allyAtWarWith'
+  /** CIV6 (Joint War): the two parties' ACCEPTED agreement — nothing in the
+   *  state meets it; only the deal's own move declares under it (`agreed`) */
+  | 'jointAgreed';
 
 /** the wire's index space for a condition — both engines address one by position */
 export const WAR_CONDITIONS: readonly WarCondition[] = [
   'none', 'convertedCity', 'occupiedFriendlyCity', 'occupiedCity', 'warOnMyCityState',
   'leadTwoEras', 'adjacentEmpires', 'toArms', 'brokenPromise', 'differentLateGovernment',
-  'allyAtWarWith',
+  'allyAtWarWith', 'jointAgreed',
 ];
 
 export interface WarKindDef {
@@ -119,6 +125,9 @@ export const WAR_KINDS: readonly WarKindDef[] = [
   // denouncement column at all, which is what makes it worth having: a
   // Formal war's price without a Formal war's five-turn denouncement.
   { id: 'thirdParty', civic: 'FOREIGN_TRADE', denounceTurns: -1, condition: 'allyAtWarWith', pct: [100, 100, 300] },
+  // Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR: the agreement's
+  // kind — the civic gates the DEAL (JOINT_WAR_CIVIC), never the row
+  { id: 'joint', civic: null, denounceTurns: -1, condition: 'jointAgreed', pct: [100, 100, 300] },
 ];
 
 export const WAR_KIND_SURPRISE = 0;
@@ -133,6 +142,7 @@ export const WAR_KIND_GOLDEN = 8;
 export const WAR_KIND_RETRIBUTION = 9;
 export const WAR_KIND_IDEOLOGICAL = 10;
 export const WAR_KIND_THIRD_PARTY = 11;
+export const WAR_KIND_JOINT = 12;
 
 export function warKindCode(id: WarKindId): number {
   return WAR_KINDS.findIndex((k) => k.id === id);

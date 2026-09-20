@@ -283,7 +283,7 @@ def poke_third_party(rules, path):
     (see `WarCondition` in warKinds.ts) — one predicate shared with Enkidu's
     discount, so the two cannot drift."""
     sim = build(rules, path)
-    TP = len(sim._war_kinds) - 1
+    TP = next(i for i, r in enumerate(sim._war_kinds) if r[2] == 10)   # the allyAtWarWith row
     civic, dturns, cond, p0, p1, p2 = sim._war_kinds[TP]
     assert (dturns, p0, p1, p2) == (-1, 100, 100, 300), sim._war_kinds[TP]
     assert civic >= 0, "the third-party row lost its civic gate"
@@ -313,6 +313,67 @@ def poke_third_party(rules, path):
     print(f"  e third-party war OK (row {TP}, civic {civic}, no denouncement, {p0}/{p1}/{p2})")
 
 
+def deal(sim, a: int, b: int, give, ask) -> None:
+    """`a` puts a table to `b`, and `b` answers it — both in ONE drain, the
+    way a turn's records arrive (geopolitics_test's helper)."""
+    di = sim._deal_items
+    blob = torch.full((sim.B, 1 + 2 * di * 3), -1, dtype=torch.long, device=sim.device)
+    blob[:, 0] = b
+    for base, bundle in ((1, give), (1 + di * 3, ask)):
+        for s, it in enumerate(bundle):
+            for c in range(3):
+                blob[:, base + s * 3 + c] = int(it[c])
+    sim.apply_geo(a, offer=blob)
+    m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
+    m[:, a] = True
+    sim.apply_geo(b, accept=m)
+    sim._geo_agreements()
+
+
+def poke_joint_war(rules, path):
+    """f. CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR): an
+    AGREEMENT with InitiatorPrereqCivic CIVIC_FOREIGN_TRADE and Third Party
+    War's 100 / 100 / 300 — a DEAL item whose acceptance declares the war
+    for BOTH parties at once, under the LAST kind of the table. The kind
+    carries no civic (the deal asks the INITIATOR's) and a condition nothing
+    in the state meets, so the default pick never takes it."""
+    sim = build(rules, path)
+    J, KJ = sim._war_k_joint, sim._deal_k_joint
+    row = sim._war_kinds[J]   # [civic, denouncement turns, condition, declaration %, capture %, raze %]
+    assert J == len(sim._war_kinds) - 1 and (row[0], row[1], row[3], row[4], row[5]) == (-1, -1, 100, 100, 300), row
+    sim.civ_civics[:] = False
+    sim.civ_civics[:, 0, sim._joint_war_civic] = True
+    assert not bool(sim._war_kinds_allowed(0, 2)[0, J]), "the joint kind opened outside an agreement"
+    assert int(sim._default_war_kind(sim._war_kinds_allowed(0, 2))[0]) == SURPRISE, "the default pick took it"
+    va = torch.full((sim.B,), 2, dtype=torch.long, device=sim.device)
+    vb = torch.zeros_like(va)
+    def ok(g, t, v) -> bool:
+        return bool(sim._deal_kind_ok(KJ, g, t, v, vb)[0])
+    assert ok(0, 1, va), "0 (Foreign Trade) may propose a joint war on 2 to 1"
+    assert not ok(1, 0, va), "the PARTNER's civic is not asked, the initiator's is"
+    assert not ok(0, 1, torch.ones_like(va)) and not ok(0, 1, torch.zeros_like(va)), "a party as the target"
+    sim.seat_friend_turns[:, 1, 2] = 10
+    sim.seat_friend_turns[:, 2, 1] = 10
+    assert not ok(0, 1, va), "the partner's friend was a target"
+    sim.seat_friend_turns[:, 1, 2] = 0
+    sim.seat_friend_turns[:, 2, 1] = 0
+    sim.treaty_turns[:, 0, 2] = 5
+    sim.treaty_turns[:, 2, 0] = 5
+    assert not ok(0, 1, va), "a peace treaty still binding"
+    sim.treaty_turns[:, 0, 2] = 0
+    sim.treaty_turns[:, 2, 0] = 0
+    # the table clears: both parties are at war with 2 under the joint kind,
+    # not with each other, and the offer is gone
+    deal(sim, 0, 1, [[KJ, 2, 0]], [])
+    assert bool(sim.war[0, 0, 2]) and bool(sim.war[0, 1, 2]) and not bool(sim.war[0, 0, 1]), "the joint war did not open"
+    assert int(sim.seat_warkind[0, 0, 2]) == J + 1 and int(sim.seat_warkind[0, 1, 2]) == J + 1, "not the joint kind"
+    assert int(sim.seat_warkind[0, 2, 0]) == -(J + 1) and int(sim.seat_warkind[0, 2, 1]) == -(J + 1)
+    assert int(sim.deal_offer_left[0, 0, 1]) == 0, "the table did not clear"
+    # ...and at war already, the item is no longer payable (nothing to declare)
+    assert not ok(0, 1, va), "a joint war on a seat both are at war with"
+    print(f"  f joint war OK (row {J}, deal kind {KJ}, civic {sim._joint_war_civic} on the initiator, {row[3]}/{row[4]}/{row[5]})")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -321,6 +382,7 @@ def main() -> int:
     poke_buff_clock(rules, path)
     poke_alliance_pressure(rules, path)
     poke_third_party(rules, path)
+    poke_joint_war(rules, path)
     print("BATTERY OK war_kinds")
     return 0
 

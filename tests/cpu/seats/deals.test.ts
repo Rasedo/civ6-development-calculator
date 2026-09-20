@@ -23,15 +23,19 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { alliancePtsWith, civsAtWar, emptySeat, setAllyTurnsWith, setTileOwner, setWar, setWarTurnsWith, borderTurnsFrom } from '../../../cpu/core/seats';
+import {
+  alliancePtsWith, civsAtWar, emptySeat, setAllyTurnsWith, setFriendTurnsWith, setTileOwner, setTreatyTurnsWith, setWar,
+  setWarTurnsWith, borderTurnsFrom, warKindWith,
+} from '../../../cpu/core/seats';
 import { ALLIANCE_QP_DEAL } from '../../../cpu/data/seats';
 import {
-  dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable,
+  dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable, dealItemPayable,
 } from '../../../cpu/core/deals';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN, DEAL_GREAT_WORK,
-  DEAL_OPEN_BORDERS, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
+  DEAL_OPEN_BORDERS, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS, DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
 } from '../../../cpu/data/seats';
+import { WAR_KIND_JOINT } from '../../../cpu/data/warKinds';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import { grantStockpile, stockOf } from '../../../cpu/core/stockpile';
 import { spiesOf } from '../../../cpu/core/espionage';
@@ -292,6 +296,56 @@ describe('the things a deal can name', () => {
     });
     expect(spiesOf(state, 1)).toHaveLength(0);
     expect(state.seats[1].treasury).toBe(1000);
+  });
+});
+
+describe('the JOINT WAR', () => {
+  // CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR): an
+  // AGREEMENT — InitiatorPrereqCivic CIVIC_FOREIGN_TRADE, Third Party War's
+  // warmonger triple; the war begins as the deal is accepted, for both.
+  const scene = (): GameState => {
+    const state = table();
+    state.seats[0]!.research.civics.push(JOINT_WAR_CIVIC);
+    return state;
+  };
+
+  it('clears the table into a war of BOTH parties on the target, under the joint kind', () => {
+    const state = scene();
+    play(state, { 0: { offer: [1, [[DEAL_JOINT_WAR, 2, 0]], []] } });
+    expect(civsAtWar(state, 0, 2)).toBe(false); // an offer alone declares nothing
+    play(state, { 1: { accept: [0] } });
+    expect(civsAtWar(state, 0, 2)).toBe(true);
+    expect(civsAtWar(state, 1, 2)).toBe(true);
+    expect(civsAtWar(state, 0, 1)).toBe(false);
+    expect(warKindWith(state, 0, 2)).toBe(WAR_KIND_JOINT);
+    expect(warKindWith(state, 1, 2)).toBe(WAR_KIND_JOINT);
+    expect(dealOfferOf(state, 0, 1)).toBeUndefined();
+    // at war already, there is nothing left to agree on
+    expect(dealItemPayable(state, 0, 1, [DEAL_JOINT_WAR, 2, 0])).toBe(false);
+  });
+
+  it('asks for the INITIATOR\'s Foreign Trade, a third living major, and no bond of either party with it', () => {
+    const bare = table(); // nobody holds the civic: the table never clears
+    play(bare, { 0: { offer: [1, [[DEAL_JOINT_WAR, 2, 0]], []] } });
+    play(bare, { 1: { accept: [0] } });
+    expect(civsAtWar(bare, 0, 2)).toBe(false);
+    expect(civsAtWar(bare, 1, 2)).toBe(false);
+
+    const state = scene();
+    const item = (t: number): [number, number, number] => [DEAL_JOINT_WAR, t, 0];
+    expect(dealItemPayable(state, 0, 1, item(2))).toBe(true);
+    expect(dealItemPayable(state, 1, 0, item(2))).toBe(false); // the partner's civic is not asked, the initiator's is
+    expect(dealItemPayable(state, 0, 1, item(0))).toBe(false); // a party is no target
+    expect(dealItemPayable(state, 0, 1, item(1))).toBe(false);
+    setFriendTurnsWith(state, 1, 2, 10); // the PARTNER's friend
+    expect(dealItemPayable(state, 0, 1, item(2))).toBe(false);
+    setFriendTurnsWith(state, 1, 2, 0);
+    setTreatyTurnsWith(state, 0, 2, 5); // a peace treaty still binding the initiator
+    expect(dealItemPayable(state, 0, 1, item(2))).toBe(false);
+    setTreatyTurnsWith(state, 0, 2, 0);
+    expect(dealItemPayable(state, 0, 1, item(2))).toBe(true);
+    state.seats[2]!.cities = []; // no living target
+    expect(dealItemPayable(state, 0, 1, item(2))).toBe(false);
   });
 });
 

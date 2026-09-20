@@ -1078,6 +1078,17 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
                 aid = ((sim.comp_kind == sim._comp_aid) & (sim.comp_target == b)
                        & sim.comp_member[:, a] & (gold >= DEAL_AID_GIFT * 2))
                 _put(a, b, quiet & aid, [_item(sim._deal_k_gold, DEAL_AID_GIFT)], [])
+            # A JOINT WAR: a seat with Foreign Trade asks a partner who shares
+            # its grudge — both have denounced a third major neither is bound
+            # to — to declare on it together (CIV6 DIPLOACTION_JOINT_WAR)
+            if sim._joint_war_civic >= 0:
+                for x in range(nrow):
+                    if x in (a, b):
+                        continue
+                    grudge = (quiet & alive_row[:, x] & sim.civ_civics[:, a, sim._joint_war_civic]
+                              & sim._denounce_active(a, x) & sim._denounce_active(b, x)
+                              & sim._joint_war_open(a, x) & sim._joint_war_open(b, x))
+                    _put(a, b, grudge, [_item(sim._deal_k_joint, x)], [])
             # A PRISONER goes home for a price.
             _put(a, b, quiet & (sim.seat_spy_held[:, b, a].sum(dim=1) > 0),
                  [_item(sim._deal_k_spy)], [_item(sim._deal_k_gold, DEAL_SPY_PRICE)])

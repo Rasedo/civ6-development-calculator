@@ -263,7 +263,7 @@ export function seatProximity(state: GameState, a: number, b: number): number {
  * undertake hostile actions (such as Denouncing or going to war) against
  * each other"; an ally is a friend twice over.
  */
-export function declareWar(state: GameState, declarer: number, target: number, kind = -1): RuleResult {
+export function declareWar(state: GameState, declarer: number, target: number, kind = -1, agreed = false): RuleResult {
   const actor = seatOf(state, declarer);
   const foe = seatOf(state, target);
   if (!actor || !foe || declarer === target) return no('No such civilization.');
@@ -272,7 +272,7 @@ export function declareWar(state: GameState, declarer: number, target: number, k
   const bound = treatyTurnsWith(state, declarer, target);
   if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
   const k = kind < 0 ? defaultWarKind(state, declarer, target) : kind;
-  if (!warKindAllowed(state, declarer, target, k)) return no('No casus belli for that war.');
+  if (!warKindAllowed(state, declarer, target, k, agreed)) return no('No casus belli for that war.');
   // CIV6 (Faces of Peace): the war kind is what the ban reads, so every pure
   // read above moves AHEAD of the first mutation (`WAR_BAN_ROWS`)
   if (warBanned(state, declarer, target, k !== WAR_KIND_SURPRISE)) {

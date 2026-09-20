@@ -614,7 +614,7 @@ class SimSeats:
         return self._denounce_left(a, b) > 0
 
     def _declare_war_major(self, row: int, tgt: int, declare: torch.Tensor,
-                           kind: torch.Tensor | None = None) -> None:
+                           kind: torch.Tensor | None = None, agreed: bool = False) -> None:
         """`declareWar`'s body — every path that opens a war between two majors
         runs exactly this: the war axis and both clocks, the routes the war
         cancels, the border grant and the missions it ends, the KIND the
@@ -624,10 +624,15 @@ class SimSeats:
 
         `kind` [B] long is the WAR_KINDS code the record declares under; None
         or -1 takes `_default_war_kind`. A kind the declarer may not declare
-        REFUSES the declaration (`warKindAllowed`), it never falls back."""
+        REFUSES the declaration (`warKindAllowed`), it never falls back.
+        `agreed` is the JOINT WAR's accepted agreement — the one requirement
+        that is not a fact of the state; only the deal's move passes it."""
         if not bool(declare.any()):
             return
         allowed = self._war_kinds_allowed(row, tgt)                       # [B, K]
+        if agreed and 0 <= self._war_k_joint < allowed.shape[1]:
+            allowed = allowed.clone()
+            allowed[:, self._war_k_joint] = True
         K = allowed.shape[1]
         want = self._default_war_kind(allowed)
         if kind is not None:
@@ -827,6 +832,8 @@ class SimSeats:
             g2, h2 = self._adopted_gov(self.civ_civics[:, tgt])
             return h1 & h2 & (g1 != g2) & (self._gov_tier[g1] >= 3) & (self._gov_tier[g2] >= 3)
         # 8: a broken promise — neither engine holds a promise
+        # 11: the JOINT agreement — not a fact of the state; only the deal's
+        # move declares under it (`_declare_war_major`'s `agreed`)
         return zero
 
     def _ally_at_war_with(self, row: int, tgt: int) -> torch.Tensor:

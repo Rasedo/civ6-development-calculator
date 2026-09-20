@@ -548,6 +548,10 @@ class SimInit:
         self._agreement_turns = int(rules.seats["agreementTurns"])
         self._alliance_civic = int(rules.seats["allianceCivic"])
         self._open_borders_civic = int(rules.seats["openBordersCivic"])
+        # the JOINT WAR: the deal item's civic gate (the initiator's), and the
+        # WAR_KINDS code its move declares under
+        self._joint_war_civic = int(rules.seats["jointWarCivic"])
+        self._war_k_joint = int(rules.seats["jointWarKind"])
         self._favor_per_alliance = int(rules.seats["favorPerAlliance"])
         self._valletta_walls_pct = int(rules.seats["vallettaWallsDiscountPct"])
         self._al_qp_turn = int(rules.seats["allianceQpTurn"])
@@ -645,6 +649,7 @@ class SimInit:
         self._deal_k_city = self._deal_kinds.index("CITY")
         self._deal_k_spy = self._deal_kinds.index("SPY")
         self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
+        self._deal_k_joint = self._deal_kinds.index("JOINT_WAR")
         self._comp_turns = int(_er2["competitionTurns"])
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])

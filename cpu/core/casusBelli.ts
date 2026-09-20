@@ -116,6 +116,10 @@ export function warConditionHolds(state: GameState, seat: number, target: number
       // CIV6 (Third Party War): "Join another player's war against a target
       // civilization." The other player read as an ALLY — see WarCondition.
       return allyAtWarWith(state, seat, target);
+    case 'jointAgreed':
+      // the accepted agreement is not a fact of the state: only the deal's
+      // own move declares under this kind (`warKindAllowed`'s `agreed`)
+      return false;
     default:
       return false;
   }
@@ -123,12 +127,15 @@ export function warConditionHolds(state: GameState, seat: number, target: number
 
 /** May `seat` declare a war of `kind` on `target` right now? The civic (or
  *  its roster override), the denouncement age, then the requirement column.
- *  A minor takes no kind. */
-export function warKindAllowed(state: GameState, seat: number, target: number, kind: number): boolean {
+ *  A minor takes no kind. `agreed` is the JOINT WAR's accepted agreement —
+ *  the one requirement that is not a fact of the state; only the deal's
+ *  move passes it. */
+export function warKindAllowed(state: GameState, seat: number, target: number, kind: number, agreed = false): boolean {
   if (kind < 0 || kind >= WAR_KINDS.length || !isCiv(seat) || !isCiv(target) || seat === target) return false;
   const def = WAR_KINDS[kind];
   if (!warKindCivicOk(state, seat, kind)) return false;
   if (def.denounceTurns >= 0 && !warDenounceHeld(state, seat, target, def.denounceTurns)) return false;
+  if (def.condition === 'jointAgreed') return agreed;
   return warConditionHolds(state, seat, target, def.condition);
 }
 

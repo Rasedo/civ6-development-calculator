@@ -43,7 +43,7 @@ re-adds them.
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
 | **B. Fidelity vs real Civ 6** | **6** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
-| C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
+| C-2 diplomatic agreements | 1 | research agreement; mark/demand/discuss on C-76 |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
@@ -60,8 +60,8 @@ re-adds them.
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
-| **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **28** | |
+| **C. Absent systems** | **21** | |
+| **OPEN, TOTAL** | **27** | |
 
 ## The question ledger — owner asks
 
@@ -116,8 +116,7 @@ close in the same commit.
 - **C-1. POWER.** Weight 1.
   - ASK 4, then BUILD: the ACCIDENT ROLL. Sourced in `Expansion2_RandomEvents.xml`: `RANDOM_EVENT_NUCLEAR_ACCIDENT_{MINOR,MAJOR,CATASTROPHIC}`, Severity 0/1/2, `MinTurnAtRisk` 10/20/30 (the reactor age each opens at), `OccurrencesPerGame` 1 apiece at MODERATE; `RandomEvent_Damages` — MINOR: improvement pillaged 10%, building pillaged 20%, radiation 2 turns; MAJOR: civilians killed 50%, improvement pillaged 40%, district pillaged 50%, buildings pillaged 100%, radiation 10 turns, land/naval units 50% @ 20-50 HP, garrison 50% @ 20-50; CATASTROPHIC: improvement pillaged 100%, buildings DESTROYED 100%, district pillaged 100%, population -80%, radiation 20 turns, units 100% @ 20-50, garrison 100% @ 20-50, civilians 100%. The age SCALING is DLL. The clock ships (`City.reactorAge` / `city_reactor_age`).
   - BLOCKER C-38: a city-state's cities are never powered (`resolveSeatPower` / `_resolve_seat_power` run for majors only). Vacuous today, pinned by `minor_yields_test::test_power_vacuous`; due when the minor's ladder reaches a building with a load.
-- **C-2. DIPLOMATIC AGREEMENTS.** Weight 2.
-  - BUILD: JOINT WAR. `DIPLOACTION_THIRD_PARTY_WAR`'s row column for column (Join Ongoing War ships as a war kind), differing only in that its target is not yet at war — which needs a TWO-SIDED agreement object the deal table does not carry: one seat's offer binding the other's declaration next turn, surviving a turn boundary and applying to a seat that did not choose it (`DEAL_ITEM_KINDS` has no war item).
+- **C-2. DIPLOMATIC AGREEMENTS.** Weight 1.
   - BUILD, half sourced: RESEARCH AGREEMENT. The gate is published (`InitiatorPrereqTech` / `TargetPrereqTech` TECH_SCIENTIFIC_THEORY, `NoCurrentResearchAgreement`, Worth/Cost only at DIPLO_STATE_ALLIED 40 and DECLARED_FRIEND 20); the PAYOUT and DURATION are not (no `Duration` on the row). The science paid is DLL.
   - BLOCKER C-76: a mission's mark ("a small positive bonus in your relationship"), DEMAND and DISCUSS (the four promises of `Expansion2_DiplomaticActions.xml`, FavorCost 30, GrievancesForRefusal 25, GrievancesPerIncursion 25), ASK-FOR-PROMISE and the WAR OF RETRIBUTION's RequiresBrokenPromise.
   - Model lines, identical on both engines and kept as notes: a luxury has no lump to trade (the install trades ACCESS, never an amount); the intel bonus is unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS` a side, an offer standing two turns; a war does not end a standing deal; the Third Party War's "another player" is read as an ALLY.

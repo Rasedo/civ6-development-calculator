@@ -18,7 +18,9 @@ import {
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
   ALLIANCE_QP_DEAL,
   DEAL_PERMANENT, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
+  DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
 } from '../data/seats';
+import { WAR_KIND_JOINT } from '../data/warKinds';
 import { STRATEGIC_IDS } from '../data/constants';
 import { CITY_MAX_HP } from '../data/units';
 import { GW_KINDS, type GreatWork } from '../data/greatWorks';
@@ -26,12 +28,12 @@ import { SPY_UNIT } from '../data/espionage';
 import { gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { outerPool, wallsMax } from './rules';
 import {
-  alliancePtsWith, civsAtWar, grantKey, isCiv, seatOf, seatsAllied,
-  setAlliancePtsWith, setBorderTurnsFrom, warTurnsWith,
+  alliancePtsWith, civsAtWar, grantKey, isCiv, seatOf, seatsAllied, seatsFriends,
+  setAlliancePtsWith, setBorderTurnsFrom, treatyTurnsWith, warTurnsWith,
 } from './seats';
 import { grantStockpile, spendStockpile, stockOf, stockpileCap } from './stockpile';
 import { spawnUnit } from './units';
-import { transferCity } from './phase';
+import { declareWar, transferCity } from './phase';
 
 /** The offer `from` has standing with `to`, if any. */
 export function dealOfferOf(state: GameState, from: number, to: number): DealOffer | undefined {
@@ -119,6 +121,21 @@ function gwTo(state: GameState, seat: number, obj: number): City | undefined {
   return seatOf(state, seat)?.cities.find((c) => gwHasRoom(state, c, obj));
 }
 
+/** CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR): an
+ *  AGREEMENT — `InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE is the GIVER's
+ *  gate, the partner needs none; the target is a third living major; and
+ *  each party must still be free to declare on it — `declareWar`'s own
+ *  early returns (at war already, friends or allies, a peace treaty
+ *  binding), asked here so the table cannot clear on a declaration that
+ *  would refuse. The GPU twin is `_deal_kind_ok` over `_joint_war_open`. */
+export function jointWarPayable(state: GameState, giver: number, receiver: number, target: number): boolean {
+  if (!isCiv(target) || target === giver || target === receiver) return false;
+  if (!seatOf(state, giver)?.research.civics.includes(JOINT_WAR_CIVIC)) return false;
+  if ((seatOf(state, target)?.cities.length ?? 0) === 0) return false;
+  return [giver, receiver].every((p) => !civsAtWar(state, p, target) && !seatsAllied(state, p, target)
+    && !seatsFriends(state, p, target) && treatyTurnsWith(state, p, target) === 0);
+}
+
 /** Can `giver` actually hand `receiver` this one thing, right now? */
 export function dealItemPayable(state: GameState, giver: number, receiver: number, it: DealItem): boolean {
   const [kind, a, b] = it;
@@ -152,6 +169,8 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
       return spyHeldWith(state, receiver, giver) > 0;
     case DEAL_OPEN_BORDERS:
       return true;
+    case DEAL_JOINT_WAR:
+      return jointWarPayable(state, giver, receiver, a);
     default:
       return false;
   }
@@ -205,6 +224,15 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
     }
     case DEAL_OPEN_BORDERS:
       setBorderTurnsFrom(state, giver, receiver, AGREEMENT_TURNS);
+      break;
+    case DEAL_JOINT_WAR:
+      // CIV6 (Joint War): the war begins as the deal is accepted — BOTH
+      // parties declare on the target now, the giver first, under the
+      // joint kind; the agreement is its casus belli (`agreed`). Each call
+      // keeps `declareWar`'s own gates: a party already dragged to war with
+      // the target by an earlier item of this table has nothing to declare.
+      declareWar(state, giver, a, WAR_KIND_JOINT, true);
+      declareWar(state, receiver, a, WAR_KIND_JOINT, true);
       break;
     default:
       break;

@@ -37,7 +37,7 @@ import {
   GRIEVANCE_WAR_BASE,
 } from '../../../cpu/data/seats';
 import {
-  FORMAL_WAR_MIN_TURNS, WAR_BUFF_TURNS, WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_LIBERATION, WAR_KIND_THIRD_PARTY,
+  FORMAL_WAR_MIN_TURNS, WAR_BUFF_TURNS, WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_JOINT, WAR_KIND_LIBERATION, WAR_KIND_THIRD_PARTY,
   WAR_KIND_RECONQUEST, WAR_KIND_SURPRISE, WAR_KIND_TERRITORIAL,
 } from '../../../cpu/data/warKinds';
 import { tilesWithin } from '../../../world/hex';
@@ -290,5 +290,26 @@ describe('the THIRD PARTY war', () => {
     grievanceWarDeclared(state, 0, 1, WAR_KIND_THIRD_PARTY);
     expect(grievanceWith(state, 1, 0))
       .toBe(Math.round((GRIEVANCE_WAR_BASE * WAR_KINDS[WAR_KIND_THIRD_PARTY]!.pct[0]) / 100));
+  });
+});
+
+describe('the JOINT war', () => {
+  // CIV6 (Expansion1_DiplomaticActions.xml, DIPLOACTION_JOINT_WAR): an
+  // AGREEMENT — InitiatorPrereqCivic CIVIC_FOREIGN_TRADE, Third Party War's
+  // 100 / 100 / 300, no denouncement. The deal is the gate (deals.test.ts);
+  // the kind itself is met by nothing but the accepted agreement.
+  it('is the last row, carries Third Party War\'s percents and no civic, and only the agreement opens it', () => {
+    const d = WAR_KINDS[WAR_KIND_JOINT]!;
+    expect(WAR_KIND_JOINT).toBe(WAR_KINDS.length - 1);
+    expect(d.id).toBe('joint');
+    expect(d.civic).toBeNull();
+    expect(d.denounceTurns).toBe(-1);
+    expect(d.condition).toBe('jointAgreed');
+    expect([...d.pct]).toEqual([100, 100, 300]);
+    const state = table();
+    state.seats[0]!.research.civics.push('FOREIGN_TRADE');
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_JOINT)).toBe(false);
+    expect(defaultWarKind(state, 0, 1)).toBe(WAR_KIND_SURPRISE); // never the default pick
+    expect(warKindAllowed(state, 0, 1, WAR_KIND_JOINT, true)).toBe(true);
   });
 });
