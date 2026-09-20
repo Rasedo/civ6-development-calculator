@@ -984,16 +984,16 @@ class SimOrders:
                     if _k == self.FARM:
                         _valid = self._farm_ground(row).gather(1, hc.unsqueeze(1)).squeeze(1)
                     elif _k == self.MINE:
-                        _valid = self.mine_ok.gather(1, hc.unsqueeze(1)).squeeze(1) & mining
+                        _valid = self._plane_seen("mine_ok", row).gather(1, hc.unsqueeze(1)).squeeze(1) & mining
                     elif _k == self.LUMBER:
-                        _valid = (self.lumber_ok.gather(1, hc.unsqueeze(1)).squeeze(1)
+                        _valid = (self._plane_seen("lumber_ok", row).gather(1, hc.unsqueeze(1)).squeeze(1)
                                   & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1) & constr)
                     else:
                         _ut = int(self._imp_unlock[_k])
                         _unl = (techs[:, _ut] if _ut >= 0
                                 else torch.ones(B, dtype=torch.bool, device=dev))
                         if self.SEASIDE >= 0 and _k == self.SEASIDE:
-                            _valid = self._seaside_ok().gather(1, hc.unsqueeze(1)).squeeze(1) & _unl
+                            _valid = self._seaside_ok(row).gather(1, hc.unsqueeze(1)).squeeze(1) & _unl
                         elif self._imp_suz[_k]:
                             _valid = self._suz_improvement_ok(row, _k).gather(
                                 1, hc.unsqueeze(1)).squeeze(1)

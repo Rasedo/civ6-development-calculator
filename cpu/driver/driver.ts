@@ -31,6 +31,7 @@ import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
+import { hiddenResourcesFor } from '../core/seats';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
@@ -347,6 +348,7 @@ for (let t = 0; t < N_TURNS; t++) {
         const owns = (t: Tile) => tileOwnedByCiv(t, seat);
         const unl = computeUnlocks(state, seat);
         const camps = campTiles(state);
+        const hidden = hiddenResourcesFor(state, seat); // `_plane_seen`: an unseen strategic is plain ground
         // `_job_mask_core`'s twin: the REPAIR arms take ANY owned pillaged
         // tile or district (a pillaged Harbor repairs from its own water
         // tile), and the IMPROVE arm asks no water question of its own —
@@ -355,7 +357,7 @@ for (let t = 0; t < N_TURNS; t++) {
         const jobTiles = state.map.tiles.filter((t) =>
           owns(t)
           && (t.pillaged || t.districtPillaged
-            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
+            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, hidden }).length > 0)));
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];
@@ -366,7 +368,7 @@ for (let t = 0; t < N_TURNS; t++) {
         let engJobTiles: Tile[] | null = null;
         const engTiles = () => (engJobTiles ??= state.map.tiles.filter((t) =>
           canBuildRoad(t, owns)
-          || validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, builder: 'MILITARY_ENGINEER' }).length > 0
+          || validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, hidden, builder: 'MILITARY_ENGINEER' }).length > 0
           || engineerFinishCity(state, seat, t.index) !== undefined));
         // `_charge_jobs`'s twin: a job TAKEN by an earlier unit of the same
         // type is masked out for the later ones — one set per type, as the

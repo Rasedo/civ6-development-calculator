@@ -2133,6 +2133,9 @@ class SimInit:
                     if _v is not None:
                         _bare[_b, _ti] = torch.tensor(_v, dtype=_live.dtype, device=device)
             self._nr_planes.append((_plane, _bare))
+        # ...and by name: a row that cannot SEE a tile's resource reads the
+        # same resource-free value the harvest would copy in (`_plane_seen`)
+        self._nr_bare: dict[str, torch.Tensor] = dict(self._nr_planes)
         # Per-district DYNAMIC adjacency source amounts, every one read from the
         # catalog (a district with no such row scores 0, which is not the same
         # as a hardwired default). The static sources live in d_static_adj.

@@ -3707,11 +3707,11 @@ class SimSeats:
     def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor, row: int) -> torch.Tensor:
         ok = self._farm_ground(row, cv)
         if self.MINE >= 0 and self._mine_unlock_tech >= 0:
-            ok = ok | (self.mine_ok & tk[:, self._mine_unlock_tech].unsqueeze(1))
+            ok = ok | (self._plane_seen("mine_ok", row) & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
-            ok = ok | (self.lumber_ok & tk[:, self._lumber_unlock_tech].unsqueeze(1))
+            ok = ok | (self._plane_seen("lumber_ok", row) & tk[:, self._lumber_unlock_tech].unsqueeze(1))
         if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
-            ok = ok | (self._seaside_ok() & tk[:, self._seaside_unlock_tech].unsqueeze(1))
+            ok = ok | (self._seaside_ok(row) & tk[:, self._seaside_unlock_tech].unsqueeze(1))
         for _g in self._imp_ground_idx:
             _gu = int(self._imp_unlock[_g])
             _gok = (self._imp_ground_ok(_g) & (self.res_imp == -1)

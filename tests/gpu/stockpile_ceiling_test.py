@@ -165,7 +165,8 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     own = ((sim.tile_seat[B0] == int(sim._ROW_SEAT[row])) & ~sim.water[B0] & (sim.improvement[B0] < 0)
            & (sim.district[B0] < 0) & (sim.res_id[B0] < 0) & (sim.centre_slot_at[B0] < 0) & sim.passable[B0]
            & sim.d_usable[B0])
-    t = int(own.nonzero(as_tuple=True)[0][0])
+    flat = own & ~sim.hills[B0]
+    t = int((flat if bool(flat.any()) else own).nonzero(as_tuple=True)[0][0])
     if int(sim.tile_ftu[B0, t]) >= 0:                    # a feature the district clears: hold its tech
         sim.civ_techs[:, row, int(sim.tile_ftu[B0, t])] = True
     sim.res_id[B0, t] = rid
@@ -176,6 +177,16 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     sim.res_priority[B0, t] = 2
     sim.res_cat[B0, t] = 2
     sim.d_usable[B0, t] = False                 # what the exporter bakes for a non-bonus resource
+    if not bool(sim.hills[B0, t]) and imp == sim.MINE:
+        # ...and `mine_ok` folds "a resource tile takes its own improvement":
+        # flat ground under a Mine resource reads mine-ok, its resource-free
+        # value does not — the row that cannot see the resource reads THAT
+        sim.mine_ok[B0, t] = True
+        sim._nr_bare["mine_ok"][B0, t] = False
+        sim.civ_techs[:, row, tech] = False
+        assert not bool(sim._plane_seen("mine_ok", row)[B0, t]), "flat ground under unseen Niter read mine-ok"
+        sim.civ_techs[:, row, tech] = True
+        assert bool(sim._plane_seen("mine_ok", row)[B0, t]), "a SEEN Mine resource lost its mine-ok"
     # a DISTRICT may stand on an unseen strategic (the install allows it; the
     # resource is lost) and not on a seen one — `_district_elig` reads the row
     j = next(jj for jj in range(sim.city_id.shape[2]) if int(sim.city_id[B0, row, jj]) == int(sim.tile_city[B0, t]))

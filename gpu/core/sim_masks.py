@@ -1131,7 +1131,7 @@ class SimMasks:
         cv = self.civ_civics[:, row] if civics is None else civics
         hf = (cv[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
               else torch.zeros(self.B, dtype=torch.bool, device=self.device))
-        out = self.farm_flat | (self.farm_hill & hf.unsqueeze(1))
+        out = self._plane_seen("farm_flat", row) | (self._plane_seen("farm_hill", row) & hf.unsqueeze(1))
         for _fc, _fl, _ft, _fh, _fv in self._live_rows(row, self._farm_terrain_rows):
             _fok = self._row_is(row, _fc, _fl)
             if _fv >= 0:
@@ -3189,8 +3189,8 @@ class SimMasks:
             )
             farmable = self._farm_ground(row, civics).gather(1, tc)
             build_f = (here_ok & farmable).unsqueeze(2)
-            build_m = (here_ok & self.mine_ok.gather(1, tc) & mining).unsqueeze(2)
-            build_l = (here_ok & self.lumber_ok.gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)
+            build_m = (here_ok & self._plane_seen("mine_ok", row).gather(1, tc) & mining).unsqueeze(2)
+            build_l = (here_ok & self._plane_seen("lumber_ok", row).gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)
         else:
             here_ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = torch.zeros(B, N, 1, dtype=torch.bool, device=dev)
@@ -3292,7 +3292,7 @@ class SimMasks:
                 _unl = (techs[:, _ut].unsqueeze(1) if _ut >= 0
                         else torch.ones(B, 1, dtype=torch.bool, device=dev))
                 if self.SEASIDE >= 0 and _k == self.SEASIDE:
-                    _ok = here_ok & self._seaside_ok().gather(1, tc) & _unl
+                    _ok = here_ok & self._seaside_ok(row).gather(1, tc) & _unl
                 elif self._imp_built_by[_k] >= 0:
                     # CIV6 (`Improvement_ValidBuildUnits`): a row a NAMED unit
                     # lays rather than the Builder (the Pa's Toa). It runs

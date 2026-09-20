@@ -3014,6 +3014,22 @@ class SimEconomy:
         have = self._seat_techs(row).gather(1, rt.clamp(min=0))
         return gated & ~have
 
+    def _plane_seen(self, name: str, row: int) -> torch.Tensor:
+        """A baked tile flag as THIS row sees it. The fixture folds "a resource
+        tile takes only its own improvement" into farm_flat / farm_hill /
+        mine_ok / lumber_ok / _sr_c; where the row cannot see the resource
+        (`_res_hidden`) the flag takes its resource-free value — the `nr`
+        value the harvest copies in — so flat Niter is plain grassland to a
+        row without Military Engineering (9287 t35: the applier mined it)."""
+        live = getattr(self, name)
+        bare = self._nr_bare.get(name)
+        if bare is None:
+            return live
+        hid = self._res_hidden(row)
+        if not bool(hid.any()):
+            return live
+        return torch.where(hid, bare, live)
+
     def _res_hidden_yields(self, row: int) -> torch.Tensor | None:
         """[B, T, 6] — the resource yields the static plane bakes that this
         row is NOT paid: `res_yields` where `_res_hidden(row)`; None when the
@@ -4711,7 +4727,7 @@ class SimEconomy:
             out = out + (per * live.to(self.dtype)).sum(dim=1).long() * got.long()
         return out
 
-    def _seaside_ok(self) -> torch.Tensor:
+    def _seaside_ok(self, row: int = -1) -> torch.Tensor:
         """[B, T] bool — where a SEASIDE RESORT may be built, the
         `validImprovementsIn` arm's twin. Static half from `sr_c` (flat
         Grassland/Plains/Desert beside a COAST tile, unpaved, no resource);
@@ -4721,7 +4737,7 @@ class SimEconomy:
         if self.SEASIDE < 0:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         return (
-            self._sr_c
+            (self._plane_seen("_sr_c", row) if row >= 0 else self._sr_c)
             & ((self.feat_id < 0) | self.feat_stripped)
             & (self.improvement < 0)
             & (self.district < 0)
