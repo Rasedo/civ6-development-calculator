@@ -190,7 +190,9 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     sim.civ_techs[:, row, tech] = False
     sim._eff_version += 1
     assert bool(sim._res_hidden(row)[B0, t]), "the planted strategic is not hidden before its tech"
-    hidden_add = sim._seat_tile_add(row)[B0, t].clone()
+    hy = sim._res_hidden_yields(row)
+    assert hy is not None and torch.equal(hy[B0, t], sim.res_yields[B0, t]), "the hidden yield plane misses the planted tile"
+    assert float(sim.res_yields[B0, t].abs().sum()) > 0, "the resource's own yields are on the plane"
     bank0 = float(sim.civ_stockpile[B0, row, k])
     sim._seat_accrue_stockpile(row)
     assert float(sim.civ_stockpile[B0, row, k]) == bank0, "accrued from a resource the seat cannot see"
@@ -209,9 +211,8 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     sim.civ_techs[:, row, tech] = True
     sim._eff_version += 1
     assert not bool(sim._res_hidden(row)[B0, t]), "the tech did not reveal it"
-    seen_add = sim._seat_tile_add(row)[B0, t]
-    assert torch.allclose(seen_add - hidden_add, sim.res_yields[B0, t]), (seen_add, hidden_add, sim.res_yields[B0, t])
-    assert float(sim.res_yields[B0, t].abs().sum()) > 0, "the resource's own yields are on the plane"
+    hy2 = sim._res_hidden_yields(row)
+    assert hy2 is None or float(hy2[B0, t].abs().sum()) == 0, "the revealed resource still withheld its yield"
     sim._seat_accrue_stockpile(row)
     assert float(sim.civ_stockpile[B0, row, k]) > bank0, "the revealed resource did not accrue"
     if unit is not None:

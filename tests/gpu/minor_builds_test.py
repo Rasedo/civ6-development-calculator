@@ -144,7 +144,8 @@ def test_the_type_district_lands_on_the_first_plot(rules, path) -> None:
     sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     sim.citystate_prod[B0, s] = 10_000.0
     plc = next(int(p) for (di, _ut, _uc, p, _fc) in sim._scaffold if int(di) == dv)
-    surface = sim.coastal_water if plc == 2 else sim.d_usable
+    # the engine's surface: an unseen strategic is plain ground to the minor
+    surface = sim.coastal_water if plc == 2 else (sim.d_usable | (sim.d_usable0 & sim._res_hidden(row)))
     expect_plane = sim._minor_district_site(s) & surface & ~sim._fallout()
     if plc == 3:
         expect_plane = expect_plane & (sim._adj_center_count() == 0)

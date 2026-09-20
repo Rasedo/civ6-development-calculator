@@ -7433,7 +7433,6 @@ class SimSeats:
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
-            plane = plane - self.res_yields * self._res_hidden(row).unsqueeze(2).to(self.dtype)
             self._belief_feat_cache = (key, plane)
             return plane
         featA = self._bel_add("featY", row)
@@ -7474,9 +7473,6 @@ class SimSeats:
         pres = self._preserve_plane(row)
         if pres is not None:
             plane = plane + pres * self._preserve_live()
-        # CIV6 (Resources.PrereqTech): the static plane bakes every resource's
-        # yield; a resource this row cannot see yet pays it nothing
-        plane = plane - self.res_yields * _hid.unsqueeze(2).to(self.dtype)
         self._belief_feat_cache = (key, plane)
         return plane
 
@@ -9715,6 +9711,11 @@ class SimSeats:
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             y_oth = y_oth + featP[:, :, 2:].sum(dim=2)
+        hidY = self._res_hidden_yields(row)   # an unseen strategic pays this row nothing
+        if hidY is not None:
+            f_plane = f_plane - hidY[:, :, 0]
+            p_plane = p_plane - hidY[:, :, 1]
+            y_oth = y_oth - hidY[:, :, 2:].sum(dim=2)
         # tileYields returns ZERO for a paved tile (yields.ts:37), and an
         # orphaned district from a razed city CAN be an unowned candidate, so
         # the district/wonder mask must zero the key here.

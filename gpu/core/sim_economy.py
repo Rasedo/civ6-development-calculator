@@ -3014,6 +3014,18 @@ class SimEconomy:
         have = self._seat_techs(row).gather(1, rt.clamp(min=0))
         return gated & ~have
 
+    def _res_hidden_yields(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — the resource yields the static plane bakes that this
+        row is NOT paid: `res_yields` where `_res_hidden(row)`; None when the
+        row sees everything. The yield composers subtract it UNCONDITIONALLY,
+        beside the belief plane and outside its gates — inside
+        `_seat_tile_add` it reached the centre's static columns only behind
+        `has_bel`, and a capital on unseen Iron paid its science (9196 t2)."""
+        hid = self._res_hidden(row)
+        if not bool(hid.any()):
+            return None
+        return self.res_yields * hid.unsqueeze(2).to(self.dtype)
+
     def _adj_source_plane(self, src: int) -> torch.Tensor:
         """[B, T] — how much ONE adjacency source answers at each tile, in the
         district walk's own units. `districtAdjacency`'s `matchesAdjacency`
@@ -4950,6 +4962,15 @@ class SimEconomy:
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP
             oth_sc = oth_sc + (featP[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
+        # CIV6 (Resources.PrereqTech): a strategic this row cannot see yet pays
+        # it nothing — the static plane baked the yield, so it comes off here,
+        # worked tile and centre alike, whatever else the row is paid
+        hidY = self._res_hidden_yields(row)
+        if hidY is not None:
+            f_plane = f_plane - hidY[:, :, 0]
+            p_plane = p_plane - hidY[:, :, 1]
+            ty_oth = ty_oth - hidY
+            oth_sc = oth_sc - (hidY[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
 
         tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, n, -1)
         M = tiles.shape[2]
@@ -5023,6 +5044,8 @@ class SimEconomy:
                 + self._feat_add_y().gather(1, _c6).double())
         if has_bel:
             ctr6 = ctr6 + featP.gather(1, _c6).double()
+        if hidY is not None:
+            ctr6 = ctr6 - hidY.gather(1, _c6).double()   # the centre too (tileYieldsForCenter)
         ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev))
         ctr6[:, :, 1] = torch.maximum(p_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_production), dtype=F64, device=dev))
         # CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
