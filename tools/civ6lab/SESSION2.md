@@ -31,29 +31,6 @@ Standing traps (all paid for on 2026-09-13):
 * Socket-spawned spies crash the game on a capture/kill escape route — a
   spy used in any scene is TRAINED in a city and travelled in.
 
-## Scene A — ask 6, the opinion deltas (GameCore)
-
-The one line the game answers directly: the diplomacy AI exposes every
-modifier between two players WITH its score.
-
-* VERIFY in the Player panel: `Players[a]:GetDiplomaticAI():GetDiplomaticModifiers(b)`
-  (a table of `{Score, Text}` per modifier) and the summary
-  `GetDiplomaticScore(b)`.
-* Read the baseline for every ordered pair of majors and write it to
-  `runs/opinion_<stamp>.jsonl` (turn, a, b, modifier text, score).
-* Then trigger ONE situation at a time from the socket and re-read the
-  same turn: a surprise war declared (`Players[a]:GetDiplomacy()` —
-  VERIFY the declare call and `WarTypes`), a denouncement, a city settled
-  within the near-border band (spawn a settler, found from the socket),
-  a promise broken, a trade route sent, a delegation. Each read is one
-  delta per modifier text.
-* Advance 5, 10 and 20 turns with `lab.py advance` and re-read: the DECAY
-  per turn is the second half of the answer, and C-76 needs both.
-* Record: modifier text, the amount on the turn of the act, the amount at
-  +5/+10/+20.
-
-Closes: C-76's deltas (ask 6). The anchors are already sourced.
-
 ## Scene B — asks 10, 12, 13, the Free City trio (GameCore + InGame)
 
 One setup answers three lines.
@@ -205,5 +182,7 @@ agreement will take"; the install publishes no duration.
 
 Every line here, once measured, is written into its AUDIT entry the way
 asks 1, 7, 11, 15 and 16 were on 2026-09-13, and the ledger row leaves.
-Scenes A, B and C each unblock a build on both engines (C-76, C-60/C-16,
-B-51r); D and E close an open item without new code beyond a table.
+Scenes B and C each unblock a build on both engines (C-60/C-16, B-51r);
+D and E close an open item without new code beyond a table. (Scene A, the
+opinion deltas, left on 2026-09-20: the opinion scale is the game's AI, not
+its engine.)

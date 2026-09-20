@@ -43,11 +43,11 @@ re-adds them.
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
 | **B. Fidelity vs real Civ 6** | **6** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
-| C-2 diplomatic agreements | 1 | the research agreement's clock (LAB); mark/demand/discuss on C-76 |
+| C-2 diplomatic agreements | 1 | the research agreement's clock (LAB); the promises (ASK) |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
-| C-26 civilization abilities, the residue | 1 | agendas (C-76), four unread DLL clauses, resource visibility |
+| C-26 civilization abilities, the residue | 1 | four unread DLL clauses; visibility's adjacency and belief clauses (LAB) |
 | C-31 the nuclear strike's last clauses | 1 | the per-delivery split and the bomber's threshold (on C-34's damage); citizens killed per ring and a wonder in the blast (ask 5) |
 | C-34 air combat's second half | 2 | fighter interception (unsourced roll); Patrol and Priority Target carry no data |
 | C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
@@ -55,13 +55,11 @@ re-adds them.
 | C-49 named storms | 1 | the per-step draw is inferred from resultants, not watched step by step (LAB) |
 | C-60 the Free City's own play | 1 | its defence (ask 13), its amenities (ask 12) |
 | C-64 majority religion | 1 | a per-seat majority read; the tie rule is ask 3 |
-| C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-74 per-game counts over per-object rolls | 1 | ask 4 (volcanoes and reactors) |
-| C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
-| **C. Absent systems** | **21** | |
-| **OPEN, TOTAL** | **27** | |
+| **C. Absent systems** | **18** | |
+| **OPEN, TOTAL** | **24** | |
 
 ## The question ledger — owner asks
 
@@ -76,7 +74,6 @@ scenes cite them), so the gaps are closed asks.
 | 3 | C-64 | the majority-religion TIE: two religions in equal cities, which wins? | LAB scene E (equal followers, equal cities, arrival order swapped) |
 | 4 | C-74, C-1 | the install counts eruptions and reactor accidents PER GAME; this engine rolls per volcano / per reactor. Proposal: divide the per-turn rate by the count of objects at risk | LAB scene F says whether the game rolls per object (half); whether this engine mirrors that or scales a per-game rate is the owner's ruling |
 | 5 | C-31 | a wonder in a nuke's blast — pillaged or not; and the per-ring kill proportion beside it | LAB scene D |
-| 6 | C-76 | the opinion DELTAS. The anchors are sourced (100 / 83 / 66 / 50 / 33 / 16 / 0 with a `DiplomaticYieldBonus` each); the install publishes every `LOC_DIPLO_MODIFIER_*` name and no amount | LAB scene A (the diplomacy AI exposes each modifier with its score); the one line the game answers directly, and it unblocks all of C-76 |
 | 9 | C-38 | what a city-state SPENDS gold and faith on. OBSERVED: it banks income minus upkeep and bought one defender when its army fell (~207 gold, 4 units -> 1); faith untouched. The magnitude — how few units triggers the buy, what it buys — needs a longer watch | LAB carry-over (a 30-turn watch) |
 | 10 | C-16 | may a spy travel to a Free City? No data gate anywhere; both engines walk the major rows | LAB scene B |
 | 12 | C-60 | a Free City's amenities: the tier is computed per OWNER and the free seat has no luxuries or policies, so it sits at the bottom band. `CivilizationLevels` has no amenity column | LAB scene B |
@@ -118,7 +115,7 @@ close in the same commit.
   - BLOCKER C-38: a city-state's cities are never powered (`resolveSeatPower` / `_resolve_seat_power` run for majors only). Vacuous today, pinned by `minor_yields_test::test_power_vacuous`; due when the minor's ladder reaches a building with a load.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 1.
   - LAB: the RESEARCH AGREEMENT's CLOCK. Built on both engines (`DEAL_RESEARCH_AGREEMENT`, `researchPactsTick` / `_research_pacts_tick`): the gate as published (`InitiatorPrereqTech` / `TargetPrereqTech` TECH_SCIENTIFIC_THEORY, `NoCurrentResearchAgreement`, priced only at DIPLO_STATE_DECLARED_FRIEND / ALLIED), the payout as the install's text says ("each party earns the Boost for that technology" — a Eureka to both). The duration is unpublished: the install's one number, `DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE` 10, is READ as the share of the two parties' combined science per turn banked against the target's cost ("The more expensive the technology, the longer the agreement will take"). tools/civ6lab/SESSION2.md scene I reads the deal screen's turn count against both sciences and the cost; a fit closes or corrects `RESEARCH_AGREEMENT_PCT`'s reading.
-  - BLOCKER C-76: a mission's mark ("a small positive bonus in your relationship"), DEMAND and DISCUSS (the four promises of `Expansion2_DiplomaticActions.xml`, FavorCost 30, GrievancesForRefusal 25, GrievancesPerIncursion 25), ASK-FOR-PROMISE and the WAR OF RETRIBUTION's RequiresBrokenPromise.
+  - ASK: the PROMISES — DEMAND and DISCUSS (the four promises of `Expansion2_DiplomaticActions.xml`, FavorCost 30, GrievancesForRefusal 25, GrievancesPerIncursion 25), ASK-FOR-PROMISE and the WAR OF RETRIBUTION's RequiresBrokenPromise. The engine half is a grievance ledger and a casus belli; the other half is a two-sided action the scripted driver would have to both make and break. Whether that is worth a driver arm is the owner's call — the mission's "small positive bonus in your relationship" is an opinion delta and left with the opinion scale (owner ruling 2026-09-20: the engine, not the game's AI).
   - Model lines, identical on both engines and kept as notes: a luxury has no lump to trade (the install trades ACCESS, never an amount); the intel bonus is unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS` a side, an offer standing two turns; a war does not end a standing deal; the Third Party War's "another player" is read as an ALLY.
 - **C-16. THE SPY'S SECOND HALF.** Weight 1.
   - ASK 14: the escape's SCALE and route (the terms are sourced; `missionOutcome` / `_mission_outcome` ship the mission roll).
@@ -129,8 +126,7 @@ close in the same commit.
 - **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.
   - DLL, and beyond this install: `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published ceiling at Breathtaking; the middle bands are this model's own. The Preserve is a New Frontier Pass district and no `PRESERVE` row exists in Base, Expansion1 or Expansion2 — the same is true of the Ngao Mbeba. A sweep of which roster members this install cannot source belongs with the hygiene pass.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
-  The census is `docs/ROSTER.md` against `docs/roster_ledger.json` (`shipped` on 338 of 343 modifiers, `open: <item>` on 5 under C-64 and C-67). Unique units are C-78, unique infrastructure C-79.
-  - BLOCKER C-76: the AGENDAS, DLL-scored against an opinion scale neither engine has.
+  The census is `docs/ROSTER.md` against `docs/roster_ledger.json` (`shipped` on 338 of 343 modifiers, three `open:` rows under C-64, two `AI:` rows — the game's diplomatic-action preferences, outside an engine model). Unique units are C-78, unique infrastructure C-79.
   - DLL, recorded: whether Trajan's grant fires on a CONQUERED city (founding ships); whether Iteru's flood avoid also skips the fertility half; whether the Knarr's Ocean clause reaches a Trader's course (`tradeWaterLevel` stays Cartography-gated); the Great Turkish Bombard's strike on a city.
   - BUILD, the residue: resource VISIBILITY ships for the seven strategics (`Resources.PrereqTech` — `hiddenResourcesFor` / `_res_hidden`: no tile yield, no improvement forced or offered, no access, no accrual, no Grand Bazaar count, and the Stave Church counts only the coastal resources its owner can see). A district or wonder may stand on a hidden strategic (the install allows it; the resource is lost). Still reading the resource whether or not the seat can see it, on BOTH engines alike: the adjacency and belief improvement clauses (LAB: whether `REQUIREMENT_PLOT_RESOURCE_VISIBLE` gates them is a DLL question the deal screen cannot answer — a Holy Site beside hidden Niter, before and after Military Engineering). The two artifact resources' `PrereqCivic` gates have no reader (no archaeology here).
   - Recorded allowlist: a CITY's own ranged strike composes its defender without the roster's rows (`cityStrikeStrength`'s block in `seatPhase`; the site census in `combat-rows.test.ts` / `combat_rows_test.py` names it).
@@ -158,24 +154,8 @@ close in the same commit.
   - ASK 12: its amenities.
 - **C-64. A SEAT HAS NO MAJORITY RELIGION.** Weight 1.
   - ASK 3, then BUILD: a per-seat majority over its cities' followed religions on both engines. Three ledger rows wait on it (`TRAIT_CITY_STATE_TOKEN_SAME_RELIGION`, `TRAIT_COMBAT_BONUS_OTHER_RELIGION`, `TRAIT_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION`).
-- **C-67. A DIPLOMATIC ACTION HAS NO PREFERENCE WEIGHT.** Weight 1.
-  - P8: `TRAIT_BEFRIEND_MINOR_CIV_HOME_CONTINENT` and `TRAIT_NO_WAR_MINOR_CIV_HOME_CONTINENT` are DLL AI weightings; a preference needs a decider with alternatives.
 - **C-74. PER-GAME COUNTS OVER PER-OBJECT ROLLS.** Weight 1.
   - ASK 4: `ERUPTION_CHANCE_PER_VOLCANO` is not covered by the MODERATE / 500 ruling — the install counts eruptions per GAME, this engine rolls per VOLCANO; C-1's reactor is the same shape.
-- **C-76. NO OPINION SCALE BETWEEN MAJORS.** Weight 2.
-  - ASK 6, then BUILD: a compared per-pair opinion on both engines. The anchors are published (Base `DiplomaticActions.xml`, `DiplomaticStates`):
-
-        state              RelationshipLevel   DiplomaticYieldBonus
-        ALLIED                    100                   50
-        DECLARED_FRIEND            83                   25
-        FRIENDLY                   66                   25
-        NEUTRAL                    50                    0
-        UNFRIENDLY                 33                  -25
-        DENOUNCED                  16                  -75
-        WAR                         0                 -100
-
-    Four of the seven are explicit facts here (WAR, DENOUNCED, DECLARED_FRIEND, ALLIED); FRIENDLY, NEUTRAL and UNFRIENDLY are the bands an opinion lands in. The carrier is not separable from the deltas — built now it would hold NEUTRAL 50 forever, a compared constant — so both halves land together. What `DiplomaticYieldBonus` is paid IN is not published either.
-  - Waiting on it: the mission's mark, DEMAND, DISCUSS, the promises and the Retribution casus belli (C-2); the agendas (C-26); the preference weights (C-67).
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
   Every district, building and improvement row is built.
   - BUILD, one clause with no carrier, recorded on the column that names it: "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — no tile-swap verb exists to refuse.

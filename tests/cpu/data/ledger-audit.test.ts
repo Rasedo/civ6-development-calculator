@@ -56,10 +56,18 @@ describe('the roster ledger and the audit agree', () => {
     expect(stale).toEqual([]);
   });
 
-  it('says only `shipped` or `open:` — no third state to hide a deferral in', () => {
+  it('says only `shipped`, `open:` or an owner-ruled `AI:` — no state to hide a deferral in', () => {
+    // OWNER RULING 2026-09-20: this project models the ENGINE, not the game's
+    // AI (the driver is our own scripted AI). A modifier that is nothing but
+    // the game's AI weighting is OUT OF SCOPE, not deferred — the one state
+    // besides the two, and it must name the ruling it rests on.
     const odd = Object.entries(ledger)
-      .filter(([, v]) => v !== 'shipped' && !v.startsWith('open'))
+      .filter(([, v]) => v !== 'shipped' && !v.startsWith('open') && !v.startsWith('AI:'))
       .map(([k, v]) => `${k}: ${v.slice(0, 40)}`);
     expect(odd).toEqual([]);
+    const unruled = Object.entries(ledger)
+      .filter(([, v]) => v.startsWith('AI:') && !v.includes('(owner 2026-09-20)'))
+      .map(([k]) => k);
+    expect(unruled).toEqual([]);
   });
 });
