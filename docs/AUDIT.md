@@ -38,11 +38,10 @@ re-adds them.
 | B-20r park orientation | 1 | no canonical vertical in this hex frame; a model choice |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
-| B-34r flood tails | 1 | coastal floods; the Egyptian and Soothsayer halves |
 | B-51r Encampment pool on capture | 1 | ask 2 |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape; the unit faith rate |
-| **B. Fidelity vs real Civ 6** | **7** | |
+| **B. Fidelity vs real Civ 6** | **6** | |
 | C-1 power | 1 | the accident roll (sourced tables, on ask 4); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 2 | joint war, research agreement; mark/demand/discuss on C-76 |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14), the counterspy term (LAB), a Free City as spy ground (ask 10) |
@@ -62,7 +61,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **22** | |
-| **OPEN, TOTAL** | **29** | |
+| **OPEN, TOTAL** | **28** | |
 
 ## The question ledger — owner asks
 
@@ -102,9 +101,6 @@ close in the same commit.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no plunder amount and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The improvement pillage table and the two plunder percentages (Total War 50, Letter of Marque 100) are sourced and ship at the install's size; only the base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
-- **B-34r. FLOOD TAILS.** Weight 1.
-  - BUILD: COASTAL floods. A flood reaches a river's own tiles (`_flood_river` / the river walk); a coastal one needs a shoreline reach and the lowland bands to drive it.
-  - BLOCKER C-26: the Egyptian ability's flood half; the Soothsayer's is an absent chassis'.
 - **B-51r. THE ENCAMPMENT'S POOL ON CAPTURE.** Weight 1.
   - ASK 2.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
