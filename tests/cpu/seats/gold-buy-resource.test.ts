@@ -3,7 +3,7 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpe
 import { seatOf, unitsOf } from '../../../cpu/core/seats';
 import { seatPhase } from '../../../cpu/core/phase';
 import { grantStockpile, stockOf, unitResourceCost } from '../../../cpu/core/stockpile';
-import { goldBuyableUnits } from '../../../cpu/core/units';
+import { goldBuyableUnits, spawnUnit } from '../../../cpu/core/units';
 import { RESOURCES } from '../../../world/resources';
 import { STRATEGIC_PER_TURN } from '../../../cpu/data/constants';
 import type { GameState } from '../../../cpu/core/types';
@@ -47,5 +47,23 @@ describe('the gold unit purchase', () => {
     const queued = seatOf(state, 0)!.cities.reduce((n, c) => n + c.queue.filter((q) => q.kind === 'unit' && q.unit === 'HORSEMAN').length, 0);
     // ...and the phase's accrual pays the pasture's per-turn yield into the same bank
     expect(stockOf(state, 0, 'HORSES')).toBe(before - unitResourceCost('HORSEMAN')!.n * (bought + queued) + STRATEGIC_PER_TURN.HORSES);
+  });
+
+  it('refuses the buy when a military unit already stands on the centre, at APPLY time', () => {
+    // CIV6 (purchase placement, measured 2026-09-13): the bought unit lands ON
+    // the centre and the purchase is refused when a unit of its class already
+    // stands there. The wire's candidate row refuses it when it offers, the
+    // GPU's rung when it applies — and so does this arm now (9027 t196: a
+    // Warrior trained onto the centre that turn, a bought one spilled beside it)
+    const { state } = scene();
+    const city = seatOf(state, 0)!.cities[0]!;
+    expect(spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!.tileIndex).toBe(city.centerIndex);
+    const gold = seatOf(state, 0)!.treasury;
+    state.seatActions = { [state.turn - 1]: { 0: { production: [], tech: null, civic: null, units: [], buy: [2, 0, 0] } } };
+    seatPhase(state);
+    expect(unitsOf(state, 0).filter((u) => u.type === 'HORSEMAN').length).toBe(0);
+    // nothing was charged for a unit that never came: the purse moved by the
+    // turn's own income and upkeep alone, never by a Horseman's price
+    expect(gold - seatOf(state, 0)!.treasury).toBeLessThan(100);
   });
 });

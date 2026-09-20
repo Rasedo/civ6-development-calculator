@@ -58,7 +58,7 @@ import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suz
 import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -2285,6 +2285,13 @@ export function seatPhase(state: GameState): void {
         // the city the purchase SPAWNS in is the one whose buildings price it
         const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
         for (const def of goldBuyableUnits(state, actor.seat)) {
+          // CIV6 (purchase placement, measured 2026-09-13): the bought unit
+          // lands ON the centre and the purchase is refused when a unit of
+          // its class already stands there — re-validated HERE, at apply
+          // time, as the GPU's `_seat_buy_unit_candidates` does: a unit
+          // trained onto the centre earlier this turn blocks the buy
+          // (9027 t196 spilled a Warrior to a neighbour on TS alone)
+          if (purchaseSpotBlocked(state, buyCity, actor.seat, def.id)) continue;
           if (!goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity)))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
