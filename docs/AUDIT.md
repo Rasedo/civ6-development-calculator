@@ -35,7 +35,7 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31; a Dark Age card style is P8 |
+| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-51r Encampment pool on capture | 1 | ask 2 |
 | B-56r inert promotions | 1 | Ground Crews waits on a PATROL that is no data row (C-34) |
@@ -91,7 +91,6 @@ close in the same commit.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.
   - BLOCKER C-1: Renewable Subsidizer and Industrialist wait on the plants.
   - BLOCKER C-31: Arms Race Proponent waits on the armament projects.
-  - P8: no card style asks for a DARK AGE card (a forced Dark Age slots 0 of 13); a fourth style is the carrier — poke-only until then. Who to hire and where to seat him is a heuristic (catalog order, lowest-loyalty city).
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no plunder amount and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The improvement pillage table and the two plunder percentages (Total War 50, Letter of Marque 100) are sourced and ship at the install's size; only the base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
