@@ -3,14 +3,17 @@ import { describe, it, expect } from 'vitest';
 import { seatOf, setBorderTurnsFrom } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity, holdWorks } from '../helpers';
-import { tourismIntlPct } from '../../../cpu/core/city';
+import { tourismIntlPct, seatTourism, lateEraTourism } from '../../../cpu/core/city';
+import { buildingVariantFor } from '../../../cpu/data/buildings';
+import { ERAS } from '../../../cpu/data/techs';
+import { CIV_LEADERS } from '../../../world/roster';
 import { seatAccumulators } from '../../../cpu/core/seatTurn';
 import { computeAdoption } from '../../../cpu/core/effects';
 import {
   TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT, GOV_INTOLERANCE, TOURISM_GOV_MULT, ENLIGHTENMENT_CIVIC,
 } from '../../../cpu/data/seats';
 import { POLICIES } from '../../../cpu/data/policies';
-import { GWO_RELIC, GWO_TOURISM } from '../../../cpu/data/greatWorks';
+import { GWO_RELIC, GWO_WRITING, GWO_TOURISM } from '../../../cpu/data/greatWorks';
 const RELIC_TOURISM = GWO_TOURISM[GWO_RELIC]!;
 import type { GameState, Seat } from '../../../cpu/core/types';
 
@@ -160,5 +163,48 @@ describe('the per-rival bank', () => {
     expect(own.tourismReligiousTo![1]).toBe(0);
     seatAccumulators(state, 0);
     expect(own.tourismReligiousTo![1]).toBe(0); // and it stays at 0
+  });
+});
+
+describe('the Film Studio’s late-era pressure', () => {
+  // CIV6 (FILMSTUDIO_ENHANCEDLATETOURISM): EFFECT_ADJUST_CITY_TOURISM_LATE_ERAS
+  // Modifier 100, MinimumEra ERA_MODERN — the city's tourism lands doubled on
+  // each rival in the Modern era or later, through the pair's own percent
+  function studioGame(civ: string | null) {
+    const state = newGame(2);
+    const own = seatOf(state, 0)!;
+    if (civ) {
+      const row = CIV_LEADERS.findIndex((r) => r.civ === civ);
+      expect(row).toBeGreaterThanOrEqual(0);
+      own.civ = row;
+    }
+    own.cities[0]!.buildings.push('BROADCAST_CENTER');
+    holdWorks(own.cities[0]!, GWO_WRITING, 2); // a known GENERAL half
+    own.tourismTo = [];
+    own.tourismReligiousTo = [];
+    seatOf(state, 1)!.research.techs.push('ELECTRICITY'); // seat 1 is Modern, seat 2 Ancient
+    return { state, own };
+  }
+
+  it('doubles the city’s own tourism toward a Modern rival and leaves an Ancient one the base', () => {
+    const { state, own } = studioGame('AMERICA');
+    expect(buildingVariantFor('AMERICA', 'BROADCAST_CENTER')!.lateEraTourism).toEqual({ pct: 100, minEra: 'Modern' });
+    const base = seatTourism(state, 0);
+    expect(base).toBeGreaterThan(0);
+    // one city holds everything the seat makes, so the extra is the whole national figure
+    expect(lateEraTourism(state, 0)).toEqual({ extra: base, minEra: ERAS.indexOf('Modern') });
+    seatAccumulators(state, 0);
+    expect(own.tourismTo![1]).toBe(2 * base);
+    expect(own.tourismTo![2]).toBe(base);
+    expect(own.tourism).toBe(base); // the national figure never carries the extra
+  });
+
+  it('is the Film Studio’s clause, not the Broadcast Center’s', () => {
+    const { state, own } = studioGame('ROME');
+    expect(lateEraTourism(state, 0)).toBeNull();
+    const base = seatTourism(state, 0);
+    seatAccumulators(state, 0);
+    expect(own.tourismTo![1]).toBe(base);
+    expect(own.tourismTo![2]).toBe(base);
   });
 });

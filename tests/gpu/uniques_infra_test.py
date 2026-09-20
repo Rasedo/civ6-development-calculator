@@ -18,6 +18,8 @@ Checks:
   E. the tourism trio: the Electronics Factory's regional Culture after
      Electricity (`_seat_regional`), the Marae's Tourism per feature tile
      after Flight and the Thermal Bath's on a fissure (`_building_tourism`).
+  F. the Film Studio: the city's own tourism banked twice on a rival in the
+     Modern era or later (`_late_era_tourism`, `_bank_tourism_per_rival`).
 """
 
 from __future__ import annotations
@@ -409,6 +411,44 @@ def main() -> None:
     play(sim, rome, "ROME")
     assert int(sim._building_tourism(rome)[0]) == 0, "another civilization's Zoo pays none"
     print("  E Thermal Bath OK (3 Tourism on a fissure, once)")
+    # -- F: the Film Studio's late-era pressure ----------------------------
+    from warmup import hold_works
+    bc = _bids.index("BROADCAST_CENTER")
+    sim = fresh(rules, path)
+    play(sim, rome, "AMERICA")
+    sim.city_bldg[0, rome, 0, bc] = True
+    hold_works(sim, 0, rome, 0, 5, 2)  # two Works of Writing: a known general half
+    bump(sim)
+    inp = sim._tourism_inputs(rome, None)
+    own_all = sim.tile_seat == rome
+    nat = int(sim._tourism_of(inp["gw_tour"], sim.city_alive[:, rome], own_all, inp["era"],
+                              resort_mult=inp["resort_mult"], park_mult=inp["park_mult"],
+                              wonder_pct=inp["wonder_pct"], gw_mult=inp["gw_mult"],
+                              suz_tour=sim._suzerain_tourism(rome, own_all) + sim._gp_district_tourism(rome)
+                              + sim._building_tourism(rome))[0])
+    assert nat > 0, "the scene wants a general tourism to double"
+    late = sim._late_era_tourism(rome, inp)
+    assert late is not None, "a standing Film Studio carries the clause"
+    extra, era_min = late
+    # one city holds everything the row makes, so the extra is the whole national figure
+    assert int(extra[0]) == nat, f"CIV6 (Film Studio): the city's own tourism {nat}, got {int(extra[0])}"
+    sim.civ_techs[0, egypt, elec] = True  # Egypt reaches the Modern era; Norway stays Ancient
+    bump(sim)
+    assert int(sim._civ_era(sim.civ_techs[:, egypt], sim.civ_civics[:, egypt])[0]) >= era_min
+    assert int(sim._civ_era(sim.civ_techs[:, norway], sim.civ_civics[:, norway])[0]) < era_min
+    sim.civ_tourism_to.zero_()
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    gen = torch.full((sim.B,), float(nat), dtype=sim.dtype, device=sim.device)
+    rel = torch.zeros(sim.B, dtype=sim.dtype, device=sim.device)
+    sim._bank_tourism_per_rival(rome, one, gen, rel, late)
+    pe = int(sim._tourism_intl_pct(rome, egypt)[0])
+    pn = int(sim._tourism_intl_pct(rome, norway)[0])
+    assert int(sim.civ_tourism_to[0, rome, egypt]) == (2 * nat) * max(0, 100 + pe) // 100, "a Modern rival takes the city's tourism twice"
+    assert int(sim.civ_tourism_to[0, rome, norway]) == nat * max(0, 100 + pn) // 100, "an Ancient rival takes the base"
+    play(sim, rome, "ROME")
+    bump(sim)
+    assert sim._late_era_tourism(rome, sim._tourism_inputs(rome, None)) is None, "the Broadcast Center carries no clause"
+    print(f"  F Film Studio OK (city tourism {nat}: Modern rival x2, Ancient rival x1)")
     print("UNIQUE INFRASTRUCTURE OK")
 
 

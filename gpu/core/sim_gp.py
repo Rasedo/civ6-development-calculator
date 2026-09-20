@@ -68,16 +68,19 @@ class SimGp:
             return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
         return self.tile_gp_perm[:, :, k]
 
-    def _gp_district_tourism(self, row: int) -> torch.Tensor:
+    def _gp_district_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `gpDistrictTourism`: CIV6 (Jamsetji Tata / Masaru Ibuka)
         +10 Tourism per complete Campus / Industrial Zone the seat holds, and
         (Kenzo Tange) a city's district ADJACENCY bonuses as Tourism at the
         wire's percent per yield. A pillaged district is dark, as it is for
-        every district yield."""
+        every district yield. `col_mask` [B, RC] narrows the sum to some
+        of the row's cities (a city's own tourism)."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if row >= self.n_majors or not self.districts_on:
             return out
         alive = self.city_alive[:, row]                     # [B, RC]
+        if col_mask is not None:
+            alive = alive & col_mask
         dt_all = self.city_dist_tile[:, row]                # [B, RC, nD]
 
         def live(di: int) -> torch.Tensor:

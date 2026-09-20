@@ -61,7 +61,7 @@ re-adds them.
 | C-67 diplomatic preference weights | 1 | waits on a decider with alternatives (P8) |
 | C-74 per-game counts over per-object rolls | 1 | ask 4 (volcanoes and reactors) |
 | C-76 an opinion scale | 2 | a compared per-pair opinion on both engines; what moves it is ask 6 |
-| C-79 unique INFRASTRUCTURE absent | 1 | two clauses with no carrier (per-pair tourism pressure, a tile-swap refusal) |
+| C-79 unique INFRASTRUCTURE absent | 1 | one clause with no carrier (a tile-swap refusal) |
 | C-80 constants vs the install | 2 | two lab lines (purchase price, Pop Star); two rules the reader census names |
 | **C. Absent systems** | **22** | |
 | **OPEN, TOTAL** | **31** | |
@@ -191,7 +191,7 @@ close in the same commit.
   - Waiting on it: the mission's mark, DEMAND, DISCUSS, the promises and the Retribution casus belli (C-2); the agendas (C-26); the preference weights (C-67).
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
   Every district, building and improvement row is built.
-  - BUILD, two clauses with no carrier, each recorded on the column that names it: the Film Studio's "+100% Tourism pressure toward other civilizations in the Modern era" — a per-PAIR tourism pressure; "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — no tile-swap verb exists to refuse.
+  - BUILD, one clause with no carrier, recorded on the column that names it: "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — no tile-swap verb exists to refuse.
   - DLL: the Stepwell's "+1 Faith beside a Holy Site, +1 Food beside a Farm" has no `Improvement_Adjacencies` row.
   - Out of scope by construction: LEY LINE adjacency (a Secret Societies resource class this map never places).
 - **C-80. CONSTANTS VS THE INSTALL.** Weight 2.

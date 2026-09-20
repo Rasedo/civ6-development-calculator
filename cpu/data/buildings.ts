@@ -13,6 +13,7 @@
 
 import type { DistrictId, Yields } from '../core/types';
 import type { FeatureId } from '../../world/types';
+import type { Era } from './techs';
 import type { AdjacencySource } from './districts';
 import type { CivId } from './seats';
 import type { PromoClass } from './promotions';
@@ -84,6 +85,10 @@ export interface BuildingVariant {
   /** CIV6 (Thermal Bath, THERMALBATH_ADDTOURISM): Tourism while the city's
    *  border holds a tile of one feature. */
   tourismWithFeature?: { feature: FeatureId; amount: number };
+  /** CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM,
+   *  EFFECT_ADJUST_CITY_TOURISM_LATE_ERAS): `pct` more of this city's
+   *  tourism toward each civilization whose era is `minEra` or later. */
+  lateEraTourism?: { pct: number; minEra: Era };
   /** CIV6 (Madrasa, OldYieldType SCIENCE -> NewYieldType FAITH): the row pays
    *  FAITH equal to its district's own adjacency bonus, beside the Science
    *  that bonus already pays. */
@@ -487,16 +492,17 @@ const rawList: BuildingDef[] = [
     // CIV6 (BUILDING_FILM_STUDIO): every column matches the Broadcast
     // Center's — Cost 580 against 580, Maintenance 3, RequiredPower 3, the
     // same two Culture rows and the same single MUSIC great-work slot. Its
-    // one clause is "+100% Tourism pressure from this city towards other
-    // civilizations in the Modern era", a per-PAIR tourism pressure this
-    // engine does not carry (recorded in docs/AUDIT.md).
-    civVariants: [{ civ: 'AMERICA', name: 'Film Studio' }],
+    // one clause is FILMSTUDIO_ENHANCEDLATETOURISM (Modifier 100, MinimumEra
+    // ERA_MODERN): this city's tourism lands doubled on each civilization in
+    // the Modern era or later (`lateEraTourism`).
+    civVariants: [{ civ: 'AMERICA', name: 'Film Studio', lateEraTourism: { pct: 100, minEra: 'Modern' } }],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_BROADCAST_CENTER', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_BROADCAST_CENTER', 'PrereqDistrict', { expect: 'DISTRICT_THEATER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_BROADCAST_CENTER', 'Maintenance'),
       'yields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_BROADCAST_CENTER&YieldType=YIELD_CULTURE', 'YieldChange'),
       'poweredYields.culture': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_BROADCAST_CENTER&YieldType=YIELD_CULTURE', 'YieldChange'),
+      'civVariants.0.lateEraTourism.pct': xml('ModifierArguments', 'ModifierId=FILMSTUDIO_ENHANCEDLATETOURISM&Name=Modifier', 'Value'),
       power: xml('Buildings_XP2', 'BuildingType=BUILDING_BROADCAST_CENTER', 'RequiredPower'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_BROADCAST_CENTER', 'PrereqBuilding')] },
     },

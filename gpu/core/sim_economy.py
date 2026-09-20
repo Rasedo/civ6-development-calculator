@@ -4528,6 +4528,59 @@ class SimEconomy:
             t = t + suz_tour
         return t
 
+    def _tourism_inputs(self, row: int, gov: torch.Tensor | None) -> dict:
+        """The seat-wide arguments of `_tourism_of` for row `row`, built once
+        per tail: the national call and the Film Studio's per-city calls read
+        the same era, multipliers and governor seating."""
+        return dict(
+            gw_tour=self._gw_tourism_general(
+                row,
+                self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
+                self._congress_gw_kmult()),
+            era=self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]),
+            resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
+            park_mult=torch.where(self._golden_ded(row, self._ded_wish),
+                                  torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
+                                  torch.ones(self.B, dtype=torch.long, device=self.device)),
+            gov_tile=self._governor_tiles(row, gov) if gov is not None else None,
+            wonder_pct=self._wonder_tourism_pct(row),
+            gw_mult=js_round(self._gov_chan(row, "mult", "gwTourismMult")).long() if self.n_governors else None,
+        )
+
+    def _late_era_tourism(self, row: int, inp: dict) -> tuple[torch.Tensor, int] | None:
+        """`lateEraTourism`'s twin — CIV6 (Film Studio,
+        FILMSTUDIO_ENHANCEDLATETOURISM): ([B] long extra, the era index) — pct
+        of the tourism each city holding a standing row makes on its own,
+        floored per city; None when no city of the row holds one."""
+        if row >= self.n_majors or not self._bvar_late_tour:
+            return None
+        cols = self.RC
+        held = (self.city_bldg[:, row, :cols]
+                & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
+                & self.city_alive[:, row, :cols].unsqueeze(2))
+        extra = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        min_era = -1
+        slot = None
+        for (bi, c), (pct, era) in self._bvar_late_tour.items():
+            has = held[:, :, bi] & self._row_plays_idx(row, c).unsqueeze(1)   # [B, cols]
+            if not bool(has.any()):
+                continue
+            min_era = era if min_era < 0 else min(min_era, era)
+            if slot is None:
+                slot = self.city_slot_at(row)                                 # [B, T]
+            for j in has.any(dim=0).nonzero().flatten().tolist():
+                one = torch.zeros(self.B, cols, dtype=torch.bool, device=self.device)
+                one[:, j] = has[:, j]
+                own_j = (slot == j) & has[:, j].unsqueeze(1)
+                own = self._tourism_of(
+                    inp["gw_tour"], one, own_j, inp["era"],
+                    resort_mult=inp["resort_mult"], park_mult=inp["park_mult"], gov_tile=inp["gov_tile"],
+                    suz_tour=self._suzerain_tourism(row, own_j) + self._gp_district_tourism(row, one)
+                    + self._building_tourism(row, one),
+                    gw_mult=inp["gw_mult"], wonder_pct=inp["wonder_pct"])
+                extra = extra + torch.div(own.long() * pct, 100, rounding_mode="floor")
+        return None if min_era < 0 else (extra, min_era)
+
     def _tourism_religious_of(self, row: int) -> torch.Tensor:
         """[B] — the RELIGIOUS half of a seat's per-turn tourism, banked apart
         (`civ_tourism_rel`) because a rival's Enlightenment or a different
@@ -4548,19 +4601,23 @@ class SimEconomy:
             t = t + holds.long() * self._holy_city_tour
         return t
 
-    def _building_tourism(self, row: int) -> torch.Tensor:
+    def _building_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `buildingTourism`: CIV6 (Marae, MARAE_TOURISM_FEATURES)
         Tourism per owned tile carrying a feature once Flight is held;
         (Thermal Bath, THERMALBATH_ADDTOURISM) Tourism while the border holds a
-        Geothermal Fissure. A dark building pays nothing."""
+        Geothermal Fissure. A dark building pays nothing. `col_mask` [B, RC]
+        narrows the sum to some of the row's cities."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if row >= self.n_majors or (not self._bvar_tour_feat and not self._bvar_tour_with_feat):
             return out
         cols = self.RC
         dreg = self.city_dist_tile[:, row, :cols]
+        alive = self.city_alive[:, row, :cols]
+        if col_mask is not None:
+            alive = alive & col_mask
         held = (self.city_bldg[:, row, :cols]
                 & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
-                & self.city_alive[:, row, :cols].unsqueeze(2))
+                & alive.unsqueeze(2))
         feat_cnt = None
         for (bi, c), (amt, tech) in self._bvar_tour_feat.items():
             w = self._row_plays_idx(row, c)

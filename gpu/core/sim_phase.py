@@ -1610,7 +1610,8 @@ class SimPhase:
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 
     def _bank_tourism_per_rival(self, row: int, active: torch.Tensor,
-                                general: torch.Tensor, religious: torch.Tensor) -> None:
+                                general: torch.Tensor, religious: torch.Tensor,
+                                late: tuple[torch.Tensor, int] | None = None) -> None:
         """`bankTourismPerRival`'s twin: the national output lands on EACH
         foreign civ through its own summed international modifier, and the two
         RELIGIOUS-ONLY halvings — CIV6 (Tourism): "-50% (Religious Tourism
@@ -1618,7 +1619,9 @@ class SimPhase:
         you haven't founded a religion" and "-50% ... if the foreign
         civilization has The Enlightenment", which Cristo Redentor's shield
         cancels — are summed into the religious half's own percent. Below
-        -100% the rival takes nothing rather than draining the bank."""
+        -100% the rival takes nothing rather than draining the bank. `late`
+        is the Film Studio's (extra, era): the extra joins the general half
+        toward a rival whose era is at least that one."""
         B, dev = self.B, self.device
         half = int(self.rules.seats.get("tourismReligiousPenaltyPct", 50))
         shielded = (self._seat_wonder_any(row, self._wond_holy_shield) if self._wond_n
@@ -1636,7 +1639,13 @@ class SimPhase:
             rel_pct = rel_pct - (enl & ~shielded).long() * half
             other = founded & (dom[:, o] >= 0) & (dom[:, o] != row)
             rel_pct = rel_pct - other.long() * half
-            add_g = torch.div(gen_l * (100 + pct).clamp(min=0), 100, rounding_mode="floor")
+            gen_o = gen_l
+            if late is not None:
+                # CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM): the extra
+                # lands on a rival in the Modern era or later, through the same percent
+                _mod = self._civ_era(self.civ_techs[:, o], self.civ_civics[:, o]) >= late[1]
+                gen_o = gen_l + torch.where(_mod, late[0], torch.zeros_like(late[0]))
+            add_g = torch.div(gen_o * (100 + pct).clamp(min=0), 100, rounding_mode="floor")
             add_r = torch.div(rel_l * (100 + rel_pct).clamp(min=0), 100, rounding_mode="floor")
             zero = torch.zeros_like(add_g)
             self.civ_tourism_to[:, row, o] += torch.where(active, add_g, zero)
@@ -1800,23 +1809,21 @@ class SimPhase:
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
+        _tin = self._tourism_inputs(row, gov)
         _nat_gen = self._tourism_of(
-            self._gw_tourism_general(
-                row,
-                self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
-                self._congress_gw_kmult()),
+            _tin["gw_tour"],
             self.city_alive[:, row],
             self.tile_seat == row,
-            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]),
-            resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
-            park_mult=torch.where(self._golden_ded(row, self._ded_wish),
-                                  torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
-                                  torch.ones(self.B, dtype=torch.long, device=self.device)),
-            gov_tile=self._governor_tiles(row, gov),
-            wonder_pct=self._wonder_tourism_pct(row),
+            _tin["era"],
+            resort_mult=_tin["resort_mult"],
+            park_mult=_tin["park_mult"],
+            gov_tile=_tin["gov_tile"],
+            wonder_pct=_tin["wonder_pct"],
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row) + self._gp_district_tourism(row) + self._building_tourism(row),
-            gw_mult=js_round(self._gov_chan(row, "mult", "gwTourismMult")).long() if self.n_governors else None,
+            gw_mult=_tin["gw_mult"],
         )
+        # CIV6 (Film Studio): the per-rival extra, read with the same snapshot
+        _late = self._late_era_tourism(row, _tin)
         _rel_t = self._tourism_religious_of(row)
         self.civ_tour_rate[:, row] = torch.where(active, (_nat_gen + _rel_t).long(), self.civ_tour_rate[:, row])
         # CIV6 (Cultural alliance 3): "+20% of your ally's Tourism".
@@ -1829,7 +1836,7 @@ class SimPhase:
                     torch.zeros_like(_nat_gen))
         bank(self.civ_tourism, _nat_gen)
         bank(self.civ_tourism_rel, _rel_t)
-        self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t)
+        self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t, _late)
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)
         # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance

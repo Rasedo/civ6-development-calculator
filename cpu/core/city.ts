@@ -1,5 +1,5 @@
 
-import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
+import { addYields, emptyYields, type City, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
@@ -874,15 +874,61 @@ export function seatTourism(
 ): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
+  const cities = citiesOf(state, seat);
+  return tourismOf(state, s, cities, cities, (tile: Tile) => tileOwnedByCiv(tile, seat), govCityIds);
+}
+
+/** CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM): the EXTRA a seat
+ *  sends to each civilization in the Modern era or later — `pct` of the
+ *  tourism each city holding the row makes on its own (its works, its
+ *  districts and buildings, its tiles), floored per city. Null when no
+ *  standing row carries the clause. Banked per rival beside the national
+ *  output (`bankTourismPerRival`), never in the national figure. */
+export function lateEraTourism(
+  state: GameState,
+  seat: number,
+  govCityIds?: ReadonlySet<number>,
+): { extra: number; minEra: number } | null {
+  const s = seatOf(state, seat);
+  if (!s) return null;
+  const civ = civOf(state, seat);
+  const cities = citiesOf(state, seat);
+  let extra = 0;
+  let minEra = -1;
+  for (const c of cities) {
+    const dark = darkBuildings(state.map, c);
+    for (const id of c.buildings) {
+      if (dark.has(id)) continue;
+      const lt = buildingVariantFor(civ, id)?.lateEraTourism;
+      if (!lt) continue;
+      const era = ERAS.indexOf(lt.minEra);
+      minEra = minEra < 0 ? era : Math.min(minEra, era);
+      const own = tourismOf(state, s, [c], cities, (tile: Tile) => tileBelongsTo(tile, c), govCityIds);
+      extra += Math.floor(own * lt.pct / 100);
+    }
+  }
+  return minEra < 0 ? null : { extra, minEra };
+}
+
+/** The general tourism made by `cities` (their works, districts and
+ *  buildings) and by the tiles `owns` admits; `allCities` carries the
+ *  seat-wide wonder multipliers whichever cities are summed. */
+function tourismOf(
+  state: GameState,
+  s: Seat,
+  cities: readonly City[],
+  allCities: readonly City[],
+  owns: (t: Tile) => boolean,
+  govCityIds?: ReadonlySet<number>,
+): number {
+  const seat = s.seat;
   let t = 0;
   const printing = s.research.techs.includes(GW_PRINTING_TECH);
   const km = congressGwMult(state);
-  const cities = citiesOf(state, seat);
   for (const c of cities) {
     // CIV6 (Curator): "+100% Tourism from Great Works in this city."
     t += greatWorkTourism(state, c, printing, km) * governorMult(state, c, (e) => e.gwTourismMult);
   }
-  const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
   // CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
   // Parks", and "Cities with Governors receive 50% Tourism from World
@@ -891,7 +937,7 @@ export function seatTourism(
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
   return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities) + buildingTourism(state, seat, cities)
-    + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
+    + resortTourism(state, owns) * wonderMult(state, allCities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null,
                     getModifiers(state, seat).wonderTourismPct);

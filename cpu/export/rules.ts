@@ -2154,6 +2154,7 @@ export function buildRules() {
         tourPerFeatTech: v.tourismPerFeature?.tech ? techIdx.get(v.tourismPerFeature.tech) ?? -1 : -1,
         tourismWithFeature: v.tourismWithFeature
           ? [featIdx.get(v.tourismWithFeature.feature) ?? -1, v.tourismWithFeature.amount] : [-1, 0],
+        lateTourism: v.lateEraTourism ? [v.lateEraTourism.pct, ERAS.indexOf(v.lateEraTourism.minEra)] : [0, -1],
         districtAdjacencyAsFaith: v.districtAdjacencyAsFaith ? 1 : 0,
       })),
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror

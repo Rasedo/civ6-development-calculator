@@ -6,7 +6,7 @@ import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from '.
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { takeItemBank } from './prodLayout';
 import { isSuzerain } from './cityStates';
-import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
+import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct, lateEraTourism, civEraIndex } from './city';
 import { computeAdoption, slottedPolicyIndices } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -88,6 +88,8 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
   let natGeneral = seatTourism(state, seat, govCityIds);
   const natReligious = seatTourismReligious(state, seat);
+  // CIV6 (Film Studio): the per-rival extra, read with the same snapshot
+  const late = lateEraTourism(state, seat, govCityIds);
   // stored before the ally reads below, so the terms never compound
   s.tourRate = natGeneral + natReligious;
   // CIV6 (Cultural alliance 3): "+20% of your ally's Tourism".
@@ -98,7 +100,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   }
   s.tourism = (s.tourism ?? 0) + natGeneral;
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
-  bankTourismPerRival(state, s, natGeneral, natReligious);
+  bankTourismPerRival(state, s, natGeneral, natReligious, late);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
@@ -177,7 +179,10 @@ export function logUnitOrder(state: GameState, seat: number, unitId: number, ver
  * cancels — are summed into the religious half's own percent. A total below
  * -100% pays nothing rather than draining the bank.
  */
-function bankTourismPerRival(state: GameState, s: Seat, general: number, religious: number): void {
+function bankTourismPerRival(
+  state: GameState, s: Seat, general: number, religious: number,
+  late: { extra: number; minEra: number } | null = null,
+): void {
   const n = state.seats.length;
   s.tourismTo ??= [];
   s.tourismReligiousTo ??= [];
@@ -191,7 +196,11 @@ function bankTourismPerRival(state: GameState, s: Seat, general: number, religio
     if (other.research.civics.includes(ENLIGHTENMENT_CIVIC) && !shielded) relPct -= TOURISM_RELIGIOUS_PENALTY_PCT;
     const dom = dominantReligionOf(other);
     if (s.religion.founded && dom >= 0 && dom !== s.seat) relPct -= TOURISM_RELIGIOUS_PENALTY_PCT;
-    s.tourismTo[o] = (s.tourismTo[o] ?? 0) + Math.floor(general * Math.max(0, 100 + pct) / 100);
+    // CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM): the extra lands on
+    // a rival in the Modern era or later, through the same percent
+    const gen = late && civEraIndex(other.research.techs, other.research.civics) >= late.minEra
+      ? general + late.extra : general;
+    s.tourismTo[o] = (s.tourismTo[o] ?? 0) + Math.floor(gen * Math.max(0, 100 + pct) / 100);
     s.tourismReligiousTo[o] = (s.tourismReligiousTo[o] ?? 0)
       + Math.floor(religious * Math.max(0, 100 + relPct) / 100);
   }
