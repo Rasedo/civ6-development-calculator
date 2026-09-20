@@ -2082,6 +2082,12 @@ class SimInit:
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
+        # ...and the same static half WITHOUT the resource clause: CIV6
+        # (Resources.PrereqTech) a strategic a row cannot see yet is plain
+        # ground, so `_district_elig` ORs this in under `_res_hidden(row)`
+        self.d_usable0 = torch.tensor(
+            [[t["du0"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
+        )
         # the worked-tile pick per seat row, stashed by the walk that
         # makes it and read by the state census. Instrumentation, not state:
         # the walk rewrites it for every row every turn.

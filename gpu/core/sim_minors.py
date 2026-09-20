@@ -109,7 +109,7 @@ class SimMinors:
             & (self.district < 0)
             & (self.built_wonder < 0)
             & (self.improvement < 0)
-            & (self.res_priority <= 1)
+            & ((self.res_priority <= 1) | self._res_hidden(self._CITY_MINOR0 + s))   # an unseen strategic is plain ground
             & (self.pair_dist[center] <= 3)
         )
         need_clear = (self.tile_ftu >= 0) & ~self.feat_stripped
@@ -232,7 +232,8 @@ class SimMinors:
                         cap_ok = spec_cnt < (torch.div(self.city_pop[:, row, 0] - 1, 3, rounding_mode="floor") + 1)
                     else:
                         cap_ok = ones_b
-                    surface = self.coastal_water if plc == 2 else self.d_usable
+                    surface = (self.coastal_water if plc == 2
+                               else self.d_usable | (self.d_usable0 & self._res_hidden(row)))
                     splane = site_s & surface & ~self._fallout()
                     if plc == 3:
                         splane = splane & (self._adj_center_count() == 0)
@@ -280,7 +281,7 @@ class SimMinors:
             & (self.district < 0)
             & (self.built_wonder < 0)
             & (self.centre_slot_at < 0)
-            & (self.res_priority <= 1)
+            & ((self.res_priority <= 1) | self._res_hidden(row))   # an unseen strategic is plain ground
         )
 
     def _wonder_unlock_ok(self, row: int, wi: int) -> torch.Tensor | None:

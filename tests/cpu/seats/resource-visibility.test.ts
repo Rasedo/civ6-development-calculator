@@ -15,7 +15,7 @@ import { setTileOwner, civHasStrategic, hiddenResourcesFor } from '../../../cpu/
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields, cityImprovedResourceKinds } from '../../../cpu/core/yields';
 import { accrueStockpiles } from '../../../cpu/core/stockpile';
-import { validImprovements } from '../../../cpu/core/rules';
+import { validImprovements, canPlaceDistrict } from '../../../cpu/core/rules';
 import { RESOURCES } from '../../../world/resources';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import type { GameState } from '../../../cpu/core/types';
@@ -64,6 +64,17 @@ describe('resource visibility', () => {
     expect(validImprovements(state, t, 0)).toContain('FARM');
     grantTechs(state, 'MILITARY_ENGINEERING');
     expect(validImprovements(state, t, 0)).toEqual(['MINE']);
+  });
+
+  it('a district may stand on a hidden strategic, and not on a seen one', () => {
+    const state = scene();
+    const city = state.seats[0]!.cities[0]!;
+    grantTechs(state, 'WRITING');
+    const t = tileAtCoords(state.map, 7, 9);
+    t.resource = 'NITER';
+    expect(canPlaceDistrict(state, city, 'CAMPUS', t.index).ok).toBe(true);   // plain ground to this seat
+    grantTechs(state, 'MILITARY_ENGINEERING');
+    expect(canPlaceDistrict(state, city, 'CAMPUS', t.index).ok).toBe(false);  // now a strategic: refused
   });
 
   it('a hidden strategic accrues nothing, gives no access and counts as unimproved', () => {

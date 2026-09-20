@@ -149,6 +149,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
         t.feature !== 'OASIS' && !t.district &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
+      // ...and the same half with the resource clause left OUT: CIV6
+      // (Resources.PrereqTech) a strategic a seat cannot see yet is plain
+      // ground to it, so the GPU ORs this in where `_res_hidden(row)` holds
+      du0:
+        !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
+        t.feature !== 'OASIS' && !t.district ? 1 : 0,
       dadj: PLACEABLE_DISTRICTS.map((id) => {
         const raw = staticAdjRaw(map, t, id);
         const adjDynamic = neighbors(map, t).some((n) => n.district !== null && n.districtComplete);

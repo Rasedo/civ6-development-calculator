@@ -2950,6 +2950,10 @@
         "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
       },
       {
+        "plane": "d_usable0",
+        "why": "`d_usable` without its resource clause — the same baked map fact, ORed in under `_res_hidden(row)` so a strategic the row cannot see yet is plain ground for a district. STATE only because the sea can take a tile (`_submerge`), which is compared directly; TS reads the live tile and the seat's own visibility, so the two engines agree by construction."
+      },
+      {
         "plane": "camp_ok",
         "why": "a map fact the exporter derives from terrain, feature and resource. It is STATE only because the sea can take a tile (`_submerge`), and the submersion itself is compared (Tile.submerged / water); TS recomputes this one live from the drowned tile, so the two engines agree by construction."
       },

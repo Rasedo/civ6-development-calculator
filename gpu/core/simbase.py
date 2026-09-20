@@ -845,7 +845,7 @@ _MUTABLE = [
     # CIV6 (Coastal Lowlands): the sea takes ground, so every tile fact it
     # moves is state now, not map generation (`_submerge`).
     "tile_submerged", "water", "wpass", "passable", "work_ok", "settle_ok",
-    "d_usable", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
+    "d_usable", "d_usable0", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
     "lux_req", "res_imp", "tile_lowland",
     # the Aqueduct's source and the atom it derives from: a drowned OASIS

@@ -163,8 +163,11 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     tech = int(sim._res_reveal_tech[rid])
     imp = int(sim._res_harvest_imp[rid])
     own = ((sim.tile_seat[B0] == int(sim._ROW_SEAT[row])) & ~sim.water[B0] & (sim.improvement[B0] < 0)
-           & (sim.district[B0] < 0) & (sim.res_id[B0] < 0) & (sim.centre_slot_at[B0] < 0) & sim.passable[B0])
+           & (sim.district[B0] < 0) & (sim.res_id[B0] < 0) & (sim.centre_slot_at[B0] < 0) & sim.passable[B0]
+           & sim.d_usable[B0])
     t = int(own.nonzero(as_tuple=True)[0][0])
+    if int(sim.tile_ftu[B0, t]) >= 0:                    # a feature the district clears: hold its tech
+        sim.civ_techs[:, row, int(sim.tile_ftu[B0, t])] = True
     sim.res_id[B0, t] = rid
     sim.res_yields[B0, t] = sim._res_y6[rid]      # the static plane bakes a resource's yields; a plant writes both
     sim.tile_yields[B0, t] += sim._res_y6[rid].to(sim.tile_yields.dtype)
@@ -172,6 +175,16 @@ def test_a_hidden_strategic_is_not_there_yet(rules, path) -> None:
     sim.res_imp[B0, t] = imp
     sim.res_priority[B0, t] = 2
     sim.res_cat[B0, t] = 2
+    sim.d_usable[B0, t] = False                 # what the exporter bakes for a non-bonus resource
+    # a DISTRICT may stand on an unseen strategic (the install allows it; the
+    # resource is lost) and not on a seen one — `_district_elig` reads the row
+    j = next(jj for jj in range(sim.city_id.shape[2]) if int(sim.city_id[B0, row, jj]) == int(sim.tile_city[B0, t]))
+    sim.civ_techs[:, row, tech] = False
+    sim._eff_version += 1
+    assert bool(sim._district_elig(row, j, 0, 0)[B0, t]), "a district refused over an unseen strategic"
+    sim.civ_techs[:, row, tech] = True
+    sim._eff_version += 1
+    assert not bool(sim._district_elig(row, j, 0, 0)[B0, t]), "a district allowed over a SEEN strategic"
     sim.improvement[B0, t] = imp
     sim.pillaged[B0, t] = False
     sim.civ_techs[:, row, tech] = False

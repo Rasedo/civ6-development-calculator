@@ -548,7 +548,9 @@ export function canPlaceDistrictIn(
     return no('Needs water on one side and a City Center or a second body of water on the other.');
   }
 
-  if (tile.resource) {
+  // CIV6 (Resources.PrereqTech): a strategic the city's seat cannot see yet
+  // is plain ground — the district may stand on it (the resource is lost)
+  if (tile.resource && !hiddenResourcesFor(state, city.seat).has(tile.resource)) {
     const cat = RESOURCES[tile.resource].category;
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
   }
@@ -994,7 +996,7 @@ export function canPlaceWonder(
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
-  if (tile.resource) {
+  if (tile.resource && !hiddenResourcesFor(state, seat).has(tile.resource)) {   // an unseen strategic is plain ground
     const cat = RESOURCES[tile.resource].category;
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
   }

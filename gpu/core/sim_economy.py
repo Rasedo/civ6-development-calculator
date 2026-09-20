@@ -962,7 +962,7 @@ class SimEconomy:
         self.wpass |= take & self.passable
         self.water |= take
         self.tile_submerged |= take
-        for _p in ("passable", "work_ok", "settle_ok", "d_usable", "camp_ok",
+        for _p in ("passable", "work_ok", "settle_ok", "d_usable", "d_usable0", "camp_ok",
                    "coastal_land", "coastal_water", "_sr_c", "district_complete",
                    "district_pillaged", "built_wonder_complete", "road", "railroad",
                    "pillaged", "tile_flooded", "antiquity", "tile_locked"):
@@ -3098,7 +3098,7 @@ class SimEconomy:
             & (self.district < 0)
             & (self.built_wonder < 0)
             & (self.improvement < 0)
-            & (self.res_priority <= 1)  # only a BONUS resource may be paved over
+            & ((self.res_priority <= 1) | self._res_hidden(row))  # only a BONUS resource may be paved over; an unseen strategic is plain ground
             & (self.pair_dist[center] <= 3)  # CITY_WORK_RADIUS
         )
         # A district PAVES the tile, so a removable feature still standing on it
@@ -3128,10 +3128,13 @@ class SimEconomy:
         # Harbor and Water Park sit on coastal water, the Spaceport and the
         # Canal on FLAT land (no Hills), the Dam on a floodplain, everything
         # else on any usable land.
+        # CIV6 (Resources.PrereqTech): a strategic this row cannot see yet is
+        # plain ground — the resource clause the static plane baked lifts
+        du = self.d_usable | (self.d_usable0 & self._res_hidden(row))
         surface = (self.coastal_water if placement == 2
-                   else self.d_usable & ~self.hills if placement in (4, 6)
-                   else self.d_usable & self.floodplain if placement == 5
-                   else self.d_usable)
+                   else du & ~self.hills if placement in (4, 6)
+                   else du & self.floodplain if placement == 5
+                   else du)
         # CIV6: "Production cannot be applied to anything in tiles containing
         # contamination" - `canPlaceDistrictIn` refuses an irradiated tile.
         surface = surface & ~self._fallout()
