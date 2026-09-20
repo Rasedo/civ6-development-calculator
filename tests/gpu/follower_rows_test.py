@@ -156,6 +156,14 @@ def test_last_prophet(rules, path) -> None:
         assert int(sim._foreign_follower_count(0)[B0]) == 1, "a foreign follower did not count"
         sim.city_followed[B0, 1, 0] = 1
         assert int(sim._foreign_follower_count(0)[B0]) == 0, "another religion counted"
+    # a FREE CITY is a foreign player's too (the free row; TS's `state.freeSeat`)
+    _fr = sim.FREE_ROW
+    _was = bool(sim.city_alive[B0, _fr, 0])
+    sim.city_alive[B0, _fr, 0] = True
+    sim.city_followed[B0, _fr, 0] = 0
+    assert int(sim._foreign_follower_count(0)[B0]) == 1, "a Free City following my religion did not count"
+    sim.city_followed[B0, _fr, 0] = -1
+    sim.city_alive[B0, _fr, 0] = _was
     print("  3 The Last Prophet OK — foreign cities only, and this row's religion only")
 
 

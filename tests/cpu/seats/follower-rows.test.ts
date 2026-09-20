@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
-import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { emptySeat, setTileOwner, setWar, freeSeatOf } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { getModifiers, religionsPresent, foreignFollowerCount } from '../../../cpu/core/effects';
 import { faithBuyableClass } from '../../../cpu/core/game';
@@ -97,6 +97,11 @@ describe('The Last Prophet', () => {
     expect(foreignFollowerCount(state, 0)).toBe(1);
     theirs.followedReligion = 1; // another religion does not count
     expect(foreignFollowerCount(state, 0)).toBe(0);
+    // a FREE CITY is a foreign player's too (`state.freeSeat`, outside
+    // `state.seats` — 9157 t189 counted it on one engine only)
+    const free = freeSeatOf(state);
+    free.cities.push({ ...theirs, id: 99, seat: free.seat, followedReligion: 0 });
+    expect(foreignFollowerCount(state, 0)).toBe(1);
   });
 
   it('names the Prophet as the guaranteed class', () => {

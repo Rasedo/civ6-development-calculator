@@ -821,6 +821,10 @@ export function foreignFollowerCount(state: GameState, seat: number): number {
   for (const cs of state.cityStates ?? []) {
     for (const c of cs.cities) if (c.followedReligion === seat) n += 1;
   }
+  // ...and the FREE CITIES, a foreign player too: they live in `state.freeSeat`,
+  // not `state.seats` (the GPU's `_foreign_follower_count` walks every row,
+  // the free row included — 9157 t189)
+  for (const c of state.freeSeat?.cities ?? []) if (c.followedReligion === seat) n += 1;
   return n;
 }
 
