@@ -3709,11 +3709,13 @@ class SimInit:
         self._march_miss = torch.full((B, T), 10**9, dtype=torch.long, device=device)
         # The march key's SEAT term, one entry per city-block cell in
         # `city_center.reshape(B, -1)` order (row-major, so the column index
-        # runs fastest). A CITY-STATE row carries its 100+ seat id, which is
-        # why the distance term is scaled by 2048 * 256 rather than 2048 * 8.
+        # runs fastest). A CITY-STATE row carries its 100+ seat id and the
+        # FREE CITIES row FREE_SEAT (300), which is why the distance term is
+        # scaled by 2048 * 512 — the same key `hostileUnitAct` packs.
         _cell_row = torch.arange(self.city_center.shape[1] * self.RC, device=device) // self.RC
         self._march_seatkey = torch.where(
-            _cell_row < self.n_majors, _cell_row, 100 + _cell_row - self.n_majors) * 2048
+            _cell_row == self.FREE_ROW, torch.full_like(_cell_row, FREE_SEAT),
+            torch.where(_cell_row < self.n_majors, _cell_row, 100 + _cell_row - self.n_majors)) * 2048
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         self._adjd_cache = None

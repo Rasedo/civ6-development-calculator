@@ -12122,11 +12122,18 @@ class SimSeats:
         self.city_pop[fell, hr, sl] = ((self.city_pop[fell, hr, sl] * 3) // 4).clamp(min=1)
         for _i in range(fell.numel()):
             self._log_pop(fell[_i:_i + 1], int(hr[_i]), sl[_i:_i + 1], "sk")
-        loss = torch.minimum(
-            torch.tensor(100.0, dtype=torch.float64, device=self.device),
-            js_round(js_round(self.civ_treasury[fell, hr].double() * 1000) / 1000 * 0.2).double(),
-        )
-        self.civ_treasury[fell, hr] -= loss.to(self.civ_treasury.dtype)
+        # the holder's treasury pays a fifth, 100 at most. A FREE CITY's holder
+        # has no treasury plane here and a never-credited `freeSeat.treasury`
+        # on TS (`sackCity` deducts min(100, round(0 * 0.2)) = 0), so only a
+        # MAJOR row is charged (seed 9092 t121+: a raider sacked a Free City).
+        _maj = hr < self.n_majors
+        if bool(_maj.any()):
+            _fm, _hm = fell[_maj], hr[_maj]
+            loss = torch.minimum(
+                torch.tensor(100.0, dtype=torch.float64, device=self.device),
+                js_round(js_round(self.civ_treasury[_fm, _hm].double() * 1000) / 1000 * 0.2).double(),
+            )
+            self.civ_treasury[_fm, _hm] -= loss.to(self.civ_treasury.dtype)
         self.city_hp[fell, hr, sl] = round(int(self.rules.combat.get("cityMaxHp", 200)) / 2)
         if self.improvements_on:
             centers = self.city_center[fell, hr, sl]

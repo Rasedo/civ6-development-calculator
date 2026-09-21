@@ -2020,7 +2020,9 @@ class SimOrders:
             # both wreck arms: only `pillaged` is written between them, never
             # `tile_seat`, so the two reads were always the same answer.
             _h_seat = self.tile_seat.gather(1, _here1).squeeze(1)
-            h_owned = (_h_seat >= 0) & (_h_seat < BARB_SEAT)
+            # `isTerritorial`: a major's, a city-state's OR the Free Cities' ground
+            # (seed 9092 t137: a raider beside a Free City's Campus)
+            h_owned = (_h_seat >= 0) & ((_h_seat < BARB_SEAT) | (_h_seat == FREE_SEAT))
             pillage = torch.zeros_like(act)
             if self.improvements_on:
                 h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
@@ -2075,7 +2077,8 @@ class SimOrders:
                 # `isTerritorial(tileSeat(t))` — owned by any major or
                 # city-state. A barbarian is hostile to all of them, so no war
                 # term joins it.
-                _owned = (self.tile_seat >= 0) & (self.tile_seat < BARB_SEAT)  # [B, T]
+                _owned = ((self.tile_seat >= 0)
+                          & ((self.tile_seat < BARB_SEAT) | (self.tile_seat == FREE_SEAT)))  # [B, T]
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & (self.district != self._encamp_didx)
@@ -2088,8 +2091,8 @@ class SimOrders:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
             # BARBARIANS MARCH ON ANYONE — `hostileUnitAct`'s city scan over
-            # majors AND city-states (real Civ 6 barbarians raid whoever is
-            # near the camp), on its key: distance, then the seat id, then the
+            # majors, city-states AND the Free Cities (real Civ 6 barbarians
+            # raid whoever is near the camp), on its key: distance, then the seat id, then the
             # centre tile (`caps.alwaysHostile`, so no war term). An adjacent
             # minor centre is a melee target now, so a parked raider fights
             # rather than stands. ONE argmin over the whole city block: the
@@ -2098,7 +2101,7 @@ class SimOrders:
             _cc = self.city_center.reshape(B, -1).clamp(min=0)  # [B, M]
             _ca = self.city_alive.reshape(B, -1)                # [B, M]
             _d2 = self.pair_dist[here.clamp(min=0).unsqueeze(1), _cc].to(torch.long)
-            _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey + _cc,
+            _key = torch.where(_ca, _d2 * (2048 * 512) + self._march_seatkey + _cc,
                                torch.full_like(_d2, 10**18))
             ckey_min, _cwin = _key.min(dim=1)
             city_tgt = torch.where(ckey_min < 10**18,

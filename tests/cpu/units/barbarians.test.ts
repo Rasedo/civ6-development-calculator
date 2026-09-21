@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT } from '../../../cpu/core/seats';
+import { BARB_SEAT, FREE_SEAT, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { barbarianPhase } from '../../../cpu/core/combat';
+import { barbarianPhase, hostileUnitAct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import type { GameState } from '../../../cpu/core/types';
 
@@ -64,5 +64,31 @@ describe('barbarian camp classes', () => {
     state.turn = 123; // > 120: KNIGHT and CROSSBOWMAN
     spawnUnit(state, 'WARRIOR', camp, BARB_SEAT);
     expect(nextSpawn(state)).toBe('KNIGHT'); // 123 % 3 === 0 -> the class slot
+  });
+});
+
+// A raider's ground: `isTerritorial` — a major's, a city-state's or the FREE
+// CITIES' — and both engines walk it (seed 9092 t137: a Horseman beside a Free
+// City's Campus held by a barbarian Crossbowman stood still on TS and marched
+// on the GPU, whose ground test stopped short of FREE_SEAT).
+describe('what a raider marches on', () => {
+  it("a Free City's district is a raid target, walked onto; a second raider halts beside it", () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    const campus = tileAtCoords(state.map, 8, 8);
+    setTileOwner(campus, FREE_SEAT);
+    campus.district = 'CAMPUS';
+    campus.districtComplete = true;
+    const start = tileAtCoords(state.map, 10, 8);
+    const horse = spawnUnit(state, 'HORSEMAN', start.index, BARB_SEAT)!;
+    hostileUnitAct(state, horse);
+    expect(horse.tileIndex).toBe(campus.index);
+    // the next raider finds the Campus held by its own kind: one step closer,
+    // then nothing beats the tile it cannot enter
+    const second = spawnUnit(state, 'HORSEMAN', start.index, BARB_SEAT)!;
+    hostileUnitAct(state, second);
+    expect(second.tileIndex).toBe(tileAtCoords(state.map, 9, 8).index);
+    hostileUnitAct(state, second);
+    expect(second.tileIndex).toBe(tileAtCoords(state.map, 9, 8).index);
   });
 });

@@ -2554,7 +2554,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // 2. Pillage the improvement underfoot, paying the target's own plunder
   // row — a barbarian still HEALS off a heal row, and only a major banks
   // a yield lump (`pillagePlunder`).
-  // BARBARIANS raid ANY territorial owner, majors and minors alike; a
+  // BARBARIANS raid ANY territorial owner — majors, minors and the Free
+  // Cities alike (`isTerritorial`; the GPU's `_owned` is the twin); a
   // non-barbarian hostile walker still needs its war.
   const here = tile();
   const hereOwned = isTerritorial(tileSeat(here))
@@ -2609,17 +2610,19 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   if (!target) {
     let best: Tile | null = null;
     let bestKey = Infinity;
-    // The city scan is ANY hostile owner's, majors and city-states alike —
-    // real Civ 6 barbarians raid whoever is near the camp, and an adjacent
-    // minor centre IS a melee target (`attackTargets`'s cityStateTarget arm),
-    // so a parked raider fights rather than stands. The key packs distance,
-    // then the seat id (wide enough for a 100+ minor), then the centre tile.
-    for (const other of state.seats) {
+    // The city scan is ANY hostile owner's, majors, city-states and the
+    // Free Cities alike — real Civ 6 barbarians raid whoever is near the
+    // camp, and an adjacent minor centre IS a melee target (`attackTargets`'s
+    // cityStateTarget arm), so a parked raider fights rather than stands.
+    // The key packs distance, then the seat id (wide enough for a 100+ minor
+    // and for FREE_SEAT 300), then the centre tile — the GPU's `_march_seatkey`.
+    const owners = state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
+    for (const other of owners) {
       if (other.seat === unit.seat) continue;
       if (!unitsHostile(state, unit, other)) continue;
       for (const oc of other.cities) {
         const t = map.tiles[oc.centerIndex];
-        const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 256)
+        const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 512)
           + other.seat * 2048
           + oc.centerIndex;
         if (key < bestKey) {
@@ -2631,7 +2634,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     for (const csx of state.cityStates) {
       if (!cityStateAttackable(state, csx, unitSeat(unit))) continue;
       const t = map.tiles[csx.centerIndex];
-      const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 256)
+      const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 512)
         + seatOfCityState(csx.id) * 2048
         + csx.centerIndex;
       if (key < bestKey) {

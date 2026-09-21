@@ -22,6 +22,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import FREE_SEAT
 from warmup import settle_all
 
 
@@ -118,6 +119,53 @@ def main() -> None:
         got = spawned_type(sim)
         assert got == expect, f"turn%3=={slot}: raided with roster type {got}, expected {expect}"
     print("  the raid rotates CLASS, ranged, melee — every camp fields all three")
+
+    # THE RAID REACHES THE FREE CITIES: `isTerritorial` counts FREE_SEAT ground,
+    # so a Free City's Campus two flat steps away is the nearest job and the
+    # raider walks onto it (seed 9092 t137, the `hostileUnitAct` twin).
+    clear_barbs(sim)
+    sim.n_camps[0] = 0
+    sim.camp_tile[0, :] = -1
+
+    def flat(t: int) -> bool:
+        return (bool(sim.passable[0, t]) and not bool(sim.wpass[0, t]) and not bool(sim.hills[0, t])
+                and int(sim.feat_id[0, t]) < 0 and int(sim.district[0, t]) < 0
+                and int(sim.centre_slot_at[0, t]) < 0
+                and int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0
+                and int(sim.improvement[0, t]) < 0)
+
+    scene = None
+    for c in range(sim.T):
+        if not flat(c):
+            continue
+        for mid in [n for n in sim.neigh[c].tolist() if n >= 0 and flat(n)]:
+            far = [n for n in sim.neigh[mid].tolist() if n >= 0 and n != c and flat(n)
+                   and int(sim.pair_dist[c, n]) == 2]
+            if far:
+                scene = (c, mid, far[0])
+                break
+        if scene:
+            break
+    assert scene, "no flat three-tile line for the free-city raid scene"
+    campus, _mid, start = scene
+    dix = 1 if sim._encamp_didx == 0 else 0
+    sim.tile_seat[0, campus] = FREE_SEAT
+    sim.district[0, campus] = dix
+    sim.district_complete[0, campus] = True
+    sim.district_pillaged[0, campus] = False
+    sim._tile_owner_ver += 1
+    sim._eff_version += 1
+    slot = int(sim.next_slot[0])
+    sim.barb_unit_alive[0, slot] = True
+    sim.barb_unit_type[0, slot] = horseman
+    sim.barb_unit_tile[0, slot] = start
+    sim.barb_unit_hp[0, slot] = 100
+    sim.military_at[0, start] = slot + sim.POOL_LO["barb"]
+    sim.next_slot[0] += 1   # the raider loop walks slots below next_slot
+    sim._barbarian_phase()
+    assert int(sim.barb_unit_tile[0, slot]) == campus, (
+        f"the raider stands on {int(sim.barb_unit_tile[0, slot])}, not the Free City's Campus {campus} (start {start}, mid {_mid}, mp left {float(sim.barb_unit_mp[0, slot])}, alive {bool(sim.barb_unit_alive[0, slot])}, military_at campus {int(sim.military_at[0, campus])}, tile_seat {int(sim.tile_seat[0, campus])})")
+    print("  a Free City's district is a raid target — the raider walked onto it")
 
     print("BARB CAMPS OK — the camp's class is its ground, and ranged is nobody's class")
 
