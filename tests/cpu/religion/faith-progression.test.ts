@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, expandBorders, grantTechs } from '../helpers';
 import { purchaseReligiousUnit, unitFaithCost, unitsAcquired } from '../../../cpu/core/game';
+import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
 import { spawnUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
@@ -44,7 +45,7 @@ describe('the faith price climbs with the copies already acquired', () => {
       expect(unitFaithCost('MISSIONARY', 1, unitsAcquired(state, 0, 'MISSIONARY')))
         .toBe(base + n * step);
       expect(purchaseReligiousUnit(state, cityId, 'MISSIONARY', 0).ok).toBe(true);
-      expect(s.faith).toBe(purse - (base + n * step));
+      expect(s.faith).toBe(purse - purchaseStep(base + n * step));
       purse = s.faith!;
       // the live ones are disbanded so the chassis cap never refuses the next
       state.units = state.units.filter((u) => u.type !== 'MISSIONARY');
@@ -68,7 +69,7 @@ describe('the faith price climbs with the copies already acquired', () => {
     const s = seatOf(state, 0)!;
     const before = s.faith!;
     expect(purchaseReligiousUnit(state, cityId, 'APOSTLE', 0).ok).toBe(true);
-    expect(s.faith).toBe(before - (base + step));
+    expect(s.faith).toBe(before - purchaseStep(base + step));
   });
 
   it('leaves the Warrior Monk flat, and keeps each chassis\' tally its own', () => {

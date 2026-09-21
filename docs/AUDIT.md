@@ -54,9 +54,9 @@ re-adds them.
 | C-64 majority religion | 1 | the CITY rule, and the four readers that want the seat one |
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
-| C-80 constants vs the install | 2 | the purchase price, the Pop Star's tag, one rule the reader census names |
-| **C. Absent systems** | **16** | |
-| **OPEN, TOTAL** | **20** | |
+| C-80 constants vs the install | 1 | one rule the reader census names (noSwap) |
+| **C. Absent systems** | **15** | |
+| **OPEN, TOTAL** | **19** | |
 
 ## The question ledger — owner asks
 
@@ -140,10 +140,8 @@ close in the same commit.
   - BUILD, one clause with no carrier, recorded on the column that names it: "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — the sentence is text only, no XML column carries it, and no tile-swap verb exists here to refuse.
   - BUILD: the Stepwell's "+1 Faith beside a Holy Site, +1 Food beside a Farm" IS sourced after all — `STEPWELL_FARMADJACENCY_FOOD` and `STEPWELL_HOLYSITEADJACENCY_FAITH`, both `MODIFIER_SINGLE_PLOT_ADJUST_PLOT_YIELDS` with Amount 1 and the requirement sets `PLOT_ADJACENT_TO_FARM_REQUIREMENTS` / `PLOT_ADJACENT_TO_HOLYSITE_REQUIREMENTS`, attached to `IMPROVEMENT_STEPWELL` in `Improvements.xml`. It is carried by MODIFIERS, not by an `Improvement_Adjacencies` row, which is the whole reason the earlier sweep read it as unpublished.
   - Out of scope by construction: LEY LINE adjacency (a Secret Societies resource class this map never places).
-- **C-80. CONSTANTS VS THE INSTALL.** Weight 2.
+- **C-80. CONSTANTS VS THE INSTALL.** Weight 1.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
-  - BUILD, the PURCHASE PRICE, fitted to all 302 priced rows of one city and then verified against a real transaction: `price = floor(mult * C / 5) * 5`, mult 4 for gold and 2 for faith, `C` the CITY's speed-scaled production cost. FLOOR, not nearest (a Slinger at cost 17 buys for 65 gold and 30 faith, never 70/35), and the divisor is `PURCHASE_DIVISOR` 5. PROGRESS DOES NOT REDUCE IT — a Monument at 25 of 30 hammers cost the same 120/60 as at zero. Units and districts price off the truncated integer cost, buildings off the fractional one (a Granary at 32.5 costs 130, not 125). `buildingPurchaseCost` / `buildingFaithCost` / `unitFaithCost` and the GPU's `gold_purchase_mult` / `faith_purchase_mult` multiply and never round to five. The faith rate for a LAND COMBAT unit, which B-D wanted, is the same 2 as everything else.
-  - BUILD: the Pop Star's 25 is SOURCED, not a lab question — `ROCKBAND_POP` writes Amount -75 on `MODIFIER_PLAYER_UNIT_ADJUST_TOURISM_BOMB_ADDITIONAL_YIELD` and the shipped text reads "Gain Gold equal to 25% of the Tourism generated", so the argument is a percentage adjustment away from 100. The catalog's 25 is right and its `cpu/data/provenance.ts` tag is not; both baseline lines in docs/PROVENANCE.md wait on that re-tag.
   - The ONE RULE the reader census still names (its baseline line stays red-listed until built):
     6. BUILD: `improvements.noSwap`: C-79's tile-swap refusal.
 

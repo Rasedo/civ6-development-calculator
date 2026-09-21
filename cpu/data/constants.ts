@@ -41,9 +41,24 @@ export const GAME_SPEED = srcConst('gameSpeed', 0.6, {
     + 'it; the install\'s own GameSpeeds table has no 0.6 row',
 });
 
-export const GOLD_PURCHASE_MULT = srcConst('scenario.goldPurchaseMult', 4,
-  gp('GOLD_PURCHASE_MULTIPLIER'));
-export const FAITH_PURCHASE_MULT = 2;
+/** THE PURCHASE PRICE, measured live (lab 2 scene G — all 302 priced rows of
+ *  one city fitted, then a real 445-gold transaction; runs/purchase_*.jsonl):
+ *  `price = floor(mult × C / PURCHASE_DIVISOR) × PURCHASE_DIVISOR`, mult 4 for
+ *  gold and 2 for faith, C the CITY's speed-scaled production cost. FLOOR,
+ *  never nearest (a Slinger at cost 17 buys for 65 gold and 30 faith), and
+ *  progress already invested never lowers it. The install's
+ *  GOLD_PURCHASE_MULTIPLIER 2 is the gold-to-faith RATIO, not the multiplier
+ *  on the cost; the faith rate is the same 2 for every chassis, land combat
+ *  units included. `goldPrice` / `faithPrice` apply the floor last. */
+export const GOLD_PURCHASE_MULT = srcConst('scenario.goldPurchaseMult', 4, {
+  lab: 'runs/purchase_20260920T181359Z.jsonl',
+  note: 'the install publishes GOLD_PURCHASE_MULTIPLIER 2 — the gold price is twice the faith price, and the faith price is 2 × the cost',
+});
+export const FAITH_PURCHASE_MULT = srcConst('scenario.faithPurchaseMult', 2, {
+  lab: 'runs/purchase_20260920T181359Z.jsonl',
+  note: 'no install row carries the faith rate; measured 2 × the scaled cost on every priced chassis and building',
+});
+export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURCHASE_DIVISOR'));
 
 export const FOOD_PER_CITIZEN = srcConst('foodPerCitizen', 2,
   gp('CITY_FOOD_CONSUMPTION_PER_POPULATION'));

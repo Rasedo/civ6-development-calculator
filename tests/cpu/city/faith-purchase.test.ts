@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { purchaseStep } from '../../../cpu/core/effects';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
 import {
@@ -60,7 +61,7 @@ describe("Valletta's class purchase", () => {
     expect(cost).toBe(BUILDINGS.MONUMENT.cost * 2);
     expect(purchaseBuildingWithFaith(state, city.id, 'MONUMENT', 0).ok).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
-    expect(seat.faith).toBe(5000 - cost);
+    expect(seat.faith).toBe(5000 - purchaseStep(cost));   // the five-step floor (measured)
     expect(seat.treasury).toBe(5000);
   });
 
@@ -133,7 +134,7 @@ describe('the land combat unit faith buys', () => {
     expect(cost).toBe(UNITS.WARRIOR.cost * 2);
     expect(purchaseUnitWithFaith(state, city.id, 'WARRIOR', 0).ok).toBe(true);
     expect(state.units.length).toBe(n0 + 1);
-    expect(seat.faith).toBe(5000 - cost);
+    expect(seat.faith).toBe(5000 - purchaseStep(cost));   // the five-step floor (measured)
     expect(seat.treasury).toBe(0);
     expect(purchaseUnitWithFaith(state, city.id, 'BUILDER', 0).ok).toBe(false);
     expect(purchaseUnitWithFaith(state, city.id, 'GALLEY', 0).ok).toBe(false);

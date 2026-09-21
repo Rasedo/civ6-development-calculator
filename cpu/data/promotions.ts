@@ -932,7 +932,13 @@ const PROMO_SRC: Readonly<Record<string, SrcMap>> = {
     cls: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_POP', 'PromotionClass', { expect: 'PROMOTION_CLASS_ROCK_BAND' }),
     tier: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_POP', 'Level'),
     requires: { derived: 'a tier-I root: the install writes no UnitPromotionPrereqs row for PROMOTION_POP' },
-    'effects.0.v': xml('ModifierArguments', 'ModifierId=ROCKBAND_POP&Name=Amount', 'Value'),
+    // ROCKBAND_POP writes Amount -75 on MODIFIER_PLAYER_UNIT_ADJUST_TOURISM_BOMB_ADDITIONAL_YIELD: a
+    // PERCENT adjustment away from 100 — the shipped text reads "Gain Gold equal to 25% of the
+    // Tourism generated" (lab 2, ask H: answered from the install)
+    'effects.0.v': {
+      derived: 'ROCKBAND_POP\'s Amount is a percentage adjustment away from 100: 100 + (-75) = 25% of the concert\'s tourism as gold',
+      inputs: [xml('ModifierArguments', 'ModifierId=ROCKBAND_POP&Name=Amount', 'Value')],
+    },
   },
   REGGAE_ROCK: {
     cls: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_REGGAE_ROCK', 'PromotionClass', { expect: 'PROMOTION_CLASS_ROCK_BAND' }),

@@ -6,6 +6,7 @@ import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '.
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { goldPurchasableBuildings } from '../../../cpu/core/rules';
+import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
@@ -27,7 +28,7 @@ describe('gold & faith purchases', () => {
     const city = foundAt(state, 5, 5);
     const cost = buildingPurchaseCost('MONUMENT');
     expect(cost).toBeGreaterThan(0);
-    seatOf(state, 0)!.treasury = cost + 10;
+    seatOf(state, 0)!.treasury = purchaseStep(cost) + 10;
     const r = purchaseBuilding(state, city.id, 'MONUMENT', 0);
     expect(r.ok).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
@@ -70,7 +71,7 @@ describe('gold & faith purchases', () => {
     city.buildings.push('SHRINE', 'TEMPLE');
     seatOf(state, 0)!.religion.worship = 'CATHEDRAL';
     const cost = buildingFaithCost(state, 0, 'CATHEDRAL');
-    seatOf(state, 0)!.faith = cost + 3;
+    seatOf(state, 0)!.faith = purchaseStep(cost) + 3;
     seatOf(state, 0)!.treasury = 0;
     const r = purchaseBuilding(state, city.id, 'CATHEDRAL', 0);
     expect(r.ok).toBe(true);
@@ -102,7 +103,7 @@ describe('gold & faith purchases', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = foundAt(state, 5, 5);
-    seatOf(state, 0)!.treasury = unitPurchaseCost(state, 'BUILDER', 0);
+    seatOf(state, 0)!.treasury = purchaseStep(unitPurchaseCost(state, 'BUILDER', 0));
     expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
     expect(state.units.length).toBe(1);
     expect(seatOf(state, 0)!.treasury).toBe(0);
@@ -110,7 +111,7 @@ describe('gold & faith purchases', () => {
     expect(unitPurchaseCost(state, 'BUILDER', 0)).toBeGreaterThan(120); // escalated
     expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false); // broke
 
-    const sCost = settlerCost(state, 0) * 4;
+    const sCost = purchaseStep(settlerCost(state, 0) * 4);
     seatOf(state, 0)!.treasury = sCost;
     city.population = 2; // a 1-pop city may not buy a settler (real Civ 6)
     // the Builder stands on the centre and holds its civilian slot: a Settler

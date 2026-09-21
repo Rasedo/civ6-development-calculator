@@ -2510,24 +2510,33 @@ class SimEconomy:
         self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, pols, val)
         return val
 
+    def _purchase_step(self, price: torch.Tensor) -> torch.Tensor:
+        """CIV6 (PURCHASE_DIVISOR 5, measured live — lab 2 scene G): every gold
+        or faith price is FLOORED to a multiple of five, after every percent
+        the seat carries; progress invested never lowers it. `purchaseStep`'s
+        twin — `floor(price / d) * d` in float64, the same two operations."""
+        d = float(self.rules.purchase_divisor)
+        return torch.floor(price.to(torch.float64) / d) * d
+
     def _gold_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
         """CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the
         accrued percent off every GOLD purchase — a building, a unit, a settler
         — applied where the purchase is priced and paid. READING: not an
-        upgrade, a tile or a patronage. `goldPrice`'s twin; `price` [B] or
-        [B/1, N]."""
-        if not self._gov_has_effects:
-            return price
-        f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
-        return price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        upgrade, a tile or a patronage. Then the five-step floor. `goldPrice`'s
+        twin; `price` [B] or [B/1, N]."""
+        if self._gov_has_effects:
+            f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
+            price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        return self._purchase_step(price)
 
     def _faith_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
         """CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued
-        percent off every FAITH purchase — `faithPrice`'s twin."""
-        if not self._gov_has_effects:
-            return price
-        f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
-        return price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        percent off every FAITH purchase, then the five-step floor —
+        `faithPrice`'s twin."""
+        if self._gov_has_effects:
+            f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
+            price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        return self._purchase_step(price)
 
     def _seat_slotted(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` actually holds, its AGE and era

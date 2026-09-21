@@ -269,9 +269,11 @@ def poke_missionary_pricing(rules, rj, path):
     cost = float(sim._unit_faith_cost(r + 1, sim._missionary_idx)[0])
     # CIV6 (Holy Order): the discount rides the whole Cost, progression included
     mm = sim._enh["mcostMult"][E["HOLY_ORDER"] + 1]
-    ho = round(cost * float(mm))
+    ho_raw = round(cost * float(mm))   # `unitFaithCost`'s twin: the rate, before the till
     got = int(sim._unit_faith_cost(r + 1, sim._missionary_idx, mm)[0])
-    assert got == ho, f"HOLY_ORDER missionary price must be {ho}, read {got}"
+    assert got == ho_raw, f"HOLY_ORDER missionary price must be {ho_raw}, read {got}"
+    # what the till charges: the five-step floor every price takes (measured; `_faith_price`)
+    ho = (ho_raw // int(sim.rules.purchase_divisor)) * int(sim.rules.purchase_divisor)
     assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 0, "GS SCRIPTURE carries no charge bonus"
     assert int(sim._type_charges[sim._missionary_idx]) == 3, "base missionary charges must be 3"
 

@@ -164,6 +164,7 @@ class Rules:
     game_speed: float
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
+    purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
@@ -367,6 +368,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         game_speed=r["scenario"].get("gameSpeed", 0.6),
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         faith_purchase_mult=r["scenario"].get("faithPurchaseMult", 2),
+        purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
         turn_limit=r["scenario"].get("turnLimit", 250),
         space_ly_target=r["scenario"].get("spaceLyTarget", 30),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),

@@ -1,4 +1,5 @@
 
+import { PURCHASE_DIVISOR } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -1582,17 +1583,27 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
 /** CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the accrued
  *  percent off every GOLD purchase — a building, a unit, a settler — applied
  *  where the purchase is priced and paid. READING: not an upgrade, a tile or a
- *  patronage. `_gold_price` is the twin. */
+ *  patronage. Then the five-step floor. `_gold_price` is the twin. */
 export function goldPrice(state: GameState, seat: number, price: number): number {
   const d = getModifiers(state, seat).goldBuyDiscountPct;
-  return d ? price * (1 - d / 100) : price;
+  return purchaseStep(d ? price * (1 - d / 100) : price);
+}
+
+/** CIV6 (PURCHASE_DIVISOR 5, measured live — lab 2 scene G, 302 of 302 priced
+ *  rows and a real transaction): every gold or faith price is FLOORED to a
+ *  multiple of five, after every percent the seat carries — never nearest (a
+ *  Slinger at cost 17 buys for 65 gold and 30 faith) — and progress already
+ *  invested never lowers it. `_purchase_step` is the twin. */
+export function purchaseStep(price: number): number {
+  return Math.floor(price / PURCHASE_DIVISOR) * PURCHASE_DIVISOR;
 }
 
 /** CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued percent
- *  off every FAITH purchase — `_faith_price` is the twin. */
+ *  off every FAITH purchase, then the five-step floor — `_faith_price` is the
+ *  twin. */
 export function faithPrice(state: GameState, seat: number, price: number): number {
   const d = getModifiers(state, seat).faithBuyDiscountPct;
-  return d ? price * (1 - d / 100) : price;
+  return purchaseStep(d ? price * (1 - d / 100) : price);
 }
 
 /** The cards seat `seat` has SLOTTED and may still use: its stored choice minus

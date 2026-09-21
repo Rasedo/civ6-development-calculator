@@ -37,7 +37,7 @@ describe('the legacy purchase discounts', () => {
   it("Merchant Republic's legacy takes its accrued percent off a gold purchase, and nothing off faith", () => {
     const state = scene('MERCHANT_REPUBLIC', 30);
     expect(legacyBonusPct(state, 0, 'MERCHANT_REPUBLIC'), '30 turns at 1%/15').toBe(2);
-    expect(goldPrice(state, 0, 100)).toBeCloseTo(98, 9);
+    expect(goldPrice(state, 0, 100)).toBe(95);   // 98, then the five-step floor every price takes (measured)
     expect(faithPrice(state, 0, 100)).toBe(100);
     // the raw price composer is untouched — the discount lands at the purchase
     expect(unitPurchaseCost(state, 'WARRIOR', 0)).toBe(unitPurchaseCost(scene('MERCHANT_REPUBLIC', 0), 'WARRIOR', 0));
@@ -46,7 +46,7 @@ describe('the legacy purchase discounts', () => {
   it("Theocracy's legacy takes its accrued percent off a faith purchase, and nothing off gold", () => {
     const state = scene('THEOCRACY', 45);
     expect(legacyBonusPct(state, 0, 'THEOCRACY'), '45 turns at 1%/15').toBe(3);
-    expect(faithPrice(state, 0, 200)).toBeCloseTo(194, 9);
+    expect(faithPrice(state, 0, 200)).toBe(190);   // 194, floored to five
     expect(goldPrice(state, 0, 200)).toBe(200);
   });
 

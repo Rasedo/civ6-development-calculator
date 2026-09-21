@@ -28,6 +28,7 @@ class purchase (kind 12) rides cs_bonus_test beside its suzerain.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -165,12 +166,18 @@ def case_building(sim, base, row: int, mon: int) -> None:
 # kind 1 — the SETTLER buy
 # ---------------------------------------------------------------------------
 
+def step(sim, price: float) -> float:
+    """the five-step floor every gold / faith price takes (`_purchase_step`, measured)"""
+    d = sim.rules.purchase_divisor
+    return math.floor(price / d) * d
+
+
 def settler_price(sim, row: int) -> float:
     r = sim.rules
     n = n_cities(sim, row)
     live = int(sim._seat_settlers(row)[0])
     q = int((sim.city_alive[0, row].unsqueeze(1) & (sim.city_current[0, row] == sim.SETTLER)).sum())
-    return (r.settler_base + r.settler_per_city * max(0, n - 1 + live + q)) * mult(sim)
+    return step(sim, (r.settler_base + r.settler_per_city * max(0, n - 1 + live + q)) * mult(sim))
 
 
 def case_settler(sim, base, row: int) -> None:
@@ -287,7 +294,7 @@ def case_unit(sim, base, row: int) -> None:
     if warr < 0:
         print(f"  row {row}: unit buy SKIPPED (no warrior in roster)")
         return
-    price = float(sim._type_cost[warr]) * mult(sim)
+    price = step(sim, float(sim._type_cost[warr]) * mult(sim))
 
     sim.restore(base)
     prep(sim, row)
@@ -433,8 +440,8 @@ def case_worship(sim, base, row: int) -> None:
     sim._stash_buy(row, worship=t1(j))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert bool(sim.city_bldg[0, row, j, wj]), f"row {row}: worship purchase not granted"
-    assert abs((f0 - float(sim.civ_faith[0, row])) - sim._worship_cost) < 1e-6, (
-        f"row {row}: worship charged {f0 - float(sim.civ_faith[0, row])} faith, want {sim._worship_cost}"
+    assert abs((f0 - float(sim.civ_faith[0, row])) - step(sim, float(sim._worship_cost))) < 1e-6, (
+        f"row {row}: worship charged {f0 - float(sim.civ_faith[0, row])} faith, want {step(sim, float(sim._worship_cost))}"
     )
     assert abs(float(sim.civ_treasury[0, row]) - g0) < 1e-6, f"row {row}: a worship buy touched the treasury"
 
@@ -485,7 +492,7 @@ def case_faith_unit(sim, base, row: int) -> None:
 
     n0 = units_of(sim, row)
     f0, g0 = float(sim.civ_faith[0, row]), float(sim.civ_treasury[0, row])
-    price = float(sim._type_cost[ui]) * sim.rules.faith_purchase_mult
+    price = step(sim, float(sim._type_cost[ui]) * sim.rules.faith_purchase_mult)
     sim._stash_buy(row, ucls=(uj, ub))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0 + 1, f"row {row}: the faith unit did not spawn"
