@@ -65,16 +65,16 @@ describe('the seat arsenal', () => {
 });
 
 describe('radioactive fallout', () => {
-  it('counts down a turn a turn, and the tile is unusable while it lasts', () => {
+  it('counts down a turn a turn; the tile is still worked but takes no district', () => {
     const state = world();
     const city = seatOf(state, 0)!.cities[0];
     const t = workableTiles(state, city)[0];
     const before = workableTiles(state, city).length;
     t.falloutTurns = 3;
     expect(irradiated(t)).toBe(true);
-    // CIV6: "cannot be worked by the city until the contamination timer
-    // expires or until the tile is cleaned"
-    expect(workableTiles(state, city).length).toBe(before - 1);
+    // measured live (lab 3 part two): contamination costs the tile's owner
+    // nothing — the citizens stay and the yields are unchanged
+    expect(workableTiles(state, city).length).toBe(before);
     // and no district may be placed on it
     grantTechs(state, 'WRITING');
     expect(canPlaceDistrict(state, city, 'CAMPUS', t.index).ok).toBe(false);

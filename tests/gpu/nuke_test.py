@@ -160,8 +160,15 @@ def main() -> int:
     s4._eff_version += 1
     for k in range(D):
         reach = s4._silo_reach(row, k)
-        want = (s4.pair_dist[silo] <= int(s4._nuke_range[k]))
+        # measured live (lab 3): its own Range, never inside its own blast
+        # radius, and only a plot the seat has REVEALED
+        want = ((s4.pair_dist[silo] <= int(s4._nuke_range[k]))
+                & (s4.pair_dist[silo] > int(s4._nuke_radius[k])))
+        if s4.fog_of_war:
+            want = want & s4.seat_explored[b, row]
         assert bool((reach[b] == want).all()), f"device {k} reaches exactly its own Range"
+        assert not bool(reach[b][s4.pair_dist[silo] <= int(s4._nuke_radius[k])].any()), (
+            "a warhead is never aimed within its own blast radius of the silo")
     # CIV6: the silo is an improvement — pillage it and it launches nothing.
     s4.pillaged[b, silo] = True
     s4._eff_version += 1
@@ -171,7 +178,7 @@ def main() -> int:
     s4._tile_owner_ver += 1
     s4._eff_version += 1
     assert not bool(s4._silo_reach(row, 0).any()), "and neither does a rival's"
-    print("  3 _silo_reach OK (Range 12 / 15, unpillaged, this seat's ground)")
+    print("  3 _silo_reach OK (Range 12 / 15 past its own radius, revealed, unpillaged, this seat's ground)")
 
     # --- 4) the carriers: a bomber's own range, a submarine's device Range ----
     s5 = fresh(rules, paths[0])
@@ -284,6 +291,7 @@ def main() -> int:
     s7.pillaged[b, silo] = False
     s7.civ_wmd[b, row, 0] = 1
     s7.seat_ext[b, row] = True
+    s7.seat_explored[b, row] = True   # a silo fires only at REVEALED ground (measured, lab 3)
     s7._tile_owner_ver += 1
     s7._eff_version += 1
     kd, tl = s7._seat_nuke_candidate(row)
@@ -356,6 +364,52 @@ def main() -> int:
     assert not bool(s9._nuke_intercepted(row, L(s9, cap1))[b]), (
         "a seat shot down its own device")
     print("  8 interception OK — a hostile cover stops it, the launcher's own does not")
+
+    # --- 9) the citizens, the unfinished district, the fallout floor ----------
+    # measured live (lab 3): killed = the city's worked tiles inside the blast,
+    # centre excluded, skipped WHOLE where it equals the population
+    s9 = fresh(rules, paths[0])
+    s9.civ_wmd[b, row, 0] = 3
+    aim = at_dist(s9, cap0, 2, 2)
+    blast = (s9.pair_dist[aim] <= s9._nuke_radius[0]).nonzero().flatten().tolist()
+    assert cap0 not in blast and aim in blast
+    inside = [t for t in blast if t != aim][:2]
+    far = at_dist(s9, aim, 3, 3)   # three out from the AIM: outside a radius-1 blast
+    assert far not in blast
+
+    def seat_pick(pop: int, picks: list[int]) -> None:
+        s9.city_pop[b, row, 0] = pop
+        s9.city_worked[b, row, 0] = -1
+        for i, t in enumerate(picks):
+            s9.city_worked[b, row, 0, i] = t
+
+    seat_pick(5, inside + [far, cap0])
+    enc = s9._encampment_didx
+    ud, cd = [t for t in blast if t not in inside and t != aim][:2]
+    s9.district[b, ud] = enc
+    s9.district_complete[b, ud] = False
+    s9.district_pillaged[b, ud] = False
+    s9.district[b, cd] = enc
+    s9.district_complete[b, cd] = True
+    s9.district_pillaged[b, cd] = False
+    s9.tile_fallout[b, aim] = 20
+    s9._eff_version += 1
+    s9._detonate(torch.ones(s9.B, dtype=torch.bool), row, 0, L(s9, aim))
+    assert int(s9.city_pop[b, row, 0]) == 3, (
+        f"two citizens worked inside the blast, got pop {int(s9.city_pop[b, row, 0])}")
+    assert s9.city_worked[b, row, 0, :4].tolist() == inside + [far, cap0], "the pick stands until the next walk"
+    assert int(s9.district[b, ud]) < 0 and not bool(s9.district_pillaged[b, ud]), "an UNFINISHED district is removed"
+    assert int(s9.district[b, cd]) == enc and bool(s9.district_pillaged[b, cd]), "a complete one is only pillaged"
+    assert int(s9.tile_fallout[b, aim]) == 20, "a shorter device never shortens the fallout"
+    assert int(s9.tile_fallout[b, inside[0]]) == int(s9._nuke_fallout[0])
+    seat_pick(2, inside)
+    s9._detonate(torch.ones(s9.B, dtype=torch.bool), row, 0, L(s9, aim))
+    assert int(s9.city_pop[b, row, 0]) == 2, "every citizen inside the blast: nobody dies"
+    seat_pick(3, inside)
+    s9._detonate(torch.ones(s9.B, dtype=torch.bool), row, 0, L(s9, aim))
+    assert int(s9.city_pop[b, row, 0]) == 1, "an idle citizen voids the pass"
+    print("  9 the citizens OK (5 -> 3; the whole-city pass 2 -> 2; the idle citizen 3 -> 1; "
+          "the unfinished district removed; fallout 20 stays 20)")
 
     print("BATTERY OK nuke")
     return 0

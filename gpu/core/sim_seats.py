@@ -11478,9 +11478,13 @@ class SimSeats:
         an Encampment is left with. The device is spent whether or not it
         found anything.
 
-        NOT here, and recorded rather than approximated: "Citizens 'working'
-        the affected tiles are eliminated" — neither engine exposes a
-        worked-tile SELECTION outside its own yield walk."""
+        Measured live (lab 3): an UNFINISHED district in the blast is removed
+        (its hammers bank), a complete one only pillaged; fallout never
+        SHORTENS a plot; and the population loss — a city loses the citizens
+        it has WORKING tiles inside the blast (the centre never counts, a
+        neighbouring city pays for its own citizen there), skipped WHOLE when
+        that number is the city's whole population. The pick is the loop-top
+        snapshot `city_worked` (TS `workedTiles`); city-states record none."""
         fire = fire & (self.civ_wmd[:, row, k] > 0)
         if not bool(fire.any()):
             return
@@ -11543,10 +11547,30 @@ class SimSeats:
         # buildings in the affected tiles are also pillaged", and "all tiles
         # affected are contaminated with radioactive fallout".
         self.pillaged |= blast & (self.improvement >= 0)
+        # an unfinished district is REMOVED (its hammers bank — the
+        # `wipeConstruction` twin); a complete one is pillaged with the rest
+        dig = blast & (self.district >= 0) & ~self.district_complete
+        if bool(dig.any()):
+            di = dig.nonzero(as_tuple=False)
+            self._wipe_construction(di[:, 0], di[:, 1])
         self.district_pillaged |= blast & (self.district >= 0)
+        # exactly the blast rings, and never SHORTER than what already burns
         self.tile_fallout[:] = torch.where(
-            blast, torch.full_like(self.tile_fallout, int(self._nuke_fallout[k])),
+            blast, torch.maximum(self.tile_fallout,
+                                 torch.full_like(self.tile_fallout, int(self._nuke_fallout[k]))),
             self.tile_fallout)
+        # the population loss: killed = the city's worked tiles inside the
+        # blast (centre excluded); skipped whole where killed >= population
+        for r in range(self.n_majors):
+            wk = self.city_worked[:, r]                                   # [B, RC, K]
+            inb = ((wk >= 0)
+                   & blast.gather(1, wk.clamp(min=0).reshape(B, -1)).reshape(wk.shape)
+                   & (wk != self.city_center[:, r].unsqueeze(2)))
+            killed = inb.sum(dim=2)
+            pop = self.city_pop[:, r]
+            take = self.city_alive[:, r] & (killed > 0) & (killed < pop)
+            if bool(take.any()):
+                self.city_pop[:, r] = torch.where(take, pop - killed, pop)
         # CIV6: "Any City Centers or Encampments caught in the blast radius
         # will have their HP and Defense Strength reduced to 0" — a nuke never
         # CAPTURES, so each floors at 1 where every non-melee blow floors it.

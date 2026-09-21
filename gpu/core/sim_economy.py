@@ -4848,7 +4848,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == int(self._ROW_SEAT[row]))  # a tile names its holder by SEAT id
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self._work_ground(row) & ~self._fallout())
+            & gat(self._work_ground(row))  # a CONTAMINATED tile is still worked (measured live, lab 3)
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)
             & (gat(self.built_wonder) < 0)
@@ -5000,7 +5000,7 @@ class SimEconomy:
             (tiles >= 0)
             & (gat(self.tile_seat) == int(self._ROW_SEAT[row]))  # a tile names its holder by SEAT id
             & (gat(self.tile_city) == ids.unsqueeze(2))
-            & gat(self._work_ground(row) & ~self._fallout())
+            & gat(self._work_ground(row))  # a CONTAMINATED tile is still worked (measured live, lab 3)
             & (tiles != ctr.unsqueeze(2))
             & (gat(self.district) < 0)  # !t.district
             & (gat(self.built_wonder) < 0)  # !t.builtWonder

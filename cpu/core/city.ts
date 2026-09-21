@@ -38,7 +38,6 @@ import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, gpCityPermOf, gpPermOf } from '../data/greatPeople';
-import { irradiated } from './nuclear';
 export interface CityStats {
   city: City;
   housing: number;
@@ -166,9 +165,10 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       !t.district &&
       !t.builtWonder &&
       !t.submerged &&
-      // CIV6: contaminated tiles "cannot be worked by the city until the
-      // contamination timer expires or until the tile is cleaned".
-      !irradiated(t) &&
+      // a CONTAMINATED tile is still worked: measured live (lab 3 part two —
+      // every worked tile of a city contaminated by hand, the citizens stayed,
+      // the yields and the food surplus were unchanged); fallout hurts the
+      // units standing in it and nothing else
       (!isImpassable(t) || (mtnOk && isMountain(t) && !t.feature)),
   );
 }

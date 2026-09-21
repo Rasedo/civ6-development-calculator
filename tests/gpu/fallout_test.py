@@ -147,9 +147,9 @@ def main() -> int:
     _tiles, _valid = s5._work_window(row)
     tw = int(_tiles[b, 0][_valid[b, 0]][0])
     s5.tile_fallout[b, tw] = 4
-    assert int(s5._workable_count(row)[b, 0]) == before - 1, \
-        "CIV6: a contaminated tile cannot be worked"
-    assert not bool(s5._district_elig(row, 0, 0)[b, tw]), "and takes no district"
+    assert int(s5._workable_count(row)[b, 0]) == before, \
+        "measured live (lab 3): a contaminated tile is STILL worked — fallout hurts units alone"
+    assert not bool(s5._district_elig(row, 0, 0)[b, tw]), "but it takes no district"
     # the centre itself: no unit is raised there, and the city neither heals
     # nor repairs
     s5.tile_fallout[b, ctr] = 4
@@ -157,7 +157,7 @@ def main() -> int:
         "CIV6: fallout prevents producing or purchasing units there"
     assert not bool(s5._repair_available(row, 0)[b]), \
         "CIV6: Repair Outer Defenses is unusable while the fallout lasts"
-    print("  5 the ground is unusable OK (work, district, unit, repair)")
+    print("  5 the ground OK (still worked; no district, no unit, no repair)")
 
     # --- 6) CLEAN FALLOUT: any chassis with a charge left --------------------
     s6 = settle_all(fresh(rules, paths[0]))

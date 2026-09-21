@@ -47,7 +47,7 @@ re-adds them.
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
 | C-26 civilization abilities, the residue | 1 | three unread DLL clauses; the visibility gate's three requirement sets |
-| C-31 the nuclear strike's last clauses | 2 | the population loss, the unfinished district, the per-channel warhead defence |
+| C-31 the nuclear strike's last clause | 1 | the per-channel warhead defence |
 | C-34 air combat's second half | 2 | the interception law itself; Patrol and Priority Target carry no data |
 | C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
 | C-41 Volcanic Soil | 1 | the proportion painted per severity, and the severity roll itself (LAB) |
@@ -57,8 +57,8 @@ re-adds them.
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
 | C-80 constants vs the install | 2 | the purchase price, the Pop Star's tag, two rules the reader census names |
-| **C. Absent systems** | **19** | |
-| **OPEN, TOTAL** | **24** | |
+| **C. Absent systems** | **18** | |
+| **OPEN, TOTAL** | **23** | |
 
 ## The question ledger — owner asks
 
@@ -117,15 +117,7 @@ close in the same commit.
   - DLL, recorded: whether Trajan's grant fires on a CONQUERED city (`TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING` is `MODIFIER_PLAYER_CITIES_GRANT_CHEAPEST_BUILDING_IN_CITY`, Amount 1, no requirement set — founding ships); whether Iteru's flood avoid also skips the fertility half (the trait's modifiers are fourteen `TRAIT_FLOODPLAINS_VALID_*` placement rows and two `TRAIT_RIVER_FASTER_BUILDTIME_*` — NO modifier carries the avoid at all); whether the Knarr's Ocean clause reaches a Trader's course (`ABILITY_KNARR_IGNORE_EMBARK_DISEMBARK_COST` IS tagged onto `CLASS_LANDCIVILIAN`, which `UNIT_TRADER` carries, so the open half is only whether `MODIFIER_PLAYER_UNIT_ADJUST_IGNORE_SHORES` — no arguments — reaches a trade route's water path; `tradeWaterLevel` stays Cartography-gated).
   - BUILD, the residue: resource VISIBILITY ships for the seven strategics (`Resources.PrereqTech` — `hiddenResourcesFor` / `_res_hidden`: no tile yield, no improvement forced or offered, no access, no accrual, no Grand Bazaar count, and the Stave Church counts only the coastal resources its owner can see). A district or wonder may stand on a hidden strategic (the install allows it; the resource is lost). The adjacency and belief improvement clauses still read the resource whether or not the seat can see it on BOTH engines — and that is NOT a DLL question: `REQUIREMENT_PLOT_RESOURCE_VISIBLE` exists and is written EXPLICITLY into the three sets that want it (`PLOT_HAS_STRATEGIC_MINE_REQUIREMENTS` in `Beliefs.xml`, `STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS` in `Buildings.xml`, `PLOT_HAS_STRATEGIC_RESOURCE` in `Expansion1_Governors.xml`), so a requirement set that does not name it reads the resource regardless. Gate those three and nothing else. The two artifact resources' `PrereqCivic` gates have no reader (no archaeology here).
   - Recorded allowlist: a CITY's own ranged strike composes its defender without the roster's rows (`cityStrikeStrength`'s block in `seatPhase`; the site census in `combat-rows.test.ts` / `combat_rows_test.py` names it).
-- **C-31. THE NUCLEAR STRIKE'S LAST CLAUSES.** Weight 2.
-  - BUILD, the POPULATION LOSS — fifteen strikes, fifteen exact predictions, no residue:
-
-        killed = |{ tiles inside the blast worked by this city's citizens, CENTRE EXCLUDED }|
-        if killed >= city.population: killed = 0     # skipped WHOLE, never clamped to 1
-        city.population -= killed                    # on the strike tick; the food box is untouched
-
-    Three clauses each have their own measured row. The walk is over the BLAST's tiles asking which city works each one, not over the cities in the radius: a city whose centre was nowhere near the blast lost exactly the one citizen who worked a mine inside it. The centre tile must be excluded or a fully covered city comes out one too high and the gate fires wrongly. And the gate's left-hand side is the POPULATION, not the worked-tile count — one city struck twice thirty seconds apart went 10 -> 5 with five idle citizens and 5 -> 5 with none. Neither engine touches `city.population` in `detonate` / `_detonate`, and both say so in the same paragraph, so there is nothing to correct here, only something to add.
-  - BUILD, the rest of the blast, all measured: an UNFINISHED district inside the radius is REMOVED where a complete one is only pillaged; nothing else is ever destroyed — buildings, wonders and improvements inside the radius read pillaged and all still stand (a wonder answers the BUILDING's pillage flag, not the district's, which is what made an earlier reading say wonders were spared); contamination is EXACTLY the blast rings (7 at radius 1, 19 at radius 2, centred on the AIM PLOT) for the weapon's `FalloutDuration` 10 / 20; and fallout costs the tile NOTHING in yield and moves NO citizen — it is 50 damage a turn, cumulative and lethal, to a unit that ends its turn in it, and citizens go on working contaminated tiles.
+- **C-31. THE NUCLEAR STRIKE'S LAST CLAUSE.** Weight 1.
   - BUILD, WHICH DELIVERY A COVER STOPS — C-34's law supplies it, and the community's per-delivery split is wrong. Every channel is the same anti-air attack; what changes is the warhead's DEFENCE: the delivering unit's own `Combat` for a BOMBER (85, Jet Bomber 90), a flat 75 for a MISSILE SILO and 80 for a NUCLEAR SUBMARINE, the two ICBM channels further REDUCED by the aim plot's terrain + feature `DefenseModifier` (rough ground makes a nuke easier to shoot down; the bomber channel takes no tile term because the anti-air attacks the aircraft, which stands nowhere). The bomber's "drop stopped under 50% HP" reading is wrong — the interceptor attacks the bomber and the DAMAGE decides. A silo or submarine launcher is never damaged; the device is spent either way; a warhead cannot be aimed within its own blast radius of the silo that fires it, and a silo may fire at any REVEALED plot in range, visible or not.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
   - BUILD, INTERCEPTION — measured against the game's own deterministic preview and 60 of 60 pre-registered live rounds. Every unit with `AntiAirCombat > 0` covers the SIX TILES ADJACENT to it and nothing beyond, whatever its class or domain: the Anti-Air Gun and Mobile SAM, the Giant Death Robot, and the Destroyer, Battleship, Minas Geraes and Missile Cruiser on water over a land aim alike (`ABILITY_ANTI_AIR_COVER` carries no radius of its own, and the `Range` column is the ranged attack's, not the cover's). One attack is made on the warhead, one rng draw:

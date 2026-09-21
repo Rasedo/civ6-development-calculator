@@ -73,6 +73,7 @@ describe('the blast', () => {
     at.improvement = 'FARM';
     const nb = tileAtCoords(state.map, 11, 8);
     nb.district = 'CAMPUS';
+    nb.districtComplete = true;   // a COMPLETE district is pillaged; an unfinished one is removed
     addWmd(state, 0, DEV, 1);
     detonate(state, 0, DEV, at.index);
     expect(at.pillaged).toBe(true);
@@ -210,5 +211,86 @@ describe('who throws it', () => {
     expect(nukeTargets(state, bomber, DEV, 12)).toEqual([]);
     addWmd(state, 0, DEV, 1);
     expect(nukeTargets(state, bomber, DEV, 12)).toContain(theirs.index);
+  });
+});
+
+// Measured live (lab 3, fifteen strikes, fifteen exact): the population rule
+// and the rest of the blast.
+describe('what the citizens pay', () => {
+  function scene() {
+    const state = world();
+    const mine = seatOf(state, 0)!.cities[0];
+    const aim = tileAtCoords(state.map, 6, 4);   // two east of the centre at (4,4)
+    const blast = nukeBlast(state, aim.index, DEV).map((t) => t.index);
+    expect(blast).not.toContain(mine.centerIndex);
+    const inside = blast.filter((i) => i !== aim.index).slice(0, 2);
+    const outside = tileAtCoords(state.map, 1, 1).index;
+    addWmd(state, 0, DEV, 3);
+    return { state, mine, aim, blast, inside, outside };
+  }
+
+  it('a city loses the citizens working tiles inside the blast; its centre never counts', () => {
+    const { state, mine, aim, inside, outside } = scene();
+    mine.population = 5;
+    mine.workedTiles = [...inside, outside, mine.centerIndex];
+    detonate(state, 0, DEV, aim.index);
+    expect(mine.population).toBe(3);
+    // the pick stands until the next walk re-seats the survivors
+    expect(mine.workedTiles).toEqual([...inside, outside, mine.centerIndex]);
+  });
+
+  it('kills nobody when every citizen it has stands inside the blast, and an idle citizen voids the pass', () => {
+    const { state, mine, aim, inside } = scene();
+    mine.population = 2;
+    mine.workedTiles = [...inside];
+    detonate(state, 0, DEV, aim.index);
+    expect(mine.population).toBe(2);
+    mine.population = 3;   // two workers, one citizen on no tile
+    detonate(state, 0, DEV, aim.index);
+    expect(mine.population).toBe(1);
+  });
+
+  it('a neighbouring city pays for its own citizen standing in the blast', () => {
+    const { state, aim, inside } = scene();
+    const foe = seatOf(state, 1)!.cities[0];
+    foe.population = 4;
+    foe.workedTiles = [inside[0]];
+    detonate(state, 0, DEV, aim.index);
+    expect(foe.population).toBe(3);
+  });
+
+  it('removes an unfinished district, only pillages a complete one, and never shortens fallout', () => {
+    const { state, aim, blast } = scene();
+    const ud = state.map.tiles[blast.find((i) => i !== aim.index)!];
+    const cd = state.map.tiles[blast.filter((i) => i !== aim.index)[1]];
+    ud.district = 'CAMPUS';
+    ud.districtComplete = false;
+    cd.district = 'CAMPUS';
+    cd.districtComplete = true;
+    aim.falloutTurns = 20;
+    detonate(state, 0, DEV, aim.index);
+    expect(ud.district).toBeNull();
+    expect(ud.districtPillaged).toBeFalsy();
+    expect(cd.district).toBe('CAMPUS');
+    expect(cd.districtPillaged).toBe(true);
+    expect(aim.falloutTurns).toBe(20);
+    expect(ud.falloutTurns).toBe(NUCLEAR_DEVICES[DEV].fallout);
+  });
+
+  it('a silo cannot aim inside its own blast radius, nor at a plot the seat has not revealed', () => {
+    const state = world();
+    const silo = tileAtCoords(state.map, 6, 6);
+    setTileOwner(silo, 0);
+    silo.improvement = 'MISSILE_SILO';
+    addWmd(state, 0, DEV, 1);
+    const adjacent = tileAtCoords(state.map, 7, 6);
+    const clear = tileAtCoords(state.map, 8, 6);
+    expect(siloReaches(state, 0, DEV, adjacent.index)).toBe(false);
+    expect(siloReaches(state, 0, DEV, clear.index)).toBe(true);
+    state.fogOfWar = true;
+    seatOf(state, 0)!.explored = new Array(state.map.tiles.length).fill(0);
+    expect(siloReaches(state, 0, DEV, clear.index)).toBe(false);
+    seatOf(state, 0)!.explored[clear.index] = 1;
+    expect(siloReaches(state, 0, DEV, clear.index)).toBe(true);
   });
 });

@@ -3882,13 +3882,19 @@ class SimMasks:
         """[B, T] bool — `siloReaches`: an unpillaged MISSILE SILO this seat
         owns stands within the device's own Range of the tile. CIV6: "When
         deployed from a Missile Silo or a Nuclear Submarine, they have a Range
-        of 12" / "of 15"."""
+        of 12" / "of 15". Measured live (lab 3, silo controls): the aim may
+        not lie within the device's own BLAST RADIUS of the firing silo, and
+        it must be REVEALED to the seat (current visibility not required)."""
         if self._silo_iid < 0:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         silo = ((self.improvement == self._silo_iid) & ~self.pillaged
                 & (self.tile_seat == row)).to(torch.float32)
-        near = (self.pair_dist <= int(self._nuke_range[k])).to(torch.float32)
-        return (silo @ near) > 0
+        near = ((self.pair_dist <= int(self._nuke_range[k]))
+                & (self.pair_dist > int(self._nuke_radius[k]))).to(torch.float32)
+        reach = (silo @ near) > 0
+        if self.fog_of_war:
+            reach = reach & self.seat_explored[:, row]
+        return reach
 
     def _nuke_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                       utype: torch.Tensor) -> torch.Tensor:

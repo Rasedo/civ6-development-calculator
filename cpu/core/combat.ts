@@ -35,7 +35,8 @@ import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
-import { revealAround, unexploredByAll } from './fog';
+import { isExplored, revealAround, unexploredByAll } from './fog';
+import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
   attacksLeftOf, attacksPerTurn,
@@ -2179,13 +2180,19 @@ export function siloTiles(state: GameState, seat: number): Tile[] {
 }
 
 /** CIV6: "When deployed from a Missile Silo ... they have a Range of 12" /
- *  "of 15", measured from whichever silo is nearest. */
+ *  "of 15", measured from whichever silo is nearest. Measured live (lab 3,
+ *  silo controls): a warhead cannot be aimed within its own BLAST RADIUS of
+ *  the silo firing it, and the aim plot must be REVEALED to the seat —
+ *  current visibility is not required. `_silo_reach` is the twin. */
 export function siloReaches(state: GameState, seat: number, k: number, tileIndex: number): boolean {
   const def = NUCLEAR_DEVICES[k];
   const at = state.map.tiles[tileIndex];
   if (!def || !at) return false;
-  return siloTiles(state, seat).some(
-    (s) => hexDistance(s.col, s.row, at.col, at.row) <= def.range);
+  if (!isExplored(state, seat, tileIndex)) return false;
+  return siloTiles(state, seat).some((s) => {
+    const d = hexDistance(s.col, s.row, at.col, at.row);
+    return d <= def.range && d > def.radius;
+  });
 }
 
 /** the k-th legal silo target, tile index ascending and cut to `width`. */
@@ -2214,18 +2221,25 @@ export function siloTargets(state: GameState, seat: number, k: number, width: nu
  *     can survive a nuclear strike. A Nuclear Device or Thermonuclear Device
  *     does 50 damage to it";
  *   * "all tile improvements are pillaged ... and any Districts and buildings
- *     in the affected tiles are also pillaged";
+ *     in the affected tiles are also pillaged" — measured live (lab 3): never
+ *     destroyed, a wonder like any building; a district still UNDER
+ *     CONSTRUCTION is removed outright, its hammers banked; routes untouched;
  *   * "all tiles affected are contaminated with radioactive fallout" for the
- *     device's own count of turns;
+ *     device's own count of turns — exactly the blast rings, and a shorter
+ *     device never SHORTENS a plot already burning longer;
+ *   * "Citizens 'working' the affected tiles are eliminated" — measured live
+ *     (lab 3, fifteen strikes, fifteen exact): a city loses the citizens it
+ *     has WORKING tiles inside the blast (its centre is worked by nobody and
+ *     never counts; a neighbouring city pays for the citizen it has standing
+ *     in the blast); if that number is the city's whole POPULATION the strike
+ *     kills nobody at all — skipped whole, not floored — so an idle or
+ *     specialist citizen turns a free pass into a full kill. It lands on the
+ *     strike tick, the food box is untouched, and the citizens stay on the
+ *     contaminated tiles until the next walk re-seats them;
  *   * "Any City Centers or Encampments caught in the blast radius will have
  *     their HP and Defense Strength reduced to 0" — a nuke never CAPTURES, so
  *     the centre floors at 1 where every other non-melee blow floors it, and
- *     the perimeter pool empties;
- *
- * NOT here: "Citizens 'working' the affected tiles are eliminated". Neither
- * engine exposes a worked-tile SELECTION outside its own yield walk, so there
- * is no assignment both could read the same way; the loss is recorded rather
- * than approximated.
+ *     the perimeter pool empties.
  *
  * The device is spent whether or not it found anything.
  */
@@ -2259,12 +2273,23 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
       killUnit(state, u);
     }
     if (tile.improvement) tile.pillaged = true;
+    // an unfinished district is REMOVED (its hammers bank); a complete one is
+    // pillaged like everything else the ground carries
+    if (tile.district && !tile.districtComplete) wipeConstruction(state, tile);
     if (tile.district) tile.districtPillaged = true;
-    tile.falloutTurns = def.fallout;
+    tile.falloutTurns = Math.max(tile.falloutTurns ?? 0, def.fallout);
     if (tile.district === 'ENCAMPMENT') {
       tile.encampHp = Math.min(tile.encampHp ?? ENCAMPMENT_HP, 1);
       tile.encampOuterHp = 0;
     }
+  }
+  // the population loss — the pick is the loop-top SNAPSHOT both engines
+  // record (`workedTiles` / `city_worked`), walked per city over the blast;
+  // city-states record no pick and lose nobody on either engine
+  for (const city of allCities(state)) {
+    let killed = 0;
+    for (const w of city.workedTiles ?? []) if (hit.has(w) && w !== city.centerIndex) killed++;
+    if (killed > 0 && killed < city.population) city.population -= killed;
   }
   for (const city of allCities(state)) {
     if (!hit.has(city.centerIndex)) continue;
