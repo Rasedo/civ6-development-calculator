@@ -1,0 +1,19 @@
+{"scene":"C-80 rule 2","kind":"note","what":"a city-state's owned plots per ENVOY received. Minor 8 AKKAD, pop 4 throughout, one city, no turns passed (all readings on turn 111). Envoys sent from player 0 with UI.RequestPlayerOperation(0, PlayerOperations.GIVE_INFLUENCE_TOKEN, {[PlayerOperations.PARAM_PLAYER_ONE]=8}); the pool topped up with Players[0]:GetInfluence():ChangeTokensToGive(n) in GameCore_Tuner. Plots counted by walking Map.GetPlotByIndex(i):GetOwner()==8."}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":2,"suzerain":-1,"plots":9}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":3,"suzerain":0,"plots":9}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":4,"suzerain":0,"plots":10}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":5,"suzerain":0,"plots":11}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":6,"suzerain":0,"plots":12}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":7,"suzerain":0,"plots":13}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":8,"suzerain":0,"plots":14}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":9,"suzerain":0,"plots":15}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":10,"suzerain":0,"plots":16}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":11,"suzerain":0,"plots":17}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":12,"suzerain":0,"plots":18}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":13,"suzerain":0,"plots":19}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":14,"suzerain":0,"plots":20}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":15,"suzerain":0,"plots":21}
+{"scene":"C-80 rule 2","turn":111,"minor":8,"envoys":16,"suzerain":0,"plots":22}
+{"scene":"C-80 rule 2","kind":"fit","slope":1.0,"intercept":6,"range":"envoys 3..16","cap":"none observed through 16 envoys","note":"plots = envoys + 6 exactly for every reading from 3 envoys on; the 2-envoy reading (9) is one tile ahead of the line, the first give's tile landing on the same tick as the suzerainty change. Suzerainty (envoy 3) does not change the slope; envoys past it keep paying."}
+{"scene":"C-80 rule 2","kind":"context","turn":111,"minors":[{"p":4,"civ":"NGAZARGAMU","mostReceived":6,"plots":12},{"p":5,"civ":"ANTANANARIVO","mostReceived":3,"plots":9},{"p":6,"civ":"NAN_MADOL","mostReceived":6,"plots":12},{"p":7,"civ":"ARMAGH","mostReceived":5,"plots":9},{"p":9,"civ":"MUSCAT","mostReceived":7,"plots":13}],"note":"untouched minors, for scale; mostReceived is the largest single donor, not the total"}
+{"scene":"C-80 rule 2","kind":"install","what":"Civilizations.xml CivilizationLevels: CIVILIZATION_LEVEL_CITY_STATE has CanAnnexTilesWithReceivedInfluence=true and StartingTilesForCity=5 (a full civ has 6 and the flag false); CIVILIZATION_LEVEL_FREE_CITIES (Expansion1_Civilizations.xml) has the flag false and StartingTilesForCity=0"}

@@ -1,190 +1,131 @@
-# Lab session 2 — the scene list
+# The lab's open scenes
 
-Written 2026-09-14. The ledger's eight "ruling" lines were classified against
-the INSTALL on 2026-09-09; the live-game oracle came up on 2026-09-13, after
-that pass, and six of the eight are facts the game will state when asked
-(the seventh, ask 6's opinion deltas, left the list on 2026-09-20: the
-opinion scale is the game's AI, not its engine). This is the order to ask
-them in, one scene each, highest yield per minute first. The carry-overs
-from session 1 close the list.
+What sessions 2 and 3 did NOT close. Everything else that was on this list —
+the Free City trio (asks 10, 12, 13), the Encampment's pools on a capture
+(ask 2), the blast and its population rule (ask 5), the majority religion
+(ask 3), the purchase price, the Pop Star, the research agreement, the
+reactor's clock, gates and payloads (ask 4), and the envoy slope
+(C-80 rule 2) — is measured, and the record is `reports/lab2_report.md` and
+`reports/lab3_report.md`.
 
-Every Lua call named below is the panel's spelling as far as the first
-session used it; anything not exercised on 2026-09-13 is marked VERIFY and
-the `Debug\*.ltp` panel for the object is the reference — open it before
-typing the call, never guess a method name into a running game.
+Before anything: `python tools/civ6lab/lab.py probe` green, a named save
+written, no battery while the game has the box. The calls, the failures and
+the traps are in `README.md`; read them before typing a call into a running
+game.
 
-## Before anything
+The placement API (`city:GetBuildQueue():CreateDistrict/CreateBuilding`,
+`WorldBuilder.CityManager():SetCityValue`) changed the price of most of what
+is left: districts, buildings and population can be built from the socket, so
+"needs a later save" is no longer a real blocker for anything here.
 
-1. Launch, load a Gathering Storm game with at least four majors met and
-   one Encampment standing somewhere (a save past turn 100 is ideal).
-   `python tools/civ6lab/lab.py probe` green.
-2. Write a named save. Every destructive scene below (capture, nuke,
-   loyalty flip) reloads from it — do not run them in sequence on one
-   timeline.
-3. No battery while the game has the box.
+## 1. Ask 14 — the escape roll's scale
 
-Standing traps (all paid for on 2026-09-13):
+Thirty escape routes is the sample the entry asks for, and the blocker was
+only ever the number of runs: a Spy can be BOUGHT in one call
+(`CityCommandTypes.PURCHASE`) and gold set with `SetGoldBalance`, which
+satisfies "trained in a city" without waiting out a build. A socket-SPAWNED
+spy still crashes the game on a capture/kill route — that boundary stands.
+`spy_start.lua` runs the missions, `spy_history.lua` reads them, `escape_fit.py`
+fits the rates.
 
-* Two military units spawned on ONE tile before Autoplay hang the AI turn
-  forever — one spawn per tile, always.
-* `SetReturnAsPlayer` must never see -1 — `lab.py advance` refuses it; do
-  not hand-roll an Autoplay call.
-* Refusal texts arrive in cp1251 on this box.
-* Socket-spawned spies crash the game on a capture/kill escape route — a
-  spy used in any scene is TRAINED in a city and travelled in.
+## 2. The counterspy term — whether it enters the ROLL
 
-## Scene B — asks 10, 12, 13, the Free City trio (GameCore + InGame)
+Settled negatively for the ODDS: with a counterspy assigned,
+`GetResultProbability` is byte-identical to the undefended baseline, on the
+same turn and a turn later. What is not settled is whether the counterspy
+enters the actual roll, and it needs real missions against a city whose
+counterspy can be confirmed standing — **and no such reader exists**: a spy
+put on counterspy duty vanishes from the unit list by the next turn, on both
+the AI's side and mine. Either find the reader or accept the negative.
 
-One setup answers three lines.
+## 3. The reactor's per-turn accident probability
 
-* Pick a city of a major far from its capital. Drive its loyalty down from
-  the socket (VERIFY in the City panel: `city:GetCulturalIdentity()` and
-  its loyalty setter/changer) and pass turns until it flips; note the
-  turn. The Free Cities player is `PlayerManager.GetFreeCitiesPlayerID()`
-  (VERIFY).
-* Ask 12 — amenities: on the flip turn and five turns later read the
-  city's `GetGrowth():GetAmenities()`, `GetAmenitiesNeeded()` and the
-  happiness/tier the UI shows (VERIFY the tier getter). Compare with what
-  the same city read the turn before the flip.
-* Ask 13 — defence: read the city's defence strength and outer/garrison
-  hit points before and after (VERIFY: the City panel's combat getters),
-  whether Walls stand (`GetBuildings():HasBuilding(...)`), then watch 15
-  turns with a `cs_probe.lua`-shaped loop over the Free Cities player:
-  what it trains, when, and whether it strikes a unit parked beside it
-  (one unit, one tile).
-* Ask 10 — spy ground: a spy TRAINED in one of the human's cities; from
-  InGame list `UnitManager.GetOperationTargets(spy, UnitOperationTypes.SPY_TRAVEL_NEW_CITY)`
-  (VERIFY the operation row name) and see whether the Free City is
-  offered; if it is, travel there and list which missions the city offers
-  and `GetResultProbability` for each.
-* Record to `runs/freecity_<stamp>.jsonl`.
+Gates and payloads are measured. What is open is how often the GAME fires one
+by itself: five reactors past every gate produced **zero** accidents in ~150
+reactor-turns (a 95% bound under 2% per reactor-turn) while 17 other random
+events fired in the same window. Two things a run must separate:
 
-Closes: ask 10 (open or closed), ask 12 (the tier), ask 13 (what it
-spawns, the cadence, the walls, the strike target).
+* rarity from exhaustion — `OccurrencesPerGame` may be a per-game budget, and
+  the two accidents I forced both landed in the event log, so the game may
+  have counted them spent. **A fresh game with reactors and no forced events
+  is the only clean test.**
+* the weight reading predicts the accident's share of the one-event-per-turn
+  draw rises with the number of eligible reactors. The district is
+  `OnePerCity`, so N reactors is N cities — cheap, since cities can be founded
+  from the socket.
 
-## Scene C — ask 2, the Encampment's pool on a capture (GameCore)
+## 4. The reactor payloads: the XML rows do not carry what was measured
 
-* Find a city with an Encampment. Read, per district, garrison and outer
-  damage (VERIFY: `district:GetDamage(DefenseTypes.DISTRICT_GARRISON)` /
-  `DISTRICT_OUTER` and `GetMaxDamage`) and the city centre's.
-* Spawn ONE strong melee unit per adjacent tile for the human (never two
-  on a tile), knock the centre down and take it with `UnitManager.RequestOperation`
-  (VERIFY the city-attack operation row) — or, cheaper, set the centre's
-  damage from the socket and take it with one attack.
-* Read every district's damage again on the capture turn and the turn
-  after. The question is whether the Encampment's garrison/outer pools
-  zero, ride through, or heal; B-51r today zeroes the centre's outer pool
-  and lets the district's own ride.
+`Expansion2_RandomEvents.xml`'s three `NUCLEAR_ACCIDENT` rows ship
+`Duration`, `Hexes`, `Spacing` and `ChanceIncreasePerDegree` all **0**, and
+there is no chance column at all — yet the measured payloads are 2 / 10 / 20
+turns of fallout on exactly one plot, −1 population at severity 2 and the
+Industrial Zone pillaged at severity 2. So the payload is DLL-side and the XML
+row cannot be its source. One sub-question rides on the same run: the
+per-severity BUILDING pillage flags went `err → true` for the Factory and the
+Power Plant at every severity and for the Workshop only at catastrophic, but
+`city:GetBuildings():IsPillaged(hash)` **throws** for a building made by
+`CreateBuilding` until the game pillages it — that reader was erroring a moment
+before it answered, so the row is the one line of part three I would re-measure
+before shipping.
 
-Closes: ask 2 (B-51r).
+## 5. The envoy's tile — WHICH tile, not how many
 
-## Scene D — ask 5, a wonder in the blast (GameCore)
+The slope is measured: +1 owned plot per envoy, no cap through 16, unchanged
+by suzerainty. What no reading covers is which plot the city-state takes —
+the ring order, the yield preference, whether it prefers the side its capital
+faces. `envoy_step.lua` already records the owned-plot set before and after
+each give, so the scene is a re-run with the plot DIFF kept rather than the
+count.
 
-* Grant a nuclear device to the human (VERIFY in the Player/WMD panel:
-  `Players[p]:GetWMDs()` and its count changer) and a delivery unit with
-  range on the target (a Bomber based in range, or a Missile Silo).
-* Build the scene at a rival city with a WONDER on a tile 1 from the
-  centre: one unit per tile at ring 0, 1 and 2 (theirs; spawn for that
-  player), an improvement in each ring.
-* Strike the centre (VERIFY `UnitOperationTypes.WMD_STRIKE` and its
-  parameter table). Read: is the wonder tile pillaged; which units died
-  per ring; the city's population and damage; fallout plots and their
-  duration.
-* Reload and repeat at least three times: the per-ring kill is a
-  PROPORTION (C-31 already knows the blast shape; what is unsourced is how
-  many die per ring), and three draws are the minimum that says anything.
-* Record to `runs/nuke_<stamp>.jsonl`.
+## 6. The 0.07 strength residual — how hills and a feature combine
 
-Closes: ask 5 (C-31), both halves.
+The ICBM warhead defence is `D = base - (aim plot terrain + feature
+DefenseModifier)` with base 75 (silo) and 80 (submarine), pinned on a bare
+tile. Terrain-only +3 and feature-only +3 each behave exactly as +3. The one
+tile that wobbles is the STACKED one — Plains Hills + Jungle, nominal +6,
+which implies an effective bonus of about **5.93**. The residual is 0.07 of a
+strength point and it sits in the COMBINATION rule, not in the warhead.
+`plot_defence.lua` plus a health sweep that walks the flip to n = 10/11 (where
+consecutive damages differ by 2.9%) is the instrument; a second stacked pairing
+(hills + forest, hills + marsh) would say whether it is a rounding of the sum
+or a different stacking rule.
 
-## Scene E — ask 3, the majority-religion tie (GameCore)
+## 7. Two shipped combat constants nobody has located
 
-* One city, two religions: push pressure from the socket until the
-  follower counts are EQUAL (VERIFY: `city:GetReligion()` and its pressure
-  adder; read `GetMajorityReligion()` and the per-religion followers).
-  Note which wins — then swap which religion reached the count first, and
-  which has the lower id, to separate the two candidate rules.
-* Civ-wide: two cities, each majority of a different religion; read the
-  player's majority (VERIFY: `Players[p]:GetReligion():GetReligionInMajorityOfCities()`).
-  Same two swaps.
-* Record the four readings.
+`COMBAT_DAMAGE_MULTIPLIER_MINIMUM = 0.25` and `COMBAT_POWER_DAMPENER = 5` are
+in `GlobalParameters.xml` and neither has been found in a measured path — the
+0.25 demonstrably does NOT floor the unit-vs-unit damage multiplier (a Warrior
+previews **1** damage against a Giant Death Robot, not 7.5). Whatever they
+clamp, it is something else. `SimulateAttackInto` is deterministic, so this is
+a sweep, not a battery.
 
-Closes: ask 3 (C-64).
+## 8. The anti-air support term, to the point
 
-## Scene F — ask 4, per-plant reactor accidents (GameCore, HALF)
+Eleven of thirteen support rows fit `+5 * hp/100` exactly; the 33 HP and 50 HP
+single-supporter rows sit about 0.3 strength low. Sub-unit and unexplained.
+Worth one more sweep only if an engine ever needs the support term to the point.
 
-Only if a late save with several Nuclear Power Plants exists; otherwise
-skip — building one from the socket is not worth the session. Watch n
-plants over m turns and count accidents per plant: independence per plant
-is the measurable half. The other half — whether THIS engine rolls per
-object or scales one per-game rate — stays a modelling ruling and the
-owner's.
+## 9. The Nuclear Emergency
 
-## Scene G — the purchase price (GameCore or InGame), from the provenance round
+`Game.GetEmergencyManager():GetEmergencyInfoTable(0)` came back empty after 21
+warheads, which is one reader on one seat rather than a verdict. Both engines
+raise `EMERGENCY_NUCLEAR` at the end of `detonate`, so it wants a second look
+with the World Congress state read as well.
 
-The engine buys at production cost × 4 (gold) and × 2 (faith); the install
-publishes GOLD_PURCHASE_MULTIPLIER 2 and PURCHASE_DIVISOR 5 and no faith
-row — the price is a DLL formula, and the owner ruled "prefer Civ 6", so it
-is measured, not argued.
+## 10. Loose ends recorded rather than pursued
 
-* In one city read the gold and faith purchase price of three units and
-  three buildings of different production costs (VERIFY in the City panel:
-  `city:GetGold():GetPurchaseCost(YieldTypes.YIELD_GOLD, hash, MilitaryFormationTypes.STANDARD_FORMATION)`
-  and the faith twin; the production cost from `GameInfo.Units[...].Cost`).
-* Repeat with the city's production already partly invested in the item
-  (the price should fall with progress — read it before and after a turn).
-* Record (item, cost, gold price, faith price, progress) to
-  `runs/purchase_<stamp>.jsonl`; a fit against `cost × m / d` with the two
-  GlobalParameters closes constants.GOLD_PURCHASE_MULT / FAITH_PURCHASE_MULT.
-
-## Scene H — the Pop Star's gold (InGame), from the provenance round
-
-The catalog says 25, the install's ROCKBAND_POP writes −75 on a tourism-bomb
-gold yield, and the relation is unverified. One Rock Band with the Pop Star
-promotion, one concert at a foreign wonder: read the gold the concert pays
-against the same concert without the promotion. Two draws is enough for a
-percentage.
-
-## Scene I — the Research Agreement's clock (InGame), from AUDIT C-2
-
-Both engines bank `DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE` (10) of the
-two parties' combined science per turn against the target technology's
-cost — a READING of "The more expensive the technology, the longer the
-agreement will take"; the install publishes no duration.
-
-* Two civilizations past Scientific Theory, Declared Friends. Open the deal
-  screen, add a Research Agreement, pick a target technology: the screen
-  states the number of TURNS. Record (target tech, its cost at this speed,
-  player science/turn, partner science/turn, turns shown).
-* Repeat with a dearer target and with a partner of very different science
-  (the two readings the formula must separate: combined science, or the
-  initiator's alone; a percentage of the cost per turn, or of the science).
-* Accept one and count the turns to the "scientific breakthrough" notice;
-  confirm both parties received the Eureka (VERIFY: `pPlayer:GetTechs():HasBoostBeenTriggered(techIndex)`).
-* Record to `runs/research_agreement_<stamp>.jsonl`; a fit closes or
-  corrects `RESEARCH_AGREEMENT_PCT`'s reading on both engines.
-
-## Carry-overs from session 1
-
-* Ask 14 — the escape roll's scale: spies TRAINED in a city, travelled in,
-  missions run until a capture/kill route resolves; the crash was the
-  socket-spawned spy's missing origin. Thirty routes is the sample the
-  entry asks for; `escape_fit.py` fits them.
-* The counterspy term: one route with a counterspy in the target district,
-  one without, same level — the difference is the term.
-* C-80 rule 2 — a city-state's tiles per ENVOY (`CanAnnexTilesWithReceivedInfluence`):
-  count a minor's owned plots, send one envoy from the socket, count again;
-  repeat to six envoys and past suzerainty. The slope is the channel's
-  magnitude; whether it caps, its cap.
-* Ask 9 — the city-state's buy rule: kill a minor's army from the socket
-  and run `cs_probe.lua` every turn for 30 turns; the trigger count and
-  the chassis bought are the magnitude C-38 lacks.
-
-## What each answer changes
-
-Every line here, once measured, is written into its AUDIT entry the way
-asks 1, 7, 11, 15 and 16 were on 2026-09-13, and the ledger row leaves.
-Scenes B and C each unblock a build on both engines (C-60/C-16, B-51r);
-D and E close an open item without new code beyond a table. (Scene A, the
-opinion deltas, left on 2026-09-20: the opinion scale is the game's AI, not
-its engine.)
+* **Ask 9, the city-state's spending watch** — banks were snapshotted at turns
+  131 and 173 and recorded. What it would measure is what a city-state CHOOSES
+  to spend on, i.e. AI behaviour, which the owner's 2026-09-20 ruling puts out
+  of scope; the engine-side halves (income, unit upkeep) are already modelled.
+  It stays here only so nobody re-opens it as an engine question.
+* **The tribal-village draw** — one pop (seed 5983) fired with no visible
+  payout and is unexplained; the magnitudes (SMALL gold 20, MEDIUM gold 37,
+  SMALL faith 10) were sampled at one era only.
+* **Experience** — the amount is not drawn and the engine's own preview is
+  seed-invariant, but no melee was made to RESOLVE from the socket, so
+  "the engine applies the number it previews" is inferred, not counted.
+* **The espionage roll** — it happens at the COMPLETION turn, where the stream
+  is shared with every other actor, so seed accounting cannot isolate it. Only
+  a real-mission sample can say what it consumes.

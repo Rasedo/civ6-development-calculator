@@ -1,0 +1,50 @@
+﻿war p6=true
+war p3=true
+war p1=true
+war p9=true
+war p2=true
+warheads thermo=35 nuclear=35
+bombers 10 at 21:22
+scout for nanmadol at 17:23
+{"scene":"D","kind":"wave-setup","tag":"nanmadol","city":"LOC_CITY_NAME_NAN_MADOL","owner":6,"x":17,"y":25,"popWanted":4,"popWas":7,"popNow":4,"scoutPlaced":true}
+scout for montrose at 11:21
+{"scene":"D","kind":"wave-setup","tag":"montrose","city":"LOC_CITY_NAME_MONTROSE","owner":3,"x":12,"y":23,"popWanted":8,"popWas":8,"popNow":8,"scoutPlaced":true}
+{"scene":"D","kind":"wave-setup","tag":"tokyo","city":"LOC_CITY_NAME_TOKYO","owner":1,"x":23,"y":26,"popWanted":12,"popWas":18,"popNow":12,"scoutPlaced":false}
+scout for muscat at 17:16
+{"scene":"D","kind":"wave-setup","tag":"muscat","city":"LOC_CITY_NAME_MUSCAT","owner":9,"x":18,"y":18,"popWanted":16,"popWas":12,"popNow":16,"scoutPlaced":true}
+scout for otsu at 29:18
+{"scene":"D","kind":"wave-setup","tag":"otsu","city":"LOC_CITY_NAME_OTSU","owner":1,"x":30,"y":20,"popWanted":20,"popWas":4,"popNow":20,"scoutPlaced":true}
+scout for meroe at 22:10
+{"scene":"D","kind":"wave-setup","tag":"meroe","city":"LOC_CITY_NAME_MEROE","owner":2,"x":22,"y":12,"popWanted":24,"popWas":7,"popNow":24,"scoutPlaced":true}
+{"scene":"D","kind":"one-strike","turn":124,"cx":17,"cy":25,"aimX":17,"aimY":25,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":3997711,"bomberDist":5,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"wave","stage":"s1-after-nanmadol","turn":124,"nanmadol":{"pop":4,"pillaged":"false"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s1-settle","turn":124,"nanmadol":{"pop":4,"pillaged":"false"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s1-poll1","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s1-poll2","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s1-poll3","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s1-poll4","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"one-strike","turn":124,"cx":12,"cy":23,"aimX":12,"aimY":23,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":4063255,"bomberDist":9,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll1","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll2","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll3","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll4","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll5","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll6","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll7","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll8","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll9","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":8,"pillaged":"false"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s2-montrose-poll10","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":12,"pillaged":"false"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"one-strike","turn":124,"cx":23,"cy":26,"aimX":23,"aimY":26,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":4128792,"bomberDist":4,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"one-strike","turn":124,"cx":18,"cy":18,"aimX":18,"aimY":18,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":4128792,"bomberDist":5,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"one-strike","turn":124,"cx":30,"cy":20,"aimX":30,"aimY":20,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":4128792,"bomberDist":10,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"one-strike","turn":124,"cx":22,"cy":12,"aimX":22,"aimY":12,"aimOffset":0,"wmd":"WMD_THERMONUCLEAR_DEVICE","bomber":4128792,"bomberDist":10,"aimRevealed":true,"can":true,"fired":true}
+{"scene":"D","kind":"wave","stage":"s3-poll1","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll2","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll3","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll4","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll5","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll6","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll7","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll8","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll9","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}
+{"scene":"D","kind":"wave","stage":"s3-poll10","turn":124,"nanmadol":{"pop":4,"pillaged":"true"},"montrose":{"pop":1,"pillaged":"true"},"tokyo":{"pop":1,"pillaged":"true"},"muscat":{"pop":16,"pillaged":"false"},"otsu":{"pop":20,"pillaged":"false"},"meroe":{"pop":24,"pillaged":"false"}}

@@ -1,0 +1,562 @@
+{"kind":"rngstream","originalSeed":"-1559601962"}
+{"kind":"rngstream","pass":"A","seed":12345,"range":32768,"draws":[27118,21378,27442,1749,24847,8022,26254,22445,4205,22514,13526,19213,4879,10543,12937,16184,29500,23990,8830,26632,20479,11532,11735,16048]}
+{"kind":"rngstream","pass":"B","seed":12345,"range":32768,"draws":[27118,21378,27442,1749,24847,8022,26254,22445,4205,22514,13526,19213,4879,10543,12937,16184,29500,23990,8830,26632,20479,11532,11735,16048]}
+{"kind":"rngstream","seedBeforeDraw":"12345","firstDraw":27118,"seedAfterDraw":"-740551042"}
+{"kind":"rngstream","seedRestored":"-1559601962"}
+{"kind":"rate","turn":208,"maxTurns":"0","gameSpeed":"-1649545904"}
+{"kind":"rate","flood":"0","floodClimate":"0","storm":"0","drought":"0","eruption":"0","fire":"0","climateLevel":"0"}
+{"kind":"rate","realismIndex":"4","realism":"REALISM_SETTING_HYPERREAL"}
+{"kind":"rate","turn":209,"maxTurns":"0","gameSpeed":"-1649545904"}
+{"kind":"rate","flood":"6","floodClimate":"0","storm":"8","drought":"4","eruption":"0","fire":"2","climateLevel":"0"}
+{"kind":"survey","turn":209,"owner":0,"major":true,"city":"LOC_CITY_NAME_TENOCHTITLAN","x":39,"y":16,"pop":12,"districtsTotal":1,"districtsComplete":1,"centrePillaged":"false","housing":21,"food":62,"foodSurplus":-4,"amenities":8,"amenitiesNeeded":6}
+{"kind":"survey","turn":209,"owner":1,"major":true,"city":"LOC_CITY_NAME_LISBON_STK","x":8,"y":12,"pop":13,"districtsTotal":1,"districtsComplete":1,"centrePillaged":"false","housing":21,"food":0,"foodSurplus":0,"amenities":8,"amenitiesNeeded":7}
+{"kind":"survey","turn":209,"owner":2,"major":false,"city":"LOC_CITY_NAME_ANTIOCH","x":15,"y":12,"pop":13,"districtsTotal":1,"districtsComplete":1,"centrePillaged":"false","housing":21,"food":0,"foodSurplus":-11,"amenities":8,"amenitiesNeeded":7}
+{"kind":"survey","turn":209,"owner":3,"major":false,"city":"LOC_CITY_NAME_BOLOGNA","x":24,"y":18,"pop":13,"districtsTotal":1,"districtsComplete":1,"centrePillaged":"false","housing":19,"food":0,"foodSurplus":-15,"amenities":8,"amenitiesNeeded":7}
+{"kind":"survey","turn":209,"owner":4,"major":false,"city":"LOC_CITY_NAME_BANDAR_BRUNEI","x":25,"y":12,"pop":13,"districtsTotal":1,"districtsComplete":1,"centrePillaged":"false","housing":21,"food":0,"foodSurplus":-15,"amenities":8,"amenitiesNeeded":7}
+{"kind":"counterspy-setup","at":"8:12","attackerSpy":917504}
+{"kind":"spymission","op":"UNITOPERATION_SPY_SIPHON_FUNDS","spy":917504,"can":false,"canNoParams":false,"fired":false,"spyAt":"8:12","moves":1}
+{"kind":"seed","set":0,"seed":12345,"turn":209}
+{"kind":"builddistrict","city":"LISBON_STK","owner":1,"district":"DISTRICT_COMMERCIAL_HUB","plot":"7:11","ok":true,"ret":"true","has":true}
+{"kind":"spymission","op":"UNITOPERATION_SPY_SIPHON_FUNDS","spy":917504,"can":true,"canNoParams":true,"fired":true,"spyAt":"8:12","moves":1}
+{"kind":"seed","set":0,"seed":12345,"turn":209}
+{"kind":"goody","stage":"plant","turn":209,"mover":131073,"moverAt":"38:16","hutPlot":"37:16","hutImprovement":"IMPROVEMENT_GOODY_HUT","gold":278.50,"faith":1200.00,"units":13,"seed":12345}
+{"kind":"goodypop","unit":131073,"target":"37:16","can":true,"fired":true,"at":"38:16","moves":2}
+{"kind":"goodyread","stage":"after","turn":209,"hutPlot":"37:16","hutImprovement":"none","moverAt":"37:16","gold":278.50,"faith":1200.00,"units":14,"seed":2033392183}
+{"kind": "goody-battery", "seed": 7, "hut": "37:17", "draws": 2, "u": [0.79852, 0.14963], "goldBefore": "278.50", "goldAfter": "278.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 4242, "hut": "36:17", "draws": null, "u": [], "goldBefore": "278.50", "goldAfter": "278.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": false}
+{"kind": "goody-battery", "seed": 60001, "hut": "38:17", "draws": 2, "u": [0.1868, 0.20551], "goldBefore": "278.50", "goldAfter": "315.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 123123, "hut": "38:18", "draws": 2, "u": [0.25891, 0.45984], "goldBefore": "315.50", "goldAfter": "335.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 900001, "hut": "37:17", "draws": 2, "u": [0.20523, 0.85251], "goldBefore": "335.50", "goldAfter": "355.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 31, "hut": "38:18", "draws": 2, "u": [0.96487, 0.39667], "goldBefore": "355.50", "goldAfter": "355.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 500500, "hut": "39:19", "draws": 2, "u": [0.54846, 0.78809], "goldBefore": "355.50", "goldAfter": "355.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-battery", "seed": 8888, "hut": "38:19", "draws": 4, "u": [0.61307, 0.31732, 0.70486, 0.78101], "goldBefore": "355.50", "goldAfter": "355.50", "faithBefore": "1200.00", "faithAfter": "1200.00", "unitsBefore": "14", "unitsAfter": "14", "hist": "AT_CREW:1 BUILDER:2 MACHINE_GUN:3 SETTLER:3 SPEC_OPS:3 SPY:1 TRADER:1", "hutGone": true}
+{"kind": "goody-verify", "seed": 998, "predicted": "FAITH", "predictedSub": "SMALL", "goldDelta": 0.0, "faithDelta": 10.0, "unitDelta": 0, "observed": "FAITH", "hutGone": true}
+{"kind": "goody-verify", "seed": 6980, "predicted": "FAITH", "predictedSub": "SMALL", "goldDelta": 0.0, "faithDelta": 10.0, "unitDelta": 0, "observed": "FAITH", "hutGone": true}
+{"kind": "goody-verify", "seed": 12962, "predicted": "FAITH", "predictedSub": "SMALL", "goldDelta": 0.0, "faithDelta": 0.0, "unitDelta": 0, "observed": "none-visible", "hutGone": false}
+{"kind": "goody-verify", "seed": 5983, "predicted": "GOLD", "predictedSub": "SMALL", "goldDelta": 0.0, "faithDelta": 0.0, "unitDelta": 0, "observed": "none-visible", "hutGone": true}
+{"kind": "combat-endpoint", "seed": 26579, "u": 0.0, "damage": 0, "predPublished": 23, "predRival": 26}
+{"kind": "combat-endpoint", "seed": 23189, "u": 0.99997, "damage": 0, "predPublished": 34, "predRival": 31}
+{"kind": "combat-endpoint", "seed": 1695, "u": 0.5, "damage": 0, "predPublished": 29, "predRival": 29}
+{"kind":"shotread","seedAfter":-120918,"defenderDamage":38,"defenderHP":62,"attackerDamage":0,"attackerMoves":0}
+{"kind": "combat-clean", "seed": 26579, "u": 0.0, "shooter": 1703959, "damage": 26}
+{"kind": "combat-clean", "seed": 1695, "u": 0.5, "shooter": 1835033, "damage": 32}
+{"kind": "combat-clean", "seed": 23189, "u": 0.99997, "shooter": 1900570, "damage": 38}
+"thermo":30,"nuclear":0,"bombersMade":8
+{"kind":"intercept-setup","aim":"36:20","guard":"UNIT_MOBILE_SAM","guardAt":"-1:-1","guardMade":false,"guardID":-1,"markerMade":true,"markerID":1048590,"aimUnits":1,"aimFallout":0,"aimOwner":-1}
+{"kind":"intercept-setup","aim":"36:15","guard":"UNIT_MOBILE_SAM","guardAt":"37:14","guardMade":true,"guardID":1114127,"markerMade":true,"markerID":1179664,"aimUnits":1,"aimFallout":0,"aimOwner":-1}
+{"kind": "intercept-seeded", "seed": 11, "fired": true, "stockBefore": 30, "stockAfter": 29, "seedAfter": -746221848, "drawsConsumed": 1, "markerAlive": true, "guardAlive": true, "aimFallout": 0}
+{"kind": "intercept-seeded", "seed": 90210, "fired": true, "stockBefore": 29, "stockAfter": 28, "seedAfter": -641722893, "drawsConsumed": 1, "markerAlive": true, "guardAlive": true, "aimFallout": 0}
+{"kind": "intercept-seeded", "seed": 424242, "fired": true, "stockBefore": 28, "stockAfter": 27, "seedAfter": 1784350339, "drawsConsumed": 1, "markerAlive": true, "guardAlive": true, "aimFallout": 20}
+{"kind": "intercept-seeded", "seed": 7777, "fired": true, "stockBefore": 27, "stockAfter": 26, "seedAfter": 7777, "drawsConsumed": null, "markerAlive": true, "guardAlive": true, "aimFallout": 20}
+{"kind": "intercept-seeded", "seed": 31415, "fired": true, "stockBefore": 26, "stockAfter": 25, "seedAfter": 31415, "drawsConsumed": null, "markerAlive": true, "guardAlive": true, "aimFallout": 20}
+{"kind": "intercept-roll", "seed": 11, "u": 0.82623, "landed": false, "draws": 1, "stockBefore": 25, "stockAfter": 24}
+{"kind": "intercept-roll", "seed": 90210, "u": 0.85059, "landed": false, "draws": null, "stockBefore": 24, "stockAfter": 24}
+{"kind": "intercept-roll", "seed": 424242, "u": 0.41544, "landed": true, "draws": 1, "stockBefore": 24, "stockAfter": 23}
+{"kind": "intercept-roll", "seed": 7777, "u": 0.16144, "landed": false, "draws": null, "stockBefore": 23, "stockAfter": 23}
+{"kind": "intercept-roll", "seed": 31415, "u": 0.52396, "landed": false, "draws": 1, "stockBefore": 23, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 555, "u": 0.59735, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 13459, "u": 0.04999, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 1017, "u": 0.29999, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 16761, "u": 0.44, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 32166, "u": 0.48001, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 20992, "u": 0.51999, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 2034, "u": 0.60001, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-roll", "seed": 26240, "u": 0.89999, "landed": false, "draws": null, "stockBefore": 22, "stockAfter": 22}
+{"kind": "intercept-law", "seed": 13459, "u": 0.04999, "landed": true, "bomberHP": 57, "bomberDamage": 43, "draws": 1, "stockBefore": 30, "stockAfter": 29}
+{"kind": "intercept-law", "seed": 16761, "u": 0.44, "landed": false, "bomberHP": 57, "bomberDamage": 43, "draws": null, "stockBefore": 30, "stockAfter": 30}
+{"kind": "intercept-law", "seed": 32166, "u": 0.48001, "landed": false, "bomberHP": 48, "bomberDamage": 52, "draws": 1, "stockBefore": 30, "stockAfter": 29}
+{"kind": "intercept-law", "seed": 339, "u": 0.10001, "landed": true, "bomberHP": 55, "bomberDamage": 45, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-law", "seed": 27257, "u": 0.20001, "landed": false, "bomberHP": 55, "bomberDamage": 45, "draws": null, "stockBefore": 40, "stockAfter": 40}
+{"kind": "intercept-law", "seed": 1017, "u": 0.29999, "landed": true, "bomberHP": 51, "bomberDamage": 49, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-law", "seed": 9140, "u": 0.35999, "landed": false, "bomberHP": 51, "bomberDamage": 49, "draws": null, "stockBefore": 40, "stockAfter": 40}
+{"kind": "intercept-law", "seed": 1356, "u": 0.39999, "landed": true, "bomberHP": 50, "bomberDamage": 50, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-law", "seed": 13459, "u": 0.04999, "landed": true, "bomberHP": 57, "bomberDamage": 43, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-law", "seed": 339, "u": 0.10001, "landed": false, "bomberHP": 57, "bomberDamage": 43, "draws": null, "stockBefore": 40, "stockAfter": 40}
+{"kind": "intercept-law", "seed": 1017, "u": 0.29999, "landed": true, "bomberHP": 51, "bomberDamage": 49, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-law", "seed": 1356, "u": 0.39999, "landed": false, "bomberHP": 51, "bomberDamage": 49, "draws": null, "stockBefore": 40, "stockAfter": 40}
+{"kind": "intercept-law", "seed": 14815, "u": 0.45001, "landed": false, "bomberHP": 48, "bomberDamage": 52, "draws": 1, "stockBefore": 40, "stockAfter": 39}
+{"kind": "intercept-stack", "guards": 1, "seed": 13459, "bomberHP": 57, "bomberDamage": 43, "landed": true, "draws": 1, "executed": true}
+{"kind": "intercept-stack", "guards": 2, "seed": 13459, "bomberHP": 57, "bomberDamage": 43, "landed": false, "draws": null, "executed": false}
+{"kind": "intercept-stack", "guards": 3, "seed": 13459, "bomberHP": 48, "bomberDamage": 52, "landed": false, "draws": 1, "executed": true}
+{"kind": "intercept-stack", "guards": 1, "seed": 13459, "bomberHP": 57, "bomberDamage": 43, "landed": true, "draws": 1, "executed": true}
+{"kind": "intercept-stack", "guards": 2, "seed": 13459, "bomberHP": 57, "bomberDamage": 43, "landed": false, "draws": null, "executed": false}
+{"kind": "intercept-stack", "guards": 3, "seed": 13459, "bomberHP": 48, "bomberDamage": 52, "landed": false, "draws": 1, "executed": true}
+{"kind":"stackreset","aim":"36:15","marker":8847401,"guards":[{"id":8912934,"at":"37:14","made":true},{"id":8978465,"at":"35:14","made":true}],"cleared":3,"aimFallout":0}
+{"kind":"bomberstate","bomber":{"x":39,"y":16,"hp":57,"damage":43,"moves":0},"guard":{"x":-9999,"y":-9999,"hp":0,"damage":100,"moves":3},"aimFallout":20,"landed":true,"thermo":39,"seed":214785232}
+{"kind":"neighbour","at":"35:15","dist":1,"terrain":"PLAINS_HILLS","hills":true,"feature":"JUNGLE","water":false,"units":0,"defenceMod":6}
+{"kind":"neighbour","at":"36:14","dist":1,"terrain":"GRASS_MOUNTAIN","hills":false,"feature":"VOLCANO","water":false,"units":0,"defenceMod":0}
+{"kind":"neighbour","at":"36:15","dist":0,"terrain":"GRASS_HILLS","hills":true,"feature":"-","water":false,"units":0,"defenceMod":3}
+{"kind":"neighbour","at":"36:16","dist":1,"terrain":"GRASS_HILLS","hills":true,"feature":"-","water":false,"units":0,"defenceMod":3}
+{"kind":"neighbour","at":"37:14","dist":1,"terrain":"PLAINS","hills":false,"feature":"JUNGLE","water":false,"units":0,"defenceMod":3}
+{"kind":"neighbour","at":"37:15","dist":1,"terrain":"PLAINS_MOUNTAIN","hills":false,"feature":"-","water":false,"units":0,"defenceMod":0}
+{"kind":"neighbour","at":"37:16","dist":1,"terrain":"GRASS","hills":false,"feature":"-","water":false,"units":0,"defenceMod":0}
+{"kind":"bomberstate","bomber":{"x":39,"y":16,"hp":57,"damage":43,"moves":0},"guard":{"x":-9999,"y":-9999,"hp":0,"damage":100,"moves":3},"aimFallout":20,"landed":true,"thermo":39,"seed":214785232}
+{"kind":"bomberstate","bomber":{"x":39,"y":16,"hp":36,"damage":64,"moves":0},"guard":{"x":35,"y":15,"hp":100,"damage":0,"moves":3},"aimFallout":0,"landed":false,"thermo":39,"seed":214785232}
+{"kind":"bomberstate","bomber":{"x":39,"y":16,"hp":23,"damage":77,"moves":0},"guard":{"x":35,"y":15,"hp":100,"damage":0,"moves":3},"aimFallout":0,"landed":false,"thermo":39,"seed":214785232}
+{"kind":"sim","CombatTypes":"AIR=1184946373 BOMBARD=1338578493 ICBM=1640240290 MELEE=748940753 RANGED=784649805 RELIGIOUS=1580168296"}
+{"kind":"sim","default":"err"}
+{"kind":"sim","attackerAntiAir":100,"attackerCombat":0,"defenderCombat":85,"defenderRanged":0,"defenderHP":23}
+{"kind":"aa","antiAirUnits":"BATTLESHIP(aa=90,cs=60,dom=SEA) BRAZILIAN_MINAS_GERAES(aa=95,cs=70,dom=SEA) ANTIAIR_GUN(aa=90,cs=0,dom=LAND) DESTROYER(aa=90,cs=85,dom=SEA) MOBILE_SAM(aa=100,cs=0,dom=LAND) MISSILE_CRUISER(aa=110,cs=75,dom=SEA) GIANT_DEATH_ROBOT(aa=90,cs=130,dom=LAND)"}
+{"kind":"aa","airUnits":"BIPLANE(cs=80,range=4) FIGHTER(cs=100,range=5) AMERICAN_P51(cs=105,range=5) BOMBER(cs=85,range=10) JET_FIGHTER(cs=110,range=6) JET_BOMBER(cs=90,range=15)"}
+{"kind":"aa","deliveryCandidates":"SUBMARINE(dom=SEA,range=2) BOMBER(dom=AIR,range=10) NUCLEAR_SUBMARINE(dom=SEA,range=2) JET_BOMBER(dom=AIR,range=15) MISSILE_CRUISER(dom=SEA,range=3)"}
+{"kind":"aa","silo":"IMPROVEMENT_MISSILE_SILO","siloIndex":15,"cityWmdStrike":"681683161"}
+{"kind": "cell", "interceptor": "UNIT_ANTIAIR_GUN", "count": 1, "hps": [], "seed": 13459, "u": 0.04999, "bomberDamage": 29, "landed": true, "draws": 1, "executed": true}
+{"kind": "cell", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "hps": [50], "seed": 13459, "u": 0.04999, "bomberDamage": 29, "landed": false, "draws": null, "executed": false}
+{"kind": "cell", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "hps": [50], "seed": 13459, "u": 0.04999, "bomberDamage": 35, "landed": true, "draws": 1, "executed": true}
+{"kind": "cell", "interceptor": "UNIT_GIANT_DEATH_ROBOT", "count": 1, "hps": [], "seed": 13459, "u": 0.04999, "bomberDamage": 35, "landed": false, "draws": null, "executed": false}
+{"kind": "cell", "interceptor": "UNIT_GIANT_DEATH_ROBOT", "count": 1, "hps": [], "seed": 13459, "u": 0.04999, "bomberDamage": 29, "landed": true, "draws": 1, "executed": true}
+{"kind": "cell", "interceptor": "UNIT_MOBILE_SAM", "count": 2, "hps": [100, 50], "seed": 13459, "u": 0.04999, "bomberDamage": 29, "landed": false, "draws": null, "executed": false}
+{"kind": "cell", "interceptor": "UNIT_MOBILE_SAM", "count": 2, "hps": [100, 50], "seed": 13459, "u": 0.04999, "bomberDamage": 48, "landed": true, "draws": 1, "executed": true}
+{"kind": "cell", "interceptor": "UNIT_MOBILE_SAM", "count": 2, "hps": [50, 100], "seed": 13459, "u": 0.04999, "bomberDamage": 48, "landed": true, "draws": 1, "executed": true}
+{"kind":"sim2","CombatManager":"CanAttackTarget GenerateCombatResults GetBestDefender GetBestInterceptor IsAttackChangeWarState SimulateAttackInto SimulateAttackVersus SimulatePriorityAttackInto"}
+{"kind":"sim2","bomberAttacks_MELEE":"err"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.954462304","value":"false"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.865706498","value":"false"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.432821635","value":"false"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.126272016","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-958805242","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-746205821","value":"100"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.853003252","value":"-1"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1263136305","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1522214634","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.1930175143","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.1472654640.type","value":"1"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.1472654640.player","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.1472654640.id","value":"3932217"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.236175385","value":"-1"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1335567287.1","value":"+0 бонус к атаке за редкие ресурсы"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1351684353","value":"0"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1779249298.y","value":"16"}
+{"kind":"sim2","path":"bomberAttacks_RANGED.1431908133.-1779249298.x","value":"39"}
+{"kind":"sim3","field":"r/CombatResultParameters.DEFENDER_CAPTURED","value":"false"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER_ADVANCES","value":"false"}
+{"kind":"sim3","field":"r/CombatResultParameters.VISUALIZE","value":"false"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.FINAL_DAMAGE_TO","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.MAX_HIT_POINTS","value":"100"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.ERA","value":"-1"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.MAX_DEFENSE_HIT_POINTS","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.DAMAGE_FROM","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.DAMAGE_TO","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.ID/type","value":"1"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.ID/player","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.ID/id","value":"3932217"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.COMBAT_SUB_TYPE","value":"-1"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.PREVIEW_TEXT_ASSIST/1","value":"+0 бонус к атаке за редкие ресурсы"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.EXPERIENCE_CHANGE","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.LOCATION/y","value":"16"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.LOCATION/x","value":"39"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.COMBAT_STRENGTH","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.STRENGTH_MODIFIER","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.WMD_TYPE","value":"-1"}
+{"kind":"sim3","field":"r/CombatResultParameters.DEFENDER/CombatResultParameters.FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim3","field":"r/CombatResultParameters.DEFENDER/CombatResultParameters.FINAL_DAMAGE_TO","value":"65"}
+{"kind":"sim4","field":"into_AIR/ATTACKER/FINAL_DAMAGE_TO","value":"54"}
+{"kind":"sim4","field":"into_AIR/ATTACKER/DAMAGE_TO","value":"54"}
+{"kind":"sim4","field":"into_AIR/ATTACKER/COMBAT_STRENGTH","value":"110"}
+{"kind":"sim4","field":"into_AIR/ATTACKER/FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/ATTACKER/DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/DEFENDER/FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/DEFENDER/FINAL_DAMAGE_TO","value":"100"}
+{"kind":"sim4","field":"into_AIR/DEFENDER/DAMAGE_TO","value":"100"}
+{"kind":"sim4","field":"into_AIR/DEFENDER/COMBAT_STRENGTH","value":"20"}
+{"kind":"sim4","field":"into_AIR/DEFENDER/DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/ANTI_AIR/FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/ANTI_AIR/FINAL_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/ANTI_AIR/DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/ANTI_AIR/COMBAT_STRENGTH","value":"100"}
+{"kind":"sim4","field":"into_AIR/ANTI_AIR/DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"sim4","field":"into_AIR/INTERCEPTOR/FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind": "aa-sweep", "case": "1 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 1, "hps": [], "predictedAA": 100, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [11206711]}
+{"kind": "aa-sweep", "case": "1 SAM @50hp", "unit": "UNIT_MOBILE_SAM", "count": 1, "hps": [50], "predictedAA": 95, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [11337783]}
+{"kind": "aa-sweep", "case": "2 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 2, "hps": [], "predictedAA": 105, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [11468855, 11534393]}
+{"kind": "aa-sweep", "case": "3 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 3, "hps": [], "predictedAA": 110, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [11665464, 11730999, 11796538]}
+{"kind": "aa-sweep", "case": "4 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 4, "hps": [], "predictedAA": 115, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [11927609, 11993144, 12058679, 12124219]}
+{"kind": "aa-sweep", "case": "1 AAgun full", "unit": "UNIT_ANTIAIR_GUN", "count": 1, "hps": [], "predictedAA": 90, "antiAirStrength": 90.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [12255290]}
+{"kind": "aa-sweep", "case": "2 AAgun full", "unit": "UNIT_ANTIAIR_GUN", "count": 2, "hps": [], "predictedAA": 95, "antiAirStrength": 90.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [12386362, 12451897]}
+{"kind": "aa-sweep", "case": "SAM + SAM@50", "unit": "UNIT_MOBILE_SAM", "count": 2, "hps": [100, 50], "predictedAA": 102.5, "antiAirStrength": 100.0, "interceptorStrength": 0.0, "interceptorUnit": -1, "guards": [12582970, 12648505]}
+{"kind":"aablock","block":"ATTACKER","field":"PREVIEW_TEXT_ANTI_AIR.1","value":"[COLOR_RED]-10[ENDCOLOR] из-за урона от ПВО"}
+{"kind":"aablock","block":"ANTI_AIR","field":"FINAL_DEFENSE_DAMAGE_TO","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"MAX_DEFENSE_HIT_POINTS","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"FINAL_DAMAGE_TO","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"MAX_HIT_POINTS","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"ERA","value":"-1"}
+{"kind":"aablock","block":"ANTI_AIR","field":"ID.type","value":"1"}
+{"kind":"aablock","block":"ANTI_AIR","field":"ID.player","value":"1"}
+{"kind":"aablock","block":"ANTI_AIR","field":"ID.id","value":"12976183"}
+{"kind":"aablock","block":"ANTI_AIR","field":"DAMAGE_FROM","value":"97"}
+{"kind":"aablock","block":"ANTI_AIR","field":"PREVIEW_TEXT_MODIFIER.1","value":"+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind":"aablock","block":"ANTI_AIR","field":"PREVIEW_TEXT_ASSIST.1","value":"+15 поддержка ПВО юнита"}
+{"kind":"aablock","block":"ANTI_AIR","field":"COMBAT_SUB_TYPE","value":"-1"}
+{"kind":"aablock","block":"ANTI_AIR","field":"EXPERIENCE_CHANGE","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"LOCATION.y","value":"16"}
+{"kind":"aablock","block":"ANTI_AIR","field":"LOCATION.x","value":"37"}
+{"kind":"aablock","block":"ANTI_AIR","field":"DAMAGE_TO","value":"0"}
+{"kind":"aablock","block":"ANTI_AIR","field":"COMBAT_STRENGTH","value":"100"}
+{"kind": "aa-sweep", "case": "1 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 1, "hps": [], "predictedAA": 100, "antiAirStrength": 100.0, "expectedDamage": 54.0, "chosenUnit": 13107258, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438.", "guards": [13107258]}
+{"kind": "aa-sweep", "case": "1 SAM @50hp", "unit": "UNIT_MOBILE_SAM", "count": 1, "hps": [50], "predictedAA": 95, "antiAirStrength": 100.0, "expectedDamage": 44.0, "chosenUnit": 13238330, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438.", "guards": [13238330]}
+{"kind": "aa-sweep", "case": "2 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 2, "hps": [], "predictedAA": 105, "antiAirStrength": 100.0, "expectedDamage": 66.0, "chosenUnit": 13369402, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438. | +5 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u041f\u0412\u041e \u044e\u043d\u0438\u0442", "guards": [13369402, 13434937]}
+{"kind": "aa-sweep", "case": "3 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 3, "hps": [], "predictedAA": 110, "antiAirStrength": 100.0, "expectedDamage": 80.0, "chosenUnit": 13566010, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438. | +10 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u041f\u0412\u041e \u044e\u043d\u0438\u0442\u0430", "guards": [13566010, 13631545, 13697080]}
+{"kind": "aa-sweep", "case": "4 SAM full", "unit": "UNIT_MOBILE_SAM", "count": 4, "hps": [], "predictedAA": 115, "antiAirStrength": 100.0, "expectedDamage": 97.0, "chosenUnit": 14024759, "chosenAt": "37:16", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438. | +15 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u041f\u0412\u041e \u044e\u043d\u0438\u0442\u0430", "guards": [13828154, 13893689, 13959224, 14024759]}
+{"kind": "aa-sweep", "case": "1 AAgun full", "unit": "UNIT_ANTIAIR_GUN", "count": 1, "hps": [], "predictedAA": 90, "antiAirStrength": 90.0, "expectedDamage": 36.0, "chosenUnit": 14155834, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438.", "guards": [14155834]}
+{"kind": "aa-sweep", "case": "2 AAgun full", "unit": "UNIT_ANTIAIR_GUN", "count": 2, "hps": [], "predictedAA": 95, "antiAirStrength": 90.0, "expectedDamage": 44.0, "chosenUnit": 14286906, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438. | +5 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u041f\u0412\u041e \u044e\u043d\u0438\u0442", "guards": [14286906, 14352441]}
+{"kind": "aa-sweep", "case": "SAM + SAM@50", "unit": "UNIT_MOBILE_SAM", "count": 2, "hps": [100, 50], "predictedAA": 102.5, "antiAirStrength": 100.0, "expectedDamage": 59.0, "chosenUnit": 14483514, "chosenAt": "37:14", "modifiers": "+0 [ICON_Strength] \u043a \u0431\u043e\u0435\u0432\u043e\u0439 \u043c\u043e\u0449\u0438 \u0437\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u043b\u043e\u0436\u043d\u043e\u0441\u0442\u0438. | +2 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u041f\u0412\u041e \u044e\u043d\u0438\u0442", "guards": [14483514, 14549049]}
+{"kind":"coastal","aim":"42:10","waterNeighbours":"41:9 41:10 41:11 42:9 43:10","landNeighbours":"42:11","distFromBase":6}
+{"kind": "aa-cell", "aim": "42:10", "interceptor": "UNIT_DESTROYER", "count": 1, "spawned": ["true"], "baseAA": 0.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind": "aa-cell", "aim": "42:10", "interceptor": "UNIT_BATTLESHIP", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind": "aa-cell", "aim": "42:10", "interceptor": "UNIT_MISSILE_CRUISER", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind": "aa-cell", "aim": "42:10", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind":"coastal","aim":"35:11","waterNeighbours":"35:10 36:10 36:11","landNeighbours":"34:11 35:12 36:12","distFromBase":6}
+{"kind": "aa-cell", "aim": "35:11", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "spawned": ["true"], "baseAA": 100.0, "expectedDamage": 54.0, "chosenAt": "34:11", "support": "+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind": "aa-cell", "aim": "35:11", "interceptor": "UNIT_DESTROYER", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind": "aa-cell", "aim": "35:10", "interceptor": "UNIT_DESTROYER", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind": "aa-cell", "aim": "35:10", "interceptor": "UNIT_MISSILE_CRUISER", "count": 1, "spawned": ["true"], "baseAA": -1.0, "expectedDamage": 0.0, "chosenAt": null, "support": ""}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.FINAL_DAMAGE_TO","value":"17"}
+{"kind":"sim3","field":"r/CombatResultParameters.ATTACKER/CombatResultParameters.COMBAT_STRENGTH","value":"110"}
+{"kind":"sim3","field":"r/CombatResultParameters.DEFENDER/CombatResultParameters.FINAL_DAMAGE_TO","value":"54"}
+{"kind":"sim3","field":"r/CombatResultParameters.DEFENDER/CombatResultParameters.COMBAT_STRENGTH","value":"90"}
+{"kind":"aastr","block":"ANTI_AIR","strength":100,"damageFrom":66,"damageTo":0,"unit":15728698,"at":"37:14","texts":"+0 [ICON_Strength] к боевой мощи за уровень сложности. | +5 поддержка ПВО юнит"}
+{"kind":"aastr","block":"INTERCEPTOR","strength":4695,"damageFrom":0,"damageTo":0,"unit":-1,"at":"-9999:-9999","texts":""}
+{"fighter":15859774,"at":"8:12","city":"8:12"}
+{"UNIT_JET_FIGHTER":15925311,"at":"34:14","UNIT_FIGHTER":15990848,"at":"34:14"}
+{"kind":"aastr","block":"ANTI_AIR","strength":100,"damageFrom":66,"damageTo":0,"unit":15728698,"at":"37:14","texts":"+0 [ICON_Strength] к боевой мощи за уровень сложности. | +5 поддержка ПВО юнит"}
+{"kind":"aastr","block":"INTERCEPTOR","strength":4695,"damageFrom":0,"damageTo":0,"unit":-1,"at":"-9999:-9999","texts":""}
+{"nuclear":9,"bomberHP":57,"fallout":10}
+{"kind": "cell2", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "hps": [], "wmd": "WMD_NUCLEAR_DEVICE", "seed": 1017, "u": 0.29999, "bomberDamage": 49, "landed": true, "stockKey": "nuclear", "stockBefore": 9}
+{"kind": "cell2", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "hps": [], "wmd": "WMD_NUCLEAR_DEVICE", "seed": 14815, "u": 0.45001, "bomberDamage": 49, "landed": false, "stockKey": "nuclear", "stockBefore": 8}
+{"aimFallout":0,"nuclear":8,"thermo":40}
+{"kind": "cell2", "interceptor": "UNIT_MOBILE_SAM", "count": 1, "hps": [], "wmd": "WMD_NUCLEAR_DEVICE", "seed": 14815, "u": 0.45001, "bomberDamage": 52, "landed": false, "stockKey": "nuclear", "stockBefore": 8}
+{"kind":"citywmd","city":"39:16","target":"36:15","wmd":"WMD_NUCLEAR_DEVICE","can":false,"canNoParams":false,"fired":false}
+{"kind":"silo","placed":true,"at":"37:16","improvement":"IMPROVEMENT_MISSILE_SILO"}
+{"kind":"citywmd","city":"39:16","target":"36:15","wmd":"WMD_NUCLEAR_DEVICE","can":false,"canNoParams":false,"fired":false}
+{"kind":"stackreset","aim":"35:11","marker":16580669,"guards":[{"id":16646204,"at":"34:11","made":true}],"cleared":2,"aimFallout":0}
+{"kind":"sub","made":true,"id":11862194,"at":"36:10","hp":100,"moves":4,"nuclear":10}
+{"can":false,"fired":false}
+{"kind":"unitops","unit":11862194,"type":"UNIT_NUCLEAR_SUBMARINE","at":"36:10","moves":4,"canStart":"ALERT AUTOMATE_EXPLORE COASTAL_RAID EXECUTE_SCRIPT MOVE_TO RANGE_ATTACK SKIP_TURN SLEEP TELEPORT_TO WAIT_FOR WMD_STRIKE"}
+{"kind":"unitops","wmdTargetEntries":0}
+{"kind":"wmdtargets","unit":11862194,"wmd":"WMD_NUCLEAR_DEVICE","launcherAt":"36:10","targets":125,"sample":"37:12(d2) 36:12(d2) 34:10(d2) 34:9(d2) 37:8(d2) 37:9(d2) 35:8(d2) 36:8(d2)"}
+{"kind":"wmdtargets","unit":11927731,"wmd":"WMD_NUCLEAR_DEVICE","launcherAt":"39:16","targets":125,"sample":"40:18(d2) 39:18(d2) 37:16(d2) 37:15(d2) 40:14(d2) 40:15(d2) 38:14(d2) 39:14(d2)"}
+{"kind":"sub","made":true,"id":11993268,"at":"34:9","hp":100,"moves":4,"nuclear":10}
+{"sub":11993268,"can":true,"fired":true}
+{"nuclear":9,"subHP":100,"samHP":100,"aimFallout":0,"seed":214785232}
+{"kind": "sub-roll", "seed": 1017, "u": 0.29999, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 1695, "u": 0.5, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 25901, "u": 0.79999, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 39699, "u": 0.95001, "executed": false, "fired": false, "landed": false}
+LANDED {"nuclear":11,"aimFallout":10,"seed":13459}
+{"name":"Game.TriggerWMDAttack","type":"nil","ok":true}
+{"name":"Game.TriggerWMDStrike","type":"nil","ok":true}
+{"name":"WMDManager","type":"nil","ok":true}
+{"gameMethodsMatchingWMDorTriggerOrAttack":""}
+{"kind": "sub-roll", "seed": 9228, "u": 0.97, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 41365, "u": 0.99899, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 13459, "u": 0.04999, "executed": true, "fired": true, "landed": false}
+{"kind":"gdrtech","player":1,"hadAdvancedAI":false,"hasNow":false,"gdrs":[{"id":17760322,"at":"37:14","aaBase":90,"hasAAPromotion":false}]}
+{"kind":"aastr","block":"ANTI_AIR","strength":90,"damageFrom":36,"damageTo":0,"unit":17760322,"at":"37:14","texts":"+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind":"gdrtech","player":1,"hadAdvancedAI":false,"hasNow":true,"gdrs":[{"id":17760322,"at":"37:14","aaBase":130,"hasAAPromotion":true}]}
+{"kind":"gdrtech","player":1,"hadAdvancedAI":true,"hasNow":true,"gdrs":[{"id":17760322,"at":"37:14","aaBase":130,"hasAAPromotion":true}]}
+{"kind":"aastr","block":"ANTI_AIR","strength":130,"damageFrom":100,"damageTo":0,"unit":17760322,"at":"37:14","texts":"+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind": "cell2", "interceptor": "UNIT_GIANT_DEATH_ROBOT", "count": 1, "hps": [100], "wmd": "WMD_NUCLEAR_DEVICE", "seed": 24680, "u": 0.08582, "bomberDamage": 100, "landed": false, "stockKey": "nuclear", "stockBefore": 11}
+{"kind": "fracsup", "supporters": 0, "supporterHP": 100, "strength": 100, "damageFrom": 54, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind": "fracsup", "supporters": 1, "supporterHP": 100, "strength": 100, "damageFrom": 66, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +5 поддержка ПВО юнит"}
+{"kind": "fracsup", "supporters": 2, "supporterHP": 100, "strength": 100, "damageFrom": 80, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +10 поддержка ПВО юнита"}
+{"kind": "fracsup", "supporters": 3, "supporterHP": 100, "strength": 100, "damageFrom": 97, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +15 поддержка ПВО юнита"}
+{"kind": "fracsup", "supporters": 0, "supporterHP": 50, "strength": 100, "damageFrom": 54, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности."}
+{"kind": "fracsup", "supporters": 1, "supporterHP": 50, "strength": 100, "damageFrom": 59, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +2 поддержка ПВО юнит"}
+{"kind": "fracsup", "supporters": 2, "supporterHP": 50, "strength": 100, "damageFrom": 66, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +5 поддержка ПВО юнита"}
+{"kind": "fracsup", "supporters": 3, "supporterHP": 50, "strength": 100, "damageFrom": 72, "texts": "+0 [ICON_Strength] к боевой мощи за уровень сложности. | +7 поддержка ПВО юнита"}
+{"kind": "fracsup2", "supporterHP": 20, "exact": 1.0, "shownSupport": 1, "damageFrom": 56}
+{"kind": "fracsup2", "supporterHP": 33, "exact": 1.65, "shownSupport": 1, "damageFrom": 57}
+{"kind": "fracsup2", "supporterHP": 40, "exact": 2.0, "shownSupport": 2, "damageFrom": 58}
+{"kind": "fracsup2", "supporterHP": 50, "exact": 2.5, "shownSupport": 2, "damageFrom": 59}
+{"kind": "fracsup2", "supporterHP": 60, "exact": 3.0, "shownSupport": 3, "damageFrom": 61}
+{"kind": "fracsup2", "supporterHP": 70, "exact": 3.5, "shownSupport": 3, "damageFrom": 62}
+{"kind": "fracsup2", "supporterHP": 80, "exact": 4.0, "shownSupport": 4, "damageFrom": 63}
+{"kind": "fracsup2", "supporterHP": 90, "exact": 4.5, "shownSupport": 4, "damageFrom": 64}
+{"kind": "fracsup2", "supporterHP": 100, "exact": 5.0, "shownSupport": 5, "damageFrom": 66}
+{"kind": "fraccurve", "unit": "UNIT_BIPLANE", "defCombat": 80, "attStrength": 100, "damageFrom": 66, "delta": 20}
+{"kind": "fraccurve", "unit": "UNIT_FIGHTER", "defCombat": 100, "attStrength": 100, "damageFrom": 30, "delta": 0}
+{"kind": "fraccurve", "unit": "UNIT_JET_FIGHTER", "defCombat": 110, "attStrength": 100, "damageFrom": 20, "delta": -10}
+{"kind": "fraccurve", "unit": "UNIT_BOMBER", "defCombat": 85, "attStrength": 100, "damageFrom": 54, "delta": 15}
+{"kind": "fraccurve", "unit": "UNIT_JET_BOMBER", "defCombat": 90, "attStrength": 100, "damageFrom": 44, "delta": 10}
+{"kind": "fraccurve", "unit": "UNIT_AMERICAN_P51", "defCombat": 105, "attStrength": 100, "damageFrom": 25, "delta": -5}
+{"kind": "silo", "guards": 1, "seed": 11, "u": 0.82623, "stockBefore": 38, "stockAfter": 37, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 2222, "u": 0.90326, "stockBefore": 37, "stockAfter": 36, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 33333, "u": 0.31982, "stockBefore": 36, "stockAfter": 35, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 444444, "u": 0.95901, "stockBefore": 35, "stockAfter": 34, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 5555555, "u": 0.77267, "stockBefore": 34, "stockAfter": 33, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 66666666, "u": 0.81372, "stockBefore": 33, "stockAfter": 32, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 777777777, "u": 0.95865, "stockBefore": 32, "stockAfter": 31, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 1, "seed": 89, "u": 0.86694, "stockBefore": 31, "stockAfter": 30, "launched": true, "aimFallout": 0, "detonated": false, "samHP": 100, "canStart": true}
+{"kind": "silo", "guards": 0, "seed": 101, "u": 0.95013, "stockBefore": 30, "stockAfter": 29, "launched": true, "aimFallout": 10, "detonated": true, "samHP": null, "canStart": true}
+{"kind": "silo", "guards": 0, "seed": 202, "u": 0.9003, "stockBefore": 29, "stockAfter": 28, "launched": true, "aimFallout": 10, "detonated": true, "samHP": null, "canStart": true}
+{"kind": "silo", "guards": 0, "seed": 303, "u": 0.85043, "stockBefore": 28, "stockAfter": 27, "launched": true, "aimFallout": 10, "detonated": true, "samHP": null, "canStart": true}
+{"kind": "sub-roll", "seed": 7, "u": 0.79852, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 13, "u": 0.34012, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 21, "u": 0.39557, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 34, "u": 0.73569, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 55, "u": 0.13126, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 89, "u": 0.86694, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 144, "u": 0.99823, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 233, "u": 0.86517, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 7, "u": 0.79852, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 13, "u": 0.34012, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 21, "u": 0.39557, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 34, "u": 0.73569, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 55, "u": 0.13126, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 89, "u": 0.86694, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 144, "u": 0.99823, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 233, "u": 0.86517, "executed": false, "fired": false, "landed": false}
+{"kind": "sub-roll", "seed": 377, "u": 0.8634, "executed": true, "fired": true, "landed": false}
+{"kind": "sub-roll", "seed": 610, "u": 0.72861, "executed": false, "fired": false, "landed": false}
+{"kind": "silo", "guards": 1, "guardType": "UNIT_ANTIAIR_GUN", "seed": 404, "u": 0.80057, "stockBefore": 20, "stockAfter": 19, "launched": true, "aimFallout": 0, "detonated": false, "samHP": null, "canStart": true}
+{"kind": "silo", "guards": 1, "guardType": "UNIT_ANTIAIR_GUN", "seed": 505, "u": 0.75073, "stockBefore": 19, "stockAfter": 18, "launched": true, "aimFallout": 0, "detonated": false, "samHP": null, "canStart": true}
+{"kind": "silo", "guards": 1, "guardType": "UNIT_ANTIAIR_GUN", "seed": 606, "u": 0.70087, "stockBefore": 18, "stockAfter": 17, "launched": true, "aimFallout": 0, "detonated": false, "samHP": null, "canStart": true}
+{"kind": "xp", "round": 1, "seed": 3, "u": 0.77078, "previewDamage": 54, "launched": true, "detonated": false, "samHPbefore": 100, "samHPafter": 100, "samXPbefore": 0, "samXPafter": 0, "xpGain": 0, "samLevel": -1, "samAlive": true}
+{"kind": "xp", "round": 2, "seed": 5, "u": 0.28464, "previewDamage": 54, "launched": false, "detonated": false, "samHPbefore": 100, "samHPafter": 100, "samXPbefore": 0, "samXPafter": 0, "xpGain": 0, "samLevel": -1, "samAlive": true}
+{"kind": "xp", "round": 3, "seed": 9, "u": 0.31238, "previewDamage": 54, "launched": true, "detonated": true, "samHPbefore": 100, "samHPafter": null, "samXPbefore": 0, "samXPafter": null, "xpGain": null, "samLevel": null, "samAlive": false}
+{"kind": "xp", "round": 4, "seed": 17, "u": 0.36783, "previewDamage": 0, "launched": false, "detonated": true, "samHPbefore": null, "samHPafter": null, "samXPbefore": null, "samXPafter": null, "xpGain": null, "samLevel": null, "samAlive": false}
+{"kind": "xp", "round": 5, "seed": 33, "u": 0.47876, "previewDamage": 0, "launched": true, "detonated": true, "samHPbefore": null, "samHPafter": null, "samXPbefore": null, "samXPafter": null, "xpGain": null, "samLevel": null, "samAlive": false}
+{"kind": "xp", "round": 6, "seed": 65, "u": 0.70059, "previewDamage": 0, "launched": false, "detonated": true, "samHPbefore": null, "samHPafter": null, "samXPbefore": null, "samXPafter": null, "xpGain": null, "samLevel": null, "samAlive": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_MOBILE_SAM", "round": 1, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_MOBILE_SAM", "round": 2, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_MOBILE_SAM", "round": 3, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_MOBILE_SAM", "round": 4, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "round": 1, "guardBefore": 100, "guardAfter": null, "guardXPbefore": 0, "guardXPafter": null, "xpGain": null, "detonated": true}
+{"kind": "xprun", "unit": 17760444, "seed": 2, "u": 0.51385, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xprun", "unit": 17825979, "seed": 6, "u": 0.5416, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xprun", "unit": 17891514, "seed": 14, "u": 0.59705, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xprun", "unit": 17957049, "seed": 30, "u": 0.70795, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xprun", "unit": 18022584, "seed": 62, "u": 0.92978, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xprun", "unit": 18088119, "seed": 126, "u": 0.37344, "fired": false, "previewXP": 3, "previewDamage": 0, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "guards": 4, "round": 1, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "guards": 4, "round": 2, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "guards": 4, "round": 3, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "guards": 4, "round": 4, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "bomber", "guard": "UNIT_ANTIAIR_GUN", "guards": 4, "round": 5, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "xpmelee", "unit": 18481398, "from": "38:13", "seed": 4, "u": 0.02771, "fired": true, "previewXP": 4, "previewDamageToDefender": 43, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "38:13", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xpmelee", "unit": 18546935, "from": "36:13", "seed": 8, "u": 0.05545, "fired": true, "previewXP": 4, "previewDamageToDefender": 31, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "36:13", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xpmelee", "unit": 18612472, "from": "37:12", "seed": 16, "u": 0.1109, "fired": true, "previewXP": 4, "previewDamageToDefender": 43, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "37:12", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xpmelee", "unit": 18678009, "from": "38:12", "seed": 32, "u": 0.2218, "fired": true, "previewXP": 4, "previewDamageToDefender": 43, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "38:12", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xpmelee", "unit": 18743546, "from": "36:12", "seed": 64, "u": 0.44363, "fired": true, "previewXP": 4, "previewDamageToDefender": 29, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "36:12", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "xpmelee", "unit": 18809027, "from": "38:14", "seed": 128, "u": 0.8873, "fired": true, "previewXP": 4, "previewDamageToDefender": 31, "defHPbefore": 100, "defHPafter": 100, "damageDealt": 0, "attackerHPafter": 100, "attackerAt": "38:14", "xpBefore": 0, "xpAfter": 0, "xpGain": 0}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_GIANT_DEATH_ROBOT", "guards": 1, "round": 1, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_GIANT_DEATH_ROBOT", "guards": 1, "round": 2, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_GIANT_DEATH_ROBOT", "guards": 1, "round": 3, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "onceperturn", "channel": "silo", "guard": "UNIT_GIANT_DEATH_ROBOT", "guards": 1, "round": 4, "guardBefore": 100, "guardAfter": 100, "guardXPbefore": 0, "guardXPafter": 0, "xpGain": 0, "detonated": false}
+{"kind": "aacover", "unit": "UNIT_ANTIAIR_GUN", "water": false, "d1": {"at": "35:15", "covers": true, "strength": 90, "damage": 36}, "d2": {"at": "34:15", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "33:15", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_MOBILE_SAM", "water": false, "d1": {"at": "35:15", "covers": true, "strength": 100, "damage": 54}, "d2": {"at": "34:15", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "33:15", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_GIANT_DEATH_ROBOT", "water": false, "d1": {"at": "35:15", "covers": true, "strength": 130, "damage": 100}, "d2": {"at": "34:15", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "33:15", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_DESTROYER", "water": true, "d1": "no legal tile", "d2": {"at": "35:17", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "34:17", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_BATTLESHIP", "water": true, "d1": "no legal tile", "d2": {"at": "35:17", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "34:17", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_MISSILE_CRUISER", "water": true, "d1": "no legal tile", "d2": {"at": "35:17", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "34:17", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "aacover", "unit": "UNIT_BRAZILIAN_MINAS_GERAES", "water": true, "d1": "no legal tile", "d2": {"at": "35:17", "covers": false, "strength": -1, "damage": 0}, "d3": {"at": "34:17", "covers": false, "strength": -1, "damage": 0}}
+{"kind": "drawcount", "guard": "UNIT_MOBILE_SAM", "seed": 111, "seedBefore": 111, "seedAfter": 2231120252, "draws": 1, "firstDraw100": 51, "firstDraw2": 1, "detonated": false}
+{"kind": "drawcount", "guard": "UNIT_MOBILE_SAM", "seed": 222, "seedBefore": 222, "seedAfter": 167260863, "draws": 1, "firstDraw100": 3, "firstDraw2": 0, "detonated": false}
+{"kind": "drawcount", "guard": "UNIT_MOBILE_SAM", "seed": 333, "seedBefore": 333, "seedAfter": 2398368770, "draws": 1, "firstDraw100": 55, "firstDraw2": 1, "detonated": false}
+{"kind": "drawcount", "guard": "NONE", "seed": 111, "seedBefore": 111, "seedAfter": 111, "draws": 0, "firstDraw100": 51, "firstDraw2": 1, "detonated": true}
+{"kind": "drawcount", "guard": "NONE", "seed": 222, "seedBefore": 222, "seedAfter": 222, "draws": 0, "firstDraw100": 3, "firstDraw2": 0, "detonated": true}
+{"kind": "drawcount", "guard": "NONE", "seed": 333, "seedBefore": 333, "seedAfter": 333, "draws": 0, "firstDraw100": 55, "firstDraw2": 1, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 152, "draw100": 5, "draw2": 0, "draw1000": 53, "u": 0.05368, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 160, "draw100": 10, "draw2": 0, "draw1000": 109, "u": 0.10913, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 168, "draw100": 16, "draw2": 0, "draw1000": 164, "u": 0.16458, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 211, "draw100": 21, "draw2": 0, "draw1000": 212, "u": 0.21268, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 219, "draw100": 26, "draw2": 0, "draw1000": 268, "u": 0.26813, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 262, "draw100": 31, "draw2": 0, "draw1000": 316, "u": 0.31622, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 305, "draw100": 36, "draw2": 0, "draw1000": 364, "u": 0.36429, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 422, "draw100": 42, "draw2": 0, "draw1000": 425, "u": 0.42535, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 465, "draw100": 47, "draw2": 0, "draw1000": 473, "u": 0.47345, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 473, "draw100": 52, "draw2": 1, "draw1000": 528, "u": 0.5289, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 516, "draw100": 57, "draw2": 1, "draw1000": 576, "u": 0.577, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 524, "draw100": 63, "draw2": 1, "draw1000": 632, "u": 0.63245, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 532, "draw100": 68, "draw2": 1, "draw1000": 687, "u": 0.6879, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 575, "draw100": 73, "draw2": 1, "draw1000": 735, "u": 0.73599, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 618, "draw100": 78, "draw2": 1, "draw1000": 784, "u": 0.78406, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 626, "draw100": 83, "draw2": 1, "draw1000": 839, "u": 0.83951, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 634, "draw100": 89, "draw2": 1, "draw1000": 894, "u": 0.89499, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 677, "draw100": 94, "draw2": 1, "draw1000": 943, "u": 0.94305, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 1, "seed": 685, "draw100": 99, "draw2": 1, "draw1000": 998, "u": 0.99854, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 75, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 75, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 75, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 75, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 51, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 51, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 51, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 51, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 50, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 50, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 50, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 50, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 49, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 49, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 49, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 49, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 25, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 25, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 25, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 25, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 109, "draw100": 0, "draw2": 0, "draw1000": 5, "u": 0.00558, "detonated": true}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 125, "draw100": 11, "draw2": 0, "draw1000": 116, "u": 0.11652, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 141, "draw100": 22, "draw2": 0, "draw1000": 227, "u": 0.22742, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 157, "draw100": 33, "draw2": 0, "draw1000": 338, "u": 0.33835, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 173, "draw100": 44, "draw2": 0, "draw1000": 449, "u": 0.44925, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 224, "draw100": 55, "draw2": 1, "draw1000": 552, "u": 0.5528, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 240, "draw100": 66, "draw2": 1, "draw1000": 663, "u": 0.6637, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 256, "draw100": 77, "draw2": 1, "draw1000": 774, "u": 0.77463, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 272, "draw100": 88, "draw2": 1, "draw1000": 885, "u": 0.88553, "detonated": false}
+{"kind": "steelman", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "seed": 288, "draw100": 99, "draw2": 1, "draw1000": 996, "u": 0.99646, "detonated": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 0, "seed": 4, "predictedDamage": 42, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 1, "seed": 16, "predictedDamage": 43, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 2, "seed": 28, "predictedDamage": 45, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 3, "seed": 40, "predictedDamage": 47, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 4, "seed": 52, "predictedDamage": 48, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 5, "seed": 64, "predictedDamage": 50, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 6, "seed": 76, "predictedDamage": 52, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 7, "seed": 88, "predictedDamage": 54, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 8, "seed": 100, "predictedDamage": 55, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 9, "seed": 112, "predictedDamage": 57, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 10, "seed": 124, "predictedDamage": 59, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "silo", "sAtt": 86.0, "n": 11, "seed": 136, "predictedDamage": 61, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 0, "seed": 4, "predictedDamage": 38, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 1, "seed": 16, "predictedDamage": 39, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 2, "seed": 28, "predictedDamage": 41, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 3, "seed": 40, "predictedDamage": 42, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 4, "seed": 52, "predictedDamage": 44, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 5, "seed": 64, "predictedDamage": 46, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 6, "seed": 76, "predictedDamage": 47, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 7, "seed": 88, "predictedDamage": 49, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 8, "seed": 100, "predictedDamage": 50, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 9, "seed": 112, "predictedDamage": 52, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 10, "seed": 124, "predictedDamage": 53, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 35, "channel": "silo", "sAtt": 83.5, "n": 11, "seed": 136, "predictedDamage": 55, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 0, "seed": 4, "predictedDamage": 55, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 1, "seed": 16, "predictedDamage": 57, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 2, "seed": 28, "predictedDamage": 59, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 3, "seed": 40, "predictedDamage": 62, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 4, "seed": 52, "predictedDamage": 64, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 5, "seed": 64, "predictedDamage": 66, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 6, "seed": 76, "predictedDamage": 68, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 7, "seed": 88, "predictedDamage": 71, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 8, "seed": 100, "predictedDamage": 73, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 9, "seed": 112, "predictedDamage": 75, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 10, "seed": 124, "predictedDamage": 77, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 30, "channel": "silo", "sAtt": 93.0, "n": 11, "seed": 136, "predictedDamage": 80, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 0, "seed": 4, "predictedDamage": 42, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 1, "seed": 16, "predictedDamage": 43, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 2, "seed": 28, "predictedDamage": 45, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 3, "seed": 40, "predictedDamage": 47, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 4, "seed": 52, "predictedDamage": 48, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 5, "seed": 64, "predictedDamage": 50, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 6, "seed": 76, "predictedDamage": 52, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 7, "seed": 88, "predictedDamage": 54, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 8, "seed": 100, "predictedDamage": 55, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 9, "seed": 112, "predictedDamage": 57, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 10, "seed": 124, "predictedDamage": 59, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 11, "seed": 136, "predictedDamage": 61, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 0, "seed": 4, "predictedDamage": 42, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 1, "seed": 16, "predictedDamage": 43, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 2, "seed": 28, "predictedDamage": 45, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 3, "seed": 40, "predictedDamage": 47, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 4, "seed": 52, "predictedDamage": 48, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 5, "seed": 64, "predictedDamage": 50, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 6, "seed": 76, "predictedDamage": 52, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 7, "seed": 88, "predictedDamage": 54, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 8, "seed": 100, "predictedDamage": 55, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 9, "seed": 112, "predictedDamage": 57, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 10, "seed": 124, "predictedDamage": 59, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "channel": "sub", "sAtt": 86.0, "n": 11, "seed": 136, "predictedDamage": 61, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 0, "seed": 4, "predictedDamage": 49, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 1, "seed": 16, "predictedDamage": 51, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 2, "seed": 28, "predictedDamage": 53, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 3, "seed": 40, "predictedDamage": 55, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 4, "seed": 52, "predictedDamage": 57, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 5, "seed": 64, "predictedDamage": 59, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 6, "seed": 76, "predictedDamage": 61, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 7, "seed": 88, "predictedDamage": 63, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 8, "seed": 100, "predictedDamage": 65, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 9, "seed": 112, "predictedDamage": 67, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 10, "seed": 124, "predictedDamage": 69, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_MOBILE_SAM", "hp": 1, "channel": "sub", "sAtt": 90.1, "n": 11, "seed": 136, "predictedDamage": 71, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 0, "seed": 4, "predictedDamage": 49, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 1, "seed": 16, "predictedDamage": 51, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 2, "seed": 28, "predictedDamage": 53, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 3, "seed": 40, "predictedDamage": 55, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 4, "seed": 52, "predictedDamage": 57, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 5, "seed": 64, "predictedDamage": 59, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 6, "seed": 76, "predictedDamage": 61, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 7, "seed": 88, "predictedDamage": 63, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 8, "seed": 100, "predictedDamage": 65, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 9, "seed": 112, "predictedDamage": 67, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 10, "seed": 124, "predictedDamage": 69, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "sAtt": 90.0, "n": 11, "seed": 136, "predictedDamage": 71, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 0, "seed": 4, "predictedDamage": 49, "predictedCancel": false, "detonated": false, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 1, "seed": 16, "predictedDamage": 51, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 2, "seed": 28, "predictedDamage": 53, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 3, "seed": 40, "predictedDamage": 55, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 4, "seed": 52, "predictedDamage": 57, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 5, "seed": 64, "predictedDamage": 59, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 6, "seed": 76, "predictedDamage": 61, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 7, "seed": 88, "predictedDamage": 63, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 8, "seed": 100, "predictedDamage": 65, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 9, "seed": 112, "predictedDamage": 67, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 10, "seed": 124, "predictedDamage": 69, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "silo", "wmd": "WMD_THERMONUCLEAR_DEVICE", "sAtt": 90.0, "n": 11, "seed": 136, "predictedDamage": 71, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "distlaw", "siloDistance": 2, "aim": "36:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "landed", "4": "landed", "5": "landed", "6": "stopped", "7": "stopped", "8": "stopped", "9": "stopped"}, "flipAt": 6, "impliedD": [72.11, 72.98]}
+{"kind": "distlaw", "siloDistance": 3, "aim": "35:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "stopped", "4": "stopped", "5": "stopped", "6": "stopped", "7": "stopped", "8": "stopped", "9": "stopped"}, "flipAt": 3, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 4, "aim": "34:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "landed", "4": "landed", "5": "landed", "6": "stopped", "7": "stopped", "8": "stopped", "9": "stopped"}, "flipAt": 6, "impliedD": [72.11, 72.98]}
+{"kind": "distlaw", "siloDistance": 6, "aim": "32:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "landed", "4": "landed", "5": "landed", "6": "stopped", "7": "stopped", "8": "stopped", "9": "stopped"}, "flipAt": 6, "impliedD": [72.11, 72.98]}
+{"kind": "distlaw", "siloDistance": 8, "aim": "30:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "landed", "4": "landed", "5": "landed", "6": "landed", "7": "landed", "8": "landed", "9": "stopped"}, "flipAt": 9, "impliedD": [74.62, 75.41]}
+{"kind": "distlaw", "siloDistance": 10, "aim": "29:13", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "refused", "4": "refused", "5": "refused", "6": "refused", "7": "refused", "8": "refused", "9": "refused"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 12, "aim": "26:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"3": "refused", "4": "refused", "5": "refused", "6": "refused", "7": "refused", "8": "refused", "9": "refused"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 2, "aim": "36:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "landed", "1": "landed", "2": "landed", "3": "landed"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 3, "aim": "35:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "landed", "1": "landed", "2": "stopped", "3": "stopped"}, "flipAt": 2, "impliedD": [68.33, 69.33]}
+{"kind": "distlaw", "siloDistance": 4, "aim": "34:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "landed", "1": "landed", "2": "landed", "3": "landed"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 6, "aim": "32:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "landed", "1": "landed", "2": "landed", "3": "landed"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 8, "aim": "30:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "landed", "1": "landed", "2": "landed", "3": "landed"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 10, "aim": "29:13", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "refused", "1": "refused", "2": "refused", "3": "refused"}, "flipAt": null, "impliedD": null}
+{"kind": "distlaw", "siloDistance": 12, "aim": "26:15", "guard": "UNIT_ANTIAIR_GUN", "hp": 60, "sAtt": 86.0, "outcomes": {"0": "refused", "1": "refused", "2": "refused", "3": "refused"}, "flipAt": null, "impliedD": null}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 0, "seed": 4, "predictedDamage": 49, "predictedCancel": false, "detonated": true, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 1, "seed": 16, "predictedDamage": 51, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 2, "seed": 28, "predictedDamage": 53, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 3, "seed": 40, "predictedDamage": 55, "predictedCancel": true, "detonated": true, "ok": false}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 4, "seed": 52, "predictedDamage": 57, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 5, "seed": 64, "predictedDamage": 59, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 6, "seed": 76, "predictedDamage": 61, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 7, "seed": 88, "predictedDamage": 63, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 8, "seed": 100, "predictedDamage": 65, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 9, "seed": 112, "predictedDamage": 67, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 10, "seed": 124, "predictedDamage": 69, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "icbmlaw", "guard": "UNIT_ANTIAIR_GUN", "hp": 100, "channel": "sub", "wmd": "WMD_NUCLEAR_DEVICE", "sAtt": 90.0, "n": 11, "seed": 136, "predictedDamage": 71, "predictedCancel": true, "detonated": false, "ok": true}
+{"kind": "hpcalib", "hp": 100, "damageFrom": 36, "sBracket": [89.292, 90.0], "model": 90.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 95, "damageFrom": 36, "sBracket": [89.292, 90.0], "model": 89.5, "modelFits": true}
+{"kind": "hpcalib", "hp": 90, "damageFrom": 35, "sBracket": [88.563, 89.292], "model": 89.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 85, "damageFrom": 34, "sBracket": [87.814, 88.563], "model": 88.5, "modelFits": true}
+{"kind": "hpcalib", "hp": 80, "damageFrom": 34, "sBracket": [87.814, 88.563], "model": 88.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 75, "damageFrom": 33, "sBracket": [87.041, 87.814], "model": 87.5, "modelFits": true}
+{"kind": "hpcalib", "hp": 70, "damageFrom": 32, "sBracket": [86.244, 87.041], "model": 87.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 65, "damageFrom": 32, "sBracket": [86.244, 87.041], "model": 86.5, "modelFits": true}
+{"kind": "hpcalib", "hp": 60, "damageFrom": 31, "sBracket": [85.421, 86.244], "model": 86.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 55, "damageFrom": 31, "sBracket": [85.421, 86.244], "model": 85.5, "modelFits": true}
+{"kind": "hpcalib", "hp": 50, "damageFrom": 30, "sBracket": [84.571, 85.421], "model": 85.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 40, "damageFrom": 29, "sBracket": [83.692, 84.571], "model": 84.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 30, "damageFrom": 28, "sBracket": [82.781, 83.692], "model": 83.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 20, "damageFrom": 27, "sBracket": [81.837, 82.781], "model": 82.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 10, "damageFrom": 26, "sBracket": [80.856, 81.837], "model": 81.0, "modelFits": true}
+{"kind": "hpcalib", "hp": 1, "damageFrom": 25, "sBracket": [79.836, 80.856], "model": 80.1, "modelFits": true}
+{"kind": "subpin", "aim": "30:15", "guardAt": "30:14", "hp": 100, "sAtt": 90.0, "outcomes": {"8": "landed", "9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [79.913, 80.652]}
+{"kind": "subpin", "aim": "30:15", "guardAt": "30:14", "hp": 97, "sAtt": 89.7, "outcomes": {"8": "landed", "9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [79.613, 80.352]}
+{"kind": "subpin", "aim": "30:15", "guardAt": "30:14", "hp": 95, "sAtt": 89.5, "outcomes": {"8": "landed", "9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [79.413, 80.152]}
+{"kind": "subpin", "aim": "30:15", "guardAt": "30:14", "hp": 93, "sAtt": 89.3, "outcomes": {"8": "landed", "9": "landed", "10": "landed", "11": "landed"}, "flipAt": null, "baseBracket": [79.952, null]}
+{"kind": "subpin", "aim": "30:15", "guardAt": "30:14", "hp": 91, "sAtt": 89.1, "outcomes": {"8": "landed", "9": "landed", "10": "landed", "11": "landed"}, "flipAt": null, "baseBracket": [79.752, null]}
+{"kind": "subpin", "aim": "32:15", "guardAt": "31:15", "hp": 100, "sAtt": 90.0, "outcomes": {"6": "landed", "7": "stopped", "10": "stopped", "11": "stopped"}, "flipAt": 7, "baseBracket": [76.722, 77.558]}
+{"kind": "subpin", "channel": "silo", "aim": "30:15", "guardAt": "30:14", "hp": 51, "sAtt": 85.1, "outcomes": {"9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [75.013, 75.752]}
+{"kind": "subpin", "channel": "silo", "aim": "30:15", "guardAt": "30:14", "hp": 50, "sAtt": 85.0, "outcomes": {"9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [74.913, 75.652]}
+{"kind": "subpin", "channel": "silo", "aim": "30:15", "guardAt": "30:14", "hp": 44, "sAtt": 84.4, "outcomes": {"9": "landed", "10": "landed", "11": "stopped"}, "flipAt": 11, "baseBracket": [74.313, 75.052]}
+{"kind": "subpin", "channel": "silo", "aim": "30:15", "guardAt": "30:14", "hp": 43, "sAtt": 84.3, "outcomes": {"9": "landed", "10": "landed", "11": "landed"}, "flipAt": null, "baseBracket": [74.952, null]}

@@ -1,0 +1,103 @@
+{"kind":"rng","Game":"AddWorldViewText GetBarbarianManager GetComponentID GetCurrentGameTurn GetCurrentTurnPhase GetCurrentTurnPhaseName GetCurrentTurnSegment GetCurrentTurnSegmentName GetDefeatRequirements GetEras GetFalloutManager GetGameDiplomacy GetGreatPeople GetHeroesManager GetLocalObserver GetLocalPlayer GetObjectFromComponentID GetPhaseName GetPlayers GetProperties GetProperty GetQuestsManager GetRandNum GetRandomSeed GetReligion GetTradeManager GetVictoryProgressForTeam GetVictoryRequirements GetWinningTeam IsAllowStrategicCommands IsAllowTacticalCommands IsDefeatEnabled IsVictoryEnabled ObserverCanSeePlayer RetirePlayer SetCurrentGameTurn SetProperty SetRandomSeed SetWinningTeam UnlockAchievement WriteHistoryLog"}
+{"kind":"rng","call":"Game.GetRandNum(100)","ok":true,"value":"69"}
+{"kind":"rng","call":"Game.GetRandNum(6)","ok":true,"value":"4"}
+{"kind":"rng","call":"Map.GetRandomSeed","ok":false,"value":"err"}
+{"kind":"rng","call":"Game.GetTurnRandomSeed","ok":false,"value":"err"}
+{"kind":"rng","call":"GameConfiguration.GetValue(GAME_SYNC_SEED)","ok":true,"value":"err"}
+{"kind":"rng","call":"GameConfiguration.GetValue(GAME_RANDOM_SEED)","ok":true,"value":"err"}
+{"kind":"rngstream","originalSeed":"-1212690568"}
+{"kind":"rngstream","pass":"A","seed":12345,"range":32768,"draws":[27118,21378,27442,1749,24847,8022,26254,22445,4205,22514,13526,19213,4879,10543,12937,16184,29500,23990,8830,26632,20479,11532,11735,16048]}
+{"kind":"rngstream","pass":"B","seed":12345,"range":32768,"draws":[27118,21378,27442,1749,24847,8022,26254,22445,4205,22514,13526,19213,4879,10543,12937,16184,29500,23990,8830,26632,20479,11532,11735,16048]}
+{"kind":"rngstream","seedBeforeDraw":"12345","firstDraw":27118,"seedAfterDraw":"-740551042"}
+{"kind":"rngstream","seedRestored":"-1212690568"}
+{"kind":"rngtrans","setSeed":0,"seedBefore":0,"range":1000000,"draw":0,"seedAfter":12345}
+{"kind":"rngtrans","setSeed":1,"seedBefore":1,"range":1000000,"draw":4357,"seedAfter":1103527590}
+{"kind":"rngtrans","setSeed":2,"seedBefore":2,"range":1000000,"draw":8714,"seedAfter":-2087924461}
+{"kind":"rngtrans","setSeed":3,"seedBefore":3,"range":1000000,"draw":13072,"seedAfter":-984409216}
+{"kind":"rngtrans","setSeed":12345,"seedBefore":12345,"range":1000000,"draw":14035,"seedAfter":-740551042}
+{"kind":"rngtrans","setSeed":65536,"seedBefore":65536,"range":1000000,"draw":5195,"seedAfter":1315778617}
+{"kind":"rngtrans","setSeed":2147483647,"seedBefore":2147483647,"range":1000000,"draw":4122,"seedAfter":1043980748}
+{"kind":"rngtrans","setSeed":-1,"seedBefore":-1,"range":1000000,"draw":12602,"seedAfter":-1103502900}
+{"kind":"rngfold","seed":12345,"range":2,"draw":1,"seedAfter":-740551042}
+{"kind":"rngfold","seed":12345,"range":6,"draw":4,"seedAfter":-740551042}
+{"kind":"rngfold","seed":12345,"range":100,"draw":82,"seedAfter":-740551042}
+{"kind":"rngfold","seed":12345,"range":1024,"draw":847,"seedAfter":-740551042}
+{"kind":"rngfold","seed":12345,"range":32768,"draw":27118,"seedAfter":-740551042}
+{"kind":"rngfold","seed":12345,"range":1000000,"draw":14035,"seedAfter":-740551042}
+{"kind":"rngtrans","seedRestored":-1212690568}
+{"kind":"rngfold2","seed":12345,"range":16384,"draw":"13559","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":32767,"draw":"27117","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":32768,"draw":"27118","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":32769,"draw":"27118","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":40000,"draw":"33103","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":65535,"draw":"54235","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":65536,"draw":"0","seedAfter":12345}
+{"kind":"rngfold2","seed":12345,"range":65537,"draw":"0","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":100000,"draw":"28521","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":131072,"draw":"0","seedAfter":12345}
+{"kind":"rngfold2","seed":12345,"range":262144,"draw":"0","seedAfter":12345}
+{"kind":"rngfold2","seed":12345,"range":1000000,"draw":"14035","seedAfter":-740551042}
+{"kind":"rngfold2","seed":12345,"range":16777216,"draw":"0","seedAfter":12345}
+{"kind":"rngfold2","seed":12345,"range":2147483647,"draw":"54235","seedAfter":-740551042}
+{"kind":"combat-setup","attacker":10092617,"ax":36,"ay":24,"attackerHP":100,"defender":9830429,"dx":36,"dy":25,"defenderHP":100,"atWar":true}
+TUNER: InGame: ERR:Runtime Error: [string "(function()..."]:15: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:15: in function '(anonymous)'
+	[string "(function()..."]:32: in function '(main chunk)'
+Lua callstack:
+
+{"kind":"shotread","seedAfter":-1212690568,"defenderDamage":0,"defenderHP":100,"attackerDamage":0,"attackerMoves":2}
+{"kind":"seed","set":1,"seed":1000,"turn":205}
+{"kind":"shot","seedExpected":1000,"can":true,"fired":true,"attackerMoves":2,"defenderHPbefore":100}
+{"kind":"shotread","seedAfter":-291337727,"defenderDamage":34,"defenderHP":66,"attackerDamage":0,"attackerMoves":0}
+{"kind":"fleet","made":6,"archers":[{"id":10158085,"x":35,"y":23,"dist":2,"moves":2},{"id":10223625,"x":36,"y":23,"dist":2,"moves":2},{"id":10289226,"x":35,"y":24,"dist":2,"moves":2},{"id":10354724,"x":34,"y":25,"dist":2,"moves":2},{"id":10420296,"x":35,"y":25,"dist":1,"moves":2},{"id":10485831,"x":37,"y":25,"dist":1,"moves":2}]}
+{"kind": "combat-roll", "seed": 1, "archer": 10158085, "damage": 64, "seedAfter": 1103527590, "fired": true}
+{"kind": "combat-roll", "seed": 5000, "archer": 10223625, "damage": 30, "seedAfter": -1456738015, "fired": true}
+{"kind": "combat-roll", "seed": 100000, "archer": 10289226, "damage": 25, "seedAfter": 929776217, "fired": true}
+{"kind": "combat-roll", "seed": 777777, "archer": 10354724, "damage": 34, "seedAfter": -307840746, "fired": true}
+{"kind": "combat-roll", "seed": 31337, "archer": 10420296, "damage": 28, "seedAfter": 2075544814, "fired": true}
+{"kind": "combat-roll", "seed": 999999, "archer": 10485831, "damage": 33, "seedAfter": -395798772, "fired": true}
+{"kind":"turnlimit","field":"Game.GetMaxGameTurns","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"cfg GAME_MAX_TURNS","ok":true,"value":"err"}
+{"kind":"turnlimit","field":"cfg GAME_TURN_LIMIT_TYPE","ok":true,"value":"err"}
+{"kind":"turnlimit","field":"cfg GAME_TURN_LIMIT","ok":true,"value":"-554045265"}
+{"kind":"turnlimit","field":"GameConfiguration.GetMaxTurns","ok":true,"value":"0"}
+{"kind":"turnlimit","field":"GameConfiguration.GetTurnLimitType","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"victory SCORE enabled","ok":true,"value":"true"}
+{"kind":"turnlimit","field":"defeat enabled","ok":true,"value":"err"}
+{"kind":"turnlimit","field":"SetValue GAME_MAX_TURNS=9999","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"SetValue GAME_TURN_LIMIT=9999","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"SetMaxTurns(9999)","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"re-read Game.GetMaxGameTurns","ok":false,"value":"err"}
+{"kind":"turnlimit","field":"re-read cfg GAME_MAX_TURNS","ok":true,"value":"err"}
+TUNER: no Lua state 'GameCore_Tuner'; the game lists ['CityStatePicker', 'CivRoyaleIntro', 'ConfirmKick', 'CreditsScreen', 'CrossPlayLogin', 'DebugHotloadCache', 'EditHotseatPlayer', 'FrontEnd', 'FrontEndPopup', 'HostGame', 'InvitePopup', 'JoiningRoom', 'LeaderPicker', 'LoadGameMenu', 'Lobby', 'Main State', 'MainMenu', 'Mods', 'MultiSelectWindow', 'My2K', 'Options', 'PBCNotifyRemind', 'PiratesIntro', 'SaveGameMenu', 'StagingRoom', 'StateTransition', 'SwitchLayoutPopup', 'Test', 'UserSetupWarning'] (GameCore_Tuner and InGame appear only once a game is loaded)
+{"kind":"setup","GameConfiguration":"AddEnabledMods ClearEnabledMods GetAIPlayerCount GetAIPlayerIDs GetAvailablePlayerCount GetAvailablePlayerIDs GetCalendarType GetCivilizationUsageIDs GetCloudTurnPlayer GetEnableModsMetaString GetEnabledGameModesMetaString GetEnabledMods GetFirstAvailablePlayer GetGameMode GetGameSpeedType GetGameState GetHandicapType GetHiddenPlayerCount GetHiddenPlayerIDs GetHumanPlayerCount GetHumanPlayerIDs GetInUsePlayerCount GetInUsePlayerIDs GetMaxTurns GetMultiplayerPlayerIDs GetObserverCount GetObserverIDs GetParticipatingPlayerCount GetParticipatingPlayerIDs GetPausePlayer GetPossibleParticipatingPlayerIDs GetRequiredMods GetRuleSet GetStartEra GetStartTurn GetStartYear GetTeamName GetTeamPlayerCount GetTurnLimitType GetTurnTimerType GetValue IsAnyMultiplayer IsCrossPlayInternetMultiplayer IsHotseat IsInternetMultiplayer IsKickVoting IsLANMultiplayer IsMatchMaking IsNetworkMultiplayer IsPaused IsPlayByCloud IsSavedGame IsWorldBuilder IsWorldBuilderEditor MakeHash PlayersWantPause RegenerateSeeds RemovePlayer SetCalendarType SetCloudTurnPlayer SetGameMode SetGameSpeedType SetGameState SetHandicapType SetKickVoting SetMatchMaking SetMaxTurns SetParticipatingPlayerCount SetRuleSet SetStartEra SetStartTurn SetStartYear SetToDefaultGameName SetToDefaults SetToPreGame SetTurnLimitType SetTurnTimerType SetValue SetValueHash SetWorldBuilder SetWorldBuilderEditor UpdateEnabledMods"}
+{"kind":"setup","field":"GetMaxTurns","ok":true,"value":"0"}
+{"kind":"setup","field":"GAME_TURN_LIMIT_TYPE","ok":true,"value":"err"}
+{"kind":"setup","field":"GAME_MAX_TURNS","ok":true,"value":"err"}
+{"kind":"setup","field":"GAME_REALISM","ok":true,"value":"2"}
+{"kind":"setup","field":"GAME_START_ERA","ok":true,"value":"-1851407529"}
+{"kind":"setup","field":"GAME_SPEED_TYPE","ok":true,"value":"327976177"}
+{"kind":"setup","field":"GetGameSpeedType","ok":true,"value":"327976177"}
+{"kind":"setup","field":"MAP_SCRIPT","ok":true,"value":"err"}
+{"kind":"setup","field":"GetMapScript","ok":false,"value":"err"}
+{"kind":"setup","field":"GAME_VICTORY_SCORE","ok":true,"value":"err"}
+{"kind":"setup","field":"GAME_NO_BARBARIANS","ok":true,"value":"err"}
+{"kind":"setup","field":"GAME_RANDOM_SEED","ok":true,"value":"err"}
+{"kind":"setup","field":"GAME_SYNC_RANDOM_SEED","ok":true,"value":"-1131795257"}
+{"kind":"turnlimit","TurnLimitTypes":"CUSTOM=40503376 GAMESPEED=-554045265 NONE=-2137446946"}
+{"kind":"turnlimit","stage":"before","turnLimitType":"0","maxTurns":"0","startEra":"-1851407529","speed":"327976177","realism":"2"}
+{"kind":"turnlimit","TurnLimitTypes":"CUSTOM=40503376 GAMESPEED=-554045265 NONE=-2137446946"}
+{"kind":"turnlimit","stage":"before","turnLimitType":"-2137446946","maxTurns":"0","startEra":"-163807222","speed":"-1649545904","realism":"4"}
+{"kind":"turnlimit","stage":"after","turnLimitType":"-2137446946","maxTurns":"0","startEra":"-163807222","speed":"-1649545904","realism":"4"}
+{"kind":"setupdecode","startEra":"ERA_INFORMATION","gameSpeed":"GAMESPEED_ONLINE","turnLimitType":"NONE","maxTurns":0,"realism":"4","humans":0,"ai":2,"participants":2,"ruleset":"RULESET_EXPANSION_2","startTurn":0}
+{"kind":"setupdecode","key":"GAME_NO_BARBARIANS","value":"err"}
+{"kind":"setupdecode","key":"GAME_NO_DISASTERS","value":"err"}
+{"kind":"setupdecode","key":"MAP_SCRIPT_NAME","value":"err"}
+{"kind":"setupdecode","key":"GAME_DIFFICULTY","value":"err"}
+{"kind":"setupdecode","key":"GAME_START_YEAR","value":"err"}
+{"kind":"setupdecode","key":"GAME_SYNC_RANDOM_SEED","value":"-1012243275"}
+{"kind":"setupdecode","key":"GAME_RANDOM_SEED","value":"err"}
+{"kind":"slots","id":0,"slotStatus":"1","isHuman":"err","civ":"err","leader":"err","alive":"true"}
+{"kind":"slots","id":1,"slotStatus":"1","isHuman":"err","civ":"err","leader":"err","alive":"true"}
+{"kind":"slots","SlotStatus":"SS_CLOSED=2 SS_COMPUTER=1 SS_OBSERVER=4 SS_OPEN=0 SS_TAKEN=3","humans":0,"ai":2,"available":0}
