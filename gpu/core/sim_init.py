@@ -3041,7 +3041,14 @@ class SimInit:
         self.railroad = torch.tensor([[t.get("rr", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
-        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 4001), dtype=torch.float64, device=device)  # 0.1-granular exp table over ±200
+        # CIV6 (GlobalParameters, measured live): damage = round((COMBAT_BASE_DAMAGE
+        # + rand(COMBAT_MAX_EXTRA_DAMAGE)) * (1 + COMBAT_POWER_SCALING)^diff), floored
+        # at COMBAT_MINIMUM_DAMAGE. The table is the exporter's 0.1-granular
+        # 1.04^diff over +-200 (one double per q, shared with TS damageRoll).
+        self._dmg_base = torch.tensor(cb["dmgBase"], dtype=torch.float64, device=device)
+        self._dmg_base_damage = int(cb["dmgBaseDamage"])
+        self._dmg_max_extra = int(cb["dmgMaxExtra"])
+        self._dmg_min = int(cb["dmgMin"])
         # The BARBARIAN ladder maps a ladder POSITION (0..3 melee, 4/5 ranged,
         # 6 scout, 7/8 naval) to a ROSTER index. barb_unit_type holds that roster index,
         # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /

@@ -231,7 +231,7 @@ const effectRow = (fx: PolicyEffects) => ({
   militaryMaintenanceAdd: fx.militaryMaintenanceAdd ?? 0,
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
-import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP } from '../data/constants';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
@@ -1403,7 +1403,13 @@ export function buildRules() {
       barbHorseRes: RESOURCE_IDS.indexOf('HORSES'), // a camp with this within barbHorseRange is a CAVALRY outpost
       barbHorseRange: BARB_HORSE_RANGE,
       campClearReward: 50,
-      dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
+      // COMBAT: the 0.1-granular (1 + COMBAT_POWER_SCALING)^Δ table over ±200 —
+      // the SAME expression as damageRoll's `base`, so both engines read one
+      // double — and the roll's three GlobalParameters rows
+      dmgBase: Array.from({ length: 4001 }, (_, i) => Math.pow(1 + COMBAT_POWER_SCALING, (i - 2000) / 10)),
+      dmgBaseDamage: COMBAT_BASE_DAMAGE,
+      dmgMaxExtra: COMBAT_MAX_EXTRA_DAMAGE,
+      dmgMin: COMBAT_MINIMUM_DAMAGE,
       // EMBARK: the Classical embarked pool and the rungs that raise it, the
       // Mathematics rung every hull and passenger reads, the LIVE water-step
       // master switch, and the embark/ocean tech gates (indices into rules

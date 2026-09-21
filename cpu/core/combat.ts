@@ -32,7 +32,7 @@ import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeFor
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
@@ -848,16 +848,21 @@ export function gdrNavalCS(attacker: Unit, foeType: string): number {
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
                            parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
-  // CIV6: `Damage (HP) = 30 * e^(0.04 * StrengthDifference) *
-  // randomBetween(80%, 120%)`, where "randomBetween is a random multiplier
-  // between given arguments, including both ends". `30 * exp(0.04 * q / 10)`
-  // with q = round(diff·10) is the same curve, pre-quantized to 0.1 so the
-  // GPU's exp table — indexed by that q — reproduces this exact JS double;
-  // one ulp in `base` can flip the rounded damage.
-  // Theological and city combat resolve through here too: the same page says
-  // both "work the same way as normal combat".
+  // CIV6 (GlobalParameters, measured live — lab 3 "The damage formula
+  // itself"): `damage = round((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE))
+  // × (1 + COMBAT_POWER_SCALING)^(S_att − S_def))` — 24 plus an integer draw
+  // in 0..11, times 1.04 per strength point, floored at COMBAT_MINIMUM_DAMAGE.
+  // The community's 30·e^(0.04Δ) with a continuous 0.8–1.2 factor agrees only
+  // within |Δ| ≤ 5 and misses by 3 at Δ = 30; COMBAT_DAMAGE_MULTIPLIER_MINIMUM
+  // does not floor the multiplier. `Math.pow(1.04, q / 10)` with
+  // q = round(diff·10) is the curve pre-quantized to 0.1 so the GPU's table —
+  // indexed by that q — reproduces this exact JS double; one ulp in `base`
+  // can flip the rounded damage. Strength stays FRACTIONAL up to here (the
+  // game sums float terms and floors once, if at all).
+  // Theological and city combat resolve through here too: both "work the
+  // same way as normal combat".
   const q = Math.round(strengthDiff * 10);
-  const base = 30 * Math.exp((0.04 * q) / 10);
+  const base = Math.pow(1 + COMBAT_POWER_SCALING, q / 10);
   // Combat log (tooling): every roll of the
   // CIV6_LOG game — the GPU _damage_roll twin. k = call-site tag, t =
   // target tile, c = the rng counter BEFORE the draw (absolute stream
@@ -865,13 +870,18 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   // quantized q (10·strengthDiff) so both engines print an identical int.
   const c0 = state.rngState >>> 0;
   const r = nextRandom(state);
-  const dmg = Math.max(1, Math.round(base * (0.8 + 0.4 * r)));
+  // the game's GetRandNum(COMBAT_MAX_EXTRA_DAMAGE): ONE draw mapped to 0..11
+  // (the game scales the top 15 bits of its LCG by the range; floor(r·12) is
+  // that mapping on this engine's unit draw — exact in a double, and the GPU
+  // twin computes the identical floor)
+  const roll = Math.floor(r * COMBAT_MAX_EXTRA_DAMAGE);
+  const dmg = Math.max(COMBAT_MINIMUM_DAMAGE, Math.round((COMBAT_BASE_DAMAGE + roll) * base));
   const cb = (globalThis as any).__cbLog;
   // `parts` (where a call site passes them) splits the diff into the two
   // strengths, so a disagreement names its SIDE before its term.
   const ad = parts ? ` a${Math.round(parts.a * 10)} d${Math.round(parts.d * 10)}`
     + (parts.at !== undefined ? ` at${parts.at} as${parts.as} dt${parts.dt} ds${parts.ds}` : '') : '';
-  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} dmg${dmg}${ad}`);
+  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${roll} dmg${dmg}${ad}`);
   return dmg;
 }
 

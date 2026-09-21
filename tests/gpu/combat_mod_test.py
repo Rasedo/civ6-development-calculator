@@ -10,7 +10,7 @@ Checks:
      every HP 0..100 (the shared IEEE expression both engines evaluate).
   B. _river_cross(frm, to) mirrors crossesRiver: it equals the exported
      riverMask bit for the frm->to neighbour direction, for every river tile.
-  C. _damage_roll reproduces 30*e^(0.04*q/10), q=round(diff*10), from the
+  C. _damage_roll reproduces round((24 + floor(12 r)) * 1.04^(q/10)), q=round(diff*10), from the
      0.1-granular fixture table + js_round — bit-exact for fractional diffs.
   D. Integrated melee: with a wounded attacker AND a wounded defender the CB
      log's quantized `diff` equals the full-assembly reference (combat +
@@ -295,10 +295,12 @@ def test_damage_roll_table(sim) -> None:
         r = sim._next_random(mask)
         q = int(js_round(diff * 10)[0])
         base = float(dmgbase[(q + 2000)])  # the table is centred at index 2000
-        want = max(1, int(js_round(base * (0.8 + 0.4 * r))[0]))
+        roll = int(torch.floor(r * sim._dmg_max_extra)[0])
+        assert 0 <= roll < sim._dmg_max_extra
+        want = max(sim._dmg_min, int(js_round((sim._dmg_base_damage + roll) * torch.tensor([base], dtype=torch.float64))[0]))
         assert got == want, f"damage_roll(diff={dv}) = {got}, reference = {want}"
         sim.rng_state = rng0.clone()  # leave the stream untouched for the next diff
-    print(f"  C. _damage_roll reproduces the 0.1-granular exp table ({len(diffs)} diffs)")
+    print(f"  C. _damage_roll reproduces the 0.1-granular 1.04^diff table with the 0..11 roll ({len(diffs)} diffs)")
 
 
 def _diff_of(events, k):

@@ -348,3 +348,15 @@ export const CITY_NAMES = [
   'Zephyria', 'Ashford', 'Briarwood', 'Coldspring', 'Dawnstar', 'Elmsworth',
   'Foxglove', 'Greyharbor', 'Hollowbrook', 'Ivorygate', 'Juniper', 'Kestrel',
 ];
+
+/** CIV6 (GlobalParameters, measured live — tools/civ6lab/reports/lab3_report.md,
+ *  "The damage formula itself"): one hit deals
+ *  `round((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE)) × (1 + COMBAT_POWER_SCALING)^(S_att − S_def))`,
+ *  floored at COMBAT_MINIMUM_DAMAGE — an integer draw 0..11 and a compound 4% per
+ *  strength point. The community's 30·e^(0.04Δ)·(0.8..1.2) agrees only within
+ *  |Δ| ≤ 5 and misses by 3 damage at Δ = 30. COMBAT_DAMAGE_MULTIPLIER_MINIMUM
+ *  0.25 does NOT floor this multiplier (a Warrior previews 1 against a GDR). */
+export const COMBAT_BASE_DAMAGE = srcConst('combat.baseDamage', 24, gp('COMBAT_BASE_DAMAGE'));
+export const COMBAT_MAX_EXTRA_DAMAGE = srcConst('combat.maxExtraDamage', 12, gp('COMBAT_MAX_EXTRA_DAMAGE'));
+export const COMBAT_POWER_SCALING = srcConst('combat.powerScaling', 0.04, gp('COMBAT_POWER_SCALING'));
+export const COMBAT_MINIMUM_DAMAGE = srcConst('combat.minimumDamage', 1, gp('COMBAT_MINIMUM_DAMAGE'));

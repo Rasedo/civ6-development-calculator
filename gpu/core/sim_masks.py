@@ -221,7 +221,10 @@ class SimMasks:
         # (up to +15 CS) cannot push |diff| past it. TS damageRoll has no clamp;
         # the table's reach is what keeps the two engines bit-exact.
         base = self._dmg_base[(q + 2000).clamp(0, 4000)]
-        dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
+        # the game's GetRandNum(12): ONE draw mapped to 0..11 — floor(r * 12) is
+        # exact in float64 and TS damageRoll computes the identical floor
+        roll = torch.floor(r * self._dmg_max_extra).to(torch.long)
+        dmg = js_round((self._dmg_base_damage + roll).to(torch.float64) * base).clamp(min=self._dmg_min).to(torch.long)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
             # `parts` splits the diff into the two strengths (TS damageRoll's
@@ -231,7 +234,7 @@ class SimMasks:
             if parts is not None and len(parts) > 2:
                 ad += f" at{int(parts[2][b])} as{int(parts[3][b])} dt{int(parts[4][b])} ds{int(parts[5][b])}"
             self._combat_events.append(
-                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}{ad}"
+                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(roll[b])} dmg{int(dmg[b])}{ad}"
             )
         return dmg
 
