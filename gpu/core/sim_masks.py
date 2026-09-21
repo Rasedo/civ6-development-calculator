@@ -717,17 +717,59 @@ class SimMasks:
         best = torch.where(held, cm, torch.zeros_like(cm)).amax(dim=1)
         return torch.maximum(best.reshape(promos.shape), ones)
 
-    def _followed_religion(self, pres: torch.Tensor, pop: torch.Tensor) -> torch.Tensor:
-        """the religion a pressure row follows — `followedReligionOf`'s twin:
-        the strongest pressure, when it holds MORE THAN HALF of the row's total
-        with the atheism baseline (CIV6 RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP
-        per citizen) — the majority of the city's citizens. Ties to the lowest
-        id, -1 when none qualifies. The turn's own resolver reads the same
-        rule, so a mid-turn read cannot disagree with it."""
-        tot = pres.sum(dim=-1) + self._atheism_per_pop * pop.clamp(min=0).long()
-        best = pres.argmax(dim=-1)
-        top = pres.gather(-1, best.unsqueeze(-1)).squeeze(-1)
-        return torch.where((top > 0) & (top * 2 > tot), best, torch.full_like(best, -1))
+    def _followers_of(self, pres: torch.Tensor, pop: torch.Tensor,
+                      unconv: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        """(followers [..., n+1] long, pressures [..., n+1] double) — how a
+        city's citizens are shared among its religions and THE UNCONVERTED
+        (last index): `followersOf`'s twin — the largest-remainder allocation
+        measured live (lab 2 scene E): floor each quota `pop * p / total`,
+        then one more citizen to each of the largest fractional remainders; a
+        remainder tie goes to the higher pressure, then the lower id. `unconv`
+        is the unconverted group's pressure — the engine derives
+        ATHEISM_PRESSURE_PER_POP x pop (the live game keeps an accumulator
+        that does not shrink with the city; the pokes pass it explicitly)."""
+        popc = pop.clamp(min=0).long()
+        none = (self._atheism_per_pop * popc).double() if unconv is None else unconv.double()
+        p = torch.cat([pres.double(), none.unsqueeze(-1)], dim=-1)
+        total = p.sum(dim=-1, keepdim=True)
+        live = (popc > 0).unsqueeze(-1) & (total > 0)
+        q = torch.where(live, popc.double().unsqueeze(-1) * p / total.clamp(min=1e-300), torch.zeros_like(p))
+        f = torch.floor(q)
+        rem = q - f
+        # rank by remainder desc, pressure desc, id asc — three STABLE sorts
+        # from the least significant key up
+        n1 = p.shape[-1]
+        idx = torch.arange(n1, device=p.device).expand_as(p)
+        o1 = torch.sort(-p, dim=-1, stable=True).indices          # pressure desc (ids already asc)
+        rem1 = rem.gather(-1, o1)
+        o2 = torch.sort(-rem1, dim=-1, stable=True).indices        # remainder desc
+        order = o1.gather(-1, o2)                                  # group at each rank
+        rank = torch.empty_like(order)
+        rank.scatter_(-1, order, idx)
+        left = (popc - f.sum(dim=-1).long()).unsqueeze(-1)
+        f = f.long() + (rank < left).long()
+        return f, p
+
+    def _followed_religion(self, pres: torch.Tensor, pop: torch.Tensor,
+                           unconv: torch.Tensor | None = None) -> torch.Tensor:
+        """the religion a pressure row follows — its MAJORITY as measured live
+        (lab 2 scene E), `followedReligionOf`'s twin: the group with the MOST
+        followers (`_followers_of`, the unconverted counted as a group); a tie
+        goes to the higher total PRESSURE, then the lower id; the winner must
+        hold at least half the citizens (2 * followers >= pop), and the
+        unconverted winning means NO majority (-1). The turn's own resolver
+        reads the same rule, so a mid-turn read cannot disagree with it."""
+        f, p = self._followers_of(pres, pop, unconv)
+        n = pres.shape[-1]
+        # the best group: followers desc, pressure desc, id asc — stable sorts
+        o1 = torch.sort(-p, dim=-1, stable=True).indices
+        f1 = f.gather(-1, o1)
+        o2 = torch.sort(-f1, dim=-1, stable=True).indices
+        best = o1.gather(-1, o2)[..., 0]
+        fb = f.gather(-1, best.unsqueeze(-1)).squeeze(-1)
+        popc = pop.clamp(min=0).long()
+        ok = (best < n) & (popc > 0) & (fb * 2 >= popc)
+        return torch.where(ok, best, torch.full_like(best, -1))
 
     def _promo_first_use(self, utype: torch.Tensor, promos: torch.Tensor,
                          used: torch.Tensor, kind: str):

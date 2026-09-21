@@ -501,9 +501,8 @@ export const RELIGION_PRESSURE_PER_TURN = 1;
 export const HOLY_CITY_PRESSURE_MULT = 4;
 export const HOLY_SITE_PRESSURE_MULT = 2;
 /** CIV6 (RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP 50): every city carries this
- * much "no religion" pressure per citizen — the baseline a religion must
- * outweigh. A city FOLLOWS the religion holding MORE THAN HALF of its total
- * pressure, atheism included: the majority of its citizens
+ * much "no religion" pressure per citizen — the UNCONVERTED group's pressure,
+ * one of the groups the city's citizens are shared among
  * (`followedReligionOf`). */
 export const ATHEISM_PRESSURE_PER_POP = 50;
 /** CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP 200): what a religion's
@@ -530,23 +529,62 @@ export function routePressureShare(amount: number, turn: number): number {
  * SCRIPTURE_SPEAD_STRENGTH's SpreadMultiplier is a PERCENT. */
 export const SPREAD_PRESSURE = 200;
 
-/** the religion a city FOLLOWS: the strongest pressure, when it holds more
- *  than half of the city's total with the atheism baseline — more than half
- *  its citizens. -1 when none does; a tie at the top goes to the lowest id.
- *  `_followed_religion` is the twin, and every follow read on this engine
- *  goes through here so no two sites can disagree about a tie. */
-export function followedReligionOf(pres: readonly number[], population: number): number {
-  let best = -1;
-  let bestP = 0;
-  let total = ATHEISM_PRESSURE_PER_POP * Math.max(0, population);
-  for (let g = 0; g < pres.length; g++) {
-    total += pres[g];
-    if (pres[g] > bestP) {
-      bestP = pres[g];
-      best = g;
-    }
+/** how a city's citizens are shared among its religions and THE UNCONVERTED
+ *  (measured live, lab 2 scene E — "pop × pressure share, rounded, forced to
+ *  sum to pop"): the largest-remainder allocation reproduces every measured
+ *  row — floor each group's quota, then one more citizen to each of the
+ *  largest fractional remainders until the population is spent. A remainder
+ *  tie goes to the higher pressure, then the lower id (the one step the lab
+ *  did not pin). Index `pres.length` is the unconverted. `_followers_of` is
+ *  the twin; the division is written `pop * p / total` on both engines.
+ *  `unconverted` is the unconverted group's pressure: the engine derives
+ *  ATHEISM_PRESSURE_PER_POP × pop; the live game keeps it as an ACCUMULATOR
+ *  that does not shrink with the city (300 at pop 2 after a nuclear strike,
+ *  400 at pop 9), which the measured rows pass in explicitly and this
+ *  engine does not model. */
+export function followersOf(pres: readonly number[], population: number, unconverted?: number): number[] {
+  const n = pres.length;
+  const pop = Math.max(0, population);
+  const p = [...pres, unconverted ?? ATHEISM_PRESSURE_PER_POP * pop];
+  let total = 0;
+  for (const x of p) total += x;
+  const f = new Array<number>(n + 1).fill(0);
+  if (pop <= 0 || total <= 0) return f;
+  const rem = new Array<number>(n + 1).fill(0);
+  let given = 0;
+  for (let g = 0; g <= n; g++) {
+    const q = pop * p[g] / total;
+    f[g] = Math.floor(q);
+    rem[g] = q - f[g];
+    given += f[g];
   }
-  return best >= 0 && bestP * 2 > total ? best : -1;
+  const order = [...f.keys()].sort((a, b) => rem[b] - rem[a] || p[b] - p[a] || a - b);
+  for (let i = 0; i < pop - given && i < order.length; i++) f[order[i]] += 1;
+  return f;
+}
+
+/** the religion a city FOLLOWS — its MAJORITY religion as measured live (lab
+ *  2 scene E, eight draws including the decider): the group with the MOST
+ *  followers, the unconverted counted as a group; a tie goes to the group
+ *  with the higher total PRESSURE (not the lower id, not arrival order), then
+ *  the lower id; the winner must hold at least half the citizens
+ *  (2 × followers ≥ population), and the unconverted winning means NO
+ *  majority (-1). `_followed_religion` is the twin, and every follow read on
+ *  this engine goes through here so no two sites can disagree about a tie. */
+export function followedReligionOf(pres: readonly number[], population: number, unconverted?: number): number {
+  const n = pres.length;
+  const pop = Math.max(0, population);
+  if (pop <= 0) return -1;
+  const none = unconverted ?? ATHEISM_PRESSURE_PER_POP * pop;
+  const f = followersOf(pres, population, none);
+  let best = n;   // the unconverted, until a religion beats it
+  for (let g = 0; g < n; g++) {
+    const pg = pres[g];
+    const pb = best === n ? none : pres[best];
+    if (f[g] > f[best] || (f[g] === f[best] && (pg > pb || (pg === pb && g < best)))) best = g;
+  }
+  if (best === n) return -1;
+  return f[best] * 2 >= pop ? best : -1;
 }
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;

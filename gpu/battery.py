@@ -692,6 +692,7 @@ def main() -> int:
                 ("districts", [py, "tests/gpu/district_breadth_test.py"], 4),  # district catalog breadth
                 ("city_registry", [py, "tests/gpu/rc_registry_test.py"], 4),  # district/tile registry consistency, every seat row
                 ("religion2", [py, "tests/gpu/religion2_test.py"], 4),  # missionary / enhancer / religious-victory surfaces
+                ("majority", [py, "tests/gpu/majority_test.py"], 2),  # the city's majority religion on the eight measured rows (followers by largest remainder, ties by pressure, the half-gate)
                 ("encampment", [py, "tests/gpu/encampment_test.py"], 4),  # Encampment strike + training XP + specialist surfaces
                 ("great_works", [py, "tests/gpu/great_works_test.py"], 4),  # Writer/Musician Great-Work slots + yield
                 ("great_works_holders", [py, "tests/gpu/great_works_holders_test.py"], 4),  # works held per holder: the slot table, placement, theming, Kristina, Nkisi
