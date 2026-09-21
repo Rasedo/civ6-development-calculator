@@ -166,6 +166,7 @@ def main() -> None:
     hs_t = next(t for t in range(sim.T) if t not in (src_c, far_t, free_t, tgt_c))
     jcol = next(c for c in range(sim.RC) if not bool(sim.city_alive[0, 0, c]))
     sim.city_alive[0, 0, jcol] = True
+    sim.city_pop[0, 0, jcol] = 1   # a city has citizens: the majority rule seats them, and a pop-0 city follows nobody
     sim.city_center[0, 0, jcol] = src_c
     sim.city_dist_tile[0, 0, jcol, hs_d] = hs_t
     sim.district_complete[0, hs_t] = True

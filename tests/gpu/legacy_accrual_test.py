@@ -272,8 +272,10 @@ def test_the_purchase_discounts(rules, path) -> None:
     import json as _json
     from core import FIXTURES as _FX
     pols = _json.loads((_FX / "rules.json").read_text(encoding="utf-8"))["policies"]
-    for gov_id, turns, purse, other, want in (("MERCHANT_REPUBLIC", 30, "_gold_price", "_faith_price", 98.0),
-                                             ("THEOCRACY", 45, "_faith_price", "_gold_price", 97.0)):
+    # 100 less the accrued 2% / 3% is 98 / 97, and every price then takes the
+    # five-step FLOOR (measured live; `_purchase_step`) — 95 both
+    for gov_id, turns, purse, other, want in (("MERCHANT_REPUBLIC", 30, "_gold_price", "_faith_price", 95.0),
+                                             ("THEOCRACY", 45, "_faith_price", "_gold_price", 95.0)):
         sim = build(path)
         p_idx = next(i for i, p in enumerate(pols) if p["id"] == f"LEGACY_{gov_id}")
         g_idx = int(sim._pol_legacy[p_idx])
@@ -295,7 +297,8 @@ def test_the_purchase_discounts(rules, path) -> None:
         assert float(getattr(sim, other)(ROW, hundred)[0]) == 100.0, f"{gov_id}'s legacy touched the other purse"
         # a [1, N] price row broadcasts per game too
         row2 = getattr(sim, purse)(ROW, torch.tensor([[100.0, 50.0]], dtype=torch.float64))
-        assert row2.shape == (sim.B, 2) and abs(float(row2[0, 1]) - want / 2) < 1e-9, row2
+        # 50 less the percent is 49 / 48.5, floored to five: 45 both
+        assert row2.shape == (sim.B, 2) and abs(float(row2[0, 1]) - 45.0) < 1e-9, row2
     print("  10 the purchase discounts OK — Merchant Republic off gold, Theocracy off faith, at the accrued percent")
 
 

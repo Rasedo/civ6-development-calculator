@@ -22,6 +22,7 @@ What this lane holds:
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -307,7 +308,10 @@ def main() -> None:
         _purse0 = float(_buy.civ_faith[0, row] if _faith else _buy.civ_treasury[0, row])
         assert bool(_buy._purchase_district(row, _want, _tt, _ss, _faith)[0]),             f"{_chan}: the verb refused with the promotion held"
         _purse1 = float(_buy.civ_faith[0, row] if _faith else _buy.civ_treasury[0, row])
-        assert abs((_purse0 - _purse1) - round(_cost * _mult)) < 1e-6,             f"{_chan}: paid {_purse0 - _purse1}, the builder's cost times {_mult} is {round(_cost * _mult)}"
+        _d = int(_buy.rules.purchase_divisor)
+        _want = math.floor(_cost * _mult / _d) * _d   # the five-step floor every price takes (measured)
+        assert abs((_purse0 - _purse1) - _want) < 1e-6, \
+            f"{_chan}: paid {_purse0 - _purse1}, the builder's cost times {_mult} floored to five is {_want}"
         assert int(_buy.district[0, _t]) == di and bool(_buy.district_complete[0, _t]),             f"{_chan}: the bought district is not standing complete"
         assert int(_buy.city_dist_tile[0, row, j, di]) == _t, f"{_chan}: the registry missed it"
         assert int(_buy.city_current[0, row, j, 0]) == -1,             f"{_chan}: a cheque disturbed the city's QUEUE"
