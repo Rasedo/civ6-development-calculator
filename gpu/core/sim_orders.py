@@ -584,7 +584,7 @@ class SimOrders:
                     for _d in range(self._n_devices):
                         _dm = _okN & (torch.div(_kk, self._nuke_cols, rounding_mode="floor") == _d)
                         if bool(_dm.any()):
-                            self._detonate(_dm, row, _d, _tg)
+                            self._detonate(_dm, row, _d, _tg, carrier=sc)
                     # the carrier spends its whole turn on the delivery
                     _mp = self.unit_mp
                     _mp[_okN.nonzero(as_tuple=True)[0], sc[_okN]] = 0

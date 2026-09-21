@@ -1368,6 +1368,9 @@ class SimInit:
         # its own. `wonder_near` is its neighbourhood closure (the ASTROLOGY
         # eureka's "near a wonder").
         self._feat_natural = torch.tensor([bool(x) for x in rules.improvements["featNatural"]], dtype=torch.bool, device=device)
+        # the feature's own DefenseModifier (`featureDefense`), read by the
+        # ICBM warhead's plot term
+        self._feat_def = torch.tensor([int(x) for x in rules.improvements["featDef"]], dtype=torch.long, device=device)
         # CIV6 (PLOT_HAS_ANY_PASSABLE_FEATURE): the Marae counts a feature
         # that is not impassable — a natural wonder included.
         self._feat_passable = torch.tensor([bool(x) for x in rules.improvements["featPassable"]], dtype=torch.bool, device=device)
@@ -2827,6 +2830,13 @@ class SimInit:
         self._fallout_damage = float(_nuc["falloutDamage"])
         self._nuke_robot_damage = float(_nuc["robotDamage"])
         self._nuke_cover_range = int(_nuc["coverRange"])
+        # INTERCEPTION (measured, lab 3): the anti-air attack's support and
+        # health terms, the silo / submarine warhead defences, the cancel line
+        self._nuke_aa_support = float(_nuc["aaSupport"])
+        self._nuke_aa_wound = float(_nuc["aaWound"])
+        self._nuke_silo_def = float(_nuc["siloDefense"])
+        self._nuke_sub_def = float(_nuc["subDefense"])
+        self._nuke_int_dmg = int(_nuc["interceptDamage"])
         self._fallout_clean_charges = int(_nuc["cleanCharges"])
         self._silo_iid = int(_nuc["siloIid"])
         self._ww_wmd_launched = float(_nuc["wwLaunched"])
@@ -3137,7 +3147,6 @@ class SimInit:
         # chassis, so it never embarks and asks no seafaring tech.
         self.unit_water_walk = torch.tensor([bool(u.get("ww", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_heal_friendly = torch.tensor([bool(u.get("healFriendly", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_nuke_cover = torch.tensor([bool(u.get("nukeCover", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_nuke_carry = torch.tensor([bool(u.get("nukeCarry", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
         # THE SIEGE CLASSES. `_type_bombard` > 0 marks a unit whose attack

@@ -14,9 +14,9 @@ import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary } from '../core/units';
-import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_INTERCEPTORS, NUKE_CARRIERS } from '../data/nuclear';
+import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_CARRIERS, NUKE_AA_SUPPORT, NUKE_AA_WOUND, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import type { PlunderRow, ImprovementId } from '../core/types';
-import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
+import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE, featureDefense } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
@@ -1170,6 +1170,13 @@ export function buildRules() {
       falloutDamage: FALLOUT_DAMAGE,
       robotDamage: NUKE_ROBOT_DAMAGE,
       coverRange: NUKE_COVER_RANGE,
+      // INTERCEPTION (measured): the support and health terms of the
+      // anti-air attack, the two ICBM warhead defences, the cancel line
+      aaSupport: NUKE_AA_SUPPORT,
+      aaWound: NUKE_AA_WOUND,
+      siloDefense: NUKE_SILO_DEFENSE,
+      subDefense: NUKE_SUB_DEFENSE,
+      interceptDamage: NUKE_INTERCEPT_DAMAGE,
       cleanCharges: FALLOUT_CLEAN_CHARGES,
       nukeCols: NUKE_COLS,
       siloIid: IMPROVEMENT_IDS.indexOf('MISSILE_SILO'),
@@ -1512,9 +1519,8 @@ export function buildRules() {
       antiAirRange: u.antiAirRange ?? -1,   // -1 = this chassis covers nothing
       gdr: u.gdr ? 1 : 0,
       ww: u.waterWalk ? 1 : 0,
-      // the nuclear pair: `nukeCover` stops a strike one hex out, `nukeCarry`
+      // the nuclear flag: `nukeCarry`
       // throws one; `healFriendly` heals at home alone.
-      nukeCover: NUKE_INTERCEPTORS.includes(u.id) ? 1 : 0,
       nukeCarry: NUKE_CARRIERS.includes(u.id) ? 1 : 0,
       healFriendly: u.healFriendlyOnly ? 1 : 0,
       spy: u.spy ? 1 : 0,
@@ -1995,6 +2001,9 @@ export function buildRules() {
       // FEAT_IDS order — what lets the GPU derive its wonder plane and price
       // a feature that ARRIVES after t0 from the same table TS reads.
       featNatural: FEAT_IDS.map((f) => (FEATURES[f]?.naturalWonder ? 1 : 0)),
+      // the feature's own DefenseModifier (`featureDefense`) — the plot term
+      // an ICBM's warhead defence loses over rough ground
+      featDef: FEAT_IDS.map((f) => featureDefense(f)),
       // CIV6 (SightThroughModifier / SightModifier — ask 11): the height a feature
       // puts in the way of a look, the height an elevation stands at and blocks with
       featSightThrough: FEAT_IDS.map((f) => FEATURE_SIGHT_THROUGH[f] ?? 0),

@@ -261,7 +261,7 @@ class Rules:
     b_appeal_y: torch.Tensor  # f64 [NB, 2, 6] — what it pays an adjacent unimproved tile at Breathtaking, then Charming
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
     resources: dict  # {harvestYield, harvestAmount, improvement} per RESOURCE_IDS — the HARVEST's own table
-    nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, cleanCharges, siloIid, wwLaunched, emergency*}
+    nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, aaSupport, aaWound, siloDefense, subDefense, interceptDamage, cleanCharges, siloIid, wwLaunched, emergency*}
     gdr: dict  # {upgradeId[], upgradeTech[], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS, navalPenalty}
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)

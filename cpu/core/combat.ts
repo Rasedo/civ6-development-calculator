@@ -8,9 +8,9 @@ import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
-import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE } from '../data/nuclear';
+import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import { AGE_GOLDEN, EMERGENCY_NUCLEAR } from '../data/seats';
-import { addWmd, nukeBlast, nukeCarrier, nukeInterceptor, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
+import { addWmd, nukeBlast, nukeCarrier, nukeInterceptStrength, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
 import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
@@ -89,6 +89,26 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
 }
 
 
+/** a FEATURE's own DefenseModifier (Features.xml): woods and rainforest
+ *  shelter (+3), marsh and floodplains EXPOSE the defender (−2 — marsh stays
+ *  SLOW to enter, only its defence value flips), and CIV6 (R&F) "Reefs
+ *  provide a +3 Defensive CS bonus for units in the water" — a NAVAL
+ *  defender's terrain, since an embarked one defends at the normalized CS
+ *  that carries no terrain at all. Exported per feature as `featDef`. */
+export function featureDefense(feature: string | null | undefined): number {
+  if (feature === 'WOODS' || feature === 'RAINFOREST') return 3;
+  if (feature === 'MARSH' || feature === 'FLOODPLAINS') return -2;
+  if (feature === 'REEF') return 3;
+  return 0;
+}
+
+/** the PLOT's terrain + feature DefenseModifier alone — what a unit standing
+ *  there gets from the ground, and what the game subtracts from an ICBM's
+ *  warhead defence over that plot (`_plot_defense_mod` is the twin). */
+export function plotDefenseModifier(tile: Tile): number {
+  return (tile.elevation === 'HILLS' ? 3 : 0) + featureDefense(tile.feature);
+}
+
 export function terrainDefense(tile: Tile): number {
   // CIV6 (Alhambra +4, Mont St. Michel +6): "Occupying unit receives +N
   // Defense Strength". The fortification half of that line is a floor on the
@@ -96,16 +116,7 @@ export function terrainDefense(tile: Tile): number {
   let d = tile.builtWonder && tile.builtWonderComplete
     ? BUILT_WONDERS[tile.builtWonder]?.effects?.occupyDefense ?? 0
     : 0;
-  if (tile.elevation === 'HILLS') d += 3;
-  if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') d += 3;
-  // Marsh and floodplains EXPOSE the defender (−2) —
-  // they don't shelter like woods/rainforest. Marsh stays SLOW to enter
-  // (moveCostInto, deliberately unchanged); only its DEFENSE value flips here.
-  if (tile.feature === 'MARSH' || tile.feature === 'FLOODPLAINS') d -= 2;
-  // CIV6 (R&F): "Reefs provide a +3 Defensive CS bonus for units in the
-  // water" — a NAVAL defender's terrain, since an embarked one defends at the
-  // normalized CS that carries no terrain at all.
-  if (tile.feature === 'REEF') d += 3;
+  d += plotDefenseModifier(tile);
   d += improvementDefenseCS(tile);
   return d;
 }
@@ -2212,6 +2223,14 @@ export function siloTargets(state: GameState, seat: number, k: number, width: nu
  * THE BLAST. CIV6 (Nuclear weapons), clause by clause, in the order both
  * engines walk it:
  *
+ *   * INTERCEPTION comes before everything, and it is a COMBAT ROLL
+ *     (measured live, lab 3 — `nukeInterceptStrength` composes the anti-air
+ *     side): the warhead defends at the delivering BOMBER's Combat, or at
+ *     NUKE_SILO_DEFENSE / NUKE_SUB_DEFENSE less the aim plot's terrain and
+ *     feature modifier for a silo or a submarine; one `damageRoll`; a hit
+ *     above NUKE_INTERCEPT_DAMAGE cancels the strike, the bomber takes the
+ *     damage either way, a silo or submarine is never hurt, and a cancelled
+ *     strike declares no war. There is no per-turn limit on interceptions;
  *   * "Using nuclear weapons counts as a declaration of war against any
  *     civilization or city-state whose territory or units are in the blast
  *     radius" — the declarations run FIRST, so nothing below is a blow struck
@@ -2243,18 +2262,33 @@ export function siloTargets(state: GameState, seat: number, k: number, width: nu
  *
  * The device is spent whether or not it found anything.
  */
-export function detonate(state: GameState, seat: number, k: number, targetIndex: number): void {
+export function detonate(state: GameState, seat: number, k: number, targetIndex: number,
+                         carrier?: Unit): void {
   const def = NUCLEAR_DEVICES[k];
   const tiles = nukeBlast(state, targetIndex, k);
   if (!def || !tiles.length || wmdHeld(state, seat, k) <= 0) return;
   addWmd(state, seat, k, -1);
-  // CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
-  // protect adjacent tiles from nuclear strikes" — and the interception tests
-  // find no roll behind it, so a covered target simply takes nothing. The
-  // device is spent either way.
-  if (nukeInterceptor(state, seat, targetIndex) >= 0) {
-    state.eventLog.push(`${def.name} intercepted.`);
-    return;
+  // INTERCEPTION — the anti-air attack on the warhead (measured live, lab
+  // 3): `carrier` names the delivering unit, a BOMBER or a NUCLEAR
+  // SUBMARINE; none means the seat's Missile Silo fired. The device is
+  // spent either way.
+  const aa = nukeInterceptStrength(state, seat, targetIndex);
+  if (aa > 0) {
+    const air = carrier !== undefined && isAirUnit(carrier.type);
+    const plot = plotDefenseModifier(state.map.tiles[targetIndex]);
+    const warhead = carrier === undefined ? NUKE_SILO_DEFENSE - plot
+      : air ? (UNITS[carrier.type]?.combat ?? 0)
+        : NUKE_SUB_DEFENSE - plot;
+    const dmg = damageRoll(state, aa - warhead, 'nukei', targetIndex);
+    if (air && carrier) {
+      // the burst answers the AIRCRAFT: it carries the hit home or falls
+      carrier.hp -= dmg;
+      if (carrier.hp <= 0) disbandUnit(state, carrier.id);
+    }
+    if (dmg > NUKE_INTERCEPT_DAMAGE) {
+      state.eventLog.push(`${def.name} intercepted.`);
+      return;
+    }
   }
   const victims = nukeVictims(state, seat, tiles);
   for (const v of victims) {

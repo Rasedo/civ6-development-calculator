@@ -228,7 +228,8 @@ def main() -> int:
     blast = (s6.pair_dist[cap1] <= s6._nuke_radius[0]).nonzero().flatten().tolist()
     ring = [t for t in blast if t != cap1]
     victim = place_mil(s6, foe, ring[0], plain)
-    bot = place_mil(s6, foe, ring[1], s6._gdr_idx) if s6._gdr_idx >= 0 else -1
+    # the LAUNCHER's own robot: a rival's would INTERCEPT (AntiAirCombat 90)
+    bot = place_mil(s6, row, ring[1], s6._gdr_idx) if s6._gdr_idx >= 0 else -1
     s6.improvement[b, ring[2]] = 3
     s6.pillaged[b, ring[2]] = False
     enc_t = ring[3]
@@ -337,33 +338,67 @@ def main() -> int:
         "the delivery costs the carrier its whole turn")
     print(f"  7 the carrier head OK (column {col} -> tile {aim})")
 
-    # --- 8) a covering weapon STOPS the strike -------------------------------
-    # CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
-    # protect adjacent tiles from nuclear strikes", and the interception tests
-    # find NO percent chance behind it. `nukeInterceptor`'s twin.
-    guard_ty = next((i for i, u in enumerate(units) if int(u.get("nukeCover", 0))), -1)
-    assert guard_ty >= 0, "the roster marks no chassis `nukeCover`"
+    # --- 8) INTERCEPTION is a combat roll (measured live, lab 3) -------------
+    # `_nuke_intercept_strength` / `_detonate`'s roll: the strongest adjacent
+    # anti-air unit fires at AA − 10·(1 − hp/100), the others support by
+    # 5·hp/100; a silo warhead defends at 75 less the plot term; > 50 cancels.
+    sam_ty = next((i for i, u in enumerate(units)
+                   if int(u.get("antiAir", 0) or 0) == 100 and not int(u.get("naval", 0))), -1)
+    gun_ty = next((i for i, u in enumerate(units)
+                   if int(u.get("antiAir", 0) or 0) == 90 and not int(u.get("naval", 0))
+                   and not int(u.get("gdr", 0))), -1)
+    assert sam_ty >= 0 and gun_ty >= 0, "the roster carries no Mobile SAM / Anti-Air Gun"
     s8 = fresh(rules, paths[0])
-    s8.civ_wmd[b, row, 0] = 1
+    s8.civ_wmd[b, row, 0] = 3
     vic8 = place_mil(s8, foe, cap1, plain)
     nb8 = [int(t) for t in s8.neigh[cap1].tolist() if t >= 0]
-    assert nb8, "the rival capital has no neighbour to guard from"
-    g8 = place_mil(s8, foe, nb8[0], guard_ty)
+    assert len(nb8) >= 2, "the rival capital has no neighbours to guard from"
+    # the anti-air side, pinned: 100; +5 support; a half-dead supporter +2.5
+    g8 = place_mil(s8, foe, nb8[0], sam_ty)
     s8._eff_version += 1
-    assert bool(s8._nuke_intercepted(row, L(s8, cap1))[b]), "the cover did not answer"
-    s8._detonate(torch.ones(s8.B, dtype=torch.bool), row, 0, L(s8, cap1))
-    assert int(s8.civ_wmd[b, row, 0]) == 0, "the stopped device is spent anyway"
+    S, has = s8._nuke_intercept_strength(row, L(s8, cap1))
+    assert bool(has[b]) and float(S[b]) == 100.0, f"one SAM reads {float(S[b])}"
+    g8b = place_mil(s8, foe, nb8[1], sam_ty)
+    s8._eff_version += 1
+    assert float(s8._nuke_intercept_strength(row, L(s8, cap1))[0][b]) == 105.0, "a second SAM supports by +5"
+    s8.major_unit_hp[b, g8b] = 50
+    assert float(s8._nuke_intercept_strength(row, L(s8, cap1))[0][b]) == 102.5, "a half-dead supporter gives +2.5"
+    s8.major_unit_hp[b, g8b] = 100
+    # a SAM against the silo channel: S 100 vs D 75 − plot, the weakest roll
+    # round(24 × 1.04^25) = 64 on flat ground — the plot term only widens it
+    plot = int(s8._plot_defense_mod(L(s8, cap1))[b])
+    assert 100 - (75 - plot) >= 25
+    for _ in range(3):
+        s8._detonate(torch.ones(s8.B, dtype=torch.bool), row, 0, L(s8, cap1))
+    assert int(s8.civ_wmd[b, row, 0]) == 0, "the stopped devices are spent anyway"
     assert bool(s8.major_unit_alive[b, vic8]), "the target was hit through its cover"
-    assert bool(s8.major_unit_alive[b, g8]), "the weapon that stopped it died"
+    assert int(s8.tile_fallout[b, cap1]) == 0, "nothing landed"
+    assert int(s8.major_unit_hp[b, g8]) == 100, "a silo launch never hurts the interceptor"
 
-    # ...and a weapon of the LAUNCHER's own seat shoots nothing down
+    # an Anti-Air Gun at 1 HP: S 80.1 against D 75 − plot deals at most
+    # round(35 × 1.04^(5.1 + plot)) — never above 50 while plot <= 3
     s9 = fresh(rules, paths[0])
     s9.civ_wmd[b, row, 0] = 1
-    place_mil(s9, row, nb8[0], guard_ty)
+    vic9 = place_mil(s9, foe, cap1, plain)
+    place_mil(s9, foe, nb8[0], gun_ty, hp=1)
     s9._eff_version += 1
-    assert not bool(s9._nuke_intercepted(row, L(s9, cap1))[b]), (
+    plot9 = int(s9._plot_defense_mod(L(s9, cap1))[b])
+    assert plot9 <= 3, f"the fixture capital stands on +{plot9} ground; pick a flatter aim"
+    S9, has9 = s9._nuke_intercept_strength(row, L(s9, cap1))
+    assert bool(has9[b]) and abs(float(S9[b]) - 80.1) < 1e-9, f"a 1 HP gun reads {float(S9[b])}"
+    s9._detonate(torch.ones(s9.B, dtype=torch.bool), row, 0, L(s9, cap1))
+    assert int(s9.tile_fallout[b, cap1]) == int(s9._nuke_fallout[0]), "the strike landed"
+    assert not bool(s9.major_unit_alive[b, vic9])
+
+    # ...and a weapon of the LAUNCHER's own seat shoots nothing down
+    s10 = fresh(rules, paths[0])
+    s10.civ_wmd[b, row, 0] = 1
+    place_mil(s10, row, nb8[0], sam_ty)
+    s10._eff_version += 1
+    assert not bool(s10._nuke_intercept_strength(row, L(s10, cap1))[1][b]), (
         "a seat shot down its own device")
-    print("  8 interception OK — a hostile cover stops it, the launcher's own does not")
+    print("  8 interception OK — the roll: SAM 100 / 105 / 102.5 stops a silo shot every time, "
+          "a 1 HP gun never, the launcher's own never fires")
 
     # --- 9) the citizens, the unfinished district, the fallout floor ----------
     # measured live (lab 3): killed = the city's worked tiles inside the blast,

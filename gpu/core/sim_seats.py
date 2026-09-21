@@ -11457,21 +11457,51 @@ class SimSeats:
             self._dig_at(dr, a_tile[dr, u], _as)
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
 
-    def _nuke_intercepted(self, row: int, tile: torch.Tensor) -> torch.Tensor:
-        """[B] — is a strike on `tile` STOPPED? `nukeInterceptor`'s twin. CIV6:
-        "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can protect
-        adjacent tiles from nuclear strikes" — the chassis the exporter marks
-        `nukeCover`, at `coverRange`, and hostile to the launcher: a seat never
-        shoots down its own."""
-        cover = (self.pair_dist[tile] <= self._nuke_cover_range)  # [B, T]
-        live = self.unit_alive & (self.unit_tile >= 0)
-        guard = live & self._type_nuke_cover[self.unit_type.clamp(min=0)]
-        guard = guard & (self.unit_seat != int(self._ROW_SEAT[row]))
-        if not bool(guard.any()):
-            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return (guard & cover.gather(1, self.unit_tile.clamp(min=0))).any(dim=1)
+    def _plot_defense_mod(self, tiles: torch.Tensor) -> torch.Tensor:
+        """[B] long — `plotDefenseModifier`: the plot's hills (+3) and its LIVE
+        feature's own DefenseModifier (`featDef`), nothing else."""
+        tc = tiles.clamp(min=0)
+        fid = self.feat_id.gather(1, tc.unsqueeze(1)).squeeze(1)
+        live = (fid >= 0) & ~self.feat_stripped.gather(1, tc.unsqueeze(1)).squeeze(1)
+        fd = self._feat_def[fid.clamp(min=0)] * live.long()
+        return self.hills.gather(1, tc.unsqueeze(1)).squeeze(1).long() * 3 + fd
 
-    def _detonate(self, fire: torch.Tensor, row: int, k: int, tile: torch.Tensor) -> None:
+    def _nuke_intercept_strength(self, row: int, tile: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """(S [B] float64, has [B] bool) — `nukeInterceptStrength`'s twin, the
+        anti-air side of an interception as measured live (lab 3). EVERY unit
+        with an anti-air strength that is not the launcher's own and stands
+        within `coverRange` of the aim plot qualifies; the STRONGEST fires at
+        AntiAirCombat − aaWound·(1 − hp/100) (continuous, never the rounded
+        `_wound`), plus its Air Defense Initiative term, and every other one
+        supports it by aaSupport·hp/100."""
+        B, dev = self.B, self.device
+        cover = (self.pair_dist[tile.clamp(min=0)] <= self._nuke_cover_range)  # [B, T]
+        ut = self.unit_type.clamp(min=0, max=self.NU - 1)
+        aa = self._anti_air_at(ut, self.unit_seat)
+        guard = (self.unit_alive & (self.unit_tile >= 0) & (self.unit_hp > 0) & (aa > 0)
+                 & (self.unit_seat != int(self._ROW_SEAT[row]))
+                 & cover.gather(1, self.unit_tile.clamp(min=0)))
+        has = guard.any(dim=1)
+        if not bool(has.any()):
+            z = torch.zeros(B, dtype=torch.float64, device=dev)
+            return z, has
+        cap = float(self.rules.combat.get("unitHp", 100))
+        hp = self.unit_hp.double()
+        own = aa.double() - self._nuke_aa_wound * (1.0 - hp / cap)
+        own = torch.where(guard, own, torch.full_like(own, -1e9))
+        best, bi = own.max(dim=1)   # the first maximum — the walk order both engines share
+        fs = bi.clamp(min=0)
+        f_aa = aa.gather(1, fs.unsqueeze(1)).squeeze(1)
+        f_seat = self.unit_seat.gather(1, fs.unsqueeze(1)).squeeze(1)
+        f_tile = self.unit_tile.gather(1, fs.unsqueeze(1)).squeeze(1)
+        gov = self._air_defense_cs(f_aa, f_seat, f_tile).double()
+        f_hp = hp.gather(1, fs.unsqueeze(1)).squeeze(1)
+        support = (torch.where(guard, hp, torch.zeros_like(hp)).sum(dim=1) - f_hp) / cap
+        s = best + gov + self._nuke_aa_support * support
+        return torch.where(has, s, torch.zeros_like(s)), has
+
+    def _detonate(self, fire: torch.Tensor, row: int, k: int, tile: torch.Tensor,
+                  carrier: torch.Tensor | None = None) -> None:
         """`detonate` — the blast. CIV6 (Nuclear weapons), in the order both
         engines walk it: the declarations first, then the units, then what the
         tiles carry, the fallout, and the two defensive pools a City Center or
@@ -11492,11 +11522,37 @@ class SimSeats:
         tt = tile.clamp(min=0)
         blast = (self.pair_dist[tt] <= int(self._nuke_radius[k])) & fire.unsqueeze(1)
         self.civ_wmd[:, row, k] = (self.civ_wmd[:, row, k] - fire.long()).clamp(min=0)
-        # CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
-        # protect adjacent tiles from nuclear strikes", and the interception
-        # tests find no roll behind it — a covered target takes nothing, and the
-        # device is spent either way (`nukeInterceptor`).
-        fire = fire & ~self._nuke_intercepted(row, tt)
+        # INTERCEPTION — one anti-air attack on the warhead, one draw (measured
+        # live, lab 3; `detonate`'s twin). `carrier` is the delivering unit's
+        # slot, a BOMBER or a NUCLEAR SUBMARINE; None means the seat's Missile
+        # Silo fired. The warhead defends at the bomber's own Combat, or at
+        # siloDefense / subDefense less the aim plot's terrain + feature term;
+        # a hit above interceptDamage cancels the strike, the bomber takes the
+        # damage either way, a silo or submarine is never hurt. The device is
+        # spent either way.
+        aa, has = self._nuke_intercept_strength(row, tt)
+        roll = fire & has
+        if bool(roll.any()):
+            plot = self._plot_defense_mod(tt).double()
+            if carrier is None:
+                air = torch.zeros_like(fire)
+                warhead = self._nuke_silo_def - plot
+            else:
+                cs = carrier.clamp(min=0)
+                cty = self.unit_type.gather(1, cs.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                air = self._type_air[cty] > 0
+                warhead = torch.where(air, self._type_combat[cty].double(), self._nuke_sub_def - plot)
+            dmg = self._damage_roll(roll, aa - warhead, k="nukei", tile=tt)
+            hit_air = roll & air
+            if bool(hit_air.any()):
+                # the burst answers the AIRCRAFT: it carries the hit home or falls
+                rows = hit_air.nonzero(as_tuple=True)[0]
+                cs_r = carrier[rows].clamp(min=0)
+                self.unit_hp[rows, cs_r] = self.unit_hp[rows, cs_r] - dmg[rows].to(self.unit_hp.dtype)
+                died = self.unit_hp[rows, cs_r] <= 0
+                if bool(died.any()):
+                    self.unit_alive[rows[died], cs_r[died]] = False
+            fire = fire & ~(roll & (dmg > self._nuke_int_dmg))
         if not bool(fire.any()):
             return
         blast = blast & fire.unsqueeze(1)

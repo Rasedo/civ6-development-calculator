@@ -35,7 +35,7 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent on C-31 |
+| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent's +30% on the three nuclear projects |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-51r Encampment pool on capture | 1 | measured: the pools ride, the lost walls zero the maxima |
 | B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
@@ -47,8 +47,7 @@ re-adds them.
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
 | C-26 civilization abilities, the residue | 1 | three unread DLL clauses; the visibility gate's three requirement sets |
-| C-31 the nuclear strike's last clause | 1 | the per-channel warhead defence |
-| C-34 air combat's second half | 2 | the interception law itself; Patrol and Priority Target carry no data |
+| C-34 air combat's second half | 1 | Patrol and Priority Target carry no data |
 | C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
 | C-41 Volcanic Soil | 1 | the proportion painted per severity, and the severity roll itself (LAB) |
 | C-49 named storms | 1 | the per-step draw is inferred from resultants, not watched step by step (LAB) |
@@ -57,8 +56,8 @@ re-adds them.
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
 | C-80 constants vs the install | 2 | the purchase price, the Pop Star's tag, two rules the reader census names |
-| **C. Absent systems** | **18** | |
-| **OPEN, TOTAL** | **23** | |
+| **C. Absent systems** | **16** | |
+| **OPEN, TOTAL** | **21** | |
 
 ## The question ledger — owner asks
 
@@ -83,7 +82,7 @@ close in the same commit.
 - **B-24r. GOVERNOR TAILS.** Weight 1.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.
   - BLOCKER C-1: Renewable Subsidizer and Industrialist wait on the plants.
-  - BLOCKER C-31: Arms Race Proponent waits on the armament projects.
+  - BUILD Arms Race Proponent: three `MODIFIER_SINGLE_CITY_ADJUST_PROJECT_PRODUCTION` rows, Amount 30 each, on PROJECT_MANHATTAN_PROJECT, PROJECT_OPERATION_IVY and PROJECT_BUILD_NUCLEAR_DEVICE (Expansion1_Governors.xml) — all three projects exist in the catalog; the old "waits on the armament projects" was false.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no row with PLUNDER in its name at all, and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The district `PlunderAmount` column (25 / 50) is sourced and ships, and so are the two plunder percentages (Total War 50, Letter of Marque 100); only the route's base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
@@ -117,16 +116,7 @@ close in the same commit.
   - DLL, recorded: whether Trajan's grant fires on a CONQUERED city (`TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING` is `MODIFIER_PLAYER_CITIES_GRANT_CHEAPEST_BUILDING_IN_CITY`, Amount 1, no requirement set — founding ships); whether Iteru's flood avoid also skips the fertility half (the trait's modifiers are fourteen `TRAIT_FLOODPLAINS_VALID_*` placement rows and two `TRAIT_RIVER_FASTER_BUILDTIME_*` — NO modifier carries the avoid at all); whether the Knarr's Ocean clause reaches a Trader's course (`ABILITY_KNARR_IGNORE_EMBARK_DISEMBARK_COST` IS tagged onto `CLASS_LANDCIVILIAN`, which `UNIT_TRADER` carries, so the open half is only whether `MODIFIER_PLAYER_UNIT_ADJUST_IGNORE_SHORES` — no arguments — reaches a trade route's water path; `tradeWaterLevel` stays Cartography-gated).
   - BUILD, the residue: resource VISIBILITY ships for the seven strategics (`Resources.PrereqTech` — `hiddenResourcesFor` / `_res_hidden`: no tile yield, no improvement forced or offered, no access, no accrual, no Grand Bazaar count, and the Stave Church counts only the coastal resources its owner can see). A district or wonder may stand on a hidden strategic (the install allows it; the resource is lost). The adjacency and belief improvement clauses still read the resource whether or not the seat can see it on BOTH engines — and that is NOT a DLL question: `REQUIREMENT_PLOT_RESOURCE_VISIBLE` exists and is written EXPLICITLY into the three sets that want it (`PLOT_HAS_STRATEGIC_MINE_REQUIREMENTS` in `Beliefs.xml`, `STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS` in `Buildings.xml`, `PLOT_HAS_STRATEGIC_RESOURCE` in `Expansion1_Governors.xml`), so a requirement set that does not name it reads the resource regardless. Gate those three and nothing else. The two artifact resources' `PrereqCivic` gates have no reader (no archaeology here).
   - Recorded allowlist: a CITY's own ranged strike composes its defender without the roster's rows (`cityStrikeStrength`'s block in `seatPhase`; the site census in `combat-rows.test.ts` / `combat_rows_test.py` names it).
-- **C-31. THE NUCLEAR STRIKE'S LAST CLAUSE.** Weight 1.
-  - BUILD, WHICH DELIVERY A COVER STOPS — C-34's law supplies it, and the community's per-delivery split is wrong. Every channel is the same anti-air attack; what changes is the warhead's DEFENCE: the delivering unit's own `Combat` for a BOMBER (85, Jet Bomber 90), a flat 75 for a MISSILE SILO and 80 for a NUCLEAR SUBMARINE, the two ICBM channels further REDUCED by the aim plot's terrain + feature `DefenseModifier` (rough ground makes a nuke easier to shoot down; the bomber channel takes no tile term because the anti-air attacks the aircraft, which stands nowhere). The bomber's "drop stopped under 50% HP" reading is wrong — the interceptor attacks the bomber and the DAMAGE decides. A silo or submarine launcher is never damaged; the device is spent either way; a warhead cannot be aimed within its own blast radius of the silo that fires it, and a silo may fire at any REVEALED plot in range, visible or not.
-- **C-34. AIR COMBAT'S SECOND HALF.** Weight 2.
-  - BUILD, INTERCEPTION — measured against the game's own deterministic preview and 60 of 60 pre-registered live rounds. Every unit with `AntiAirCombat > 0` covers the SIX TILES ADJACENT to it and nothing beyond, whatever its class or domain: the Anti-Air Gun and Mobile SAM, the Giant Death Robot, and the Destroyer, Battleship, Minas Geraes and Missile Cruiser on water over a land aim alike (`ABILITY_ANTI_AIR_COVER` carries no radius of its own, and the `Range` column is the ranged attack's, not the cover's). One attack is made on the warhead, one rng draw:
-
-        S = max over the adjacent qualifying interceptors of (AntiAirCombat - 10 * (1 - hp/100))
-            + COMBAT_ANTI_AIR_SUPPORT_BONUS_MODIFIER (5) * sum of hp/100 over the others
-        damage = round((24 + rand(12)) * 1.04^(S - D));   cancelled iff damage > 50
-
-    The STRONGEST interceptor fires and the rest only support, scaled by their own health; there is NO per-turn budget (four consecutive launches at one unmoved SAM were all stopped, and five bomber strikes at one stack of guns all cancelled); a seat never intercepts its own warhead; an intercepted strike declares no war where a landed one does. `nukeInterceptor` / `_nuke_intercepted` ship the pedia's four-unit class list with `NUKE_COVER_RANGE = 1` and no roll at all. Two facts for the same build: a FIGHTER does not intercept in this build (three enemy fighters in range produced an empty interceptor block, and there is no air-patrol stance to put one in), and an interceptor never earns experience — `UNIT_ANTIAIR_GUN`, `UNIT_MOBILE_SAM` and `UNIT_GIANT_DEATH_ROBOT` all ship `CanEarnExperience="false"` and five real interceptions banked zero.
+- **C-34. AIR COMBAT'S SECOND HALF.** Weight 1.
   - DLL: PATROL is not a data row (no `UNITOPERATION_PATROL`, no command, no promotion in any layer, re-grepped) — it is the UI's name for a fighter sitting ready, and the live game exposes no stance to enter.
   - DLL: PRIORITY TARGET is a command with no data — `UNITCOMMAND_PRIORITY_TARGET` (`Expansion1_UnitCommands.xml`) has a category, an interface mode, an icon and a label, and no argument, requirement set or magnitude in any layer.
 - **C-38. A CITY-STATE'S CITY.** Weight 1.

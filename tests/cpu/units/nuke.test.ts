@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setTileOwner, civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
-import { detonate, nukeReach, nukeTargets, siloReaches, siloTargets, siloTiles } from '../../../cpu/core/combat';
-import { addWmd, irradiated, nukeBlast, nukeInterceptor, nukeOffers, nukeVictims, wmdHeld } from '../../../cpu/core/nuclear';
-import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, NUKE_INTERCEPTORS } from '../../../cpu/data/nuclear';
+import { detonate, nukeReach, nukeTargets, plotDefenseModifier, siloReaches, siloTargets, siloTiles } from '../../../cpu/core/combat';
+import { addWmd, irradiated, nukeBlast, nukeInterceptor, nukeInterceptStrength, nukeOffers, nukeVictims, wmdHeld } from '../../../cpu/core/nuclear';
+import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../../../cpu/data/nuclear';
 import { EMERGENCY_NUCLEAR } from '../../../cpu/data/seats';
 import { wwGet } from '../../../cpu/core/weariness';
 import { UNITS } from '../../../cpu/data/units';
@@ -54,7 +54,8 @@ describe('the blast', () => {
     setTileOwner(at, 1);
     addWmd(state, 0, DEV, 1);
     const foot = spawnUnit(state, 'WARRIOR', at.index, 1)!;
-    const bot = spawnUnit(state, 'GIANT_DEATH_ROBOT', tileAtCoords(state.map, 11, 8).index, 1)!;
+    // the LAUNCHER's own robot: a rival's would INTERCEPT (AntiAirCombat 90)
+    const bot = spawnUnit(state, 'GIANT_DEATH_ROBOT', tileAtCoords(state.map, 11, 8).index, 0)!;
     bot.hp = 100;
     detonate(state, 0, DEV, at.index);
     expect(state.units.some((u) => u.id === foot.id)).toBe(false);
@@ -100,44 +101,103 @@ describe('the blast', () => {
   });
 });
 
+// Interception, measured live (lab 3): one anti-air attack on the warhead,
+// one draw, cancelled iff the damage is above 50. On the test map the aim
+// plot is flat grassland, so the ICBM channels' plot term is 0.
 describe('what stops one', () => {
-  it('a covering weapon takes the blast off the map, and spends the device', () => {
-    // CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
-    // protect adjacent tiles from nuclear strikes", and the interception tests
-    // find NO percent chance behind it.
+  function scene() {
     const state = world();
     const at = tileAtCoords(state.map, 10, 8);
     const victim = spawnUnit(state, 'WARRIOR', at.index, 1)!;
-    const guard = spawnUnit(state, 'MOBILE_SAM',
-      tileAtCoords(state.map, 11, 8).index, 1)!;
-    expect(NUKE_INTERCEPTORS).toContain('MOBILE_SAM');
-    expect(nukeInterceptor(state, 0, at.index)).toBe(guard.id);
+    addWmd(state, 0, DEV, 3);
+    expect(plotDefenseModifier(at)).toBe(0);
+    return { state, at, victim };
+  }
 
-    addWmd(state, 0, DEV, 1);
-    detonate(state, 0, DEV, at.index);
-    // the device is spent either way, and the victim is untouched
+  it('the anti-air side: the strongest fires at its health-scaled strength, the rest support by theirs', () => {
+    const { state, at } = scene();
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(0);
+    const sam = spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 11, 8).index, 1)!;
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(100);
+    expect(nukeInterceptor(state, 0, at.index)).toBe(sam.id);
+    const second = spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 9, 8).index, 1)!;
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(105);       // +5 support
+    second.hp = 50;
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(102.5);     // a half-dead supporter gives +2.5
+    sam.hp = 50;
+    second.hp = 100;
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(102.5);     // the healthy one fires now
+    expect(nukeInterceptor(state, 0, at.index)).toBe(second.id);
+    // a weapon of the LAUNCHER's own seat is not an interceptor
+    spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 10, 9).index, 0);
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(102.5);
+    // ...nor is anything beyond the cover range
+    expect(NUKE_COVER_RANGE).toBe(1);
+    const far = world();
+    spawnUnit(far, 'MOBILE_SAM', tileAtCoords(far.map, 13, 8).index, 1);
+    expect(nukeInterceptStrength(far, 0, at.index)).toBe(0);
+  });
+
+  it('a Missile Cruiser beside the aim stops a silo shot on flat ground at every roll, and spends the device', () => {
+    const { state, at, victim } = scene();
+    const sea = tileAtCoords(state.map, 11, 8);
+    sea.terrain = 'COAST';
+    const ship = spawnUnit(state, 'MISSILE_CRUISER', sea.index, 1)!;
+    // S 110 against D 75: the weakest roll deals round(24 × 1.04^35) = 95
+    expect(nukeInterceptStrength(state, 0, at.index)).toBe(110);
+    expect(NUKE_SILO_DEFENSE).toBe(75);
+    for (let i = 0; i < 3; i++) detonate(state, 0, DEV, at.index);
     expect(wmdHeld(state, 0, DEV)).toBe(0);
     expect(state.units.some((u) => u.id === victim.id)).toBe(true);
-    expect(irradiated(state.map.tiles[at.index])).toBe(false);
+    expect(irradiated(at)).toBe(false);
+    expect(ship.hp).toBe(100);   // a silo launcher is never hurt, and neither is the interceptor
   });
 
-  it('a weapon of the LAUNCHER own seat shoots nothing down', () => {
-    const state = world();
-    const at = tileAtCoords(state.map, 10, 8);
-    spawnUnit(state, 'WARRIOR', at.index, 1);
-    spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 11, 8).index, 0);
-    expect(nukeInterceptor(state, 0, at.index)).toBe(-1);
-    addWmd(state, 0, DEV, 1);
+  it('an Anti-Air Gun at 1 HP stops nothing: S 80.1 against D 75 never clears 50', () => {
+    const { state, at, victim } = scene();
+    const gun = spawnUnit(state, 'ANTI_AIR_GUN', tileAtCoords(state.map, 11, 8).index, 1)!;
+    gun.hp = 1;
+    expect(nukeInterceptStrength(state, 0, at.index)).toBeCloseTo(80.1, 6);
     detonate(state, 0, DEV, at.index);
-    expect(irradiated(state.map.tiles[at.index])).toBe(true);
+    expect(irradiated(at)).toBe(true);
+    expect(state.units.some((u) => u.id === victim.id)).toBe(false);
   });
 
-  it('a weapon BEYOND the cover range stops nothing', () => {
+  it('a bomber takes the hit: a Missile Cruiser downs the strike and wounds the plane, a lone gun only wounds it', () => {
+    const { state, at, victim } = scene();
+    const pad = tileAtCoords(state.map, 5, 5);
+    setTileOwner(pad, 0);
+    const bomber = spawnUnit(state, 'BOMBER', pad.index, 0)!;
+    const sea = tileAtCoords(state.map, 11, 8);
+    sea.terrain = 'COAST';
+    const ship = spawnUnit(state, 'MISSILE_CRUISER', sea.index, 1)!;
+    // the warhead defends at the bomber's own Combat 85: S 110 deals 64..93
+    detonate(state, 0, DEV, at.index, bomber);
+    expect(irradiated(at)).toBe(false);
+    expect(bomber.hp).toBeGreaterThan(0);
+    expect(bomber.hp).toBeLessThanOrEqual(100 - 64);
+    // against an Anti-Air Gun (90) the same bomber takes 29..43 and the strike lands
+    state.units.splice(state.units.indexOf(ship), 1);
+    bomber.hp = 100;
+    spawnUnit(state, 'ANTI_AIR_GUN', tileAtCoords(state.map, 9, 8).index, 1);
+    detonate(state, 0, DEV, at.index, bomber);
+    expect(irradiated(at)).toBe(true);
+    expect(state.units.some((u) => u.id === victim.id)).toBe(false);
+    expect(bomber.hp).toBeGreaterThanOrEqual(100 - 43);
+    expect(bomber.hp).toBeLessThanOrEqual(100 - 29);
+    expect(NUKE_INTERCEPT_DAMAGE).toBe(50);
+    expect(NUKE_SUB_DEFENSE).toBe(80);
+  });
+
+  it('rough ground under the aim plot is what an ICBM loses: hills and a feature read +6, marsh −2', () => {
     const state = world();
-    const at = tileAtCoords(state.map, 10, 8);
-    spawnUnit(state, 'MOBILE_SAM', tileAtCoords(state.map, 13, 8).index, 1);
-    expect(NUKE_COVER_RANGE).toBe(1);
-    expect(nukeInterceptor(state, 0, at.index)).toBe(-1);
+    const t = tileAtCoords(state.map, 10, 8);
+    t.elevation = 'HILLS';
+    t.feature = 'RAINFOREST';
+    expect(plotDefenseModifier(t)).toBe(6);
+    t.elevation = 'FLAT';
+    t.feature = 'MARSH';
+    expect(plotDefenseModifier(t)).toBe(-2);
   });
 });
 

@@ -10,12 +10,14 @@
  * A LEAF module: the verbs that SPEND a build charge to clean fallout live
  * with the other charge verbs in `units`, so nothing here reaches back.
  */
-import type { GameState } from './types';
+import type { GameState, Unit } from './types';
 import type { Tile } from '../../world/types';
 import { tilesWithin } from '../../world/hex';
 import { NO_SEAT, seatOf, seatsAllied, tileSeat, unitSeat } from './seats';
 import { getModifiers } from './effects';
-import { NUCLEAR_DEVICES, NUKE_CARRIERS, NUKE_COVER_RANGE, NUKE_INTERCEPTORS } from '../data/nuclear';
+import { NUCLEAR_DEVICES, NUKE_CARRIERS, NUKE_COVER_RANGE, NUKE_AA_SUPPORT, NUKE_AA_WOUND } from '../data/nuclear';
+import { UNIT_HP } from '../data/units';
+import { antiAirAt, airDefenseOf } from './air';
 
 /** how many of device `k` this seat holds. */
 export function wmdHeld(state: GameState, seat: number, k: number): number {
@@ -100,38 +102,79 @@ export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile
 }
 
 /**
- * The weapon that STOPS a strike on `tileIndex`, or none.
+ * The anti-air side of an interception, measured live (lab 3 parts three,
+ * six and eight; 60 of 60 pre-registered rounds). EVERY unit with an anti-air
+ * strength — land or naval, whatever its class — that is not the launcher's
+ * own and stands within NUKE_COVER_RANGE of the aim plot qualifies. The
+ * STRONGEST fires (ties to the walk order: tile index, then occupancy) at
  *
- * CIV6: "Destroyers, Battleships, Missile Cruisers, and Mobile SAMs can
- * protect adjacent tiles from nuclear strikes" — `NUKE_INTERCEPTORS` at
- * `NUKE_COVER_RANGE`, read like an anti-air weapon's own cover: one hex out,
- * and the tile it stands on. The weapon must be HOSTILE to the launcher; a
- * seat never shoots down its own.
+ *     AntiAirCombat − NUKE_AA_WOUND · (1 − hp/100)   [+ Air Defense Initiative]
  *
- * CIV6 (Gathering Storm interception tests, forums.civfanatics.com/threads/
- * ...665241, Dec 2020): the tests find NO percent chance, so the protection is
- * deterministic and the stopped device is lost from the inventory. What those
- * tests add and the page does not carry — that a silo launch answers to the
- * Gun AA, the Battleship and the SAM while a submarine launch answers to the
- * SAM alone, and that a BOMBER's delivery turns on the interception taking it
- * under 50% HP — needs the interception DAMAGE the install never publishes
- *, so the page's own list stands for every delivery.
- *
- * Ties: the lowest tile index, then the tile's own occupancy order — the same
- * total order `airCoverAgainst` walks.
+ * and every OTHER qualifying unit supports it by NUKE_AA_SUPPORT · hp/100
+ * (fractional — the game sums float terms; three half-health supporters
+ * read +7 in the preview). The firer's health term is CONTINUOUS, not the
+ * rounded `woundPenalty`. 0 where nobody qualifies. `_nuke_intercept_strength`
+ * is the twin.
  */
-export function nukeInterceptor(state: GameState, seat: number, tileIndex: number): number {
+export function nukeInterceptors(state: GameState, seat: number, tileIndex: number): Unit[] {
   const at = state.map.tiles[tileIndex];
-  if (!at) return -1;
+  if (!at) return [];
+  const out: Unit[] = [];
   for (const t of tilesWithin(state.map, at.col, at.row, NUKE_COVER_RANGE)) {
     for (const u of state.units) {
       if (u.tileIndex !== t.index || u.hp <= 0) continue;
-      if (!NUKE_INTERCEPTORS.includes(u.type)) continue;
       if (unitSeat(u) === seat) continue;
-      return u.id;
+      if (antiAirAt(state, u) <= 0) continue;
+      out.push(u);
     }
   }
-  return -1;
+  return out;
+}
+
+/** a qualifying unit's own attack strength — its anti-air less the
+ *  continuous health term */
+function interceptorCS(state: GameState, u: Unit): number {
+  return antiAirAt(state, u) - NUKE_AA_WOUND * (1 - u.hp / UNIT_HP);
+}
+
+export function nukeInterceptStrength(state: GameState, seat: number, tileIndex: number): number {
+  const guards = nukeInterceptors(state, seat, tileIndex);
+  if (!guards.length) return 0;
+  let firer = guards[0];
+  let best = interceptorCS(state, firer);
+  for (const u of guards) {
+    const cs = interceptorCS(state, u);
+    if (cs > best) {
+      best = cs;
+      firer = u;
+    }
+  }
+  // CIV6 (Air Defense Initiative): "+25 Combat Strength to ANTI-AIR support
+  // units within the city's territory when defending against aircraft and
+  // ICBMs" — the governor's term rides the one that fires
+  let s = best + (airDefenseOf(state, firer) - antiAirAt(state, firer));
+  for (const u of guards) {
+    if (u === firer) continue;
+    s += NUKE_AA_SUPPORT * (u.hp / UNIT_HP);
+  }
+  return s;
+}
+
+/** the unit that FIRES at a strike on `tileIndex`, or -1 — the strongest
+ *  qualifying interceptor (`nukeInterceptStrength` says how hard). */
+export function nukeInterceptor(state: GameState, seat: number, tileIndex: number): number {
+  const guards = nukeInterceptors(state, seat, tileIndex);
+  if (!guards.length) return -1;
+  let firer = guards[0];
+  let best = interceptorCS(state, firer);
+  for (const u of guards) {
+    const cs = interceptorCS(state, u);
+    if (cs > best) {
+      best = cs;
+      firer = u;
+    }
+  }
+  return firer.id;
 }
 
 /** CIV6: a device is deployed by "bomber aircraft, Nuclear Submarines, and the

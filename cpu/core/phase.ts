@@ -1612,7 +1612,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         const k = Math.floor(off / NUKE_COLS);
         const tgt = nukeTargets(state, unit, k, NUKE_COLS)[off % NUKE_COLS];
         if (tgt !== undefined) {
-          detonate(state, actor.seat, k, tgt);
+          detonate(state, actor.seat, k, tgt, unit);
           // the carrier spends its whole turn on the delivery
           unit.movesLeft = 0;
           unit.attacksLeft = 0;
