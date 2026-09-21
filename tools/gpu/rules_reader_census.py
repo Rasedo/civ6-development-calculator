@@ -45,9 +45,10 @@ GPU_DIRS = [ROOT / "gpu" / "core", ROOT / "policy"]
 TS_DIRS = [ROOT / "cpu" / "core"]
 
 CIV_LEVEL_REASON = (
-    "an install `CivilizationLevels` permission carried literally: only "
-    "canAnnexTilesWithCulture forks a live rule (cpu/core/phase.ts:497, "
-    "gpu/core/sim_init.py:3865); the rest are asserted against each engine's own shape in "
+    "an install `CivilizationLevels` permission carried literally: only the two annex "
+    "columns fork a live rule — canAnnexTilesWithCulture the culture claim, "
+    "canAnnexTilesWithReceivedInfluence the minor's plot per envoy; the rest are asserted "
+    "against each engine's own shape in "
     "tests/cpu/minors/civ-levels.test.ts:38 and tests/gpu/minor_record_test.py:99")
 
 # key -> why nobody needs to read it
@@ -129,10 +130,12 @@ ALLOWLIST: dict[str, str] = {
     "lowlandMaxBand": "the cap the shipped `lw` plane is asserted against, read at "
                       "tests/gpu/climate_test.py:92 and :275; the band itself is derived once on "
                       "TS (deriveLowlands) and the GPU reads the plane, not the constant",
-    # `canAnnexTilesWithReceivedInfluence` and `startingTilesForCity` are NOT
-    # here: those two rows the engine's shape CONTRADICTS rather than matches
-    # (a city-state's border never grows on either engine, and every city of
-    # every class starts with its whole first ring). They stay orphans on
+    # `canAnnexTilesWithReceivedInfluence` is not here because it is READ now:
+    # a minor takes one plot per envoy received (cpu/core/cityStates.ts
+    # `envoyTiles`, gpu/core/sim_minors.py `_minor_envoy_tiles`), which is the
+    # column's own live fork. `startingTilesForCity` is NOT here either: that
+    # row the engine's shape CONTRADICTS rather than matches (every city of
+    # every class starts with its whole first ring), so it stays an orphan on
     # purpose — see the AUDIT.
     "canFoundCities": CIV_LEVEL_REASON,
     "canAnnexTilesWithGold": CIV_LEVEL_REASON,

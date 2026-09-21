@@ -51,6 +51,77 @@ class SimMinors:
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
         self._seat_border_growth(row, col, act, tot[:, 4] * keep)
 
+    def _minor_envoy_tiles(self) -> None:
+        """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`.
+
+        CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`): TRUE
+        for CITY_STATE and FALSE for a full civ, the Free Cities player and a
+        tribe — the one column of that table only a minor owns, and the reason
+        its culture box banks and claims nothing. Measured on one minor over
+        fifteen readings on a SINGLE turn, so nothing but the envoys moved:
+        exactly +1 owned plot per envoy received, `plots = envoys + 6` (the six
+        the minor is seated with), no cap through sixteen, and the suzerain
+        contest does not change the slope.
+
+        The LEDGER is `city_acquired` itself — the `tilesAcquired` twin — so
+        the rule needs no counter of its own: a minor's box buys nothing, so
+        every tile that counter holds was bought by an envoy. The count it
+        claims up to is the RAW store, `seat_citystate_envoys` and never
+        `_envoys_here`, because a governor POSTING is not an envoy RECEIVED.
+        Claiming up to the count rather than on each delta is what makes the
+        measured equation an invariant, and it settles the one case the lab
+        did not reach: an envoy REMOVED (a spy's Fabricate Scandal) takes no
+        ground back and buys nothing new until the count passes its own mark.
+
+        WHICH plot is `_seat_border_key`, the culture claim's own pick and its
+        own refusals, clause for clause with `pickBorderTile` — nearest first,
+        then resource priority, then yield sum, then tile index; a plot
+        another player holds is not taken and a plot with no owned neighbour
+        is out of reach. The GAME's choice rule is unmeasured.
+        """
+        if self.S == 0:
+            return
+        bidx = self._bidx
+        col = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        env = self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
+        for s in range(self.S):
+            row = self._CITY_MINOR0 + s
+            if not bool(self._row_annex_influence[row]):
+                continue
+            # a dead minor receives nothing; a negative difference (a removal)
+            # claims nothing and gives nothing back
+            want = (env[:, s] - self.city_acquired[bidx, row, col]) * self.citystate_alive[:, s].long()
+            if not bool((want > 0).any()):
+                continue
+            center = self.city_center[bidx, row, col]
+            cid = self.city_id[bidx, row, col]
+            tiles, tc, nbs, key0 = self._seat_border_key(row, center)
+            unowned = self._seat_tile_unclaimed(tc)
+            adj_own = self._seat_tile_adj_city(row, cid, tc, nbs)
+            for _ in range(int(want.max())):  # the TS while-loop, one plot at a time
+                ready = want > 0
+                ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
+                claim = ready & ok.any(dim=1)
+                if not bool(claim.any()):
+                    break
+                key = torch.where(ok, key0, self._inf_f)
+                best = key.argmin(dim=1)
+                rows = claim.nonzero(as_tuple=True)[0]
+                spot = tiles[rows, best[rows]]
+                self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
+                self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
+                self._tile_owner_ver += 1
+                # acquireTile's revealAround is a MAJOR's alone ("nothing reads
+                # a city-state's fog"), so this row reveals nothing.
+                # A claim widens a LATER city's workable candidates.
+                self._claim_version += 1
+                self.city_acquired[rows, row, col[rows]] += 1
+                want = want - claim.long()
+                unowned[rows, best[rows]] = False
+                nb_s = self.neigh[spot]  # [n, 6]
+                adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
+                adj_own[rows] = adj_own[rows] | adj_hit
+
     def _minor_research(self, s: int) -> None:
         """The cheapest available row completes (table order on a price tie),
         at most one per pot per turn — the `minorResearch` twin. Early Empire

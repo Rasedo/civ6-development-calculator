@@ -7,6 +7,9 @@ import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
+// the border-growth pick and its claim: a minor's envoy plots are taken by
+// the city rule's OWN next-tile choice, never a second one
+import { pickBorderTile, acquireTile } from './city';
 import { isWater, isImpassable, hasFreshWater, naturalWonderAt } from '../../world/query';
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
@@ -201,6 +204,55 @@ export function setMet(cityState: CityState, seat: number): void {
 export function addEnvoys(state: GameState, cityState: CityState, seat: number, n = 1): void {
   cityState.envoys[seat] = (cityState.envoys[seat] ?? 0) + n;
   resolveSuzerains(state);
+  // the influence LANDS: the ground it buys arrives at the WRITE, not at the
+  // minor's next phase — the reading was taken with no turns passed
+  receiveEnvoyTiles(state);
+}
+
+/**
+ * A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT.
+ *
+ * CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`): TRUE for
+ * CITY_STATE and FALSE for a full civ, the Free Cities player and a tribe —
+ * the one column of that table only a minor owns, and the reason a minor's
+ * culture box banks and claims nothing. Measured on one minor over fifteen
+ * readings on a single turn, so nothing but the envoys moved: EXACTLY +1
+ * owned plot per envoy received, `plots = envoys + 6` — the six
+ * `placeCityStateAt` starts with — no cap through sixteen, and the suzerain
+ * contest does not change the slope.
+ *
+ * The LEDGER is `tilesAcquired` itself, so the rule needs no counter of its
+ * own: a minor's box buys nothing, so every tile that record counts was
+ * bought by an envoy. Claiming UP TO the count rather than on each delta is
+ * what makes the measured equation an invariant, and it settles the one case
+ * the lab did not reach — an envoy REMOVED (a spy's Fabricate Scandal) takes
+ * no ground back, and buys nothing new until the count passes its own mark.
+ *
+ * WHICH plot is the city rule's own next-tile pick (`pickBorderTile`: nearest
+ * first, then resource priority, then yield sum, then tile index), including
+ * its refusals — a plot another player already holds is not taken, and a plot
+ * with no owned neighbour inside the border radius is out of reach. The
+ * GAME's choice rule is unmeasured.
+ */
+export function envoyTiles(state: GameState, cityState: CityState): void {
+  if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
+  const city = minorCity(cityState);
+  let want = Object.values(cityState.envoys).reduce((n, e) => n + e, 0) - city.tilesAcquired;
+  while (want > 0) {
+    const next = pickBorderTile(state, city);
+    if (next === null) break; // the border rule's own refusal: nothing free is in reach
+    acquireTile(state, city, next);
+    want -= 1;
+  }
+  // `minorCity` is a fresh VIEW every call, so the claim is written back
+  cityState.tilesAcquired = city.tilesAcquired;
+}
+
+/** Every minor, in roster order — one envoy write can raise the count at
+ *  several at once (a quest resolves per minor), and the GPU twin walks its
+ *  `S` columns in the same order. */
+export function receiveEnvoyTiles(state: GameState): void {
+  for (const cityState of state.cityStates ?? []) envoyTiles(state, cityState);
 }
 
 /**

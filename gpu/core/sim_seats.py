@@ -1113,6 +1113,7 @@ class SimSeats:
                             _n = _n + (_tw & _diff).to(_n.dtype)
                     self.seat_citystate_envoys[rows, row, ei[rows]] += _n
                     self._cs_resolve_suzerain()
+                    self._minor_envoy_tiles()  # the influence LANDS: a plot per envoy (`addEnvoys`)
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
         if war is not None:
@@ -13072,6 +13073,7 @@ class SimSeats:
             self.seat_citystate_quest_issued[:, row, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.seat_citystate_quest_issued[:, row, :S])
             self.seat_citystate_envoys[:, row, :S] = self.seat_citystate_envoys[:, row, :S] + resolved.long() * q_env
             self._cs_resolve_suzerain()
+            self._minor_envoy_tiles()  # the quest's envoys buy ground too (`addEnvoys`)
             self._eff_version += 1
 
         # --- ISSUE on cooldown (deterministic first-satisfiable) ------------

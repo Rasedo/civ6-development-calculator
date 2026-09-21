@@ -22,7 +22,7 @@ import {
 import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
-import { isSuzerain, resolveSuzerains } from './cityStates';
+import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -351,6 +351,9 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
         if (Number(s) !== unit.seat) cs.envoys[Number(s)] = 0;
       }
       resolveSuzerains(state);
+      // the granted envoys are RECEIVED influence like any other: the minor
+      // takes its plots here, the same composer the envoy verb ends on
+      receiveEnvoyTiles(state);
     }
   }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;

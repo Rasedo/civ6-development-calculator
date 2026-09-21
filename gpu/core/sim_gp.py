@@ -381,6 +381,9 @@ class SimGp:
                     if _o != row:
                         _env[_r, _o, _cs2] = 0
                 self._cs_resolve_suzerain()
+                # the granted envoys are RECEIVED influence like any other —
+                # the `gpAbility` twin's own call
+                self._minor_envoy_tiles()
         _gpp = col("gppAll")
         if bool((_gpp != 0).any()):
             self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)

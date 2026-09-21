@@ -3999,6 +3999,14 @@ class SimInit:
             [bool(_lvl[x]["canAnnexTilesWithCulture"]) for x in _row_level],
             dtype=torch.bool, device=device,
         )
+        # ...and its opposite number, TRUE for a CITY_STATE alone: ground
+        # bought with the influence SPENT ON the row (`_minor_envoy_tiles`).
+        # The two columns are disjoint, which is why a minor's border grows at
+        # all and why it never grows on Culture.
+        self._row_annex_influence = torch.tensor(
+            [bool(_lvl[x]["canAnnexTilesWithReceivedInfluence"]) for x in _row_level],
+            dtype=torch.bool, device=device,
+        )
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
         self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self._ww_opened = torch.zeros(B, dtype=torch.long, device=device)
