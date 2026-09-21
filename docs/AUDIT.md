@@ -37,10 +37,9 @@ re-adds them.
 |---|---|---|
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent's +30% on the three nuclear projects |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
-| B-51r Encampment pool on capture | 1 | measured: the pools ride, the lost walls zero the maxima |
 | B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
-| **B. Fidelity vs real Civ 6** | **5** | |
+| **B. Fidelity vs real Civ 6** | **4** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | the research agreement must come OUT; the promises' engine half |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14) |
@@ -55,9 +54,9 @@ re-adds them.
 | C-64 majority religion | 1 | the CITY rule, and the four readers that want the seat one |
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
-| C-80 constants vs the install | 2 | the purchase price, the Pop Star's tag, two rules the reader census names |
+| C-80 constants vs the install | 2 | the purchase price, the Pop Star's tag, one rule the reader census names |
 | **C. Absent systems** | **16** | |
-| **OPEN, TOTAL** | **21** | |
+| **OPEN, TOTAL** | **20** | |
 
 ## The question ledger — owner asks
 
@@ -86,8 +85,6 @@ close in the same commit.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no row with PLUNDER in its name at all, and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The district `PlunderAmount` column (25 / 50) is sourced and ships, and so are the two plunder percentages (Total War 50, Letter of Marque 100); only the route's base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
-- **B-51r. THE ENCAMPMENT'S POOL ON CAPTURE.** Weight 1.
-  - BUILD, measured on a live capture with the pools set to known values first: the Encampment's own GARRISON pool RIDES THROUGH byte for byte (40/100 before, 40/100 after) — neither zeroed nor healed. The centre comes up at exactly HALF its maximum. Both OUTER pools read 0/0 afterwards, and the mechanism is the lost Walls: `DISTRICT_CITY_CENTER` carries `CaptureRemovesCityDefenses="true"`, and the outer MAXIMUM is the walls level every defending district shares — so the zeroing belongs on the walls and on the maximum, not on the centre's pool. `transferCity` keeps the walls building today (`keptBuildings`, "ANCIENT_WALLS is kept with outerHp 0") where the install removes it, and `Tile.encampOuterHp` / `encamp_outer_hp` should FALL OUT of that rather than be written. The -25% population and the vanishing incomplete district already ship and both re-measured true.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
   - BUILD: GROUND_CREWS reads "Heal while patrolling or deployed" (`Promotions_Text.xml`), and its one modifier `GROUND_CREWS_BONUS_HEALTH` / `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION` carries no argument and no requirement set — the modifier type is the whole rule and the engine's own healing supplies the number. The PATROL half is no verb anywhere: no `UNITOPERATION_PATROL`, no command, no promotion in any layer, and the live game offers no air-patrol stance (C-34). The DEPLOYED half is an air unit sitting at its base, which both engines already model (`cpu/core/air.ts` / the GPU's air rows) — so the promotion is buildable on that half and the entry is not a wait.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
@@ -147,8 +144,7 @@ close in the same commit.
   The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
   - BUILD, the PURCHASE PRICE, fitted to all 302 priced rows of one city and then verified against a real transaction: `price = floor(mult * C / 5) * 5`, mult 4 for gold and 2 for faith, `C` the CITY's speed-scaled production cost. FLOOR, not nearest (a Slinger at cost 17 buys for 65 gold and 30 faith, never 70/35), and the divisor is `PURCHASE_DIVISOR` 5. PROGRESS DOES NOT REDUCE IT — a Monument at 25 of 30 hammers cost the same 120/60 as at zero. Units and districts price off the truncated integer cost, buildings off the fractional one (a Granary at 32.5 costs 130, not 125). `buildingPurchaseCost` / `buildingFaithCost` / `unitFaithCost` and the GPU's `gold_purchase_mult` / `faith_purchase_mult` multiply and never round to five. The faith rate for a LAND COMBAT unit, which B-D wanted, is the same 2 as everything else.
   - BUILD: the Pop Star's 25 is SOURCED, not a lab question — `ROCKBAND_POP` writes Amount -75 on `MODIFIER_PLAYER_UNIT_ADJUST_TOURISM_BOMB_ADDITIONAL_YIELD` and the shipped text reads "Gain Gold equal to 25% of the Tourism generated", so the argument is a percentage adjustment away from 100. The catalog's 25 is right and its `cpu/data/provenance.ts` tag is not; both baseline lines in docs/PROVENANCE.md wait on that re-tag.
-  - The TWO RULES the reader census names (their baseline lines stay red-listed until built):
-    2. BUILD: `civLevels.canAnnexTilesWithReceivedInfluence` — measured on one minor with NO turns passed, so nothing but the envoys moved: exactly +1 owned plot per envoy, `plots = envoys + 6` from the third envoy on, no cap through sixteen, and suzerainty did not change the slope. The channel is buildable now.
+  - The ONE RULE the reader census still names (its baseline line stays red-listed until built):
     6. BUILD: `improvements.noSwap`: C-79's tile-swap refusal.
 
 ## Harness — not weighted

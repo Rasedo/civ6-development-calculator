@@ -5,6 +5,8 @@ import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } f
 import { makeState, tileAtCoords } from '../helpers';
 import { createGame, foundCity } from '../../../cpu/core/game';
 import { seatPhase, transferCity } from '../../../cpu/core/phase';
+import { encampOuterPool, fitEncampOuter, outerPool, wallsMax } from '../../../cpu/core/rules';
+import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import type { GameState, City, Seat, Tile } from '../../../cpu/core/types';
 
@@ -214,5 +216,83 @@ describe('PALACE grant on founding and on capture', () => {
     const captured = seatOf(state, 0)!.cities[seatOf(state, 0)!.cities.length - 1];
     expect(captured.buildings).not.toContain('PALACE');
     expect(captured.buildings).toContain('TEMPLE');
+  });
+});
+
+/** The four pools a captured city carries, with every one of them PRE-SET to a
+ *  known value before the capture so the ride-through can be told from a heal:
+ *  the Encampment's own GARRISON, the Encampment's OUTER pool, the centre's
+ *  GARRISON and the centre's OUTER pool. */
+function walledCityWithEncampment(state: GameState, col: number, row: number) {
+  const civ = addCiv(state, col, row);
+  const city = civ.cities[0];
+  city.buildings = ['PALACE', 'ANCIENT_WALLS'];
+  city.population = 4;
+  city.hp = 120;              // the centre's garrison, wounded but standing
+  city.outerHp = 60;          // ...behind a part-breached perimeter
+  const enc = tilesWithin(state.map, col, row, 1).find((t) => t.index !== city.centerIndex)!;
+  setTileOwner(enc, civ.seat, city.id);
+  enc.district = 'ENCAMPMENT';
+  enc.districtComplete = true;
+  enc.encampHp = 40;          // CIV6: the district's own 100-point garrison
+  enc.encampOuterHp = 70;     // ...and its own share of the walls' perimeter
+  city.districts.push({ type: 'ENCAMPMENT', tileIndex: enc.index });
+  return { civ, city, enc };
+}
+
+describe("a captured city's four pools", () => {
+  it('CIV6 (CaptureRemovesCityDefenses): the conquest destroys the Walls, so BOTH outer pools read 0/0', () => {
+    const state = makeState();
+    const { civ, city, enc } = walledCityWithEncampment(state, 6, 6);
+    // before: a real perimeter, sized by the walls every defending district shares
+    const maxBefore = wallsMax(state, city);
+    expect(maxBefore).toBeGreaterThan(0);
+    expect(outerPool(state, city)).toBe(60);
+    expect(encampOuterPool(state, city, enc)).toBe(70);
+
+    transferCity(state, civ.seat, seatOf(state, 0)!, city, 'conquered');
+    const taken = seatOf(state, 0)!.cities[seatOf(state, 0)!.cities.length - 1];
+
+    // the WALLS are gone — the building, not just the pool behind it
+    expect(taken.buildings).not.toContain('ANCIENT_WALLS');
+    expect(wallsMax(state, taken)).toBe(0);
+    // ...so the centre's outer pool and the Encampment's own both read 0/0
+    expect(taken.outerHp).toBe(0);
+    expect(outerPool(state, taken)).toBe(0);
+    expect(encampOuterPool(state, taken, enc)).toBe(0);
+    // the Encampment's GARRISON rides through byte for byte — neither zeroed
+    // nor healed (measured 40/100 before, 40/100 after)
+    expect(enc.encampHp).toBe(40);
+    // the CENTRE's garrison is reset to exactly half its maximum
+    expect(taken.hp).toBe(Math.round(CITY_MAX_HP / 2));
+    // and the district itself rides, complete, into the new owner's registry
+    expect(taken.districts.some((d) => d.type === 'ENCAMPMENT' && d.tileIndex === enc.index)).toBe(true);
+    expect(taken.population).toBe(3); // -25%, floored
+  });
+
+  it('a REBUILT set of walls brings both pools back full', () => {
+    const state = makeState();
+    const { civ, city, enc } = walledCityWithEncampment(state, 6, 6);
+    transferCity(state, civ.seat, seatOf(state, 0)!, city, 'conquered');
+    const taken = seatOf(state, 0)!.cities[seatOf(state, 0)!.cities.length - 1];
+    taken.buildings.push('ANCIENT_WALLS');
+    taken.outerHp = wallsMax(state, taken);
+    fitEncampOuter(state, taken);
+    expect(outerPool(state, taken)).toBe(wallsMax(state, taken));
+    expect(encampOuterPool(state, taken, enc)).toBe(wallsMax(state, taken));
+  });
+
+  it('a LOYALTY flip breaches nothing: the walls, the perimeter and the centre all ride', () => {
+    const state = makeState();
+    const { civ, city, enc } = walledCityWithEncampment(state, 6, 6);
+    transferCity(state, civ.seat, seatOf(state, 0)!, city, 'revolted');
+    const moved = seatOf(state, 0)!.cities[seatOf(state, 0)!.cities.length - 1];
+    expect(moved.buildings).toContain('ANCIENT_WALLS');
+    expect(moved.outerHp).toBe(60);
+    expect(outerPool(state, moved)).toBe(60);
+    expect(encampOuterPool(state, moved, enc)).toBe(70);
+    expect(enc.encampHp).toBe(40);
+    expect(moved.hp).toBe(120);
+    expect(moved.population).toBe(4);
   });
 });

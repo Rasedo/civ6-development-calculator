@@ -211,6 +211,81 @@ def test_capture_plunder(rules, path):
     print(f"  capture plunder OK ({caps} captures: +40 each, war ends on the last; raze: neither)")
 
 
+def _plant_pools(sim, r: int, j: int) -> tuple[int, int, int]:
+    """A walled civ city with a complete Encampment beside it and EVERY pool
+    pre-set to a known value — the lab's own scene, so a ride-through can be
+    told from a heal. Returns (centre tile, Encampment tile, walls max)."""
+    assert sim._walls_bidx >= 0 and sim._encamp_didx >= 0, "walls/Encampment not exported"
+    ctr = int(sim.city_center[0, r, j])
+    sim.city_bldg[0, r, j, sim._walls_bidx] = True
+    sim._bldg_version += 1
+    wmax = int(sim._walls_max_at(torch.tensor([r]), torch.tensor([j]))[0])
+    assert wmax > 0, "ANCIENT_WALLS supplies no perimeter"
+    sim.city_hp[0, r, j] = 120        # the centre's garrison, wounded but standing
+    sim.city_outer_hp[0, r, j] = 60   # ...behind a part-breached perimeter
+    sim.city_pop[0, r, j] = 4
+    dfc = sim.pair_dist[ctr].to(torch.long)
+    owned = ((sim.city_slot_at(r)[0] == j) & (sim.district[0] < 0) & (dfc == 1)).nonzero(as_tuple=True)[0]
+    assert len(owned), "no free owned ring-1 tile for the Encampment"
+    enc = int(owned[0])
+    sim.district[0, enc] = sim._encamp_didx
+    sim.district_complete[0, enc] = True
+    sim.district_pillaged[0, enc] = False
+    sim.district_dead[0, enc] = False
+    # a hand-built scene writes the city's REGISTRY as well as the tile plane,
+    # exactly as every completion site does
+    sim.city_dist_tile[0, r, j, sim._encamp_didx] = enc
+    sim.encamp_hp[0, enc] = 40        # the district's OWN garrison, 40/100
+    sim.encamp_outer_hp[0, enc] = 70  # ...and its own share of the perimeter
+    return ctr, enc, wmax
+
+
+def test_capture_pools(rules, path):
+    """CIV6 (`DISTRICT_CITY_CENTER` CaptureRemovesCityDefenses="true"), measured
+    on a live capture with the pools pre-set: the conquest DESTROYS the Walls,
+    so the centre's outer pool and every Encampment's own read 0/0 — the outer
+    MAXIMUM is the walls level each defending district shares. The Encampment's
+    GARRISON rides through byte for byte, the centre's is reset to half its
+    maximum, and a LOYALTY flip breaches nothing at all. `transferCity`'s twin."""
+    sim = build(rules, path, steps=20)
+    idx = sim.city_alive[0, 1:sim.n_majors].nonzero()
+    assert len(idx), "no civ city by t20 on this seed"
+    r, j = int(idx[0, 0]) + 1, int(idx[0, 1])
+    max_cities = int(sim.rules.seats.get("maxCities", 6))
+    assert int(sim.city_alive[0, 0].sum()) < max_cities, "seat 0 full — the capture would raze"
+    ctr, enc, wmax = _plant_pools(sim, r, j)
+
+    assert sim._transfer_city(0, r, j, 0, conquest=True), "the capture razed"
+    col = int(sim.centre_slot_at[0, ctr])
+    assert col >= 0 and bool(sim.city_alive[0, 0, col])
+    # the WALLS are gone — the building, not just the pool behind it
+    assert not bool(sim.city_bldg[0, 0, col, sim._walls_bidx]), "the capture must destroy the Walls"
+    after = int(sim._walls_max_at(torch.tensor([0]), torch.tensor([col]))[0])
+    assert after == 0, f"outer maximum {after} after the walls were lost, want 0"
+    assert int(sim.city_outer_hp[0, 0, col]) == 0, "the centre's outer pool must read 0/0"
+    assert min(int(sim.encamp_outer_hp[0, enc]), after) == 0, "the Encampment's outer pool must read 0/0"
+    # the Encampment's GARRISON rides through byte for byte — neither zeroed
+    # nor healed (measured 40/100 before, 40/100 after)
+    assert int(sim.encamp_hp[0, enc]) == 40, "the Encampment garrison must ride through"
+    half = (int(sim.rules.combat.get("cityMaxHp", 200)) + 1) // 2
+    assert int(sim.city_hp[0, 0, col]) == half, "the centre comes up at half its maximum"
+    assert int(sim.city_dist_tile[0, 0, col, sim._encamp_didx]) == enc, "the complete district rides"
+    assert int(sim.city_pop[0, 0, col]) == 3, "-25% population, floored"
+
+    # ...and a LOYALTY flip keeps every one of them
+    sim2 = build(rules, path, steps=20)
+    ctr2, enc2, _ = _plant_pools(sim2, r, j)
+    assert sim2._transfer_city(0, r, j, 0, conquest=False), "the loyalty flip failed"
+    col2 = int(sim2.centre_slot_at[0, ctr2])
+    assert bool(sim2.city_bldg[0, 0, col2, sim2._walls_bidx]), "a loyalty flip destroys no Walls"
+    assert int(sim2.city_outer_hp[0, 0, col2]) == 60, "the perimeter rides a loyalty flip"
+    assert int(sim2.encamp_outer_hp[0, enc2]) == 70 and int(sim2.encamp_hp[0, enc2]) == 40
+    assert int(sim2.city_hp[0, 0, col2]) == 120, "a loyalty flip wounds nobody"
+    assert int(sim2.city_pop[0, 0, col2]) == 4, "a loyalty flip costs no population"
+    print(f"  capture pools OK (walls destroyed: outer {wmax} -> 0/0 on centre and Encampment, "
+          f"garrison 40/100 rides, centre {half}; loyalty flip keeps all four)")
+
+
 def _melee_slot(sim):
     """First alive MELEE military slot in seat 0's pool."""
     for p_ in range(int(sim.unit_next.max())):
@@ -452,6 +527,7 @@ def main() -> None:
     test_golden_war(rules, path)
     test_peace(rules, path)
     test_capture_plunder(rules, path)
+    test_capture_pools(rules, path)
     test_cs_siege(rules, path)
     test_enkidu_war_discount(rules, path)
     print("WAR/PEACE PLUMBING OK")

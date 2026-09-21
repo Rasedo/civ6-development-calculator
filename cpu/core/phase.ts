@@ -1130,8 +1130,7 @@ export function transferCity(
     }
   }
   // Conquest keeps infrastructure: the city carries its districts, its
-  // buildings MINUS PALACE, and its wonders. ANCIENT_WALLS is kept with
-  // outerHp 0 (it heals back).
+  // buildings MINUS the PALACE and MINUS the Walls, and its wonders.
   //
   // The districts are DERIVED from the tiles that just re-owned (complete ones
   // only), never copied from the loser's `districts` array: a seat's array and
@@ -1146,7 +1145,18 @@ export function transferCity(
       keptDistricts.push({ type: t.district, tileIndex: t.index });
     }
   }
-  const keptBuildings = civCity.buildings.filter((b) => b !== 'PALACE');
+  // CIV6 (`DISTRICT_CITY_CENTER` carries `CaptureRemovesCityDefenses="true"`):
+  // a CONQUEST destroys the Walls themselves — the building goes, not just the
+  // pool behind it. Measured on a live capture with the pools set to known
+  // values first: every outer pool of the city reads 0/0 afterwards, and the
+  // mechanism is the lost building, because the outer MAXIMUM is the walls
+  // level every defending district of the city shares. So the centre's pool
+  // and each Encampment's own both fall out of `wallsMax` together and stay 0
+  // until Walls are rebuilt — no pool is written for the district at all, and
+  // the Encampment's own GARRISON (`Tile.encampHp`, a separate pool) rides
+  // through byte for byte. A transfer by loyalty destroys nothing.
+  const keptBuildings = civCity.buildings.filter(
+    (b) => b !== 'PALACE' && !(why === 'conquered' && BUILDINGS[b]?.walls));
   const flipped: City = {
     id: to.nextCityId++,
     name: civCity.name,
@@ -1201,10 +1211,14 @@ export function transferCity(
     freePressure: isFreeSeat(to.seat) ? state.seats.map(() => 0) : undefined,
     foundedTurn: state.turn,
   };
-  // walls kept, outer pool 0 — a captured city stands behind a breach; a
-  // transfer by loyalty breaches nothing
-  if (why === 'conquered' && keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
-  else if (why !== 'conquered') flipped.outerHp = civCity.outerHp;
+  // the walls are gone, so `wallsMax` is 0 and `outerPool` reads 0/0 — the
+  // stored 0 is written anyway and UNCONDITIONALLY on a conquest, because an
+  // ABSENT `outerHp` means FULL: a captor already holding Urban Defenses (a
+  // tier no building supplies) would otherwise take delivery of a city that
+  // is refortified the instant it changes hands. A transfer by loyalty
+  // breaches nothing and carries the pool it had.
+  if (why === 'conquered') flipped.outerHp = 0;
+  else flipped.outerHp = civCity.outerHp;
   to.cities.push(flipped);
   logPopWrite(state, flipped, 'tr');
   if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);

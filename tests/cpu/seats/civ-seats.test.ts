@@ -10,7 +10,7 @@ import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize, choosePantheon } from '../../../cpu/core/game';
-import { canFoundCity } from '../../../cpu/core/rules';
+import { canFoundCity, wallsMax } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
@@ -290,7 +290,7 @@ describe('war and peace', () => {
 });
 
 describe('conquest keeps infrastructure', () => {
-  it('capture carries districts + buildings + wonders MINUS PALACE, walls at outerHp 0', () => {
+  it('capture carries districts + buildings + wonders MINUS the PALACE and MINUS the Walls', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
@@ -318,7 +318,8 @@ describe('conquest keeps infrastructure', () => {
     holyTile.districtComplete = false;
     setTileOwner(holyTile, civ.seat, civCity.id);
     civCity.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
-    // PALACE must never transfer; MARKET + ANCIENT_WALLS are kept.
+    // PALACE must never transfer, and a CONQUEST destroys the Walls with the
+    // rest of the city's defenses; MARKET is kept.
     civCity.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
 
     transferCity(state, civ.seat, seatOf(state, 0)!, civCity, 'conquered', true);
@@ -329,14 +330,17 @@ describe('conquest keeps infrastructure', () => {
     // HOLY_SITE is dropped (paved-but-dead), not carried.
     expect(taken.districts.map((d) => d.type).sort()).toEqual(['CAMPUS', 'CITY_CENTER']);
     expect(taken.districts.map((d) => d.type)).not.toContain('HOLY_SITE');
-    // buildings kept minus PALACE.
+    // buildings kept minus the PALACE and minus the Walls.
     expect(taken.buildings).not.toContain('PALACE');
     expect(taken.buildings).toContain('MARKET');
-    expect(taken.buildings).toContain('ANCIENT_WALLS');
+    expect(taken.buildings).not.toContain('ANCIENT_WALLS');
     // wonders kept.
     expect(taken.wonders.map((w) => w.id)).toContain('PYRAMIDS');
-    // ANCIENT_WALLS kept but the outer pool resets to 0, and heals back.
+    // CIV6 (CaptureRemovesCityDefenses): the Walls are destroyed, so the
+    // perimeter's MAXIMUM is 0 and the stored pool with it — 0/0 until the
+    // new owner builds Walls again.
     expect(taken.outerHp).toBe(0);
+    expect(wallsMax(state, taken)).toBe(0);
     // the district/wonder tiles re-own to the new city and stay paved.
     expect(tileCity(state.map.tiles[campusTile.index])).toBe(taken.id);
     expect(state.map.tiles[campusTile.index].district).toBe('CAMPUS');

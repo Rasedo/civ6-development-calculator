@@ -9387,8 +9387,9 @@ class SimSeats:
         The receiver earns GRIEVANCES, the loser re-crowns and loses its routes
         to the city, the city's OWN tiles (registry scan, never a radius sweep)
         re-tag to the receiver's next id, pop lands at ×0.75 floor 1, the boxes
-        reset, and the COMPLETE districts, the wonders, the buildings, the great
-        works, the relics and the religion all ride along.
+        reset, and the COMPLETE districts, the wonders, the buildings (MINUS
+        the Walls a conquest destroys), the great works, the relics and the
+        religion all ride along.
 
         Returns False when a CONQUEST razes at the receiver's city cap: the city
         ceases — territory freed, centre unpaved, no plunder. LOYALTY FLIPS ARE
@@ -9429,6 +9430,22 @@ class SimSeats:
         # a pillaged building stays pillaged in the new owner's hands — the
         # repair is the queue's, whoever holds the queue
         old_bpil = self.city_bldg_pillaged[b, src_row, src_col, :].clone()
+        # CIV6 (`DISTRICT_CITY_CENTER` carries `CaptureRemovesCityDefenses`):
+        # a CONQUEST destroys the WALLS THEMSELVES, not just the pool behind
+        # them — `keptBuildings`' second clause. Measured on a live capture
+        # with the pools set to known values first: every outer pool of the
+        # city reads 0/0 afterwards, and the mechanism is the lost building,
+        # because the outer MAXIMUM is the walls level every defending
+        # district of the city shares. So the centre's `city_outer_hp` and
+        # each Encampment's own `encamp_outer_hp` both fall out of
+        # `_walls_max_at` together and stay 0 until Walls are rebuilt — no
+        # pool is written for the district at all, and the Encampment's
+        # GARRISON (`encamp_hp`, a separate pool) rides through byte for byte.
+        # A transfer by loyalty destroys nothing.
+        if conquest:
+            for _wbi in self._walls_rows:
+                old_bldg[_wbi] = False
+                old_bpil[_wbi] = False  # TS filters pillagedBuildings to keptBuildings
         # RELIGION TRAVELS WITH THE CITY (TS copies religionPressure and
         # followedReligion into the flipped literal). Both planes are slot
         # indexed, so the fact has to be carried across by hand.
@@ -9522,8 +9539,11 @@ class SimSeats:
         self.city_acquired[b, dst_row, col] = old_acq
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
-        # the Walls ride along; on a conquest the perimeter does not — a
-        # captured city stands behind a breach until it runs the repair project
+        # the Walls are GONE on a conquest, so `_walls_max_at` is 0 and the
+        # pool reads 0/0; the stored 0 goes in anyway, because a captor
+        # already holding Urban Defenses (a tier no building supplies) would
+        # otherwise take delivery of a city refortified the instant it changed
+        # hands. A loyalty flip breaches nothing and carries the pool it had.
         self.city_outer_hp[b, dst_row, col] = 0 if conquest else old_outer
         self.city_last_hit[b, dst_row, col] = 0
         # the race a FREE CITY runs starts at nothing "since the Free City
