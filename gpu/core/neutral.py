@@ -473,7 +473,11 @@ def _citizen_rows(sim, row: int, alive: torch.Tensor) -> tuple:
     valid = valid & alive.unsqueeze(2)
     bb, jj, mm = valid.nonzero(as_tuple=True)
     t_v = tiles[bb, jj, mm]
-    work = torch.stack([bb, jj, t_v, sim.res_priority[bb, t_v], locked[bb, jj, mm].long()], dim=1).tolist()
+    # the priority of the resource STILL on the plot: a district placed on a
+    # bonus resource strips it (`res_stripped`; TS deletes `tile.resource`),
+    # and a razed district's plot is workable again without it
+    _prio = sim.res_priority[bb, t_v] * (~sim.res_stripped[bb, t_v]).long()
+    work = torch.stack([bb, jj, t_v, _prio, locked[bb, jj, mm].long()], dim=1).tolist()
     if not bool((alive.sum(dim=1) >= 2).any()):
         return work, []
     slot = torch.arange(RC, device=sim.device).view(1, RC, 1).expand(B, RC, M)
@@ -528,7 +532,9 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
     if site == 0:  # the class's own completed district
         if arg < 0:
             return torch.zeros_like(own)
-        return own & (sim.district == arg) & sim.district_complete & ~sim.pillaged
+        # the DISTRICT's pillage fact (`_gp_site_ok`, TS gpActivateOk), never
+        # the improvement plane's
+        return own & (sim.district == arg) & sim.district_complete & ~sim.district_pillaged
     if site == 1:  # anywhere — nothing to walk to
         return torch.ones_like(own)
     if site == 2:  # a city with an open slot taking a work of this class's kind
@@ -568,12 +574,16 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
 def _found_ok(sim, row: int, gate: torch.Tensor) -> torch.Tensor:
     """[B, T] — `canFoundCity`'s own terms over the whole map, in the games
     `gate` names: unowned, settle_ok, bare of district and wonder, >= 4 from
-    every live city (majors and city-states)."""
+    every live city (majors, the Free Cities row and city-states — the
+    engine's `_found_city_at` spacing, TS `canFoundCity` over `cityHolders`)."""
     B, T, dev = sim.B, sim.T, sim.device
     ok = torch.zeros(B, T, dtype=torch.bool, device=dev)
     nrow = sim.n_majors
-    ctr = torch.cat((sim.city_center[:, :nrow].reshape(B, -1), sim.citystate_center), dim=1)
-    live = torch.cat((sim.city_alive[:, :nrow].reshape(B, -1), sim.citystate_alive), dim=1)
+    fr = sim.FREE_ROW
+    ctr = torch.cat((sim.city_center[:, :nrow].reshape(B, -1), sim.city_center[:, fr:fr + 1].reshape(B, -1),
+                     sim.citystate_center), dim=1)
+    live = torch.cat((sim.city_alive[:, :nrow].reshape(B, -1), sim.city_alive[:, fr:fr + 1].reshape(B, -1),
+                      sim.citystate_alive), dim=1)
     for b in range(B):
         if not bool(gate[b]):
             continue

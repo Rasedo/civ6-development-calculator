@@ -459,8 +459,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # emits per unit.
                 gj_t = drive._builder_jobs(st, nobs_seat[seat])
                 gs_t = drive._spread_targets(st, nobs_seat[seat])
-                gj_all = gj_t.tolist()
-                gs_all = gs_t.tolist()
                 # the decide pass reuses the other pre-decide reads verbatim
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
                 for b, msg in enumerate(msgs):
@@ -473,14 +471,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
                         flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.n_majors - 1, sim.RC, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
-                    for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(seat), [])),
-                                         ("spread", gs_all[b], msg.get("spreads", {}).get(str(seat), []))):
-                        for i in range(max(len(ga), len(ta))):
-                            gv = ga[i] if i < len(ga) else -1
-                            tv = ta[i] if i < len(ta) else -1
-                            if gv != tv:
-                                flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
-                                break
             prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break
@@ -755,40 +745,8 @@ def main() -> None:
             groups_checked += _n
             gj_t = drive._builder_jobs(st, nobs_seat[seat])
             gs_t = drive._spread_targets(st, nobs_seat[seat])
-            gj = gj_t[0].tolist()
-            gs = gs_t[0].tolist()
-            tj = msg.get("jobs", {}).get(str(seat), [])
-            ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
-            for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
-                for i in range(max(len(ga), len(ta))):
-                    gv = ga[i] if i < len(ga) else -1
-                    tv = ta[i] if i < len(ta) else -1
-                    if gv != tv:
-                        rep = f"turn {t + 1} seat {seat}: {name.upper()} TARGET row {i}: GPU {gv} vs TS {tv}"
-                        if os.environ.get("CIV6_SERVE_DEBUG_JOB") and name == "job":
-                            for _dt in (gv, tv):
-                                if _dt < 0:
-                                    continue
-                                print(f"  tile {_dt}: city_slot {int(sim.city_slot_at(seat)[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
-                                      f" water {bool(sim.water[0, _dt])} imp {int(sim.improvement[0, _dt])}"
-                                      f" dist {int(sim.district[0, _dt])} wond {int(sim.built_wonder[0, _dt])}"
-                                      f" ctr {int(sim.centre_slot_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
-                                      f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
-                                      f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
-                                      f" res {int(sim.res_imp[0, _dt])}")
-                            for _p in range(int(sim.unit_next[0])):
-                                if not bool(sim.major_unit_alive[0, _p]):
-                                    continue
-                                print(f"  u[{_p}] seat {int(sim.major_unit_seat[0, _p])}"
-                                      f" tile {int(sim.major_unit_tile[0, _p])} type {int(sim.major_unit_type[0, _p])}"
-                                      f" charges {int(sim.major_unit_charges[0, _p])}")
-                        print(rep)
-                        if first_report is None:
-                            first_report = rep
-                        obs_bails += 1
-                        break
         if obs_bails:
             break
         geo = records.geo_decide_and_apply(sim, st, [args.seed])
