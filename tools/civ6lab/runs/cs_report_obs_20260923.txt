@@ -1,0 +1,2926 @@
+== p6 CIVILIZATION_HONG_KONG  turns 1-251
+  t13: +{'UNIT_WARRIOR': 1} (gold 58 -> 64)
+  t18: -{'UNIT_WARRIOR': 1} (army 2)
+  t30: -{'UNIT_WARRIOR': 1} (army 1)
+  t32: +{'UNIT_WARRIOR': 1} (gold 79 -> 86)
+  t35: -{'UNIT_WARRIOR': 1} (army 1)
+  t38: BUY? +{'UNIT_GALLEY': 1} gold 121 -> 2 (drop 118), army before 1, building UNIT_ARCHER
+  t40: +{'UNIT_ARCHER': 1} (gold 8 -> 14)
+  t42: -{'UNIT_GALLEY': 1} (army 2)
+  t44: +{'UNIT_HEAVY_CHARIOT': 1} (gold 30 -> 36)
+  t48: +{'UNIT_HEAVY_CHARIOT': 1} (gold 53 -> 58)
+  t54: suzerain -1 -> 0
+  t57: +{'UNIT_HEAVY_CHARIOT': 1} (gold 97 -> 103)
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 118 -> 118)
+  t61: -{'UNIT_WARRIOR': 1} (army 5)
+  t64: +{'UNIT_CROSSBOWMAN': 1} (gold 126 -> 124)
+  t64: -{'UNIT_ARCHER': 1} (army 5)
+  t73: +{'UNIT_MAN_AT_ARMS': 1} (gold 133 -> 129)
+  t73: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t82: +{'UNIT_KNIGHT': 1} (gold 131 -> 129)
+  t82: -{'UNIT_HEAVY_CHARIOT': 1} (army 5)
+  t83: -{'UNIT_HEAVY_CHARIOT': 1} (army 4)
+  t85: +{'UNIT_KNIGHT': 1} (gold 130 -> 126)
+  t85: -{'UNIT_HEAVY_CHARIOT': 1} (army 4)
+  t101: +{'UNIT_MUSKETMAN': 1} (gold 135 -> 132)
+  t101: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t109: war [] -> [1]
+  t116: war [1] -> []
+  t124: -{'UNIT_KNIGHT': 1} (army 3)
+  t126: -{'UNIT_MUSKETMAN': 1, 'UNIT_CROSSBOWMAN': 1, 'UNIT_KNIGHT': 1} (army 0)
+  t140: +{'UNIT_MUSKETMAN': 1, 'UNIT_KNIGHT': 1, 'UNIT_CROSSBOWMAN': 1} (gold 497 -> 517)
+  t143: -{'UNIT_MUSKETMAN': 1, 'UNIT_KNIGHT': 1, 'UNIT_CROSSBOWMAN': 1} (army 0)
+  t157: +{'UNIT_LINE_INFANTRY': 1, 'UNIT_KNIGHT': 1, 'UNIT_FIELD_CANNON': 1} (gold 803 -> 823)
+  t162: suzerain 0 -> -1
+  t168: suzerain -1 -> 2
+  t175: +{'UNIT_CUIRASSIER': 1} (gold 762 -> 760)
+  t175: -{'UNIT_KNIGHT': 1} (army 3)
+  t185: BUY? +{'UNIT_TANK': 1} gold 789 -> 783 (drop 7), army before 3, building UNIT_TRADER
+  t185: -{'UNIT_CUIRASSIER': 1} (army 3)
+  t200: suzerain 2 -> 3
+  t208: BUY? +{'UNIT_MECHANIZED_INFANTRY': 1} gold 876 -> 750 (drop 125), army before 3, building BUILDING_SEWER
+  t208: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  t224: suzerain 3 -> 1
+  t225: +{'UNIT_MODERN_ARMOR': 1} (gold 850 -> 854)
+  t225: -{'UNIT_TANK': 1} (army 3)
+  t239: war [] -> [4]
+  t248: +{'UNIT_MACHINE_GUN': 1} (gold 729 -> 730)
+  t248: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t10) > BUILDING_GRANARY (t13) > BUILDING_MONUMENT (t24) > UNIT_WARRIOR (t29) > BUILDING_MONUMENT (t32) > DISTRICT_HARBOR (t34) > UNIT_ARCHER (t35) > UNIT_HEAVY_CHARIOT (t40) > DISTRICT_HARBOR (t48) > BUILDING_LIGHTHOUSE (t50) > UNIT_TRADER (t51) > UNIT_HEAVY_CHARIOT (t53) > BUILDING_WALLS (t57) > NONE (t62) > DISTRICT_HARBOR (t69) > BUILDING_LIGHTHOUSE (t70) > NONE (t72) > UNIT_TRADER (t78) > NONE (t81) > DISTRICT_HARBOR (t84) > BUILDING_LIGHTHOUSE (t85) > UNIT_BUILDER (t86) > DISTRICT_HARBOR (t89) > BUILDING_LIGHTHOUSE (t90) > BUILDING_CASTLE (t109) > PROJECT_ENHANCE_DISTRICT_HARBOR (t121) > BUILDING_LIGHTHOUSE (t156) > DISTRICT_INDUSTRIAL_ZONE (t160) > NONE (t162) > BUILDING_STAR_FORT (t163) > UNIT_TRADER (t181) > BUILDING_SEWER (t205) > UNIT_SUPPLY_CONVOY (t240)
+  end: gold 740 faith 4663 army {'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MODERN_ARMOR': 1, 'UNIT_MACHINE_GUN': 1} pop [13]
+== p7 CIVILIZATION_AYUTTHAYA  turns 1-227
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 80 -> 85)
+  t25: -{'UNIT_WARRIOR': 1} (army 3)
+  t32: +{'UNIT_ARCHER': 1} (gold 150 -> 154)
+  t35: +{'UNIT_ARCHER': 1} (gold 56 -> 60)
+  t60: +{'UNIT_SWORDSMAN': 1} (gold 55 -> 57)
+  t60: -{'UNIT_WARRIOR': 1} (army 5)
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 57 -> 56)
+  t61: -{'UNIT_WARRIOR': 1} (army 5)
+  t62: +{'UNIT_SWORDSMAN': 1} (gold 56 -> 54)
+  t62: -{'UNIT_WARRIOR': 1} (army 5)
+  t73: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 60 -> 46 (drop 13), army before 5, building NONE
+  t73: -{'UNIT_SWORDSMAN': 2} (army 5)
+  t74: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 46 -> 40 (drop 7), army before 5, building NONE
+  t74: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t74: suzerain -1 -> 5
+  t86: suzerain 5 -> -1
+  t87: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t89: -{'UNIT_MAN_AT_ARMS': 2} (army 2)
+  t90: +{'UNIT_CROSSBOWMAN': 1} (gold 2 -> 4)
+  t90: -{'UNIT_ARCHER': 1} (army 2)
+  t91: +{'UNIT_CROSSBOWMAN': 1} (gold 4 -> 9)
+  t93: +{'UNIT_CROSSBOWMAN': 1} (gold 10 -> 7)
+  t93: -{'UNIT_ARCHER': 1} (army 3)
+  t95: +{'UNIT_CROSSBOWMAN': 1} (gold 6 -> 6)
+  t96: -{'UNIT_CROSSBOWMAN': 2} (army 2)
+  t97: suzerain -1 -> 5
+  t102: +{'UNIT_CROSSBOWMAN': 1} (gold 13 -> 15)
+  t105: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t106: +{'UNIT_CROSSBOWMAN': 1} (gold 9 -> 11)
+  t112: +{'UNIT_TREBUCHET': 1} (gold 7 -> 6)
+  t113: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_TREBUCHET': 1} (army 2)
+  t116: +{'UNIT_TREBUCHET': 1} (gold 6 -> 8)
+  t120: +{'UNIT_TREBUCHET': 1} (gold 5 -> 5)
+  t121: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_TREBUCHET': 1} (army 2)
+  t122: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t123: +{'UNIT_BOMBARD': 1} (gold 3 -> 3)
+  t123: -{'UNIT_TREBUCHET': 1} (army 1)
+  t125: war [] -> [4]
+  t126: +{'UNIT_FIELD_CANNON': 1} (gold 7 -> 8)
+  t127: -{'UNIT_FIELD_CANNON': 1, 'UNIT_BOMBARD': 1} (army 0)
+  t137: +{'UNIT_FIELD_CANNON': 1} (gold 44 -> 48)
+  t137: war [4] -> []
+  t142: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t156: +{'UNIT_FIELD_CANNON': 1} (gold 144 -> 149)
+  t189: suzerain 5 -> 4
+  t190: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t204: +{'UNIT_FIELD_CANNON': 1} (gold 27 -> 28)
+  t207: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t223: suzerain 4 -> -1
+  t227: war [] -> [5]
+  t227: suzerain -1 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t15) > BUILDING_GRANARY (t20) > UNIT_TRADER (t28) > UNIT_ARCHER (t29) > NONE (t35) > BUILDING_WATER_MILL (t39) > NONE (t41) > UNIT_BUILDER (t42) > NONE (t43) > BUILDING_WALLS (t56) > NONE (t57) > UNIT_BUILDER (t75) > NONE (t76) > UNIT_CROSSBOWMAN (t90) > BUILDING_CASTLE (t95) > NONE (t99) > UNIT_CROSSBOWMAN (t100) > UNIT_BUILDER (t106) > UNIT_TREBUCHET (t108) > NONE (t112) > UNIT_TREBUCHET (t114) > NONE (t120) > UNIT_FIELD_CANNON (t122) > BUILDING_STAR_FORT (t126) > UNIT_FIELD_CANNON (t131) > DISTRICT_THEATER (t140) > BUILDING_AMPHITHEATER (t144) > BUILDING_MUSEUM_ART (t153) > UNIT_BUILDER (t169) > DISTRICT_HARBOR (t171) > BUILDING_SEWER (t174) > NONE (t179) > DISTRICT_NEIGHBORHOOD (t180) > UNIT_BUILDER (t209) > DISTRICT_HARBOR (t212) > BUILDING_LIGHTHOUSE (t214) > NONE (t221) > UNIT_TRADER (t222) > UNIT_BUILDER (t227)
+  end: gold 73 faith 86 army {} pop [13]
+== p8 CIVILIZATION_KABUL  turns 1-251
+  t15: +{'UNIT_WARRIOR': 1} (gold 65 -> 70)
+  t17: +{'UNIT_WARRIOR': 1} (gold 75 -> 80)
+  t19: +{'UNIT_WARRIOR': 1} (gold 85 -> 90)
+  t28: -{'UNIT_WARRIOR': 1} (army 4)
+  t30: +{'UNIT_ARCHER': 1} (gold 140 -> 170)
+  t35: BUY? +{'UNIT_ARCHER': 1} gold 186 -> 75 (drop 111), army before 5, building NONE
+  t46: +{'UNIT_SWORDSMAN': 1} (gold 101 -> 98)
+  t46: -{'UNIT_WARRIOR': 1} (army 6)
+  t48: BUY? +{'UNIT_SWORDSMAN': 2} gold 99 -> 90 (drop 10), army before 6, building NONE
+  t48: -{'UNIT_WARRIOR': 2} (army 6)
+  t51: BUY? +{'UNIT_SWORDSMAN': 1} gold 82 -> 74 (drop 8), army before 6, building NONE
+  t51: -{'UNIT_WARRIOR': 1} (army 6)
+  t64: -{'UNIT_ARCHER': 1, 'UNIT_SWORDSMAN': 2} (army 3)
+  t66: +{'UNIT_CATAPULT': 1} (gold 10 -> 10)
+  t71: +{'UNIT_CATAPULT': 1} (gold 29 -> 27)
+  t76: -{'UNIT_CATAPULT': 1} (army 4)
+  t77: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 9 -> 3 (drop 7), army before 4, building UNIT_CATAPULT
+  t77: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t78: -{'UNIT_CATAPULT': 1} (army 3)
+  t81: +{'UNIT_CATAPULT': 1} (gold 0 -> 0)
+  t87: +{'UNIT_CATAPULT': 1} (gold 0 -> 0)
+  t96: -{'UNIT_CATAPULT': 1} (army 4)
+  t97: -{'UNIT_CATAPULT': 1} (army 3)
+  t98: -{'UNIT_ARCHER': 1} (army 2)
+  t118: suzerain -1 -> 4
+  t119: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t120: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t125: war [] -> [5]
+  t127: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t135: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t136: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t137: war [5] -> []
+  t147: suzerain 4 -> -1
+  t153: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t157: suzerain -1 -> 1
+  t159: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t165: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t169: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_FIELD_CANNON': 1} (army 0)
+  t183: +{'UNIT_AT_CREW': 1, 'UNIT_FIELD_CANNON': 1} (gold 80 -> 87)
+  t197: suzerain 1 -> -1
+  t202: +{'UNIT_AT_CREW': 1} (gold 44 -> 42)
+  t206: -{'UNIT_AT_CREW': 2} (army 1)
+  t208: suzerain -1 -> 1
+  t227: suzerain 1 -> -1
+  t231: suzerain -1 -> 4
+  t235: suzerain 4 -> 1
+  t239: suzerain 1 -> 2
+  t240: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t242: war [] -> [1]
+  t242: suzerain 2 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t13) > BUILDING_GRANARY (t19) > UNIT_BUILDER (t27) > UNIT_ARCHER (t29) > NONE (t30) > UNIT_ARCHER (t34) > NONE (t35) > BUILDING_WATER_MILL (t50) > NONE (t51) > BUILDING_WALLS (t59) > NONE (t60) > UNIT_CATAPULT (t65) > NONE (t76) > UNIT_CATAPULT (t77) > UNIT_TRADER (t87) > BUILDING_CASTLE (t98) > UNIT_BUILDER (t107) > UNIT_PIKE_AND_SHOT (t110) > BUILDING_STAR_FORT (t135) > UNIT_FIELD_CANNON (t145) > DISTRICT_ENCAMPMENT (t159) > UNIT_BUILDER (t164) > BUILDING_BARRACKS (t167) > BUILDING_ARMORY (t175) > UNIT_AT_CREW (t190) > BUILDING_ARMORY (t202) > UNIT_BUILDER (t203) > BUILDING_MILITARY_ACADEMY (t205) > BUILDING_SEWER (t225) > UNIT_SUPPLY_CONVOY (t234) > UNIT_BUILDER (t240) > UNIT_MODERN_AT (t242)
+  end: gold 43 faith 0 army {} pop [14]
+== p9 CIVILIZATION_BRUSSELS  turns 1-251
+  t16: +{'UNIT_WARRIOR': 1} (gold 118 -> 127)
+  t18: +{'UNIT_WARRIOR': 1} (gold 138 -> 149)
+  t20: +{'UNIT_ARCHER': 1} (gold 160 -> 171)
+  t31: BUY? +{'UNIT_ARCHER': 1} gold 271 -> 176 (drop 95), army before 5, building NONE
+  t39: suzerain -1 -> 1
+  t41: -{'UNIT_WARRIOR': 1} (army 5)
+  t51: BUY? +{'UNIT_CATAPULT': 1} gold 257 -> 25 (drop 232), army before 5, building UNIT_TRADER
+  t57: +{'UNIT_SWORDSMAN': 1} (gold 65 -> 69)
+  t57: -{'UNIT_WARRIOR': 1} (army 6)
+  t58: +{'UNIT_SWORDSMAN': 2} (gold 69 -> 65)
+  t58: -{'UNIT_WARRIOR': 2} (army 6)
+  t69: suzerain 1 -> -1
+  t70: +{'UNIT_MAN_AT_ARMS': 1} (gold 124 -> 124)
+  t70: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t71: +{'UNIT_MAN_AT_ARMS': 1} (gold 124 -> 123)
+  t71: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t72: +{'UNIT_MAN_AT_ARMS': 1} (gold 123 -> 122)
+  t72: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t73: suzerain -1 -> 1
+  t93: +{'UNIT_CROSSBOWMAN': 1} (gold 209 -> 210)
+  t93: -{'UNIT_ARCHER': 1} (army 6)
+  t95: +{'UNIT_TREBUCHET': 1} (gold 213 -> 212)
+  t95: -{'UNIT_CATAPULT': 1} (army 6)
+  t96: +{'UNIT_CROSSBOWMAN': 1} (gold 212 -> 209)
+  t96: -{'UNIT_ARCHER': 1} (army 6)
+  t97: suzerain 1 -> -1
+  t98: +{'UNIT_MUSKETMAN': 1} (gold 210 -> 205)
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t99: BUY? +{'UNIT_MUSKETMAN': 1} gold 205 -> 200 (drop 6), army before 6, building NONE
+  t99: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t99: suzerain -1 -> 0
+  t102: BUY? +{'UNIT_MUSKETMAN': 1} gold 196 -> 189 (drop 7), army before 6, building NONE
+  t102: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t106: BUY? +{'UNIT_BOMBARD': 1} gold 180 -> 172 (drop 8), army before 6, building NONE
+  t106: -{'UNIT_TREBUCHET': 1} (army 6)
+  t107: suzerain 0 -> -1
+  t118: suzerain -1 -> 0
+  t122: -{'UNIT_CROSSBOWMAN': 1} (army 5)
+  t124: suzerain 0 -> -1
+  t134: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t135: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 29 -> 22 (drop 8), army before 4, building UNIT_PIKE_AND_SHOT
+  t135: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t135: suzerain -1 -> 1
+  t136: BUY? +{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_LINE_INFANTRY': 1} gold 22 -> 13 (drop 9), army before 4, building UNIT_BUILDER
+  t136: -{'UNIT_MUSKETMAN': 1} (army 5)
+  t137: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_LINE_INFANTRY': 1, 'UNIT_BOMBARD': 1} (army 2)
+  t139: +{'UNIT_FIELD_CANNON': 1} (gold 10 -> 11)
+  t139: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t143: +{'UNIT_FIELD_CANNON': 1} (gold 25 -> 29)
+  t155: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t156: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t157: suzerain 1 -> 0
+  t158: suzerain 0 -> 1
+  t174: +{'UNIT_INFANTRY': 1} (gold 187 -> 193)
+  t174: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t207: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 355 -> 355)
+  t207: -{'UNIT_INFANTRY': 1} (army 1)
+  t233: +{'UNIT_SUPPLY_CONVOY': 1} (gold 426 -> 431)
+  t239: war [] -> [4]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t14) > UNIT_ARCHER (t18) > BUILDING_GRANARY (t20) > NONE (t26) > UNIT_ARCHER (t30) > NONE (t31) > UNIT_TRADER (t51) > NONE (t52) > UNIT_BUILDER (t53) > NONE (t54) > BUILDING_WALLS (t61) > NONE (t62) > BUILDING_CASTLE (t92) > NONE (t93) > UNIT_BUILDER (t104) > NONE (t105) > BUILDING_STAR_FORT (t131) > NONE (t132) > UNIT_PIKE_AND_SHOT (t135) > UNIT_BUILDER (t136) > UNIT_FIELD_CANNON (t138) > DISTRICT_INDUSTRIAL_ZONE (t143) > BUILDING_WORKSHOP (t145) > UNIT_BUILDER (t154) > BUILDING_FACTORY (t155) > DISTRICT_NEIGHBORHOOD (t169) > BUILDING_SEWER (t189) > DISTRICT_INDUSTRIAL_ZONE (t201) > BUILDING_WORKSHOP (t202) > BUILDING_FACTORY (t205) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t206) > UNIT_SUPPLY_CONVOY (t223) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t233)
+  end: gold 334 faith 1764 army {'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_SUPPLY_CONVOY': 1} pop [17]
+== p10 CIVILIZATION_FEZ  turns 1-186
+  t14: +{'UNIT_WARRIOR': 1} (gold 60 -> 65)
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 80 -> 85)
+  t26: BUY? +{'UNIT_ARCHER': 1} gold 120 -> 5 (drop 115), army before 5, building NONE
+  t30: -{'UNIT_WARRIOR': 1} (army 5)
+  t55: war [] -> [4]
+  t55: suzerain -1 -> 5
+  t56: -{'UNIT_WARRIOR': 4, 'UNIT_ARCHER': 1} (army 0)
+  t60: +{'UNIT_CATAPULT': 1} (gold 123 -> 128)
+  t62: war [4] -> []
+  t70: +{'UNIT_SWORDSMAN': 1, 'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 2} (gold 157 -> 162)
+  t87: -{'UNIT_WARRIOR': 1} (army 4)
+  t88: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t104: +{'UNIT_CROSSBOWMAN': 1} (gold 113 -> 112)
+  t104: -{'UNIT_ARCHER': 1} (army 3)
+  t107: +{'UNIT_CROSSBOWMAN': 1} (gold 116 -> 118)
+  t110: BUY? +{'UNIT_BOMBARD': 1} gold 115 -> 109 (drop 6), army before 4, building BUILDING_CASTLE
+  t110: -{'UNIT_CATAPULT': 1} (army 4)
+  t113: BUY? +{'UNIT_FIELD_CANNON': 2} gold 104 -> 91 (drop 13), army before 4, building UNIT_BUILDER
+  t113: -{'UNIT_CROSSBOWMAN': 2} (army 4)
+  t115: BUY? +{'UNIT_MUSKETMAN': 1} gold 81 -> 68 (drop 13), army before 4, building BUILDING_UNIVERSITY
+  t115: -{'UNIT_WARRIOR': 1} (army 4)
+  t118: -{'UNIT_MUSKETMAN': 1, 'UNIT_FIELD_CANNON': 1, 'UNIT_BOMBARD': 1} (army 1)
+  t125: war [] -> [4]
+  t137: war [4] -> []
+  t148: suzerain 5 -> 4
+  t167: suzerain 4 -> 3
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t13) > BUILDING_GRANARY (t18) > NONE (t24) > DISTRICT_CAMPUS (t28) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t29) > UNIT_BUILDER (t36) > BUILDING_LIBRARY (t39) > NONE (t43) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t44) > UNIT_BUILDER (t48) > BUILDING_WATER_MILL (t50) > UNIT_CATAPULT (t56) > UNIT_BUILDER (t60) > UNIT_TRADER (t61) > BUILDING_WATER_MILL (t66) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t67) > BUILDING_WALLS (t75) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t77) > UNIT_CROSSBOWMAN (t102) > BUILDING_CASTLE (t107) > UNIT_BUILDER (t113) > BUILDING_UNIVERSITY (t115) > BUILDING_STAR_FORT (t134) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t141) > DISTRICT_NEIGHBORHOOD (t162) > BUILDING_SEWER (t183)
+  end: gold 37 faith 16294 army {'UNIT_FIELD_CANNON': 1} pop [12]
+== p11 CIVILIZATION_CARDIFF  turns 1-251
+  t32: BUY? +{'UNIT_WARRIOR': 1} gold 158 -> 83 (drop 75), army before 2, building UNIT_WARRIOR
+  t34: +{'UNIT_WARRIOR': 1} (gold 89 -> 93)
+  t56: +{'UNIT_SWORDSMAN': 1} (gold 206 -> 209)
+  t56: -{'UNIT_WARRIOR': 1} (army 4)
+  t57: +{'UNIT_SWORDSMAN': 1} (gold 209 -> 210)
+  t57: -{'UNIT_WARRIOR': 1} (army 4)
+  t60: +{'UNIT_SWORDSMAN': 1} (gold 218 -> 217)
+  t60: -{'UNIT_WARRIOR': 1} (army 4)
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 217 -> 214)
+  t61: -{'UNIT_WARRIOR': 1} (army 4)
+  t73: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 215 -> 206 (drop 9), army before 4, building BUILDING_WALLS
+  t73: -{'UNIT_SWORDSMAN': 2} (army 4)
+  t75: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 205 -> 199 (drop 6), army before 4, building NONE
+  t75: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t78: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 195 -> 188 (drop 7), army before 4, building NONE
+  t78: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t88: +{'UNIT_MAN_AT_ARMS': 1} (gold 160 -> 157)
+  t92: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t97: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t99: +{'UNIT_MUSKETMAN': 1} (gold 123 -> 118)
+  t99: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t107: +{'UNIT_KNIGHT': 1} (gold 136 -> 138)
+  t109: BUY? +{'UNIT_MUSKETMAN': 1} gold 136 -> 129 (drop 7), army before 4, building UNIT_KNIGHT
+  t109: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t115: BUY? +{'UNIT_MUSKETMAN': 1} gold 115 -> 107 (drop 8), army before 4, building UNIT_KNIGHT
+  t115: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t117: BUY? +{'UNIT_KNIGHT': 1} gold 104 -> 93 (drop 10), army before 4, building NONE
+  t124: -{'UNIT_MUSKETMAN': 1, 'UNIT_KNIGHT': 1} (army 3)
+  t127: +{'UNIT_PIKE_AND_SHOT': 1} (gold 31 -> 27)
+  t128: -{'UNIT_KNIGHT': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t136: +{'UNIT_LINE_INFANTRY': 1} (gold 34 -> 31)
+  t136: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t138: +{'UNIT_PIKE_AND_SHOT': 1} (gold 31 -> 32)
+  t140: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t148: suzerain -1 -> 5
+  t160: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t181: +{'UNIT_INFANTRY': 1} (gold 5 -> 3)
+  t181: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t205: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 34 -> 29)
+  t205: -{'UNIT_INFANTRY': 1} (army 1)
+  t207: suzerain 5 -> -1
+  t208: suzerain -1 -> 3
+  t209: -{'UNIT_MECHANIZED_INFANTRY': 1} (army 0)
+  t211: suzerain 3 -> -1
+  t222: suzerain -1 -> 1
+  t223: suzerain 1 -> -1
+  t237: suzerain -1 -> 4
+  t239: war [] -> [1]
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_BUILDER (t25) > UNIT_WARRIOR (t30) > UNIT_TRADER (t34) > BUILDING_GRANARY (t45) > BUILDING_WATER_MILL (t57) > BUILDING_WALLS (t71) > NONE (t75) > UNIT_MAN_AT_ARMS (t87) > NONE (t88) > BUILDING_CASTLE (t92) > UNIT_KNIGHT (t98) > NONE (t117) > UNIT_PIKE_AND_SHOT (t125) > NONE (t127) > UNIT_PIKE_AND_SHOT (t129) > BUILDING_STAR_FORT (t138) > UNIT_TRADER (t151) > DISTRICT_INDUSTRIAL_ZONE (t162) > UNIT_TRADER (t168) > BUILDING_WORKSHOP (t178) > BUILDING_FACTORY (t191) > BUILDING_SEWER (t207) > UNIT_BUILDER (t214) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t215) > NONE (t225) > DISTRICT_NEIGHBORHOOD (t226) > BUILDING_FOOD_MARKET (t243)
+  end: gold 302 faith 1638 army {} pop [12]
+== p12 CIVILIZATION_YEREVAN  turns 1-251
+  t24: +{'UNIT_WARRIOR': 1} (gold 114 -> 120)
+  t25: suzerain -1 -> 4
+  t26: +{'UNIT_WARRIOR': 1, 'UNIT_ARCHER': 1} (gold 125 -> 130)
+  t28: -{'UNIT_WARRIOR': 1} (army 4)
+  t38: +{'UNIT_HEAVY_CHARIOT': 1} (gold 92 -> 100)
+  t43: war [] -> [5]
+  t56: +{'UNIT_SWORDSMAN': 1} (gold 223 -> 225)
+  t56: -{'UNIT_WARRIOR': 1} (army 5)
+  t57: +{'UNIT_SWORDSMAN': 1} (gold 225 -> 225)
+  t57: -{'UNIT_WARRIOR': 1} (army 5)
+  t58: -{'UNIT_WARRIOR': 1} (army 4)
+  t62: war [5] -> []
+  t81: +{'UNIT_MAN_AT_ARMS': 1} (gold 239 -> 243)
+  t81: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t82: -{'UNIT_ARCHER': 1} (army 3)
+  t83: +{'UNIT_MAN_AT_ARMS': 1} (gold 250 -> 253)
+  t83: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t89: +{'UNIT_KNIGHT': 1} (gold 284 -> 285)
+  t89: -{'UNIT_HEAVY_CHARIOT': 1} (army 3)
+  t97: suzerain 4 -> -1
+  t105: +{'UNIT_MUSKETMAN': 1} (gold 341 -> 337)
+  t105: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t106: +{'UNIT_MUSKETMAN': 1} (gold 337 -> 332)
+  t106: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t118: suzerain -1 -> 3
+  t127: war [] -> [4]
+  t127: suzerain 3 -> 5
+  t134: war [4] -> []
+  t134: suzerain 5 -> -1
+  t140: +{'UNIT_LINE_INFANTRY': 1} (gold 252 -> 251)
+  t140: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t141: BUY? +{'UNIT_CUIRASSIER': 1, 'UNIT_LINE_INFANTRY': 1} gold 251 -> 244 (drop 7), army before 3, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t141: -{'UNIT_MUSKETMAN': 1, 'UNIT_KNIGHT': 1} (army 3)
+  t142: suzerain -1 -> 3
+  t168: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t174: +{'UNIT_INFANTRY': 1} (gold 219 -> 216)
+  t174: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t204: +{'UNIT_TANK': 1} (gold 329 -> 329)
+  t204: -{'UNIT_CUIRASSIER': 1} (army 2)
+  t207: suzerain 3 -> -1
+  t208: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 340 -> 339)
+  t208: -{'UNIT_INFANTRY': 1} (army 2)
+  t224: BUY? +{'UNIT_MODERN_ARMOR': 1} gold 347 -> 341 (drop 6), army before 2, building BUILDING_SEWER
+  t224: -{'UNIT_TANK': 1} (army 2)
+  t250: war [] -> [1]
+  t250: suzerain -1 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t7) > BUILDING_MONUMENT (t16) > UNIT_WARRIOR (t23) > NONE (t26) > UNIT_TRADER (t29) > NONE (t33) > UNIT_HEAVY_CHARIOT (t37) > NONE (t38) > UNIT_BUILDER (t40) > DISTRICT_HOLY_SITE (t41) > BUILDING_SHRINE (t43) > DISTRICT_HARBOR (t52) > BUILDING_LIGHTHOUSE (t55) > BUILDING_WALLS (t73) > PROJECT_ENHANCE_DISTRICT_HARBOR (t76) > BUILDING_TEMPLE (t91) > BUILDING_SYNAGOGUE (t104) > BUILDING_CASTLE (t124) > BUILDING_STAR_FORT (t131) > PROJECT_ENHANCE_DISTRICT_HARBOR (t132) > NONE (t143) > BUILDING_SHIPYARD (t144) > UNIT_BUILDER (t172) > UNIT_TRADER (t174) > NONE (t178) > DISTRICT_NEIGHBORHOOD (t179) > UNIT_BUILDER (t209) > BUILDING_SEWER (t211) > UNIT_SUPPLY_CONVOY (t239)
+  end: gold 240 faith 12434 army {'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MODERN_ARMOR': 1} pop [15]
+== p13 CIVILIZATION_JAKARTA  turns 1-251
+  t18: -{'UNIT_WARRIOR': 1} (army 1)
+  t32: +{'UNIT_ARCHER': 1} (gold 166 -> 173)
+  t35: BUY? +{'UNIT_ARCHER': 1} gold 183 -> 69 (drop 115), army before 2, building UNIT_ARCHER
+  t37: +{'UNIT_ARCHER': 1} (gold 73 -> 77)
+  t41: +{'UNIT_ARCHER': 1} (gold 89 -> 94)
+  t50: suzerain -1 -> 1
+  t58: +{'UNIT_SWORDSMAN': 1} (gold 163 -> 162)
+  t58: -{'UNIT_WARRIOR': 1} (army 5)
+  t63: BUY? +{'UNIT_CROSSBOWMAN': 2} gold 167 -> 159 (drop 8), army before 5, building BUILDING_MARKET
+  t63: -{'UNIT_ARCHER': 2} (army 5)
+  t64: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 159 -> 152 (drop 7), army before 5, building BUILDING_MARKET
+  t64: -{'UNIT_ARCHER': 1} (army 5)
+  t65: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 152 -> 146 (drop 6), army before 5, building BUILDING_MARKET
+  t65: -{'UNIT_ARCHER': 1} (army 5)
+  t74: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 121 -> 112 (drop 9), army before 5, building BUILDING_MARKET
+  t74: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t91: suzerain 1 -> -1
+  t96: suzerain -1 -> 0
+  t98: +{'UNIT_MUSKETMAN': 1} (gold 176 -> 174)
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t106: suzerain 0 -> -1
+  t107: suzerain -1 -> 0
+  t108: suzerain 0 -> -1
+  t119: suzerain -1 -> 1
+  t125: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t136: +{'UNIT_LINE_INFANTRY': 1} (gold 338 -> 338)
+  t136: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t137: BUY? +{'UNIT_FIELD_CANNON': 2} gold 338 -> 332 (drop 6), army before 4, building PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB
+  t137: -{'UNIT_CROSSBOWMAN': 2} (army 4)
+  t162: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t169: +{'UNIT_INFANTRY': 1} (gold 179 -> 174)
+  t169: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  t182: suzerain 1 -> 2
+  t184: suzerain 2 -> -1
+  t189: suzerain -1 -> 2
+  t205: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 186 -> 187)
+  t205: -{'UNIT_INFANTRY': 1} (army 3)
+  t208: +{'UNIT_FIELD_CANNON': 1} (gold 195 -> 195)
+  t208: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t225: suzerain 2 -> -1
+  t245: war [] -> [4]
+  t245: suzerain -1 -> 1
+  t247: BUY? +{'UNIT_MACHINE_GUN': 2, 'UNIT_MODERN_AT': 1} gold 371 -> 363 (drop 9), army before 3, building UNIT_SUPPLY_CONVOY
+  t247: -{'UNIT_FIELD_CANNON': 2} (army 4)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > BUILDING_GRANARY (t17) > UNIT_ARCHER (t28) > NONE (t41) > UNIT_TRADER (t43) > NONE (t45) > UNIT_BUILDER (t50) > BUILDING_WALLS (t51) > NONE (t53) > BUILDING_MARKET (t59) > UNIT_BUILDER (t75) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t79) > BUILDING_CASTLE (t94) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t102) > BUILDING_STAR_FORT (t139) > BUILDING_BANK (t149) > UNIT_TRADER (t197) > UNIT_AT_CREW (t224) > UNIT_SUPPLY_CONVOY (t247)
+  end: gold 345 faith 14683 army {'UNIT_MACHINE_GUN': 2, 'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MODERN_AT': 1} pop [13]
+== p14 CIVILIZATION_MUSCAT  turns 1-251
+  t8: +{'UNIT_WARRIOR': 1} (gold 45 -> 53)
+  t13: +{'UNIT_WARRIOR': 1} (gold 88 -> 97)
+  t18: +{'UNIT_WARRIOR': 1} (gold 133 -> 142)
+  t20: BUY? +{'UNIT_WARRIOR': 1} gold 151 -> 80 (drop 71), army before 5, building UNIT_WARRIOR
+  t23: +{'UNIT_WARRIOR': 1} (gold 98 -> 108)
+  t29: -{'UNIT_WARRIOR': 2} (army 5)
+  t30: -{'UNIT_WARRIOR': 1} (army 4)
+  t43: BUY? +{'UNIT_GALLEY': 1} gold 198 -> 83 (drop 115), army before 4, building UNIT_TRADER
+  t45: -{'UNIT_WARRIOR': 1} (army 4)
+  t47: -{'UNIT_WARRIOR': 3, 'UNIT_GALLEY': 1} (army 0)
+  t47: suzerain -1 -> 3
+  t61: +{'UNIT_WARRIOR': 2, 'UNIT_GALLEY': 1} (gold 173 -> 190)
+  t63: -{'UNIT_WARRIOR': 2, 'UNIT_GALLEY': 1} (army 0)
+  t64: BUY? +{'UNIT_CATAPULT': 1} gold 231 -> 12 (drop 219), army before 0, building BUILDING_LIGHTHOUSE
+  t75: -{'UNIT_CATAPULT': 1} (army 0)
+  t77: +{'UNIT_GALLEY': 1} (gold 242 -> 257)
+  t78: -{'UNIT_GALLEY': 1} (army 0)
+  t84: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 347 -> 2 (drop 345), army before 0, building DISTRICT_COMMERCIAL_HUB
+  t97: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t111: +{'UNIT_CROSSBOWMAN': 1} (gold 427 -> 451)
+  t112: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t114: BUY? +{'UNIT_PIKE_AND_SHOT': 1} gold 504 -> 31 (drop 473), army before 0, building BUILDING_CASTLE
+  t120: -{'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t140: BUY? +{'UNIT_FIELD_CANNON': 1} gold 645 -> 21 (drop 624), army before 0, building BUILDING_SHIPYARD
+  t165: BUY? +{'UNIT_FIELD_CANNON': 1} gold 789 -> 162 (drop 627), army before 1, building BUILDING_BANK
+  t165: suzerain 3 -> -1
+  t167: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t167: suzerain -1 -> 5
+  t189: BUY? +{'UNIT_AT_CREW': 1} gold 789 -> 19 (drop 771), army before 1, building DISTRICT_NEIGHBORHOOD
+  t198: suzerain 5 -> 4
+  t211: suzerain 4 -> 3
+  t226: +{'UNIT_MODERN_AT': 1} (gold 1028 -> 1063)
+  t226: -{'UNIT_AT_CREW': 1} (army 2)
+  t239: suzerain 3 -> -1
+  t248: +{'UNIT_MACHINE_GUN': 1} (gold 1985 -> 2024)
+  t248: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_WARRIOR (t4) > BUILDING_MONUMENT (t23) > UNIT_TRADER (t43) > DISTRICT_HARBOR (t57) > BUILDING_LIGHTHOUSE (t61) > DISTRICT_COMMERCIAL_HUB (t81) > BUILDING_WALLS (t85) > BUILDING_MARKET (t88) > UNIT_TRADER (t101) > BUILDING_CASTLE (t110) > UNIT_TRADER (t118) > BUILDING_STAR_FORT (t126) > BUILDING_SHIPYARD (t135) > BUILDING_BANK (t160) > DISTRICT_NEIGHBORHOOD (t177) > BUILDING_STOCK_EXCHANGE (t200) > BUILDING_SEAPORT (t223)
+  end: gold 2146 faith 45 army {'UNIT_MACHINE_GUN': 1, 'UNIT_MODERN_AT': 1} pop [11]
+== p15 CIVILIZATION_NAZCA  turns 1-251
+  t7: +{'UNIT_WARRIOR': 1} (gold 27 -> 34)
+  t15: +{'UNIT_WARRIOR': 1} (gold 87 -> 95)
+  t29: -{'UNIT_WARRIOR': 1} (army 3)
+  t30: -{'UNIT_WARRIOR': 1} (army 2)
+  t30: suzerain -1 -> 2
+  t33: BUY? +{'UNIT_GALLEY': 1} gold 236 -> 121 (drop 115), army before 2, building UNIT_WARRIOR
+  t35: +{'UNIT_WARRIOR': 1} (gold 130 -> 139)
+  t45: -{'UNIT_WARRIOR': 3, 'UNIT_GALLEY': 1} (army 0)
+  t59: +{'UNIT_WARRIOR': 3, 'UNIT_GALLEY': 1} (gold 237 -> 251)
+  t62: -{'UNIT_WARRIOR': 1} (army 3)
+  t63: -{'UNIT_WARRIOR': 1} (army 2)
+  t67: BUY? +{'UNIT_CATAPULT': 1} gold 325 -> 95 (drop 229), army before 2, building BUILDING_SHRINE
+  t67: -{'UNIT_WARRIOR': 1} (army 2)
+  t69: -{'UNIT_GALLEY': 1, 'UNIT_CATAPULT': 1} (army 0)
+  t83: +{'UNIT_GALLEY': 1} (gold 280 -> 292)
+  t84: -{'UNIT_GALLEY': 1} (army 0)
+  t90: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 368 -> 20 (drop 347), army before 0, building BUILDING_LIGHTHOUSE
+  t92: +{'UNIT_GALLEY': 1} (gold 30 -> 39)
+  t92: suzerain 2 -> -1
+  t95: suzerain -1 -> 2
+  t99: suzerain 2 -> 1
+  t100: suzerain 1 -> 2
+  t111: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t118: suzerain 2 -> -1
+  t130: +{'UNIT_CARAVEL': 1} (gold 118 -> 123)
+  t130: -{'UNIT_GALLEY': 1} (army 1)
+  t140: suzerain -1 -> 1
+  t145: suzerain 1 -> -1
+  t150: suzerain -1 -> 2
+  t156: -{'UNIT_CARAVEL': 1} (army 0)
+  t170: +{'UNIT_CARAVEL': 1} (gold 374 -> 389)
+  t176: +{'UNIT_IRONCLAD': 1} (gold 437 -> 442)
+  t176: -{'UNIT_CARAVEL': 1} (army 1)
+  t186: suzerain 2 -> -1
+  t216: BUY? +{'UNIT_AT_CREW': 1} gold 788 -> 8 (drop 780), army before 1, building BUILDING_SEWER
+  t251: +{'UNIT_MODERN_AT': 1} (gold 619 -> 631)
+  t251: -{'UNIT_AT_CREW': 1} (army 2)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_WARRIOR (t4) > UNIT_BUILDER (t7) > UNIT_WARRIOR (t12) > DISTRICT_HOLY_SITE (t15) > BUILDING_MONUMENT (t18) > UNIT_WARRIOR (t31) > UNIT_TRADER (t35) > DISTRICT_HARBOR (t48) > UNIT_BUILDER (t51) > BUILDING_SHRINE (t54) > BUILDING_TEMPLE (t66) > BUILDING_SHRINE (t67) > BUILDING_LIGHTHOUSE (t68) > BUILDING_WALLS (t73) > BUILDING_LIGHTHOUSE (t79) > DISTRICT_HOLY_SITE (t91) > BUILDING_SHRINE (t92) > BUILDING_TEMPLE (t95) > BUILDING_CASTLE (t107) > UNIT_TRADER (t113) > BUILDING_SHRINE (t120) > BUILDING_TEMPLE (t121) > BUILDING_CATHEDRAL (t124) > BUILDING_TEMPLE (t132) > BUILDING_SHRINE (t133) > PROJECT_REPAIR_OUTER_DEFENSES (t134) > DISTRICT_HOLY_SITE (t135) > BUILDING_SHRINE (t136) > BUILDING_STAR_FORT (t138) > UNIT_PIKE_AND_SHOT (t144) > BUILDING_STAR_FORT (t145) > UNIT_TRADER (t147) > DISTRICT_HOLY_SITE (t156) > BUILDING_SHRINE (t157) > BUILDING_TEMPLE (t158) > BUILDING_CATHEDRAL (t161) > UNIT_TRADER (t170) > DISTRICT_NEIGHBORHOOD (t180) > BUILDING_SEWER (t209) > UNIT_SUPPLY_CONVOY (t245)
+  end: gold 631 faith 1269 army {'UNIT_IRONCLAD': 1, 'UNIT_MODERN_AT': 1} pop [13]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-251
+  t139: +{'UNIT_MUSKETMAN': 1} (gold 0 -> 0)
+  t140: +{'UNIT_WARRIOR': 1} (gold 0 -> 0)
+  t141: -{'UNIT_WARRIOR': 1, 'UNIT_MUSKETMAN': 1} (army 0)
+  t143: +{'UNIT_COURSER': 1} (gold 0 -> 0)
+  t145: -{'UNIT_COURSER': 1} (army 0)
+  t148: +{'UNIT_MUSKETMAN': 1} (gold 0 -> 0)
+  t151: +{'UNIT_TREBUCHET': 1} (gold 0 -> 0)
+  t152: -{'UNIT_TREBUCHET': 1} (army 1)
+  t153: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t154: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t156: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t157: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t158: +{'UNIT_COURSER': 1} (gold 0 -> 0)
+  t159: -{'UNIT_COURSER': 1} (army 1)
+  t160: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t161: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t163: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t164: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t165: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t165: -{'UNIT_INFANTRY': 1} (army 1)
+  t167: -{'UNIT_CAVALRY': 1} (army 0)
+  t170: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t171: -{'UNIT_INFANTRY': 1} (army 0)
+  t173: +{'UNIT_COURSER': 1} (gold 0 -> 0)
+  t174: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t175: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t178: +{'UNIT_MUSKETMAN': 1} (gold 0 -> 0)
+  t179: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t179: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t180: -{'UNIT_COURSER': 1, 'UNIT_CAVALRY': 1} (army 0)
+  t218: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t219: -{'UNIT_INFANTRY': 1} (army 0)
+  t222: +{'UNIT_INFANTRY': 1, 'UNIT_MECHANIZED_INFANTRY': 1} (gold 0 -> 0)
+  t223: -{'UNIT_INFANTRY': 1} (army 1)
+  t224: -{'UNIT_MECHANIZED_INFANTRY': 1} (army 0)
+  t226: +{'UNIT_MACHINE_GUN': 1} (gold 0 -> 0)
+  t227: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t227: -{'UNIT_MACHINE_GUN': 1} (army 1)
+  t228: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t246: +{'UNIT_LINE_INFANTRY': 1} (gold 0 -> 0)
+  t247: -{'UNIT_LINE_INFANTRY': 1} (army 0)
+  t251: +{'UNIT_LINE_INFANTRY': 1} (gold 21 -> 26)
+  builds: - (t1) > UNIT_WARRIOR (t139) > BUILDING_MONUMENT (t140) > UNIT_TREBUCHET (t143) > BUILDING_WALLS (t151) > BUILDING_UNIVERSITY (t155) > BUILDING_CASTLE (t169) > - (t182) > BUILDING_AMPHITHEATER (t218) > DISTRICT_AQUEDUCT (t219) > BUILDING_MUSEUM_ARTIFACT (t220) > BUILDING_RESEARCH_LAB (t224) > BUILDING_STOCK_EXCHANGE (t229) > - (t231) > UNIT_PIKEMAN (t247)
+  end: gold 26 faith 108 army {'UNIT_LINE_INFANTRY': 1} pop [5]
+== p6 CIVILIZATION_SINGAPORE  turns 1-251
+  t20: +{'UNIT_WARRIOR': 1} (gold 90 -> 95)
+  t23: +{'UNIT_WARRIOR': 1} (gold 107 -> 113)
+  t25: BUY? +{'UNIT_GALLEY': 1} gold 119 -> 0 (drop 119), army before 4, building UNIT_WARRIOR
+  t27: +{'UNIT_WARRIOR': 1} (gold 5 -> 10)
+  t64: BUY? +{'UNIT_SWORDSMAN': 4} gold 75 -> 60 (drop 15), army before 6, building BUILDING_WATER_MILL
+  t64: -{'UNIT_WARRIOR': 4} (army 6)
+  t69: BUY? +{'UNIT_SWORDSMAN': 1} gold 49 -> 44 (drop 5), army before 6, building NONE
+  t69: -{'UNIT_WARRIOR': 1} (army 6)
+  t69: suzerain -1 -> 2
+  t81: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 22 -> 15 (drop 7), army before 6, building NONE
+  t81: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t82: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 15 -> 7 (drop 8), army before 6, building NONE
+  t82: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t83: -{'UNIT_MAN_AT_ARMS': 2} (army 4)
+  t84: +{'UNIT_MAN_AT_ARMS': 1} (gold 3 -> 0)
+  t84: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t93: +{'UNIT_MAN_AT_ARMS': 1} (gold 31 -> 30)
+  t93: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t94: +{'UNIT_MAN_AT_ARMS': 1} (gold 30 -> 28)
+  t94: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t111: +{'UNIT_MUSKETMAN': 1} (gold 68 -> 66)
+  t111: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t114: +{'UNIT_MUSKETMAN': 1} (gold 74 -> 74)
+  t114: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t117: +{'UNIT_MUSKETMAN': 1} (gold 82 -> 77)
+  t117: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t117: suzerain 2 -> 5
+  t119: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t122: +{'UNIT_CARAVEL': 1} (gold 98 -> 99)
+  t122: -{'UNIT_GALLEY': 1} (army 3)
+  t140: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t146: war [] -> [1, 4]
+  t148: +{'UNIT_LINE_INFANTRY': 1} (gold 245 -> 251)
+  t148: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t162: +{'UNIT_PIKE_AND_SHOT': 1} (gold 425 -> 434)
+  t166: -{'UNIT_CARAVEL': 1} (army 2)
+  t176: +{'UNIT_INFANTRY': 1} (gold 542 -> 547)
+  t176: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t179: war [1, 4] -> []
+  t179: suzerain 5 -> -1
+  t181: +{'UNIT_FIELD_CANNON': 1} (gold 581 -> 590)
+  t218: +{'UNIT_MODERN_AT': 1} (gold 737 -> 734)
+  t218: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t234: war [] -> [4]
+  t234: suzerain -1 -> 2
+  t236: BUY? +{'UNIT_MECHANIZED_INFANTRY': 1} gold 716 -> 709 (drop 7), army before 3, building BUILDING_FLOOD_BARRIER
+  t236: -{'UNIT_INFANTRY': 1} (army 3)
+  t239: BUY? +{'UNIT_MACHINE_GUN': 1} gold 702 -> 693 (drop 9), army before 3, building BUILDING_FLOOD_BARRIER
+  t239: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t244: war [4] -> []
+  t244: suzerain 2 -> -1
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t18) > BUILDING_GRANARY (t23) > UNIT_WARRIOR (t24) > BUILDING_GRANARY (t27) > NONE (t35) > DISTRICT_HARBOR (t36) > BUILDING_LIGHTHOUSE (t37) > NONE (t39) > UNIT_BUILDER (t40) > NONE (t43) > BUILDING_WALLS (t49) > NONE (t50) > BUILDING_WATER_MILL (t53) > NONE (t67) > UNIT_TRADER (t84) > NONE (t85) > UNIT_BUILDER (t88) > NONE (t89) > BUILDING_CASTLE (t99) > NONE (t103) > BUILDING_STAR_FORT (t146) > UNIT_PIKE_AND_SHOT (t147) > UNIT_FIELD_CANNON (t162) > NONE (t181) > BUILDING_SEWER (t212) > NONE (t213) > BUILDING_FLOOD_BARRIER (t217)
+  end: gold 649 faith 18 army {'UNIT_MODERN_AT': 1, 'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MACHINE_GUN': 1} pop [12]
+== p7 CIVILIZATION_HUNZA  turns 1-188
+  t31: suzerain -1 -> 1
+  t32: -{'UNIT_WARRIOR': 2} (army 0)
+  t37: BUY? +{'UNIT_ARCHER': 1} gold 114 -> 3 (drop 111), army before 0, building BUILDING_GRANARY
+  t60: BUY? +{'UNIT_HEAVY_CHARIOT': 1} gold 193 -> 76 (drop 116), army before 1, building UNIT_HEAVY_CHARIOT
+  t61: +{'UNIT_ARCHER': 1} (gold 76 -> 84)
+  t67: -{'UNIT_ARCHER': 1} (army 2)
+  t68: -{'UNIT_ARCHER': 1} (army 1)
+  t69: BUY? +{'UNIT_GALLEY': 1} gold 132 -> 14 (drop 118), army before 1, building DISTRICT_COMMERCIAL_HUB
+  t78: +{'UNIT_ARCHER': 1, 'UNIT_HEAVY_CHARIOT': 1} (gold 67 -> 71)
+  t78: suzerain 1 -> -1
+  t94: suzerain -1 -> 4
+  t95: +{'UNIT_KNIGHT': 2} (gold 173 -> 169)
+  t95: -{'UNIT_HEAVY_CHARIOT': 2} (army 4)
+  t98: suzerain 4 -> -1
+  t99: +{'UNIT_CROSSBOWMAN': 1} (gold 170 -> 165)
+  t99: -{'UNIT_ARCHER': 1} (army 4)
+  t101: suzerain -1 -> 4
+  t112: +{'UNIT_CARAVEL': 1} (gold 130 -> 125)
+  t112: -{'UNIT_GALLEY': 1} (army 4)
+  t132: -{'UNIT_KNIGHT': 1} (army 3)
+  t138: suzerain 4 -> 1
+  t146: war [] -> [5]
+  t150: BUY? +{'UNIT_FIELD_CANNON': 1} gold 102 -> 95 (drop 8), army before 3, building UNIT_PIKEMAN
+  t150: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t151: BUY? +{'UNIT_CUIRASSIER': 1} gold 95 -> 85 (drop 10), army before 3, building UNIT_PIKEMAN
+  t151: -{'UNIT_KNIGHT': 1} (army 3)
+  t151: suzerain 1 -> 4
+  t152: BUY? +{'UNIT_PIKE_AND_SHOT': 1} gold 85 -> 74 (drop 12), army before 3, building BUILDING_MARKET
+  t155: suzerain 4 -> 1
+  t157: -{'UNIT_CARAVEL': 1, 'UNIT_PIKE_AND_SHOT': 1, 'UNIT_CUIRASSIER': 1} (army 1)
+  t159: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t160: +{'UNIT_FIELD_CANNON': 1} (gold 36 -> 40)
+  t160: suzerain 1 -> 4
+  t162: suzerain 4 -> 1
+  t165: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t167: +{'UNIT_FIELD_CANNON': 1} (gold 79 -> 84)
+  t167: suzerain 1 -> 4
+  t180: war [5] -> []
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > NONE (t20) > BUILDING_GRANARY (t21) > UNIT_ARCHER (t38) > UNIT_BUILDER (t47) > UNIT_HEAVY_CHARIOT (t57) > DISTRICT_COMMERCIAL_HUB (t68) > UNIT_BUILDER (t79) > BUILDING_WALLS (t88) > UNIT_BUILDER (t97) > BUILDING_MARKET (t103) > UNIT_BUILDER (t115) > BUILDING_CASTLE (t125) > NONE (t127) > UNIT_PIKEMAN (t128) > BUILDING_MARKET (t152) > UNIT_BUILDER (t162) > UNIT_TRADER (t170)
+  end: gold 198 faith 0 army {'UNIT_FIELD_CANNON': 1} pop [13]
+== p8 CIVILIZATION_CAHOKIA  turns 1-251
+  t21: -{'UNIT_WARRIOR': 1} (army 1)
+  t22: +{'UNIT_ARCHER': 1} (gold 147 -> 158)
+  t25: +{'UNIT_ARCHER': 1} (gold 73 -> 83)
+  t27: +{'UNIT_ARCHER': 1} (gold 92 -> 101)
+  t30: +{'UNIT_ARCHER': 1} (gold 120 -> 131)
+  t31: suzerain -1 -> 2
+  t41: -{'UNIT_ARCHER': 1} (army 4)
+  t45: suzerain 2 -> -1
+  t61: +{'UNIT_CATAPULT': 1} (gold 347 -> 360)
+  t66: suzerain -1 -> 2
+  t70: +{'UNIT_SWORDSMAN': 1} (gold 452 -> 456)
+  t70: -{'UNIT_WARRIOR': 1} (army 5)
+  t77: +{'UNIT_CROSSBOWMAN': 2} (gold 531 -> 533)
+  t77: -{'UNIT_ARCHER': 2} (army 5)
+  t78: +{'UNIT_MAN_AT_ARMS': 1, 'UNIT_CROSSBOWMAN': 1} (gold 533 -> 532)
+  t78: -{'UNIT_ARCHER': 1, 'UNIT_SWORDSMAN': 1} (army 5)
+  t86: suzerain 2 -> -1
+  t97: +{'UNIT_TREBUCHET': 1} (gold 613 -> 612)
+  t97: -{'UNIT_CATAPULT': 1} (army 5)
+  t100: suzerain -1 -> 5
+  t110: +{'UNIT_MUSKETMAN': 1} (gold 497 -> 492)
+  t110: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t111: +{'UNIT_BOMBARD': 1} (gold 492 -> 487)
+  t111: -{'UNIT_TREBUCHET': 1} (army 5)
+  t116: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t118: +{'UNIT_PIKE_AND_SHOT': 1} (gold 342 -> 341)
+  t127: +{'UNIT_PIKE_AND_SHOT': 1} (gold 308 -> 304)
+  t131: -{'UNIT_PIKE_AND_SHOT': 1} (army 5)
+  t138: suzerain 5 -> -1
+  t144: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 207 -> 197 (drop 10), army before 5, building BUILDING_MARKET
+  t144: -{'UNIT_MUSKETMAN': 1} (army 5)
+  t145: BUY? +{'UNIT_FIELD_CANNON': 1} gold 197 -> 186 (drop 11), army before 5, building BUILDING_MARKET
+  t145: -{'UNIT_CROSSBOWMAN': 1} (army 5)
+  t147: BUY? +{'UNIT_FIELD_CANNON': 1} gold 179 -> 168 (drop 12), army before 5, building BUILDING_MARKET
+  t147: -{'UNIT_CROSSBOWMAN': 1} (army 5)
+  t150: war [] -> [1, 4]
+  t150: suzerain -1 -> 5
+  t151: -{'UNIT_FIELD_CANNON': 1} (army 4)
+  t163: war [1, 4] -> [3]
+  t163: suzerain 5 -> 0
+  t165: war [3] -> []
+  t165: suzerain 0 -> -1
+  t172: war [] -> [3]
+  t172: suzerain -1 -> 0
+  t176: war [3] -> []
+  t176: suzerain 0 -> -1
+  t177: war [] -> [3]
+  t177: suzerain -1 -> 0
+  t179: war [3] -> [1, 4]
+  t179: suzerain 0 -> 5
+  t180: war [1, 4] -> [1]
+  t183: war [1] -> [3]
+  t183: suzerain 5 -> 0
+  t184: war [3] -> []
+  t184: suzerain 0 -> -1
+  t194: BUY? +{'UNIT_ARTILLERY': 1} gold 33 -> 27 (drop 6), army before 4, building BUILDING_BANK
+  t194: -{'UNIT_BOMBARD': 1} (army 4)
+  t196: -{'UNIT_ARTILLERY': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t198: +{'UNIT_INFANTRY': 1} (gold 32 -> 42)
+  t198: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t233: war [] -> [0, 4]
+  t233: suzerain -1 -> 3
+  t237: +{'UNIT_MACHINE_GUN': 1} (gold 472 -> 481)
+  t237: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t241: war [0, 4] -> []
+  t241: suzerain 3 -> -1
+  t242: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 528 -> 535)
+  t242: -{'UNIT_INFANTRY': 1} (army 2)
+  t247: -{'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MACHINE_GUN': 1} (army 0)
+  t247: war [] -> [2, 3, 5]
+  t247: suzerain -1 -> 4
+  t251: war [2, 3, 5] -> [3, 5]
+  builds: - (t1) > BUILDING_MONUMENT (t4) > NONE (t5) > UNIT_BUILDER (t6) > BUILDING_MONUMENT (t9) > UNIT_ARCHER (t20) > NONE (t22) > UNIT_ARCHER (t23) > NONE (t27) > UNIT_ARCHER (t28) > UNIT_BUILDER (t30) > BUILDING_WATER_MILL (t34) > UNIT_TRADER (t43) > NONE (t49) > BUILDING_GRANARY (t50) > UNIT_CATAPULT (t56) > BUILDING_WALLS (t61) > NONE (t65) > BUILDING_CASTLE (t98) > NONE (t99) > UNIT_PIKE_AND_SHOT (t117) > DISTRICT_COMMERCIAL_HUB (t127) > BUILDING_MARKET (t133) > BUILDING_STAR_FORT (t151) > UNIT_BUILDER (t164) > BUILDING_BANK (t168) > DISTRICT_HARBOR (t196) > BUILDING_SEWER (t203) > BUILDING_LIGHTHOUSE (t227) > UNIT_SUPPLY_CONVOY (t242)
+  end: gold 559 faith 196 army {} pop [19]
+== p9 CIVILIZATION_CAGUANA  turns 1-251
+  t11: -{'UNIT_WARRIOR': 1} (army 1)
+  t27: suzerain -1 -> 5
+  t28: +{'UNIT_WARRIOR': 1} (gold 155 -> 160)
+  t32: -{'UNIT_WARRIOR': 1} (army 1)
+  t35: BUY? +{'UNIT_WARRIOR': 1} gold 198 -> 125 (drop 73), army before 1, building UNIT_TRADER
+  t39: -{'UNIT_WARRIOR': 1} (army 1)
+  t40: +{'UNIT_WARRIOR': 1} (gold 165 -> 178)
+  t40: suzerain 5 -> -1
+  t41: -{'UNIT_WARRIOR': 1} (army 1)
+  t46: +{'UNIT_ARCHER': 1} (gold 243 -> 256)
+  t48: -{'UNIT_WARRIOR': 1} (army 1)
+  t51: BUY? +{'UNIT_ARCHER': 1} gold 304 -> 196 (drop 108), army before 1, building UNIT_ARCHER
+  t53: BUY? +{'UNIT_ARCHER': 2} gold 207 -> 100 (drop 107), army before 2, building UNIT_HEAVY_CHARIOT
+  t55: suzerain -1 -> 5
+  t56: +{'UNIT_HEAVY_CHARIOT': 1} (gold 4 -> 16)
+  t98: +{'UNIT_CROSSBOWMAN': 1} (gold 181 -> 185)
+  t98: -{'UNIT_ARCHER': 1} (army 5)
+  t99: +{'UNIT_CROSSBOWMAN': 1} (gold 185 -> 187)
+  t99: -{'UNIT_ARCHER': 1} (army 5)
+  t100: +{'UNIT_CROSSBOWMAN': 1} (gold 187 -> 187)
+  t100: -{'UNIT_ARCHER': 1} (army 5)
+  t107: +{'UNIT_KNIGHT': 1} (gold 201 -> 199)
+  t107: -{'UNIT_HEAVY_CHARIOT': 1} (army 5)
+  t108: +{'UNIT_CROSSBOWMAN': 1} (gold 199 -> 194)
+  t108: -{'UNIT_ARCHER': 1} (army 5)
+  t128: suzerain 5 -> -1
+  t130: suzerain -1 -> 5
+  t144: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t146: war [] -> [1, 4]
+  t148: war [1, 4] -> []
+  t148: suzerain 5 -> -1
+  t151: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t152: +{'UNIT_TREBUCHET': 1} (gold 21 -> 21)
+  t156: BUY? +{'UNIT_BOMBARD': 1} gold 12 -> 4 (drop 8), army before 4, building PROJECT_ENHANCE_DISTRICT_THEATER
+  t156: -{'UNIT_TREBUCHET': 1} (army 4)
+  t157: -{'UNIT_CROSSBOWMAN': 2} (army 2)
+  t159: +{'UNIT_CUIRASSIER': 1} (gold 7 -> 9)
+  t159: -{'UNIT_KNIGHT': 1} (army 2)
+  t162: +{'UNIT_ARTILLERY': 1} (gold 21 -> 22)
+  t162: -{'UNIT_BOMBARD': 1} (army 2)
+  t172: BUY? +{'UNIT_TANK': 1} gold 57 -> 49 (drop 7), army before 2, building DISTRICT_NEIGHBORHOOD
+  t172: -{'UNIT_CUIRASSIER': 1} (army 2)
+  t172: war [] -> [5]
+  t172: suzerain -1 -> 1
+  t175: -{'UNIT_TANK': 1} (army 1)
+  t180: war [5] -> []
+  t180: suzerain 1 -> -1
+  t250: +{'UNIT_ROCKET_ARTILLERY': 1} (gold 609 -> 615)
+  t250: -{'UNIT_ARTILLERY': 1} (army 1)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t7) > UNIT_BUILDER (t21) > UNIT_WARRIOR (t25) > UNIT_TRADER (t30) > BUILDING_MONUMENT (t37) > UNIT_WARRIOR (t38) > BUILDING_MONUMENT (t40) > UNIT_ARCHER (t43) > BUILDING_MONUMENT (t49) > UNIT_ARCHER (t51) > UNIT_HEAVY_CHARIOT (t53) > BUILDING_WALLS (t56) > NONE (t59) > DISTRICT_THEATER (t66) > BUILDING_AMPHITHEATER (t67) > NONE (t74) > BUILDING_AMPHITHEATER (t77) > PROJECT_ENHANCE_DISTRICT_THEATER (t78) > NONE (t83) > PROJECT_ENHANCE_DISTRICT_THEATER (t85) > NONE (t88) > PROJECT_ENHANCE_DISTRICT_THEATER (t89) > NONE (t90) > BUILDING_CASTLE (t97) > NONE (t98) > BUILDING_MUSEUM_ART (t100) > NONE (t113) > BUILDING_MUSEUM_ART (t117) > PROJECT_ENHANCE_DISTRICT_THEATER (t121) > NONE (t131) > PROJECT_ENHANCE_DISTRICT_THEATER (t132) > NONE (t133) > PROJECT_ENHANCE_DISTRICT_THEATER (t134) > NONE (t141) > PROJECT_ENHANCE_DISTRICT_THEATER (t143) > UNIT_TREBUCHET (t147) > PROJECT_ENHANCE_DISTRICT_THEATER (t152) > DISTRICT_NEIGHBORHOOD (t168) > UNIT_BUILDER (t187) > PROJECT_ENHANCE_DISTRICT_THEATER (t188) > BUILDING_SEWER (t224) > BUILDING_MUSEUM_ART (t242) > UNIT_SUPPLY_CONVOY (t248)
+  end: gold 625 faith 39821 army {'UNIT_ROCKET_ARTILLERY': 1} pop [15]
+== p10 CIVILIZATION_CARDIFF  turns 1-251
+  t17: +{'UNIT_WARRIOR': 1} (gold 79 -> 85)
+  t19: +{'UNIT_WARRIOR': 1} (gold 91 -> 97)
+  t21: +{'UNIT_WARRIOR': 1} (gold 103 -> 109)
+  t24: BUY? +{'UNIT_GALLEY': 1} gold 121 -> 2 (drop 119), army before 5, building BUILDING_GRANARY
+  t49: suzerain -1 -> 1
+  t65: +{'UNIT_SWORDSMAN': 1} (gold 204 -> 209)
+  t65: -{'UNIT_WARRIOR': 1} (army 6)
+  t66: +{'UNIT_SWORDSMAN': 1} (gold 209 -> 212)
+  t66: -{'UNIT_WARRIOR': 1} (army 6)
+  t67: +{'UNIT_SWORDSMAN': 1} (gold 212 -> 213)
+  t67: -{'UNIT_WARRIOR': 1} (army 6)
+  t69: +{'UNIT_SWORDSMAN': 1} (gold 217 -> 212)
+  t69: -{'UNIT_WARRIOR': 1} (army 6)
+  t72: +{'UNIT_SWORDSMAN': 1} (gold 208 -> 202)
+  t72: -{'UNIT_WARRIOR': 1} (army 6)
+  t91: +{'UNIT_MAN_AT_ARMS': 1} (gold 195 -> 191)
+  t91: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t92: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 191 -> 185 (drop 6), army before 6, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t92: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t93: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 185 -> 178 (drop 7), army before 6, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t93: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t97: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 170 -> 157 (drop 13), army before 6, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t97: -{'UNIT_SWORDSMAN': 2} (army 6)
+  t109: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t110: BUY? +{'UNIT_TREBUCHET': 1, 'UNIT_MUSKETMAN': 1} gold 121 -> 114 (drop 7), army before 5, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t110: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t111: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t112: BUY? +{'UNIT_MUSKETMAN': 2} gold 108 -> 96 (drop 12), army before 5, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t112: -{'UNIT_MAN_AT_ARMS': 2} (army 5)
+  t119: -{'UNIT_GALLEY': 1} (army 4)
+  t124: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t134: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t135: +{'UNIT_BOMBARD': 1} (gold 60 -> 61)
+  t135: -{'UNIT_TREBUCHET': 1} (army 2)
+  t138: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t141: +{'UNIT_PIKE_AND_SHOT': 1} (gold 95 -> 110)
+  t146: war [] -> [5]
+  t172: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_BOMBARD': 1} (army 0)
+  t186: +{'UNIT_ARTILLERY': 1, 'UNIT_PIKE_AND_SHOT': 1} (gold 593 -> 613)
+  t193: -{'UNIT_ARTILLERY': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t193: war [5] -> []
+  t195: +{'UNIT_ARTILLERY': 1, 'UNIT_PIKE_AND_SHOT': 1} (gold 609 -> 625)
+  t195: suzerain 1 -> -1
+  t198: war [] -> [0]
+  t198: suzerain -1 -> 3
+  t209: war [0] -> [0, 4]
+  t218: +{'UNIT_MODERN_AT': 1} (gold 354 -> 361)
+  t218: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t219: -{'UNIT_MODERN_AT': 1} (army 1)
+  t220: war [0, 4] -> [4]
+  t220: suzerain 3 -> 2
+  t231: war [4] -> []
+  t231: suzerain 2 -> -1
+  t238: war [] -> [2, 3, 5]
+  t238: suzerain -1 -> 4
+  t239: -{'UNIT_ARTILLERY': 1} (army 0)
+  t251: war [2, 3, 5] -> [3, 5]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t15) > BUILDING_GRANARY (t21) > NONE (t31) > BUILDING_LIGHTHOUSE (t37) > NONE (t38) > DISTRICT_HARBOR (t39) > BUILDING_LIGHTHOUSE (t40) > UNIT_BUILDER (t52) > BUILDING_WALLS (t53) > NONE (t55) > BUILDING_WATER_MILL (t56) > PROJECT_ENHANCE_DISTRICT_HARBOR (t63) > NONE (t69) > DISTRICT_HARBOR (t70) > BUILDING_LIGHTHOUSE (t71) > PROJECT_ENHANCE_DISTRICT_HARBOR (t74) > BUILDING_CASTLE (t100) > UNIT_TREBUCHET (t105) > PROJECT_ENHANCE_DISTRICT_HARBOR (t110) > UNIT_TRADER (t123) > UNIT_PIKE_AND_SHOT (t135) > UNIT_BUILDER (t141) > BUILDING_STAR_FORT (t143) > DISTRICT_INDUSTRIAL_ZONE (t150) > UNIT_TRADER (t154) > BUILDING_SHIPYARD (t161) > BUILDING_WORKSHOP (t180) > PROJECT_ENHANCE_DISTRICT_HARBOR (t184) > DISTRICT_INDUSTRIAL_ZONE (t198) > BUILDING_FACTORY (t199) > DISTRICT_NEIGHBORHOOD (t215) > BUILDING_FACTORY (t238) > PROJECT_MANHATTAN_PROJECT (t243)
+  end: gold 789 faith 21946 army {} pop [8]
+== p11 CIVILIZATION_NGAZARGAMU  turns 1-251
+  t10: -{'UNIT_WARRIOR': 1} (army 1)
+  t13: -{'UNIT_WARRIOR': 1} (army 0)
+  t16: BUY? +{'UNIT_WARRIOR': 1} gold 96 -> 23 (drop 73), army before 0, building BUILDING_MONUMENT
+  t21: -{'UNIT_WARRIOR': 1} (army 0)
+  t34: +{'UNIT_ARCHER': 1} (gold 158 -> 169)
+  t36: BUY? +{'UNIT_ARCHER': 1} gold 178 -> 68 (drop 110), army before 1, building UNIT_ARCHER
+  t38: +{'UNIT_ARCHER': 1} (gold 76 -> 85)
+  t43: +{'UNIT_ARCHER': 1} (gold 114 -> 121)
+  t48: +{'UNIT_HEAVY_CHARIOT': 1} (gold 143 -> 150)
+  t54: +{'UNIT_HEAVY_CHARIOT': 1} (gold 177 -> 182)
+  t64: suzerain -1 -> 3
+  t69: -{'UNIT_ARCHER': 1} (army 5)
+  t76: -{'UNIT_ARCHER': 1} (army 4)
+  t77: -{'UNIT_ARCHER': 2, 'UNIT_HEAVY_CHARIOT': 2} (army 0)
+  t78: BUY? +{'UNIT_CATAPULT': 1} gold 235 -> 3 (drop 232), army before 0, building BUILDING_WATER_MILL
+  t91: +{'UNIT_ARCHER': 1} (gold 93 -> 101)
+  t91: -{'UNIT_CATAPULT': 1} (army 1)
+  t97: +{'UNIT_TREBUCHET': 1} (gold 154 -> 161)
+  t97: -{'UNIT_ARCHER': 1} (army 1)
+  t103: -{'UNIT_TREBUCHET': 1} (army 0)
+  t104: +{'UNIT_CROSSBOWMAN': 1} (gold 219 -> 231)
+  t111: +{'UNIT_BOMBARD': 1} (gold 292 -> 297)
+  t122: suzerain 3 -> -1
+  t126: suzerain -1 -> 3
+  t129: war [] -> [0]
+  t133: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t135: -{'UNIT_BOMBARD': 1} (army 0)
+  t140: +{'UNIT_PIKE_AND_SHOT': 1} (gold 181 -> 190)
+  t143: +{'UNIT_BOMBARD': 1} (gold 202 -> 203)
+  t143: war [0] -> [3]
+  t143: suzerain 3 -> 0
+  t148: war [3] -> []
+  t148: suzerain 0 -> -1
+  t156: war [] -> [0]
+  t156: suzerain -1 -> 3
+  t158: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t159: -{'UNIT_BOMBARD': 1} (army 0)
+  t172: +{'UNIT_FIELD_CANNON': 1} (gold 354 -> 361)
+  t172: war [0] -> []
+  t173: +{'UNIT_BOMBARD': 1} (gold 361 -> 360)
+  t173: suzerain 3 -> -1
+  t227: war [] -> [3]
+  t227: suzerain -1 -> 0
+  t236: BUY? +{'UNIT_MACHINE_GUN': 1, 'UNIT_SUPPLY_CONVOY': 1} gold 271 -> 263 (drop 8), army before 2, building BUILDING_FOOD_MARKET
+  t236: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t250: war [3] -> [2, 3]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_TRADER (t20) > UNIT_ARCHER (t30) > UNIT_HEAVY_CHARIOT (t43) > BUILDING_GRANARY (t54) > BUILDING_WATER_MILL (t68) > BUILDING_WALLS (t81) > UNIT_TRADER (t84) > UNIT_CATAPULT (t93) > UNIT_CROSSBOWMAN (t97) > UNIT_TREBUCHET (t104) > BUILDING_CASTLE (t111) > DISTRICT_ENCAMPMENT (t119) > BUILDING_BARRACKS (t125) > UNIT_PIKE_AND_SHOT (t132) > PROJECT_REPAIR_OUTER_DEFENSES (t140) > UNIT_TRADER (t141) > BUILDING_ARMORY (t148) > UNIT_FIELD_CANNON (t163) > BUILDING_MILITARY_ACADEMY (t172) > DISTRICT_NEIGHBORHOOD (t196) > BUILDING_SEWER (t216) > UNIT_SUPPLY_CONVOY (t227) > BUILDING_FOOD_MARKET (t236)
+  end: gold 177 faith 25 army {'UNIT_MACHINE_GUN': 1, 'UNIT_BOMBARD': 1, 'UNIT_SUPPLY_CONVOY': 1} pop [14]
+== p12 CIVILIZATION_JERUSALEM  turns 1-251
+  t20: -{'UNIT_WARRIOR': 1} (army 1)
+  t21: +{'UNIT_WARRIOR': 1} (gold 140 -> 146)
+  t24: -{'UNIT_WARRIOR': 1} (army 1)
+  t25: BUY? +{'UNIT_ARCHER': 1} gold 164 -> 50 (drop 114), army before 1, building BUILDING_GRANARY
+  t30: suzerain -1 -> 3
+  t38: BUY? +{'UNIT_GALLEY': 1} gold 129 -> 12 (drop 117), army before 2, building UNIT_TRADER
+  t42: -{'UNIT_WARRIOR': 1, 'UNIT_ARCHER': 1, 'UNIT_GALLEY': 1} (army 0)
+  t56: +{'UNIT_GALLEY': 1, 'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1} (gold 121 -> 143)
+  t57: -{'UNIT_GALLEY': 1, 'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1} (army 0)
+  t67: +{'UNIT_GALLEY': 1, 'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1} (gold 381 -> 403)
+  t67: suzerain 3 -> -1
+  t78: -{'UNIT_ARCHER': 1} (army 2)
+  t88: -{'UNIT_WARRIOR': 1} (army 1)
+  t89: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 873 -> 534 (drop 339), army before 1, building BUILDING_TEMPLE
+  t92: suzerain -1 -> 0
+  t94: BUY? +{'UNIT_TREBUCHET': 1} gold 612 -> 115 (drop 496), army before 2, building DISTRICT_HOLY_SITE
+  t98: suzerain 0 -> -1
+  t103: suzerain -1 -> 0
+  t119: suzerain 0 -> 3
+  t122: +{'UNIT_BOMBARD': 1} (gold 343 -> 352)
+  t122: -{'UNIT_TREBUCHET': 1} (army 3)
+  t124: +{'UNIT_FIELD_CANNON': 1} (gold 365 -> 367)
+  t124: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t129: war [] -> [0]
+  t152: war [0] -> []
+  t153: war [] -> [3]
+  t153: suzerain 3 -> 0
+  t165: war [3] -> []
+  t165: suzerain 0 -> -1
+  t166: +{'UNIT_CARAVEL': 1} (gold 670 -> 668)
+  t166: -{'UNIT_GALLEY': 1} (army 3)
+  t196: suzerain -1 -> 5
+  t197: BUY? +{'UNIT_ARTILLERY': 1} gold 766 -> 372 (drop 394), army before 3, building DISTRICT_NEIGHBORHOOD
+  t197: -{'UNIT_BOMBARD': 1} (army 3)
+  t197: war [] -> [3]
+  t197: suzerain 5 -> 0
+  t199: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t203: -{'UNIT_ARTILLERY': 1, 'UNIT_CARAVEL': 1} (army 0)
+  t226: +{'UNIT_MODERN_AT': 1} (gold 613 -> 634)
+  t241: +{'UNIT_MODERN_AT': 1} (gold 843 -> 864)
+  t242: -{'UNIT_MODERN_AT': 1} (army 1)
+  t250: -{'UNIT_MODERN_AT': 1} (army 0)
+  t250: war [3] -> [2, 3]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > DISTRICT_HOLY_SITE (t16) > UNIT_WARRIOR (t18) > BUILDING_GRANARY (t21) > DISTRICT_HOLY_SITE (t31) > UNIT_TRADER (t32) > BUILDING_SHRINE (t40) > DISTRICT_HARBOR (t50) > BUILDING_LIGHTHOUSE (t53) > DISTRICT_HOLY_SITE (t71) > BUILDING_SHRINE (t72) > BUILDING_TEMPLE (t75) > BUILDING_SHRINE (t90) > BUILDING_WALLS (t91) > DISTRICT_HOLY_SITE (t94) > BUILDING_SHRINE (t95) > BUILDING_TEMPLE (t99) > BUILDING_CASTLE (t102) > BUILDING_CATHEDRAL (t112) > BUILDING_STAR_FORT (t130) > BUILDING_SHIPYARD (t141) > UNIT_TRADER (t172) > DISTRICT_NEIGHBORHOOD (t188) > UNIT_MODERN_AT (t213) > BUILDING_SEAPORT (t226) > UNIT_MODERN_AT (t227) > UNIT_SUPPLY_CONVOY (t241)
+  end: gold 875 faith 2059 army {} pop [17]
+== p13 CIVILIZATION_LAHORE  turns 1-251
+  t19: -{'UNIT_WARRIOR': 1} (army 1)
+  t23: +{'UNIT_WARRIOR': 1} (gold 24 -> 30)
+  t28: +{'UNIT_ARCHER': 1} (gold 73 -> 78)
+  t48: +{'UNIT_SWORDSMAN': 1} (gold 145 -> 144)
+  t48: -{'UNIT_WARRIOR': 1} (army 3)
+  t49: +{'UNIT_SWORDSMAN': 1} (gold 144 -> 141)
+  t49: -{'UNIT_WARRIOR': 1} (army 3)
+  t55: war [] -> [3]
+  t64: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t68: -{'UNIT_ARCHER': 1} (army 1)
+  t72: +{'UNIT_CATAPULT': 1} (gold 135 -> 138)
+  t79: +{'UNIT_CATAPULT': 1} (gold 193 -> 196)
+  t79: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t87: +{'UNIT_CATAPULT': 1} (gold 203 -> 204)
+  t93: suzerain -1 -> 0
+  t95: BUY? +{'UNIT_TREBUCHET': 1} gold 198 -> 192 (drop 6), army before 3, building UNIT_TRADER
+  t95: -{'UNIT_CATAPULT': 1} (army 3)
+  t96: BUY? +{'UNIT_TREBUCHET': 1} gold 192 -> 185 (drop 7), army before 3, building UNIT_TRADER
+  t96: -{'UNIT_CATAPULT': 1} (army 3)
+  t121: war [3] -> []
+  t122: -{'UNIT_TREBUCHET': 2, 'UNIT_CATAPULT': 1} (army 0)
+  t129: war [] -> [3]
+  t135: +{'UNIT_FIELD_CANNON': 1} (gold 140 -> 148)
+  t136: +{'UNIT_TREBUCHET': 2, 'UNIT_BOMBARD': 1} (gold 148 -> 147)
+  t137: BUY? +{'UNIT_BOMBARD': 1} gold 147 -> 135 (drop 12), army before 4, building NONE
+  t137: -{'UNIT_TREBUCHET': 1} (army 4)
+  t140: BUY? +{'UNIT_BOMBARD': 1} gold 117 -> 103 (drop 14), army before 4, building NONE
+  t140: -{'UNIT_TREBUCHET': 1} (army 4)
+  t142: -{'UNIT_BOMBARD': 1} (army 3)
+  t151: -{'UNIT_BOMBARD': 1, 'UNIT_FIELD_CANNON': 1} (army 1)
+  t195: -{'UNIT_BOMBARD': 1} (army 0)
+  t201: war [3] -> []
+  t201: suzerain 0 -> -1
+  t212: +{'UNIT_FIELD_CANNON': 1} (gold 85 -> 90)
+  t214: war [] -> [4]
+  t214: suzerain -1 -> 5
+  t215: suzerain 5 -> 2
+  t238: +{'UNIT_MACHINE_GUN': 1} (gold 90 -> 85)
+  t238: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t250: war [4] -> [0, 4, 5]
+  t251: -{'UNIT_MACHINE_GUN': 1} (army 0)
+  t251: war [0, 4, 5] -> [0, 5]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_WARRIOR (t20) > UNIT_ARCHER (t23) > UNIT_BUILDER (t28) > BUILDING_GRANARY (t31) > UNIT_BUILDER (t39) > UNIT_TRADER (t42) > NONE (t48) > BUILDING_WATER_MILL (t49) > UNIT_CATAPULT (t64) > UNIT_TRADER (t87) > NONE (t97) > DISTRICT_ENCAMPMENT (t98) > BUILDING_WALLS (t99) > BUILDING_BARRACKS (t104) > NONE (t119) > UNIT_FIELD_CANNON (t122) > NONE (t135) > PROJECT_REPAIR_OUTER_DEFENSES (t146) > DISTRICT_NEIGHBORHOOD (t147) > UNIT_PIKE_AND_SHOT (t176) > PROJECT_REPAIR_OUTER_DEFENSES (t183) > UNIT_FIELD_CANNON (t184) > PROJECT_REPAIR_OUTER_DEFENSES (t212) > DISTRICT_NEIGHBORHOOD (t213)
+  end: gold 78 faith 51 army {} pop [13]
+== p14 CIVILIZATION_HONG_KONG  turns 1-251
+  t8: -{'UNIT_WARRIOR': 1} (army 1)
+  t10: -{'UNIT_WARRIOR': 1} (army 0)
+  t28: +{'UNIT_ARCHER': 1} (gold 136 -> 142)
+  t33: +{'UNIT_ARCHER': 1} (gold 160 -> 164)
+  t35: BUY? +{'UNIT_ARCHER': 1} gold 168 -> 51 (drop 117), army before 2, building UNIT_HEAVY_CHARIOT
+  t39: +{'UNIT_HEAVY_CHARIOT': 1} (gold 59 -> 61)
+  t87: +{'UNIT_CROSSBOWMAN': 1} (gold 153 -> 150)
+  t87: -{'UNIT_ARCHER': 1} (army 4)
+  t89: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 149 -> 144 (drop 6), army before 4, building BUILDING_GRANARY
+  t89: -{'UNIT_ARCHER': 1} (army 4)
+  t91: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 141 -> 133 (drop 8), army before 4, building BUILDING_GRANARY
+  t91: -{'UNIT_ARCHER': 1} (army 4)
+  t100: BUY? +{'UNIT_KNIGHT': 1} gold 102 -> 95 (drop 7), army before 4, building BUILDING_CASTLE
+  t100: -{'UNIT_HEAVY_CHARIOT': 1} (army 4)
+  t117: -{'UNIT_CROSSBOWMAN': 3} (army 1)
+  t127: +{'UNIT_PIKE_AND_SHOT': 1} (gold 66 -> 71)
+  t133: +{'UNIT_CUIRASSIER': 1} (gold 77 -> 74)
+  t133: -{'UNIT_KNIGHT': 1} (army 2)
+  t134: suzerain -1 -> 5
+  t137: +{'UNIT_PIKE_AND_SHOT': 1} (gold 72 -> 72)
+  t138: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t146: war [] -> [1, 4]
+  t148: BUY? +{'UNIT_PIKE_AND_SHOT': 1} gold 42 -> 36 (drop 6), army before 2, building BUILDING_STAR_FORT
+  t149: -{'UNIT_CUIRASSIER': 1, 'UNIT_PIKE_AND_SHOT': 2} (army 0)
+  t158: war [1, 4] -> [5]
+  t158: suzerain 5 -> 1
+  t174: BUY? +{'UNIT_FIELD_CANNON': 1} gold 162 -> 52 (drop 110), army before 0, building UNIT_SUPPLY_CONVOY
+  t182: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t191: +{'UNIT_SUPPLY_CONVOY': 1} (gold 99 -> 104)
+  t193: war [5] -> []
+  t204: +{'UNIT_FIELD_CANNON': 1} (gold 167 -> 170)
+  t207: war [] -> [4]
+  t213: -{'UNIT_FIELD_CANNON': 1, 'UNIT_SUPPLY_CONVOY': 1} (army 0)
+  t217: +{'UNIT_FIELD_CANNON': 1, 'UNIT_SUPPLY_CONVOY': 1} (gold 218 -> 220)
+  t217: suzerain 1 -> 2
+  t220: +{'UNIT_MODERN_AT': 1} (gold 223 -> 224)
+  t237: BUY? +{'UNIT_MACHINE_GUN': 1} gold 126 -> 116 (drop 10), army before 3, building BUILDING_FLOOD_BARRIER
+  t237: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t250: war [4] -> [0, 4, 5]
+  t251: war [0, 4, 5] -> [0, 5]
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_ARCHER (t23) > UNIT_HEAVY_CHARIOT (t33) > BUILDING_WATER_MILL (t39) > UNIT_TRADER (t62) > BUILDING_WALLS (t79) > BUILDING_GRANARY (t86) > BUILDING_CASTLE (t99) > NONE (t112) > UNIT_PIKE_AND_SHOT (t118) > PROJECT_REPAIR_OUTER_DEFENSES (t137) > UNIT_BUILDER (t138) > UNIT_PIKE_AND_SHOT (t140) > BUILDING_STAR_FORT (t148) > UNIT_FIELD_CANNON (t160) > UNIT_SUPPLY_CONVOY (t174) > UNIT_FIELD_CANNON (t191) > PROJECT_REPAIR_OUTER_DEFENSES (t204) > UNIT_MODERN_AT (t206) > BUILDING_FLOOD_BARRIER (t220)
+  end: gold 28 faith 0 army {'UNIT_MACHINE_GUN': 1, 'UNIT_SUPPLY_CONVOY': 1, 'UNIT_MODERN_AT': 1} pop [12]
+== p15 CIVILIZATION_ANTANANARIVO  turns 1-251
+  t17: BUY? +{'UNIT_WARRIOR': 1} gold 95 -> 22 (drop 73), army before 2, building BUILDING_GRANARY
+  t27: suzerain -1 -> 0
+  t28: -{'UNIT_WARRIOR': 3} (army 0)
+  t32: +{'UNIT_ARCHER': 1} (gold 17 -> 24)
+  t38: +{'UNIT_WARRIOR': 1} (gold 55 -> 61)
+  t42: +{'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1} (gold 80 -> 86)
+  t51: BUY? +{'UNIT_SPEARMAN': 1} gold 124 -> 4 (drop 121), army before 4, building BUILDING_AMPHITHEATER
+  t75: +{'UNIT_SWORDSMAN': 1} (gold 69 -> 69)
+  t75: -{'UNIT_WARRIOR': 1} (army 5)
+  t76: +{'UNIT_SWORDSMAN': 1} (gold 69 -> 67)
+  t76: -{'UNIT_WARRIOR': 1} (army 5)
+  t77: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 67 -> 58 (drop 9), army before 5, building BUILDING_LIGHTHOUSE
+  t77: -{'UNIT_SWORDSMAN': 2} (army 5)
+  t81: suzerain 0 -> -1
+  t98: +{'UNIT_CROSSBOWMAN': 1} (gold 60 -> 56)
+  t98: -{'UNIT_ARCHER': 1} (army 5)
+  t100: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 56 -> 50 (drop 5), army before 5, building BUILDING_CASTLE
+  t100: -{'UNIT_ARCHER': 1} (army 5)
+  t103: suzerain -1 -> 3
+  t108: BUY? +{'UNIT_MUSKETMAN': 2} gold 34 -> 21 (drop 12), army before 5, building BUILDING_CASTLE
+  t108: -{'UNIT_MAN_AT_ARMS': 2} (army 5)
+  t110: -{'UNIT_MUSKETMAN': 2} (army 3)
+  t111: +{'UNIT_PIKEMAN': 1} (gold 12 -> 11)
+  t111: -{'UNIT_SPEARMAN': 1} (army 3)
+  t114: suzerain 3 -> 0
+  t125: suzerain 0 -> -1
+  t129: war [] -> [0]
+  t129: suzerain -1 -> 3
+  t150: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t151: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_PIKEMAN': 1} (army 0)
+  t209: war [0] -> [0, 4]
+  t213: +{'UNIT_FIELD_CANNON': 1} (gold 338 -> 343)
+  t228: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t250: war [0, 4] -> []
+  t250: suzerain 3 -> -1
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > BUILDING_GRANARY (t15) > UNIT_BUILDER (t26) > UNIT_ARCHER (t28) > UNIT_TRADER (t32) > NONE (t36) > UNIT_WARRIOR (t37) > UNIT_ARCHER (t38) > UNIT_BUILDER (t42) > NONE (t43) > DISTRICT_THEATER (t46) > BUILDING_AMPHITHEATER (t47) > UNIT_BUILDER (t64) > DISTRICT_HARBOR (t68) > BUILDING_WALLS (t72) > BUILDING_LIGHTHOUSE (t77) > BUILDING_CASTLE (t100) > UNIT_TRADER (t113) > UNIT_BUILDER (t134) > PROJECT_ENHANCE_DISTRICT_THEATER (t139) > UNIT_BUILDER (t190) > UNIT_CROSSBOWMAN (t195) > DISTRICT_THEATER (t213) > PROJECT_REPAIR_OUTER_DEFENSES (t215) > BUILDING_AMPHITHEATER (t216) > UNIT_AT_CREW (t227)
+  end: gold 580 faith 4758 army {} pop [15]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-251
+  t103: +{'UNIT_MAN_AT_ARMS': 2} (gold 0 -> 0)
+  t104: +{'UNIT_SLINGER': 1} (gold 0 -> 0)
+  t106: -{'UNIT_MAN_AT_ARMS': 2} (army 1)
+  t107: +{'UNIT_CROSSBOWMAN': 1} (gold 0 -> 0)
+  t112: +{'UNIT_CROSSBOWMAN': 1} (gold 0 -> 0)
+  t113: -{'UNIT_CROSSBOWMAN': 2} (army 1)
+  t114: -{'UNIT_SLINGER': 1} (army 0)
+  t128: +{'UNIT_LINE_INFANTRY': 1} (gold 0 -> 0)
+  t132: +{'UNIT_LINE_INFANTRY': 1} (gold 0 -> 0)
+  t133: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t137: -{'UNIT_LINE_INFANTRY': 1} (army 0)
+  t147: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t151: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t152: -{'UNIT_INFANTRY': 1} (army 1)
+  t156: -{'UNIT_INFANTRY': 1} (army 0)
+  t204: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t205: -{'UNIT_INFANTRY': 1} (army 0)
+  t208: +{'UNIT_HELICOPTER': 1} (gold 0 -> 0)
+  t209: -{'UNIT_HELICOPTER': 1} (army 0)
+  t213: +{'UNIT_HELICOPTER': 1} (gold 0 -> 0)
+  t214: -{'UNIT_HELICOPTER': 1} (army 0)
+  t218: +{'UNIT_MACHINE_GUN': 1} (gold 0 -> 0)
+  t219: -{'UNIT_MACHINE_GUN': 1} (army 0)
+  t223: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t224: -{'UNIT_INFANTRY': 1} (army 0)
+  t228: +{'UNIT_MACHINE_GUN': 1} (gold 0 -> 0)
+  t229: -{'UNIT_MACHINE_GUN': 1} (army 0)
+  t233: +{'UNIT_INFANTRY': 1} (gold 0 -> 0)
+  t234: -{'UNIT_INFANTRY': 1} (army 0)
+  t238: +{'UNIT_MACHINE_GUN': 1} (gold 0 -> 0)
+  t239: -{'UNIT_MACHINE_GUN': 1} (army 0)
+  builds: - (t1) > UNIT_SLINGER (t103) > BUILDING_MONUMENT (t104) > UNIT_CATAPULT (t110) > - (t113) > BUILDING_WALLS (t128) > BUILDING_CASTLE (t135) > - (t137) > BUILDING_WALLS (t147) > - (t156) > BUILDING_WALLS (t204) > BUILDING_CASTLE (t206) > BUILDING_ARMORY (t214) > BUILDING_MILITARY_ACADEMY (t220) > BUILDING_BROADCAST_CENTER (t229) > - (t242)
+  end: gold 0 faith 9 army {} pop []
+== p6 CIVILIZATION_BRUSSELS  turns 1-251
+  t16: -{'UNIT_WARRIOR': 1} (army 1)
+  t29: +{'UNIT_WARRIOR': 1} (gold 156 -> 160)
+  t32: +{'UNIT_WARRIOR': 1} (gold 170 -> 176)
+  t36: BUY? +{'UNIT_GALLEY': 1} gold 192 -> 73 (drop 119), army before 3, building UNIT_TRADER
+  t50: BUY? +{'UNIT_GALLEY': 1} gold 134 -> 14 (drop 121), army before 4, building BUILDING_WALLS
+  t57: -{'UNIT_GALLEY': 1} (army 4)
+  t58: +{'UNIT_SWORDSMAN': 3} (gold 60 -> 56)
+  t58: -{'UNIT_WARRIOR': 3} (army 4)
+  t59: -{'UNIT_GALLEY': 1} (army 3)
+  t74: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t87: +{'UNIT_MAN_AT_ARMS': 1} (gold 120 -> 123)
+  t87: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t89: +{'UNIT_MAN_AT_ARMS': 1} (gold 131 -> 133)
+  t89: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t98: +{'UNIT_MUSKETMAN': 1} (gold 196 -> 200)
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t100: +{'UNIT_MUSKETMAN': 1} (gold 207 -> 209)
+  t100: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t107: suzerain -1 -> 0
+  t122: +{'UNIT_LINE_INFANTRY': 1} (gold 342 -> 345)
+  t122: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t125: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t179: suzerain 0 -> -1
+  t197: suzerain -1 -> 0
+  t199: suzerain 0 -> 2
+  t201: +{'UNIT_INFANTRY': 1} (gold 477 -> 479)
+  t201: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t224: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 608 -> 609)
+  t224: -{'UNIT_INFANTRY': 1} (army 1)
+  t229: suzerain 2 -> 4
+  t250: suzerain 4 -> 0
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > BUILDING_GRANARY (t16) > UNIT_WARRIOR (t27) > UNIT_TRADER (t32) > NONE (t38) > DISTRICT_HARBOR (t39) > UNIT_BUILDER (t40) > DISTRICT_HARBOR (t44) > BUILDING_LIGHTHOUSE (t46) > NONE (t48) > DISTRICT_HARBOR (t49) > BUILDING_WALLS (t50) > UNIT_BUILDER (t56) > BUILDING_LIGHTHOUSE (t61) > NONE (t74) > UNIT_TRADER (t75) > BUILDING_WATER_MILL (t87) > BUILDING_CASTLE (t104) > BUILDING_STAR_FORT (t118) > PROJECT_ENHANCE_DISTRICT_HARBOR (t129) > NONE (t154) > BUILDING_LIGHTHOUSE (t155) > UNIT_TRADER (t156) > DISTRICT_INDUSTRIAL_ZONE (t210) > BUILDING_FLOOD_BARRIER (t225)
+  end: gold 710 faith 4559 army {'UNIT_MECHANIZED_INFANTRY': 1} pop [13]
+== p7 CIVILIZATION_RAPA_NUI  turns 1-251
+  t13: -{'UNIT_WARRIOR': 1} (army 1)
+  t15: +{'UNIT_WARRIOR': 1} (gold 94 -> 102)
+  t17: +{'UNIT_WARRIOR': 1} (gold 110 -> 118)
+  t20: +{'UNIT_WARRIOR': 1} (gold 134 -> 142)
+  t22: BUY? +{'UNIT_ARCHER': 1} gold 150 -> 38 (drop 112), army before 4, building UNIT_ARCHER
+  t23: +{'UNIT_ARCHER': 1} (gold 38 -> 45)
+  t56: -{'UNIT_WARRIOR': 1} (army 5)
+  t65: -{'UNIT_ARCHER': 1} (army 4)
+  t69: BUY? +{'UNIT_GALLEY': 2} gold 375 -> 136 (drop 239), army before 4, building BUILDING_LIGHTHOUSE
+  t69: -{'UNIT_WARRIOR': 1} (army 5)
+  t72: +{'UNIT_SWORDSMAN': 1} (gold 155 -> 160)
+  t72: -{'UNIT_WARRIOR': 1} (army 5)
+  t73: +{'UNIT_MAN_AT_ARMS': 1} (gold 160 -> 163)
+  t73: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t78: +{'UNIT_MAN_AT_ARMS': 1} (gold 191 -> 194)
+  t78: -{'UNIT_WARRIOR': 1} (army 5)
+  t81: suzerain -1 -> 5
+  t89: suzerain 5 -> 2
+  t98: +{'UNIT_MUSKETMAN': 1} (gold 151 -> 150)
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t99: +{'UNIT_MUSKETMAN': 1} (gold 150 -> 148)
+  t99: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t103: +{'UNIT_CROSSBOWMAN': 1} (gold 152 -> 149)
+  t103: -{'UNIT_ARCHER': 1} (army 5)
+  t106: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t126: -{'UNIT_GALLEY': 1} (army 3)
+  t136: +{'UNIT_FIELD_CANNON': 1} (gold 216 -> 212)
+  t136: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t146: BUY? +{'UNIT_CARAVEL': 1} gold 204 -> 197 (drop 6), army before 3, building UNIT_TRADER
+  t146: -{'UNIT_GALLEY': 1} (army 3)
+  t153: suzerain 2 -> -1
+  t155: suzerain -1 -> 4
+  t173: suzerain 4 -> 2
+  t178: BUY? +{'UNIT_INFANTRY': 1} gold 288 -> 180 (drop 107), army before 3, building DISTRICT_NEIGHBORHOOD
+  t178: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t188: +{'UNIT_IRONCLAD': 1} (gold 242 -> 244)
+  t188: -{'UNIT_CARAVEL': 1} (army 3)
+  t198: -{'UNIT_IRONCLAD': 1, 'UNIT_FIELD_CANNON': 1, 'UNIT_INFANTRY': 1} (army 0)
+  t205: +{'UNIT_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1, 'UNIT_IRONCLAD': 1} (gold 509 -> 517)
+  t205: suzerain 2 -> -1
+  t215: +{'UNIT_MACHINE_GUN': 1} (gold 589 -> 592)
+  t215: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t219: suzerain -1 -> 2
+  t221: suzerain 2 -> 1
+  t224: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 636 -> 637)
+  t224: -{'UNIT_INFANTRY': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > UNIT_WARRIOR (t12) > UNIT_ARCHER (t20) > UNIT_BUILDER (t23) > BUILDING_GRANARY (t26) > NONE (t36) > DISTRICT_HARBOR (t55) > BUILDING_LIGHTHOUSE (t56) > BUILDING_WALLS (t73) > BUILDING_WATER_MILL (t77) > BUILDING_CASTLE (t89) > DISTRICT_THEATER (t95) > NONE (t98) > BUILDING_AMPHITHEATER (t99) > BUILDING_MUSEUM_ART (t113) > BUILDING_STAR_FORT (t138) > UNIT_TRADER (t145) > DISTRICT_NEIGHBORHOOD (t169) > BUILDING_SHIPYARD (t204) > PROJECT_ENHANCE_DISTRICT_THEATER (t229) > BUILDING_SEWER (t250)
+  end: gold 600 faith 105 army {'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_MACHINE_GUN': 1, 'UNIT_IRONCLAD': 1} pop [14]
+== p8 CIVILIZATION_HATTUSA  turns 1-251
+  t16: -{'UNIT_WARRIOR': 1} (army 1)
+  t33: +{'UNIT_ARCHER': 1} (gold 158 -> 162)
+  t70: +{'UNIT_SWORDSMAN': 1} (gold 236 -> 239)
+  t70: -{'UNIT_WARRIOR': 1} (army 2)
+  t71: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 239 -> 123 (drop 116), army before 2, building BUILDING_WATER_MILL
+  t71: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t81: +{'UNIT_CROSSBOWMAN': 1} (gold 186 -> 187)
+  t81: -{'UNIT_ARCHER': 1} (army 2)
+  t96: suzerain -1 -> 3
+  t97: +{'UNIT_MUSKETMAN': 1} (gold 259 -> 258)
+  t97: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t97: suzerain 3 -> 5
+  t106: suzerain 5 -> -1
+  t108: suzerain -1 -> 5
+  t112: suzerain 5 -> -1
+  t113: suzerain -1 -> 3
+  t114: suzerain 3 -> 5
+  t127: -{'UNIT_MUSKETMAN': 1, 'UNIT_CROSSBOWMAN': 1} (army 0)
+  t129: +{'UNIT_CROSSBOWMAN': 1, 'UNIT_MUSKETMAN': 1} (gold 190 -> 197)
+  t129: suzerain 5 -> -1
+  t144: +{'UNIT_LINE_INFANTRY': 1} (gold 278 -> 280)
+  t144: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t146: +{'UNIT_FIELD_CANNON': 1} (gold 286 -> 287)
+  t146: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t146: suzerain -1 -> 3
+  t167: suzerain 3 -> -1
+  t168: suzerain -1 -> 3
+  t187: +{'UNIT_INFANTRY': 1} (gold 262 -> 259)
+  t187: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t211: +{'UNIT_SUPPLY_CONVOY': 1} (gold 299 -> 301)
+  t212: +{'UNIT_MACHINE_GUN': 1} (gold 301 -> 296)
+  t212: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t220: suzerain 3 -> 1
+  t224: BUY? +{'UNIT_MECHANIZED_INFANTRY': 1} gold 275 -> 268 (drop 8), army before 3, building BUILDING_FLOOD_BARRIER
+  t224: -{'UNIT_INFANTRY': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > DISTRICT_CAMPUS (t15) > UNIT_BUILDER (t17) > BUILDING_GRANARY (t20) > UNIT_ARCHER (t31) > NONE (t33) > BUILDING_LIBRARY (t34) > BUILDING_WALLS (t50) > UNIT_TRADER (t54) > UNIT_BUILDER (t60) > UNIT_TRADER (t63) > NONE (t69) > BUILDING_WATER_MILL (t70) > NONE (t75) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t76) > BUILDING_CASTLE (t95) > BUILDING_UNIVERSITY (t107) > BUILDING_STAR_FORT (t132) > NONE (t134) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t135) > UNIT_BUILDER (t156) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t158) > UNIT_BUILDER (t191) > UNIT_SUPPLY_CONVOY (t194) > UNIT_BUILDER (t211) > BUILDING_FLOOD_BARRIER (t215)
+  end: gold 59 faith 16869 army {'UNIT_MACHINE_GUN': 1, 'UNIT_SUPPLY_CONVOY': 1, 'UNIT_MECHANIZED_INFANTRY': 1} pop [19]
+== p9 CIVILIZATION_SINGAPORE  turns 1-251
+  t9: -{'UNIT_WARRIOR': 1} (army 1)
+  t14: -{'UNIT_WARRIOR': 1} (army 0)
+  t15: BUY? +{'UNIT_WARRIOR': 1} gold 101 -> 29 (drop 72), army before 0, building BUILDING_GRANARY
+  t26: -{'UNIT_WARRIOR': 1} (army 0)
+  t32: BUY? +{'UNIT_ARCHER': 1} gold 175 -> 66 (drop 109), army before 0, building UNIT_BUILDER
+  t40: suzerain -1 -> 5
+  t42: -{'UNIT_ARCHER': 1} (army 0)
+  t44: BUY? +{'UNIT_SPEARMAN': 1} gold 170 -> 55 (drop 115), army before 0, building UNIT_BUILDER
+  t53: +{'UNIT_HEAVY_CHARIOT': 1} (gold 148 -> 158)
+  t56: BUY? +{'UNIT_ARCHER': 1} gold 181 -> 71 (drop 109), army before 2, building UNIT_ARCHER
+  t57: +{'UNIT_ARCHER': 1} (gold 71 -> 81)
+  t69: +{'UNIT_CATAPULT': 1} (gold 96 -> 110)
+  t74: +{'UNIT_CATAPULT': 1} (gold 150 -> 162)
+  t80: +{'UNIT_TREBUCHET': 2} (gold 212 -> 213)
+  t80: -{'UNIT_CATAPULT': 2} (army 6)
+  t81: +{'UNIT_CROSSBOWMAN': 1} (gold 213 -> 217)
+  t81: -{'UNIT_ARCHER': 1} (army 6)
+  t84: +{'UNIT_CROSSBOWMAN': 1} (gold 231 -> 233)
+  t84: -{'UNIT_ARCHER': 1} (army 6)
+  t106: war [] -> [4]
+  t107: +{'UNIT_TREBUCHET': 1} (gold 324 -> 330)
+  t108: -{'UNIT_HEAVY_CHARIOT': 1} (army 6)
+  t109: +{'UNIT_PIKEMAN': 1} (gold 329 -> 328)
+  t109: -{'UNIT_SPEARMAN': 1} (army 6)
+  t114: +{'UNIT_TREBUCHET': 1} (gold 338 -> 340)
+  t115: BUY? +{'UNIT_BOMBARD': 1} gold 340 -> 335 (drop 6), army before 7, building BUILDING_CASTLE
+  t115: -{'UNIT_TREBUCHET': 1} (army 7)
+  t117: BUY? +{'UNIT_BOMBARD': 1} gold 333 -> 327 (drop 6), army before 7, building BUILDING_CASTLE
+  t117: -{'UNIT_TREBUCHET': 1} (army 7)
+  t118: -{'UNIT_CROSSBOWMAN': 1} (army 6)
+  t120: -{'UNIT_TREBUCHET': 1} (army 5)
+  t125: -{'UNIT_TREBUCHET': 1} (army 4)
+  t128: +{'UNIT_PIKE_AND_SHOT': 1} (gold 207 -> 206)
+  t128: -{'UNIT_PIKEMAN': 1} (army 4)
+  t129: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t130: -{'UNIT_BOMBARD': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t136: +{'UNIT_PIKE_AND_SHOT': 1} (gold 285 -> 298)
+  t140: -{'UNIT_BOMBARD': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t149: +{'UNIT_FIELD_CANNON': 1} (gold 476 -> 490)
+  t154: +{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_ARTILLERY': 1} (gold 524 -> 532)
+  t158: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t163: BUY? +{'UNIT_PIKE_AND_SHOT': 1} gold 545 -> 49 (drop 496), army before 2, building UNIT_TRADER
+  t169: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t172: +{'UNIT_PIKE_AND_SHOT': 1} (gold 91 -> 99)
+  t174: -{'UNIT_ARTILLERY': 1} (army 2)
+  t175: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t189: suzerain 5 -> -1
+  t192: +{'UNIT_FIELD_CANNON': 1} (gold 328 -> 345)
+  t192: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t202: suzerain -1 -> 2
+  t203: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t210: suzerain 2 -> 5
+  t213: suzerain 5 -> 2
+  t236: +{'UNIT_MACHINE_GUN': 1} (gold 830 -> 839)
+  t238: -{'UNIT_MACHINE_GUN': 1} (army 0)
+  t244: BUY? +{'UNIT_AT_CREW': 1} gold 891 -> 100 (drop 792), army before 0, building UNIT_AT_CREW
+  t246: +{'UNIT_AT_CREW': 1} (gold 104 -> 108)
+  t247: -{'UNIT_AT_CREW': 1} (army 1)
+  t248: war [4] -> []
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t9) > UNIT_BUILDER (t29) > UNIT_TRADER (t34) > UNIT_BUILDER (t44) > BUILDING_MONUMENT (t47) > UNIT_HEAVY_CHARIOT (t49) > UNIT_ARCHER (t53) > BUILDING_WALLS (t57) > NONE (t62) > UNIT_CATAPULT (t64) > NONE (t74) > UNIT_TREBUCHET (t106) > PROJECT_REPAIR_OUTER_DEFENSES (t114) > BUILDING_CASTLE (t115) > BUILDING_STAR_FORT (t122) > UNIT_PIKE_AND_SHOT (t127) > NONE (t136) > PROJECT_REPAIR_OUTER_DEFENSES (t138) > UNIT_FIELD_CANNON (t139) > NONE (t149) > PROJECT_REPAIR_OUTER_DEFENSES (t152) > UNIT_TRADER (t153) > UNIT_PIKE_AND_SHOT (t165) > UNIT_FIELD_CANNON (t180) > DISTRICT_INDUSTRIAL_ZONE (t192) > BUILDING_WORKSHOP (t198) > DISTRICT_NEIGHBORHOOD (t215) > UNIT_MACHINE_GUN (t224) > UNIT_AT_CREW (t236) > UNIT_MACHINE_GUN (t246)
+  end: gold 127 faith 0 army {'UNIT_AT_CREW': 1} pop [7]
+== p10 CIVILIZATION_VALLETTA  turns 1-251
+  t14: +{'UNIT_WARRIOR': 1} (gold 60 -> 65)
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 105 -> 110)
+  t25: +{'UNIT_ARCHER': 1} (gold 35 -> 40)
+  t45: suzerain -1 -> 1
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 173 -> 172)
+  t61: -{'UNIT_WARRIOR': 1} (army 6)
+  t62: BUY? +{'UNIT_SWORDSMAN': 3} gold 172 -> 158 (drop 14), army before 6, building NONE
+  t62: -{'UNIT_WARRIOR': 3} (army 6)
+  t64: BUY? +{'UNIT_SWORDSMAN': 1} gold 154 -> 144 (drop 10), army before 6, building NONE
+  t64: -{'UNIT_WARRIOR': 1} (army 6)
+  t79: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 53 -> 42 (drop 12), army before 6, building NONE
+  t79: -{'UNIT_ARCHER': 1} (army 6)
+  t81: -{'UNIT_SWORDSMAN': 3, 'UNIT_CROSSBOWMAN': 1} (army 2)
+  t89: +{'UNIT_MAN_AT_ARMS': 1} (gold 31 -> 28)
+  t89: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t94: +{'UNIT_MAN_AT_ARMS': 1} (gold 32 -> 28)
+  t94: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t97: BUY? +{'UNIT_MUSKETMAN': 1} gold 28 -> 23 (drop 5), army before 2, building BUILDING_BARRACKS
+  t97: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t98: BUY? +{'UNIT_MUSKETMAN': 1} gold 23 -> 16 (drop 6), army before 2, building BUILDING_ARMORY
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t104: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t113: +{'UNIT_CROSSBOWMAN': 1} (gold 22 -> 25)
+  t117: +{'UNIT_CROSSBOWMAN': 1} (gold 23 -> 22)
+  t121: +{'UNIT_PIKE_AND_SHOT': 1} (gold 12 -> 8)
+  t121: -{'UNIT_CROSSBOWMAN': 2} (army 2)
+  t123: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t129: +{'UNIT_PIKE_AND_SHOT': 1} (gold 17 -> 19)
+  t135: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t136: +{'UNIT_LINE_INFANTRY': 1} (gold 5 -> 1)
+  t136: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t137: -{'UNIT_LINE_INFANTRY': 1} (army 0)
+  t138: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 5)
+  t159: +{'UNIT_FIELD_CANNON': 1} (gold 43 -> 44)
+  t162: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_FIELD_CANNON': 1} (army 0)
+  t170: +{'UNIT_FIELD_CANNON': 1} (gold 48 -> 54)
+  t181: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t208: +{'UNIT_CAVALRY': 1} (gold 163 -> 172)
+  t212: +{'UNIT_MILITARY_ENGINEER': 1} (gold 168 -> 167)
+  t220: suzerain 1 -> -1
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t12) > BUILDING_GRANARY (t18) > UNIT_ARCHER (t24) > NONE (t25) > UNIT_BUILDER (t31) > NONE (t32) > BUILDING_WATER_MILL (t56) > BUILDING_WALLS (t57) > NONE (t59) > UNIT_BUILDER (t81) > UNIT_TRADER (t82) > DISTRICT_ENCAMPMENT (t87) > BUILDING_CASTLE (t88) > BUILDING_BARRACKS (t92) > BUILDING_ARMORY (t98) > UNIT_CROSSBOWMAN (t110) > UNIT_PIKE_AND_SHOT (t117) > BUILDING_STAR_FORT (t121) > UNIT_PIKE_AND_SHOT (t125) > BUILDING_MILITARY_ACADEMY (t138) > UNIT_FIELD_CANNON (t153) > UNIT_BUILDER (t159) > UNIT_FIELD_CANNON (t160) > DISTRICT_NEIGHBORHOOD (t170) > UNIT_BUILDER (t189) > UNIT_CAVALRY (t191) > UNIT_MILITARY_ENGINEER (t208) > BUILDING_SEWER (t212) > PROJECT_MANHATTAN_PROJECT (t224)
+  end: gold 82 faith 99 army {'UNIT_MILITARY_ENGINEER': 1, 'UNIT_CAVALRY': 1} pop [15]
+== p11 CIVILIZATION_NAZCA  turns 1-223
+  t23: -{'UNIT_WARRIOR': 1} (army 1)
+  t30: suzerain -1 -> 0
+  t32: +{'UNIT_ARCHER': 1} (gold 40 -> 45)
+  t63: +{'UNIT_HORSEMAN': 1} (gold 154 -> 159)
+  t68: BUY? +{'UNIT_SWORDSMAN': 1} gold 169 -> 164 (drop 6), army before 3, building BUILDING_TEMPLE
+  t68: -{'UNIT_WARRIOR': 1} (army 3)
+  t74: -{'UNIT_HORSEMAN': 1} (army 2)
+  t80: -{'UNIT_ARCHER': 1} (army 1)
+  t81: +{'UNIT_MAN_AT_ARMS': 1} (gold 62 -> 59)
+  t81: -{'UNIT_SWORDSMAN': 1} (army 1)
+  t84: -{'UNIT_MAN_AT_ARMS': 1} (army 0)
+  t141: +{'UNIT_FIELD_CANNON': 1} (gold 469 -> 478)
+  t151: BUY? +{'UNIT_PIKE_AND_SHOT': 1} gold 509 -> 11 (drop 499), army before 1, building NONE
+  t154: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t160: +{'UNIT_PIKE_AND_SHOT': 1} (gold 9 -> 11)
+  t168: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t174: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t204: suzerain 0 -> 5
+  t215: suzerain 5 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > UNIT_BUILDER (t15) > DISTRICT_HOLY_SITE (t19) > UNIT_TRADER (t21) > DISTRICT_HOLY_SITE (t28) > UNIT_ARCHER (t29) > DISTRICT_HOLY_SITE (t32) > BUILDING_SHRINE (t33) > UNIT_BUILDER (t38) > PROJECT_ENHANCE_DISTRICT_HOLY_SITE (t41) > UNIT_TRADER (t50) > DISTRICT_HOLY_SITE (t57) > BUILDING_SHRINE (t58) > UNIT_HORSEMAN (t60) > BUILDING_WALLS (t63) > BUILDING_TEMPLE (t66) > NONE (t75) > BUILDING_WAT (t76) > BUILDING_CASTLE (t85) > UNIT_TRADER (t92) > DISTRICT_HOLY_SITE (t100) > BUILDING_SHRINE (t101) > UNIT_BUILDER (t103) > BUILDING_TEMPLE (t105) > BUILDING_WAT (t108) > BUILDING_GRANARY (t112) > BUILDING_WATER_MILL (t118) > BUILDING_STAR_FORT (t124) > UNIT_FIELD_CANNON (t129) > DISTRICT_HOLY_SITE (t141) > BUILDING_SHRINE (t142) > BUILDING_TEMPLE (t144) > BUILDING_WAT (t147) > NONE (t151) > UNIT_PIKE_AND_SHOT (t152) > DISTRICT_NEIGHBORHOOD (t160) > BUILDING_SHRINE (t201) > NONE (t203) > BUILDING_WAT (t204) > UNIT_AT_CREW (t205)
+  end: gold 88 faith 4922 army {} pop [15]
+== p12 CIVILIZATION_BUENOS_AIRES  turns 1-251
+  t18: -{'UNIT_WARRIOR': 1} (army 1)
+  t19: -{'UNIT_WARRIOR': 1} (army 0)
+  t24: +{'UNIT_ARCHER': 1} (gold 135 -> 140)
+  t28: BUY? +{'UNIT_ARCHER': 1} gold 152 -> 36 (drop 116), army before 1, building UNIT_TRADER
+  t32: +{'UNIT_ARCHER': 1} (gold 48 -> 54)
+  t32: war [] -> [2]
+  t36: +{'UNIT_ARCHER': 1} (gold 64 -> 66)
+  t37: -{'UNIT_ARCHER': 1} (army 3)
+  t38: +{'UNIT_ARCHER': 1} (gold 68 -> 70)
+  t46: +{'UNIT_ARCHER': 1} (gold 80 -> 84)
+  t48: +{'UNIT_ARCHER': 1} (gold 87 -> 90)
+  t51: +{'UNIT_ARCHER': 1, 'UNIT_HEAVY_CHARIOT': 1} (gold 94 -> 96)
+  t54: +{'UNIT_ARCHER': 1} (gold 94 -> 94)
+  t60: +{'UNIT_ARCHER': 1} (gold 85 -> 83)
+  t71: +{'UNIT_ARCHER': 1} (gold 63 -> 62)
+  t73: BUY? +{'UNIT_CROSSBOWMAN': 4} gold 60 -> 37 (drop 22), army before 11, building UNIT_ARCHER
+  t73: -{'UNIT_ARCHER': 4} (army 11)
+  t74: -{'UNIT_ARCHER': 1, 'UNIT_HEAVY_CHARIOT': 1, 'UNIT_CROSSBOWMAN': 3} (army 6)
+  t75: -{'UNIT_ARCHER': 1} (army 5)
+  t76: +{'UNIT_CROSSBOWMAN': 1} (gold 23 -> 20)
+  t79: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 17 -> 10 (drop 6), army before 6, building UNIT_CROSSBOWMAN
+  t79: -{'UNIT_ARCHER': 1} (army 6)
+  t80: -{'UNIT_CROSSBOWMAN': 2} (army 4)
+  t81: +{'UNIT_CROSSBOWMAN': 1} (gold 7 -> 5)
+  t81: -{'UNIT_ARCHER': 1} (army 4)
+  t84: -{'UNIT_ARCHER': 1, 'UNIT_CROSSBOWMAN': 1} (army 2)
+  t85: +{'UNIT_CROSSBOWMAN': 1} (gold 3 -> 3)
+  t85: -{'UNIT_ARCHER': 1} (army 2)
+  t131: war [2] -> []
+  t135: +{'UNIT_FIELD_CANNON': 1} (gold 113 -> 111)
+  t135: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t136: +{'UNIT_FIELD_CANNON': 1} (gold 111 -> 106)
+  t136: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t147: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t149: suzerain -1 -> 2
+  t206: suzerain 2 -> 5
+  t214: +{'UNIT_MACHINE_GUN': 1} (gold 121 -> 119)
+  t214: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t222: suzerain 5 -> 0
+  t241: suzerain 0 -> 2
+  t243: suzerain 2 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > BUILDING_GRANARY (t14) > UNIT_ARCHER (t22) > UNIT_TRADER (t24) > UNIT_ARCHER (t30) > UNIT_TRADER (t38) > UNIT_ARCHER (t44) > NONE (t48) > UNIT_HEAVY_CHARIOT (t49) > NONE (t51) > UNIT_ARCHER (t52) > UNIT_BUILDER (t54) > UNIT_ARCHER (t57) > UNIT_BUILDER (t67) > UNIT_ARCHER (t70) > NONE (t71) > UNIT_ARCHER (t72) > UNIT_CROSSBOWMAN (t76) > DISTRICT_INDUSTRIAL_ZONE (t84) > UNIT_BUILDER (t89) > BUILDING_CASTLE (t92) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t104) > BUILDING_STAR_FORT (t130) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t137) > BUILDING_WORKSHOP (t159) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t177) > BUILDING_FACTORY (t199) > UNIT_BUILDER (t201) > DISTRICT_NEIGHBORHOOD (t204) > BUILDING_WORKSHOP (t234) > BUILDING_FACTORY (t237)
+  end: gold 186 faith 11678 army {'UNIT_MACHINE_GUN': 1} pop [8]
+== p13 CIVILIZATION_GRANADA  turns 1-251
+  t20: +{'UNIT_WARRIOR': 1} (gold 98 -> 103)
+  t23: +{'UNIT_ARCHER': 1} (gold 115 -> 122)
+  t32: +{'UNIT_HEAVY_CHARIOT': 1} (gold 176 -> 185)
+  t35: +{'UNIT_HEAVY_CHARIOT': 1} (gold 201 -> 209)
+  t46: +{'UNIT_SWORDSMAN': 1} (gold 186 -> 189)
+  t46: -{'UNIT_WARRIOR': 1} (army 6)
+  t47: +{'UNIT_SWORDSMAN': 1} (gold 189 -> 190)
+  t47: -{'UNIT_WARRIOR': 1} (army 6)
+  t48: +{'UNIT_SWORDSMAN': 1} (gold 190 -> 189)
+  t48: -{'UNIT_WARRIOR': 1} (army 6)
+  t50: suzerain -1 -> 5
+  t52: suzerain 5 -> -1
+  t62: suzerain -1 -> 5
+  t70: suzerain 5 -> -1
+  t78: +{'UNIT_CROSSBOWMAN': 1} (gold 219 -> 215)
+  t78: -{'UNIT_ARCHER': 1} (army 6)
+  t80: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 214 -> 208 (drop 6), army before 6, building NONE
+  t80: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t82: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 206 -> 199 (drop 7), army before 6, building NONE
+  t82: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t85: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t89: BUY? +{'UNIT_KNIGHT': 2} gold 186 -> 175 (drop 11), army before 5, building NONE
+  t89: -{'UNIT_HEAVY_CHARIOT': 2} (army 5)
+  t94: -{'UNIT_KNIGHT': 1} (army 4)
+  t99: BUY? +{'UNIT_MUSKETMAN': 1} gold 127 -> 119 (drop 8), army before 4, building NONE
+  t99: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t102: BUY? +{'UNIT_MUSKETMAN': 1} gold 111 -> 102 (drop 9), army before 4, building NONE
+  t102: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t120: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t122: +{'UNIT_PIKE_AND_SHOT': 1} (gold 5 -> 4)
+  t123: -{'UNIT_MUSKETMAN': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t128: +{'UNIT_PIKE_AND_SHOT': 1} (gold 12 -> 15)
+  t131: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t134: +{'UNIT_PIKE_AND_SHOT': 1} (gold 12 -> 18)
+  t145: +{'UNIT_PIKE_AND_SHOT': 1} (gold 29 -> 29)
+  t146: suzerain -1 -> 4
+  t147: +{'UNIT_PIKE_AND_SHOT': 1} (gold 25 -> 21)
+  t148: -{'UNIT_PIKE_AND_SHOT': 3} (army 1)
+  t152: +{'UNIT_CUIRASSIER': 1, 'UNIT_PIKE_AND_SHOT': 1} (gold 30 -> 31)
+  t152: -{'UNIT_KNIGHT': 1} (army 2)
+  t158: +{'UNIT_FIELD_CANNON': 1} (gold 36 -> 37)
+  t166: BUY? +{'UNIT_TANK': 1} gold 18 -> 8 (drop 9), army before 3, building UNIT_FIELD_CANNON
+  t166: -{'UNIT_CUIRASSIER': 1} (army 3)
+  t167: -{'UNIT_FIELD_CANNON': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t169: +{'UNIT_FIELD_CANNON': 1} (gold 9 -> 16)
+  t176: +{'UNIT_SUPPLY_CONVOY': 1} (gold 26 -> 27)
+  t180: +{'UNIT_PIKE_AND_SHOT': 1} (gold 26 -> 26)
+  t183: -{'UNIT_SUPPLY_CONVOY': 1, 'UNIT_FIELD_CANNON': 1} (army 2)
+  t187: +{'UNIT_SUPPLY_CONVOY': 1} (gold 20 -> 23)
+  t191: +{'UNIT_PIKE_AND_SHOT': 1} (gold 25 -> 25)
+  t195: -{'UNIT_PIKE_AND_SHOT': 2, 'UNIT_SUPPLY_CONVOY': 1} (army 1)
+  t195: suzerain 4 -> 5
+  t201: +{'UNIT_SUPPLY_CONVOY': 1} (gold 28 -> 32)
+  t206: +{'UNIT_AT_CREW': 1} (gold 38 -> 35)
+  t210: suzerain 5 -> -1
+  t215: -{'UNIT_SUPPLY_CONVOY': 1, 'UNIT_AT_CREW': 1} (army 1)
+  t217: suzerain -1 -> 3
+  t218: +{'UNIT_AT_CREW': 1} (gold 15 -> 18)
+  t229: -{'UNIT_AT_CREW': 1} (army 1)
+  t231: -{'UNIT_TANK': 1} (army 0)
+  t246: suzerain 3 -> 0
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_BUILDER (t15) > UNIT_WARRIOR (t18) > UNIT_ARCHER (t20) > UNIT_TRADER (t23) > UNIT_HEAVY_CHARIOT (t29) > BUILDING_WATER_MILL (t35) > BUILDING_GRANARY (t44) > NONE (t48) > BUILDING_WALLS (t52) > NONE (t53) > UNIT_BUILDER (t63) > NONE (t64) > BUILDING_CASTLE (t84) > NONE (t85) > BUILDING_STAR_FORT (t110) > NONE (t111) > UNIT_PIKE_AND_SHOT (t121) > NONE (t147) > UNIT_PIKE_AND_SHOT (t149) > UNIT_FIELD_CANNON (t152) > UNIT_SUPPLY_CONVOY (t169) > UNIT_PIKE_AND_SHOT (t176) > NONE (t180) > UNIT_SUPPLY_CONVOY (t184) > UNIT_PIKE_AND_SHOT (t187) > NONE (t191) > BUILDING_SEWER (t193) > NONE (t197) > UNIT_SUPPLY_CONVOY (t198) > UNIT_BUILDER (t201) > UNIT_PIKE_AND_SHOT (t203) > DISTRICT_ENCAMPMENT (t206) > UNIT_AT_CREW (t210) > DISTRICT_NEIGHBORHOOD (t218) > BUILDING_BARRACKS (t241) > BUILDING_ARMORY (t246)
+  end: gold 66 faith 99 army {} pop [9]
+== p14 CIVILIZATION_LA_VENTA  turns 1-251
+  t32: BUY? +{'UNIT_GALLEY': 1} gold 136 -> 14 (drop 122), army before 2, building UNIT_ARCHER
+  t33: +{'UNIT_ARCHER': 1} (gold 14 -> 16)
+  t38: +{'UNIT_ARCHER': 1} (gold 20 -> 21)
+  t51: suzerain -1 -> 3
+  t54: -{'UNIT_GALLEY': 1, 'UNIT_WARRIOR': 2, 'UNIT_ARCHER': 2} (army 0)
+  t67: +{'UNIT_CATAPULT': 1} (gold 52 -> 55)
+  t68: +{'UNIT_ARCHER': 2, 'UNIT_WARRIOR': 2} (gold 55 -> 56)
+  t78: BUY? +{'UNIT_CROSSBOWMAN': 1, 'UNIT_SWORDSMAN': 1} gold 58 -> 49 (drop 9), army before 5, building BUILDING_TEMPLE
+  t78: -{'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1} (army 5)
+  t80: BUY? +{'UNIT_MAN_AT_ARMS': 1, 'UNIT_CROSSBOWMAN': 1} gold 47 -> 34 (drop 13), army before 5, building BUILDING_TEMPLE
+  t80: -{'UNIT_ARCHER': 1, 'UNIT_SWORDSMAN': 1} (army 5)
+  t83: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_WARRIOR': 1} (army 3)
+  t85: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t86: +{'UNIT_TREBUCHET': 1} (gold 6 -> 1)
+  t86: -{'UNIT_CATAPULT': 1} (army 2)
+  t87: -{'UNIT_TREBUCHET': 1} (army 1)
+  t91: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t105: +{'UNIT_CROSSBOWMAN': 1} (gold 52 -> 55)
+  t114: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t128: +{'UNIT_CROSSBOWMAN': 1} (gold 42 -> 48)
+  t136: +{'UNIT_FIELD_CANNON': 1} (gold 99 -> 107)
+  t136: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t144: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t158: +{'UNIT_FIELD_CANNON': 1} (gold 207 -> 229)
+  t160: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t171: +{'UNIT_FIELD_CANNON': 1} (gold 317 -> 331)
+  t171: suzerain 3 -> 5
+  t196: suzerain 5 -> -1
+  t203: +{'UNIT_SUPPLY_CONVOY': 1} (gold 608 -> 621)
+  t217: +{'UNIT_MACHINE_GUN': 1} (gold 765 -> 771)
+  t217: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t219: suzerain -1 -> 1
+  t225: faith 5829 -> 5668
+  t227: suzerain 1 -> -1
+  builds: - (t1) > BUILDING_MONUMENT (t2) > UNIT_BUILDER (t15) > DISTRICT_HOLY_SITE (t18) > BUILDING_SHRINE (t20) > UNIT_ARCHER (t28) > PROJECT_ENHANCE_DISTRICT_HOLY_SITE (t38) > BUILDING_WALLS (t55) > UNIT_CATAPULT (t60) > DISTRICT_HARBOR (t67) > BUILDING_TEMPLE (t71) > BUILDING_CASTLE (t90) > UNIT_BUILDER (t100) > BUILDING_LIGHTHOUSE (t103) > BUILDING_STAR_FORT (t118) > UNIT_TRADER (t127) > NONE (t131) > UNIT_TRADER (t132) > BUILDING_GRANARY (t138) > DISTRICT_NEIGHBORHOOD (t142) > UNIT_SUPPLY_CONVOY (t178) > BUILDING_SEWER (t203) > UNIT_AT_CREW (t241)
+  end: gold 1020 faith 6578 army {'UNIT_SUPPLY_CONVOY': 1, 'UNIT_MACHINE_GUN': 1} pop [15]
+== p15 CIVILIZATION_WOLIN  turns 1-251
+  t21: +{'UNIT_WARRIOR': 1} (gold 99 -> 104)
+  t24: +{'UNIT_WARRIOR': 1} (gold 116 -> 121)
+  t26: +{'UNIT_WARRIOR': 1} (gold 126 -> 132)
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 220 -> 222)
+  t61: -{'UNIT_WARRIOR': 1} (army 5)
+  t64: +{'UNIT_SWORDSMAN': 2} (gold 230 -> 224)
+  t64: -{'UNIT_WARRIOR': 2} (army 5)
+  t67: +{'UNIT_SWORDSMAN': 1} (gold 224 -> 218)
+  t67: -{'UNIT_WARRIOR': 1} (army 5)
+  t70: BUY? +{'UNIT_SWORDSMAN': 1} gold 214 -> 208 (drop 7), army before 5, building NONE
+  t70: -{'UNIT_WARRIOR': 1} (army 5)
+  t81: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 168 -> 158 (drop 9), army before 5, building NONE
+  t81: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t82: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 158 -> 148 (drop 10), army before 5, building NONE
+  t82: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t85: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 136 -> 126 (drop 11), army before 5, building NONE
+  t85: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t89: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 104 -> 92 (drop 12), army before 5, building NONE
+  t89: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t93: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 68 -> 56 (drop 13), army before 5, building NONE
+  t93: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t97: -{'UNIT_MAN_AT_ARMS': 3} (army 2)
+  t98: +{'UNIT_MUSKETMAN': 1} (gold 20 -> 14)
+  t98: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t101: +{'UNIT_MUSKETMAN': 1} (gold 18 -> 18)
+  t101: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t110: +{'UNIT_CROSSBOWMAN': 1} (gold 60 -> 65)
+  t120: suzerain -1 -> 4
+  t122: +{'UNIT_LINE_INFANTRY': 1} (gold 81 -> 78)
+  t122: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t124: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 73 -> 66 (drop 7), army before 3, building BUILDING_STAR_FORT
+  t124: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t126: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t140: +{'UNIT_PIKE_AND_SHOT': 1} (gold 49 -> 49)
+  t148: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_CROSSBOWMAN': 1} (army 1)
+  t153: +{'UNIT_PIKE_AND_SHOT': 1} (gold 21 -> 20)
+  t168: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t172: +{'UNIT_FIELD_CANNON': 1} (gold 23 -> 30)
+  t174: suzerain 4 -> -1
+  t195: +{'UNIT_SUPPLY_CONVOY': 1} (gold 78 -> 81)
+  t204: BUY? +{'UNIT_AT_CREW': 1} gold 83 -> 78 (drop 5), army before 3, building BUILDING_SEWER
+  t204: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t214: +{'UNIT_MACHINE_GUN': 1} (gold 73 -> 68)
+  t214: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t223: suzerain -1 -> 0
+  t226: suzerain 0 -> 1
+  t245: suzerain 1 -> 5
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t19) > NONE (t26) > BUILDING_GRANARY (t27) > NONE (t35) > BUILDING_WATER_MILL (t49) > NONE (t51) > BUILDING_WALLS (t56) > NONE (t57) > BUILDING_CASTLE (t84) > NONE (t85) > UNIT_TRADER (t98) > UNIT_CROSSBOWMAN (t99) > BUILDING_STAR_FORT (t110) > UNIT_PIKE_AND_SHOT (t126) > UNIT_FIELD_CANNON (t153) > UNIT_SUPPLY_CONVOY (t172) > UNIT_BUILDER (t195) > BUILDING_SEWER (t198) > DISTRICT_ENCAMPMENT (t246)
+  end: gold 45 faith 0 army {'UNIT_MACHINE_GUN': 1, 'UNIT_SUPPLY_CONVOY': 1, 'UNIT_AT_CREW': 1} pop [9]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-251
+  t223: +{'UNIT_MECHANIZED_INFANTRY': 2} (gold 0 -> 0)
+  t227: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t235: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 0 -> 0)
+  t236: -{'UNIT_MECHANIZED_INFANTRY': 1} (army 3)
+  t239: +{'UNIT_RANGER': 1} (gold 0 -> 0)
+  t240: -{'UNIT_MECHANIZED_INFANTRY': 1} (army 3)
+  t241: -{'UNIT_CAVALRY': 1} (army 2)
+  t242: +{'UNIT_CAVALRY': 1} (gold 2 -> 5)
+  t244: -{'UNIT_RANGER': 1, 'UNIT_MECHANIZED_INFANTRY': 1} (army 1)
+  t247: +{'UNIT_MACHINE_GUN': 1} (gold 18 -> 26)
+  builds: - (t1) > DISTRICT_AQUEDUCT (t223) > DISTRICT_CAMPUS (t230) > BUILDING_LIBRARY (t241) > BUILDING_MUSEUM_ART (t243)
+  end: gold 33 faith 0 army {'UNIT_CAVALRY': 1, 'UNIT_MACHINE_GUN': 1} pop [14]
+== p6 CIVILIZATION_NAZCA  turns 1-239
+  t14: +{'UNIT_WARRIOR': 1} (gold 60 -> 65)
+  t22: -{'UNIT_WARRIOR': 1} (army 2)
+  t23: +{'UNIT_WARRIOR': 1} (gold 105 -> 110)
+  t28: BUY? +{'UNIT_ARCHER': 1} gold 154 -> 38 (drop 115), army before 3, building UNIT_ARCHER
+  t30: +{'UNIT_ARCHER': 1} (gold 42 -> 46)
+  t37: +{'UNIT_ARCHER': 1} (gold 62 -> 65)
+  t50: suzerain -1 -> 0
+  t75: +{'UNIT_SWORDSMAN': 1} (gold 178 -> 177)
+  t75: -{'UNIT_WARRIOR': 1} (army 6)
+  t77: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 178 -> 169 (drop 9), army before 6, building BUILDING_MONUMENT
+  t77: -{'UNIT_SWORDSMAN': 1, 'UNIT_WARRIOR': 1} (army 6)
+  t78: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 169 -> 161 (drop 8), army before 6, building BUILDING_MONUMENT
+  t78: -{'UNIT_WARRIOR': 1} (army 6)
+  t86: BUY? +{'UNIT_CROSSBOWMAN': 3} gold 121 -> 100 (drop 21), army before 6, building BUILDING_MONUMENT
+  t86: -{'UNIT_ARCHER': 3} (army 6)
+  t92: -{'UNIT_CROSSBOWMAN': 3, 'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t105: +{'UNIT_MUSKETMAN': 1} (gold 33 -> 29)
+  t105: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t106: BUY? +{'UNIT_MUSKETMAN': 1} gold 29 -> 24 (drop 5), army before 2, building UNIT_TRADER
+  t106: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t133: +{'UNIT_LINE_INFANTRY': 1} (gold 43 -> 39)
+  t133: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t135: +{'UNIT_LINE_INFANTRY': 1} (gold 39 -> 35)
+  t135: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t153: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t156: suzerain 0 -> -1
+  t172: BUY? +{'UNIT_INFANTRY': 1} gold 49 -> 43 (drop 5), army before 1, building BUILDING_CATHEDRAL
+  t172: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t174: suzerain -1 -> 0
+  t186: war [] -> [2]
+  t203: +{'UNIT_AT_CREW': 1} (gold 14 -> 15)
+  t209: -{'UNIT_INFANTRY': 1} (army 1)
+  t220: +{'UNIT_MODERN_AT': 1} (gold 43 -> 42)
+  t220: -{'UNIT_AT_CREW': 1} (army 1)
+  t224: +{'UNIT_MODERN_AT': 1} (gold 43 -> 39)
+  t227: -{'UNIT_MODERN_AT': 1} (army 1)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > UNIT_WARRIOR (t9) > DISTRICT_HOLY_SITE (t14) > UNIT_WARRIOR (t18) > UNIT_ARCHER (t23) > PROJECT_ENHANCE_DISTRICT_HOLY_SITE (t37) > BUILDING_GRANARY (t53) > UNIT_BUILDER (t65) > BUILDING_WALLS (t69) > BUILDING_MONUMENT (t75) > UNIT_BUILDER (t88) > BUILDING_WATER_MILL (t92) > NONE (t93) > UNIT_TRADER (t94) > BUILDING_CASTLE (t111) > NONE (t124) > PROJECT_REPAIR_OUTER_DEFENSES (t127) > BUILDING_SHRINE (t128) > UNIT_BUILDER (t136) > BUILDING_CASTLE (t139) > BUILDING_STAR_FORT (t141) > UNIT_BUILDER (t151) > BUILDING_TEMPLE (t154) > BUILDING_CATHEDRAL (t169) > UNIT_AT_CREW (t187) > PROJECT_REPAIR_OUTER_DEFENSES (t224) > DISTRICT_HOLY_SITE (t229) > BUILDING_SHRINE (t230) > UNIT_AT_CREW (t232)
+  end: gold 13 faith 4274 army {'UNIT_MODERN_AT': 1} pop [14]
+== p7 CIVILIZATION_KANDY  turns 1-251
+  t20: -{'UNIT_WARRIOR': 1} (army 1)
+  t31: -{'UNIT_WARRIOR': 1} (army 0)
+  t73: +{'UNIT_CATAPULT': 1} (gold 171 -> 177)
+  t86: +{'UNIT_TREBUCHET': 1} (gold 226 -> 225)
+  t86: -{'UNIT_CATAPULT': 1} (army 1)
+  t109: suzerain -1 -> 1
+  t110: -{'UNIT_TREBUCHET': 1} (army 0)
+  t115: +{'UNIT_PIKE_AND_SHOT': 1} (gold 196 -> 194)
+  t120: -{'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t124: +{'UNIT_TREBUCHET': 1} (gold 218 -> 220)
+  t127: -{'UNIT_TREBUCHET': 1} (army 0)
+  t136: +{'UNIT_PIKE_AND_SHOT': 1} (gold 273 -> 280)
+  t141: +{'UNIT_BOMBARD': 1} (gold 293 -> 297)
+  t155: faith 667 -> 485
+  t158: +{'UNIT_FIELD_CANNON': 1} (gold 149 -> 148)
+  t159: BUY? +{'UNIT_ARTILLERY': 1} gold 148 -> 137 (drop 11), army before 3, building UNIT_FIELD_CANNON
+  t159: -{'UNIT_BOMBARD': 1} (army 3)
+  t173: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_FIELD_CANNON': 1} (army 1)
+  t174: +{'UNIT_FIELD_CANNON': 1} (gold 23 -> 24)
+  t177: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t195: +{'UNIT_AT_CREW': 1} (gold 32 -> 28)
+  t201: suzerain 1 -> 3
+  t203: suzerain 3 -> 1
+  t207: -{'UNIT_AT_CREW': 1} (army 1)
+  t208: suzerain 1 -> -1
+  t210: war [] -> [5]
+  t210: suzerain -1 -> 1
+  t218: war [5] -> []
+  t231: +{'UNIT_MODERN_AT': 1} (gold 19 -> 15)
+  t231: suzerain 1 -> 3
+  t232: -{'UNIT_MODERN_AT': 1} (army 1)
+  t236: -{'UNIT_ARTILLERY': 1} (army 0)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > DISTRICT_HOLY_SITE (t22) > BUILDING_GRANARY (t24) > BUILDING_SHRINE (t36) > UNIT_TRADER (t48) > BUILDING_WALLS (t59) > UNIT_BUILDER (t63) > UNIT_CATAPULT (t66) > BUILDING_WATER_MILL (t73) > BUILDING_TEMPLE (t86) > UNIT_PIKEMAN (t108) > BUILDING_CASTLE (t115) > NONE (t121) > UNIT_TRADER (t122) > UNIT_BUILDER (t126) > UNIT_PIKE_AND_SHOT (t128) > BUILDING_STAR_FORT (t136) > UNIT_FIELD_CANNON (t146) > BUILDING_SEWER (t174) > UNIT_PIKE_AND_SHOT (t183) > BUILDING_SEWER (t195) > UNIT_AT_CREW (t210) > DISTRICT_HOLY_SITE (t231) > PROJECT_REPAIR_OUTER_DEFENSES (t232) > BUILDING_SHRINE (t233) > UNIT_BUILDER (t235) > BUILDING_TEMPLE (t239) > BUILDING_WAT (t244) > UNIT_BUILDER (t251)
+  end: gold 44 faith 1317 army {} pop [15]
+== p8 CIVILIZATION_GRANADA  turns 1-251
+  t14: +{'UNIT_WARRIOR': 1} (gold 60 -> 65)
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 80 -> 85)
+  t20: -{'UNIT_WARRIOR': 2} (army 3)
+  t22: -{'UNIT_WARRIOR': 1} (army 2)
+  t25: +{'UNIT_ARCHER': 1} (gold 119 -> 125)
+  t27: +{'UNIT_ARCHER': 1} (gold 130 -> 135)
+  t29: +{'UNIT_ARCHER': 1} (gold 139 -> 143)
+  t50: BUY? +{'UNIT_GALLEY': 1} gold 159 -> 37 (drop 122), army before 5, building NONE
+  t63: +{'UNIT_SWORDSMAN': 1} (gold 136 -> 140)
+  t63: -{'UNIT_WARRIOR': 1} (army 6)
+  t64: +{'UNIT_SWORDSMAN': 1} (gold 140 -> 141)
+  t64: -{'UNIT_WARRIOR': 1} (army 6)
+  t79: +{'UNIT_CROSSBOWMAN': 1} (gold 247 -> 249)
+  t79: -{'UNIT_ARCHER': 1} (army 6)
+  t80: +{'UNIT_CROSSBOWMAN': 2} (gold 249 -> 244)
+  t80: -{'UNIT_ARCHER': 2} (army 6)
+  t83: +{'UNIT_MAN_AT_ARMS': 1} (gold 246 -> 242)
+  t83: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t85: +{'UNIT_MAN_AT_ARMS': 1} (gold 242 -> 237)
+  t85: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t92: suzerain -1 -> 3
+  t112: BUY? +{'UNIT_MUSKETMAN': 2} gold 70 -> 57 (drop 13), army before 6, building NONE
+  t112: -{'UNIT_MAN_AT_ARMS': 2} (army 6)
+  t114: war [] -> [5]
+  t121: -{'UNIT_MUSKETMAN': 1} (army 5)
+  t122: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t122: war [5] -> []
+  t125: +{'UNIT_PIKE_AND_SHOT': 1} (gold 9 -> 9)
+  t126: -{'UNIT_CROSSBOWMAN': 2} (army 3)
+  t130: +{'UNIT_CARAVEL': 1, 'UNIT_PIKE_AND_SHOT': 1} (gold 11 -> 8)
+  t130: -{'UNIT_GALLEY': 1} (army 4)
+  t131: -{'UNIT_CARAVEL': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t132: +{'UNIT_LINE_INFANTRY': 1} (gold 3 -> 1)
+  t132: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t134: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t148: suzerain 3 -> -1
+  t160: +{'UNIT_FIELD_CANNON': 1} (gold 136 -> 140)
+  t167: +{'UNIT_FIELD_CANNON': 1} (gold 106 -> 102)
+  t169: suzerain -1 -> 1
+  t172: BUY? +{'UNIT_FIELD_CANNON': 1} gold 61 -> 52 (drop 10), army before 3, building NONE
+  t173: -{'UNIT_FIELD_CANNON': 3} (army 1)
+  t174: +{'UNIT_INFANTRY': 1} (gold 34 -> 33)
+  t174: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t189: -{'UNIT_INFANTRY': 1} (army 0)
+  t208: +{'UNIT_AT_CREW': 1} (gold 115 -> 124)
+  t211: +{'UNIT_MILITARY_ENGINEER': 1} (gold 127 -> 128)
+  t213: -{'UNIT_MILITARY_ENGINEER': 1} (army 1)
+  t217: suzerain 1 -> -1
+  t218: +{'UNIT_SUPPLY_CONVOY': 1} (gold 2 -> 4)
+  t219: -{'UNIT_SUPPLY_CONVOY': 1} (army 1)
+  t224: -{'UNIT_AT_CREW': 1} (army 0)
+  t240: +{'UNIT_HELICOPTER': 1} (gold 160 -> 169)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t13) > BUILDING_GRANARY (t18) > NONE (t25) > UNIT_ARCHER (t26) > NONE (t29) > UNIT_TRADER (t35) > NONE (t36) > BUILDING_WALLS (t53) > NONE (t54) > UNIT_BUILDER (t69) > NONE (t70) > BUILDING_CASTLE (t90) > NONE (t91) > DISTRICT_ENCAMPMENT (t100) > BUILDING_BARRACKS (t101) > PROJECT_REPAIR_OUTER_DEFENSES (t108) > NONE (t109) > BUILDING_ARMORY (t114) > UNIT_PIKE_AND_SHOT (t121) > NONE (t125) > UNIT_PIKE_AND_SHOT (t127) > BUILDING_STAR_FORT (t130) > BUILDING_MILITARY_ACADEMY (t136) > UNIT_FIELD_CANNON (t153) > NONE (t172) > BUILDING_SEWER (t173) > UNIT_SUPPLY_CONVOY (t182) > UNIT_TRADER (t189) > UNIT_AT_CREW (t195) > UNIT_MILITARY_ENGINEER (t208) > UNIT_SUPPLY_CONVOY (t211) > UNIT_HELICOPTER (t218) > NONE (t240) > PROJECT_REPAIR_OUTER_DEFENSES (t242) > NONE (t243) > PROJECT_REPAIR_OUTER_DEFENSES (t246) > PROJECT_MANHATTAN_PROJECT (t247)
+  end: gold 160 faith 143 army {'UNIT_HELICOPTER': 1} pop [7]
+== p9 CIVILIZATION_PALENQUE  turns 1-251
+  t20: +{'UNIT_WARRIOR': 1} (gold 90 -> 95)
+  t29: +{'UNIT_ARCHER': 1} (gold 147 -> 154)
+  t31: +{'UNIT_ARCHER': 1} (gold 56 -> 62)
+  t44: -{'UNIT_ARCHER': 1} (army 4)
+  t46: BUY? +{'UNIT_ARCHER': 1} gold 131 -> 15 (drop 116), army before 4, building PROJECT_ENHANCE_DISTRICT_CAMPUS
+  t51: -{'UNIT_WARRIOR': 1} (army 4)
+  t53: -{'UNIT_WARRIOR': 1} (army 3)
+  t71: +{'UNIT_SWORDSMAN': 1} (gold 154 -> 157)
+  t71: -{'UNIT_WARRIOR': 1} (army 3)
+  t78: suzerain -1 -> 4
+  t85: +{'UNIT_MAN_AT_ARMS': 1} (gold 117 -> 118)
+  t85: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t89: +{'UNIT_CROSSBOWMAN': 1} (gold 133 -> 132)
+  t89: -{'UNIT_ARCHER': 1} (army 3)
+  t91: +{'UNIT_CROSSBOWMAN': 1} (gold 134 -> 130)
+  t91: -{'UNIT_ARCHER': 1} (army 3)
+  t94: +{'UNIT_TREBUCHET': 1} (gold 130 -> 130)
+  t102: suzerain 4 -> -1
+  t107: suzerain -1 -> 4
+  t116: BUY? +{'UNIT_MUSKETMAN': 1} gold 66 -> 59 (drop 7), army before 4, building PROJECT_ENHANCE_DISTRICT_CAMPUS
+  t116: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t117: BUY? +{'UNIT_BOMBARD': 1} gold 59 -> 51 (drop 8), army before 4, building PROJECT_ENHANCE_DISTRICT_CAMPUS
+  t117: -{'UNIT_TREBUCHET': 1} (army 4)
+  t118: suzerain 4 -> -1
+  t121: war [] -> [3]
+  t121: suzerain -1 -> 5
+  t122: war [3] -> []
+  t125: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_BOMBARD': 1} (army 2)
+  t125: war [] -> [2, 4]
+  t126: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t128: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t133: +{'UNIT_PIKE_AND_SHOT': 1} (gold 50 -> 58)
+  t139: +{'UNIT_PIKE_AND_SHOT': 1} (gold 79 -> 83)
+  t141: war [2, 4] -> [4]
+  t145: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t147: +{'UNIT_PIKE_AND_SHOT': 1} (gold 86 -> 88)
+  t149: war [4] -> []
+  t149: suzerain 5 -> -1
+  t152: war [] -> [4]
+  t152: suzerain -1 -> 5
+  t154: war [4] -> []
+  t154: suzerain 5 -> 2
+  t159: suzerain 2 -> -1
+  t168: -{'UNIT_PIKE_AND_SHOT': 2} (army 0)
+  t188: suzerain -1 -> 0
+  t216: suzerain 0 -> 2
+  t221: suzerain 2 -> 0
+  t231: suzerain 0 -> 2
+  t234: suzerain 2 -> 0
+  t246: suzerain 0 -> 3
+  t248: suzerain 3 -> 0
+  builds: - (t1) > BUILDING_MONUMENT (t2) > BUILDING_GRANARY (t11) > UNIT_WARRIOR (t19) > UNIT_BUILDER (t20) > DISTRICT_CAMPUS (t22) > BUILDING_LIBRARY (t24) > NONE (t27) > UNIT_ARCHER (t28) > NONE (t31) > DISTRICT_CAMPUS (t36) > BUILDING_LIBRARY (t37) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t44) > UNIT_TRADER (t59) > BUILDING_WALLS (t64) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t66) > NONE (t82) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t83) > UNIT_TREBUCHET (t89) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t94) > BUILDING_CASTLE (t121) > UNIT_BUILDER (t125) > UNIT_PIKE_AND_SHOT (t126) > PROJECT_REPAIR_OUTER_DEFENSES (t139) > UNIT_PIKE_AND_SHOT (t140) > PROJECT_REPAIR_OUTER_DEFENSES (t154) > BUILDING_STAR_FORT (t156) > DISTRICT_CAMPUS (t164) > BUILDING_LIBRARY (t165) > UNIT_TRADER (t167) > UNIT_BUILDER (t175) > BUILDING_UNIVERSITY (t176) > NONE (t187) > BUILDING_RESEARCH_LAB (t188) > DISTRICT_HARBOR (t205) > BUILDING_SEWER (t208) > DISTRICT_NEIGHBORHOOD (t218)
+  end: gold 283 faith 35928 army {} pop [12]
+== p10 CIVILIZATION_JOHANNESBURG  turns 1-251
+  t22: +{'UNIT_WARRIOR': 1} (gold 100 -> 105)
+  t24: +{'UNIT_WARRIOR': 1} (gold 110 -> 115)
+  t26: +{'UNIT_WARRIOR': 1} (gold 120 -> 125)
+  t33: BUY? +{'UNIT_WARRIOR': 1} gold 157 -> 59 (drop 98), army before 5, building NONE
+  t51: suzerain -1 -> 0
+  t70: +{'UNIT_MAN_AT_ARMS': 1} (gold 168 -> 169)
+  t70: -{'UNIT_WARRIOR': 1} (army 6)
+  t72: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 173 -> 166 (drop 7), army before 6, building NONE
+  t72: -{'UNIT_WARRIOR': 2} (army 6)
+  t73: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 166 -> 153 (drop 13), army before 6, building NONE
+  t73: -{'UNIT_WARRIOR': 2} (army 6)
+  t75: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 144 -> 131 (drop 14), army before 6, building NONE
+  t75: -{'UNIT_WARRIOR': 1} (army 6)
+  t88: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t145: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t147: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t154: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t155: -{'UNIT_FIELD_CANNON': 1} (army 5)
+  t156: -{'UNIT_FIELD_CANNON': 1} (army 4)
+  t156: war [] -> [4]
+  t157: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t158: +{'UNIT_LINE_INFANTRY': 1} (gold 0 -> 1)
+  t158: -{'UNIT_MAN_AT_ARMS': 2} (army 2)
+  t160: +{'UNIT_LINE_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} (gold 7 -> 8)
+  t160: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t161: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t164: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t174: +{'UNIT_FIELD_CANNON': 1} (gold 73 -> 79)
+  t176: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t190: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t194: +{'UNIT_FIELD_CANNON': 1} (gold 145 -> 148)
+  t194: suzerain 0 -> -1
+  t198: +{'UNIT_AT_CREW': 1} (gold 156 -> 159)
+  t204: suzerain -1 -> 3
+  t219: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t220: +{'UNIT_MODERN_AT': 1} (gold 135 -> 138)
+  t220: -{'UNIT_AT_CREW': 1} (army 1)
+  t227: BUY? +{'UNIT_MODERN_AT': 1} gold 141 -> 130 (drop 11), army before 1, building UNIT_MODERN_AT
+  t232: -{'UNIT_MODERN_AT': 1} (army 1)
+  t238: -{'UNIT_MODERN_AT': 1} (army 0)
+  t240: +{'UNIT_MODERN_AT': 1} (gold 43 -> 49)
+  t242: suzerain 3 -> 2
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > BUILDING_GRANARY (t13) > UNIT_WARRIOR (t21) > NONE (t26) > UNIT_WARRIOR (t32) > NONE (t33) > UNIT_BUILDER (t45) > NONE (t46) > BUILDING_WALLS (t61) > NONE (t62) > BUILDING_CASTLE (t92) > NONE (t93) > UNIT_TRADER (t116) > NONE (t117) > BUILDING_STAR_FORT (t130) > NONE (t131) > UNIT_FIELD_CANNON (t146) > NONE (t154) > UNIT_FIELD_CANNON (t156) > NONE (t165) > PROJECT_REPAIR_OUTER_DEFENSES (t169) > UNIT_FIELD_CANNON (t170) > PROJECT_REPAIR_OUTER_DEFENSES (t174) > BUILDING_SEWER (t175) > UNIT_TRADER (t183) > UNIT_BUILDER (t188) > DISTRICT_INDUSTRIAL_ZONE (t189) > PROJECT_REPAIR_OUTER_DEFENSES (t192) > UNIT_AT_CREW (t193) > NONE (t198) > UNIT_AT_CREW (t203) > NONE (t204) > PROJECT_REPAIR_OUTER_DEFENSES (t205) > NONE (t206) > PROJECT_REPAIR_OUTER_DEFENSES (t210) > DISTRICT_INDUSTRIAL_ZONE (t211) > NONE (t212) > PROJECT_REPAIR_OUTER_DEFENSES (t214) > DISTRICT_NEIGHBORHOOD (t215) > UNIT_AT_CREW (t219) > UNIT_MODERN_AT (t227) > DISTRICT_INDUSTRIAL_ZONE (t240) > PROJECT_REPAIR_OUTER_DEFENSES (t241) > UNIT_TRADER (t242) > UNIT_MACHINE_GUN (t250)
+  end: gold 15 faith 82 army {'UNIT_MODERN_AT': 1} pop [7]
+== p11 CIVILIZATION_HATTUSA  turns 1-226
+  t10: -{'UNIT_WARRIOR': 1} (army 1)
+  t28: +{'UNIT_WARRIOR': 1} (gold 125 -> 130)
+  t30: suzerain -1 -> 5
+  t42: suzerain 5 -> -1
+  t43: -{'UNIT_WARRIOR': 1} (army 1)
+  t48: suzerain -1 -> 5
+  t53: +{'UNIT_HEAVY_CHARIOT': 1} (gold 158 -> 162)
+  t53: -{'UNIT_WARRIOR': 1} (army 1)
+  t67: +{'UNIT_SWORDSMAN': 1} (gold 120 -> 128)
+  t68: -{'UNIT_SWORDSMAN': 1, 'UNIT_HEAVY_CHARIOT': 1} (army 0)
+  t79: +{'UNIT_CATAPULT': 1} (gold 131 -> 146)
+  t82: +{'UNIT_HEAVY_CHARIOT': 1} (gold 170 -> 182)
+  t83: suzerain 5 -> -1
+  t84: war [] -> [1]
+  t91: +{'UNIT_TREBUCHET': 1} (gold 274 -> 276)
+  t92: -{'UNIT_CATAPULT': 1} (army 2)
+  t103: +{'UNIT_TREBUCHET': 1} (gold 113 -> 113)
+  t108: suzerain -1 -> 3
+  t110: -{'UNIT_TREBUCHET': 1} (army 2)
+  t113: +{'UNIT_BOMBARD': 1} (gold 152 -> 148)
+  t113: -{'UNIT_TREBUCHET': 1} (army 2)
+  t114: war [1] -> [1, 5]
+  t115: -{'UNIT_HEAVY_CHARIOT': 1} (army 1)
+  t118: -{'UNIT_BOMBARD': 1} (army 0)
+  t122: war [1, 5] -> [1]
+  t131: suzerain 3 -> -1
+  t155: suzerain -1 -> 2
+  t159: +{'UNIT_PIKE_AND_SHOT': 1} (gold 437 -> 452)
+  t175: suzerain 2 -> -1
+  t179: -{'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t186: +{'UNIT_FIELD_CANNON': 1} (gold 634 -> 650)
+  t191: suzerain -1 -> 5
+  t205: +{'UNIT_AT_CREW': 1} (gold 794 -> 794)
+  t206: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t215: +{'UNIT_AT_CREW': 1} (gold 3 -> 0)
+  t215: suzerain 5 -> 0
+  t219: -{'UNIT_AT_CREW': 1} (army 1)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t9) > UNIT_WARRIOR (t22) > BUILDING_GRANARY (t28) > UNIT_TRADER (t39) > UNIT_HEAVY_CHARIOT (t48) > DISTRICT_CAMPUS (t53) > BUILDING_WALLS (t60) > BUILDING_MONUMENT (t66) > UNIT_CATAPULT (t71) > BUILDING_MONUMENT (t79) > BUILDING_LIBRARY (t83) > UNIT_CATAPULT (t85) > UNIT_TREBUCHET (t91) > PROJECT_REPAIR_OUTER_DEFENSES (t103) > UNIT_PIKE_AND_SHOT (t107) > BUILDING_CASTLE (t108) > UNIT_PIKE_AND_SHOT (t110) > BUILDING_CASTLE (t117) > UNIT_TRADER (t129) > UNIT_BUILDER (t135) > BUILDING_STAR_FORT (t138) > UNIT_PIKE_AND_SHOT (t154) > BUILDING_WATER_MILL (t159) > UNIT_FIELD_CANNON (t172) > UNIT_AT_CREW (t186)
+  end: gold 0 faith 116 army {'UNIT_AT_CREW': 1} pop [15]
+== p12 CIVILIZATION_LA_VENTA  turns 1-251
+  t12: -{'UNIT_WARRIOR': 1} (army 1)
+  t20: -{'UNIT_WARRIOR': 1} (army 0)
+  t22: BUY? +{'UNIT_WARRIOR': 1} gold 100 -> 25 (drop 75), army before 0, building DISTRICT_HOLY_SITE
+  t28: +{'UNIT_ARCHER': 1} (gold 47 -> 51)
+  t28: -{'UNIT_WARRIOR': 1} (army 1)
+  t39: +{'UNIT_ARCHER': 1} (gold 81 -> 84)
+  t43: +{'UNIT_ARCHER': 1} (gold 90 -> 92)
+  t52: suzerain -1 -> 4
+  t78: -{'UNIT_ARCHER': 1} (army 2)
+  t80: -{'UNIT_ARCHER': 1} (army 1)
+  t81: +{'UNIT_CROSSBOWMAN': 1} (gold 144 -> 143)
+  t81: -{'UNIT_ARCHER': 1} (army 1)
+  t96: -{'UNIT_CROSSBOWMAN': 1} (army 0)
+  t110: +{'UNIT_TREBUCHET': 1} (gold 50 -> 51)
+  t114: -{'UNIT_TREBUCHET': 1} (army 0)
+  t116: +{'UNIT_PIKE_AND_SHOT': 1} (gold 46 -> 42)
+  t125: war [] -> [5]
+  t126: +{'UNIT_PIKE_AND_SHOT': 1} (gold 15 -> 12)
+  t127: -{'UNIT_PIKE_AND_SHOT': 2} (army 0)
+  t128: +{'UNIT_TREBUCHET': 1} (gold 5 -> 6)
+  t129: -{'UNIT_TREBUCHET': 1} (army 0)
+  t134: +{'UNIT_PIKE_AND_SHOT': 1} (gold 8 -> 9)
+  t135: -{'UNIT_PIKE_AND_SHOT': 1} (army 0)
+  t150: +{'UNIT_FIELD_CANNON': 1} (gold 62 -> 66)
+  t164: +{'UNIT_FIELD_CANNON': 1} (gold 53 -> 52)
+  t165: war [5] -> []
+  t171: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t191: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  t212: +{'UNIT_AT_CREW': 1} (gold 63 -> 64)
+  t219: suzerain 4 -> 2
+  t223: BUY? +{'UNIT_MODERN_AT': 1} gold 39 -> 32 (drop 7), army before 1, building UNIT_SUPPLY_CONVOY
+  t223: -{'UNIT_AT_CREW': 1} (army 1)
+  t224: suzerain 2 -> 0
+  t225: -{'UNIT_MODERN_AT': 1} (army 0)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t7) > DISTRICT_HOLY_SITE (t22) > UNIT_ARCHER (t24) > UNIT_BUILDER (t28) > BUILDING_MONUMENT (t31) > NONE (t35) > UNIT_ARCHER (t36) > UNIT_TRADER (t43) > UNIT_BUILDER (t58) > BUILDING_WALLS (t61) > BUILDING_SHRINE (t66) > UNIT_BUILDER (t74) > BUILDING_TEMPLE (t77) > BUILDING_CATHEDRAL (t90) > UNIT_TREBUCHET (t102) > UNIT_PIKEMAN (t110) > BUILDING_CASTLE (t116) > NONE (t122) > UNIT_PIKE_AND_SHOT (t123) > UNIT_BUILDER (t126) > UNIT_PIKE_AND_SHOT (t128) > NONE (t134) > BUILDING_STAR_FORT (t135) > UNIT_FIELD_CANNON (t140) > UNIT_BUILDER (t150) > UNIT_FIELD_CANNON (t153) > UNIT_BUILDER (t164) > DISTRICT_NEIGHBORHOOD (t166) > BUILDING_SEWER (t189) > UNIT_AT_CREW (t203) > UNIT_SUPPLY_CONVOY (t212) > BUILDING_FOOD_MARKET (t225)
+  end: gold 68 faith 2800 army {} pop [12]
+== p13 CIVILIZATION_AUCKLAND  turns 1-251
+  t25: +{'UNIT_WARRIOR': 1, 'UNIT_ARCHER': 1} (gold 137 -> 143)
+  t28: +{'UNIT_ARCHER': 1} (gold 153 -> 158)
+  t28: -{'UNIT_WARRIOR': 1} (army 4)
+  t30: BUY? +{'UNIT_ARCHER': 1} gold 162 -> 51 (drop 111), army before 4, building UNIT_ARCHER
+  t32: +{'UNIT_ARCHER': 1} (gold 54 -> 57)
+  t55: BUY? +{'UNIT_ARCHER': 1} gold 119 -> 1 (drop 119), army before 6, building NONE
+  t66: +{'UNIT_SWORDSMAN': 1} (gold 5 -> 0)
+  t66: -{'UNIT_WARRIOR': 1} (army 7)
+  t67: -{'UNIT_ARCHER': 1} (army 6)
+  t71: +{'UNIT_MAN_AT_ARMS': 1} (gold 5 -> 2)
+  t71: -{'UNIT_WARRIOR': 1} (army 6)
+  t72: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t75: +{'UNIT_MAN_AT_ARMS': 1} (gold 5 -> 5)
+  t75: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t78: +{'UNIT_CATAPULT': 1} (gold 13 -> 17)
+  t103: +{'UNIT_TREBUCHET': 1} (gold 50 -> 47)
+  t103: -{'UNIT_CATAPULT': 1} (army 6)
+  t107: +{'UNIT_CROSSBOWMAN': 1} (gold 51 -> 47)
+  t107: -{'UNIT_ARCHER': 1} (army 6)
+  t109: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 46 -> 41 (drop 6), army before 6, building NONE
+  t109: -{'UNIT_ARCHER': 1} (army 6)
+  t110: BUY? +{'UNIT_BOMBARD': 1} gold 41 -> 33 (drop 8), army before 6, building NONE
+  t110: -{'UNIT_TREBUCHET': 1} (army 6)
+  t112: BUY? +{'UNIT_MUSKETMAN': 1} gold 29 -> 20 (drop 9), army before 6, building NONE
+  t112: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t114: -{'UNIT_CROSSBOWMAN': 2} (army 4)
+  t115: +{'UNIT_CROSSBOWMAN': 1} (gold 11 -> 7)
+  t115: -{'UNIT_ARCHER': 1} (army 4)
+  t116: +{'UNIT_PIKE_AND_SHOT': 1} (gold 7 -> 6)
+  t117: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_CROSSBOWMAN': 1} (army 3)
+  t118: -{'UNIT_ARCHER': 1} (army 2)
+  t120: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t123: -{'UNIT_BOMBARD': 1} (army 0)
+  t125: +{'UNIT_PIKE_AND_SHOT': 1} (gold 40 -> 51)
+  t144: +{'UNIT_FIELD_CANNON': 1} (gold 66 -> 73)
+  t163: +{'UNIT_FIELD_CANNON': 1} (gold 94 -> 94)
+  t172: BUY? +{'UNIT_FIELD_CANNON': 1} gold 48 -> 43 (drop 5), army before 3, building UNIT_FIELD_CANNON
+  t174: -{'UNIT_FIELD_CANNON': 3} (army 1)
+  t180: +{'UNIT_FIELD_CANNON': 1} (gold 61 -> 68)
+  t183: +{'UNIT_AT_CREW': 1} (gold 74 -> 72)
+  t183: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t206: +{'UNIT_SUPPLY_CONVOY': 1} (gold 118 -> 119)
+  t217: +{'UNIT_AT_CREW': 1} (gold 133 -> 135)
+  t220: BUY? +{'UNIT_MODERN_AT': 2} gold 130 -> 118 (drop 12), army before 4, building NONE
+  t220: -{'UNIT_AT_CREW': 2} (army 4)
+  t228: BUY? +{'UNIT_MACHINE_GUN': 1} gold 47 -> 32 (drop 15), army before 4, building NONE
+  t228: -{'UNIT_FIELD_CANNON': 1} (army 4)
+  t229: -{'UNIT_SUPPLY_CONVOY': 1, 'UNIT_MODERN_AT': 1, 'UNIT_MACHINE_GUN': 1} (army 1)
+  t231: +{'UNIT_SUPPLY_CONVOY': 1} (gold 22 -> 27)
+  t233: suzerain -1 -> 1
+  t235: suzerain 1 -> 2
+  t245: +{'UNIT_MODERN_AT': 1} (gold 48 -> 50)
+  t249: -{'UNIT_MODERN_AT': 1} (army 2)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_BUILDER (t13) > BUILDING_GRANARY (t15) > UNIT_WARRIOR (t23) > NONE (t25) > UNIT_ARCHER (t26) > NONE (t28) > UNIT_ARCHER (t29) > NONE (t32) > BUILDING_WALLS (t63) > NONE (t64) > UNIT_TRADER (t73) > UNIT_CATAPULT (t74) > NONE (t78) > BUILDING_CASTLE (t104) > NONE (t105) > UNIT_PIKE_AND_SHOT (t115) > BUILDING_STAR_FORT (t125) > UNIT_FIELD_CANNON (t134) > BUILDING_SEWER (t180) > UNIT_SUPPLY_CONVOY (t195) > UNIT_BUILDER (t206) > UNIT_AT_CREW (t207) > NONE (t217) > UNIT_SUPPLY_CONVOY (t230) > UNIT_MODERN_AT (t231) > UNIT_BUILDER (t245) > UNIT_MODERN_AT (t247)
+  end: gold 19 faith 0 army {'UNIT_SUPPLY_CONVOY': 1, 'UNIT_MODERN_AT': 1} pop [11]
+== p14 CIVILIZATION_AKKAD  turns 1-251
+  t19: +{'UNIT_WARRIOR': 1} (gold 85 -> 90)
+  t21: +{'UNIT_WARRIOR': 1} (gold 96 -> 102)
+  t23: +{'UNIT_WARRIOR': 1} (gold 108 -> 114)
+  t29: BUY? +{'UNIT_ARCHER': 1} gold 146 -> 39 (drop 107), army before 5, building NONE
+  t32: suzerain -1 -> 4
+  t40: suzerain 4 -> -1
+  t42: suzerain -1 -> 4
+  t47: suzerain 4 -> -1
+  t49: suzerain -1 -> 4
+  t53: suzerain 4 -> -1
+  t59: suzerain -1 -> 5
+  t62: +{'UNIT_SWORDSMAN': 1} (gold 323 -> 328)
+  t62: -{'UNIT_WARRIOR': 1} (army 6)
+  t63: +{'UNIT_SWORDSMAN': 1} (gold 328 -> 331)
+  t63: -{'UNIT_WARRIOR': 1} (army 6)
+  t64: +{'UNIT_SWORDSMAN': 2} (gold 331 -> 327)
+  t64: -{'UNIT_WARRIOR': 2} (army 6)
+  t65: +{'UNIT_SWORDSMAN': 1} (gold 327 -> 324)
+  t65: -{'UNIT_WARRIOR': 1} (army 6)
+  t72: suzerain 5 -> -1
+  t76: suzerain -1 -> 5
+  t80: +{'UNIT_CROSSBOWMAN': 1} (gold 312 -> 306)
+  t80: -{'UNIT_ARCHER': 1} (army 6)
+  t83: +{'UNIT_MAN_AT_ARMS': 1} (gold 300 -> 292)
+  t83: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t84: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 292 -> 277 (drop 14), army before 6, building NONE
+  t84: -{'UNIT_SWORDSMAN': 2} (army 6)
+  t84: suzerain 5 -> -1
+  t85: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 277 -> 266 (drop 11), army before 6, building NONE
+  t85: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t87: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 259 -> 247 (drop 12), army before 6, building NONE
+  t87: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t108: suzerain -1 -> 4
+  t112: BUY? +{'UNIT_MUSKETMAN': 3} gold 56 -> 33 (drop 23), army before 6, building NONE
+  t112: -{'UNIT_MAN_AT_ARMS': 3} (army 6)
+  t113: -{'UNIT_MAN_AT_ARMS': 1, 'UNIT_MUSKETMAN': 2} (army 3)
+  t116: +{'UNIT_MUSKETMAN': 1} (gold 15 -> 12)
+  t116: -{'UNIT_MAN_AT_ARMS': 1} (army 3)
+  t119: suzerain 4 -> -1
+  t121: +{'UNIT_PIKE_AND_SHOT': 1} (gold 16 -> 17)
+  t124: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t125: war [] -> [5]
+  t125: suzerain -1 -> 4
+  t127: +{'UNIT_PIKE_AND_SHOT': 1} (gold 7 -> 6)
+  t132: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t136: war [5] -> []
+  t136: suzerain 4 -> 0
+  t139: -{'UNIT_PIKE_AND_SHOT': 1} (army 4)
+  t152: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t158: war [] -> [5]
+  t158: suzerain 0 -> 4
+  t159: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t160: -{'UNIT_CAVALRY': 1} (army 5)
+  t161: -{'UNIT_CAVALRY': 1} (army 4)
+  t163: war [5] -> []
+  t164: suzerain 4 -> -1
+  t166: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t168: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t170: suzerain -1 -> 0
+  t178: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t182: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t184: +{'UNIT_INFANTRY': 1} (gold 4 -> 2)
+  t184: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t187: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t191: suzerain 0 -> -1
+  t195: suzerain -1 -> 4
+  t201: +{'UNIT_SUPPLY_CONVOY': 1} (gold 41 -> 45)
+  t207: suzerain 4 -> -1
+  t210: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 49 -> 44)
+  t210: -{'UNIT_INFANTRY': 1} (army 2)
+  t212: +{'UNIT_AT_CREW': 1} (gold 42 -> 42)
+  t220: -{'UNIT_MECHANIZED_INFANTRY': 1, 'UNIT_SUPPLY_CONVOY': 1} (army 1)
+  t221: +{'UNIT_MODERN_AT': 1} (gold 11 -> 16)
+  t221: -{'UNIT_AT_CREW': 1} (army 1)
+  t224: +{'UNIT_MODERN_AT': 1} (gold 28 -> 29)
+  t225: suzerain -1 -> 4
+  t229: -{'UNIT_MODERN_AT': 1} (army 1)
+  t237: +{'UNIT_SUPPLY_CONVOY': 1} (gold 33 -> 36)
+  t243: suzerain 4 -> -1
+  t248: suzerain -1 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_BUILDER (t15) > UNIT_WARRIOR (t17) > BUILDING_GRANARY (t23) > NONE (t26) > UNIT_ARCHER (t28) > NONE (t29) > UNIT_BUILDER (t38) > NONE (t39) > BUILDING_WATER_MILL (t52) > BUILDING_WALLS (t53) > NONE (t55) > BUILDING_CASTLE (t90) > NONE (t91) > UNIT_BUILDER (t92) > NONE (t93) > UNIT_TRADER (t114) > UNIT_PIKE_AND_SHOT (t115) > NONE (t121) > UNIT_PIKE_AND_SHOT (t125) > BUILDING_STAR_FORT (t132) > UNIT_PIKE_AND_SHOT (t133) > BUILDING_STAR_FORT (t137) > UNIT_CAVALRY (t143) > UNIT_BUILDER (t159) > UNIT_FIELD_CANNON (t162) > BUILDING_SEWER (t177) > UNIT_BUILDER (t190) > UNIT_SUPPLY_CONVOY (t192) > UNIT_AT_CREW (t201) > UNIT_SUPPLY_CONVOY (t224) > UNIT_MACHINE_GUN (t237)
+  end: gold 42 faith 18 army {'UNIT_MODERN_AT': 1, 'UNIT_SUPPLY_CONVOY': 1} pop [15]
+== p15 CIVILIZATION_SAMARKAND  turns 1-251
+  t18: -{'UNIT_WARRIOR': 1} (army 1)
+  t29: +{'UNIT_WARRIOR': 1} (gold 92 -> 101)
+  t33: +{'UNIT_ARCHER': 1} (gold 125 -> 133)
+  t34: -{'UNIT_WARRIOR': 2} (army 1)
+  t34: suzerain -1 -> 3
+  t37: +{'UNIT_ARCHER': 1} (gold 36 -> 43)
+  t40: +{'UNIT_ARCHER': 1} (gold 53 -> 58)
+  t48: +{'UNIT_WARRIOR': 2, 'UNIT_ARCHER': 1, 'UNIT_HEAVY_CHARIOT': 1} (gold 93 -> 100)
+  t49: suzerain 3 -> -1
+  t52: suzerain -1 -> 3
+  t53: +{'UNIT_HEAVY_CHARIOT': 1} (gold 114 -> 119)
+  t57: suzerain 3 -> 2
+  t58: suzerain 2 -> -1
+  t62: -{'UNIT_WARRIOR': 1} (army 7)
+  t67: suzerain -1 -> 3
+  t77: +{'UNIT_MAN_AT_ARMS': 1} (gold 109 -> 111)
+  t77: -{'UNIT_WARRIOR': 1} (army 7)
+  t83: +{'UNIT_KNIGHT': 2} (gold 152 -> 159)
+  t83: -{'UNIT_HEAVY_CHARIOT': 2} (army 7)
+  t85: +{'UNIT_CROSSBOWMAN': 2} (gold 165 -> 161)
+  t85: -{'UNIT_ARCHER': 2} (army 7)
+  t86: +{'UNIT_CROSSBOWMAN': 1} (gold 161 -> 158)
+  t86: -{'UNIT_ARCHER': 1} (army 7)
+  t89: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 159 -> 151 (drop 7), army before 7, building PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB
+  t89: -{'UNIT_ARCHER': 1} (army 7)
+  t92: suzerain 3 -> -1
+  t101: suzerain -1 -> 2
+  t114: -{'UNIT_KNIGHT': 1, 'UNIT_CROSSBOWMAN': 2} (army 4)
+  t120: +{'UNIT_MUSKETMAN': 1} (gold 58 -> 58)
+  t120: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t125: war [] -> [5]
+  t130: +{'UNIT_CUIRASSIER': 1} (gold 100 -> 100)
+  t130: -{'UNIT_KNIGHT': 1} (army 4)
+  t131: -{'UNIT_MUSKETMAN': 1, 'UNIT_CROSSBOWMAN': 2, 'UNIT_CUIRASSIER': 1} (army 0)
+  t132: +{'UNIT_CROSSBOWMAN': 2, 'UNIT_MUSKETMAN': 1, 'UNIT_CUIRASSIER': 1} (gold 119 -> 123)
+  t132: war [5] -> []
+  t132: suzerain 2 -> 1
+  t133: BUY? +{'UNIT_FIELD_CANNON': 2} gold 123 -> 116 (drop 6), army before 4, building UNIT_TRADER
+  t133: -{'UNIT_CROSSBOWMAN': 2} (army 4)
+  t134: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 116 -> 111 (drop 5), army before 4, building UNIT_TRADER
+  t134: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t134: war [] -> [5]
+  t134: suzerain 1 -> 2
+  t141: war [5] -> []
+  t152: suzerain 2 -> -1
+  t157: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  t167: suzerain -1 -> 1
+  t177: +{'UNIT_INFANTRY': 1} (gold 200 -> 208)
+  t177: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  t178: +{'UNIT_TANK': 1} (gold 208 -> 216)
+  t178: -{'UNIT_CUIRASSIER': 1} (army 3)
+  t188: suzerain 1 -> -1
+  t193: suzerain -1 -> 1
+  t208: suzerain 1 -> -1
+  t210: suzerain -1 -> 1
+  t211: +{'UNIT_MECHANIZED_INFANTRY': 1} (gold 395 -> 406)
+  t211: -{'UNIT_INFANTRY': 1} (army 3)
+  t215: suzerain 1 -> 0
+  t227: +{'UNIT_MODERN_ARMOR': 1} (gold 580 -> 600)
+  t227: -{'UNIT_TANK': 1} (army 3)
+  t229: +{'UNIT_MACHINE_GUN': 1} (gold 622 -> 640)
+  t229: -{'UNIT_FIELD_CANNON': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t3) > NONE (t4) > UNIT_BUILDER (t5) > BUILDING_GRANARY (t8) > NONE (t17) > BUILDING_MONUMENT (t18) > UNIT_WARRIOR (t26) > NONE (t29) > UNIT_ARCHER (t30) > UNIT_TRADER (t33) > UNIT_ARCHER (t34) > UNIT_TRADER (t40) > UNIT_HEAVY_CHARIOT (t45) > UNIT_BUILDER (t48) > UNIT_HEAVY_CHARIOT (t50) > NONE (t53) > DISTRICT_COMMERCIAL_HUB (t58) > BUILDING_WALLS (t59) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t62) > BUILDING_MARKET (t67) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t79) > UNIT_BUILDER (t111) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t113) > BUILDING_CASTLE (t121) > NONE (t126) > BUILDING_STAR_FORT (t127) > UNIT_TRADER (t133) > UNIT_BUILDER (t141) > BUILDING_BANK (t143) > UNIT_BUILDER (t163) > BUILDING_STOCK_EXCHANGE (t164) > DISTRICT_NEIGHBORHOOD (t185) > BUILDING_SEWER (t199) > NONE (t207) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t208) > DISTRICT_HARBOR (t237) > BUILDING_LIGHTHOUSE (t244)
+  end: gold 1248 faith 24777 army {'UNIT_MODERN_ARMOR': 1, 'UNIT_MACHINE_GUN': 1, 'UNIT_MECHANIZED_INFANTRY': 1} pop [17]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-251
+  builds: - (t1)
+  end: gold 0 faith 0 army {} pop []
+== p6 CIVILIZATION_PRESLAV  turns 1-201
+  t27: +{'UNIT_ARCHER': 1} (gold 128 -> 134)
+  t30: +{'UNIT_ARCHER': 1} (gold 142 -> 147)
+  t32: +{'UNIT_ARCHER': 1} (gold 150 -> 154)
+  t45: suzerain -1 -> 3
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 104 -> 101)
+  t61: -{'UNIT_WARRIOR': 1} (army 5)
+  t67: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 106 -> 98 (drop 7), army before 5, building NONE
+  t67: -{'UNIT_WARRIOR': 1, 'UNIT_SWORDSMAN': 1} (army 5)
+  t68: war [] -> [2]
+  t71: +{'UNIT_CATAPULT': 1} (gold 86 -> 82)
+  t75: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t76: +{'UNIT_CATAPULT': 1} (gold 61 -> 58)
+  t78: war [2] -> []
+  t81: +{'UNIT_CATAPULT': 1} (gold 44 -> 42)
+  t85: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 30 -> 21 (drop 9), army before 7, building NONE
+  t85: -{'UNIT_ARCHER': 1} (army 7)
+  t86: -{'UNIT_CATAPULT': 3} (army 4)
+  t87: +{'UNIT_CROSSBOWMAN': 1} (gold 15 -> 10)
+  t87: -{'UNIT_ARCHER': 1} (army 4)
+  t90: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t91: +{'UNIT_CROSSBOWMAN': 1} (gold 5 -> 1)
+  t91: -{'UNIT_ARCHER': 1} (army 3)
+  t102: +{'UNIT_CROSSBOWMAN': 1} (gold 0 -> 0)
+  t124: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t129: war [] -> [2]
+  t136: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t137: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t138: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 5)
+  t138: -{'UNIT_MAN_AT_ARMS': 1} (army 1)
+  t152: +{'UNIT_MUSKETMAN': 1} (gold 23 -> 24)
+  t154: +{'UNIT_FIELD_CANNON': 1} (gold 22 -> 23)
+  t154: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t155: -{'UNIT_PIKE_AND_SHOT': 1} (army 1)
+  t171: +{'UNIT_FIELD_CANNON': 1} (gold 33 -> 34)
+  t171: war [2] -> []
+  t171: suzerain 3 -> 5
+  t172: -{'UNIT_FIELD_CANNON': 2} (army 0)
+  t180: +{'UNIT_FIELD_CANNON': 1} (gold 88 -> 96)
+  t181: +{'UNIT_FIELD_CANNON': 2} (gold 96 -> 88)
+  t181: war [] -> [2]
+  t181: suzerain 5 -> 3
+  t183: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t188: -{'UNIT_FIELD_CANNON': 2} (army 0)
+  t191: war [2] -> []
+  t191: suzerain 3 -> 5
+  t196: +{'UNIT_SUPPLY_CONVOY': 1} (gold 107 -> 113)
+  t201: war [] -> [2]
+  t201: suzerain 5 -> 3
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t7) > BUILDING_MONUMENT (t17) > UNIT_ARCHER (t25) > NONE (t32) > UNIT_TRADER (t36) > NONE (t39) > UNIT_BUILDER (t51) > NONE (t52) > BUILDING_WALLS (t65) > NONE (t66) > UNIT_CATAPULT (t68) > NONE (t81) > UNIT_CROSSBOWMAN (t91) > NONE (t92) > UNIT_CROSSBOWMAN (t93) > BUILDING_CASTLE (t102) > NONE (t112) > BUILDING_STAR_FORT (t122) > UNIT_PIKE_AND_SHOT (t126) > UNIT_TRADER (t138) > UNIT_FIELD_CANNON (t142) > UNIT_TRADER (t154) > UNIT_FIELD_CANNON (t158) > UNIT_TRADER (t171) > PROJECT_REPAIR_OUTER_DEFENSES (t175) > UNIT_BUILDER (t176) > UNIT_FIELD_CANNON (t178) > NONE (t180) > UNIT_SUPPLY_CONVOY (t181) > BUILDING_SEWER (t196)
+  end: gold 137 faith 0 army {'UNIT_SUPPLY_CONVOY': 1} pop [9]
+== p7 CIVILIZATION_HATTUSA  turns 1-65
+  t10: -{'UNIT_WARRIOR': 1} (army 1)
+  t14: -{'UNIT_WARRIOR': 1} (army 0)
+  t20: +{'UNIT_WARRIOR': 1} (gold 89 -> 93)
+  t25: -{'UNIT_WARRIOR': 1} (army 0)
+  t27: BUY? +{'UNIT_ARCHER': 1} gold 117 -> 1 (drop 116), army before 0, building UNIT_ARCHER
+  t30: +{'UNIT_ARCHER': 1} (gold 7 -> 10)
+  t32: suzerain -1 -> 0
+  t34: +{'UNIT_ARCHER': 1} (gold 15 -> 17)
+  t52: suzerain 0 -> -1
+  t63: war [] -> [0]
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > DISTRICT_CAMPUS (t16) > UNIT_WARRIOR (t18) > UNIT_TRADER (t20) > UNIT_ARCHER (t27) > BUILDING_GRANARY (t34) > BUILDING_LIBRARY (t42) > UNIT_BUILDER (t48) > BUILDING_WATER_MILL (t51) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t56) > UNIT_CATAPULT (t64)
+  end: gold 77 faith 30 army {'UNIT_ARCHER': 3} pop [8]
+== p8 CIVILIZATION_LA_VENTA  turns 1-201
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 80 -> 85)
+  t21: +{'UNIT_WARRIOR': 1} (gold 95 -> 100)
+  t32: +{'UNIT_WARRIOR': 1} (gold 150 -> 155)
+  t33: -{'UNIT_WARRIOR': 1} (army 5)
+  t36: -{'UNIT_WARRIOR': 1} (army 4)
+  t41: +{'UNIT_ARCHER': 1} (gold 198 -> 231)
+  t57: suzerain -1 -> 0
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 277 -> 287)
+  t61: -{'UNIT_WARRIOR': 1} (army 5)
+  t62: +{'UNIT_SWORDSMAN': 1} (gold 287 -> 294)
+  t62: -{'UNIT_WARRIOR': 1} (army 5)
+  t63: +{'UNIT_SWORDSMAN': 1} (gold 294 -> 299)
+  t63: -{'UNIT_WARRIOR': 1} (army 5)
+  t64: -{'UNIT_ARCHER': 1} (army 4)
+  t66: -{'UNIT_WARRIOR': 1} (army 3)
+  t78: -{'UNIT_SWORDSMAN': 1} (army 2)
+  t80: BUY? +{'UNIT_CATAPULT': 1} gold 428 -> 198 (drop 230), army before 2, building BUILDING_SHRINE
+  t83: -{'UNIT_SWORDSMAN': 2, 'UNIT_CATAPULT': 1} (army 0)
+  t85: war [] -> [1]
+  t86: +{'UNIT_CATAPULT': 1, 'UNIT_SWORDSMAN': 2} (gold 258 -> 260)
+  t86: war [1] -> [0]
+  t86: suzerain 0 -> 1
+  t87: -{'UNIT_CATAPULT': 1, 'UNIT_SWORDSMAN': 2} (army 0)
+  t96: faith 491 -> 313
+  t101: +{'UNIT_SWORDSMAN': 1, 'UNIT_CATAPULT': 1} (gold 237 -> 243)
+  t107: -{'UNIT_CATAPULT': 1} (army 1)
+  t108: war [0] -> []
+  t116: +{'UNIT_WARRIOR_MONK': 1} (gold 216 -> 230)
+  t116: faith 703 -> 623
+  t121: +{'UNIT_PIKEMAN': 1} (gold 274 -> 286)
+  t122: +{'UNIT_PIKE_AND_SHOT': 1} (gold 286 -> 290)
+  t122: -{'UNIT_PIKEMAN': 1} (army 3)
+  t123: +{'UNIT_MUSKETMAN': 1} (gold 290 -> 292)
+  t123: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t125: suzerain 1 -> 4
+  t127: +{'UNIT_LINE_INFANTRY': 1} (gold 308 -> 308)
+  t127: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t127: suzerain 4 -> 1
+  t128: suzerain 1 -> 4
+  t130: suzerain 4 -> -1
+  t141: suzerain -1 -> 1
+  t167: suzerain 1 -> -1
+  t169: suzerain -1 -> 1
+  t187: +{'UNIT_INFANTRY': 1} (gold 530 -> 530)
+  t187: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  t189: +{'UNIT_AT_CREW': 1} (gold 539 -> 543)
+  t189: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t195: +{'UNIT_MODERN_AT': 1} (gold 584 -> 586)
+  t195: -{'UNIT_AT_CREW': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t15) > NONE (t16) > UNIT_WARRIOR (t17) > UNIT_BUILDER (t21) > BUILDING_GRANARY (t24) > UNIT_WARRIOR (t30) > NONE (t32) > UNIT_TRADER (t34) > UNIT_ARCHER (t39) > NONE (t41) > BUILDING_WATER_MILL (t46) > BUILDING_WALLS (t51) > DISTRICT_HARBOR (t54) > BUILDING_LIGHTHOUSE (t57) > DISTRICT_HOLY_SITE (t72) > BUILDING_SHRINE (t75) > BUILDING_TEMPLE (t84) > BUILDING_SYNAGOGUE (t95) > UNIT_TRADER (t96) > BUILDING_CASTLE (t107) > UNIT_PIKEMAN (t114) > UNIT_BUILDER (t121) > BUILDING_STAR_FORT (t124) > PROJECT_ENHANCE_DISTRICT_HARBOR (t136) > UNIT_BUILDER (t160) > BUILDING_SHIPYARD (t163) > DISTRICT_NEIGHBORHOOD (t195)
+  end: gold 615 faith 4162 army {'UNIT_WARRIOR_MONK': 1, 'UNIT_MODERN_AT': 1, 'UNIT_INFANTRY': 1} pop [14]
+== p9 CIVILIZATION_LAHORE  turns 1-182
+  t12: +{'UNIT_WARRIOR': 1} (gold 50 -> 55)
+  t14: +{'UNIT_WARRIOR': 1} (gold 60 -> 65)
+  t16: +{'UNIT_WARRIOR': 1} (gold 70 -> 75)
+  t18: +{'UNIT_WARRIOR': 1} (gold 80 -> 85)
+  t30: BUY? +{'UNIT_WARRIOR': 1} gold 140 -> 65 (drop 75), army before 6, building NONE
+  t47: -{'UNIT_WARRIOR': 1} (army 6)
+  t48: +{'UNIT_SWORDSMAN': 1} (gold 150 -> 150)
+  t48: -{'UNIT_WARRIOR': 1} (army 6)
+  t50: +{'UNIT_SWORDSMAN': 1} (gold 153 -> 151)
+  t50: -{'UNIT_WARRIOR': 1} (army 6)
+  t52: +{'UNIT_SWORDSMAN': 1} (gold 152 -> 148)
+  t52: -{'UNIT_WARRIOR': 1} (army 6)
+  t58: -{'UNIT_WARRIOR': 1} (army 5)
+  t59: -{'UNIT_WARRIOR': 1} (army 4)
+  t61: +{'UNIT_ARCHER': 1} (gold 135 -> 134)
+  t66: BUY? +{'UNIT_SWORDSMAN': 1} gold 126 -> 119 (drop 7), army before 5, building NONE
+  t66: -{'UNIT_WARRIOR': 1} (army 5)
+  t77: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 79 -> 70 (drop 9), army before 5, building NONE
+  t77: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t80: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 60 -> 50 (drop 10), army before 5, building NONE
+  t80: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t81: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 50 -> 39 (drop 11), army before 5, building NONE
+  t81: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t83: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 32 -> 20 (drop 12), army before 5, building NONE
+  t83: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t84: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 20 -> 7 (drop 13), army before 5, building NONE
+  t84: -{'UNIT_MAN_AT_ARMS': 3, 'UNIT_ARCHER': 1} (army 2)
+  t90: +{'UNIT_CROSSBOWMAN': 1} (gold 19 -> 23)
+  t94: +{'UNIT_TREBUCHET': 1} (gold 26 -> 27)
+  t98: +{'UNIT_TREBUCHET': 1} (gold 21 -> 19)
+  t98: suzerain -1 -> 4
+  t115: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t116: -{'UNIT_CROSSBOWMAN': 1} (army 5)
+  t118: war [] -> [0]
+  t120: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t121: -{'UNIT_TREBUCHET': 1} (army 5)
+  t125: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t126: -{'UNIT_PIKE_AND_SHOT': 1} (army 5)
+  t134: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t136: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t142: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t143: -{'UNIT_FIELD_CANNON': 1} (army 5)
+  t148: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t149: -{'UNIT_FIELD_CANNON': 1} (army 5)
+  t153: +{'UNIT_PIKE_AND_SHOT': 1} (gold 0 -> 0)
+  t158: -{'UNIT_PIKE_AND_SHOT': 1} (army 5)
+  t162: +{'UNIT_RANGER': 1} (gold 0 -> 0)
+  t163: -{'UNIT_RANGER': 1} (army 5)
+  t169: -{'UNIT_MAN_AT_ARMS': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  t170: +{'UNIT_ARTILLERY': 1} (gold 0 -> 3)
+  t170: -{'UNIT_PIKE_AND_SHOT': 1, 'UNIT_TREBUCHET': 1} (army 2)
+  t171: +{'UNIT_SUPPLY_CONVOY': 1} (gold 3 -> 9)
+  t179: +{'UNIT_PIKE_AND_SHOT': 1} (gold 42 -> 46)
+  t180: -{'UNIT_PIKE_AND_SHOT': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > UNIT_WARRIOR (t11) > BUILDING_GRANARY (t18) > UNIT_BUILDER (t26) > NONE (t27) > UNIT_BUILDER (t35) > NONE (t36) > UNIT_ARCHER (t60) > NONE (t61) > BUILDING_WALLS (t76) > NONE (t77) > UNIT_TRADER (t85) > UNIT_CROSSBOWMAN (t86) > UNIT_TREBUCHET (t90) > BUILDING_CASTLE (t98) > UNIT_TREBUCHET (t102) > NONE (t103) > UNIT_PIKE_AND_SHOT (t114) > BUILDING_STAR_FORT (t125) > UNIT_PIKE_AND_SHOT (t131) > UNIT_FIELD_CANNON (t136) > UNIT_PIKE_AND_SHOT (t148) > UNIT_BUILDER (t153) > UNIT_RANGER (t155) > UNIT_SUPPLY_CONVOY (t162) > UNIT_PIKE_AND_SHOT (t171)
+  end: gold 46 faith 28 army {'UNIT_ARTILLERY': 1, 'UNIT_PIKE_AND_SHOT': 1, 'UNIT_SUPPLY_CONVOY': 1} pop [7]
+== p10 CIVILIZATION_BRUSSELS  turns 1-201
+  t19: -{'UNIT_WARRIOR': 1} (army 1)
+  t23: +{'UNIT_WARRIOR': 1} (gold 109 -> 114)
+  t29: +{'UNIT_WARRIOR': 1} (gold 142 -> 172)
+  t32: BUY? +{'UNIT_ARCHER': 1} gold 183 -> 68 (drop 115), army before 3, building UNIT_ARCHER
+  t33: +{'UNIT_ARCHER': 1} (gold 68 -> 73)
+  t49: BUY? +{'UNIT_ARCHER': 1} gold 124 -> 7 (drop 117), army before 5, building NONE
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 36 -> 34)
+  t61: -{'UNIT_WARRIOR': 1} (army 6)
+  t67: +{'UNIT_SWORDSMAN': 1} (gold 36 -> 31)
+  t67: -{'UNIT_WARRIOR': 1} (army 6)
+  t69: BUY? +{'UNIT_SWORDSMAN': 1} gold 30 -> 23 (drop 7), army before 6, building NONE
+  t69: -{'UNIT_WARRIOR': 1} (army 6)
+  t73: -{'UNIT_SWORDSMAN': 1, 'UNIT_ARCHER': 3} (army 2)
+  t73: war [] -> [2]
+  t73: suzerain -1 -> 3
+  t78: war [2] -> []
+  t78: suzerain 3 -> -1
+  t81: +{'UNIT_CATAPULT': 1} (gold 30 -> 35)
+  t83: +{'UNIT_MAN_AT_ARMS': 1} (gold 39 -> 38)
+  t83: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t86: +{'UNIT_MAN_AT_ARMS': 1, 'UNIT_CATAPULT': 1} (gold 44 -> 42)
+  t86: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t88: BUY? +{'UNIT_TREBUCHET': 1} gold 42 -> 37 (drop 5), army before 4, building UNIT_CROSSBOWMAN
+  t88: -{'UNIT_CATAPULT': 1} (army 4)
+  t89: BUY? +{'UNIT_TREBUCHET': 1} gold 37 -> 31 (drop 6), army before 4, building UNIT_CROSSBOWMAN
+  t89: -{'UNIT_CATAPULT': 1} (army 4)
+  t89: suzerain -1 -> 2
+  t92: -{'UNIT_TREBUCHET': 2} (army 2)
+  t96: -{'UNIT_MAN_AT_ARMS': 2} (army 0)
+  t101: +{'UNIT_MAN_AT_ARMS': 2} (gold 44 -> 47)
+  t101: suzerain 2 -> -1
+  t104: +{'UNIT_CROSSBOWMAN': 1} (gold 52 -> 54)
+  t106: suzerain -1 -> 2
+  t108: +{'UNIT_CROSSBOWMAN': 1} (gold 52 -> 51)
+  t119: -{'UNIT_CROSSBOWMAN': 2} (army 2)
+  t121: suzerain 2 -> 5
+  t123: -{'UNIT_MAN_AT_ARMS': 2} (army 0)
+  t131: +{'UNIT_MAN_AT_ARMS': 1} (gold 76 -> 82)
+  t131: suzerain 5 -> -1
+  t137: war [] -> [2]
+  t137: suzerain -1 -> 3
+  t141: +{'UNIT_PIKE_AND_SHOT': 1} (gold 131 -> 135)
+  t141: war [2] -> []
+  t141: suzerain 3 -> -1
+  t151: war [] -> [2]
+  t151: suzerain -1 -> 3
+  t154: war [2] -> []
+  t154: suzerain 3 -> -1
+  t155: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 141 -> 132 (drop 9), army before 2, building BUILDING_WORKSHOP
+  t155: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t158: war [] -> [2]
+  t158: suzerain -1 -> 3
+  t160: war [2] -> []
+  t160: suzerain 3 -> -1
+  t176: BUY? +{'UNIT_INFANTRY': 1} gold 89 -> 83 (drop 6), army before 2, building DISTRICT_NEIGHBORHOOD
+  t176: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  t187: war [] -> [2]
+  t187: suzerain -1 -> 3
+  t190: BUY? +{'UNIT_AT_CREW': 1} gold 47 -> 40 (drop 7), army before 2, building DISTRICT_NEIGHBORHOOD
+  t190: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t195: BUY? +{'UNIT_MODERN_AT': 1} gold 32 -> 25 (drop 7), army before 2, building DISTRICT_NEIGHBORHOOD
+  t195: -{'UNIT_AT_CREW': 1} (army 2)
+  t197: -{'UNIT_MODERN_AT': 1} (army 1)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > BUILDING_GRANARY (t15) > UNIT_WARRIOR (t20) > UNIT_BUILDER (t23) > UNIT_WARRIOR (t26) > UNIT_ARCHER (t29) > NONE (t33) > BUILDING_WATER_MILL (t53) > NONE (t54) > BUILDING_WALLS (t68) > NONE (t69) > UNIT_TRADER (t73) > UNIT_CATAPULT (t77) > UNIT_BUILDER (t81) > UNIT_CATAPULT (t82) > UNIT_CROSSBOWMAN (t86) > NONE (t92) > UNIT_TRADER (t93) > UNIT_CROSSBOWMAN (t99) > BUILDING_CASTLE (t108) > DISTRICT_INDUSTRIAL_ZONE (t114) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t118) > BUILDING_STAR_FORT (t130) > UNIT_PIKE_AND_SHOT (t136) > UNIT_BUILDER (t141) > BUILDING_WORKSHOP (t143) > UNIT_BUILDER (t158) > PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE (t159) > DISTRICT_NEIGHBORHOOD (t174) > UNIT_BUILDER (t196) > BUILDING_FACTORY (t198)
+  end: gold 21 faith 4311 army {'UNIT_INFANTRY': 1} pop [12]
+== p11 CIVILIZATION_ANTANANARIVO  turns 1-166
+  t38: +{'UNIT_ARCHER': 1} (gold 64 -> 69)
+  t40: -{'UNIT_WARRIOR': 1} (army 2)
+  t49: +{'UNIT_ARCHER': 1} (gold 136 -> 140)
+  t54: war [] -> [4]
+  t55: -{'UNIT_ARCHER': 1} (army 2)
+  t61: +{'UNIT_HEAVY_CHARIOT': 1} (gold 185 -> 189)
+  t61: -{'UNIT_WARRIOR': 1} (army 2)
+  t70: +{'UNIT_CATAPULT': 1} (gold 220 -> 224)
+  t70: -{'UNIT_HEAVY_CHARIOT': 1} (army 2)
+  t77: BUY? +{'UNIT_CATAPULT': 1} gold 239 -> 2 (drop 237), army before 2, building UNIT_ARCHER
+  t83: -{'UNIT_CATAPULT': 1} (army 2)
+  t84: -{'UNIT_ARCHER': 1} (army 1)
+  t86: +{'UNIT_CROSSBOWMAN': 1} (gold 16 -> 14)
+  t87: +{'UNIT_TREBUCHET': 1} (gold 14 -> 10)
+  t87: -{'UNIT_CATAPULT': 1} (army 2)
+  t88: -{'UNIT_TREBUCHET': 1} (army 1)
+  t101: +{'UNIT_PIKEMAN': 1} (gold 41 -> 44)
+  t108: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t125: -{'UNIT_PIKEMAN': 1} (army 0)
+  t151: suzerain -1 -> 0
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > NONE (t18) > BUILDING_GRANARY (t19) > UNIT_ARCHER (t32) > UNIT_BUILDER (t38) > UNIT_ARCHER (t45) > DISTRICT_THEATER (t49) > UNIT_TRADER (t54) > UNIT_HEAVY_CHARIOT (t56) > UNIT_CATAPULT (t61) > BUILDING_WALLS (t70) > UNIT_ARCHER (t74) > DISTRICT_THEATER (t86) > UNIT_PIKEMAN (t88) > DISTRICT_THEATER (t101) > UNIT_TRADER (t103) > UNIT_BUILDER (t120) > BUILDING_CASTLE (t125) > BUILDING_STAR_FORT (t140) > DISTRICT_THEATER (t156) > BUILDING_AMPHITHEATER (t157) > UNIT_BUILDER (t160) > BUILDING_WATER_MILL (t163) > UNIT_PIKE_AND_SHOT (t164)
+  end: gold 182 faith 0 army {} pop [11]
+== p12 CIVILIZATION_TARUGA  turns 1-201
+  t19: +{'UNIT_WARRIOR': 1} (gold 85 -> 90)
+  t22: +{'UNIT_WARRIOR': 1} (gold 100 -> 105)
+  t24: suzerain -1 -> 4
+  t42: BUY? +{'UNIT_GALLEY': 1} gold 133 -> 18 (drop 115), army before 4, building BUILDING_LIGHTHOUSE
+  t62: +{'UNIT_SWORDSMAN': 2} (gold 178 -> 177)
+  t62: -{'UNIT_WARRIOR': 2} (army 5)
+  t63: +{'UNIT_SWORDSMAN': 1} (gold 177 -> 179)
+  t63: -{'UNIT_WARRIOR': 1} (army 5)
+  t64: +{'UNIT_SWORDSMAN': 1} (gold 179 -> 178)
+  t64: -{'UNIT_WARRIOR': 1} (army 5)
+  t67: BUY? +{'UNIT_MAN_AT_ARMS': 3} gold 183 -> 171 (drop 12), army before 5, building UNIT_TRADER
+  t67: -{'UNIT_SWORDSMAN': 3} (army 5)
+  t69: +{'UNIT_MAN_AT_ARMS': 1} (gold 171 -> 165)
+  t69: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t102: +{'UNIT_CARAVEL': 1} (gold 254 -> 257)
+  t102: -{'UNIT_GALLEY': 1} (army 5)
+  t119: -{'UNIT_CARAVEL': 1} (army 4)
+  t123: +{'UNIT_MUSKETMAN': 1} (gold 332 -> 335)
+  t123: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t124: +{'UNIT_MUSKETMAN': 2} (gold 335 -> 331)
+  t124: -{'UNIT_MAN_AT_ARMS': 2} (army 4)
+  t125: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t127: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t140: +{'UNIT_LINE_INFANTRY': 1} (gold 431 -> 434)
+  t140: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t146: +{'UNIT_LINE_INFANTRY': 1} (gold 451 -> 452)
+  t146: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t170: suzerain 4 -> 0
+  t176: +{'UNIT_INFANTRY': 2} (gold 545 -> 542)
+  t176: -{'UNIT_LINE_INFANTRY': 2} (army 2)
+  t182: suzerain 0 -> -1
+  t191: war [] -> [4]
+  t191: suzerain -1 -> 0
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t17) > UNIT_BUILDER (t22) > BUILDING_GRANARY (t25) > DISTRICT_HARBOR (t34) > NONE (t35) > BUILDING_LIGHTHOUSE (t36) > DISTRICT_CAMPUS (t46) > BUILDING_WALLS (t49) > UNIT_BUILDER (t53) > BUILDING_WATER_MILL (t56) > NONE (t61) > UNIT_TRADER (t62) > UNIT_BUILDER (t69) > BUILDING_LIBRARY (t71) > PROJECT_ENHANCE_DISTRICT_HARBOR (t86) > BUILDING_CASTLE (t112) > BUILDING_STAR_FORT (t128) > UNIT_TRADER (t151) > PROJECT_ENHANCE_DISTRICT_HARBOR (t174)
+  end: gold 683 faith 3223 army {'UNIT_INFANTRY': 2} pop [15]
+== p13 CIVILIZATION_GENEVA  turns 1-201
+  t12: -{'UNIT_WARRIOR': 1} (army 1)
+  t32: BUY? +{'UNIT_ARCHER': 1} gold 149 -> 35 (drop 115), army before 1, building UNIT_ARCHER
+  t32: -{'UNIT_WARRIOR': 1} (army 1)
+  t34: +{'UNIT_ARCHER': 1} (gold 39 -> 44)
+  t38: +{'UNIT_ARCHER': 1} (gold 56 -> 60)
+  t41: +{'UNIT_HEAVY_CHARIOT': 1} (gold 65 -> 68)
+  t47: +{'UNIT_HEAVY_CHARIOT': 1} (gold 78 -> 79)
+  t57: suzerain -1 -> 5
+  t76: BUY? +{'UNIT_CROSSBOWMAN': 2} gold 116 -> 110 (drop 6), army before 5, building BUILDING_LIGHTHOUSE
+  t76: -{'UNIT_ARCHER': 2} (army 5)
+  t78: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 110 -> 105 (drop 5), army before 5, building BUILDING_LIGHTHOUSE
+  t78: -{'UNIT_ARCHER': 1} (army 5)
+  t98: +{'UNIT_KNIGHT': 1} (gold 171 -> 173)
+  t98: -{'UNIT_HEAVY_CHARIOT': 1} (army 5)
+  t101: +{'UNIT_KNIGHT': 1} (gold 180 -> 179)
+  t101: -{'UNIT_HEAVY_CHARIOT': 1} (army 5)
+  t127: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t133: -{'UNIT_KNIGHT': 1} (army 3)
+  t141: +{'UNIT_FIELD_CANNON': 1} (gold 124 -> 119)
+  t141: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t143: BUY? +{'UNIT_CUIRASSIER': 1} gold 117 -> 111 (drop 7), army before 3, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t143: -{'UNIT_KNIGHT': 1} (army 3)
+  t144: BUY? +{'UNIT_FIELD_CANNON': 1} gold 111 -> 102 (drop 9), army before 3, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t144: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t156: -{'UNIT_FIELD_CANNON': 1, 'UNIT_CUIRASSIER': 1} (army 1)
+  t157: -{'UNIT_FIELD_CANNON': 1} (army 0)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_GRANARY (t8) > BUILDING_MONUMENT (t20) > UNIT_ARCHER (t31) > UNIT_HEAVY_CHARIOT (t38) > UNIT_BUILDER (t41) > UNIT_HEAVY_CHARIOT (t44) > BUILDING_WATER_MILL (t47) > DISTRICT_CAMPUS (t56) > BUILDING_LIBRARY (t58) > DISTRICT_HARBOR (t67) > UNIT_BUILDER (t70) > BUILDING_WALLS (t72) > BUILDING_LIGHTHOUSE (t74) > NONE (t80) > UNIT_TRADER (t81) > UNIT_BUILDER (t83) > PROJECT_ENHANCE_DISTRICT_HARBOR (t85) > BUILDING_CASTLE (t100) > BUILDING_UNIVERSITY (t104) > PROJECT_ENHANCE_DISTRICT_HARBOR (t121) > BUILDING_STAR_FORT (t146) > UNIT_TRADER (t153) > BUILDING_SHIPYARD (t160) > PROJECT_ENHANCE_DISTRICT_HARBOR (t177) > BUILDING_SEWER (t193)
+  end: gold 471 faith 11821 army {} pop [16]
+== p14 CIVILIZATION_ANTIOCH  turns 1-201
+  t31: +{'UNIT_ARCHER': 1} (gold 229 -> 237)
+  t34: +{'UNIT_ARCHER': 1} (gold 251 -> 258)
+  t34: suzerain -1 -> 5
+  t35: -{'UNIT_WARRIOR': 1} (army 3)
+  t36: -{'UNIT_WARRIOR': 1} (army 2)
+  t39: BUY? +{'UNIT_HEAVY_CHARIOT': 1} gold 284 -> 176 (drop 108), army before 2, building UNIT_TRADER
+  t47: suzerain 5 -> -1
+  t50: -{'UNIT_HEAVY_CHARIOT': 1, 'UNIT_ARCHER': 1} (army 1)
+  t50: suzerain -1 -> 2
+  t52: BUY? +{'UNIT_ARCHER': 1} gold 133 -> 21 (drop 112), army before 1, building BUILDING_WATER_MILL
+  t59: +{'UNIT_CATAPULT': 1} (gold 63 -> 70)
+  t64: +{'UNIT_HEAVY_CHARIOT': 1, 'UNIT_ARCHER': 1} (gold 94 -> 102)
+  t68: war [] -> [3]
+  t73: -{'UNIT_ARCHER': 1} (army 4)
+  t78: war [3] -> []
+  t83: +{'UNIT_CROSSBOWMAN': 1} (gold 154 -> 161)
+  t83: -{'UNIT_ARCHER': 1} (army 4)
+  t93: suzerain 2 -> -1
+  t96: suzerain -1 -> 2
+  t99: suzerain 2 -> 5
+  t103: suzerain 5 -> 2
+  t110: +{'UNIT_TREBUCHET': 1} (gold 549 -> 560)
+  t110: -{'UNIT_CATAPULT': 1} (army 4)
+  t110: suzerain 2 -> -1
+  t112: +{'UNIT_KNIGHT': 1} (gold 574 -> 584)
+  t112: -{'UNIT_HEAVY_CHARIOT': 1} (army 4)
+  t122: suzerain -1 -> 2
+  t127: suzerain 2 -> -1
+  t131: war [] -> [3]
+  t131: suzerain -1 -> 2
+  t139: BUY? +{'UNIT_KNIGHT': 1} gold 703 -> 266 (drop 437), army before 4, building UNIT_TRADER
+  t139: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t140: war [3] -> []
+  t140: suzerain 2 -> -1
+  t141: +{'UNIT_BOMBARD': 1} (gold 265 -> 264)
+  t141: -{'UNIT_TREBUCHET': 1} (army 4)
+  t146: +{'UNIT_CUIRASSIER': 1} (gold 284 -> 284)
+  t146: -{'UNIT_KNIGHT': 1} (army 4)
+  t147: -{'UNIT_KNIGHT': 1} (army 3)
+  t153: war [] -> [3]
+  t153: suzerain -1 -> 2
+  t159: war [3] -> []
+  t159: suzerain 2 -> -1
+  t164: BUY? +{'UNIT_FIELD_CANNON': 1} gold 358 -> 353 (drop 5), army before 3, building BUILDING_BANK
+  t164: -{'UNIT_ARCHER': 1} (army 3)
+  t166: BUY? +{'UNIT_ARTILLERY': 1, 'UNIT_TANK': 1} gold 355 -> 346 (drop 9), army before 3, building UNIT_TRADER
+  t166: -{'UNIT_BOMBARD': 1, 'UNIT_CUIRASSIER': 1} (army 3)
+  t181: suzerain -1 -> 5
+  t182: -{'UNIT_ARTILLERY': 1, 'UNIT_FIELD_CANNON': 1, 'UNIT_TANK': 1} (army 0)
+  t183: +{'UNIT_TANK': 1, 'UNIT_ARTILLERY': 1, 'UNIT_FIELD_CANNON': 1} (gold 299 -> 307)
+  t183: war [] -> [2]
+  t183: suzerain 5 -> 3
+  t197: +{'UNIT_MODERN_ARMOR': 1} (gold 349 -> 346)
+  t197: -{'UNIT_TANK': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_BUILDER (t18) > BUILDING_GRANARY (t20) > UNIT_ARCHER (t29) > UNIT_TRADER (t34) > UNIT_HEAVY_CHARIOT (t36) > UNIT_TRADER (t39) > BUILDING_WATER_MILL (t44) > UNIT_CATAPULT (t54) > DISTRICT_COMMERCIAL_HUB (t59) > BUILDING_MARKET (t62) > BUILDING_WALLS (t74) > NONE (t75) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t78) > NONE (t80) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t83) > BUILDING_CASTLE (t116) > PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB (t121) > BUILDING_MARKET (t132) > UNIT_TRADER (t134) > DISTRICT_COMMERCIAL_HUB (t140) > BUILDING_STAR_FORT (t141) > UNIT_BUILDER (t147) > BUILDING_MARKET (t149) > BUILDING_BANK (t151) > UNIT_TRADER (t166) > DISTRICT_NEIGHBORHOOD (t175)
+  end: gold 344 faith 15516 army {'UNIT_ARTILLERY': 1, 'UNIT_FIELD_CANNON': 1, 'UNIT_MODERN_ARMOR': 1} pop [16]
+== p15 CIVILIZATION_KABUL  turns 1-201
+  t10: -{'UNIT_WARRIOR': 1} (army 1)
+  t11: +{'UNIT_WARRIOR': 1} (gold 82 -> 89)
+  t13: +{'UNIT_WARRIOR': 1} (gold 96 -> 103)
+  t15: +{'UNIT_WARRIOR': 1} (gold 110 -> 117)
+  t17: BUY? +{'UNIT_WARRIOR': 1} gold 124 -> 31 (drop 93), army before 4, building UNIT_WARRIOR
+  t19: +{'UNIT_WARRIOR': 1} (gold 38 -> 45)
+  t41: -{'UNIT_WARRIOR': 1} (army 5)
+  t43: +{'UNIT_ARCHER': 1} (gold 292 -> 303)
+  t47: +{'UNIT_SWORDSMAN': 1} (gold 333 -> 338)
+  t47: -{'UNIT_WARRIOR': 1} (army 6)
+  t48: +{'UNIT_SWORDSMAN': 1} (gold 338 -> 341)
+  t48: -{'UNIT_WARRIOR': 1} (army 6)
+  t49: +{'UNIT_SWORDSMAN': 1} (gold 341 -> 342)
+  t49: -{'UNIT_WARRIOR': 1} (army 6)
+  t50: BUY? +{'UNIT_GALLEY': 1} gold 342 -> 221 (drop 121), army before 6, building NONE
+  t52: +{'UNIT_SWORDSMAN': 1} (gold 224 -> 222)
+  t52: -{'UNIT_WARRIOR': 1} (army 7)
+  t56: suzerain -1 -> 3
+  t61: +{'UNIT_SWORDSMAN': 1} (gold 128 -> 127)
+  t61: -{'UNIT_WARRIOR': 1} (army 7)
+  t68: +{'UNIT_MAN_AT_ARMS': 1} (gold 157 -> 157)
+  t68: -{'UNIT_SWORDSMAN': 2} (army 6)
+  t68: war [] -> [2]
+  t69: +{'UNIT_MAN_AT_ARMS': 1} (gold 157 -> 158)
+  t69: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t70: +{'UNIT_MAN_AT_ARMS': 1} (gold 158 -> 158)
+  t70: -{'UNIT_SWORDSMAN': 1} (army 6)
+  t72: war [2] -> []
+  t72: suzerain 3 -> -1
+  t76: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t84: -{'UNIT_GALLEY': 1} (army 4)
+  t90: BUY? +{'UNIT_CATAPULT': 1} gold 390 -> 165 (drop 225), army before 4, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t98: +{'UNIT_TREBUCHET': 1} (gold 258 -> 266)
+  t98: -{'UNIT_CATAPULT': 1} (army 5)
+  t107: +{'UNIT_CROSSBOWMAN': 1} (gold 375 -> 386)
+  t107: -{'UNIT_ARCHER': 1} (army 5)
+  t112: +{'UNIT_MUSKETMAN': 1} (gold 443 -> 452)
+  t112: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t114: BUY? +{'UNIT_CARAVEL': 1} gold 467 -> 2 (drop 465), army before 5, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t115: +{'UNIT_MUSKETMAN': 1} (gold 2 -> 8)
+  t115: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t125: +{'UNIT_MUSKETMAN': 1} (gold 50 -> 48)
+  t125: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t136: war [] -> [3]
+  t136: suzerain -1 -> 2
+  t140: +{'UNIT_TREBUCHET': 1} (gold 64 -> 63)
+  t140: -{'UNIT_CARAVEL': 1} (army 6)
+  t141: BUY? +{'UNIT_BOMBARD': 1} gold 63 -> 57 (drop 6), army before 6, building BUILDING_STAR_FORT
+  t141: -{'UNIT_TREBUCHET': 1} (army 6)
+  t141: war [3] -> []
+  t141: suzerain 2 -> -1
+  t145: BUY? +{'UNIT_LINE_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} gold 50 -> 38 (drop 12), army before 6, building BUILDING_STAR_FORT
+  t145: -{'UNIT_MUSKETMAN': 1, 'UNIT_CROSSBOWMAN': 1} (army 6)
+  t146: BUY? +{'UNIT_BOMBARD': 1} gold 38 -> 28 (drop 10), army before 6, building UNIT_BUILDER
+  t146: -{'UNIT_TREBUCHET': 1} (army 6)
+  t147: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 28 -> 17 (drop 11), army before 6, building UNIT_BUILDER
+  t147: -{'UNIT_MUSKETMAN': 1} (army 6)
+  t148: -{'UNIT_BOMBARD': 1, 'UNIT_LINE_INFANTRY': 1} (army 4)
+  t150: +{'UNIT_LINE_INFANTRY': 1} (gold 14 -> 14)
+  t150: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t154: war [] -> [3]
+  t154: suzerain -1 -> 2
+  t159: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  t171: war [3] -> []
+  t171: suzerain 2 -> -1
+  t184: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t185: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t187: -{'UNIT_BOMBARD': 1} (army 0)
+  t191: war [] -> [2]
+  t191: suzerain -1 -> 3
+  builds: - (t1) > BUILDING_MONUMENT (t2) > UNIT_WARRIOR (t10) > BUILDING_GRANARY (t19) > NONE (t24) > UNIT_ARCHER (t42) > NONE (t43) > DISTRICT_HARBOR (t60) > BUILDING_LIGHTHOUSE (t61) > BUILDING_WALLS (t70) > UNIT_TRADER (t71) > PROJECT_ENHANCE_DISTRICT_HARBOR (t76) > BUILDING_CASTLE (t99) > PROJECT_ENHANCE_DISTRICT_HARBOR (t104) > UNIT_TREBUCHET (t139) > BUILDING_STAR_FORT (t140) > UNIT_BUILDER (t146) > DISTRICT_ENCAMPMENT (t148) > UNIT_TRADER (t151) > DISTRICT_NEIGHBORHOOD (t157) > UNIT_TRADER (t168) > BUILDING_SHIPYARD (t174) > BUILDING_BARRACKS (t190) > BUILDING_ARMORY (t192)
+  end: gold 537 faith 17587 army {} pop [14]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-201
+  builds: - (t1)
+  end: gold 0 faith 0 army {} pop []
+== p6 CIVILIZATION_CARDIFF  turns 1-177
+  t19: BUY? +{'UNIT_WARRIOR': 1} gold 115 -> 42 (drop 73), army before 2, building UNIT_BUILDER
+  t21: -{'UNIT_WARRIOR': 1} (army 2)
+  t25: +{'UNIT_WARRIOR': 1} (gold 77 -> 84)
+  t27: +{'UNIT_WARRIOR': 1} (gold 91 -> 98)
+  t28: -{'UNIT_WARRIOR': 1} (army 3)
+  t30: +{'UNIT_ARCHER': 1} (gold 137 -> 144)
+  t33: +{'UNIT_ARCHER': 1} (gold 156 -> 162)
+  t51: suzerain -1 -> 4
+  t71: BUY? +{'UNIT_CATAPULT': 1} gold 317 -> 84 (drop 233), army before 5, building NONE
+  t80: +{'UNIT_SWORDSMAN': 1} (gold 121 -> 122)
+  t80: -{'UNIT_WARRIOR': 1} (army 6)
+  t81: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 122 -> 116 (drop 6), army before 6, building NONE
+  t81: -{'UNIT_WARRIOR': 1, 'UNIT_SWORDSMAN': 1} (army 6)
+  t84: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 116 -> 111 (drop 5), army before 6, building NONE
+  t84: -{'UNIT_WARRIOR': 1} (army 6)
+  t98: BUY? +{'UNIT_CROSSBOWMAN': 2} gold 70 -> 57 (drop 13), army before 6, building NONE
+  t98: -{'UNIT_ARCHER': 2} (army 6)
+  t99: BUY? +{'UNIT_TREBUCHET': 1} gold 57 -> 45 (drop 12), army before 6, building NONE
+  t99: -{'UNIT_CATAPULT': 1} (army 6)
+  t101: BUY? +{'UNIT_MUSKETMAN': 2} gold 37 -> 19 (drop 18), army before 6, building NONE
+  t101: -{'UNIT_MAN_AT_ARMS': 2} (army 6)
+  t102: -{'UNIT_CROSSBOWMAN': 2, 'UNIT_MUSKETMAN': 1, 'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t104: +{'UNIT_CROSSBOWMAN': 1} (gold 7 -> 10)
+  t107: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t110: +{'UNIT_CROSSBOWMAN': 1} (gold 20 -> 25)
+  t113: +{'UNIT_CROSSBOWMAN': 1} (gold 30 -> 33)
+  t126: +{'UNIT_BOMBARD': 1} (gold 31 -> 28)
+  t126: -{'UNIT_TREBUCHET': 1} (army 4)
+  t137: +{'UNIT_PIKE_AND_SHOT': 1} (gold 32 -> 34)
+  t141: +{'UNIT_PIKE_AND_SHOT': 1} (gold 26 -> 23)
+  t142: -{'UNIT_BOMBARD': 1, 'UNIT_PIKE_AND_SHOT': 1} (army 4)
+  t145: +{'UNIT_PIKE_AND_SHOT': 1} (gold 19 -> 20)
+  t146: BUY? +{'UNIT_LINE_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} gold 20 -> 7 (drop 13), army before 5, building UNIT_PIKE_AND_SHOT
+  t146: -{'UNIT_CROSSBOWMAN': 1, 'UNIT_MUSKETMAN': 1} (army 5)
+  t147: -{'UNIT_LINE_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} (army 3)
+  t149: +{'UNIT_FIELD_CANNON': 1} (gold 6 -> 5)
+  t149: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t155: -{'UNIT_FIELD_CANNON': 1} (army 2)
+  t159: +{'UNIT_FIELD_CANNON': 1} (gold 20 -> 25)
+  t163: -{'UNIT_PIKE_AND_SHOT': 2, 'UNIT_FIELD_CANNON': 1} (army 0)
+  t165: +{'UNIT_FIELD_CANNON': 1} (gold 33 -> 48)
+  t170: +{'UNIT_FIELD_CANNON': 1} (gold 89 -> 100)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_BUILDER (t19) > UNIT_WARRIOR (t22) > UNIT_ARCHER (t27) > BUILDING_WATER_MILL (t33) > BUILDING_GRANARY (t41) > UNIT_TRADER (t47) > NONE (t51) > BUILDING_WALLS (t72) > NONE (t73) > UNIT_BUILDER (t77) > NONE (t78) > BUILDING_CASTLE (t93) > NONE (t94) > UNIT_CROSSBOWMAN (t103) > NONE (t107) > UNIT_CROSSBOWMAN (t108) > NONE (t113) > BUILDING_STAR_FORT (t123) > NONE (t124) > UNIT_PIKE_AND_SHOT (t136) > NONE (t141) > UNIT_PIKE_AND_SHOT (t143) > UNIT_FIELD_CANNON (t149) > UNIT_BUILDER (t159) > UNIT_FIELD_CANNON (t160) > UNIT_SUPPLY_CONVOY (t175)
+  end: gold 127 faith 0 army {'UNIT_FIELD_CANNON': 2} pop [11]
+== p7 CIVILIZATION_AKKAD  turns 1-180
+  t15: +{'UNIT_WARRIOR': 1} (gold 65 -> 70)
+  t17: +{'UNIT_WARRIOR': 2} (gold 75 -> 105)
+  t24: +{'UNIT_WARRIOR': 1} (gold 34 -> 40)
+  t40: suzerain -1 -> 3
+  t41: +{'UNIT_SWORDSMAN': 1} (gold 131 -> 131)
+  t41: -{'UNIT_WARRIOR': 1} (army 6)
+  t42: +{'UNIT_SWORDSMAN': 1} (gold 131 -> 129)
+  t42: -{'UNIT_WARRIOR': 1} (army 6)
+  t43: +{'UNIT_SWORDSMAN': 1} (gold 129 -> 125)
+  t43: -{'UNIT_WARRIOR': 1} (army 6)
+  t43: suzerain 3 -> -1
+  t45: +{'UNIT_SWORDSMAN': 1} (gold 124 -> 118)
+  t45: -{'UNIT_WARRIOR': 1} (army 6)
+  t48: BUY? +{'UNIT_SWORDSMAN': 2} gold 112 -> 99 (drop 13), army before 6, building NONE
+  t48: -{'UNIT_WARRIOR': 2} (army 6)
+  t67: -{'UNIT_SWORDSMAN': 2} (army 4)
+  t68: suzerain -1 -> 3
+  t74: +{'UNIT_CATAPULT': 1, 'UNIT_MAN_AT_ARMS': 1} (gold 28 -> 34)
+  t74: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t75: +{'UNIT_MAN_AT_ARMS': 2} (gold 34 -> 33)
+  t75: -{'UNIT_SWORDSMAN': 2} (army 5)
+  t76: +{'UNIT_MAN_AT_ARMS': 1} (gold 33 -> 35)
+  t76: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t77: +{'UNIT_MAN_AT_ARMS': 1} (gold 35 -> 41)
+  t80: suzerain 3 -> -1
+  t84: suzerain -1 -> 0
+  t91: +{'UNIT_TREBUCHET': 1} (gold 103 -> 106)
+  t91: -{'UNIT_CATAPULT': 1} (army 6)
+  t108: war [] -> [5]
+  t124: +{'UNIT_MUSKETMAN': 1} (gold 263 -> 262)
+  t124: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t125: +{'UNIT_MUSKETMAN': 2} (gold 262 -> 258)
+  t125: -{'UNIT_MAN_AT_ARMS': 2} (army 6)
+  t128: war [5] -> []
+  t129: +{'UNIT_MUSKETMAN': 1} (gold 271 -> 271)
+  t129: -{'UNIT_MAN_AT_ARMS': 1} (army 6)
+  t130: -{'UNIT_MUSKETMAN': 1} (army 5)
+  t132: BUY? +{'UNIT_LINE_INFANTRY': 2} gold 279 -> 268 (drop 12), army before 5, building BUILDING_STAR_FORT
+  t132: -{'UNIT_MUSKETMAN': 2} (army 5)
+  t135: BUY? +{'UNIT_LINE_INFANTRY': 1, 'UNIT_BOMBARD': 1} gold 271 -> 263 (drop 8), army before 5, building BUILDING_SHIPYARD
+  t135: -{'UNIT_TREBUCHET': 1, 'UNIT_MUSKETMAN': 1} (army 5)
+  t137: -{'UNIT_LINE_INFANTRY': 1} (army 4)
+  t144: +{'UNIT_LINE_INFANTRY': 1} (gold 156 -> 155)
+  t144: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t150: suzerain 0 -> -1
+  t152: suzerain -1 -> 1
+  t153: +{'UNIT_ARTILLERY': 1} (gold 180 -> 178)
+  t153: -{'UNIT_BOMBARD': 1} (army 4)
+  t161: -{'UNIT_LINE_INFANTRY': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > UNIT_WARRIOR (t14) > NONE (t17) > BUILDING_GRANARY (t18) > UNIT_WARRIOR (t23) > NONE (t24) > UNIT_BUILDER (t41) > NONE (t42) > DISTRICT_HARBOR (t58) > BUILDING_LIGHTHOUSE (t59) > BUILDING_WALLS (t65) > BUILDING_WATER_MILL (t66) > UNIT_TRADER (t68) > NONE (t72) > UNIT_CATAPULT (t73) > NONE (t74) > UNIT_MAN_AT_ARMS (t75) > PROJECT_ENHANCE_DISTRICT_HARBOR (t77) > BUILDING_CASTLE (t96) > PROJECT_ENHANCE_DISTRICT_HARBOR (t99) > UNIT_TRADER (t110) > PROJECT_ENHANCE_DISTRICT_HARBOR (t114) > BUILDING_STAR_FORT (t130) > BUILDING_SHIPYARD (t135) > PROJECT_ENHANCE_DISTRICT_HARBOR (t148) > UNIT_BUILDER (t179) > PROJECT_ENHANCE_DISTRICT_HARBOR (t180)
+  end: gold 268 faith 22310 army {'UNIT_LINE_INFANTRY': 2, 'UNIT_ARTILLERY': 1} pop [12]
+== p8 CIVILIZATION_GENEVA  turns 1-180
+  t30: suzerain -1 -> 3
+  t41: BUY? +{'UNIT_ARCHER': 1} gold 175 -> 58 (drop 116), army before 2, building UNIT_HEAVY_CHARIOT
+  t46: +{'UNIT_HEAVY_CHARIOT': 1} (gold 68 -> 71)
+  t62: -{'UNIT_HEAVY_CHARIOT': 1, 'UNIT_WARRIOR': 2, 'UNIT_ARCHER': 1} (army 0)
+  t68: +{'UNIT_CATAPULT': 1} (gold 18 -> 24)
+  t76: +{'UNIT_ARCHER': 1, 'UNIT_WARRIOR': 1, 'UNIT_HEAVY_CHARIOT': 1, 'UNIT_SWORDSMAN': 1} (gold 50 -> 53)
+  t82: BUY? +{'UNIT_SWORDSMAN': 1} gold 50 -> 45 (drop 6), army before 5, building BUILDING_LIBRARY
+  t82: -{'UNIT_WARRIOR': 1} (army 5)
+  t83: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 45 -> 38 (drop 7), army before 5, building BUILDING_LIBRARY
+  t83: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t84: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 38 -> 27 (drop 10), army before 5, building BUILDING_LIBRARY
+  t84: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t89: -{'UNIT_MAN_AT_ARMS': 1, 'UNIT_CATAPULT': 1, 'UNIT_HEAVY_CHARIOT': 1} (army 2)
+  t90: -{'UNIT_ARCHER': 1, 'UNIT_MAN_AT_ARMS': 1} (army 0)
+  t104: +{'UNIT_MAN_AT_ARMS': 1, 'UNIT_CROSSBOWMAN': 1} (gold 83 -> 82)
+  t104: suzerain 3 -> -1
+  t119: BUY? +{'UNIT_MUSKETMAN': 1} gold 68 -> 62 (drop 6), army before 2, building BUILDING_UNIVERSITY
+  t119: -{'UNIT_MAN_AT_ARMS': 1} (army 2)
+  t124: BUY? +{'UNIT_FIELD_CANNON': 1} gold 55 -> 49 (drop 6), army before 2, building BUILDING_UNIVERSITY
+  t124: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t126: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 45 -> 36 (drop 9), army before 2, building BUILDING_UNIVERSITY
+  t126: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t130: -{'UNIT_FIELD_CANNON': 1, 'UNIT_LINE_INFANTRY': 1} (army 0)
+  t132: suzerain -1 -> 3
+  t147: +{'UNIT_FIELD_CANNON': 1} (gold 91 -> 98)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > DISTRICT_CAMPUS (t23) > UNIT_BUILDER (t28) > BUILDING_GRANARY (t34) > UNIT_HEAVY_CHARIOT (t41) > BUILDING_GRANARY (t46) > UNIT_TRADER (t52) > UNIT_BUILDER (t60) > UNIT_CATAPULT (t62) > BUILDING_WALLS (t68) > BUILDING_WATER_MILL (t70) > NONE (t72) > BUILDING_LIBRARY (t73) > UNIT_BUILDER (t86) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t87) > BUILDING_CASTLE (t98) > UNIT_BUILDER (t105) > BUILDING_UNIVERSITY (t107) > PROJECT_REPAIR_OUTER_DEFENSES (t127) > UNIT_BUILDER (t129) > BUILDING_STAR_FORT (t130) > UNIT_BUILDER (t138) > UNIT_FIELD_CANNON (t140) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t147) > UNIT_BUILDER (t177) > BUILDING_SEWER (t180)
+  end: gold 138 faith 3675 army {'UNIT_FIELD_CANNON': 1} pop [13]
+== p9 CIVILIZATION_JERUSALEM  turns 1-180
+  t7: +{'UNIT_WARRIOR': 1} (gold 25 -> 30)
+  t30: BUY? +{'UNIT_SPEARMAN': 1} gold 132 -> 11 (drop 121), army before 3, building BUILDING_GRANARY
+  t42: +{'UNIT_SWORDSMAN': 1} (gold 43 -> 41)
+  t42: -{'UNIT_WARRIOR': 1} (army 4)
+  t43: +{'UNIT_SWORDSMAN': 1} (gold 41 -> 37)
+  t43: -{'UNIT_WARRIOR': 1} (army 4)
+  t46: BUY? +{'UNIT_SWORDSMAN': 1} gold 35 -> 29 (drop 6), army before 4, building UNIT_TRADER
+  t46: -{'UNIT_WARRIOR': 1} (army 4)
+  t64: -{'UNIT_SPEARMAN': 1} (army 3)
+  t70: suzerain -1 -> 2
+  t81: +{'UNIT_MAN_AT_ARMS': 1} (gold 86 -> 87)
+  t81: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t82: +{'UNIT_MAN_AT_ARMS': 1} (gold 87 -> 87)
+  t82: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t84: +{'UNIT_MAN_AT_ARMS': 1} (gold 91 -> 90)
+  t84: -{'UNIT_SWORDSMAN': 1} (army 3)
+  t98: suzerain 2 -> -1
+  t102: BUY? +{'UNIT_MUSKETMAN': 2} gold 83 -> 70 (drop 13), army before 3, building BUILDING_TEMPLE
+  t102: -{'UNIT_MAN_AT_ARMS': 2} (army 3)
+  t105: suzerain -1 -> 3
+  t108: war [] -> [2]
+  t113: -{'UNIT_MUSKETMAN': 2} (army 1)
+  t114: -{'UNIT_MAN_AT_ARMS': 1} (army 0)
+  t116: war [2] -> []
+  t123: +{'UNIT_MAN_AT_ARMS': 1} (gold 63 -> 65)
+  t123: suzerain 3 -> -1
+  t125: -{'UNIT_MAN_AT_ARMS': 1} (army 0)
+  t125: suzerain -1 -> 3
+  t126: +{'UNIT_MAN_AT_ARMS': 1} (gold 72 -> 74)
+  t126: suzerain 3 -> -1
+  t127: +{'UNIT_MUSKETMAN': 1} (gold 74 -> 71)
+  t127: -{'UNIT_MAN_AT_ARMS': 1} (army 1)
+  t128: suzerain -1 -> 3
+  t136: suzerain 3 -> -1
+  t137: +{'UNIT_LINE_INFANTRY': 1} (gold 80 -> 76)
+  t137: -{'UNIT_MUSKETMAN': 1} (army 1)
+  t158: +{'UNIT_FIELD_CANNON': 1} (gold 176 -> 183)
+  t171: BUY? +{'UNIT_INFANTRY': 1} gold 52 -> 41 (drop 11), army before 2, building DISTRICT_NEIGHBORHOOD
+  t171: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_WARRIOR (t4) > UNIT_BUILDER (t7) > BUILDING_MONUMENT (t11) > DISTRICT_HOLY_SITE (t18) > BUILDING_GRANARY (t21) > UNIT_TRADER (t41) > UNIT_BUILDER (t58) > BUILDING_WATER_MILL (t63) > BUILDING_WALLS (t73) > UNIT_BUILDER (t76) > BUILDING_SHRINE (t80) > UNIT_BUILDER (t90) > BUILDING_TEMPLE (t93) > PROJECT_REPAIR_OUTER_DEFENSES (t110) > UNIT_BUILDER (t111) > BUILDING_CASTLE (t113) > BUILDING_WAT (t121) > UNIT_TRADER (t131) > BUILDING_STAR_FORT (t141) > UNIT_BUILDER (t146) > UNIT_FIELD_CANNON (t149) > DISTRICT_NEIGHBORHOOD (t158)
+  end: gold 28 faith 1130 army {'UNIT_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} pop [13]
+== p10 CIVILIZATION_BUENOS_AIRES  turns 1-180
+  t16: +{'UNIT_WARRIOR': 1} (gold 109 -> 117)
+  t18: +{'UNIT_WARRIOR': 1} (gold 125 -> 133)
+  t20: +{'UNIT_WARRIOR': 1} (gold 141 -> 149)
+  t21: -{'UNIT_WARRIOR': 1} (army 4)
+  t29: +{'UNIT_WARRIOR': 1} (gold 213 -> 221)
+  t42: +{'UNIT_ARCHER': 1} (gold 253 -> 264)
+  t45: -{'UNIT_WARRIOR': 1} (army 5)
+  t69: +{'UNIT_SWORDSMAN': 1} (gold 573 -> 582)
+  t69: -{'UNIT_WARRIOR': 1} (army 5)
+  t70: +{'UNIT_SWORDSMAN': 1} (gold 582 -> 590)
+  t70: -{'UNIT_WARRIOR': 1} (army 5)
+  t71: +{'UNIT_SWORDSMAN': 1} (gold 590 -> 596)
+  t71: -{'UNIT_WARRIOR': 1} (army 5)
+  t73: +{'UNIT_SWORDSMAN': 1} (gold 605 -> 610)
+  t73: -{'UNIT_WARRIOR': 1} (army 5)
+  t96: +{'UNIT_MAN_AT_ARMS': 1} (gold 764 -> 765)
+  t96: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t97: +{'UNIT_MAN_AT_ARMS': 2} (gold 765 -> 760)
+  t97: -{'UNIT_SWORDSMAN': 2} (army 5)
+  t98: +{'UNIT_MAN_AT_ARMS': 1} (gold 760 -> 758)
+  t98: -{'UNIT_SWORDSMAN': 1} (army 5)
+  t100: +{'UNIT_CROSSBOWMAN': 1} (gold 760 -> 757)
+  t100: -{'UNIT_ARCHER': 1} (army 5)
+  t101: +{'UNIT_MUSKETMAN': 1} (gold 757 -> 752)
+  t101: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t103: +{'UNIT_MUSKETMAN': 1} (gold 751 -> 745)
+  t103: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t104: BUY? +{'UNIT_MUSKETMAN': 1} gold 745 -> 739 (drop 7), army before 5, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t104: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t106: BUY? +{'UNIT_MUSKETMAN': 1} gold 736 -> 728 (drop 8), army before 5, building BUILDING_CASTLE
+  t106: -{'UNIT_MAN_AT_ARMS': 1} (army 5)
+  t116: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 703 -> 343 (drop 360), army before 5, building PROJECT_ENHANCE_DISTRICT_HARBOR
+  t129: suzerain -1 -> 5
+  t133: -{'UNIT_MUSKETMAN': 1} (army 5)
+  t133: war [] -> [2]
+  t135: war [2] -> []
+  t135: suzerain 5 -> 4
+  t143: war [] -> [5]
+  t144: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t145: +{'UNIT_LINE_INFANTRY': 1} (gold 184 -> 182)
+  t145: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t146: -{'UNIT_MUSKETMAN': 2} (army 2)
+  t147: +{'UNIT_FIELD_CANNON': 1} (gold 194 -> 200)
+  t147: -{'UNIT_CROSSBOWMAN': 1} (army 2)
+  t154: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t159: war [5] -> []
+  t164: +{'UNIT_FIELD_CANNON': 1} (gold 304 -> 320)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > UNIT_WARRIOR (t15) > BUILDING_GRANARY (t20) > UNIT_WARRIOR (t28) > NONE (t29) > DISTRICT_HARBOR (t35) > PROJECT_ENHANCE_DISTRICT_HARBOR (t36) > UNIT_ARCHER (t40) > PROJECT_ENHANCE_DISTRICT_HARBOR (t42) > BUILDING_LIGHTHOUSE (t52) > BUILDING_WALLS (t64) > BUILDING_WATER_MILL (t65) > PROJECT_ENHANCE_DISTRICT_HARBOR (t69) > BUILDING_CASTLE (t106) > PROJECT_ENHANCE_DISTRICT_HARBOR (t113) > BUILDING_STAR_FORT (t129) > DISTRICT_INDUSTRIAL_ZONE (t137) > BUILDING_SHIPYARD (t140) > DISTRICT_NEIGHBORHOOD (t153) > UNIT_FIELD_CANNON (t156) > DISTRICT_NEIGHBORHOOD (t164) > UNIT_TRADER (t174)
+  end: gold 363 faith 14913 army {'UNIT_FIELD_CANNON': 2} pop [13]
+== p11 CIVILIZATION_PALENQUE  turns 1-180
+  t26: +{'UNIT_WARRIOR': 1} (gold 143 -> 149)
+  t32: -{'UNIT_WARRIOR': 1} (army 2)
+  t34: +{'UNIT_ARCHER': 1} (gold 90 -> 97)
+  t38: +{'UNIT_ARCHER': 1} (gold 116 -> 148)
+  t71: +{'UNIT_SWORDSMAN': 1} (gold 380 -> 382)
+  t71: -{'UNIT_WARRIOR': 1} (army 4)
+  t72: +{'UNIT_SWORDSMAN': 1} (gold 382 -> 382)
+  t72: -{'UNIT_WARRIOR': 1} (army 4)
+  t78: +{'UNIT_CROSSBOWMAN': 1} (gold 396 -> 394)
+  t78: -{'UNIT_ARCHER': 1} (army 4)
+  t81: +{'UNIT_CROSSBOWMAN': 1} (gold 396 -> 392)
+  t81: -{'UNIT_ARCHER': 1} (army 4)
+  t84: BUY? +{'UNIT_MAN_AT_ARMS': 2} gold 390 -> 378 (drop 11), army before 4, building BUILDING_WALLS
+  t84: -{'UNIT_SWORDSMAN': 2} (army 4)
+  t95: suzerain -1 -> 4
+  t115: BUY? +{'UNIT_MUSKETMAN': 1} gold 174 -> 168 (drop 6), army before 4, building UNIT_BUILDER
+  t115: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t116: BUY? +{'UNIT_MUSKETMAN': 1} gold 168 -> 162 (drop 6), army before 4, building UNIT_BUILDER
+  t116: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t124: BUY? +{'UNIT_FIELD_CANNON': 1} gold 141 -> 132 (drop 9), army before 4, building BUILDING_STAR_FORT
+  t124: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t126: BUY? +{'UNIT_FIELD_CANNON': 1} gold 128 -> 119 (drop 9), army before 4, building BUILDING_STAR_FORT
+  t126: -{'UNIT_CROSSBOWMAN': 1} (army 4)
+  t127: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 119 -> 112 (drop 7), army before 4, building BUILDING_STAR_FORT
+  t127: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t128: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 112 -> 104 (drop 8), army before 4, building BUILDING_STAR_FORT
+  t128: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t152: -{'UNIT_LINE_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} (army 2)
+  t155: suzerain 4 -> -1
+  t170: +{'UNIT_INFANTRY': 1} (gold 139 -> 141)
+  t170: -{'UNIT_LINE_INFANTRY': 1} (army 2)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > NONE (t16) > BUILDING_GRANARY (t17) > UNIT_WARRIOR (t23) > DISTRICT_CAMPUS (t26) > UNIT_ARCHER (t29) > DISTRICT_HARBOR (t38) > BUILDING_LIBRARY (t42) > PROJECT_ENHANCE_DISTRICT_HARBOR (t60) > BUILDING_WALLS (t84) > BUILDING_LIGHTHOUSE (t89) > NONE (t106) > BUILDING_CASTLE (t107) > UNIT_TRADER (t108) > UNIT_BUILDER (t114) > BUILDING_STAR_FORT (t117) > PROJECT_ENHANCE_DISTRICT_HARBOR (t134) > NONE (t174) > UNIT_TRADER (t175)
+  end: gold 67 faith 3000 army {'UNIT_INFANTRY': 1, 'UNIT_FIELD_CANNON': 1} pop [14]
+== p12 CIVILIZATION_BOLOGNA  turns 1-180
+  t18: -{'UNIT_WARRIOR': 1} (army 1)
+  t22: -{'UNIT_WARRIOR': 1} (army 0)
+  t29: +{'UNIT_ARCHER': 1} (gold 24 -> 29)
+  t32: +{'UNIT_ARCHER': 1} (gold 38 -> 41)
+  t32: suzerain -1 -> 1
+  t33: -{'UNIT_ARCHER': 1} (army 1)
+  t34: -{'UNIT_ARCHER': 1} (army 0)
+  t35: +{'UNIT_HEAVY_CHARIOT': 1} (gold 48 -> 53)
+  t39: -{'UNIT_HEAVY_CHARIOT': 1} (army 0)
+  t42: +{'UNIT_ARCHER': 1} (gold 104 -> 112)
+  t45: BUY? +{'UNIT_ARCHER': 1} gold 126 -> 13 (drop 113), army before 1, building BUILDING_WATER_MILL
+  t48: +{'UNIT_ARCHER': 1} (gold 24 -> 30)
+  t49: -{'UNIT_ARCHER': 3} (army 0)
+  t63: +{'UNIT_CATAPULT': 1, 'UNIT_ARCHER': 2} (gold 112 -> 117)
+  t67: BUY? +{'UNIT_GALLEY': 1} gold 123 -> 1 (drop 121), army before 3, building BUILDING_LIGHTHOUSE
+  t72: +{'UNIT_CROSSBOWMAN': 1} (gold 12 -> 9)
+  t72: -{'UNIT_ARCHER': 1} (army 4)
+  t75: +{'UNIT_CROSSBOWMAN': 1} (gold 10 -> 6)
+  t75: -{'UNIT_ARCHER': 1} (army 4)
+  t77: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t90: +{'UNIT_TREBUCHET': 1} (gold 56 -> 61)
+  t90: -{'UNIT_CATAPULT': 1} (army 3)
+  t97: +{'UNIT_CROSSBOWMAN': 1} (gold 93 -> 101)
+  t115: suzerain 1 -> 4
+  t117: suzerain 4 -> 1
+  t119: +{'UNIT_BOMBARD': 1} (gold 61 -> 61)
+  t119: -{'UNIT_TREBUCHET': 1} (army 4)
+  t128: +{'UNIT_CARAVEL': 1} (gold 108 -> 109)
+  t128: -{'UNIT_GALLEY': 1} (army 4)
+  t151: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t153: +{'UNIT_FIELD_CANNON': 1} (gold 156 -> 154)
+  t153: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t175: +{'UNIT_IRONCLAD': 1} (gold 145 -> 145)
+  t175: -{'UNIT_CARAVEL': 1} (army 3)
+  t176: BUY? +{'UNIT_ARTILLERY': 1} gold 145 -> 135 (drop 10), army before 3, building BUILDING_SHIPYARD
+  t176: -{'UNIT_BOMBARD': 1} (army 3)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t7) > DISTRICT_CAMPUS (t15) > BUILDING_GRANARY (t16) > UNIT_TRADER (t25) > UNIT_ARCHER (t26) > UNIT_HEAVY_CHARIOT (t32) > UNIT_TRADER (t35) > UNIT_ARCHER (t40) > BUILDING_WATER_MILL (t42) > DISTRICT_CAMPUS (t49) > BUILDING_LIBRARY (t50) > UNIT_BUILDER (t59) > UNIT_CATAPULT (t61) > NONE (t63) > DISTRICT_HARBOR (t64) > BUILDING_LIGHTHOUSE (t66) > UNIT_TRADER (t79) > BUILDING_WALLS (t87) > UNIT_CROSSBOWMAN (t89) > BUILDING_CASTLE (t97) > NONE (t107) > BUILDING_UNIVERSITY (t110) > BUILDING_STAR_FORT (t119) > BUILDING_UNIVERSITY (t126) > NONE (t145) > PROJECT_ENHANCE_DISTRICT_HARBOR (t147) > NONE (t148) > PROJECT_ENHANCE_DISTRICT_HARBOR (t151) > NONE (t152) > BUILDING_SHIPYARD (t154) > UNIT_FIELD_CANNON (t177)
+  end: gold 144 faith 57 army {'UNIT_FIELD_CANNON': 1, 'UNIT_ARTILLERY': 1, 'UNIT_IRONCLAD': 1} pop [13]
+== p13 CIVILIZATION_RAPA_NUI  turns 1-180
+  t18: -{'UNIT_WARRIOR': 1} (army 1)
+  t21: +{'UNIT_WARRIOR': 1} (gold 22 -> 28)
+  t22: -{'UNIT_WARRIOR': 1} (army 1)
+  t25: +{'UNIT_WARRIOR': 1} (gold 46 -> 52)
+  t26: -{'UNIT_WARRIOR': 1} (army 1)
+  t29: +{'UNIT_WARRIOR': 1} (gold 70 -> 76)
+  t31: suzerain -1 -> 2
+  t32: -{'UNIT_WARRIOR': 1} (army 1)
+  t46: BUY? +{'UNIT_GALLEY': 1} gold 127 -> 35 (drop 92), army before 1, building UNIT_TRADER
+  t47: -{'UNIT_WARRIOR': 1} (army 1)
+  t55: BUY? +{'UNIT_GALLEY': 1} gold 116 -> 6 (drop 110), army before 1, building BUILDING_GRANARY
+  t61: -{'UNIT_GALLEY': 2} (army 0)
+  t75: +{'UNIT_GALLEY': 2} (gold 112 -> 134)
+  t77: +{'UNIT_CATAPULT': 1} (gold 154 -> 172)
+  t88: war [] -> [3]
+  t90: +{'UNIT_TREBUCHET': 1} (gold 353 -> 363)
+  t90: -{'UNIT_CATAPULT': 1} (army 3)
+  t94: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 405 -> 59 (drop 346), army before 3, building BUILDING_CASTLE
+  t99: -{'UNIT_GALLEY': 1} (army 3)
+  t116: war [3] -> []
+  t127: BUY? +{'UNIT_TREBUCHET': 1} gold 392 -> 0 (drop 392), army before 3, building UNIT_PIKEMAN
+  t130: +{'UNIT_BOMBARD': 1} (gold 10 -> 11)
+  t130: -{'UNIT_TREBUCHET': 1} (army 4)
+  t131: +{'UNIT_BOMBARD': 1} (gold 11 -> 15)
+  t131: -{'UNIT_TREBUCHET': 1} (army 4)
+  t133: war [] -> [5]
+  t134: +{'UNIT_CARAVEL': 1} (gold 30 -> 32)
+  t134: -{'UNIT_GALLEY': 1} (army 4)
+  t139: +{'UNIT_PIKE_AND_SHOT': 1} (gold 51 -> 50)
+  t144: -{'UNIT_PIKE_AND_SHOT': 1} (army 4)
+  t146: -{'UNIT_BOMBARD': 1} (army 3)
+  t147: -{'UNIT_BOMBARD': 1} (army 2)
+  t149: -{'UNIT_CROSSBOWMAN': 1} (army 1)
+  t172: +{'UNIT_IRONCLAD': 1} (gold 145 -> 160)
+  t172: -{'UNIT_CARAVEL': 1} (army 1)
+  builds: - (t1) > UNIT_SLINGER (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t8) > UNIT_WARRIOR (t17) > BUILDING_MONUMENT (t29) > UNIT_TRADER (t35) > DISTRICT_HARBOR (t49) > BUILDING_GRANARY (t53) > BUILDING_LIGHTHOUSE (t64) > BUILDING_WALLS (t67) > UNIT_CATAPULT (t70) > BUILDING_LIGHTHOUSE (t77) > BUILDING_CASTLE (t93) > NONE (t99) > BUILDING_LIGHTHOUSE (t100) > DISTRICT_THEATER (t104) > UNIT_TRADER (t112) > UNIT_PIKEMAN (t124) > PROJECT_REPAIR_OUTER_DEFENSES (t139) > DISTRICT_THEATER (t145) > BUILDING_STAR_FORT (t146) > UNIT_TRADER (t157)
+  end: gold 306 faith 132 army {'UNIT_IRONCLAD': 1} pop [11]
+== p14 CIVILIZATION_LAHORE  turns 1-180
+  t29: +{'UNIT_WARRIOR': 1} (gold 162 -> 169)
+  t31: +{'UNIT_ARCHER': 1} (gold 176 -> 183)
+  t69: +{'UNIT_SWORDSMAN': 2} (gold 493 -> 493)
+  t69: -{'UNIT_WARRIOR': 2} (army 4)
+  t73: +{'UNIT_SWORDSMAN': 1} (gold 510 -> 511)
+  t73: -{'UNIT_WARRIOR': 1} (army 4)
+  t94: +{'UNIT_MAN_AT_ARMS': 1} (gold 469 -> 469)
+  t94: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t97: +{'UNIT_MAN_AT_ARMS': 1} (gold 476 -> 475)
+  t97: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t101: +{'UNIT_MUSKETMAN': 1} (gold 483 -> 481)
+  t101: -{'UNIT_SWORDSMAN': 1} (army 4)
+  t106: +{'UNIT_MUSKETMAN': 1} (gold 484 -> 479)
+  t106: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t109: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 479 -> 473 (drop 5), army before 4, building NONE
+  t109: -{'UNIT_ARCHER': 1} (army 4)
+  t112: BUY? +{'UNIT_MUSKETMAN': 1} gold 467 -> 459 (drop 8), army before 4, building NONE
+  t112: -{'UNIT_MAN_AT_ARMS': 1} (army 4)
+  t130: -{'UNIT_MUSKETMAN': 1} (army 3)
+  t143: war [] -> [5]
+  t143: suzerain -1 -> 2
+  t144: +{'UNIT_PIKE_AND_SHOT': 1} (gold 319 -> 321)
+  t144: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t150: +{'UNIT_PIKE_AND_SHOT': 1} (gold 308 -> 306)
+  t154: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 289 -> 278 (drop 11), army before 4, building UNIT_PIKE_AND_SHOT
+  t154: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t157: BUY? +{'UNIT_LINE_INFANTRY': 1} gold 264 -> 251 (drop 13), army before 4, building UNIT_FIELD_CANNON
+  t157: -{'UNIT_MUSKETMAN': 1} (army 4)
+  t160: BUY? +{'UNIT_FIELD_CANNON': 1} gold 228 -> 216 (drop 12), army before 4, building UNIT_SUPPLY_CONVOY
+  t168: -{'UNIT_PIKE_AND_SHOT': 1} (army 4)
+  t171: -{'UNIT_LINE_INFANTRY': 2, 'UNIT_PIKE_AND_SHOT': 1, 'UNIT_FIELD_CANNON': 1} (army 0)
+  t172: +{'UNIT_SUPPLY_CONVOY': 1} (gold 41 -> 52)
+  builds: - (t1) > BUILDING_MONUMENT (t2) > NONE (t3) > UNIT_BUILDER (t4) > BUILDING_MONUMENT (t6) > BUILDING_GRANARY (t14) > UNIT_BUILDER (t24) > UNIT_WARRIOR (t28) > NONE (t29) > UNIT_ARCHER (t30) > UNIT_TRADER (t31) > BUILDING_WATER_MILL (t41) > NONE (t53) > UNIT_BUILDER (t54) > NONE (t56) > BUILDING_WALLS (t63) > NONE (t64) > BUILDING_CASTLE (t93) > NONE (t94) > BUILDING_STAR_FORT (t133) > NONE (t134) > UNIT_PIKE_AND_SHOT (t143) > UNIT_BUILDER (t150) > UNIT_PIKE_AND_SHOT (t152) > UNIT_FIELD_CANNON (t157) > UNIT_SUPPLY_CONVOY (t160) > UNIT_BUILDER (t172) > UNIT_FIELD_CANNON (t174)
+  end: gold 127 faith 22 army {'UNIT_SUPPLY_CONVOY': 1} pop [10]
+== p15 CIVILIZATION_MOHENJO_DARO  turns 1-180
+  t33: +{'UNIT_ARCHER': 1} (gold 42 -> 47)
+  t35: suzerain -1 -> 5
+  t41: suzerain 5 -> -1
+  t50: BUY? +{'UNIT_ARCHER': 2} gold 144 -> 30 (drop 114), army before 3, building NONE
+  t53: suzerain -1 -> 5
+  t61: war [] -> [0]
+  t62: +{'UNIT_CATAPULT': 1} (gold 79 -> 84)
+  t68: +{'UNIT_CATAPULT': 1} (gold 105 -> 113)
+  t73: +{'UNIT_CATAPULT': 1, 'UNIT_SWORDSMAN': 1} (gold 137 -> 138)
+  t73: -{'UNIT_WARRIOR': 1} (army 8)
+  t75: +{'UNIT_SWORDSMAN': 1} (gold 140 -> 137)
+  t75: -{'UNIT_WARRIOR': 1} (army 8)
+  t78: +{'UNIT_CATAPULT': 1} (gold 137 -> 137)
+  t83: +{'UNIT_CATAPULT': 1} (gold 122 -> 119)
+  t84: war [0] -> []
+  t89: BUY? +{'UNIT_CROSSBOWMAN': 1, 'UNIT_MAN_AT_ARMS': 1} gold 94 -> 78 (drop 16), army before 10, building UNIT_CATAPULT
+  t89: -{'UNIT_SWORDSMAN': 1, 'UNIT_ARCHER': 1} (army 10)
+  t90: BUY? +{'UNIT_MAN_AT_ARMS': 1} gold 78 -> 64 (drop 14), army before 10, building UNIT_CATAPULT
+  t90: -{'UNIT_SWORDSMAN': 1} (army 10)
+  t92: BUY? +{'UNIT_TREBUCHET': 2} gold 54 -> 35 (drop 20), army before 10, building UNIT_CATAPULT
+  t92: -{'UNIT_CATAPULT': 2} (army 10)
+  t93: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 35 -> 18 (drop 17), army before 10, building UNIT_CATAPULT
+  t93: -{'UNIT_TREBUCHET': 2, 'UNIT_MAN_AT_ARMS': 2, 'UNIT_ARCHER': 1} (army 6)
+  t94: BUY? +{'UNIT_CROSSBOWMAN': 1} gold 18 -> 11 (drop 7), army before 6, building UNIT_CATAPULT
+  t94: -{'UNIT_ARCHER': 1} (army 6)
+  t96: -{'UNIT_CATAPULT': 1, 'UNIT_CROSSBOWMAN': 2} (army 3)
+  t97: +{'UNIT_TREBUCHET': 1} (gold 1 -> 0)
+  t97: -{'UNIT_CATAPULT': 1} (army 3)
+  t100: +{'UNIT_TREBUCHET': 1} (gold 7 -> 5)
+  t100: -{'UNIT_CATAPULT': 1} (army 3)
+  t101: suzerain 5 -> -1
+  t110: war [] -> [5]
+  t110: suzerain -1 -> 0
+  t111: war [5] -> []
+  t111: suzerain 0 -> -1
+  t114: +{'UNIT_MUSKETMAN': 1} (gold 32 -> 36)
+  t118: BUY? +{'UNIT_BOMBARD': 2} gold 35 -> 24 (drop 10), army before 4, building BUILDING_STAR_FORT
+  t118: -{'UNIT_TREBUCHET': 2} (army 4)
+  t121: war [] -> [5]
+  t121: suzerain -1 -> 0
+  t122: -{'UNIT_BOMBARD': 2} (army 2)
+  t125: +{'UNIT_LINE_INFANTRY': 1} (gold 20 -> 19)
+  t125: -{'UNIT_MUSKETMAN': 1} (army 2)
+  t128: war [5] -> []
+  t130: +{'UNIT_FIELD_CANNON': 1, 'UNIT_PIKE_AND_SHOT': 1} (gold 34 -> 33)
+  t130: -{'UNIT_CROSSBOWMAN': 1} (army 3)
+  t132: suzerain 0 -> -1
+  t137: war [] -> [5]
+  t137: suzerain -1 -> 2
+  t139: -{'UNIT_PIKE_AND_SHOT': 1} (army 2)
+  t140: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t150: +{'UNIT_FIELD_CANNON': 1} (gold 61 -> 64)
+  t152: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  t152: war [5] -> []
+  t152: suzerain 2 -> -1
+  t174: suzerain -1 -> 4
+  builds: - (t1) > BUILDING_MONUMENT (t3) > NONE (t4) > UNIT_BUILDER (t5) > BUILDING_GRANARY (t9) > BUILDING_MONUMENT (t22) > NONE (t29) > UNIT_ARCHER (t30) > UNIT_TRADER (t33) > UNIT_BUILDER (t43) > UNIT_ARCHER (t46) > NONE (t50) > BUILDING_WALLS (t54) > NONE (t55) > UNIT_CATAPULT (t61) > UNIT_BUILDER (t95) > BUILDING_CASTLE (t98) > UNIT_MUSKETMAN (t106) > NONE (t114) > BUILDING_STAR_FORT (t117) > UNIT_PIKE_AND_SHOT (t123) > NONE (t130) > BUILDING_AMPHITHEATER (t131) > UNIT_FIELD_CANNON (t140) > PROJECT_REPAIR_OUTER_DEFENSES (t150) > UNIT_TRADER (t151) > BUILDING_AMPHITHEATER (t160) > UNIT_BUILDER (t163) > BUILDING_MUSEUM_ART (t164) > DISTRICT_NEIGHBORHOOD (t177)
+  end: gold 111 faith 191 army {'UNIT_FIELD_CANNON': 1} pop [12]
+== p62 CIVILIZATION_FREE_CITIES  turns 1-180
+  t114: +{'UNIT_MUSKETMAN': 2} (gold 0 -> 0)
+  t120: +{'UNIT_SLINGER': 1} (gold 0 -> 0)
+  t123: -{'UNIT_MUSKETMAN': 2} (army 1)
+  t137: -{'UNIT_SLINGER': 1} (army 0)
+  t169: +{'UNIT_LINE_INFANTRY': 2} (gold 0 -> 0)
+  t172: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t173: +{'UNIT_CAVALRY': 1} (gold 0 -> 0)
+  t174: +{'UNIT_WARRIOR': 1} (gold 0 -> 0)
+  t174: -{'UNIT_CAVALRY': 1} (army 2)
+  t175: -{'UNIT_LINE_INFANTRY': 1} (army 1)
+  t178: +{'UNIT_FIELD_CANNON': 1} (gold 0 -> 0)
+  t180: -{'UNIT_FIELD_CANNON': 1} (army 1)
+  builds: - (t1) > UNIT_SLINGER (t114) > BUILDING_GRANARY (t120) > - (t123) > UNIT_WARRIOR (t169) > PROJECT_ENHANCE_DISTRICT_CAMPUS (t174) > - (t180)
+  end: gold 0 faith 0 army {'UNIT_WARRIOR': 1} pop []
