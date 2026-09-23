@@ -119,6 +119,12 @@ def main(argv=None) -> int:
                       flush=True)
                 print("   ", t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}_oom"))[-1], flush=True)
                 break
+    if a.observer:
+        # the run's own count did not end it: two lab games ran 11 and 22
+        # turns past SetTurns(250) — the watch's target is the end, so the
+        # watch ends it
+        print("   ", t.run(lab.GC, 'AutoplayManager.SetActive(false); print("autoplay stopped at turn "'
+                                  ' .. Game.GetCurrentGameTurn())')[-1], flush=True)
     hist = lab.RUNS / f"event_history_{a.tag}_{stamp}.txt"
     hist.write_text("\n".join(t.run(IG, (HERE / "event_history.lua").read_text(encoding="utf-8"), timeout=120)),
                     encoding="utf-8")
