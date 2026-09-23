@@ -73,6 +73,22 @@
     "envoy": [
       ["avail", "int", "envoys in this seat's bank"],
       ["held", "list", "per city-state index (the roster index, fixed for the game): the envoys this seat holds there, -1 where it has not met the city-state or the city-state is gone"]
+    ],
+    "congress": [
+      ["slate", "list", "the two resolution table indices (CONGRESS_RESOLUTIONS) on the ANNOUNCED slate of the Regular Session the coming turn would hold (TS `worldCongress`: every CONGRESS_INTERVAL turn from CONGRESS_MIN_ERA; the slate is `state.congressSlate`), -1 in a slot with no resolution or on a turn with no session"],
+      ["pref_outcome", "list", "per slate slot: the outcome this seat prefers on that resolution (`preference`), -1 where the slot is -1"],
+      ["pref_target", "list", "per slate slot: the target it prefers (`preference`), -1 where the slot is -1"],
+      ["dv", "bool", "that session also holds the Diplomatic Victory resolution (world era >= CONGRESS_DV_MIN_ERA)"],
+      ["leader", "int", "the Diplomatic Victory leader's major seat index when `dv`: the most diplomatic victory points among majors holding a city, ties to the lower index (the scan inside TS `runDvResolution`); -1 otherwise"],
+      ["special", "bool", "a Special Session would sit on the coming turn: a called emergency whose hiatus has run out, the Congress open (TS `specialSessions`)"],
+      ["favor", "int", "this seat's diplomatic favor, floored"],
+      ["vote_step", "int", "the favor price step of one extra vote (`buyVotes`' curve)"]
+    ],
+    "gp": [
+      ["offer", "list", "per Great Person class: the individual on offer (`gpOffer`: a roster index, -1 a draw pending, -2 exhausted); empty where the world has no Great Person classes"],
+      ["passed_by", "list", "per class: the major seat index that passed on the standing offer (`gpPassedBy`), -1 nobody"],
+      ["price", "list", "per class: the offer's frozen price in Great Person points (a whole number)"],
+      ["points", "list", "per class: this seat's Great Person points, floored"]
     ]
   },
   "city": [
@@ -81,6 +97,10 @@
     ["pop", "int", "its population"],
     ["settlerQueued", "int", "the settlers on order in its queue, at any depth"],
     ["prodOpen", "list", "the production columns it may queue now (the one production layout, cpu/core/prodLayout.ts), ascending; empty while its queue has no room"],
-    ["distSites", "table", "for every OPEN district column: each plot the district may go on, as [column, tile, adjacency] — the adjacency the district would earn there (floored; 0 for the types with no adjacency yield) — ascending by column, then tile"]
+    ["distSites", "table", "for every OPEN district column: each plot the district may go on, as [column, tile, adjacency] — the adjacency the district would earn there (floored; 0 for the types with no adjacency yield) — ascending by column, then tile"],
+    ["specSlots", "list", "per district table index: the specialist slots the district offers (`citySpecialistSlots`); empty where the world has no districts"],
+    ["specPin", "list", "per district table index: the citizens pinned into its slots (`City.specialistPref`), -1 where the automatic rule fills it; empty likewise"],
+    ["workTiles", "table", "every plot the city may work (`workableTiles`), as [tile, resource priority, locked]: the plot's resource priority (0 = none) and 1 where its citizen pin is set (`Tile.locked`); ascending by tile"],
+    ["swapFrom", "table", "every plot a sibling city holds that this city may claim (`swapTileOk`), as [tile, the holder's centre, worked, locked]: worked = 1 where any of the seat's cities works it, locked = 1 where its pin is set; ascending by tile"]
   ]
 }

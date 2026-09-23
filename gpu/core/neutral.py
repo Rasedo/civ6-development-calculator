@@ -8,9 +8,13 @@ The groups: `buy` (every purchase candidate the seat has), `route` (the
 trade route it would open), `nuke` (the silo launch it would take),
 `research` (the open techs and civics with their prices), `policy` (the cards
 it may slot and the slots), `war` (the open war columns and the kind each
-declaration takes) and `envoy` (the bank and the courtship per city-state).
-After them `cities`: one row per living city in the seat's ARRAY order, with
-its production columns and the plots each open district column may take.
+declaration takes), `envoy` (the bank and the courtship per city-state),
+`congress` (the session the coming turn holds and this seat's preference on
+it) and `gp` (the Great Person offers and this seat's points). After them
+`cities`: one row per living city in the seat's ARRAY order, with its
+production columns, the plots each open district column may take, its
+specialist slots and pins, the plots it may work and the plots a sibling
+holds that it may claim.
 """
 from __future__ import annotations
 
@@ -106,6 +110,11 @@ def _as_long(v: torch.Tensor) -> torch.Tensor:
     return v.to(torch.long)
 
 
+def _floored(v: torch.Tensor) -> torch.Tensor:
+    """A [B, ...] quantity as whole numbers, rounded down."""
+    return v.floor().to(torch.long) if v.is_floating_point() else v.to(torch.long)
+
+
 def _open_cost(sim, row: int, civic: bool) -> torch.Tensor:
     """[B, n] long — every item's effective research cost, -1 where the item
     is not open. The cost is `_eff_cost`'s: a base cost, boosted and
@@ -153,7 +162,35 @@ def _columns(sim, row: int) -> dict:
     met_live = sim.seat_citystate_met[:, row, : sim.S] & sim.citystate_alive[:, : sim.S]
     held = sim.seat_citystate_envoys[:, row, : sim.S]
     out["envoy", "held"] = torch.where(met_live, _as_long(held), torch.full_like(held, -1, dtype=torch.long))
+    out.update(_congress(sim, row))
+    # the Great Person offers, one row per class; points are floored, which
+    # keeps `points >= price` exact because a price is a whole number
+    nG = sim.gp_offer.shape[1] if sim._gp_nc else 0
+    out["gp", "offer"] = sim.gp_offer[:, :nG]
+    out["gp", "passed_by"] = sim.gp_passed_by[:, :nG]
+    out["gp", "price"] = _as_long(sim.gp_price[:, :nG])
+    out["gp", "points"] = _floored(sim.civ_gpp[:, row, :nG])
     return out
+
+
+def _congress(sim, row: int) -> dict:
+    """The `congress` group: the session the coming step would hold, and
+    what this seat prefers on each resolution of its slate."""
+    turn = int(sim.turn) + 1
+    _fires, res0, res1, dv = sim._congress_upcoming(turn)
+    slate = torch.stack([res0, res1], dim=1)                          # -1 off a session turn
+    pref_o, pref_t = torch.full_like(slate, -1), torch.full_like(slate, -1)
+    for r in sorted({r for r in slate.flatten().tolist() if r >= 0}):
+        o, t = sim._congress_pref(r, row)
+        at = slate == r
+        pref_o = torch.where(at, o.unsqueeze(1), pref_o)
+        pref_t = torch.where(at, t.unsqueeze(1), pref_t)
+    return {("congress", "slate"): slate, ("congress", "pref_outcome"): pref_o,
+            ("congress", "pref_target"): pref_t, ("congress", "dv"): dv,
+            ("congress", "leader"): sim._congress_leader(dv),
+            ("congress", "special"): sim._special_upcoming(turn),
+            ("congress", "favor"): _floored(sim.civ_diplo_favor[:, row]),
+            ("congress", "vote_step"): torch.full((sim.B,), int(sim._congress_vstep), dtype=torch.long, device=sim.device)}
 
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense
@@ -164,7 +201,8 @@ def _city_rows(sim, row: int) -> list:
     """Seat `row`'s `cities`, one list per game: a dict per LIVING city in
     array order keyed by `CITY_FIELDS`. The production columns are
     `_seat_production_mask`'s, and the district plots the ones its own sweep
-    tested, so an open district column always lists at least one plot."""
+    tested, so an open district column always lists at least one plot. The
+    specialist columns hold slots then pins side by side until the split."""
     B = sim.B
     alive = sim.city_alive[:, row]
     sites: dict = {}
@@ -190,10 +228,18 @@ def _city_rows(sim, row: int) -> list:
             k_slot = torch.tensor([j for j, _si in keys], dtype=torch.long, device=sim.device)
             k_col = torch.tensor([sim.DISTRICT_BASE + si for _j, si in keys], dtype=torch.long, device=sim.device)
             site_rows = torch.stack([bb, k_slot[kk], k_col[kk], tt, _as_long(adj[k_adj[kk], bb, tt])], dim=1)
+    if len(sim.districts_cat):
+        spec = torch.cat([sim._city_spec_slots(row), sim.city_spec_pin[:, row]], dim=2)
+        spec = spec.gather(1, order.unsqueeze(2).expand(-1, -1, spec.shape[2]))
+    else:
+        spec = torch.zeros(B, sim.RC, 0, dtype=torch.long, device=sim.device)
+    nD = spec.shape[2] // 2
+    work_rows, swap_rows = _citizen_rows(sim, row, alive)
     n_alive = alive.sum(dim=1).tolist()
-    rank_l, scal_l = rank.tolist(), scal.tolist()
-    out = [[{"centre": c, "isCapital": bool(cap), "pop": pop, "settlerQueued": sq, "prodOpen": [], "distSites": []}
-            for c, cap, pop, sq in scal_l[b][:n_alive[b]]] for b in range(B)]
+    rank_l, scal_l, spec_l = rank.tolist(), scal.tolist(), spec.tolist()
+    out = [[{"centre": c, "isCapital": bool(cap), "pop": pop, "settlerQueued": sq, "prodOpen": [], "distSites": [],
+             "specSlots": sp[:nD], "specPin": sp[nD:], "workTiles": [], "swapFrom": []}
+            for (c, cap, pop, sq), sp in zip(scal_l[b][:n_alive[b]], spec_l[b])] for b in range(B)]
     for b, j, c in opened.tolist():
         k = rank_l[b][j]
         if k < n_alive[b]:
@@ -204,7 +250,51 @@ def _city_rows(sim, row: int) -> list:
         k = rank_l[b][j]
         if k < n_alive[b]:
             out[b][k]["distSites"].append([c, t, a])
+    for field, rows_ in (("workTiles", work_rows), ("swapFrom", swap_rows)):
+        for b, j, *r in rows_:
+            k = rank_l[b][j]
+            if k < n_alive[b]:
+                out[b][k][field].append(r)
+        for cities in out:
+            for c in cities:
+                c[field].sort()
     return out
+
+
+def _citizen_rows(sim, row: int, alive: torch.Tensor) -> tuple:
+    """([b, slot, tile, resource priority, locked] per workable plot,
+    [b, slot, tile, holder's centre, worked, locked] per plot a sibling holds
+    that the slot may claim) — `workTiles` and `swapFrom` before they are
+    laid out per city."""
+    B, RC, T = sim.B, sim.RC, sim.T
+    tiles, valid = sim._work_window(row)                              # [B, RC, M]
+    M = tiles.shape[2]
+    tf = tiles.clamp(min=0).reshape(B, -1)
+    locked = sim.tile_locked.gather(1, tf).reshape(B, RC, M)
+    valid = valid & alive.unsqueeze(2)
+    bb, jj, mm = valid.nonzero(as_tuple=True)
+    t_v = tiles[bb, jj, mm]
+    work = torch.stack([bb, jj, t_v, sim.res_priority[bb, t_v], locked[bb, jj, mm].long()], dim=1).tolist()
+    if not bool((alive.sum(dim=1) >= 2).any()):
+        return work, []
+    slot = torch.arange(RC, device=sim.device).view(1, RC, 1).expand(B, RC, M)
+    ok = sim._swap_tile_ok(row, slot.reshape(B, -1), tiles.reshape(B, -1)).reshape(B, RC, M)
+    if not bool(ok.any()):
+        return work, []
+    # the holder: the living sibling whose id the plot carries
+    owner = sim.tile_city.gather(1, tf).reshape(B, RC, M)
+    ids, ctrs = sim.city_id[:, row], sim.city_center[:, row]
+    hold = (ids.view(B, 1, 1, RC) == owner.unsqueeze(3)) & alive.view(B, 1, 1, RC)
+    holder = ctrs.gather(1, hold.long().argmax(dim=3).reshape(B, -1)).reshape(B, RC, M)
+    # worked by ANY of the seat's city slots
+    wk = sim.city_worked[:, row].reshape(B, -1)
+    worked = torch.zeros(B, T + 1, dtype=torch.bool, device=sim.device)
+    worked.scatter_(1, torch.where(wk >= 0, wk, torch.full_like(wk, T)), True)
+    worked = worked[:, :T].gather(1, tf).reshape(B, RC, M)
+    bb, jj, mm = ok.nonzero(as_tuple=True)
+    swap = torch.stack([bb, jj, tiles[bb, jj, mm], holder[bb, jj, mm], worked[bb, jj, mm].long(),
+                        locked[bb, jj, mm].long()], dim=1).tolist()
+    return work, swap
 
 
 def seat_obs(sim, row: int) -> list:

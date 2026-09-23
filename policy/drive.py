@@ -138,10 +138,10 @@ def _policy_rand(seed: int, turn: int, row: int, salt: int) -> float:
     return ((t ^ (t >> 14)) & _M32) / 4294967296.0
 
 
-def _policy_rng(sim, seeds: list, turn: int, row: int, salt: int) -> torch.Tensor:
+def _policy_rng(device, seeds: list, turn: int, row: int, salt: int) -> torch.Tensor:
     return torch.tensor(
         [_policy_rand(int(s_), turn, row, salt) for s_ in seeds],
-        dtype=torch.float64, device=sim.device,
+        dtype=torch.float64, device=device,
     )
 
 
@@ -744,112 +744,102 @@ def _war_ctx(blocks: dict) -> dict:
     }
 
 
-def _decide_citizens(sim, row: int):
+def _decide_citizens(nobs: list, device):
     """The CITIZEN-ASSIGNMENT verbs, once per city each: pin one citizen into
     the first district that seats one, and one onto the first RESOURCE plot the
-    city can work. Everything else stays with the automatic rule."""
-    B = sim.B
-    alive = sim.city_alive[:, row]
+    city can work. Everything else stays with the automatic rule. Read off the
+    observation's `cities` rows; returns (spec, lock): spec = (centre [B, C],
+    pins [B, C, nD]) on the rows' array axis, SPEC_KEEP where nothing is
+    pinned, and lock [B, C] the plot each city flips, -1 for none — each None
+    when no game has one."""
+    B = len(nobs)
+    C = max(1, max(len(o["cities"]) for o in nobs))
+    nD = max((len(c["specSlots"]) for o in nobs for c in o["cities"]), default=0)
+    centre = [[-1] * C for _ in range(B)]
+    pins = [[[simbase.SPEC_KEEP] * nD for _ in range(C)] for _ in range(B)]
+    lock = [[-1] * C for _ in range(B)]
+    any_pin = any_lock = False
+    for b, o in enumerate(nobs):
+        for k, c in enumerate(o["cities"]):
+            centre[b][k] = c["centre"]
+            if c["pop"] >= ladder.SPEC_PIN_POP and not any(p >= 0 for p in c["specPin"]):
+                d = next((d for d, s in enumerate(c["specSlots"]) if s > 0), None)
+                if d is not None:
+                    pins[b][k][d] = 1
+                    any_pin = True
+            # a city that already holds a pinned plot is left alone
+            work = c["workTiles"]
+            if not any(lk for _t, _r, lk in work):
+                t = next((t for t, r, _lk in work if r > 0), None)  # ascending: the lowest
+                if t is not None:
+                    lock[b][k] = t
+                    any_lock = True
     spec = None
-    if len(sim.districts_cat):
-        pin = sim.city_spec_pin[:, row]
-        slots = sim._city_spec_slots(row)
-        want = (
-            (alive & (sim.city_pop[:, row] >= ladder.SPEC_PIN_POP) & ~(pin >= 0).any(dim=2)).unsqueeze(2)
-            & (slots > 0)
-        )
-        first = want & (want.long().cumsum(dim=2) == 1)
-        if bool(first.any()):
-            spec = torch.where(first, torch.ones_like(pin), torch.full_like(pin, simbase.SPEC_KEEP))
-    tiles, valid = sim._work_window(row)
-    tf = tiles.clamp(min=0).reshape(B, -1)
-    res = sim.res_priority.gather(1, tf).reshape_as(tiles) > 0
-    held = sim.tile_locked.gather(1, tf).reshape_as(tiles)
-    cand = valid & res & ~held & alive.unsqueeze(2) & ~(valid & held).any(dim=2).unsqueeze(2)
-    key = torch.where(cand, tiles, torch.full_like(tiles, 10 ** 9))
-    best = key.min(dim=2).values
-    lock = torch.where(best < 10 ** 9, best, torch.full_like(best, -1))
-    return spec, (lock if bool((lock >= 0).any()) else None)
+    if any_pin:
+        spec = (torch.tensor(centre, dtype=torch.long, device=device),
+                torch.tensor(pins, dtype=torch.long, device=device))
+    return spec, (torch.tensor(lock, dtype=torch.long, device=device) if any_lock else None)
 
 
-def _decide_swap(sim, row: int):
+def _decide_swap(nobs: list, device):
     """The TILE SWAP, our own scripted rule: a city with MORE citizens than
     plots it may work takes ONE plot from a sibling that has plots to spare
-    and is not working (or pinning) it. The lowest (city slot, tile) pair
-    the engine's own predicate allows wins, and a seat swaps at most once a
-    turn. Zero draws. Returns [B, 1, 2] (claimant's centre, tile), -1 where a
-    game has none, or None on a quiet turn."""
-    B, dev, T = sim.B, sim.device, sim.T
-    alive = sim.city_alive[:, row]
-    if not bool((alive.sum(dim=1) >= 2).any()):
+    and is not working (or pinning) it. The observation lists the plots the
+    engine's predicate allows (`swapFrom`); the first city in array order
+    with one, its lowest tile, wins, and a seat swaps at most once a turn.
+    Zero draws. Returns [B, 1, 2] (claimant's centre, tile), -1 where a game
+    has none, or None on a quiet turn."""
+    picks = []
+    for o in nobs:
+        cs = o["cities"]
+        spare = {c["centre"] for c in cs if len(c["workTiles"]) > c["pop"]}
+        best = None
+        for c in cs:
+            if c["pop"] <= len(c["workTiles"]):
+                continue
+            best = next(([c["centre"], t] for t, frm, worked, locked in c["swapFrom"]
+                         if frm in spare and not worked and not locked), None)
+            if best is not None:
+                break
+        picks.append(best)
+    if all(p is None for p in picks):
         return None
-    tiles, valid = sim._work_window(row)
-    count = valid.sum(dim=2)
-    pop = sim.city_pop[:, row]
-    short = alive & (pop > count)
-    spare = alive & (count > pop)
-    if not bool((short.any(dim=1) & spare.any(dim=1)).any()):
-        return None
-    RC, M = tiles.shape[1], tiles.shape[2]
-    tf = tiles.clamp(min=0).reshape(B, -1)
-    owner = sim.tile_city.gather(1, tf).reshape(B, RC, M)
-    ids = sim.city_id[:, row]
-    owner_spare = ((ids.view(B, 1, 1, RC) == owner.unsqueeze(3))
-                   & (alive & spare).view(B, 1, 1, RC)).any(dim=3)
-    wk = sim.city_worked[:, row].reshape(B, -1)
-    worked = torch.zeros(B, T + 1, dtype=torch.bool, device=dev)
-    worked.scatter_(1, torch.where(wk >= 0, wk, torch.full_like(wk, T)), True)
-    busy = (worked[:, :T] | sim.tile_locked).gather(1, tf).reshape(B, RC, M)
-    jj = torch.arange(RC, device=dev).view(1, RC, 1).expand(B, RC, M)
-    cand = short.unsqueeze(2) & (tiles >= 0) & owner_spare & ~busy
-    if not bool(cand.any()):
-        return None
-    cand = cand & sim._swap_tile_ok(row, jj.reshape(B, -1), tiles.reshape(B, -1)).reshape(B, RC, M)
-    key = torch.where(cand, jj * T + tiles, torch.full_like(tiles, 10 ** 9)).reshape(B, -1).min(dim=1).values
-    has = key < 10 ** 9
-    if not bool(has.any()):
-        return None
-    j = torch.where(has, key // T, torch.zeros_like(key))
-    centre = torch.where(has, sim.city_center[:, row].gather(1, j.unsqueeze(1)).squeeze(1), torch.full_like(key, -1))
-    tile = torch.where(has, key % T, torch.full_like(key, -1))
-    return torch.stack([centre, tile], dim=1).unsqueeze(1)
+    return torch.tensor([p or [-1, -1] for p in picks], dtype=torch.long, device=device).unsqueeze(1)
 
 
-def _decide_vote(sim, row: int):
-    """The WORLD CONGRESS ballot for the session the coming step would run.
-    The ladder votes its own interest: outcome A on the target it holds the
-    most of, free; and on the Diplomatic Victory resolution it backs itself or
-    blocks the leader, with every point of favor it has. Slot 3 is the SPECIAL
-    session — join every emergency it is not the target of. Returns [B, 4, 3] —
-    [outcome, target, extra votes] per slot — or None on a quiet turn."""
-    fires, res0, res1, dv = sim._congress_upcoming(int(sim.turn) + 1)
-    special = sim._special_upcoming(int(sim.turn) + 1)
-    if not bool(fires.any()) and not bool(special.any()):
+def _decide_vote(nobs: list, row: int, device):
+    """The WORLD CONGRESS ballot for the session the coming step would run,
+    off the observation's `congress` group. The ladder votes its own
+    interest: its preference on each slate resolution, free; and on the
+    Diplomatic Victory resolution it backs itself or blocks the leader, with
+    every point of favor it has. Slot 3 is the SPECIAL session — join every
+    emergency it is not the target of. Returns [B, 4, 3] — [outcome, target,
+    extra votes] per slot — or None on a quiet turn."""
+    cg = _obs_group(nobs, "congress", device)
+    slate = _obs_dense(nobs, "congress", "slate", device)
+    special = cg["special"]
+    if not bool((slate >= 0).any()) and not bool(cg["dv"].any()) and not bool(special.any()):
         return None
-    B, dev = sim.B, sim.device
-    out = torch.full((B, 4, 3), -1, dtype=torch.long, device=dev)
-    zero = torch.zeros(B, dtype=torch.long, device=dev)
+    pref_o = _obs_dense(nobs, "congress", "pref_outcome", device)
+    pref_t = _obs_dense(nobs, "congress", "pref_target", device)
+    B = len(nobs)
+    out = torch.full((B, 4, 3), -1, dtype=torch.long, device=device)
+    zero = torch.zeros(B, dtype=torch.long, device=device)
     # THE SPECIAL SESSION: the ladder joins every emergency it is not the
     # target of, which is also what a seat with no ballot does.
-    out[:, 3, 0] = torch.where(special, zero, out[:, 3, 0])
-    out[:, 3, 1] = torch.where(special, zero, out[:, 3, 1])
-    out[:, 3, 2] = torch.where(special, zero, out[:, 3, 2])
-    for slot, sel in ((0, res0), (1, res1)):
-        for r in range(len(sim._congress_res)):
-            m = fires & (sel == r)
-            if not bool(m.any()):
-                continue
-            ai_o, ai_t = sim._congress_pref(r, row)
-            out[:, slot, 0] = torch.where(m, ai_o, out[:, slot, 0])
-            out[:, slot, 1] = torch.where(m, ai_t, out[:, slot, 1])
-            out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
-    lead = sim._congress_leader(dv)
-    ok = dv & (lead >= 0)
+    for f in range(3):
+        out[:, 3, f] = torch.where(special, zero, out[:, 3, f])
+    for slot in (0, 1):
+        m = slate[:, slot] >= 0
+        out[:, slot, 0] = torch.where(m, pref_o[:, slot], out[:, slot, 0])
+        out[:, slot, 1] = torch.where(m, pref_t[:, slot], out[:, slot, 1])
+        out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
+    lead = cg["leader"]
+    ok = cg["dv"] & (lead >= 0)
     if bool(ok.any()):
         # ALL of it: the curve runs out of favor before it runs out of rungs,
         # so favor/step + 1 is an upper bound on what the bank can buy.
-        want = torch.div(sim.civ_diplo_favor[:, row], max(1, sim._congress_vstep),
-                         rounding_mode="floor").long() + 1
+        want = torch.div(cg["favor"], cg["vote_step"].clamp(min=1), rounding_mode="floor") + 1
         out[:, 2, 0] = torch.where(ok, (lead != row).long(), out[:, 2, 0])
         out[:, 2, 1] = torch.where(ok, lead.clamp(min=0), out[:, 2, 1])
         out[:, 2, 2] = torch.where(ok, want, out[:, 2, 2])
@@ -955,7 +945,7 @@ def decide_geo(sim, seeds=None):
             return torch.full((B,), bool(pin), dtype=torch.bool, device=dev)
         if seeds is None:
             return torch.zeros(B, dtype=torch.bool, device=dev)
-        return _policy_rng(sim, seeds, 0, r, 5) < ladder.DIPLO_SHARE
+        return _policy_rng(sim.device, seeds, 0, r, 5) < ladder.DIPLO_SHARE
 
     diplo = torch.stack([_diplo_row(r) for r in range(nrow)], dim=1)
     ob_civic = (sim.civ_civics[:, :nrow, sim._open_borders_civic]
@@ -984,7 +974,7 @@ def decide_geo(sim, seeds=None):
             )
             # the TYPE is a per-(game, pair) style - stable across renewals
             ally_ty[:, a, b] = (
-                (_policy_rng(sim, seeds, 0, min(a, b) * nrow + max(a, b), 9) * 5).long().clamp(min=0, max=4)
+                (_policy_rng(sim.device, seeds, 0, min(a, b) * nrow + max(a, b), 9) * 5).long().clamp(min=0, max=4)
                 if seeds is not None else torch.zeros(B, dtype=torch.long, device=dev))
             # Granted to whoever this seat already trusts, and by a diplomat to
             # any quiet neighbour — the grant is one-way, so it costs the
@@ -1183,7 +1173,7 @@ def _maybe_form_tier(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
     is_u = (prod >= sim.UNIT_BASE) & (prod < sim.UNIT_BASE + sim.NU)
     if not bool(is_u.any()):
         return prod
-    r = _policy_rng(sim, seeds, turn or 0, row, 7)
+    r = _policy_rng(sim.device, seeds, turn or 0, row, 7)
     hit = is_u & (r < ladder.FORM_SHARE).unsqueeze(1)
     if not bool(hit.any()):
         return prod
@@ -1198,17 +1188,19 @@ def _maybe_form_tier(sim, row: int, mask: torch.Tensor, prod: torch.Tensor,
     return torch.where(hit & (deep | can_c), pick, prod)
 
 
-def _decide_gp_pass(sim, row: int, seeds, turn) -> torch.Tensor | None:
+def _decide_gp_pass(nobs: list, row: int, seeds, turn, device) -> torch.Tensor | None:
     """Sometimes PASS on a claimable Great Person. Free variation like the
     reorder: the applier re-validates every clause, and a verb nothing ever
-    chooses is a verb the gate never reaches."""
-    if seeds is None or getattr(sim, "_gp_nc", 0) == 0:
+    chooses is a verb the gate never reaches. The offers are the
+    observation's `gp` group."""
+    if seeds is None or not nobs[0]["gp"]["offer"]:
         return None
-    elig = ((sim.gp_offer >= 0) & (sim.gp_passed_by < 0)
-            & (sim.civ_gpp[:, row].double() >= sim.gp_price))
+    offer = _obs_dense(nobs, "gp", "offer", device)
+    elig = ((offer >= 0) & (_obs_dense(nobs, "gp", "passed_by", device) < 0)
+            & (_obs_dense(nobs, "gp", "points", device) >= _obs_dense(nobs, "gp", "price", device)))
     if not bool(elig.any()):
         return None
-    r = _policy_rng(sim, seeds, turn or 0, row, 8)
+    r = _policy_rng(device, seeds, turn or 0, row, 8)
     hit = elig.any(dim=1) & (r < ladder.GP_PASS_SHARE)
     if not bool(hit.any()):
         return None
@@ -1235,7 +1227,8 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     plan, keyed by name. Writes nothing. `nobs` is the seat's neutral
     observation, one dict per game (shared/decide.schema.json). `prod` is
     (centre [B, C], column [B, C]) over the observation's cities in array
-    order, and `dtile` [B, C, nS] rides the same axis."""
+    order, and `dtile` [B, C, nS] rides the same axis, as do `spec`
+    (centre [B, C], pins [B, C, nD]) and `lock` [B, C]."""
     dev = sim.device
     # PRODUCTION on the observation's city axis — array order, every city
     # named by its centre; the record resolves each centre to its slot
@@ -1250,7 +1243,7 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     if style["deep"] is not None:
         deep = torch.full((sim.B,), bool(style["deep"]), dtype=torch.bool, device=sim.device)
     else:
-        deep = (_policy_rng(sim, seeds, 0, row, 4) < ladder.DEEP_SHARE
+        deep = (_policy_rng(sim.device, seeds, 0, row, 4) < ladder.DEEP_SHARE
                 if seeds is not None else None)
     # RESEARCH off the observation's prices: an open item carries its whole
     # effective cost, a shut one -1
@@ -1270,7 +1263,7 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
         if style["cards"] is not None:
             cstyle = torch.full((sim.B,), ladder.CARD_STYLE_NAMES.index(style["cards"]), dtype=torch.long, device=sim.device)
         elif seeds is not None:
-            cstyle = ladder.card_style_of(_policy_rng(sim, seeds, 0, row, 10))
+            cstyle = ladder.card_style_of(_policy_rng(sim.device, seeds, 0, row, 10))
         else:
             cstyle = None
         policies = ladder.pick_policies(pol_open, _obs_dense(nobs, "policy", "slots", dev), sim._pol_kind,
@@ -1280,9 +1273,9 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     war_kind = None
     if seeds is not None and turn is not None:
         rng_w = {
-            "dow": _policy_rng(sim, seeds, turn, row, 1),
-            "peace": _policy_rng(sim, seeds, turn, row, 2),
-            "raid": _policy_rng(sim, seeds, turn, row, 3),
+            "dow": _policy_rng(sim.device, seeds, turn, row, 1),
+            "peace": _policy_rng(sim.device, seeds, turn, row, 2),
+            "raid": _policy_rng(sim.device, seeds, turn, row, 3),
         }
         n_tgt = int(nobs[0]["war"]["targets"])
         war_mask = torch.cat([_obs_members(nobs, "war", "declare", n_tgt, dev),
@@ -1303,10 +1296,10 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     # exactly as the route verb does.
     _nk = _obs_group(nobs, "nuke", sim.device)
     nuke = (_nk["device"], _nk["tile"])
-    spec, lock = _decide_citizens(sim, row)
-    swap = _decide_swap(sim, row)
-    vote = _decide_vote(sim, row)
-    gp_pass = _decide_gp_pass(sim, row, seeds, turn)
+    spec, lock = _decide_citizens(nobs, dev)
+    swap = _decide_swap(nobs, dev)
+    vote = _decide_vote(nobs, row, dev)
+    gp_pass = _decide_gp_pass(nobs, row, seeds, turn, dev)
     return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,

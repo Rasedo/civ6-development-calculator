@@ -80,23 +80,26 @@ def _buys_by_slot(sim, row: int, dec: dict) -> dict:
     return out
 
 
+def _by_slot(sim, row: int, centre: torch.Tensor, v: torch.Tensor, fill: int) -> torch.Tensor:
+    """[B, C, ...] values on a CENTRE-keyed city axis (`centre` [B, C]) ->
+    [B, RC, ...] on the seat's slots, `fill` in every slot no entry names.
+    A living city's centre is unique to it, so a slot is named at most once;
+    `fill` must be the least value `v` holds, which the max over the entries
+    then passes over."""
+    hit = ((sim.city_center[:, row].unsqueeze(1) == centre.unsqueeze(2))
+           & sim.city_alive[:, row].unsqueeze(1) & (centre >= 0).unsqueeze(2))   # [B, C, RC]
+    extra = v.dim() - 2
+    hit = hit.reshape(*hit.shape, *([1] * extra))
+    return torch.where(hit, v.unsqueeze(2), torch.full_like(v, fill).unsqueeze(2)).amax(dim=1)
+
+
 def _production_by_slot(sim, row: int, prod: tuple, dtile):
     """The production decisions name cities by CENTRE — (centre [B, C],
     column [B, C]) with `dtile` [B, C, nS] on the same axis; the engine's
     queue takes slots. Returns ([B, RC], [B, RC, nS] | None), -1 in every
     slot no decision names."""
     centre, col = prod
-    # [B, C, RC]: decision k names slot j. A living city's centre is unique
-    # to it, so every slot is named at most once and the max over k picks it.
-    hit = ((sim.city_center[:, row].unsqueeze(1) == centre.unsqueeze(2))
-           & sim.city_alive[:, row].unsqueeze(1) & (centre >= 0).unsqueeze(2))
-    neg = torch.full_like(col, -1)
-    by_slot = torch.where(hit, col.unsqueeze(2), neg.unsqueeze(2)).amax(dim=1)
-    dt = None
-    if dtile is not None:
-        dt = torch.where(hit.unsqueeze(3), dtile.unsqueeze(2),
-                         torch.full_like(dtile, -1).unsqueeze(2)).amax(dim=1)
-    return by_slot, dt
+    return _by_slot(sim, row, centre, col, -1), (None if dtile is None else _by_slot(sim, row, centre, dtile, -1))
 
 
 def apply_decisions(sim, row: int, dec: dict) -> None:
@@ -106,13 +109,16 @@ def apply_decisions(sim, row: int, dec: dict) -> None:
     the replay side passes the recorded tile and places it."""
     by_slot = _buys_by_slot(sim, row, dec)
     prod, dtile = _production_by_slot(sim, row, dec["prod"], dec["dtile"])
+    # the specialist pins, (centre [B, C], pins [B, C, nD]): SPEC_KEEP is the
+    # least value a pin holds, so it is the fill
+    spec = None if dec["spec"] is None else _by_slot(sim, row, *dec["spec"], simbase.SPEC_KEEP)
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=dec["tech"],
                            civic=dec["civic"], policies=dec["policies"], war=dec["war"], war_kind=dec["war_kind"],
                            envoys=dec["env_seq"], buy=by_slot.get("buy"), worship=by_slot.get("worship"),
                            relig=by_slot.get("relig"), levy=dec["levy"], monu=by_slot.get("monu"),
                            nat=by_slot.get("nat"), cls=by_slot.get("cls"), ucls=by_slot.get("ucls"),
                            pat=dec["pat"], band=by_slot.get("band"), dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
-                           spec=dec["spec"], lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
+                           spec=spec, lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
                            gp_pass=dec["gp_pass"])
 
 
@@ -181,8 +187,6 @@ def extract_geo(geo, row: int, b: int) -> dict:
 
 
 def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, b: int) -> dict:
-    _ctr = sim.city_center[b, row]
-    _alive_c = sim.city_alive[b, row]
     nS = 0 if dtile is None else int(dtile.shape[2])
     prod_pairs = []
     for k, (centre, col) in enumerate(zip(prod[0][b].tolist(), prod[1][b].tolist())):
@@ -211,9 +215,8 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
     if nuke is not None and int(nuke[0][b]) >= 0 and int(nuke[1][b]) >= 0:
         rec["nuke"] = [int(nuke[0][b]), int(nuke[1][b])]
     if spec is not None:
-        pins = [[int(_ctr[j]), di, int(spec[b, j, di])]
-                for j in range(int(spec.shape[1])) if bool(_alive_c[j])
-                for di in range(int(spec.shape[2])) if int(spec[b, j, di]) > simbase.SPEC_KEEP]
+        pins = [[c, di, n] for c, row_n in zip(spec[0][b].tolist(), spec[1][b].tolist()) if c >= 0
+                for di, n in enumerate(row_n) if n > simbase.SPEC_KEEP]
         if pins:
             rec["specialists"] = pins
     if lock is not None:
@@ -395,13 +398,14 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     _sp = rec.get("specialists") or []
     spec = None
     if _sp:
+        # CENTRE-KEYED as the driver decides them, one entry per named city
         nD = sim.city_spec_pin.shape[3]
-        spec = torch.full((sim.B, sim.RC, nD), simbase.SPEC_KEEP, dtype=torch.long, device=dev)
+        _sc = sorted({int(_c) for _c, _di, _n in _sp})
+        pins = torch.full((sim.B, len(_sc), nD), simbase.SPEC_KEEP, dtype=torch.long, device=dev)
         for _c, _di, _n in _sp:
-            _hj = _slot_of(sim, row, _full(_c))
-            _rw = (_hj >= 0).nonzero(as_tuple=True)[0]
-            if len(_rw) and 0 <= int(_di) < nD:
-                spec[_rw, _hj[_rw], int(_di)] = int(_n)
+            if 0 <= int(_di) < nD:
+                pins[:, _sc.index(int(_c)), int(_di)] = int(_n)
+        spec = (torch.tensor(_sc, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1), pins)
     _lk = rec.get("lockTiles") or []
     lock = (torch.tensor(_lk, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1)
             if _lk else None)

@@ -10,7 +10,11 @@ per catalog row, ascending card and war-column indices, a war kind only where
 a declaration is open, one envoy row per city-state. The `cities` rows follow
 the seat's living cities in array order and carry exactly the production
 mask's open columns, and every plot of every open district column with the
-adjacency the placement ranks it by.
+adjacency the placement ranks it by; the specialist slots and pins, the
+workable plots and the plots a sibling holds that `_swap_tile_ok` lets the
+city claim. The `congress` group reads the engine's own schedule and
+preference (a session turn is forced, forty turns never reach one), and the
+`gp` group the standing offers.
 
 Driven for a stretch first, over two worlds at once, so the seats hold
 cities and the buy candidates are live rather than all -1.
@@ -19,6 +23,7 @@ cities and the buy candidates are live rather than all -1.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -31,6 +36,8 @@ from core.env import BatchEnv
 from core import neutral, records
 
 TURNS = 40
+# the row width of every `table` field, as its schema meaning lays it out
+TABLE_WIDTH = {"distSites": 3, "workTiles": 3, "swapFrom": 4}
 
 
 def plain(v) -> bool:
@@ -53,10 +60,14 @@ def main() -> None:
     for row in range(0, sim.n_majors, 2):
         for j in range(sim.RC):
             sim._q_clear(torch.arange(sim.B), row, j)
-    live =live_research = live_cards = live_declare = live_cols = live_sites = 0
+    live = live_research = live_cards = live_declare = live_cols = live_sites = 0
+    live_work = live_swap = live_gp = 0
     for row in range(sim.n_majors):
         nobs = neutral.seat_obs(sim, row)
         pmask = sim._seat_production_mask(row)
+        spec_slots = sim._city_spec_slots(row) if len(sim.districts_cat) else None
+        win_t, win_v = sim._work_window(row)
+        worked = [{int(t) for t in sim.city_worked[b, row].flatten().tolist() if t >= 0} for b in range(sim.B)]
         assert len(nobs) == sim.B, f"seat {row}: {len(nobs)} observations for {sim.B} games"
         for b, ob in enumerate(nobs):
             assert plain(ob), f"seat {row} game {b}: the observation holds a non-plain value"
@@ -118,7 +129,8 @@ def main() -> None:
                     elif kind == "list":
                         assert type(v) is list and all(type(x) is int for x in v), f"{where}: cities.{f} = {v!r}"
                     elif kind == "table":
-                        assert type(v) is list and all(type(r) is list and len(r) == 3 and all(type(x) is int for x in r)
+                        assert type(v) is list and all(type(r) is list and len(r) == TABLE_WIDTH[f]
+                                                       and all(type(x) is int for x in r)
                                                        for r in v), f"{where}: cities.{f} = {v!r}"
                     else:
                         assert type(v) is int, f"{where}: cities.{f} = {v!r} is not an int"
@@ -144,15 +156,79 @@ def main() -> None:
                         f"{where}: city {c['centre']} column {col} plots"
                     assert all(a == int(adj[t]) for t, a in mine), f"{where}: city {c['centre']} column {col} adjacency"
                     live_sites += len(mine)
+                # CITIZENS: the specialist slots and pins per district, the
+                # workable plots with their resource priority and pin, and
+                # every plot a sibling holds that the city may claim
+                if len(sim.districts_cat):
+                    assert c["specSlots"] == spec_slots[b, j].tolist(), f"{where}: city {c['centre']} specSlots"
+                    assert c["specPin"] == sim.city_spec_pin[b, row, j].tolist(), f"{where}: city {c['centre']} specPin"
+                else:
+                    assert c["specSlots"] == [] and c["specPin"] == [], f"{where}: specialist rows without districts"
+                wt = sorted((int(t), int(sim.res_priority[b, t]), int(sim.tile_locked[b, t]))
+                            for t, v in zip(win_t[b, j].tolist(), win_v[b, j].tolist()) if v)
+                assert [tuple(r) for r in c["workTiles"]] == wt, f"{where}: city {c['centre']} workTiles"
+                live_work += len(wt)
+                sw = []
+                for t in win_t[b, j].tolist():
+                    if t < 0 or not bool(sim._swap_tile_ok(row, torch.tensor([[j]]).expand(sim.B, 1),
+                                                           torch.tensor([[t]]).expand(sim.B, 1))[b, 0]):
+                        continue
+                    holder = [int(sim.city_center[b, row, i]) for i in range(sim.RC)
+                              if bool(sim.city_alive[b, row, i]) and int(sim.city_id[b, row, i]) == int(sim.tile_city[b, t])]
+                    assert len(holder) == 1, f"{where}: plot {t} has holders {holder}"
+                    sw.append([t, holder[0], int(t in worked[b]), int(sim.tile_locked[b, t])])
+                assert c["swapFrom"] == sorted(sw), f"{where}: city {c['centre']} swapFrom {c['swapFrom']} vs {sorted(sw)}"
+                live_swap += len(sw)
+            # CONGRESS: the coming session as the engine's own schedule reads it
+            fires, res0, res1, dv = sim._congress_upcoming(int(sim.turn) + 1)
+            cg = ob["congress"]
+            assert cg["slate"] == [int(res0[b]), int(res1[b])], f"{where}: congress.slate {cg['slate']}"
+            assert cg["dv"] == bool(dv[b]) and cg["leader"] == int(sim._congress_leader(dv)[b]), f"{where}: congress dv/leader"
+            assert cg["special"] == bool(sim._special_upcoming(int(sim.turn) + 1)[b]), f"{where}: congress.special"
+            assert cg["favor"] == int(math.floor(float(sim.civ_diplo_favor[b, row]))), f"{where}: congress.favor"
+            assert cg["vote_step"] == int(sim._congress_vstep), f"{where}: congress.vote_step"
+            for s, r in enumerate(cg["slate"]):
+                want = (-1, -1) if r < 0 else tuple(int(x[b]) for x in sim._congress_pref(r, row))
+                assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"{where}: congress pref slot {s}"
+            # GREAT PEOPLE: one row per class
+            gp = ob["gp"]
+            nG = sim.gp_offer.shape[1] if sim._gp_nc else 0
+            assert gp["offer"] == sim.gp_offer[b, :nG].tolist(), f"{where}: gp.offer"
+            assert gp["passed_by"] == sim.gp_passed_by[b, :nG].tolist(), f"{where}: gp.passed_by"
+            assert gp["price"] == [int(x) for x in sim.gp_price[b, :nG].tolist()], f"{where}: gp.price"
+            assert all(float(x) == int(x) for x in sim.gp_price[b, :nG].tolist()), f"{where}: a fractional gp price"
+            assert gp["points"] == [math.floor(x) for x in sim.civ_gpp[b, row, :nG].tolist()], f"{where}: gp.points"
+            live_gp += sum(x >= 0 for x in gp["offer"])
             if not rows_c:
                 assert not bool(pmask[b].any()), f"{where}: no living city, yet a production column is open"
+    # A SESSION TURN, forced: forty turns never reach the Congress, so the
+    # schedule is made to announce the first two resolutions with the
+    # Diplomatic Victory vote, and every seat's preference is read back
+    NR = len(sim._congress_res)
+    assert NR >= 2, f"{NR} congress resolutions in the catalog"
+    on = torch.ones(sim.B, dtype=torch.bool)
+    sim._congress_upcoming = lambda _turn: (on, torch.zeros(sim.B, dtype=torch.long),
+                                            torch.ones(sim.B, dtype=torch.long), on)
+    live_pref = 0
+    for row in range(sim.n_majors):
+        for b, ob in enumerate(neutral.seat_obs(sim, row)):
+            cg = ob["congress"]
+            assert cg["slate"] == [0, 1] and cg["dv"], f"seat {row} game {b}: the forced session {cg}"
+            assert cg["leader"] == int(sim._congress_leader(on)[b]), f"seat {row} game {b}: congress.leader"
+            for s in range(2):
+                want = tuple(int(x[b]) for x in sim._congress_pref(s, row))
+                assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"seat {row} game {b}: pref slot {s}"
+                live_pref += 1
+    del sim._congress_upcoming
     assert live > 0, "no seat held a city — the scene never exercised the city fields"
+    assert live_work > 0, "no city listed a workable plot"
     assert live_cols > 0 and live_sites > 0, f"the cities rows never filled: {live_cols} columns, {live_sites} plots"
     assert live_research > 0 and live_cards > 0 and live_declare > 0, (
         f"a list group never filled: {live_research} open items, {live_cards} cards, {live_declare} declarations")
     print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
-          f"{live_cols} open production columns, {live_sites} district plots)")
+          f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
+          f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences)")
 
 
 if __name__ == "__main__":

@@ -153,20 +153,25 @@ def test_patronage_refuses_the_passer(rules, path) -> None:
 def test_the_driver_mirrors_the_applier(rules, path) -> None:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
     from drive import _decide_gp_pass
+    from core import neutral
     sim = build(rules, path)
     stand_offer(sim, 0, 60.0)
     sim.civ_gpp[B0, ROW, 0] = 100.0
     picks = []
+    # the driver reads the OBSERVATION; the state stands still, only the
+    # turn keying the draw moves
+    nobs = neutral.seat_obs(sim, ROW)
     for turn in range(60):
-        out = _decide_gp_pass(sim, ROW, [42], turn)
+        out = _decide_gp_pass(nobs, ROW, [42], turn, sim.device)
         if out is not None and int(out[B0]) >= 0:
             picks.append(int(out[B0]))
     assert picks, "sixty turns of an eligible pass and the driver never took it"
     assert all(p == 0 for p in picks), f"the driver named a class it cannot pass: {sorted(set(picks))}"
     # a passed class leaves the driver's menu too
     sim.gp_passed_by[B0, 0] = 1
+    nobs = neutral.seat_obs(sim, ROW)
     for turn in range(60):
-        out = _decide_gp_pass(sim, ROW, [42], turn)
+        out = _decide_gp_pass(nobs, ROW, [42], turn, sim.device)
         assert out is None or int(out[B0]) < 0, "the driver named an already-passed individual"
     print(f"  5 driver OK — {len(picks)}/60 passes, all on the offered class, none after the stamp")
 

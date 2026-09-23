@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "gpu"))
 sys.path.insert(0, str(ROOT / "policy"))
 
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
+from core import BatchSim, load_rules, load_fixture, fixture_paths, neutral  # noqa: E402
 from warmup import settle_all  # noqa: E402
 import drive  # noqa: E402
 
@@ -168,13 +168,13 @@ def main() -> None:
     sim.city_pop[0, row, jb] = 1
     sim.city_worked[0, row] = -1
     sim._eff_version += 1
-    pick = drive._decide_swap(sim, row)
+    pick = drive._decide_swap(neutral.seat_obs(sim, row), sim.device)
     assert pick is not None, "a short city beside a spare sibling must claim a plot"
     c, t = int(pick[0, 0, 0]), int(pick[0, 0, 1])
     assert c == ca, "the short city is the claimant"
     assert ok(sim, row, ja, t), "the driver names only a plot the predicate allows"
     sim.city_pop[0, row, ja] = 1
-    assert drive._decide_swap(sim, row) is None, "no city short of plots, no swap"
+    assert drive._decide_swap(neutral.seat_obs(sim, row), sim.device) is None, "no city short of plots, no swap"
     print(f"  the driver's rule claims plot {t} for the short city")
 
     print("TILE SWAP OK — the predicate, its record arm and the driver's rule")
