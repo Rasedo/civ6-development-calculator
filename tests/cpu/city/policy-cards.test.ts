@@ -170,14 +170,16 @@ describe('the building-yield boost', () => {
     const ctx = makeYieldCtx(state, 0);
     const before = cityBuildingYields(ctx, city);
     ctx.mods.buildingYieldBoosts.push(POLICIES.SIMULTANEUM.effects.buildingYieldBoost!);
-    const flat = cityBuildingYields(ctx, city);
-    // every Holy Site building's FAITH doubles; the Cathedral's culture does not
-    expect(flat.faith).toBe(before.faith * 2);
-    expect(flat.culture).toBe(before.culture);
+    // neither clause met: the card pays nothing (Gathering Storm deletes the
+    // flat +100% its DOUBLE rows paid)
+    expect(cityBuildingYields(ctx, city)).toEqual(before);
 
     city.population = 15; // "+50% if city population is 15 or higher"
+    const plain = cityBuildingYields(makeYieldCtx(state, 0), city);
     const big = cityBuildingYields(ctx, city);
-    expect(big.faith).toBeCloseTo(before.faith * 2.5);
+    // every Holy Site building's FAITH moves; the Cathedral's culture does not
+    expect(big.faith).toBeCloseTo(plain.faith * 1.5);
+    expect(big.culture).toBe(plain.culture);
   });
 });
 

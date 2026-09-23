@@ -782,7 +782,7 @@ def _main() -> int:
                 ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # an alliance shares what it sees
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # the portal on a mountain range
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # the levy mark and its 75% discount
-                ("legacy_accrual", [py, "tests/gpu/legacy_accrual_test.py"], 6),  # the government clock an accumulating bonus rides
+                ("government_bonus", [py, "tests/gpu/government_bonus_test.py"], 6),  # the GS flat government bonus and what a legacy card pays
                 ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
                 ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # a narrowed XP award must read its own game
                 ("incoming_route", [py, "tests/gpu/incoming_route_test.py"], 2),  # a route coming in is paid with none going out

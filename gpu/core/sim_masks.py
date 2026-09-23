@@ -168,6 +168,9 @@ class SimMasks:
                     pred = per.sum(dim=(1, 2)) >= brow["count"]
                 else:
                     pred = on[:, :, dtype].sum(dim=1) >= brow["count"]
+            elif kind == "alliance":
+                # BOOST_TRIGGER_HAVE_ALLIANCE_LEVEL_X: any major at the level
+                pred = (self._alliance_levels_of(row) >= brow["level"]).any(dim=1)
             elif kind == "policies":
                 if self._gov_has_effects and self._npol:
                     pred = self._gov_mods(row)[4].sum(dim=1) >= brow["count"]

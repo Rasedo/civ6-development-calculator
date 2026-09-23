@@ -5,7 +5,7 @@ import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
 import type { CivId, LeaderId } from '../data/seats';
 import { AGE_GOLDEN, ALLIANCE_ECONOMIC } from '../data/seats';
-import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type LegacyRateRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
+import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
 import { PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, DOMESTIC_ROUTE_YIELD_ROWS, INTL_ROUTE_YIELD_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, CAPTURE_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS, ENVOY_SAME_RELIGION_ROWS, MAJORITY_FOUNDER_ROWS, type CenterAdjRow, type GreatWorkYieldRow, type StockpileRateRow, type StockpileCapRow, type UnitChargeRow, type TileCostRow, type FarmTerrainRow, type RouteImprovementRow, type GrantUnitRow, type SpyCapacityRow, type CapitalRow, rowIsFor, type PlotYieldRow, type ProdMultRow, type RouteYieldRow, type CombatCsWhen, type EmbarkMoveRow, type IgnoreShoresRow } from '../data/civilizations';
 import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
@@ -251,8 +251,6 @@ export interface Modifiers {
   startBoosts: readonly string[];
   postCombatLoyalty: readonly PostCombatLoyaltyRow[];
   levy: readonly LevyRow[];
-  /** the seat's accrual RATE per government, above the base 100. */
-  legacyRates: readonly LegacyRateRow[];
   domesticRouteLoyalty: number;
   incomingRouteYields: readonly IncomingRouteYieldRow[];
   /** batch 12 — the wonder, the river and the post */
@@ -398,8 +396,11 @@ export interface Modifiers {
   navalRaiderMoves: number;
   grievanceNoDecay: boolean;
   projectProdMult: number;
-  /** the legacy channels. `influenceMult` multiplies the ONE envoy
-   *  accrual sum; the two discounts are percentages OFF a purchase price. */
+  /** production toward districts (Merchant Republic's flat bonus). */
+  districtProdMult: number;
+  /** the government flat-bonus channels. `influenceMult` multiplies the ONE
+   *  envoy accrual sum; the two discounts are percentages OFF a purchase
+   *  price. */
   influenceMult: number;
   goldBuyDiscountPct: number;
   faithBuyDiscountPct: number;
@@ -522,7 +523,6 @@ export function defaultModifiers(): Modifiers {
     startBoosts: [],
     postCombatLoyalty: [],
     levy: [],
-    legacyRates: [],
     domesticRouteLoyalty: 0,
     incomingRouteYields: [],
     wonderEraProd: [],
@@ -623,6 +623,7 @@ export function defaultModifiers(): Modifiers {
     navalRaiderMoves: 0,
     grievanceNoDecay: false,
     projectProdMult: 1,
+    districtProdMult: 1,
     influenceMult: 1,
     goldBuyDiscountPct: 0,
     faithBuyDiscountPct: 0,
@@ -708,9 +709,9 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.navalRaiderMoves) mods.navalRaiderMoves += fx.navalRaiderMoves;
   if (fx.grievanceNoDecay) mods.grievanceNoDecay = true;
   if (fx.projectProdMult) mods.projectProdMult *= fx.projectProdMult;
+  if (fx.districtProdMult) mods.districtProdMult *= fx.districtProdMult;
   if (fx.influenceMult) mods.influenceMult *= fx.influenceMult;
-  // the discounts ADD: two legacy cards cannot both be slotted for the same
-  // government, but a future row could stack with one.
+  // the discounts ADD
   if (fx.goldBuyDiscountPct) mods.goldBuyDiscountPct += fx.goldBuyDiscountPct;
   if (fx.faithBuyDiscountPct) mods.faithBuyDiscountPct += fx.faithBuyDiscountPct;
   if (fx.loyaltyAll) mods.loyaltyAll += fx.loyaltyAll;
@@ -930,15 +931,15 @@ function plotRowsGateOnEra(civ: string | null, leader: string | null): boolean {
  * the call tree rather than against the fields that "look like" they matter:
  *
  *  - the roster: `civOf` / `leaderOf` (the ~100 `rowIsFor` table filters,
- *    `legacyRatePct`, Phoenicia's coastal loyalty);
+ *    Phoenicia's coastal loyalty);
  *  - `age` (the golden-age flag and `inDarkAge`);
  *  - `research.techs` / `research.civics` (`modifiersFromResearch`,
  *    `completedEffectsIn`, `computeUnlocksIn`, `computeAdoption`,
  *    `unlockedPolicyIds`'s `civEraIndex`, `plotYieldRowsFor`'s civic clause);
  *  - the city count and population SUM (the belief seat's `followers`/`cities`);
  *  - `religion`'s pantheon / founded / founder / enhancer;
- *  - `government.policies` (the stored cards), `government.held` (the legacy
- *    cards' gate) and `government.govTurns` (`legacyBonusPct`);
+ *  - `government.policies` (the stored cards) and `government.held` (the
+ *    legacy cards' gate);
  *  - the World Congress record (`congressPolicyBlocked` and, under the
  *    city-state block, `congressSuzBonusBlocked`);
  *  - the WORLD era, where a plot row of this roster gates on one;
@@ -979,14 +980,14 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   for (let i = 0; i < stored.length; i++) fpPush(m, stored[i]);
   fpPush(m, FP_MARK);
   fpPush(m, gov.held);
-  const govTurns = gov.govTurns;
-  if (govTurns) for (let i = 0; i < govTurns.length; i++) fpPush(m, govTurns[i]);
-  fpPush(m, FP_MARK);
   // the government ROWS are a catalog, but they are still an input `applyGovernment`
   // reads: a test borrows a row onto the adopted government by SWAPPING the
   // effects object in memory (`borrowingRow`), exactly as the GPU poke does, so
   // the identity of each row's effects rides the fingerprint.
-  for (let i = 0; i < GOVERNMENT_LIST.length; i++) fpPush(m, GOVERNMENT_LIST[i].effects);
+  for (let i = 0; i < GOVERNMENT_LIST.length; i++) {
+    fpPush(m, GOVERNMENT_LIST[i].effects);
+    fpPush(m, GOVERNMENT_LIST[i].bonus);
+  }
   fpPush(m, FP_MARK);
 
   const congress = state.congress;
@@ -1146,7 +1147,6 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
   mods.startBoosts = mine(START_BOOST_ROWS).map((r) => r.tech);
   mods.postCombatLoyalty = mine(POST_COMBAT_LOYALTY_ROWS);
   mods.levy = mine(LEVY_ROWS);
-  mods.legacyRates = mine(LEGACY_RATE_ROWS);
   mods.domesticRouteLoyalty = mine(DOMESTIC_ROUTE_LOYALTY_ROWS).reduce((n, r) => n + r.amount, 0);
   mods.incomingRouteYields = mine(INCOMING_ROUTE_YIELD_ROWS);
   mods.wonderEraProd = mine(WONDER_ERA_PROD_ROWS);
@@ -1183,8 +1183,7 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
     applyGovernment(mods, s.research, s.government.policies, congressPolicyBlocked(state),
-                    inDarkAge(state, seat), s.government.held,
-                    (g) => legacyBonusPct(state, seat, g));
+                    inDarkAge(state, seat), s.government.held);
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -1440,8 +1439,7 @@ export function inDarkAge(state: GameState, seat: number): boolean {
 }
 
 /** The `GOVERNMENT_LIST` position of one government id, -1 for an unknown or
- *  absent one. `governmentBit` and the accrual clock both key off this, so
- *  the mask and the counter can never drift apart on the index. */
+ *  absent one — the index `governmentBit` shifts by. */
 export function governmentIndex(id: string | null): number {
   return id === null ? -1 : GOVERNMENT_LIST.findIndex((g) => g.id === id);
 }
@@ -1451,82 +1449,6 @@ export function governmentIndex(id: string | null): number {
 export function governmentBit(id: string | null): number {
   const i = governmentIndex(id);
   return i < 0 ? 0 : 1 << i;
-}
-
-/** CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): the percentage a
- *  seat has accumulated against one government's own `BonusType` — Increment
- *  per Interval turns held, floored, and never lost. A seat whose roster row
- *  raises the RATE (America's Founding Fathers, `BonusRate: 100`, "earn all
- *  government legacy bonuses in half the usual time") divides the interval
- *  rather than multiplying the result, so the two readings agree at every
- *  whole increment instead of only at the end.
- *
- *  ONE composer: the card's payout, the observation and both tests read it
- *  here. */
-export function legacyBonusPct(state: GameState, seat: number, govId: string): number {
-  const gi = governmentIndex(govId);
-  if (gi < 0) return 0;
-  const g = GOVERNMENT_LIST[gi];
-  if (!g.bonus) return 0;
-  const turns = seatOf(state, seat)?.government.govTurns?.[gi] ?? 0;
-  if (turns <= 0) return 0;
-  const rate = 100 + legacyRatePct(state, seat, govId);
-  return Math.floor((turns * rate) / (100 * g.bonus.interval)) * g.bonus.increment;
-}
-
-/** The seat's `BonusRate` for one government, as a percentage ADDED to the
- *  base 100. The install writes nine separate rows for America, one per
- *  government, so this is keyed by government rather than blanket.
- *
- *  Reads the ROWS directly rather than `getModifiers`: the accrual is spent
- *  by a legacy card, which `applyGovernment` slots while the modifier object
- *  is still being BUILT — asking for it there would recurse. The fog walk
- *  reads `ALLIANCE_SHARED_VIS_ROWS` the same way and for the same reason. */
-export function legacyRatePct(state: GameState, seat: number, govId: string): number {
-  const civ = civOf(state, seat);
-  const leader = leaderOf(state, seat);
-  let out = 0;
-  for (const r of LEGACY_RATE_ROWS) {
-    if (r.government === govId && rowIsFor(r, civ, leader)) out = Math.max(out, r.ratePct);
-  }
-  return out;
-}
-
-/** CIV6: what ONE government's accumulated percentage actually pays. Each
- *  government names exactly ONE `BonusType`, so a legacy card is worth a
- *  percentage of one thing — not the government's whole inherent package,
- *  which is what this engine used to hand back.
- *
- *  The channel each name maps to is corroborated twice over: the install's
- *  own Increment/Interval, and the community's independently-reported
- *  percentages ("+1% experience every five turns" for Oligarchy, "+1% wonder
- *  production every 20 turns" for Autocracy) which match those rows exactly.
- *  A pct of 0 must return an EMPTY object — a seat three turns into a
- *  government has earned nothing, and a multiplicative channel must stay
- *  exactly 1 rather than becoming 1.0 by a different route. */
-export function legacyEffects(gov: GovernmentDef, pct: number): PolicyEffects {
-  if (pct <= 0 || !gov.bonus) return {};
-  const f = pct / 100;
-  switch (gov.bonus.type) {
-    case 'wonderConstruction':
-      return { prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: f } };
-    case 'unitProduction':
-      return { prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: f } };
-    case 'overallProduction':
-      return { yieldMult: { production: 1 + f } };
-    case 'districtProjects':
-      return { projectProdMult: 1 + f };
-    case 'greatPeople':
-      return { gppMult: 1 + f };
-    case 'combatExperience':
-      return { xpPct: pct };
-    case 'envoys':
-      return { influenceMult: 1 + f };
-    case 'goldPurchases':
-      return { goldBuyDiscountPct: pct };
-    case 'faithPurchases':
-      return { faithBuyDiscountPct: pct };
-  }
 }
 
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
@@ -1582,8 +1504,8 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
   return out;
 }
 
-/** CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the accrued
- *  percent off every GOLD purchase — a building, a unit, a settler — applied
+/** CIV6 (Democracy, GOVERNMENTBONUS_GOLD_PURCHASES): the percent off every
+ *  GOLD purchase — a building, a unit, a settler — applied
  *  where the purchase is priced and paid. READING: not an upgrade, a tile or a
  *  patronage. Then the five-step floor. `_gold_price` is the twin. */
 export function goldPrice(state: GameState, seat: number, price: number): number {
@@ -1600,8 +1522,8 @@ export function purchaseStep(price: number): number {
   return Math.floor(price / PURCHASE_DIVISOR) * PURCHASE_DIVISOR;
 }
 
-/** CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued percent
- *  off every FAITH purchase, then the five-step floor — `_faith_price` is the
+/** CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent off every
+ *  FAITH purchase, then the five-step floor — `_faith_price` is the
  *  twin. */
 export function faithPrice(state: GameState, seat: number, price: number): number {
   const d = getModifiers(state, seat).faithBuyDiscountPct;
@@ -1666,8 +1588,7 @@ export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]
 }
 
 function applyGovernment(mods: Modifiers, research: ResearchState, stored: readonly (string | null)[],
-                         blocked = -1, dark = false, held = 0,
-                         legacyPct: (govId: string) => number = () => 0): void {
+                         blocked = -1, dark = false, held = 0): void {
   // the government is still what the civics adopt; the CARDS are what the
   // seat chose (`government.policies`, a driver decision), minus any card
   // whose unlock has lapsed since
@@ -1677,17 +1598,14 @@ function applyGovernment(mods: Modifiers, research: ResearchState, stored: reado
   const open = unlockedPolicyIds(research, blocked, dark, held, government!);
   const policies = stored.filter((p): p is string => !!p && open.has(p));
   applyPolicyEffects(mods, gov.effects);
+  // the flat bonus is the government's alone: its legacy card never pays it
+  if (gov.bonus) applyPolicyEffects(mods, gov.bonus);
   for (const cardId of policies) {
     if (!cardId) continue;
     const card = POLICIES[cardId];
     if (!card) continue;
-    // CIV6: a LEGACY card is worth the percentage its government has
-    // ACCUMULATED against its own BonusType — not that government's whole
-    // inherent bonus, which is what `card.effects` still holds.
-    // `legacyPct` is a closure because this body has no seat to ask.
-    applyPolicyEffects(mods, card.legacyOf !== undefined
-      ? legacyEffects(GOVERNMENTS[card.legacyOf], legacyPct(card.legacyOf))
-      : card.effects);
+    // a LEGACY card's `effects` are its government's inherent bonus
+    applyPolicyEffects(mods, card.effects);
     // CIV6 (Thermopylae): the magnitude is "every Military Policy slotted"
     if (card.kind === 'military') mods.militaryPolicies += 1;
   }

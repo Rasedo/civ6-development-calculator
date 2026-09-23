@@ -73,9 +73,10 @@ def main() -> None:
     assert len(live) == 1, f"SIMULTANEUM is the one live boost row, got {len(live)}"
     _row = live[0]
     assert int(_row[0]) == hs and int(_row[1]) == 5, "Simultaneum is FAITH from the Holy Site"
-    assert float(_row[2]) == 1.0 and float(_row[3]) == 15.0 and float(_row[4]) == 0.5, "flat +100%, +50% at pop 15"
-    assert float(_row[5]) == 4.0 and float(_row[6]) == 0.5, "+50% at +4 adjacency"
-    print(f"  3 buildingYieldBoost: district {int(_row[0])} yield {int(_row[1])} pct {float(_row[2])}")
+    assert len(_row) == 6, "no flat half: Gathering Storm deletes the card's DOUBLE rows"
+    assert float(_row[2]) == 15.0 and float(_row[3]) == 0.5, "+50% at pop 15"
+    assert float(_row[4]) == 4.0 and float(_row[5]) == 0.5, "+50% at +4 adjacency"
+    print(f"  3 buildingYieldBoost: district {int(_row[0])} yield {int(_row[1])} +{float(_row[3])} at pop {float(_row[2])}")
 
     # 4) The production cards' two axes.
     prod = [p for p in fx_of(AGOGE_IN)[12]["prod"] if bool(p[0][0])]

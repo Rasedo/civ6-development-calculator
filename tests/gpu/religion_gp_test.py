@@ -43,7 +43,7 @@ def main() -> None:
     # --- Writer/Musician classes -> n_gp = 9 -------------------------------
     cd = rr["gpClassDistrict"]
     assert len(cd) == 9, f"expected 9 GP classes (Writer/Musician added), got {len(cd)}"
-    assert rr["gpRoster"] == [24, 21, 24, 16, 23, 23, 27, 29, 18],         f"the nine sourced rosters: {rr['gpRoster']}"
+    assert rr["gpRoster"] == [24, 21, 24, 16, 23, 23, 26, 29, 18],         f"the nine sourced rosters: {rr['gpRoster']}"
     # nobody is Ancient, the Artists start in the Renaissance, the Musicians in
     # the Industrial era, and the Prophets run out after the Renaissance.
     assert min(min(c) for c in rr["gpEra"]) == 1, "no Great Person is Ancient"

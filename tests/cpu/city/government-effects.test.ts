@@ -40,12 +40,9 @@ function borrowingRow(fx: PolicyEffects, body: () => void): void {
 }
 
 describe('the sourced government rows', () => {
-  // A government row carries its INHERENT bonus and nothing else. Its LEGACY
-  // bonus is a separate thing you cannot have at the same time: Rise and Fall
-  // made it a Wildcard policy card, unlocked only once you have SWITCHED AWAY
-  // from that government. Paying it here would hand a player both halves at
-  // once, which no version of Civ 6 does.
-  it('ships each page INHERENT bonus, and never the legacy one', () => {
+  // `effects` is a government's INHERENT bonus — what its legacy card copies.
+  // Its Gathering Storm FLAT bonus lives in `bonus` (tests/cpu/seats/government-bonus.test.ts).
+  it('ships each page INHERENT bonus in effects', () => {
     expect(GOVERNMENTS.AUTOCRACY.effects).toEqual({ yieldsPerGovBuilding: 1 });
     expect(GOVERNMENTS.OLIGARCHY.effects).toEqual(
       { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } });
@@ -66,10 +63,11 @@ describe('the sourced government rows', () => {
     expect(GOVERNMENTS.CHIEFDOM.effects).toEqual({});
   });
 
-  it('no government pays a legacy channel', () => {
+  it('the flat bonus is never in the inherent effects a legacy card copies', () => {
     // +10% wonder production, +20% unit XP, +15% GPP, +50% unit production,
     // +10% Science, +50% Influence, +15% district production and the two
-    // purchase discounts are LEGACY rows, every one.
+    // purchase discounts are the government's FLAT bonus (`bonus`), which its
+    // legacy card does not pay.
     for (const g of Object.values(GOVERNMENTS)) {
       expect(g.effects.prodBoost, `${g.id} prodBoost`).toBeUndefined();
       expect(g.effects.xpPct, `${g.id} xpPct`).toBeUndefined();
@@ -108,8 +106,8 @@ describe('governmentUnitCS — the promotion-class axis', () => {
 });
 
 describe('the xpPct channel — "+20% Unit Experience"', () => {
-  // Oligarchy's LEGACY row, so no government carries it; the channel is a
-  // card's now, and this drill borrows the magnitude onto an adopted row.
+  // Oligarchy's flat bonus; this drill borrows the magnitude onto the
+  // adopted row, since no game adopts Oligarchy.
   it('joins the building percentage of a CITY award, integer-exact', () => {
     borrowingRow({ xpPct: 20 }, () => {
       const state = makeState();
@@ -218,8 +216,8 @@ describe('CLASSICAL REPUBLIC — the ANY-district gate and the GPP factor', () =
   });
 });
 
-// Both rows below are LEGACY bonuses, so no government carries them; the
-// prodBoost channel is a card's, and these pin its two targets.
+// Both rows below are flat government bonuses (Fascism's units, Autocracy's
+// wonders); these pin the prodBoost channel's two class-free targets.
 describe('the prodBoost targets', () => {
   it('an anyUnit arm reaches class-carrying and class-free units alike', () => {
     const m = defaultModifiers();
@@ -243,7 +241,7 @@ describe('the prodBoost targets', () => {
     const mods = getModifiers(state, 0);
     expect(mods.wwCutPct).toBe(20);
     expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5 }]);
-    // and NOT Fascism's legacy +50% toward units
-    expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0);
+    // and Fascism's flat bonus: "+50% Production toward Units", every unit
+    expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0.5);
   });
 });

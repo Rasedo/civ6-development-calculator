@@ -268,15 +268,10 @@ def main() -> None:
     assert float(sim._gov_dc_house[cr]) == 1.0 and float(sim._gov_dc_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1/+1 in cities with ANY district"
     assert int(sim._gov_hid_min[cr]) == -1, "CLASSICAL_REPUBLIC no longer rides the SPECIALTY channel"
     assert float(sim._gov_housing[gov_idx["MONARCHY"]]) == 0.0, "MONARCHY's unsourced flat housing stays deleted"
-    # A government pays its INHERENT bonus and never its LEGACY one — Rise and
-    # Fall made every legacy bonus a Wildcard card you can only hold once you
-    # have left that government, so no row here may carry one.
+    # The GS flat bonus rides the government row (tests/gpu/government_bonus_test.py
+    # pins each one); Theocracy's faith-bought land units are not in it.
     for gname in gov_idx:
         g = gov_idx[gname]
-        assert float(sim._gov_xppct[g]) == 0.0, f"{gname}: unit experience is a legacy row"
-        assert float(sim._gov_gppmult[g]) == 1.0, f"{gname}: the GPP factor is a legacy row"
-        assert float(sim._gov_prodb[g, 0]) == -1.0, f"{gname}: production toward wonders/units is a legacy row"
-        assert float((sim._gov_ymult[g] - 1).abs().sum()) == 0.0, f"{gname}: a yield multiplier is a legacy row"
         assert not bool(sim._gov_faith_units[g]), f"{gname}: GS moved the faith purchase to the Grand Master's Chapel"
 
     # 10) FASCISM through the fold: TOTALITARIANISM alone at tier 3 adopts
@@ -288,7 +283,7 @@ def main() -> None:
     assert float(fxF["wwcut"][0]) == 20.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -20% weariness, no xp term"
     assert float(fxF["gppmult"][0]) == 1.0, "FASCISM fx: no GPP factor"
     _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p in fxF["prod"] if bool(_a[0])]
-    assert (2, 0, -1, 0.5) not in _prows, "FASCISM fx: +50% toward units is its LEGACY row, not the government's"
+    assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: its flat bonus, +50% toward every unit"
 
     # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;
     #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto

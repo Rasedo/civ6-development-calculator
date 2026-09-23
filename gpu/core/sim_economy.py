@@ -1993,33 +1993,6 @@ class SimEconomy:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
-    def _legacy_pct(self, row: int, gov: int) -> torch.Tensor:
-        """[B] long — the percentage seat `row` has accumulated against
-        government `gov`'s own BonusType.
-
-        CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): Increment per
-        Interval turns held, floored, kept for good. A roster row that raises
-        the RATE (America's Founding Fathers, BonusRate 100) divides the
-        interval rather than multiplying the result, so the two readings agree
-        at every whole increment and not only at the end.
-
-        ONE composer, the twin of `legacyBonusPct`.
-        """
-        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if not self._ngov or gov < 0 or gov >= self._ngov:
-            return z
-        interval = int(self._gov_bonus_int[gov])
-        if int(self._gov_bonus_type[gov]) < 0 or interval <= 0:
-            return z
-        inc = int(self._gov_bonus_inc[gov])
-        rate = torch.full_like(z, 100)
-        for _civ, _lead, _gov, _pct in self._live_rows(row, self._legacy_rate_rows):
-            if _gov == gov:
-                rate = torch.maximum(rate, torch.where(self._row_is(row, _civ, _lead),
-                                                       torch.full_like(z, 100 + _pct), z))
-        turns = self.civ_gov_turns[:, row, gov]
-        return (turns * rate) // (100 * interval) * inc
-
     def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
                          era: torch.Tensor | None, held: torch.Tensor | None,
                          adopted: torch.Tensor) -> torch.Tensor:
@@ -2183,7 +2156,7 @@ class SimEconomy:
         tpmult = torch.ones(B, dtype=dt, device=dev)
         # adjacencyMult, one column per PLACEABLE district: the product of the
         # adopted government's and every slotted card's. byb is the list of
-        # LIVE buildingYieldBoost rows — (active [B], the exported 7-tuple).
+        # LIVE buildingYieldBoost rows — (active [B], the exported 6-tuple).
         adjm = torch.ones(B, len(self.districts_cat), dtype=dt, device=dev)
         byb: list = []
         # The channels with no shape of their own: `prod` is a list of
@@ -2196,14 +2169,10 @@ class SimEconomy:
             "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _o.clone(),
             "pillm": _o.clone(),
             "rgold": _z.clone(), "infl": _z.clone(),
-            # Monarchy's envoy influence, and the two purchase
-            # discounts. The discounts have no READER on either engine
-            # yet — the price is composed at a dozen sites and a
-            # discount added at eleven of them is the two-composers
-            # class — so both engines carry the channel and pay it
-            # nowhere, which is at least the SAME nowhere.
+            # Monarchy's envoy influence and the two purchase discounts
+            # (`_gold_price` / `_faith_price`), the flat government bonuses
             "inflmult": _o.clone(), "goldbuydisc": _z.clone(),
-            "faithbuydisc": _z.clone(),
+            "faithbuydisc": _z.clone(), "distprod": _o.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
             "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
@@ -2282,6 +2251,10 @@ class SimEconomy:
             fx["pillm"] = fx["pillm"] * torch.where(has_gov, self._gov_pillm[adopted], _o)
             fx["gppmult"] = fx["gppmult"] * torch.where(
                 has_gov, self._gov_gppmult[adopted], torch.ones_like(fx["gppmult"]))
+            for _k, _t in (("distprod", self._gov_distprod), ("inflmult", self._gov_inflmult)):
+                fx[_k] = fx[_k] * torch.where(has_gov, _t[adopted], _o)
+            fx["goldbuydisc"] = fx["goldbuydisc"] + self._gov_goldbuy[adopted] * _gf
+            fx["faithbuydisc"] = fx["faithbuydisc"] + self._gov_faithbuy[adopted] * _gf
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
             fx["envoy2"] = fx["envoy2"] | (has_gov & self._gov_envoy2[adopted])
             fx["gpp"] = fx["gpp"] + self._gov_gpp[adopted] * _gf.double().unsqueeze(1)
@@ -2302,10 +2275,8 @@ class SimEconomy:
                 slotted = (self._seat_policies(row)
                            & self._policy_unlocked(civics2, dark, era, held, _ad)
                            & _hg.unsqueeze(1))
-            # a LEGACY card pays its ACCRUAL (the loop below) and never its table row,
-            # which still holds the government's whole package — the ordinary
-            # channels read the CARDS, the returned mask and the payout loop the full set
-            cards = slotted & (self._pol_legacy < 0).unsqueeze(0)
+            # a LEGACY card is an ordinary row: its government's inherent bonus
+            cards = slotted
             fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
             sd = cards.to(dt)
             city_y = city_y + sd @ self._pol_city_y
@@ -2357,45 +2328,6 @@ class SimEconomy:
                 fx["gppmult"] = fx["gppmult"] * torch.where(
                     cards, self._pol_gppmult.unsqueeze(0).expand(B, -1),
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
-                # CIV6: a LEGACY card is worth the percentage its own
-                # government has ACCUMULATED against the ONE BonusType it
-                # names — not that government's whole inherent bonus, which
-                # is what `_pol_*` still holds for it. Nine cards at
-                # most, so a loop over the legacy ones beats a table.
-                if row is not None and self._ngov:
-                    for _p in range(self._npol):
-                        _g = int(self._pol_legacy[_p])
-                        if _g < 0:
-                            continue
-                        _bt = int(self._gov_bonus_type[_g])
-                        if _bt < 0:
-                            continue
-                        _on = slotted[:, _p]
-                        if not bool(_on.any()):
-                            continue
-                        _pc = (self._legacy_pct(row, _g) * _on.long()).to(dt)
-                        _f = _pc / 100.0
-                        if _bt in (self.GB_WONDER, self.GB_UNIT_PROD):
-                            # (mask, target, classMask, eraMax, pct) — the pct
-                            # is per GAME here, where every other row carries a
-                            # catalog scalar, so the consumer broadcasts.
-                            fx["prod"].append((
-                                _on & (_pc > 0),
-                                1 if _bt == self.GB_WONDER else 2, 0, -1, _f))
-                        elif _bt == self.GB_OVERALL_PROD:
-                            ymult[:, 1] = ymult[:, 1] * (1.0 + _f)
-                        elif _bt == self.GB_DISTRICT_PROJ:
-                            fx["projprod"] = fx["projprod"] * (1.0 + _f)
-                        elif _bt == self.GB_GREAT_PEOPLE:
-                            fx["gppmult"] = fx["gppmult"] * (1.0 + _f).to(fx["gppmult"].dtype)
-                        elif _bt == self.GB_COMBAT_XP:
-                            fx["xppct"] = fx["xppct"] + _pc
-                        elif _bt == self.GB_ENVOYS:
-                            fx["inflmult"] = fx["inflmult"] * (1.0 + _f)
-                        elif _bt == self.GB_GOLD_BUY:
-                            fx["goldbuydisc"] = fx["goldbuydisc"] + _pc
-                        elif _bt == self.GB_FAITH_BUY:
-                            fx["faithbuydisc"] = fx["faithbuydisc"] + _pc
                 fx["envoy1"] = fx["envoy1"] | (cards & self._pol_envoy1.unsqueeze(0)).any(dim=1)
                 fx["envoy2"] = fx["envoy2"] | (cards & self._pol_envoy2.unsqueeze(0)).any(dim=1)
                 fx["tourroute"] = fx["tourroute"] + (cards.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
@@ -2411,12 +2343,15 @@ class SimEconomy:
                                ("concert", self._pol_concert), ("milmaint", self._pol_mil_maint)):
                     fx[_k] = fx[_k] + sd @ _t
                 for _k, _t in (("routeymul", self._pol_route_ymult), ("raiderprod", self._pol_raider_prod),
-                               ("projprod", self._pol_proj_prod), ("landcost", self._pol_land_cost)):
+                               ("projprod", self._pol_proj_prod), ("landcost", self._pol_land_cost),
+                               ("distprod", self._pol_distprod), ("inflmult", self._pol_inflmult)):
                     fx[_k] = fx[_k] * torch.where(cards, _t.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 for _k, _t in (("nosettler", self._pol_no_settlers), ("healhome", self._pol_heal_home),
                                ("grievhold", self._pol_griev_hold), ("noenvoy", self._pol_no_envoy)):
                     fx[_k] = fx[_k] | (cards & _t.unsqueeze(0)).any(dim=1)
                 fx["raidermove"] = fx["raidermove"] + (cards.long() * self._pol_raider_moves.unsqueeze(0)).sum(dim=1)
+                fx["goldbuydisc"] = fx["goldbuydisc"] + sd @ self._pol_goldbuy
+                fx["faithbuydisc"] = fx["faithbuydisc"] + sd @ self._pol_faithbuy
                 fx["domroute"] = fx["domroute"] + sd @ self._pol_dom_route
                 fx["impy"] = fx["impy"] + torch.einsum("bp,pik->bik", sd, self._pol_imp_y)
                 fx["govymul"] = fx["govymul"] * torch.where(
@@ -2476,7 +2411,7 @@ class SimEconomy:
         ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
         if ent is not None and ent[0] == ver:
-            return ent[8]
+            return ent[7]
         # `_seat_civics` hands back a VIEW of the live plane; a key that is not
         # a copy compares equal to itself forever and freezes the answer.
         civ = self._seat_civics(row).clone()
@@ -2490,24 +2425,17 @@ class SimEconomy:
         era = self._civ_era(self._seat_techs(row), civ)
         held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
-        # ...and the CLOCK. A legacy card's payout is what this seat has
-        # ACCUMULATED, so the answer moves on a turn when none of the five
-        # inputs above do. Left out, the memo would freeze the accrual at
-        # whatever it was when the answer was first computed.
-        turns = self.civ_gov_turns[:, row].clone() if major else torch.zeros(
-            (self.B,) + tuple(self.civ_gov_turns.shape[2:]), dtype=self.civ_gov_turns.dtype, device=self.device)
         # ...and the STORE: the cards the seat chose are an input now, and a
         # key that is a view of the live plane would freeze the first answer
         pols = self._seat_policies(row).clone()
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
-                and torch.equal(ent[5], held) and torch.equal(ent[6], turns) \
-                and torch.equal(ent[7], pols):
-            val = ent[8]
+                and torch.equal(ent[5], held) and torch.equal(ent[6], pols):
+            val = ent[7]
         else:
             val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, turns, pols, val)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, pols, val)
         return val
 
     def _purchase_step(self, price: torch.Tensor) -> torch.Tensor:
@@ -2519,8 +2447,8 @@ class SimEconomy:
         return torch.floor(price.to(torch.float64) / d) * d
 
     def _gold_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
-        """CIV6 (Merchant Republic's legacy, BonusType goldPurchases): the
-        accrued percent off every GOLD purchase — a building, a unit, a settler
+        """CIV6 (Democracy, GOVERNMENTBONUS_GOLD_PURCHASES): the percent
+        off every GOLD purchase — a building, a unit, a settler
         — applied where the purchase is priced and paid. READING: not an
         upgrade, a tile or a patronage. Then the five-step floor. `goldPrice`'s
         twin; `price` [B] or [B/1, N]."""
@@ -2530,8 +2458,8 @@ class SimEconomy:
         return self._purchase_step(price)
 
     def _faith_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
-        """CIV6 (Theocracy's legacy, BonusType faithPurchases): the accrued
-        percent off every FAITH purchase, then the five-step floor —
+        """CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent
+        off every FAITH purchase, then the five-step floor —
         `faithPrice`'s twin."""
         if self._gov_has_effects:
             f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
@@ -5386,16 +5314,15 @@ class SimEconomy:
                     bld_y[:, :, 1] = bld_y[:, :, 1] + torch.where(has_sy, hadj, torch.zeros_like(hadj))
         _byb = self._gov_mods(row)[11]
         if _byb and bool(selb.any()):
-            for _act, _r7 in _byb:
-                _di, _yi = int(_r7[0]), int(_r7[1])
+            for _act, _r6 in _byb:
+                _di, _yi = int(_r6[0]), int(_r6[1])
                 _live = dlive[:, :, _di] & _act.unsqueeze(1)
                 if not bool(_live.any()):
                     continue
-                _pct = torch.full((B, n), float(_r7[2]), dtype=F64, device=dev)
-                _pct = _pct + (pop >= float(_r7[3])).double() * float(_r7[4])
+                _pct = (pop >= float(_r6[2])).double() * float(_r6[3])
                 _adjv = self._district_adj_seat(row, _di).gather(
                     1, dreg[:, :, _di].clamp(min=0)).double()
-                _pct = _pct + (_adjv >= float(_r7[5])).double() * float(_r7[6])
+                _pct = _pct + (_adjv >= float(_r6[4])).double() * float(_r6[5])
                 _mine = (selb & (self._b_req_district.reshape(1, 1, -1) == _di)).double()
                 _base = torch.einsum("bjn,bn->bj", _mine, bcol["yields"][:, :, _yi])
                 bld_y[:, :, _yi] = bld_y[:, :, _yi] + torch.where(

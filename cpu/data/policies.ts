@@ -33,18 +33,18 @@ export const SLOT_KINDS = ['military', 'economic', 'diplomatic', 'wildcard'] as 
 export const GOVERNMENTS_ADOPTION_LIVE = true;
 
 /**
- * CIV6 (Simultaneum / Rationalism / Grand Opéra / Free Market): "+100% <yield>
- * from <district> district buildings", and the two Gathering Storm clauses
- * beside it — "+50% if city population is 15 or higher, +50% if district has
- * at least +4 adjacency bonus". The percentages ADD, so a big city with a
- * strong district pays +200%. Only the NAMED yield moves: a Cathedral pays
- * faith AND culture, and Simultaneum is a faith card.
+ * CIV6 (Simultaneum / Rationalism / Grand Opéra / Free Market, GS): "Extra
+ * <yield> from buildings in <district>: +50% if city population is 15 or
+ * higher, +50% if district has at least +4 adjacency bonus" — two
+ * MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT rows,
+ * each behind its own requirement set. The percentages ADD, so a big city
+ * with a strong district pays +100% and a card with neither clause met pays
+ * nothing. Only the NAMED yield moves: a Cathedral pays faith AND culture,
+ * and Simultaneum is a faith card.
  */
 export interface BuildingYieldBoost {
   district: DistrictId;
   yield: keyof Yields;
-  /** the flat percentage the card always pays, as a fraction (1 = +100%) */
-  pct: number;
   popMin: number;
   popPct: number;
   adjMin: number;
@@ -179,9 +179,14 @@ export interface PolicyEffects {
   grievanceNoDecay?: boolean;
   /** Automated Workforce: production toward city PROJECTS. */
   projectProdMult?: number;
-  /** the government legacy channels this model had no shape for —
-   *  Monarchy's envoy influence and the two purchase discounts. */
+  /** Merchant Republic (GOVERNMENTBONUS_DISTRICT_PRODUCTION): production
+   *  toward DISTRICTS. */
+  districtProdMult?: number;
+  /** Monarchy (GOVERNMENTBONUS_ENVOYS): multiplies the influence points
+   *  earned toward envoys. */
   influenceMult?: number;
+  /** Democracy / Theocracy (GOVERNMENTBONUS_GOLD_PURCHASES /
+   *  _FAITH_PURCHASES): percent off every gold / faith purchase. */
   goldBuyDiscountPct?: number;
   faithBuyDiscountPct?: number;
   /** Automated Workforce: loyalty per turn in every city. */
@@ -307,33 +312,37 @@ const POLICY_SRC: Record<string, SrcMap> = {
     kind: xml('Policies', 'PolicyType=POLICY_SIMULTANEUM', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     'effects.buildingYieldBoost.district': xml('ModifierArguments', 'ModifierId=SIMULTANEUM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=DistrictType', 'Value', { expect: 'DISTRICT_HOLY_SITE' }),
     'effects.buildingYieldBoost.yield': xml('ModifierArguments', 'ModifierId=SIMULTANEUM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=YieldType', 'Value', { expect: 'YIELD_FAITH' }),
-    'effects.buildingYieldBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=SIMULTANEUM_DOUBLESHRINE&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.popPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=SIMULTANEUM_BUILDING_YIELDS_HIGH_POP&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.adjPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=SIMULTANEUM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=Amount', 'Value')] },
+    'effects.buildingYieldBoost.popMin': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_HIGH_POPULATION&Name=Amount', 'Value'),
+    'effects.buildingYieldBoost.adjMin': xml('RequirementArguments', 'RequirementId=REQUIRES_HOLY_SITE_HAS_HIGH_ADJACENCY&Name=Amount', 'Value'),
   },
   GRAND_OPERA: {
     kind: xml('Policies', 'PolicyType=POLICY_GRAND_OPERA', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     'effects.buildingYieldBoost.district': xml('ModifierArguments', 'ModifierId=GRANDOPERA_BUILDING_YIELDS_HIGH_ADJACENCY&Name=DistrictType', 'Value', { expect: 'DISTRICT_THEATER' }),
     'effects.buildingYieldBoost.yield': xml('ModifierArguments', 'ModifierId=GRANDOPERA_BUILDING_YIELDS_HIGH_ADJACENCY&Name=YieldType', 'Value', { expect: 'YIELD_CULTURE' }),
-    'effects.buildingYieldBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=GRANDOPERA_DOUBLEAMPHITHEATER&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.popPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=GRANDOPERA_BUILDING_YIELDS_HIGH_POP&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.adjPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=GRANDOPERA_BUILDING_YIELDS_HIGH_ADJACENCY&Name=Amount', 'Value')] },
+    'effects.buildingYieldBoost.popMin': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_HIGH_POPULATION&Name=Amount', 'Value'),
+    'effects.buildingYieldBoost.adjMin': xml('RequirementArguments', 'RequirementId=REQUIRES_THEATER_SQUARE_HAS_HIGH_ADJACENCY&Name=Amount', 'Value'),
   },
   RATIONALISM: {
     kind: xml('Policies', 'PolicyType=POLICY_RATIONALISM', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     'effects.buildingYieldBoost.district': xml('ModifierArguments', 'ModifierId=RATIONALISM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=DistrictType', 'Value', { expect: 'DISTRICT_CAMPUS' }),
     'effects.buildingYieldBoost.yield': xml('ModifierArguments', 'ModifierId=RATIONALISM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=YieldType', 'Value', { expect: 'YIELD_SCIENCE' }),
-    'effects.buildingYieldBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=RATIONALISM_DOUBLELIBRARY&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.popPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=RATIONALISM_BUILDING_YIELDS_HIGH_POP&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.adjPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=RATIONALISM_BUILDING_YIELDS_HIGH_ADJACENCY&Name=Amount', 'Value')] },
+    'effects.buildingYieldBoost.popMin': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_HIGH_POPULATION&Name=Amount', 'Value'),
+    'effects.buildingYieldBoost.adjMin': xml('RequirementArguments', 'RequirementId=REQUIRES_CAMPUS_HAS_HIGH_ADJACENCY&Name=Amount', 'Value'),
   },
   FREE_MARKETS: {
     kind: xml('Policies', 'PolicyType=POLICY_FREE_MARKET', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     'effects.buildingYieldBoost.district': xml('ModifierArguments', 'ModifierId=FREEMARKET_BUILDING_YIELDS_HIGH_ADJACENCY&Name=DistrictType', 'Value', { expect: 'DISTRICT_COMMERCIAL_HUB' }),
     'effects.buildingYieldBoost.yield': xml('ModifierArguments', 'ModifierId=FREEMARKET_BUILDING_YIELDS_HIGH_ADJACENCY&Name=YieldType', 'Value', { expect: 'YIELD_GOLD' }),
-    'effects.buildingYieldBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FREEMARKET_DOUBLEMARKET&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.popPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FREEMARKET_BUILDING_YIELDS_HIGH_POP&Name=Amount', 'Value')] },
     'effects.buildingYieldBoost.adjPct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FREEMARKET_BUILDING_YIELDS_HIGH_ADJACENCY&Name=Amount', 'Value')] },
+    'effects.buildingYieldBoost.popMin': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_HIGH_POPULATION&Name=Amount', 'Value'),
+    'effects.buildingYieldBoost.adjMin': xml('RequirementArguments', 'RequirementId=REQUIRES_COMMERCIAL_HUB_HAS_HIGH_ADJACENCY&Name=Amount', 'Value'),
   },
   LIBERALISM: {
     kind: xml('Policies', 'PolicyType=POLICY_LIBERALISM', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
@@ -641,17 +650,17 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('MEDINA_QUARTER', 'Medina Quarter', 'economic', '+2 housing in cities with 3+ specialty districts.', 'SUFFRAGE', {
       housingIfDistricts: { min: 3, housing: 2 },
     }),
-    P('SIMULTANEUM', 'Simultaneum', 'economic', '+100% faith from Holy Site buildings; +50% more at population 15+, +50% more at +4 adjacency.', undefined, {
-      buildingYieldBoost: { district: 'HOLY_SITE', yield: 'faith', pct: 1, popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
+    P('SIMULTANEUM', 'Simultaneum', 'economic', '+50% faith from Holy Site buildings at population 15+, +50% more at +4 adjacency.', undefined, {
+      buildingYieldBoost: { district: 'HOLY_SITE', yield: 'faith', popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
     }),
-    P('GRAND_OPERA', 'Grand Opéra', 'economic', '+100% culture from Theater Square buildings; +50% more at population 15+, +50% more at +4 adjacency.', undefined, {
-      buildingYieldBoost: { district: 'THEATER_SQUARE', yield: 'culture', pct: 1, popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
+    P('GRAND_OPERA', 'Grand Opéra', 'economic', '+50% culture from Theater Square buildings at population 15+, +50% more at +4 adjacency.', undefined, {
+      buildingYieldBoost: { district: 'THEATER_SQUARE', yield: 'culture', popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
     }),
-    P('RATIONALISM', 'Rationalism', 'economic', '+100% science from Campus buildings; +50% more at population 15+, +50% more at +4 adjacency.', undefined, {
-      buildingYieldBoost: { district: 'CAMPUS', yield: 'science', pct: 1, popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
+    P('RATIONALISM', 'Rationalism', 'economic', '+50% science from Campus buildings at population 15+, +50% more at +4 adjacency.', undefined, {
+      buildingYieldBoost: { district: 'CAMPUS', yield: 'science', popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
     }),
-    P('FREE_MARKETS', 'Free Market', 'economic', '+100% gold from Commercial Hub buildings; +50% more at population 15+, +50% more at +4 adjacency.', undefined, {
-      buildingYieldBoost: { district: 'COMMERCIAL_HUB', yield: 'gold', pct: 1, popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
+    P('FREE_MARKETS', 'Free Market', 'economic', '+50% gold from Commercial Hub buildings at population 15+, +50% more at +4 adjacency.', undefined, {
+      buildingYieldBoost: { district: 'COMMERCIAL_HUB', yield: 'gold', popMin: 15, popPct: 0.5, adjMin: 4, adjPct: 0.5 },
     }),
     // the install writes POLICY_LIBERALISM no ObsoletePolicies row: it never retires.
     P('LIBERALISM', 'Liberalism', 'economic', '+1 amenity in cities with 2+ specialty districts.', undefined, {
@@ -846,32 +855,6 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
   ].map((p) => [p.id, { ...p, src: POLICY_SRC[p.id] }]),
 );
 
-/** CIV6: the nine accumulating bonus kinds the install's `GovernmentBonusNames`
- *  lists, less its own "none" row. Each government names exactly one — which is why a
- *  legacy card is worth a percentage of ONE thing and not the government's
- *  whole inherent package. */
-export type GovBonusType =
-  | 'wonderConstruction' | 'combatExperience' | 'greatPeople' | 'envoys'
-  | 'faithPurchases' | 'goldPurchases' | 'unitProduction'
-  | 'overallProduction' | 'districtProjects';
-
-/** CIV6 (MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS): the government's
- *  accumulating bonus — `Increment` percent for every `Interval` turns held.
- *  `Interval` is ScaleByGameSpeed in the install. */
-/** The WIRE order of `GovBonusType` — the index the GPU reads. Appended-to
- *  only at the end, like every other catalog this engine exports. */
-export const GOV_BONUS_TYPES = [
-  'wonderConstruction', 'combatExperience', 'greatPeople', 'envoys',
-  'faithPurchases', 'goldPurchases', 'unitProduction',
-  'overallProduction', 'districtProjects',
-] as const;
-
-export interface GovBonus {
-  type: GovBonusType;
-  increment: number;
-  interval: number;
-}
-
 export interface GovernmentDef {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
@@ -879,12 +862,17 @@ export interface GovernmentDef {
   name: string;
   tier: number;
   slots: SlotKind[];
-  /** CIV6: absent on the Chiefdom alone, which accumulates nothing. */
-  bonus?: GovBonus;
-  /** The government's inherent bonus. Each row's CIV6 quote sits at its
-   *  definition; where a term needs a channel this model has no shape for,
-   *  the row carries the half that fits and the rest is an open AUDIT item. */
+  /** The government's inherent bonus — the modifiers its `GovernmentModifiers`
+   *  rows and its legacy card's `PolicyModifiers` rows BOTH attach. Each row's
+   *  CIV6 quote sits at its definition; where a term needs a channel this
+   *  model has no shape for, the row carries the half that fits and the rest
+   *  is an open AUDIT item. */
   effects: PolicyEffects;
+  /** CIV6 (Gathering Storm): the government's second bonus — what its
+   *  `GovernmentModifiers` attach and its legacy card does NOT (eight
+   *  MODIFIER_PLAYER_GOVERNMENT_FLAT_BONUS rows, and Communism's science).
+   *  Paid only while the seat is IN the government. Absent on the Chiefdom. */
+  bonus?: PolicyEffects;
   description: string;
 }
 
@@ -895,22 +883,33 @@ const G = (
   slots: SlotKind[],
   effects: PolicyEffects,
   description: string,
-  bonus?: GovBonus,
-): GovernmentDef => ({ id, name, tier, slots, effects, description, bonus });
+): GovernmentDef => ({ id, name, tier, slots, effects, description });
 
-/** The install's nine accumulating rows, verbatim from `Governments.xml`'s
- *  MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS arguments. Every one is
- *  Increment 1; only the interval differs. */
-const GOV_BONUS: Record<string, GovBonus> = {
-  OLIGARCHY: { type: 'combatExperience', increment: 1, interval: 5 },
-  MONARCHY: { type: 'envoys', increment: 1, interval: 10 },
-  DEMOCRACY: { type: 'districtProjects', increment: 1, interval: 10 },
-  FASCISM: { type: 'unitProduction', increment: 1, interval: 10 },
-  CLASSICAL_REPUBLIC: { type: 'greatPeople', increment: 1, interval: 15 },
-  MERCHANT_REPUBLIC: { type: 'goldPurchases', increment: 1, interval: 15 },
-  THEOCRACY: { type: 'faithPurchases', increment: 1, interval: 15 },
-  AUTOCRACY: { type: 'wonderConstruction', increment: 1, interval: 20 },
-  COMMUNISM: { type: 'overallProduction', increment: 1, interval: 20 },
+/** CIV6 (Expansion1_Governments.xml, re-shipped by Gathering Storm): each
+ *  government's flat bonus in this catalog's channels. The eight
+ *  MODIFIER_PLAYER_GOVERNMENT_FLAT_BONUS rows name a `BonusType` and an
+ *  `Amount` percent; Communism's is an ordinary city yield modifier
+ *  (COMMUNISM_SCIENCE, Expansion2_Governments.xml). */
+const GOV_BONUS: Record<string, PolicyEffects> = {
+  // GOVERNMENTBONUS_WONDER_CONSTRUCTION: "+10% Production toward Wonders."
+  AUTOCRACY: { prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.1 } },
+  // GOVERNMENTBONUS_COMBAT_EXPERIENCE: "+20% Unit Experience."
+  OLIGARCHY: { xpPct: 20 },
+  // GOVERNMENTBONUS_GREAT_PEOPLE: "+15% Great Person points."
+  CLASSICAL_REPUBLIC: { gppMult: 1.15 },
+  // GOVERNMENTBONUS_ENVOYS: "+50% Influence Points."
+  MONARCHY: { influenceMult: 1.5 },
+  // GOVERNMENTBONUS_FAITH_PURCHASES: "15% Discount on Purchases with Faith."
+  THEOCRACY: { faithBuyDiscountPct: 15 },
+  // GOVERNMENTBONUS_DISTRICT_PRODUCTION: "+15% Production toward Districts."
+  MERCHANT_REPUBLIC: { districtProdMult: 1.15 },
+  // GOVERNMENTBONUS_UNIT_PRODUCTION: "+50% Production toward Units."
+  FASCISM: { prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: 0.5 } },
+  // GOVERNMENTBONUS_GOLD_PURCHASES: the install's Amount is 15 (the English
+  // text still reads 25%).
+  DEMOCRACY: { goldBuyDiscountPct: 15 },
+  // COMMUNISM_SCIENCE: "+10% Science."
+  COMMUNISM: { yieldMult: { science: 1.1 } },
 };
 
 const M = 'military' as const;
@@ -929,59 +928,47 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
   AUTOCRACY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_AUTOCRACY', 'Tier', { expect: 'Tier1' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_AUTOCRACY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_AUTOCRACY', 'BonusType', { expect: 'GOVERNMENTBONUS_WONDER_CONSTRUCTION' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=AUTOCRACY_WONDERS_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=AUTOCRACY_WONDERS_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.prodBoost.target': xml('ModifierArguments', 'ModifierId=AUTOCRACY_WONDERS&Name=BonusType', 'Value', { expect: 'GOVERNMENTBONUS_WONDER_CONSTRUCTION' }),
+    'bonus.prodBoost.eraMax': { derived: '-1: every era - the flat bonus names no era', inputs: [xml('ModifierArguments', 'ModifierId=AUTOCRACY_WONDERS&Name=BonusType', 'Value')] },
+    'bonus.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=AUTOCRACY_WONDERS&Name=Amount', 'Value')] },
     'effects.yieldsPerGovBuilding': xml('ModifierArguments', 'ModifierId=AUTOCRACY_TIER1&Name=Amount', 'Value'),
   },
   OLIGARCHY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_OLIGARCHY', 'Tier', { expect: 'Tier1' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_OLIGARCHY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_OLIGARCHY', 'BonusType', { expect: 'GOVERNMENTBONUS_COMBAT_EXPERIENCE' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=OLIGARCHY_UNIT_EXPERIENCE_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=OLIGARCHY_UNIT_EXPERIENCE_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.xpPct': xml('ModifierArguments', 'ModifierId=OLIGARCHY_UNIT_EXPERIENCE&Name=Amount', 'Value'),
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=OLIGARCHY_MELEE_BUFF&Name=Amount', 'Value'),
   },
   CLASSICAL_REPUBLIC: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC', 'Tier', { expect: 'Tier1' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot (the Classical Republic has NO military row — none in the install, none here)', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC&GovernmentSlotType=SLOT_ECONOMIC', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC&GovernmentSlotType=SLOT_MILITARY', 'NumSlots', { absent: true })] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC', 'BonusType', { expect: 'GOVERNMENTBONUS_GREAT_PEOPLE' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_GREAT_PEOPLE_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_GREAT_PEOPLE_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.gppMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_GREAT_PEOPLE&Name=Amount', 'Value')] },
     'effects.cityWithDistrict.housing': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_HOUSING&Name=Amount', 'Value'),
     'effects.cityWithDistrict.amenities': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_AMENITY&Name=Amount', 'Value'),
   },
   MONARCHY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_MONARCHY', 'Tier', { expect: 'Tier2' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_MONARCHY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_MONARCHY', 'BonusType', { expect: 'GOVERNMENTBONUS_ENVOYS' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=MONARCHY_ENVOYS_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=MONARCHY_ENVOYS_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.influenceMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=MONARCHY_ENVOYS&Name=Amount', 'Value')] },
     'effects.housingPerWallLevel': xml('ModifierArguments', 'ModifierId=MONARCHY_WALLS_HOUSING&Name=Amount', 'Value'),
   },
   MERCHANT_REPUBLIC: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC', 'Tier', { expect: 'Tier2' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC', 'BonusType', { expect: 'GOVERNMENTBONUS_GOLD_PURCHASES' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=MERCHANT_REPUBLIC_GOLD_PURCHASE_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=MERCHANT_REPUBLIC_GOLD_PURCHASE_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.districtProdMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=MERCHANT_REPUBLIC_DISTRICTS&Name=Amount', 'Value')] },
     'effects.governorYieldMult.gold': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=MERCHANT_REPUBLIC_GOLD_MODIFIER&Name=Amount', 'Value')] },
   },
   THEOCRACY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_THEOCRACY', 'Tier', { expect: 'Tier2' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_THEOCRACY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_THEOCRACY', 'BonusType', { expect: 'GOVERNMENTBONUS_FAITH_PURCHASES' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=THEOCRACY_FAITH_PURCHASE_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=THEOCRACY_FAITH_PURCHASE_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.faithBuyDiscountPct': xml('ModifierArguments', 'ModifierId=THEOCRACY_FAITH_PURCHASE&Name=Amount', 'Value'),
     'effects.theologyCS': xml('ModifierArguments', 'ModifierId=THEOCRACY_RELIGIOUS_BUFF&Name=Amount', 'Value'),
     'effects.governorPerCitizen.faith': xml('ModifierArguments', 'ModifierId=THEOCRACY_RELIGIOUS_PEOPLE&Name=Amount', 'Value'),
   },
   DEMOCRACY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_DEMOCRACY', 'Tier', { expect: 'Tier3' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_DEMOCRACY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_DEMOCRACY', 'BonusType', { expect: 'GOVERNMENTBONUS_DISTRICT_PROJECTS' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=DEMOCRACY_DISTRICT_PROCESSES_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=DEMOCRACY_DISTRICT_PROCESSES_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.goldBuyDiscountPct': xml('ModifierArguments', 'ModifierId=DEMOCRACY_GOLD_PURCHASE&Name=Amount', 'Value'),
     'effects.allyRouteYield.food': xml('ModifierArguments', 'ModifierId=DEMOCRACY_TRADEROUTEFOODFROMALLY&Name=Amount', 'Value'),
     'effects.allyRouteYield.production': xml('ModifierArguments', 'ModifierId=DEMOCRACY_TRADEROUTEPRODUCTIONFROMALLY&Name=Amount', 'Value'),
     'effects.alliancePointsPerTurn': xml('ModifierArguments', 'ModifierId=DEMOCRACY_ALLIANCEPOINTS&Name=Amount', 'Value'),
@@ -989,17 +976,15 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
   COMMUNISM: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_COMMUNISM', 'Tier', { expect: 'Tier3' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_COMMUNISM&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_COMMUNISM', 'BonusType', { expect: 'GOVERNMENTBONUS_OVERALL_PRODUCTION' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=COMMUNISM_ALL_PRODUCTION_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=COMMUNISM_ALL_PRODUCTION_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.yieldMult.science': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=COMMUNISM_SCIENCE&Name=YieldType', 'Value', { expect: 'YIELD_SCIENCE' }), xml('ModifierArguments', 'ModifierId=COMMUNISM_SCIENCE&Name=Amount', 'Value')] },
     'effects.governorPerCitizen.production': xml('ModifierArguments', 'ModifierId=COMMUNISM_PRODUCTIVE_PEOPLE&Name=Amount', 'Value'),
   },
   FASCISM: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'Tier', { expect: 'Tier3' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_FASCISM&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
-    'bonus.type': xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'BonusType', { expect: 'GOVERNMENTBONUS_UNIT_PRODUCTION' }),
-    'bonus.increment': xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION_ACCUMULATING&Name=Increment', 'Value'),
-    'bonus.interval': xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION_ACCUMULATING&Name=Interval', 'Value'),
+    'bonus.prodBoost.target': xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=BonusType', 'Value', { expect: 'GOVERNMENTBONUS_UNIT_PRODUCTION' }),
+    'bonus.prodBoost.eraMax': { derived: '-1: every era - the flat bonus names no era', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=BonusType', 'Value')] },
+    'bonus.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=Amount', 'Value')] },
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_ATTACK_BUFF&Name=Amount', 'Value'),
     'effects.wwCutPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
@@ -1015,7 +1000,7 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   },
   OLIGARCHY: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_OLIGARCHY', 'PolicyToUnlock', { expect: 'POLICY_GOV_OLIGARCHY' }),
-    'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=OLIGARCHY_MELEE_BUFF&Name=Amount', 'Value'),
+    'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=OLIGARCHY_LEGACY_MELEE_BUFF&Name=Amount', 'Value'),
   },
   CLASSICAL_REPUBLIC: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC', 'PolicyToUnlock', { expect: 'POLICY_GOV_CLASSICAL_REPUBLIC' }),
@@ -1032,7 +1017,7 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   },
   THEOCRACY: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_THEOCRACY', 'PolicyToUnlock', { expect: 'POLICY_GOV_THEOCRACY' }),
-    'effects.theologyCS': xml('ModifierArguments', 'ModifierId=THEOCRACY_RELIGIOUS_BUFF&Name=Amount', 'Value'),
+    'effects.theologyCS': xml('ModifierArguments', 'ModifierId=THEOCRACY_LEGACY_RELIGIOUS_BUFF&Name=Amount', 'Value'),
     'effects.governorPerCitizen.faith': xml('ModifierArguments', 'ModifierId=THEOCRACY_RELIGIOUS_PEOPLE&Name=Amount', 'Value'),
   },
   DEMOCRACY: {
@@ -1047,7 +1032,7 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   },
   FASCISM: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'PolicyToUnlock', { expect: 'POLICY_GOV_FASCISM' }),
-    'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_ATTACK_BUFF&Name=Amount', 'Value'),
+    'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_LEGACY_ATTACK_BUFF&Name=Amount', 'Value'),
     'effects.wwCutPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
 };
@@ -1109,20 +1094,16 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
       { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 20 },
       '+5 combat strength for all units; -20% war weariness.'),
-  ].map((g) => [g.id, { ...g, bonus: GOV_BONUS[g.id], src: GOVERNMENT_SRC[g.id] }]),
+  ].map((g) => [g.id, { ...g, ...(GOV_BONUS[g.id] ? { bonus: GOV_BONUS[g.id] } : {}), src: GOVERNMENT_SRC[g.id] }]),
 );
 
-// CIV6: every government but the Chiefdom has a LEGACY policy card — one
-// "unlocked by" that government and "cannot be slotted while in" it.
-// Appended LAST, so the wire's card indices (which the World Congress' Policy
-// Treaty names) keep their positions.
-//
-// `effects` here is NOT what the card pays. A legacy card is worth the
-// percentage its government has ACCUMULATED against its own BonusType, which
-// only a seat can answer, so `applyGovernment` builds the real payload from
-// `legacyEffects` and never reads this field for a legacy card. It
-// stays because the wire and the UI both name a card's effects, and an empty
-// object there would read as "this card does nothing".
+// CIV6: every government but the Chiefdom has a LEGACY policy card
+// (`Governments.PolicyToUnlock`, a Wildcard with RequiresGovernmentUnlock) —
+// one "unlocked by" that government and "cannot be slotted while in" it. Its
+// `PolicyModifiers` are the government's INHERENT bonus, so the card pays
+// `effects` and never the government's flat `bonus`. Appended LAST, so the
+// wire's card indices (which the World Congress' Policy Treaty names) keep
+// their positions.
 for (const g of Object.values(GOVERNMENTS)) {
   if (g.tier === 0) continue; // the Chiefdom alone has no legacy bonus
   POLICIES[`LEGACY_${g.id}`] = {

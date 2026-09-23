@@ -23,7 +23,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, t
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, sameReligionToken, getModifiers, governmentIndex, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -2628,6 +2628,9 @@ export function seatPhase(state: GameState): void {
         // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
+        // CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION):
+        // "+15% Production toward Districts."
+        if (q.kind === 'district') _em *= seatMods.districtProdMult;
         // CIV6 (Founder of Carthage): "+50% Production toward districts in the
         // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
         if (q.kind === 'district' && seatMods.plazaDistrictProd
@@ -3015,15 +3018,6 @@ export function seatPhase(state: GameState): void {
     // completed civic can move it, which is why this sits at the loop's exit.
     const _govNow = computeAdoption(rsr).government;
     actor.government.held |= governmentBit(_govNow);
-    // ...and the CLOCK the legacy bonus accrues on. It rides the same
-    // line as `held` deliberately: `|=` is idempotent, so a gating difference
-    // between the engines is invisible in the mask and grows without bound in
-    // the counter. One site, one condition, both engines.
-    const _govIdx = governmentIndex(_govNow);
-    if (_govIdx >= 0) {
-      const _turns = (actor.government.govTurns ??= GOVERNMENT_LIST.map(() => 0));
-      _turns[_govIdx] += 1;
-    }
     // a CHANGED government keeps the slotted cards that still fit its slots
     // and drops the rest; the freed slots wait for the driver's next decision
     if (_govNow && _govNow !== _govBefore) {

@@ -718,12 +718,12 @@ class SimPhase:
         fx = pre["fx"] = {}
         if gm is not None:
             _fxp = gm[12]
-            for _k in ("raiderprod", "landcost", "projprod"):
+            for _k in ("raiderprod", "landcost", "projprod", "distprod"):
                 _v = _fxp[_k]
                 fx[_k] = _v if bool((_v != 1).any()) else None
             pre["pb"] = _fxp["prod"]
         else:
-            fx["raiderprod"] = fx["landcost"] = fx["projprod"] = None
+            fx["raiderprod"] = fx["landcost"] = fx["projprod"] = fx["distprod"] = None
             pre["pb"] = None
         _hk = None
         if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
@@ -902,6 +902,13 @@ class SimPhase:
             if bool((_dm != 1).any()):
                 _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
                 _emall = torch.where(_dist_i, _emall * _dm, _emall)
+        # CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION): "+15%
+        # Production toward Districts" — the seat's, right after the governor's
+        if self._gov_has_effects and pre["fx"]["distprod"] is not None:
+            _dp = pre["fx"]["distprod"].to(_emall.dtype)
+            _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
+            _emall = torch.where(_dist_i, _emall * _dp, _emall)
+        if self.n_governors and row < self.n_majors:
             _pm = self._gov_chan(row, "mult", "projectProdMult")[bidx, col].to(_emall.dtype)
 
             if bool((_pm != 1).any()) and self._proj_rows:
@@ -1010,13 +1017,7 @@ class SimPhase:
                             & ((self._type_cls[_ui] & _cmask) != 0)
                         if _eramax >= 0:
                             _hit = _hit & (self._type_era[_ui] <= _eramax)
-                    # every catalog row carries a scalar pct; a LEGACY
-                    # card's is per GAME, because it is an accrual.
-                    # ...gathered per city row like every other per-game mask
-                    # in this walk (`_fw[bidx]`), never broadcast against it
-                    _pctv = (_pct.to(_add.dtype)[bidx]
-                             if torch.is_tensor(_pct) else _pct)
-                    _add = _add + (_pact & _hit).to(_add.dtype) * _pctv
+                    _add = _add + (_pact & _hit).to(_add.dtype) * _pct
         # CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
         # this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
         # bonus Production in all Cities for 5 turns". Percentages both, so
@@ -1903,14 +1904,10 @@ class SimPhase:
             _adopted, _has = self._adopted_gov(self.civ_civics[:, row])
             # `active` is the TS loop's `cities.length === 0` continue, which
             # sits ABOVE this line in seatPhase — so a city-less seat writes
-            # neither the mask nor the clock. The mask never showed the
-            # difference because `|=` is idempotent; the clock would have
-            # grown by one every turn.
+            # nothing.
             _gov_on = _has & active
             self.civ_gov_held[:, row] |= torch.where(
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
-            self.civ_gov_turns[:, row] += torch.nn.functional.one_hot(
-                _adopted.clamp(min=0), self.civ_gov_turns.shape[2]) * _gov_on.long().unsqueeze(1)
             # a CHANGED government keeps the slotted cards that still fit its
             # slots and drops the rest; the freed slots wait for the driver's
             # next decision — `setGovernment`'s carry-over, at the one place

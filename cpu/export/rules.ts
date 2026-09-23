@@ -87,16 +87,16 @@ import {
   SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL,
 } from '../data/espionage';
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, GOVERNMENT_LIST, GOV_BONUS_TYPES, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind, type BuildingYieldBoost, type PolicyEffects } from '../data/policies';
+import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind, type BuildingYieldBoost, type PolicyEffects, type GovernmentDef } from '../data/policies';
 
 /** A `buildingYieldBoost` as the GPU reads it:
- *  [districtIndex, yieldIndex, pct, popMin, popPct, adjMin, adjPct].
+ *  [districtIndex, yieldIndex, popMin, popPct, adjMin, adjPct].
  *  districtIndex -1 = the row carries no boost. */
 const boostRow = (b: BuildingYieldBoost | undefined): number[] =>
   b
     ? [PLACEABLE_DISTRICTS.indexOf(b.district), YIELD_KEYS.indexOf(b.yield),
-       b.pct, b.popMin, b.popPct, b.adjMin, b.adjPct]
-    : [-1, -1, 0, 0, 0, 0, 0];
+       b.popMin, b.popPct, b.adjMin, b.adjPct]
+    : [-1, -1, 0, 0, 0, 0];
 
 /** Every channel a government or a policy card can carry, in one row so the
  *  two tables cannot drift. A government and a card layer identically. */
@@ -146,6 +146,17 @@ const governorEffectRow = (fx: GovernorEffects) => ({
   appealNearFeature: fx.appealNearFeature ?? 0,
   firstPromoBonus: fx.firstPromoBonus ?? 0,
 });
+
+/** A government's inherent `effects` and its flat `bonus` as ONE effects
+ *  object — refused if the two write the same channel, which the wire's one
+ *  row per government could not carry. */
+const governmentEffects = (g: GovernmentDef): PolicyEffects => {
+  const bonus = g.bonus ?? {};
+  for (const k of Object.keys(bonus)) {
+    if (k in g.effects) throw new Error(`${g.id}: the flat bonus and the inherent bonus both write ${k}`);
+  }
+  return { ...g.effects, ...bonus };
+};
 
 const effectRow = (fx: PolicyEffects) => ({
   cityYields: YIELD_KEYS.map((k) => fx.cityYields?.[k] ?? 0),
@@ -220,6 +231,10 @@ const effectRow = (fx: PolicyEffects) => ({
   navalRaiderMoves: fx.navalRaiderMoves ?? 0,
   grievanceNoDecay: fx.grievanceNoDecay ? 1 : 0,
   projectProdMult: fx.projectProdMult ?? 1,
+  districtProdMult: fx.districtProdMult ?? 1,
+  influenceMult: fx.influenceMult ?? 1,
+  goldBuyDiscountPct: fx.goldBuyDiscountPct ?? 0,
+  faithBuyDiscountPct: fx.faithBuyDiscountPct ?? 0,
   loyaltyAll: fx.loyaltyAll ?? 0,
   favorPerBuilding: fx.favorPerBuilding
     ? [buildingIdx.get(fx.favorPerBuilding.building) ?? -1, fx.favorPerBuilding.favor]
@@ -253,7 +268,7 @@ import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
-import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, LEGACY_RATE_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
+import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { AMENITY_TIERS, amenityTierIndex } from '../data/constants';
 import { CIV_LEVELS, CIV_LEVEL_ORDER } from '../data/civLevels';
 
@@ -370,6 +385,8 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     // mask (`_gov_policy_mods`). Seat-0 only: the civ-seat boost detector has
     // no arm for this kind (civ governments carry no slotted-policy count).
     row = { kind: 'policies', count: c.count };
+  } else if (c.kind === 'alliance') {
+    row = { kind: 'alliance', level: c.level };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
@@ -1744,10 +1761,6 @@ export function buildRules() {
       // [civ, leaderRow, amount, goldenExtra] — both NEGATIVE, a loyalty loss
       postCombatLoyalty: POST_COMBAT_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount, r.goldenExtra]),
       // [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat]
-      // [civ, leaderRow, governmentIndex, ratePct]
-      legacyRates: LEGACY_RATE_ROWS.map((r) => [rowCiv(r), rowLeader(r),
-                                                GOVERNMENT_LIST.findIndex((g) => g.id === r.government),
-                                                r.ratePct]),
       levy: LEVY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.upgradeDiscountPct,
                                   r.envoys, r.levyMoves, r.levyCombat]),
       domesticRouteLoyalty: DOMESTIC_ROUTE_LOYALTY_ROWS.map((r) => [rowCiv(r), rowLeader(r), r.amount]),
@@ -2285,11 +2298,6 @@ export function buildRules() {
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,
       tier: g.tier,
-      // the accumulating bonus — [bonusTypeIndex, increment, interval],
-      // -1 in the first slot for the Chiefdom, which accumulates nothing.
-      bonus: g.bonus
-        ? [GOV_BONUS_TYPES.indexOf(g.bonus.type), g.bonus.increment, g.bonus.interval]
-        : [-1, 0, 0],
       intolerance: GOV_INTOLERANCE[g.id] ?? 0,
       unlockCivic: civicList.findIndex((c) =>
         c.effects.some((e) => e.kind === 'unlockGovernment' && e.government === g.id),
@@ -2300,7 +2308,9 @@ export function buildRules() {
         g.slots.filter((s) => s === 'diplomatic').length,
         g.slots.filter((s) => s === 'wildcard').length,
       ],
-      ...effectRow(g.effects),
+      // the inherent bonus and the flat one layer as ONE row: the government
+      // pays both, and no channel is written by the two at once
+      ...effectRow(governmentEffects(g)),
     })),
     governors: GOVERNORS.map((g) => ({
       id: g.id,

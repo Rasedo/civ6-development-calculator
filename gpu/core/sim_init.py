@@ -714,12 +714,6 @@ class SimInit:
         # legacy card, and the one fact `_adopted_gov` cannot re-derive because
         # it depends on the ORDER the civics arrived in.
         self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        # ...and the CLOCK: turns this seat has spent in each government,
-        # which is what an accumulating bonus accrues on. `civ_gov_held` answers
-        # "ever" and this answers "how long"; they are written on the same line
-        # under the same condition, because an idempotent `|=` hides a gating
-        # difference that a counter would show at once.
-        self.civ_gov_turns = torch.zeros(B, self.n_majors, max(1, len(rules.governments or [])), dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
@@ -2158,11 +2152,6 @@ class SimInit:
         self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
-        # the wire's GOV_BONUS_TYPES order (cpu/data/policies.ts),
-        # named so the payout switch reads as the mapping it is.
-        (self.GB_WONDER, self.GB_COMBAT_XP, self.GB_GREAT_PEOPLE, self.GB_ENVOYS,
-         self.GB_FAITH_BUY, self.GB_GOLD_BUY, self.GB_UNIT_PROD,
-         self.GB_OVERALL_PROD, self.GB_DISTRICT_PROJ) = range(9)
         _govs = rules.governments or []
         _pols = rules.policies or []
         self._ngov = len(_govs)
@@ -2175,13 +2164,6 @@ class SimInit:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
-            # MODIFIER_PLAYER_GOVERNMENT_ACCUMULATING_BONUS: [nGov] each,
-            # the bonus TYPE this government accumulates (-1 = none, the Chiefdom
-            # alone), the percent per step and the turns per step.
-            assert self.civ_gov_turns.shape[2] == self._ngov, "the clock's width is not the government roster's"
-            self._gov_bonus_type = torch.tensor([int(g["bonus"][0]) for g in _govs], dtype=torch.long, device=device)
-            self._gov_bonus_inc = torch.tensor([int(g["bonus"][1]) for g in _govs], dtype=torch.long, device=device)
-            self._gov_bonus_int = torch.tensor([int(g["bonus"][2]) for g in _govs], dtype=torch.long, device=device)
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
             self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_cap_y = torch.tensor([[float(x) for x in g["capitalYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
@@ -2221,14 +2203,14 @@ class SimInit:
             self._gov_ais_amen = torch.tensor([float(x[1]) for x in _gai], dtype=dtype, device=device)
             # adjacencyMult: a MULTIPLIER on one district type's adjacency
             # bonus, per PLACEABLE district column. buildingYieldBoost: one
-            # [district, yield, pct, popMin, popPct, adjMin, adjPct] row.
+            # [district, yield, popMin, popPct, adjMin, adjPct] row.
             _nd_pl = len(self.districts_cat)
             self._gov_adj_mult = torch.tensor(
                 [[float(x) for x in g.get("adjacencyMult", [1] * _nd_pl)] for g in _govs],
                 dtype=dtype, device=device)  # [nGov, nD]
             self._gov_byb = torch.tensor(
-                [[float(x) for x in g.get("buildingYieldBoost", [-1, -1, 0, 0, 0, 0, 0])] for g in _govs],
-                dtype=torch.float64, device=device)  # [nGov, 7]
+                [[float(x) for x in g["buildingYieldBoost"]] for g in _govs],
+                dtype=torch.float64, device=device)  # [nGov, 6]
             # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._gov_prodb = torch.tensor(
@@ -2269,6 +2251,12 @@ class SimInit:
             self._gov_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _govs], dtype=dtype, device=device)
+            # the Gathering Storm FLAT bonus's channels (the government row
+            # carries its inherent and its flat bonus as one)
+            self._gov_distprod = torch.tensor([float(r["districtProdMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_inflmult = torch.tensor([float(r["influenceMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_goldbuy = torch.tensor([float(r["goldBuyDiscountPct"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_faithbuy = torch.tensor([float(r["faithBuyDiscountPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_fx_mag = float(
                 (self._gov_prodb[:, 0] >= 0).sum()
                 + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
@@ -2284,7 +2272,9 @@ class SimInit:
                 + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
                 + self._gov_dc_house.abs().sum() + self._gov_dc_amen.abs().sum()
                 + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
-                + self._gov_govbldy.abs().sum())
+                + self._gov_govbldy.abs().sum()
+                + (self._gov_distprod - 1).abs().sum() + (self._gov_inflmult - 1).abs().sum()
+                + self._gov_goldbuy.abs().sum() + self._gov_faithbuy.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
@@ -2317,8 +2307,8 @@ class SimInit:
                 [[float(x) for x in p.get("adjacencyMult", [1] * _nd_pl)] for p in _pols],
                 dtype=dtype, device=device)  # [nPol, nD]
             self._pol_byb = torch.tensor(
-                [[float(x) for x in p.get("buildingYieldBoost", [-1, -1, 0, 0, 0, 0, 0])] for p in _pols],
-                dtype=torch.float64, device=device)  # [nPol, 7]
+                [[float(x) for x in p["buildingYieldBoost"]] for p in _pols],
+                dtype=torch.float64, device=device)  # [nPol, 6]
             # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._pol_prodb = torch.tensor(
@@ -2348,9 +2338,9 @@ class SimInit:
             # THE DARK-AGE window: [firstEra, lastEra], [-1, -1] on every
             # ordinary card. A Dark Age card needs no unlocking civic — the
             # seat's AGE and this window are its whole gate.
-            # CIV6 (Legacy policy card): the government whose bonus the card
-            # carries, -1 on an ordinary card. Having BEEN in that government
-            # unlocks it; being in it still forbids the slot.
+            # CIV6 (Legacy policy card): the government whose inherent bonus
+            # the card carries, -1 on an ordinary card. Having BEEN in that
+            # government unlocks it; being in it still forbids the slot.
             self._pol_legacy = torch.tensor([int(r.get("legacy", -1)) for r in _pols], dtype=torch.long, device=device)
             _pdk = [r.get("dark", [-1, -1]) for r in _pols]
             self._pol_dark_lo = torch.tensor([int(x[0]) for x in _pdk], dtype=torch.long, device=device)
@@ -2400,6 +2390,10 @@ class SimInit:
             self._pol_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_distprod = torch.tensor([float(r["districtProdMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_inflmult = torch.tensor([float(r["influenceMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_goldbuy = torch.tensor([float(r["goldBuyDiscountPct"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_faithbuy = torch.tensor([float(r["faithBuyDiscountPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_fx_mag = float(
                 (self._pol_prodb[:, 0] >= 0).sum()
                 + self._pol_bcharge.abs().sum() + self._pol_mcut.abs().sum()
@@ -2415,7 +2409,9 @@ class SimInit:
                 + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()
                 + self._pol_dc_house.abs().sum() + self._pol_dc_amen.abs().sum()
                 + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
-                + self._pol_govbldy.abs().sum())
+                + self._pol_govbldy.abs().sum()
+                + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
+                + self._pol_goldbuy.abs().sum() + self._pol_faithbuy.abs().sum())
             self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
         # Master switch (rules.governmentsLive), mirroring the TS
         # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the
@@ -3624,10 +3620,6 @@ class SimInit:
         self._post_combat_loyalty_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["postCombatLoyalty"]]  # type: ignore[misc]
         # [civ, leaderRow, upgradeDiscountPct, envoys, levyMoves, levyCombat]
-        # [civ, leaderRow, governmentIndex, ratePct] — America's nine
-        # TRAIT_*_BONUS_RATE rows, added to the base 100.
-        self._legacy_rate_rows: list[tuple[int, int, int, int]] = [
-            tuple(int(x) for x in r) for r in _uq["legacyRates"]]  # type: ignore[misc]
         self._levy_rows: list[tuple[int, int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["levy"]]  # type: ignore[misc]
         self._domestic_route_loyalty_rows: list[tuple[int, int, int]] = [

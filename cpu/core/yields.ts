@@ -504,7 +504,7 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     if (pillaged.has(b.district)) continue;
     const d = city.districts.find((x) => x.type === b.district);
     if (!d || !ctx.map.tiles[d.tileIndex].districtComplete) continue;
-    let pct = b.pct;
+    let pct = 0;
     if (city.population >= b.popMin) pct += b.popPct;
     // The adjacency the district ACTUALLY pays — a card that doubles it can
     // push the district over this card's own threshold, which is what the

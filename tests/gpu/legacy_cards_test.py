@@ -97,11 +97,15 @@ def test_wire(rules, path) -> None:
     legacy = {POLS[i]: GOVS[int(g)] for i, g in enumerate(sim._pol_legacy.tolist()) if g >= 0}
     want = {f"LEGACY_{g['id']}": g["id"] for g in RULES["governments"] if int(g["tier"]) > 0}
     assert legacy == want, f"the wire carries {sorted(legacy)}, the catalog says {sorted(want)}"
-    # ...and each one's effect columns ARE its government's own
+    # ...and each one's effect columns ARE its government's own INHERENT
+    # bonus: the government row also carries its GS flat bonus, in the
+    # channels below, which the card never pays
+    flat = ("prodBoost", "xpPct", "gppMult", "yieldMult", "influenceMult",
+            "goldBuyDiscountPct", "faithBuyDiscountPct", "districtProdMult")
     for pid, gid in legacy.items():
         pi, gi = POLS.index(pid), GOVS.index(gid)
         pol, gov = RULES["policies"][pi], RULES["governments"][gi]
-        shared = [k for k in pol if k in gov and k not in ("id", "unlockCivic", "slots", "tier")]
+        shared = [k for k in pol if k in gov and k not in ("id", "unlockCivic", "slots", "tier") + flat]
         assert shared, "no effect column is shared between a card and a government row"
         for k in shared:
             assert pol[k] == gov[k], f"{pid}.{k} != {gid}.{k}"

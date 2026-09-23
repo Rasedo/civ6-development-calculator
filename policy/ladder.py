@@ -322,7 +322,7 @@ def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
     order, each kind filling its own slots, the overflow and the wildcard-kind
     cards taking the W slots. LEGACY-FIRST hands the W slots to the unlocked
     LEGACY cards before anything else — the one style that ever slots one,
-    which is what makes the government legacy's accrued payout reachable. MILITARY-FIRST hands
+    which is what makes a legacy card's payout reachable. MILITARY-FIRST hands
     the W slots to the military overflow first. DARK-FIRST hands them to the
     Dark Age cards, which are wildcard-only and unlocked by no civic at all,
     so no other style ever asks for one — the carrier that makes those rows

@@ -588,7 +588,6 @@ SEAT = {
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
-    "governmentTurns": _civ_vec("civ_gov_turns"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
     "goldenAges": _civ_scalar("golden_ages"),

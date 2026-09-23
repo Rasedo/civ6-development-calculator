@@ -30,6 +30,9 @@ export type BoostCheck =
   | { kind: 'anyWonderBuilt' }
   | { kind: 'nearNaturalWonder' }
   | { kind: 'policies'; count: number }
+  /** BOOST_TRIGGER_HAVE_ALLIANCE_LEVEL_X: an alliance with any major at
+   *  `level` or above */
+  | { kind: 'alliance'; level: number }
   | { kind: 'cities'; count: number };
 
 export interface BoostDef {
@@ -68,7 +71,7 @@ const RAW_BOOSTS: Record<string, BoostDef> = {
   MILITARY_SCIENCE: { desc: 'Kill a unit with a knight. (manual)' },
   ELECTRICITY: { desc: 'Build 3 privateers. (manual)' },
   RADIO: { desc: 'Build a national park. (manual)' },
-  CHEMISTRY: { desc: 'Complete a research agreement. (manual)' },
+  CHEMISTRY: { desc: 'Have a level 2 Alliance.', check: { kind: 'alliance', level: 2 } },
   STEEL: { desc: 'Mine coal.', check: { kind: 'improvement', id: 'MINE', count: 1, onResource: true } },
   REPLACEABLE_PARTS: { desc: 'Grow a city to 15 population.', check: { kind: 'cityPop', pop: 15 } },
 

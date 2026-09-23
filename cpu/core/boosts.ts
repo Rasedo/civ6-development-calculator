@@ -1,6 +1,6 @@
 
 import { dedicationEvent } from './eras';
-import { seatOf, citiesOf, tileOwnedByCiv } from './seats';
+import { seatOf, citiesOf, tileOwnedByCiv, allianceLevelWith } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState } from './types';
 import { neighbors } from '../../world/hex';
@@ -98,6 +98,8 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
     }
     case 'cities':
       return citiesOf(state, seat).length >= check.count;
+    case 'alliance':
+      return state.seats.some((o) => o.seat !== seat && allianceLevelWith(state, seat, o.seat) >= check.level);
   }
 }
 

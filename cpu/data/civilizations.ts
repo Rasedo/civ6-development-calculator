@@ -513,15 +513,6 @@ const START_BOOST_SRC: readonly (SrcMap | undefined)[] = [
 const POST_COMBAT_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [
   { amount: ma('TRAIT_DIMINISH_LOYALTY_IN_ENEMY_CITY'), goldenExtra: ma('TRAIT_DIMINISH_LOYALTY_IN_ENEMY_CITY', 'AdditionalGoldenAge') },
 ];
-/** the nine Founding Fathers rows, in the order `LEGACY_RATE_ROWS` builds them */
-const LEGACY_RATE_SRC: Readonly<Record<string, SrcMap>> = Object.fromEntries(
-  ['AUTOCRACY', 'CLASSICAL_REPUBLIC', 'COMMUNISM', 'DEMOCRACY', 'FASCISM',
-    'MERCHANT_REPUBLIC', 'MONARCHY', 'OLIGARCHY', 'THEOCRACY'].map((g) => [g, {
-    government: xml('ModifierArguments', `ModifierId=TRAIT_${g}_BONUS_RATE&Name=BonusRate`, 'ModifierId',
-      { expect: `TRAIT_${g}_BONUS_RATE` }),
-    ratePct: ma(`TRAIT_${g}_BONUS_RATE`, 'BonusRate'),
-  }]),
-);
 const LEVY_SRC: readonly (SrcMap | undefined)[] = [
   { upgradeDiscountPct: ma('LEVY_UNITUPGRADEDISCOUNT'), envoys: ma('LEVY_MILITARY_TWO_FREE_ENVOYS'),
     levyMoves: ma('RAVEN_LEVY_MOVEMENT'), levyCombat: ma('RAVEN_LEVY_COMBAT') },
@@ -1947,28 +1938,6 @@ export const POST_COMBAT_LOYALTY_ROWS: readonly PostCombatLoyaltyRow[] = withSrc
 /** CIV6 (Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT
  *  and EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): "levied units cost 75%
  *  less to upgrade" and a levy hands back two Envoys. */
-/** CIV6 (Founding Fathers): "Earn all Government legacy bonuses in half the
- *  usual time." The install writes it as NINE separate modifiers on America's
- *  trait — TRAIT_AUTOCRACY_BONUS_RATE and its eight siblings — each carrying
- *  `BonusRate: 100` and NO ModifierType, which is DLL-read data rather than
- *  an effect. Keyed by government here for the same reason: nine rows in the
- *  install, nine rows on the wire. */
-export interface LegacyRateRow {
-  civ?: CivId;
-  leader?: LeaderId;
-  /** a `GOVERNMENTS` id */
-  government: string;
-  /** added to the base 100, so 100 = twice the rate = half the interval */
-  ratePct: number;
-}
-export const LEGACY_RATE_ROWS: readonly LegacyRateRow[] = [
-  'AUTOCRACY', 'CLASSICAL_REPUBLIC', 'COMMUNISM', 'DEMOCRACY', 'FASCISM',
-  'MERCHANT_REPUBLIC', 'MONARCHY', 'OLIGARCHY', 'THEOCRACY',
-].map((government) => ({
-  civ: 'AMERICA' as CivId, government, ratePct: 100,
-  ...(LEGACY_RATE_SRC[government] ? { src: LEGACY_RATE_SRC[government] } : {}),
-}));
-
 export interface LevyRow {
   civ?: CivId;
   leader?: LeaderId;

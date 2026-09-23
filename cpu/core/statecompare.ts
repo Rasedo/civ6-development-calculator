@@ -504,7 +504,6 @@ const SEAT: Record<string, Extractor> = {
   }),
   policiesSlotted: overSeats((s) => s.government.policies
     .map((p) => (p ? POLICY_IDX.get(p) ?? -1 : -1)).filter((i) => i >= 0).sort((a, b) => a - b)),
-  governmentTurns: overSeats((s) => [...(s.government.govTurns ?? [])]),
   prevAge: overSeats((s) => s.prevAge ?? 1),
   darkAges: overSeats((s) => s.darkAges ?? 0),
   goldenAges: overSeats((s) => s.goldenAges ?? 0),

@@ -169,7 +169,7 @@ describe('governments and policies', () => {
     expect(computeCityStats(state, city).breakdown.districts.science).toBe(4);
   });
 
-  it('Rationalism doubles campus building yields', () => {
+  it('Rationalism pays nothing in a small city beside a weak Campus', () => {
     const state = makeState(makeMap(16, 16));
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     state.sandbox = true;
@@ -180,7 +180,9 @@ describe('governments and policies', () => {
     grantCivics(state, 'CODE_OF_LAWS', 'SUFFRAGE');
     expect(computeCityStats(state, city).breakdown.buildings.science).toBe(4); // palace 2 + library 2
     grantCivics(state, 'ENLIGHTENMENT');
-    expect(computeCityStats(state, city).breakdown.buildings.science).toBe(6); // library 2 -> 4
+    expect(seatOf(state, 0)!.government.policies).toContain('RATIONALISM');
+    // GS: +50% at population 15, +50% at +4 adjacency, and no flat half
+    expect(computeCityStats(state, city).breakdown.buildings.science).toBe(4);
   });
 
   it('the tier tie-break adopts AUTOCRACY, first tier-1 in table order', () => {

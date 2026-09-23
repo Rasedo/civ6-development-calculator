@@ -127,7 +127,6 @@ const GP_INSTALL_ID: Readonly<Record<string, string>> = {
   GP_ANDREI_RUBLEV: 'ANDREY_RUBLEV',
   GP_SERGEI_GORSHKOV: 'SERGEY_GORSHKOV',
   GP_THELFLD: 'AETHELFLAED',
-  GP_GENGHIS_KHAN_UNIT: 'GENGHIS_KHAN',
   GP_SIMON_BOLIVAR_UNIT: 'SIMON_BOLIVAR',
   GP_SAMORI_TOURE: 'SAMORI_TURE',
   GP_EDGAR_ALLAN_POE: 'EDGAR_ALLEN_POE',
@@ -137,11 +136,11 @@ const GP_INSTALL_ID: Readonly<Record<string, string>> = {
   GP_LILI_UOKALANI: 'LILIUOKALANI',
 };
 
-/** the four this install's readable data files do not carry a row for at all
+/** the two this install's readable data files do not carry a row for at all
  *  (they ship in DLC packs the checker skips) — their class and era stay
  *  UNSOURCED rather than pointing at a row that is not there. */
 const GP_NO_INSTALL_ROW: ReadonlySet<string> = new Set([
-  'GP_TOGO_HEIHACHIRO', 'GP_AMINA', 'GP_SUDIRMAN', 'GP_JOSE_DE_SAN_MARTIN',
+  'GP_AMINA', 'GP_JOSE_DE_SAN_MARTIN',
 ]);
 
 /**
@@ -367,7 +366,6 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     // Medieval
     P('GENERAL', 'GP_THELFLD', 'Æthelflæd', 2),
     P('GENERAL', 'GP_EL_CID', 'El Cid', 2),
-    P('GENERAL', 'GP_GENGHIS_KHAN_UNIT', 'Genghis Khan (unit)', 2),
     P('GENERAL', 'GP_TIMUR', 'Timur', 2),
     // Renaissance
     P('GENERAL', 'GP_ANA_NZINGA', 'Ana Nzinga', 3),
@@ -910,7 +908,6 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
   GP_THELFLD: { unit: 'KNIGHT' },
   GP_EL_CID: { formation: 1 },
-  GP_GENGHIS_KHAN_UNIT: { promotionLevels: 1, xpPct: 25 },
   GP_TIMUR: { promotionLevels: 1, xpPct: 25 },
   GP_ANA_NZINGA: { envoys: 1 },
   GP_AMINA: { envoys: 1 },
