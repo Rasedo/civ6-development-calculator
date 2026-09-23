@@ -4,7 +4,7 @@ GPU side.
 Four classes arrive at once, and with them two new combat conditions
 (`CS_DEF_VS_AIR`, `CS_DEF_VS_AA`), the promotion term inside the sortie, an
 aircraft that finally banks XP, and two channels that pay outside a roll —
-Loot's coastal gold and Tactical Maintenance's heal.
+Loot's coastal gold and the Tactical Maintenance and Ground Crews heals.
 
 Every check below is poked into the same bodies `policy/drive.py` drives:
 `_promo_cs`, `_air_strike_targets`, `_apply_seat_unit_actions`, `_heal_blocked`,
@@ -303,6 +303,22 @@ def main() -> None:
         "a plane that spent its turn WITHOUT attacking is still grounded")
     print("  7 Tactical Maintenance OK (heals after a strike, not after a rebase)")
 
+    # -- 7b: GROUND CREWS -----------------------------------------------------
+    # CIV6: "Heal while patrolling or deployed" — HEAL_AFTER_ACTION, so a
+    # fighter at its base heals after a sortie and after a rebase alike.
+    sim = fresh(rules, path)
+    fs, _ = retype(sim, row, FIGHTER)
+    crews = 1 << col_with(rules, "AIR_FIGHTER", "HEAL_AFTER_ACTION")
+    sim.major_unit_mp[0, fs] = 0.0                       # the turn is spent
+    for struck, what in ((0, "a sortie"), (int(sim._full_attacks("major")[0, fs]), "a rebase")):
+        sim.major_unit_attacks[0, fs] = struck
+        sim.major_unit_promos[0, fs] = 0
+        assert bool(sim._heal_blocked("major")[0, fs]), f"{what} silences the ordinary heal"
+        sim.major_unit_promos[0, fs] = crews
+        assert not bool(sim._heal_blocked("major")[0, fs]), (
+            f"CIV6 (Ground Crews): 'heal while deployed' — even after {what}")
+    print("  7b Ground Crews OK (heals after a sortie and after a rebase)")
+
     # -- 8: LOOT --------------------------------------------------------------
     # CIV6: "+50 Gold from coastal raids", flat and on top of the plunder row.
     def raid(loot: bool) -> int:
@@ -408,7 +424,7 @@ def main() -> None:
           "half health refused, Superfortress waives it)")
 
     print("AIR PROMO OK — four trees, both new conditions, the sortie's XP, Sky "
-          "and Stars, Tactical Maintenance, Loot, the carrier deck and air pillage")
+          "and Stars, Tactical Maintenance, Ground Crews, Loot, the carrier deck and air pillage")
 
 
 if __name__ == "__main__":

@@ -37,9 +37,8 @@ re-adds them.
 |---|---|---|
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
-| B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
-| **B. Fidelity vs real Civ 6** | **4** | |
+| **B. Fidelity vs real Civ 6** | **3** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | the promises' engine half |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14) |
@@ -54,7 +53,7 @@ re-adds them.
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-81 the tile swap's reach | 1 | which plots the DLL offers a claiming city (LAB) |
 | **C. Absent systems** | **13** | |
-| **OPEN, TOTAL** | **17** | |
+| **OPEN, TOTAL** | **16** | |
 
 ## The question ledger — owner asks
 
@@ -82,8 +81,6 @@ close in the same commit.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no row with PLUNDER in its name at all, and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The district `PlunderAmount` column (25 / 50) is sourced and ships, and so are the two plunder percentages (Total War 50, Letter of Marque 100); only the route's base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
-- **B-56r. THE INERT PROMOTIONS.** Weight 1.
-  - BUILD: GROUND_CREWS reads "Heal while patrolling or deployed" (`Promotions_Text.xml`), and its one modifier `GROUND_CREWS_BONUS_HEALTH` / `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION` carries no argument and no requirement set — the modifier type is the whole rule and the engine's own healing supplies the number. The PATROL half is no verb anywhere: no `UNITOPERATION_PATROL`, no command, no promotion in any layer, and the live game offers no air-patrol stance (C-34). The DEPLOYED half is an air unit sitting at its base, which both engines already model (`cpu/core/air.ts` / the GPU's air rows) — so the promotion is buildable on that half and the entry is not a wait.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
   - DLL: the PER-CITY war-weariness split. The install's numbers are `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0, NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`, `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`, `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200, TURN_AT_WAR 50}`, `_WARMONGER_BASE 16` — re-read in `GlobalParameters.xml`, all thirteen still there and still the whole of it; how the per-city rows compose is not published. The empire-wide rule ships (`warWearinessPenalty`).
   - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield and turn tables independently.

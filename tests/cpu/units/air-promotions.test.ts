@@ -15,7 +15,7 @@ import { BUILDINGS } from '../../../cpu/data/buildings';
 import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { RESOURCES } from '../../../world/resources';
-import { airPillageTargets, airRange, airSlotsAt, airStrikeTargets } from '../../../cpu/core/air';
+import { airPillageTargets, airRange, airSlotsAt, airStrikeTargets, rebaseAir } from '../../../cpu/core/air';
 import { airStrike, awardCityXp } from '../../../cpu/core/combat';
 import { promoCS, promoValue, promoFlag, promoAvailable, promoReady } from '../../../cpu/core/promotions';
 import {
@@ -462,23 +462,34 @@ describe('the bomber wrecks what a tile carries', () => {
   });
 });
 
-describe('the rows that ship inert, and say so', () => {
-  it('GROUND CREWS carries no effect yet — and BOARDING no longer', () => {
-    // GROUND CREWS waits on a mechanic neither engine has: it heals "while
-    // patrolling or deployed", and PATROL turns out to be no data row at all
-    // — no operation, no command, no promotion, just the UI's name for
-    // a fighter sitting ready. It exists so the tree's shape and its
-    // prerequisites are the source's.
-    const crews = promoRows('AIR_FIGHTER').find((p) => p.id === 'GROUND_CREWS')!;
-    expect(crews.effects).toEqual([{ kind: 'NONE' }]);
-    // BOARDING left this list in #242n: the magnitude the AUDIT called
-    // unpublished is BOARDING_GOLD_FROM_NAVAL_VICTORY's
-    // PercentDefeatedStrength 100.
-    const boarding = promoRows('NAVAL_RAIDER').find((p) => p.id === 'BOARDING')!;
-    expect(boarding.effects).toEqual([{ kind: 'NAVAL_KILL_GOLD', v: 100, mask: 0 }]);
-    // SUPERFORTRESS left this list with the verb it waits on.
-    expect(promoFlag(
-      { type: BOMBER, promos: bit('AIR_BOMBER', 'SUPERFORTRESS') }, 'AIR_PILLAGE_ANY_HP',
-    )).toBe(true);
+describe('GROUND CREWS', () => {
+  it('lets the fighter heal at its base on a turn it acted, and nobody else', () => {
+    // CIV6 (Ground Crews): "Heal while patrolling or deployed" —
+    // MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION, no argument, no
+    // requirement: the base's own heal, whatever the fighter did this turn.
+    function fly(promos: number, act: 'strike' | 'rebase'): number {
+      const { state, city, pad } = airState();
+      setWar(state, 0, 1, true);
+      grantStrategic(state, city, FIGHTER);
+      const foe = tileAtCoords(state.map, 8, 11);   // land, within the biplane's reach
+      const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
+      plane.promos = promos;
+      plane.hp = 40;
+      if (act === 'strike') {
+        spawnUnit(state, 'WARRIOR', foe.index, 1);
+        expect(airStrike(state, plane.id, foe.index, 0).ok).toBe(true);
+      } else {
+        expect(rebaseAir(state, plane, city.centerIndex)).toBe(true);
+      }
+      expect(plane.movesLeft).toBe(0);          // the action spent the turn
+      const before = plane.hp;
+      refreshUnits(state);
+      return plane.hp - before;
+    }
+    const crews = bit('AIR_FIGHTER', 'GROUND_CREWS');
+    expect(fly(0, 'strike')).toBe(0);
+    expect(fly(0, 'rebase')).toBe(0);
+    expect(fly(crews, 'strike')).toBeGreaterThan(0);
+    expect(fly(crews, 'rebase')).toBeGreaterThan(0);
   });
 });

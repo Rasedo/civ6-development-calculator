@@ -105,6 +105,7 @@ export const PROMO_KINDS = [
   'SIEGE_MOVE_SHOOT',    // a siege unit may attack after moving
   'HEAL_ANYWHERE',       // heals outside friendly territory
   'HEAL_AFTER_ATTACK',   // attacking does not silence this turn's heal
+  'HEAL_AFTER_ACTION',   // no action (a sortie, a rebase) silences this turn's heal
   'RAID_GOLD',           // +v gold on top of a coastal raid's own take
   'NAVAL_KILL_GOLD',     // gold worth v% of a defeated NAVAL unit's strength
   'AIR_SLOTS',           // +v aircraft this hull bases
@@ -992,7 +993,6 @@ const op = (m: number): PromoEffect => cs('SPY_OP_LEVEL', SPY_OP_PROMO_LEVELS, 1
  *  within 10 hexes when it kills a non-Barbarian unit". */
 export const KILL_SPREAD_PRESSURE = 250;
 export const KILL_SPREAD_RANGE = 10;
-const none: PromoEffect = { kind: 'NONE' };
 
 export const PROMOTIONS: readonly PromoDef[] = [
   // ---- RECON ----------------------------------------------------------
@@ -1127,7 +1127,12 @@ export const PROMOTIONS: readonly PromoDef[] = [
     cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.AIR_BOMBER)),
   P('STRAFE', 'AIR_FIGHTER', 2, ['COCKPIT_ARMOR'],
     cs('CS_VS_CLASS_ANY', 17, MASK_LAND & ~MASK_CAVALRY)),
-  P('GROUND_CREWS', 'AIR_FIGHTER', 3, ['INTERCEPTOR'], none),
+  // CIV6 (Ground Crews): "Heal while patrolling or deployed" —
+  // GROUND_CREWS_BONUS_HEALTH is MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION
+  // with no argument and no requirement set, so the engine's own heal supplies
+  // the number and the modifier lifts the rest gate. A fighter always sits at
+  // a base, so every turn is a deployed turn; patrolling is no verb.
+  P('GROUND_CREWS', 'AIR_FIGHTER', 3, ['INTERCEPTOR'], { kind: 'HEAL_AFTER_ACTION' }),
   P('TANK_BUSTER', 'AIR_FIGHTER', 3, ['STRAFE'], cs('CS_VS_CLASS_ANY', 17, MASK_CAVALRY)),
   P('DROP_TANKS', 'AIR_FIGHTER', 4, ['GROUND_CREWS', 'TANK_BUSTER'], cs('RANGE', 2)),
 

@@ -1973,6 +1973,9 @@ export function refreshUnits(state: GameState): void {
     // on the bomber's list alone, and a sortie is the only thing that spends an
     // aircraft's turn, so a spent attack excuses the spent movement. The
     // fortify gate below keeps the plain reading — no aircraft digs in.
+    // CIV6 (Ground Crews): "Heal while patrolling or deployed" — the fighter's
+    // HEAL_AFTER_ACTION excuses a sortie and a rebase alike, and a plane
+    // always stands at its base.
     // CIV6 (Mamluk): "This unit heals every turn, even after moving or
     // combat" — the rest gate does not apply to that chassis at all.
     // CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved or
@@ -1984,7 +1987,8 @@ export function refreshUnits(state: GameState): void {
     const rested = unit.movesLeft >= grantedLast
       || !!UNITS[unit.type]?.healsAlways
       || paHeal
-      || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'));
+      || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'))
+      || promoFlag(unit, 'HEAL_AFTER_ACTION');
     if (rested && !starved && !healBlocked) {
       const home = ownGround;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;

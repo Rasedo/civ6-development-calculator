@@ -4247,8 +4247,12 @@ class SimEconomy:
         # CIV6 (Mamluk): "This unit heals every turn, even after moving or
         # combat" — the rest gate does not reach that chassis at all.
         _t = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        # CIV6 (Ground Crews): "Heal while patrolling or deployed" — the
+        # fighter's HEAL_AFTER_ACTION excuses a sortie and a rebase alike, and
+        # a plane always stands at its base.
         out = (self._spent_mp(pre) & ~self._type_heals_always[_t]
-               & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK")))
+               & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK"))
+               & ~self._promo_pool_flag(pre, "HEAL_AFTER_ACTION"))
         # CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved
         # or attacked" — the improvement's OWN civilization's units, so the
         # tile's row and the unit's seat both have to agree.
