@@ -24,10 +24,12 @@ whose seat holds a unit that walks toward it, and the war march's targets
 action columns it may take. Last the `head`: the engine turn and `vec`, the
 RL observation vector.
 
-Two values ride beside the per-seat observation: `geo_obs`, ONE per game —
-the diplomatic table every seat's agreements and deals are decided from at
-once — and `static_of`, ONE per game — the rules and map facts the driver
-reads (`Static`), built from rules.json and the world's dimensions alone.
+Three values ride beside the per-seat observation, ONE per game each:
+`geo_obs`, the diplomatic table every seat's agreements and deals are
+decided from at once; `world_obs`, the facts every seat sees alike, which
+the TS engine emits too (cpu/core/decideObs.ts) and the gate compares; and
+`static_of`, the rules and map facts the driver reads (`Static`), built from
+rules.json and the world's dimensions alone.
 """
 from __future__ import annotations
 
@@ -47,6 +49,7 @@ TARGET_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["targets"]]
 UNIT_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["unit"]]
 HEAD_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["head"]]
 GEO_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["geo"]]
+WORLD_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["world"]]
 STATIC_FIELDS: list = [f[0] for f in SCHEMA["static"]]
 
 
@@ -775,4 +778,29 @@ def geo_obs(sim) -> list:
         for f, _k in GEO_FIELDS:
             g[f] = held[b] if f == "civics" else lists[f][b]
         out.append(g)
+    return out
+
+
+def world_obs(sim) -> list:
+    """The facts every seat sees alike, one dict per game keyed by
+    `WORLD_FIELDS`: the turn, every living city of every holder (the majors'
+    rows, then the Free Cities row — TS `cityHolders`) as [holder seat,
+    centre, followed religion] in slot order, which is array order at the
+    decide moment; every living city-state as [id, centre]; the Tribal
+    Village tiles. Reads only."""
+    n, RC = sim.n_majors, sim.RC
+    rows = [(r, r) for r in range(n)] + [(sim.FREE_ROW, simbase.FREE_SEAT)]
+    alive = sim.city_alive.tolist()
+    ctr = sim.city_center.tolist()
+    fol = sim.city_followed[:, :, :RC].tolist()
+    cs_alive, cs_ctr = sim.citystate_alive.tolist(), sim.citystate_center.tolist()
+    goody = sim.tile_goody.bool()
+    turn = int(sim.turn)
+    out = []
+    for b in range(sim.B):
+        cities = [[seat, ctr[b][r][j], fol[b][r][j]] for r, seat in rows for j in range(RC) if alive[b][r][j]]
+        states = [[s, cs_ctr[b][s]] for s in range(sim.S) if cs_alive[b][s]]
+        out.append({"turn": turn, "cities": cities, "cityStates": states,
+                    "goody": goody[b].nonzero(as_tuple=True)[0].tolist()})
+    assert not out or list(out[0]) == [f for f, _k in WORLD_FIELDS], "the schema and world_obs disagree"
     return out

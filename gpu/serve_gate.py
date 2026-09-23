@@ -167,6 +167,34 @@ def dump_diff(man: dict, group: str, gdump: dict, tdump: dict,
     return reps
 
 
+def neutral_diff(path: str, g, t) -> str | None:
+    """The first place two neutral-observation values differ, as
+    `<path>: GPU <value> vs TS <value>` naming the field and the row, or
+    None where they are equal. Dicts walk the GPU's keys in order, then any
+    key only TS sent; lists walk by index, then a length difference."""
+    if isinstance(g, dict) and isinstance(t, dict):
+        for k in [*g, *(k for k in t if k not in g)]:
+            if k not in g or k not in t:
+                return f"{path}.{k}: GPU {json.dumps(g.get(k))} vs TS {json.dumps(t.get(k))}"
+            d = neutral_diff(f"{path}.{k}", g[k], t[k])
+            if d:
+                return d
+        return None
+    if isinstance(g, list) and isinstance(t, list):
+        for i, (x, y) in enumerate(zip(g, t)):
+            d = neutral_diff(f"{path}[{i}]", x, y)
+            if d:
+                return d
+        if len(g) != len(t):
+            n = min(len(g), len(t))
+            return (f"{path}: GPU {len(g)} rows vs TS {len(t)} rows, from [{n}]: "
+                    f"GPU {json.dumps(g[n:n + 3])} vs TS {json.dumps(t[n:n + 3])}")
+        return None
+    if type(g) is not type(t) or g != t:
+        return f"{path}: GPU {json.dumps(g)} vs TS {json.dumps(t)}"
+    return None
+
+
 def _buy_row(o: dict, rk: int, rc: int, mk: int) -> list:
     """One game's row of the BUY-candidate tripwire, read off the neutral
     observation in the TS driver twin's exact shape — shared by the batched
@@ -384,6 +412,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
 
     bad = 0
     first: str | None = None
+    world_checked = 0
 
     def flag(rep: str) -> None:
         nonlocal bad, first
@@ -418,6 +447,13 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             msgs = [read_msg(ch) for ch in children]
             prof["wait_obs (TS children)"] += _pc() - _t
             _t = _pc()
+            # THE NEUTRAL OBSERVATION'S WORLD GROUP, emitted by both engines
+            # pre-decide and compared field by field
+            for b, (gw, msg) in enumerate(zip(neutral.world_obs(sim), msgs)):
+                d = neutral_diff("world", gw, msg.get("world"))
+                if d:
+                    flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {d}")
+                world_checked += 1
             pre_seat: dict = {}
             nobs_seat: dict = {}
             for seat in seats:
@@ -576,7 +612,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         print(f"SERVE GATE (BATCHED) RED — first: {first}")
         sys.exit(1)
     print(f"SERVE GATE (BATCHED) OK — {len(seeds)} games x {turns} turns in one batch: "
-          "obs + unit targets equal everywhere, state digests agree on every group")
+          f"obs + unit targets equal everywhere, the neutral world group equal on {world_checked} "
+          "(game, turn) pairs, state digests agree on every group")
 
 
 def main() -> None:
@@ -693,10 +730,19 @@ def main() -> None:
 
     obs_bails = 0
     trace_bad = 0
+    world_checked = 0
     first_report: str | None = None
     for t in range(t0, args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
+        d = neutral_diff("world", neutral.world_obs(sim)[0], msg.get("world"))
+        if d:
+            rep = f"turn {t + 1}: NEUTRAL {d}"
+            print(rep)
+            if first_report is None:
+                first_report = rep
+            obs_bails += 1
+        world_checked += 1
         obs_seat: dict = {}
         for seat in seats:
             obs_seat[seat] = env.observe(seat)
@@ -831,7 +877,7 @@ def main() -> None:
         print(f"SERVE GATE RED — first: {first_report}")
         sys.exit(1)
     print(f"SERVE GATE OK — seed {args.seed}, {args.turns} turns: obs equal on every (turn, seat), "
-          "state digests agree on every group")
+          f"the neutral world group equal on {world_checked} turns, state digests agree on every group")
 
 
 if __name__ == "__main__":

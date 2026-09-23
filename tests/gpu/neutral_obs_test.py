@@ -20,7 +20,9 @@ lists the enemy's improvements and cities, and the driver marches every
 unit where a candidate-by-candidate scan would. The head carries the engine
 turn and the RL vector value for value. The diplomatic table (`geo_obs`)
 matches the raw pair planes cell by cell, a denouncement, an offer and a
-captive spy forced in; the static value built from rules.json and the world
+captive spy forced in; the world group (`world_obs`) lists every living city
+on its holder's ground, every city-state on its own and the Tribal Villages;
+the static value built from rules.json and the world
 file alone equals every sim attribute the driver used to read.
 
 Driven for a stretch first, over two worlds at once, so the seats hold
@@ -331,6 +333,35 @@ def check_geo(sim, geos: list) -> Counter:
     return live
 
 
+def check_world(sim, worlds: list) -> Counter:
+    """The world group against the raw planes: one row per living city of
+    the majors' and the Free Cities' rows, each centre on ground its holder
+    owns, its followed religion the city's own; one row per living
+    city-state, its centre on its own ground; the Tribal Villages."""
+    live: Counter = Counter()
+    assert len(worlds) == sim.B, "one world group per game"
+    for b, w in enumerate(worlds):
+        where = f"world game {b}"
+        assert list(w) == [f for f, _k in neutral.WORLD_FIELDS] and plain(w), f"{where}: fields {list(w)}"
+        assert w["turn"] == int(sim.turn), f"{where}: turn"
+        n_alive = int(sim.city_alive[b, :sim.n_majors].sum()) + int(sim.city_alive[b, sim.FREE_ROW].sum())
+        assert len(w["cities"]) == n_alive, f"{where}: {len(w['cities'])} city rows for {n_alive} living cities"
+        for seat, ctr, fol in w["cities"]:
+            assert int(sim.tile_seat[b, ctr]) == seat, f"{where}: city {ctr} stands on seat {int(sim.tile_seat[b, ctr])}'s ground, row says {seat}"
+            row = sim.FREE_ROW if seat == simbase.FREE_SEAT else seat
+            j = [k for k in range(sim.RC) if bool(sim.city_alive[b, row, k]) and int(sim.city_center[b, row, k]) == ctr]
+            assert len(j) == 1 and int(sim.city_followed[b, row, j[0]]) == fol, f"{where}: city {ctr} followed"
+            live["followed"] += int(fol >= 0)
+        assert len(w["cityStates"]) == int(sim.citystate_alive[b].sum()), f"{where}: city-state rows"
+        for s, ctr in w["cityStates"]:
+            assert int(sim.tile_seat[b, ctr]) == 100 + s, f"{where}: city-state {s} centre {ctr}"
+        assert w["goody"] == sim.tile_goody[b].nonzero(as_tuple=True)[0].tolist(), f"{where}: goody"
+        live["cities"] += len(w["cities"])
+        live["cityStates"] += len(w["cityStates"])
+        live["goody"] += len(w["goody"])
+    return live
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()[:2]
@@ -344,6 +375,8 @@ def main() -> None:
     # offer on the table and a spy held forced in, so every pair plane holds
     # something to read
     live_geo = check_geo(sim, neutral.geo_obs(sim))
+    live_world = check_world(sim, neutral.world_obs(sim))
+    assert live_world["cities"] > 0 and live_world["cityStates"] > 0, f"the world group never filled: {dict(live_world)}"
     poked = ("seat_denounced", "deal_offer_left", "deal_offer_ask", "seat_spy_held")
     keep = {p: getattr(sim, p).clone() for p in poked}
     sim.seat_denounced[:, 0, 1] = int(sim.turn) - 1
@@ -556,6 +589,7 @@ def main() -> None:
             f"the unit rows or tile planes never filled: {live_units} units, {dict(live_tgt)}")
     print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
           f"{live_units} unit rows, target tiles {dict(live_tgt)}, the diplomatic table {dict(live_geo)}, "
+          f"the world group {dict(live_world)}, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
           f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
           f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences; "
