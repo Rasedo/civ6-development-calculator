@@ -5,7 +5,7 @@
  * PERSON's own sourced row, `GP_ABILITY`.
  */
 
-import type { City, CityState, GameState, GreatPersonClass, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
@@ -17,7 +17,7 @@ import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
-  type GpEffect, type GreatPersonDef,
+  type GpEffect, type GpSite, type GreatPersonDef,
 } from '../data/greatPeople';
 import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT, gwKindObjects } from '../data/greatWorks';
@@ -70,35 +70,46 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
   const tile = state.map.tiles[unit.tileIndex];
   if (!tile) return false;
   const { site, district } = gpSiteOf(person);
+  return gpSiteHolds(state, unit.seat, site, district, tile,
+    (city) => gwOpen(state, city, person, unit.gpAt ?? 0));
+}
+
+/** Does `tile` answer activation site `site` for a person of `seat`?
+ *  `district` is the site's district (the `district` arm), `room` whether a
+ *  city of the seat has a slot for the person's works (the `gwSlot` arm). */
+export function gpSiteHolds(
+  state: GameState, seat: number, site: GpSite, district: DistrictId | undefined, tile: Tile,
+  room: (city: City) => boolean,
+): boolean {
   switch (site) {
     case 'anywhere':
       return true;
     case 'district': {
-      if (!tileOwnedByCiv(tile, unit.seat)) return false;
-      return tile.district === district && tile.districtComplete && !tile.districtPillaged;
+      if (!tileOwnedByCiv(tile, seat)) return false;
+      return district !== undefined && tile.district === district && tile.districtComplete && !tile.districtPillaged;
     }
     case 'gwSlot': {
-      if (!tileOwnedByCiv(tile, unit.seat)) return false;
+      if (!tileOwnedByCiv(tile, seat)) return false;
       const city = cityAtTile(state, tile);
-      return !!city && city.seat === unit.seat && gwOpen(state, city, person, unit.gpAt ?? 0);
+      return !!city && city.seat === seat && room(city);
     }
     case 'cityState':
       return isCityStateSeat(tileSeat(tile));
     case 'luxury':
-      return tileOwnedByCiv(tile, unit.seat)
+      return tileOwnedByCiv(tile, seat)
         && !!tile.resource && RESOURCES[tile.resource]?.category === 'luxury';
     case 'adjacentOwn':
       return tileSeat(tile) < 0
-        && neighbors(state.map, tile).some((n) => tileOwnedByCiv(n, unit.seat));
+        && neighbors(state.map, tile).some((n) => tileOwnedByCiv(n, seat));
     case 'suzerainCityState': {
       const cs = cityStateAtSeat(state, tileSeat(tile));
-      return !!cs && isSuzerain(state, cs, unit.seat);
+      return !!cs && isSuzerain(state, cs, seat);
     }
     case 'adjacentBarbarian':
       return adjacentBarbarians(state, tile).length > 0;
     case 'enemyTerritory': {
       const ts = tileSeat(tile);
-      return ts >= 0 && ts !== unit.seat && civsAtWar(state, unit.seat, ts);
+      return ts >= 0 && ts !== seat && civsAtWar(state, seat, ts);
     }
   }
 }

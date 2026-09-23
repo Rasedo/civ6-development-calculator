@@ -7,15 +7,16 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
 import { ENGINEER_LIVE, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { DISTRICT_ADJ_ROWS, rowIsFor } from '../data/civilizations';
-import { campTiles, citiesOf, hiddenResourcesFor, seatOf, tileCity, tileOwnedByCiv } from './seats';
+import { citiesOf, seatOf, tileCity } from './seats';
 import { computeUnlocks, getModifiers } from './effects';
-import { availableBuildings, canBuildRoad, validImprovementsIn } from './rules';
+import { availableBuildings } from './rules';
 import { trainableUnits } from './units';
-import { availableProjects, engineerFinishCity } from './game';
+import { availableProjects } from './game';
 import { citySpecialistSlots, resourcePriority, swapTileOk, workableTiles } from './city';
 import { buildingVariantAdjacency, districtAdjacency } from './yields';
 import { prodLayout } from './prodLayout';
 import { districtSiteLegal, formationOrderOk, wonderSite } from './phase';
+import { builderHasJob, engineerHasJob } from './targetSites';
 
 /**
  * THE CITY ROWS (production, district sites, citizens, swaps).
@@ -45,31 +46,6 @@ export interface CityObs {
 function heldOrQueued(state: GameState, seat: number, id: string): boolean {
   return state.units.some((u) => u.seat === seat && u.type === id)
     || citiesOf(state, seat).some((c) => c.queue.some((q) => q.kind === 'unit' && q.unit === id && !q.formation));
-}
-
-/** A Builder would find work somewhere: an owned tile that is pillaged,
- *  holds a pillaged district, or is bare and takes an improvement the seat
- *  has unlocked (the job plane the unit planner walks toward). */
-function builderHasJob(state: GameState, seat: number): boolean {
-  const owns = (t: Tile) => tileOwnedByCiv(t, seat);
-  const unlocks = computeUnlocks(state, seat);
-  const camps = campTiles(state);
-  const hidden = hiddenResourcesFor(state, seat);
-  return state.map.tiles.some((t) => owns(t)
-    && (t.pillaged || t.districtPillaged
-      || (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map, camps, hidden }).length > 0)));
-}
-
-/** A Military Engineer would find work somewhere: a road it may lay, an
- *  engineer improvement site, or a 20%-charge site. */
-function engineerHasJob(state: GameState, seat: number): boolean {
-  const owns = (t: Tile) => tileOwnedByCiv(t, seat);
-  const unlocks = computeUnlocks(state, seat);
-  const camps = campTiles(state);
-  const hidden = hiddenResourcesFor(state, seat);
-  return state.map.tiles.some((t) => canBuildRoad(t, owns)
-    || validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map, camps, hidden, builder: 'MILITARY_ENGINEER' }).length > 0
-    || engineerFinishCity(state, seat, t.index) !== undefined);
 }
 
 /** The seat-wide half of the unit columns: per roster unit that the combat

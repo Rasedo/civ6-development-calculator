@@ -1393,6 +1393,14 @@ export function digUnderfoot(state: GameState, tile: Tile | undefined, seat: num
   return null;
 }
 
+/** the city an excavated Artifact lands in: the LOWEST-id city of the seat
+ *  with an open slot that takes one; undefined where none has room. */
+export function artifactHome(state: GameState, seat: number): City | undefined {
+  return (seatOf(state, seat)?.cities ?? [])
+    .filter((c) => gwHasRoom(state, c, GWO_ARTIFACT))
+    .sort((a, b) => a.id - b.id)[0];
+}
+
 /**
  * EXCAVATE a dig into an Artifact. The Archaeologist must stand on
  * an ANTIQUITY SITE or a SHIPWRECK, hold a charge, and the tile must be its
@@ -1417,9 +1425,7 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
   if (borderClosedTo(state, unit.seat, tile, unit.type)) {
     return no('That dig lies behind a closed border.');
   }
-  const home = seatOf(state, seat)!.cities
-    .filter((c) => gwHasRoom(state, c, GWO_ARTIFACT))
-    .sort((a, b) => a.id - b.id)[0];
+  const home = artifactHome(state, seat);
   if (!home) return no('No city has a free artifact slot.');
   placeGreatWork(state, home, {
     obj: GWO_ARTIFACT,
