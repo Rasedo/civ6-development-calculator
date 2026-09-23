@@ -202,8 +202,12 @@ class SimSeats:
             self._claim_version += 1
             self._eff_version += 1
 
-    def _seat_production_mask(self, row: int) -> torch.Tensor:
+    def _seat_production_mask(self, row: int, sites: dict | None = None) -> torch.Tensor:
         """[B, RC, W] — THE production decision space, for seat row `row`.
+
+        `sites`, when given, collects each district column's PLOTS as the
+        sweep computes them: `sites[(j, si)]` = [B, T] the tiles city slot j
+        may take scaffold row si on, False wherever that column is shut.
 
         ONE body for every seat, in the ONE production layout
         (cpu/core/prodLayout.ts): NB queue-building columns, 1 settler, 1 idle,
@@ -394,8 +398,10 @@ class SimSeats:
                         gate_d = gate_d & (spec_cnt < cap_max)
                     if not bool(gate_d.any()):
                         continue
-                    ok_d[:, si] = gate_d & self._district_elig(
-                        row, j, di, plc, base=site).any(dim=1)
+                    elig_d = self._district_elig(row, j, di, plc, base=site)
+                    ok_d[:, si] = gate_d & elig_d.any(dim=1)
+                    if sites is not None:
+                        sites[(j, si)] = elig_d & (gate_d & room[:, j]).unsqueeze(1)
             base_j = torch.cat([ok_b, ok_s, ones_b.unsqueeze(1), ok_u, ok_d], dim=1)
             ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
             if nW_m > 0:

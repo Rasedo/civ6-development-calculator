@@ -51,22 +51,39 @@ def _seat_style(row: int) -> dict:
     return ladder.style_of(STYLE_TABLE[row % len(STYLE_TABLE)])
 
 
-def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
-    """The per-seat counters no mask can express, read from the OBSERVATION's
-    ctx block (ladder.CTX_FIELDS) rather than off sim tensors — the values
-    are the scripted sites' own, rendered by env._ctx_block, so a TS client
-    rendering the same observation feeds the ladder identically. city_cap
-    stays rules-side: static data is not state."""
+def _obs_cities(nobs: list, width: int, device) -> dict:
+    """The observation's `cities` rows as tensors on ONE city axis — array
+    order, padded to the widest seat of the batch: `centre` [B, C] (-1 on a
+    pad), `is_capital` [B, C], `settlers` [B] (on order anywhere), `mask`
+    [B, C, width] (the open production columns) and `sites`
+    {(b, k, column): [(tile, adjacency), ...]}."""
+    B = len(nobs)
+    C = max(1, max(len(o["cities"]) for o in nobs))
+    centre = torch.full((B, C), -1, dtype=torch.long)
+    is_cap = torch.zeros(B, C, dtype=torch.bool)
+    settlers = torch.zeros(B, dtype=torch.long)
+    mask = torch.zeros(B, C, width, dtype=torch.bool)
+    sites: dict = {}
+    for b, o in enumerate(nobs):
+        for k, c in enumerate(o["cities"]):
+            centre[b, k] = c["centre"]
+            is_cap[b, k] = c["isCapital"]
+            settlers[b] += c["settlerQueued"]
+            if c["prodOpen"]:
+                mask[b, k, c["prodOpen"]] = True
+            for col, t, a in c["distSites"]:
+                sites.setdefault((b, k, col), []).append((t, a))
+    return {"centre": centre.to(device), "is_capital": is_cap.to(device),
+            "settlers": settlers.to(device), "mask": mask.to(device), "sites": sites}
+
+
+def _prod_ctx(blocks: dict, cities: dict, sim, seat: int) -> dict:
+    """The per-seat counters no mask can express, read from the OBSERVATION —
+    the ctx block (ladder.CTX_FIELDS) and the `cities` rows — rather than off
+    sim tensors, so a TS client rendering the same observation feeds the
+    ladder identically. city_cap stays rules-side: static data is not
+    state."""
     ctx = blocks["ctx"]
-    emp = blocks["empire"]
-    # is_capital must be MASK-ALIGNED (the masks' city axis is SLOT order)
-    # while the obs city block is LIVING-ORDER — the two axes differ once a
-    # city dies. Until the serve obs dict carries a per-city identity (centre
-    # tile) to re-map with, this one flag reads the slot-ordered plane
-    # directly; the wire itself stays centre-keyed (the record schema), so
-    # nothing TS-facing leaks. `seat` IS the row of the merged city block, so
-    # this reads one plane for everybody.
-    is_cap = sim.city_is_cap[:, seat]
     n_cities = ctx[:, 0].long()
     # ONE city cap for every seat — the ladder's maxCities heuristic. (The
     # seat-0 arm this replaced read a `sim.C` that was itself
@@ -87,8 +104,8 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
         rot = si if si is not None else rot
     return {
         "dist_rot": rot,
-        "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
-        "is_capital": is_cap,  # the wonder tier's capital heuristic (city col 9)
+        "settler_queued": cities["settlers"] > 0,
+        "is_capital": cities["is_capital"],  # the wonder tier's capital heuristic
         "melee": ctx[:, 2].long(),
         "ranged": ctx[:, 3].long(),
         "unit_count": ctx[:, 1].long(),
@@ -1114,36 +1131,43 @@ def _deal_turn(sim, off, acc, alive_row, rstr, prox, prox_max) -> None:
             acc[:, a, b] = standing & (sim.war[:, a, b] | afford)
 
 
-def _district_tiles(sim, row: int, prod: torch.Tensor):
-    """[B, RC, nS] the tile each city would put each district column on, or
-    None when this world has no district columns.
+def _district_tiles(sim, prod: torch.Tensor, sites: dict):
+    """[B, C, nS] the tile each city (array order, `prod`'s axis) would put
+    each district column on, or None when this world has no district columns.
 
     The placement CHOICE, which is policy and belongs here: a scan per engine
-    would have to agree forever. Only the column a city actually
-    picked is filled — every other entry stays -1, and the apply refuses a
-    district column whose tile is -1. A net driving `production_pref` must fill
-    every column it wants reachable, through this same body.
+    would have to agree forever. Only the column a city actually picked is
+    filled — every other entry stays -1, and the apply refuses a district
+    column whose tile is -1. The plots and their adjacency are the
+    observation's (`_obs_cities`' `sites`).
     """
     nS = len(sim._scaffold) if sim.districts_on else 0
     if nS == 0:
         return None
-    out = torch.full((sim.B, sim.RC, nS), -1, dtype=torch.long, device=sim.device)
-    jmax = min(int(prod.shape[1]), sim.RC)
-    # WHICH (city, district) pairs anybody picked, in ONE transfer. The
-    # RC x nScaffold `want.any()` sweep this replaces was a host sync per pair,
-    # and a seat queues a district in a city or two at most.
-    si_all = prod[:, :jmax] - sim.DISTRICT_BASE
+    B, C = prod.shape
+    out = torch.full((B, C, nS), -1, dtype=torch.long, device=prod.device)
+    # WHICH (city, district) pairs anybody picked, in ONE transfer
+    si_all = prod - sim.DISTRICT_BASE
     sel = (si_all >= 0) & (si_all < nS)
     if not bool(sel.any()):
         return out
-    pairs = sorted({(int(j), int(s)) for (_b, j), s
+    pairs = sorted({(int(k), int(s)) for (_b, k), s
                     in zip(sel.nonzero(as_tuple=False).tolist(), si_all[sel].tolist())})
-    for j, si in pairs:
-        di, _ut, _uc, plc, _fc = sim._scaffold[si]
-        want = prod[:, j] == sim.DISTRICT_BASE + si
-        t = ladder.pick_district_tile(sim._district_elig(row, j, di, plc),
-                                      sim.district_rank_adj(di, plc))
-        out[:, j, si] = torch.where(want, t, out[:, j, si])
+    for k, si in pairs:
+        col = sim.DISTRICT_BASE + si
+        want = prod[:, k] == col
+        per_game = [sites.get((b, k, col), []) for b in range(B)]
+        # the planes only need to span the listed plots: the rank is (adjacency,
+        # then the LOWEST tile), whatever the width
+        w = 1 + max((t for ps in per_game for t, _a in ps), default=0)
+        elig = torch.zeros(B, w, dtype=torch.bool)
+        adj = torch.zeros(B, w, dtype=torch.float64)
+        for b, ps in enumerate(per_game):
+            for t, a in ps:
+                elig[b, t] = True
+                adj[b, t] = a
+        t = ladder.pick_district_tile(elig, adj).to(prod.device)
+        out[:, k, si] = torch.where(want, t, out[:, k, si])
     return out
 
 
@@ -1209,15 +1233,19 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
                 pre: dict | None = None) -> dict:
     """Seat `row`'s turn decisions, every DECIDE_FIELDS entry but the unit
     plan, keyed by name. Writes nothing. `nobs` is the seat's neutral
-    observation, one dict per game (shared/decide.schema.json)."""
+    observation, one dict per game (shared/decide.schema.json). `prod` is
+    (centre [B, C], column [B, C]) over the observation's cities in array
+    order, and `dtile` [B, C, nS] rides the same axis."""
     dev = sim.device
-    prod_mask = sim._seat_production_mask(row)
+    # PRODUCTION on the observation's city axis — array order, every city
+    # named by its centre; the record resolves each centre to its slot
+    cities = _obs_cities(nobs, sim.PROD_W, dev)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     style = _seat_style(row)
-    prod = ladder.pick_production(prod_mask, classes, roster, _prod_ctx(blocks, sim, row),
+    prod = ladder.pick_production(cities["mask"], classes, roster, _prod_ctx(blocks, cities, sim, row),
                                   tier_order=style["tier_order"])
-    prod = _maybe_form_tier(sim, row, prod_mask, prod, seeds, turn)
-    dtile = _district_tiles(sim, row, prod)
+    prod = _maybe_form_tier(sim, row, cities["mask"], prod, seeds, turn)
+    dtile = _district_tiles(sim, prod, cities["sites"])
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
     if style["deep"] is not None:
         deep = torch.full((sim.B,), bool(style["deep"]), dtype=torch.bool, device=sim.device)
@@ -1279,7 +1307,7 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     swap = _decide_swap(sim, row)
     vote = _decide_vote(sim, row)
     gp_pass = _decide_gp_pass(sim, row, seeds, turn)
-    return {"prod": prod, "dtile": dtile, "tech": tech, "civic": civic, "war": war,
+    return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,

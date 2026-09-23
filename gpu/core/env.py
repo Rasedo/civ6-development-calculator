@@ -29,6 +29,7 @@ from __future__ import annotations
 import torch
 
 from .engine import BatchSim, Rules, UNIT_SLOTS
+from .neutral import living_order
 
 def n_unit_acts(rules: Rules) -> int:
     """The unit head's width, read from the SHIPPED action enum — never a literal.
@@ -167,9 +168,8 @@ class BatchEnv:
             dim=2,
         ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin
         # The city AXIS is LIVING ORDER, not slot order: the TS array shifts
-        # down when a city is lost. Compact alive slots to the front, stable in
-        # slot (= founding) order.
-        _ord = torch.argsort((~alive).long(), dim=1, stable=True)
+        # down when a city is lost — the neutral observation's `cities` order.
+        _ord = living_order(alive)
         per_city = per_city.gather(1, _ord.unsqueeze(2).expand(-1, -1, per_city.shape[2]))
 
         mine = s.major_unit_alive & (s.major_unit_seat == row)

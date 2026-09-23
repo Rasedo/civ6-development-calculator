@@ -27,10 +27,10 @@ plus the optional fields the extractors below document (war, warKind, envoys,
 buy, buyFaith, levy, and the geo intents). Codes are the MASK layouts
 (`seat_masks`, `_seat_unit_mask`), one layout for every seat, so the same file
 can drive any of them.
-The CITY AXIS is keyed by CENTRE TILE, not index: the recorder reads cities by
-GPU slot and TS applies by founding-order array position, and the two diverge
-exactly when compaction or capture reorders slots — match cities by centre,
-never by slot. The UNITS axis stays positional: the engines deliberately
+The CITY AXIS is keyed by CENTRE TILE, not index: the driver decides over the
+observation's cities in array order, the engines hold them in their own slots,
+and a centre is the one name both share — `apply_decisions` resolves each
+centre to the living city standing there. The UNITS axis stays positional: the engines deliberately
 mirror unit order (TS splices captured units to the END because the GPU
 appends; deaths drop identically from both).
 """
@@ -80,13 +80,33 @@ def _buys_by_slot(sim, row: int, dec: dict) -> dict:
     return out
 
 
+def _production_by_slot(sim, row: int, prod: tuple, dtile):
+    """The production decisions name cities by CENTRE — (centre [B, C],
+    column [B, C]) with `dtile` [B, C, nS] on the same axis; the engine's
+    queue takes slots. Returns ([B, RC], [B, RC, nS] | None), -1 in every
+    slot no decision names."""
+    centre, col = prod
+    # [B, C, RC]: decision k names slot j. A living city's centre is unique
+    # to it, so every slot is named at most once and the max over k picks it.
+    hit = ((sim.city_center[:, row].unsqueeze(1) == centre.unsqueeze(2))
+           & sim.city_alive[:, row].unsqueeze(1) & (centre >= 0).unsqueeze(2))
+    neg = torch.full_like(col, -1)
+    by_slot = torch.where(hit, col.unsqueeze(2), neg.unsqueeze(2)).amax(dim=1)
+    dt = None
+    if dtile is not None:
+        dt = torch.where(hit.unsqueeze(3), dtile.unsqueeze(2),
+                         torch.full_like(dtile, -1).unsqueeze(2)).amax(dim=1)
+    return by_slot, dt
+
+
 def apply_decisions(sim, row: int, dec: dict) -> None:
     """Stash one seat's non-unit decisions (the DECIDE_FIELDS names) for the
     step to apply. production_tile rides along or the drive and its own record
     diverge: a district column without its tile is refused at the apply, while
     the replay side passes the recorded tile and places it."""
     by_slot = _buys_by_slot(sim, row, dec)
-    sim.apply_seat_actions(row, production=dec["prod"], production_tile=dec["dtile"], tech=dec["tech"],
+    prod, dtile = _production_by_slot(sim, row, dec["prod"], dec["dtile"])
+    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=dec["tech"],
                            civic=dec["civic"], policies=dec["policies"], war=dec["war"], war_kind=dec["war_kind"],
                            envoys=dec["env_seq"], buy=by_slot.get("buy"), worship=by_slot.get("worship"),
                            relig=by_slot.get("relig"), levy=dec["levy"], monu=by_slot.get("monu"),
@@ -161,19 +181,17 @@ def extract_geo(geo, row: int, b: int) -> dict:
 
 
 def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, b: int) -> dict:
-    _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
     nS = 0 if dtile is None else int(dtile.shape[2])
     prod_pairs = []
-    for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0]))):
-        col = int(_pr[j])
-        if col < 0 or not bool(_alive_c[j]):
+    for k, (centre, col) in enumerate(zip(prod[0][b].tolist(), prod[1][b].tolist())):
+        if col < 0 or centre < 0:
             continue
-        pair = [int(_ctr[j]), col]
+        pair = [centre, col]
         si = col - sim.DISTRICT_BASE
         if 0 <= si < nS:
-            pair.append(int(dtile[b, j, si]))  # a DISTRICT column names its tile
+            pair.append(int(dtile[b, k, si]))  # a DISTRICT column names its tile
         prod_pairs.append(pair)
     _t = None if tech is None or int(tech[b]) < 0 else int(tech[b])
     _c = None if civic is None or int(civic[b]) < 0 else int(civic[b])
@@ -296,18 +314,22 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     the run from it.
     """
     dev = sim.device
-    prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
+    # the production entries, CENTRE-KEYED as the driver decides them;
+    # apply_decisions resolves each centre to the living city standing there
+    ents = rec["production"] or [[-1, -1]]
+    E = len(ents)
+    centre = torch.tensor([int(e[0]) for e in ents], dtype=torch.long, device=dev).reshape(1, E).expand(sim.B, -1)
+    pcol = torch.tensor([int(e[1]) for e in ents], dtype=torch.long, device=dev).reshape(1, E).expand(sim.B, -1)
     nS = len(sim._scaffold) if sim.districts_on else 0
-    dtile = torch.full((sim.B, sim.RC, nS), -1, dtype=torch.long, device=dev) if nS else None
-    for ent in rec["production"]:
-        centre, col = int(ent[0]), int(ent[1])
-        hit = (sim.city_center[:, row] == centre) & sim.city_alive[:, row]
-        prod = torch.where(hit, torch.full_like(prod, col), prod)
-        si = col - sim.DISTRICT_BASE
-        if dtile is not None and 0 <= si < nS:
-            # a district column carries its TILE as the pair's third element
-            t = int(ent[2]) if len(ent) > 2 else -1
-            dtile[:, :, si] = torch.where(hit, torch.full_like(dtile[:, :, si], t), dtile[:, :, si])
+    dtile = None
+    if nS:
+        dtile = torch.full((sim.B, E, nS), -1, dtype=torch.long, device=dev)
+        for k, ent in enumerate(ents):
+            si = int(ent[1]) - sim.DISTRICT_BASE
+            if 0 <= si < nS:
+                # a district column carries its TILE as the pair's third element
+                dtile[:, k, si] = int(ent[2]) if len(ent) > 2 else -1
+    prod = (centre, pcol)
     # [B] like the war arm below — a bare torch.tensor(int) is 0-dim and the
     # record apply gathers on dim 1.
     tech = None if rec["tech"] is None else torch.full((sim.B,), int(rec["tech"]), dtype=torch.long, device=dev)

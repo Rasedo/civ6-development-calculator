@@ -187,10 +187,12 @@ def main() -> None:
     rec_sim.seat_ext[0, row] = True
     e6 = rec_sim._district_elig(row, j, di, plc)
     t6 = int(ladder.pick_district_tile(e6, rec_sim.district_rank_adj(di, plc))[0])
-    prod6 = torch.full((1, rec_sim.RC), -1, dtype=torch.long)
-    prod6[0, j] = rec_sim.DISTRICT_BASE + si
-    dt6 = torch.full((1, rec_sim.RC, len(rec_sim._scaffold)), -1, dtype=torch.long)
-    dt6[0, j, si] = t6
+    # the driver's production decision: (centre, column) per city, the tile
+    # on the same axis
+    prod6 = (rec_sim.city_center[:, row, j:j + 1].clone(),
+             torch.full((1, 1), rec_sim.DISTRICT_BASE + si, dtype=torch.long))
+    dt6 = torch.full((1, 1, len(rec_sim._scaffold)), -1, dtype=torch.long)
+    dt6[0, 0, si] = t6
     # every decision slot by NAME: the record grows a slot most rounds, and a
     # positional call here broke on two of them in one week
     import inspect

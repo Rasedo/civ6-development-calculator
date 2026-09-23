@@ -1,5 +1,5 @@
 {
-  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every group is an object keyed by its field names in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none; list = a list of plain integers, laid out as its meaning says (a dense list indexed by a table index, or ascending indices). Every price is an exact integer: no field carries a fraction. Emitters: gpu/core/neutral.py (GPU).",
+  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every `seat` group is an object keyed by its field names in the order listed; after them, `cities` is a list with one object per LIVING city of the seat, in the seat's city-ARRAY order (TS `seat.cities`: founding order, a lost city spliced out, a gained one appended), each keyed by the `city` fields in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none; list = a list of plain integers, laid out as its meaning says (a dense list indexed by a table index, or ascending indices); table = a list of fixed-width rows of plain integers, ascending. Every price is an exact integer: no field carries a fraction. Emitters: gpu/core/neutral.py (GPU).",
   "seat": {
     "buy": [
       ["bldg_city", "city", "the city holding the cheapest completable gold-buyable building"],
@@ -74,5 +74,13 @@
       ["avail", "int", "envoys in this seat's bank"],
       ["held", "list", "per city-state index (the roster index, fixed for the game): the envoys this seat holds there, -1 where it has not met the city-state or the city-state is gone"]
     ]
-  }
+  },
+  "city": [
+    ["centre", "int", "the city's CENTRE tile, its name on the wire"],
+    ["isCapital", "bool", "it is the seat's capital"],
+    ["pop", "int", "its population"],
+    ["settlerQueued", "int", "the settlers on order in its queue, at any depth"],
+    ["prodOpen", "list", "the production columns it may queue now (the one production layout, cpu/core/prodLayout.ts), ascending; empty while its queue has no room"],
+    ["distSites", "table", "for every OPEN district column: each plot the district may go on, as [column, tile, adjacency] — the adjacency the district would earn there (floored; 0 for the types with no adjacency yield) — ascending by column, then tile"]
+  ]
 }

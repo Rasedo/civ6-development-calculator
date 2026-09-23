@@ -9,6 +9,8 @@ trade route it would open), `nuke` (the silo launch it would take),
 `research` (the open techs and civics with their prices), `policy` (the cards
 it may slot and the slots), `war` (the open war columns and the kind each
 declaration takes) and `envoy` (the bank and the courtship per city-state).
+After them `cities`: one row per living city in the seat's ARRAY order, with
+its production columns and the plots each open district column may take.
 """
 from __future__ import annotations
 
@@ -20,6 +22,15 @@ import torch
 SCHEMA = json.loads((Path(__file__).resolve().parents[2] / "shared" / "decide.schema.json")
                     .read_text(encoding="utf-8"))
 SEAT_GROUPS: dict = {g: [(f[0], f[1]) for f in fields] for g, fields in SCHEMA["seat"].items()}
+CITY_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["city"]]
+
+
+def living_order(alive: torch.Tensor) -> torch.Tensor:
+    """[B, RC] city slots -> [B, RC] the slot at each position of the seat's
+    city ARRAY: the living first, in slot order (which is founding order —
+    cities append and the step-end reclaim compacts stably), the dead after.
+    Every reader of the city axis in living order takes this one ordering."""
+    return torch.argsort((~alive).long(), dim=1, stable=True)
 
 
 def _buy_ctx(sim, row: int) -> dict:
@@ -149,9 +160,59 @@ def _columns(sim, row: int) -> dict:
 _INDEX_LISTS = {("policy", "unlocked"), ("war", "declare"), ("war", "sue")}
 
 
+def _city_rows(sim, row: int) -> list:
+    """Seat `row`'s `cities`, one list per game: a dict per LIVING city in
+    array order keyed by `CITY_FIELDS`. The production columns are
+    `_seat_production_mask`'s, and the district plots the ones its own sweep
+    tested, so an open district column always lists at least one plot."""
+    B = sim.B
+    alive = sim.city_alive[:, row]
+    sites: dict = {}
+    mask = sim._seat_production_mask(row, sites)                      # [B, RC, W]
+    order = living_order(alive)
+    rank = torch.argsort(order, dim=1)                                # slot -> array position
+    scal = torch.stack([_as_long(sim.city_center[:, row]), sim.city_is_cap[:, row].long(),
+                        _as_long(sim.city_pop[:, row]),
+                        (sim.city_current[:, row] == sim.SETTLER).sum(dim=2)], dim=2)
+    scal = scal.gather(1, order.unsqueeze(2).expand(-1, -1, scal.shape[2]))
+    opened = mask.nonzero()                                           # (b, slot, column), ascending
+    site_rows = torch.zeros(0, 5, dtype=torch.long, device=sim.device)
+    if sites:
+        keys = sorted(sites)                                          # (slot, scaffold row)
+        planes = torch.stack([sites[k] for k in keys])                # [K, B, T]
+        kk, bb, tt = planes.nonzero(as_tuple=True)                    # key, then game, then tile
+        if kk.numel():
+            srows = sorted({si for _j, si in keys})
+            adj = torch.stack([sim.district_rank_adj(sim._scaffold[si][0], sim._scaffold[si][3])
+                               for si in srows])                      # [nS', B, T]
+            at = {si: i for i, si in enumerate(srows)}
+            k_adj = torch.tensor([at[si] for _j, si in keys], dtype=torch.long, device=sim.device)
+            k_slot = torch.tensor([j for j, _si in keys], dtype=torch.long, device=sim.device)
+            k_col = torch.tensor([sim.DISTRICT_BASE + si for _j, si in keys], dtype=torch.long, device=sim.device)
+            site_rows = torch.stack([bb, k_slot[kk], k_col[kk], tt, _as_long(adj[k_adj[kk], bb, tt])], dim=1)
+    n_alive = alive.sum(dim=1).tolist()
+    rank_l, scal_l = rank.tolist(), scal.tolist()
+    out = [[{"centre": c, "isCapital": bool(cap), "pop": pop, "settlerQueued": sq, "prodOpen": [], "distSites": []}
+            for c, cap, pop, sq in scal_l[b][:n_alive[b]]] for b in range(B)]
+    for b, j, c in opened.tolist():
+        k = rank_l[b][j]
+        if k < n_alive[b]:
+            out[b][k]["prodOpen"].append(c)
+    # the keys are sorted by (slot, scaffold row) and the nonzero walks each
+    # key's tiles ascending, so a city's plots arrive by column, then tile
+    for b, j, c, t, a in site_rows.tolist():
+        k = rank_l[b][j]
+        if k < n_alive[b]:
+            out[b][k]["distSites"].append([c, t, a])
+    return out
+
+
 def seat_obs(sim, row: int) -> list:
     """Seat `row`'s observation, one dict per game of the batch (index = b):
-    {group: {field: int | bool | list[int]}} over `SEAT_GROUPS`. Reads only."""
+    {group: {field: int | bool | list[int]}} over `SEAT_GROUPS`, then
+    "cities": [{field: ...} over `CITY_FIELDS`, one per living city in array
+    order]. Reads only."""
+    cities = _city_rows(sim, row)
     cols = _columns(sim, row)
     order = [(g, name, kind) for g in SEAT_GROUPS for name, kind in SEAT_GROUPS[g]]
     assert [(g, n) for g, n, _k in order] == list(cols), "the schema and the emitted columns disagree"
@@ -170,5 +231,6 @@ def seat_obs(sim, row: int) -> list:
                 ob[g][name] = [k for k, x in enumerate(xs) if x] if (g, name) in _INDEX_LISTS else [int(x) for x in xs]
             else:
                 ob[g][name] = bool(xs[0]) if kind == "bool" else int(xs[0])
+        ob["cities"] = cities[b]
         out.append(ob)
     return out
