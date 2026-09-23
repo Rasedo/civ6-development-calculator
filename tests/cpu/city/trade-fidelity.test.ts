@@ -11,7 +11,7 @@ import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAS
 import { isWater } from '../../../world/query';
 import { hexDistance } from '../../../world/hex';
 import { applySeatActionRecord, declareWar, seatPhase, warTargets } from '../../../cpu/core/phase';
-import { routeCandidateRow } from '../../../cpu/driver/driver';
+import { routeCandidateRow } from '../../../cpu/core/buyCandidates';
 import { spawnUnit, trainableUnits, traderCost } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { TECHS } from '../../../cpu/data/techs';

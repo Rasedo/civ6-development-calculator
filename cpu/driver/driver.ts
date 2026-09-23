@@ -15,29 +15,17 @@
  * dev server for the UI later. The record schema is the interface.
  */
 import { writeFileSync } from 'node:fs';
-import type { City, DistrictId, GameState, Seat, Tile } from '../core/types';
-import { allCities, campTiles, cityHolders, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
-import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
-import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
-import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from '../core/trade';
-import { isExplored } from '../core/fog';
-import { buildingFaithCost, endTurn, engineerFinishCity, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost, unitsAcquired } from '../core/game';
-import { goldenDedication, monumentalityBuyMult } from '../core/eras';
-import { builderCost, goldBuyableUnits, purchaseSpotBlocked } from '../core/units';
-import { hasMet, isSuzerain } from '../core/cityStates';
-import { pickBorderTile } from '../core/city';
-import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
-import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import type { DistrictId, GameState, Tile } from '../core/types';
+import { allCities, campTiles, cityHolders, seatOf, tileOwnedByCiv } from '../core/seats';
+import { endTurn, engineerFinishCity } from '../core/game';
+import { buyCandidateRow, routeCandidateRow } from '../core/buyCandidates';
 import { observeSeat } from '../core/observe';
 import { worldObs, seatGroups } from '../core/decideObs';
 import { stateDigest, groupDump } from '../core/statecompare';
-import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
+import { canBuildRoad, validImprovementsIn } from '../core/rules';
 import { hiddenResourcesFor } from '../core/seats';
-import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from '../core/effects';
+import { computeUnlocks } from '../core/effects';
 import { hexDistance } from '../../world/hex';
-import { prodLayout } from '../core/prodLayout';
-import { UNITS } from '../data/units';
-import { BUILDINGS } from '../data/buildings';
 
 export interface DriverOpts {
   state: GameState;
@@ -54,13 +42,6 @@ export interface DriverOpts {
   send: (msg: unknown) => void;
 }
 
-/** The route CANDIDATE this seat would take — a decider-side row over EVERY
- * legal destination at once: own cities in array order, then MET city-states,
- * then every other major's EXPLORED cities (from asc, to asc, cityState asc,
- * seat asc). Best NEW in-range pair by the route's TOTAL yields,
- * strictly-greater beats, so ties keep the first pair in that scan order.
- * [origin CENTRE, dest code (CENTRE or -(2 + city-state ID))], [-1,-1] = none.
- * Gated on capacity AND a free Trader — the unit the verb spends. */
 /** The decomposition log's window, ONE PER LINE KIND — the GPU's
  *  `_trim_by_kind` twin. A flat window lets whichever emitter is chattiest
  *  push every other kind out, and the two engines are chatty in different
@@ -98,223 +79,6 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
   return out;
 }
 
-export function routeCandidateRow(state: GameState, actor: Seat): number[] {
-  const routes = actor.tradeRoutes ?? [];
-  if (actor.cities.length < 1) return [-1, -1];
-  if (routes.length >= tradeCapacity(state, actor.seat)) return [-1, -1];
-  if (state.unitsMode && !freeTrader(state, actor.seat)) return [-1, -1];
-  let best: { from: number; dest: number; ySum: number } | null = null;
-  for (const from of actor.cities) {
-    for (const to of actor.cities) {
-      if (to.id === from.id) continue;
-      if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
-      if (!routeInRange(state, actor.seat, from.centerIndex, to.centerIndex)) continue;
-      const y = routeYields(state, to);
-      const ySum = y.food + y.production;
-      if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
-    }
-    for (const cityState of state.cityStates) {
-      // THE DEST CODE NAMES THE CITY-STATE'S ID, never its position in this
-      // array. `captureCityState` splices the array, so every later position
-      // shifts the moment a minor is taken — and the APPLIER has always
-      // decoded this code with `cityStateById`, so the encoder was the half
-      // that disagreed. The GPU's slot index is the id and never moves.
-      const ci = cityState.id;
-      const gMet = hasMet(cityState, actor.seat);
-      const gHas = routes.some((x) => x.from === from.id && x.toCs === cityState.id);
-      const gRch = routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex);
-      // EVERY city-state, gate by gate — a candidate one engine holds and the
-      // other refuses is the whole question, and only the gates answer it.
-      const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
-      if (dlG) dlG.push(`rg:${actor.seat}:${state.turn}:${-(2 + ci)} f${from.centerIndex} met${gMet ? 1 : 0} has${gHas ? 1 : 0} reach${gRch ? 1 : 0} ctr${cityState.centerIndex}`);
-      if (!gMet || gHas || !gRch) continue;
-      const cy = cityStateRouteYields(cityState);
-      const post = routePostGold(state, actor.seat, cityState.centerIndex);
-      const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith + post;
-      // the ROUTE decomposition: one line per city-state candidate that got
-      // this far, so a pair that disagrees names the term rather than the
-      // answer. Only candidates PAST the three gates reach here, which is
-      // itself the evidence when one engine prints a line and the other does
-      // not.
-      const dlC = (globalThis as { __diffLog?: string[] }).__diffLog;
-      if (dlC) dlC.push(`rc:${actor.seat}:${state.turn}:${-(2 + ci)} f${from.centerIndex} y${ySum - post} post${post} key${ySum}`);
-      if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
-    }
-    // An INTERNATIONAL destination competes on the same total-yield key as a
-    // domestic or city-state one; it is not a fallback for when nothing else
-    // is reachable.
-    for (const other of state.seats) {
-      if (other.seat === actor.seat) continue;
-      for (const pc of other.cities) {
-        if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
-        if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-        if (!routeInRange(state, actor.seat, from.centerIndex, pc.centerIndex)) continue;
-        const py = routeYieldsInternational(state, from, pc, actor.seat);
-        const ySum = py.food + py.production + py.gold + py.science + py.culture + py.faith
-          + routePostGold(state, actor.seat, pc.centerIndex);
-        if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: pc.centerIndex, ySum };
-      }
-    }
-  }
-  return best ? [best.from, best.dest] : [-1, -1];
-}
-
-function buyCandidateRow(state: GameState, actor: Seat): number[] {
-    let buyC = -1;
-    let buyB = -1;
-    let bd: (typeof BUILDINGS)[string] | null = null;
-    let bc: (typeof actor.cities)[number] | null = null;
-    // The purchase's OWN legality, not a second copy of it: the shared gold
-    // list plus `buildingCompletable`, the pair the phase arm applies.
-    for (const city of actor.cities) {
-      for (const def of goldPurchasableBuildings(state, city)) {
-        if (def.noPurchase) continue;
-        if (!buildingCompletable(state, city, def.id)) continue;
-        if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
-          bd = def;
-          bc = city;
-        }
-      }
-    }
-    if (bd && bc && Math.round((actor.treasury ?? 0) * 1000) >= Math.round((goldPrice(state, actor.seat, bd.cost * GOLD_PURCHASE_MULT) + PEACE_GOLD_COST(0)) * 1000)) {
-      buyC = bc.centerIndex;
-      buyB = prodLayout().buildings.indexOf(bd.id);
-    }
-    const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-    const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
-      && !purchaseSpotBlocked(state, settlerSpawnCity, actor.seat, 'SETTLER')
-      && goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)));
-    let mil = 0;
-    for (const u of state.units) {
-      if (u.seat !== actor.seat) continue;
-      if ((UNITS[u.type]?.combat ?? 0) > 0) mil += 1;
-    }
-    for (const city of actor.cities) {
-      const q = city.queue[0];
-      if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
-    }
-    // `unitPurchaseCost` is the price the applier charges — Mercenary
-    // Companies moves it, and every column offered here is a military unit.
-    const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-    const anyU = goldBuyableUnits(state, actor.seat).some(
-      (def) => buyCity !== undefined && !purchaseSpotBlocked(state, buyCity, actor.seat, def.id)
-        && goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity))),
-    );
-    const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
-    let tileOk = 0;
-    let tileT = -1;
-    let tileC = -1;
-    // the SEAT's whole yield context, as the applier's own pick reads it
-    // (`makeYieldCtx`): a bare { map, mods } dropped the Preserve's Grove and
-    // Sanctuary terms, the hidden resources and every other per-seat clause,
-    // so the offered tile could differ from the one the buy then takes
-    const actorCtx = makeYieldCtx(state, actor.seat);
-    for (const city of actor.cities) {
-      const next = pickBorderTile(state, city, actorCtx);
-      if (next === null) continue;
-      if (goldAffordable(actor.treasury ?? 0, tilePurchaseCost(state, city, next))) {
-        tileOk = 1;
-        tileT = next;
-        tileC = city.centerIndex;
-      }
-      break;
-    }
-    const hsOk = (city: (typeof actor.cities)[number]): boolean => {
-      const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
-      const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
-      return !!ht?.districtComplete && !ht.districtPillaged;
-    };
-    let worshipC = -1;
-    let religKind = -1;
-    let religC = -1;
-    if (actor.religion.founded) {
-      const wid = WORSHIP_BUILDINGS[actor.seat % WORSHIP_BUILDINGS.length];
-      if (goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, buildingFaithCost(state, actor.seat, wid)))) {
-        worshipC = actor.cities.find((city) => !city.buildings.includes(wid) && city.buildings.includes('TEMPLE') && hsOk(city))?.centerIndex ?? -1;
-      }
-      // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
-      // TEMPLE on top, so the two arms walk to DIFFERENT cities.
-      // ...and every tier is sold only by a city WITH a majority religion —
-      // `_seat_religious_city_ok`'s clause, which the engine's applier ANDs
-      const follows = (city: City) => (city.followedReligion ?? -1) >= 0;
-      const shrineCity = actor.cities.find((city) => city.buildings.includes('SHRINE') && hsOk(city) && follows(city));
-      const templeCity = actor.cities.find((city) => city.buildings.includes('SHRINE')
-        && city.buildings.includes('TEMPLE') && hsOk(city) && follows(city));
-      const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
-      const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
-      const mCost = faithPrice(state, actor.seat, unitFaithCost('MISSIONARY', eb?.missionaryCostMult ?? 1, unitsAcquired(state, actor.seat, 'MISSIONARY')));
-      if (shrineCity && liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
-        religKind = 5;
-        religC = shrineCity.centerIndex;
-      } else if (templeCity) {
-        const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
-        const liveQ = state.units.filter((u) => u.seat === actor.seat && u.type === 'INQUISITOR').length;
-        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, unitFaithCost('APOSTLE', 1, unitsAcquired(state, actor.seat, 'APOSTLE'))))) {
-          religKind = 6;
-          religC = templeCity.centerIndex;
-        } else if (actor.religion.inquisition && liveQ < INQUISITOR_CAP
-          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, unitFaithCost('INQUISITOR', 1, unitsAcquired(state, actor.seat, 'INQUISITOR'))))) {
-          religKind = 11;
-          religC = templeCity.centerIndex;
-        }
-      }
-    }
-    // The Monumentality faith-civilian pick (kind 8 builder, 9 settler,
-    // settler preferred) — the pick_monu twin, spawn at the capital (else
-    // first city) like the gold settler buy.
-    let monuKind = -1;
-    let monuC = -1;
-    if (goldenDedication(state, actor.seat, DED_MONUMENTALITY)) {
-      const monuSpawn = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-      if (monuSpawn) {
-        const liveBuilders = state.units.filter((u) => u.seat === actor.seat && u.type === 'BUILDER').length;
-        if (liveBuilders < 1
-          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, builderCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)))) {
-          monuKind = 8;
-          monuC = monuSpawn.centerIndex;
-        }
-        if (monuSpawn.population >= 2
-          && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, settlerCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat)))) {
-          monuKind = 9;
-          monuC = monuSpawn.centerIndex;
-        }
-      }
-    }
-    // The NATURALIST faith buy (kind 10) — faith-only in any city, behind
-    // CONSERVATION, spawning at the capital (else the first city) like the
-    // other faith civilians. ONE live Naturalist at a time is the ladder's
-    // own cap, not a game rule: the unit exists to be spent on a park.
-    let natKind = -1;
-    let natC = -1;
-    {
-      const natSpawn = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-      const liveNat = state.units.filter((u) => u.seat === actor.seat && u.type === 'NATURALIST').length;
-      if (natSpawn && liveNat < 1
-        && isCivicComplete(state, UNITS.NATURALIST.requiresCivic!, actor.seat)
-        && goldAffordable(actor.faith ?? 0, faithPrice(state, actor.seat, naturalistCost(state, actor.seat)))) {
-        natKind = 10;
-        natC = natSpawn.centerIndex;
-      }
-    }
-    let levyIdx = -1;
-    // At war with ANY other major, read off this seat's own row — the GPU's
-    // `war[row, :1+R].any()` twin. Reading one fixed axis instead would make a
-    // civ fighting only another civ read FALSE and never levy.
-    const atWar = state.seats.some((o) => o.seat !== actor.seat && civsAtWar(state, actor.seat, o.seat));
-    if (atWar && goldAffordable(actor.treasury ?? 0, LEVY_GOLD_COST)) {
-      for (let ci = 0; ci < state.cityStates.length; ci++) {
-        const csl = state.cityStates[ci];
-        if (csl.type !== 'militaristic') continue;
-        if (!isSuzerain(state, csl, actor.seat)) continue;
-        if (state.turn - (csl.lastLevyTurn ?? -LEVY_COOLDOWN) < LEVY_COOLDOWN) continue;
-        levyIdx = ci;
-        break;
-      }
-    }
-  return [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0,
-    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx, monuKind, monuC,
-    natKind, natC];
-}
 
 
 export async function runDriver(o: DriverOpts): Promise<void> {

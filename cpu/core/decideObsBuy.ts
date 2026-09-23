@@ -1,4 +1,7 @@
 import type { SeatEmitter } from './decideObs';
+import type { GameState } from './types';
+import { seatOf } from './seats';
+import { buyContext, routeCandidateRow } from './buyCandidates';
 
 /**
  * THE PURCHASE AND ROUTE CANDIDATES (the buy context, the route pair).
@@ -9,4 +12,16 @@ import type { SeatEmitter } from './decideObs';
  * compares each one with the GPU's group of that name, field by field, before
  * the decide. A name the GPU does not emit is a red.
  */
-export const SEAT_GROUPS: Record<string, SeatEmitter> = {};
+
+/** The `route` group: the origin centre and destination code of the trade
+ *  route the seat would open (`routeCandidateRow`), -1 each where none. */
+function routeGroup(state: GameState, seat: number): { from: number; dest: number } {
+  const actor = seatOf(state, seat);
+  const [from, dest] = actor ? routeCandidateRow(state, actor) : [-1, -1];
+  return { from, dest };
+}
+
+export const SEAT_GROUPS: Record<string, SeatEmitter> = {
+  buy: buyContext,
+  route: routeGroup,
+};
