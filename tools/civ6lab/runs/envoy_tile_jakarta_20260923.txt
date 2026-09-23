@@ -1,0 +1,33 @@
+envoys 1 plots 7
+envoys 2 plots 8
+  NEW [17,25] d2 fpg 3/1/0 TERRAIN_GRASS_HILLS - RESOURCE_SHEEP touch1 idx1867
+envoys 3 plots 9
+  NEW [19,21] d2 fpg 2/2/0 TERRAIN_PLAINS_HILLS FEATURE_JUNGLE - touch1 idx1573
+envoys 4 plots 10
+  NEW [16,23] d2 fpg 2/2/0 TERRAIN_PLAINS_HILLS FEATURE_JUNGLE - touch1 idx1718
+envoys 5 plots 11
+  NEW [17,24] d2 fpg 2/2/0 TERRAIN_PLAINS_HILLS FEATURE_JUNGLE - touch4 idx1793
+envoys 6 plots 12
+  NEW [18,21] d2 fpg 2/1/0 TERRAIN_PLAINS FEATURE_JUNGLE - touch3 idx1572
+envoys 7 plots 13
+  NEW [20,22] d2 fpg 2/2/0 TERRAIN_PLAINS_HILLS FEATURE_JUNGLE - touch3 idx1648
+envoys 8 plots 14
+  NEW [18,25] d2 fpg 2/2/0 TERRAIN_GRASS_HILLS FEATURE_FOREST - touch3 idx1868
+envoys 9 plots 15
+  NEW [17,21] d2 fpg 2/1/0 TERRAIN_GRASS_HILLS - - touch2 idx1571
+envoys 10 plots 16
+  NEW [17,22] d2 fpg 2/0/0 TERRAIN_GRASS - - touch4 idx1645
+envoys 11 plots 17
+  NEW [20,23] d2 fpg 2/1/0 TERRAIN_GRASS_HILLS - - touch2 idx1722
+envoys 12 plots 18
+  NEW [20,24] d2 fpg 0/0/0 TERRAIN_GRASS_MOUNTAIN FEATURE_VOLCANO - touch3 idx1796
+envoys 13 plots 19
+  NEW [19,25] d2 fpg 0/0/0 TERRAIN_GRASS_MOUNTAIN - - touch3 idx1869
+envoys 14 plots 20
+  NEW [19,20] d3 fpg 2/2/0 TERRAIN_GRASS_HILLS - RESOURCE_STONE touch2 idx1499
+envoys 15 plots 21
+  NEW [16,24] d3 fpg 3/0/0 TERRAIN_GRASS - RESOURCE_CATTLE touch2 idx1792
+envoys 16 plots 22
+  NEW [16,21] d3 fpg 2/1/0 TERRAIN_GRASS - RESOURCE_STONE touch2 idx1570
+envoys 17 plots 23
+  NEW [20,25] d3 fpg 2/2/0 TERRAIN_PLAINS_HILLS FEATURE_JUNGLE - touch2 idx1870

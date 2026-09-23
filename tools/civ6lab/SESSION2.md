@@ -71,6 +71,16 @@ before shipping.
 
 ## 5. The envoy's tile — WHICH tile, not how many
 
+**Answered in lab 4 (2026-09-23, `envoy_tile.lua`, `runs/envoy_tile_jakarta_20260923.txt`):**
+21 envoys to Jakarta took its whole ring 2 before any ring-3 plot; within a
+ring the resource plots first (Sheep, then Stone, Cattle, Stone), then the
+2/2 hills, the 2/1 and 2/0 flats, the no-yield Mountain and Volcano last.
+That is the shape of the border-growth picker, which both engines already use
+for envoy plots (`envoyTiles` -> `pickBorderTile`). Not proven plot for plot:
+in ring 2 a 2/1 plains came before two 2/2 hills, so the score has terms past
+the yield sum — a check of our scorer on THIS map waits on a map importer.
+The city's own `GetCulture():GetNextPlot()` reads -1 for a minor.
+
 The slope is measured: +1 owned plot per envoy, no cap through 16, unchanged
 by suzerainty. What no reading covers is which plot the city-state takes —
 the ring order, the yield preference, whether it prefers the side its capital
