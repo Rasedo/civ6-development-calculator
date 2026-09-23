@@ -63,7 +63,7 @@ def _last_pass_head(rows: list[dict]) -> str:
 
 
 def record(results, wall: float, ok: bool, mem: dict | None = None,
-           oom: bool = False) -> None:
+           oom: bool = False, box: str | None = None) -> None:
     """Append one battery record. `results` is battery.py's (name, secs, rc)
     list. Never raises: a statistics writer that can fail a green battery is
     worse than no statistics."""
@@ -87,6 +87,9 @@ def record(results, wall: float, ok: bool, mem: dict | None = None,
             "result": "oom" if oom else "pass" if ok else "fail",
             "mem": mem,
             "wall_s": round(wall, 1),
+            # "clean" only when the owner set MEASURE mode: the box was free,
+            # so the wall is a measurement; "working" walls answer correctness only
+            "box": box,
             "dirty": bool(_git("status", "--porcelain")),
             "since_last_pass": since,
             "commits_under_test": commits,

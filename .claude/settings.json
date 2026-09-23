@@ -2,22 +2,30 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": "python -X utf8 -c \"import pathlib; p = pathlib.Path('.claude/HANDOFF.md'); print('=== POST-COMPACTION HANDOFF (.claude/HANDOFF.md) ===\\n' + p.read_text(encoding='utf-8') if p.exists() else 'No .claude/HANDOFF.md handoff file present.')\""
+            "command": "python -X utf8 .claude/hooks/session_start.py"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "python -X utf8 .claude/hooks/no_heredoc.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 .claude/hooks/owner_files.py"
           }
         ]
       }
@@ -26,16 +34,13 @@
   "permissions": {
     "allow": [
       "Bash(export PYTHONUTF8=1)",
-      "Bash(python gpu/parity_test.py *)",
-      "Bash(python gpu/parity_test.py)",
       "Bash(npx tsc --noEmit)",
-      "Bash(npx vite-node scripts/export-gpu.ts)",
-      "Bash(python gpu/rollout.py *)",
       "Bash(python gpu/battery.py *)",
+      "Bash(python gpu/battery.py)",
+      "Bash(python tools/mode.py)",
       "Bash(npx vitest run *)",
       "Bash(npm test)",
-      "Bash(npm run gpu:replay)",
-      "Bash(npm run gpu:export)",
+      "Bash(npm run seed:check)",
       "Bash(tasklist *)"
     ],
     "deny": [

@@ -317,6 +317,7 @@ def lane_cost() -> dict[str, float]:
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
 import test_stats as _stats  # noqa: E402
+import battery_live as _live  # noqa: E402
 
 # NO LANE OUTLIVES THE RUN. A hung lane used to sit there until the box was
 # rebooted, holding its memory and a core; past this many seconds it is killed
@@ -327,6 +328,12 @@ LANE_CAP = 1800.0
 results: list[tuple[str, float, int]] = []
 lock = threading.Lock()
 failed = threading.Event()
+
+
+def _tick() -> None:
+    """Progress into the live record the status line reads. Called under `lock`."""
+    _live.update(done=len(results),
+                 failed=sum(1 for _, _, rc in results if rc > 0 or rc == -4))
 
 
 def kill_tree(p: subprocess.Popen) -> None:
@@ -388,6 +395,7 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
                 with lock:
                     results.append((name, dt, -3))
                     print(f"  {name:<14} {dt:6.1f}s  bail  (another lane failed)", flush=True)
+                    _tick()
                 return
             if cap and time.time() - t0 > cap:
                 kill_tree(p)
@@ -396,6 +404,7 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
                     results.append((name, dt, -4))
                     failed.set()
                     print(f"  {name:<14} {dt:6.1f}s  FAIL timeout (cap {cap:.0f}s)", flush=True)
+                    _tick()
                 return
     p = subprocess.CompletedProcess(cmd, p.returncode, out, err)
     dt = time.time() - t0
@@ -435,6 +444,7 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
             _m = re.search(r"first: seed (\d+) turn (\d+)", p.stdout + p.stderr)
             if _m:
                 _hunt_hint.append((_m.group(1), _m.group(2)))
+        _tick()
 
 
 def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads: int) -> None:
@@ -472,19 +482,44 @@ def lane(steps: list[tuple[str, list[str], int]]) -> None:
             with lock:
                 results.append((name, 0.0, -1))
                 print(f"  {name:<14}   skip  (earlier failure)", flush=True)
+                _tick()
             continue
         run(name, cmd, threads)
 
 
 def main() -> int:
+    # The owner's mode switch and the one-at-a-time rule come before anything
+    # else, the cadence rule inside `_main` after them (tools/gpu/battery_live.py).
+    if _live.mode() == "build" and os.environ.get("CIV6_BATTERY_OWNER") != "1":
+        print("BATTERY REFUSED — the owner set BUILD mode (.claude/mode): no battery "
+              "and no hunt runs until the owner lifts it (`python tools/mode.py normal`).")
+        return 2
+    other = _live.running()
+    if other:
+        print(f"BATTERY REFUSED — another battery is running: pid {other.get('pid')}, "
+              f"{other.get('kind')} at {other.get('head')}, started "
+              f"{time.strftime('%H:%M:%S', time.localtime(other.get('started', 0)))}. "
+              "One battery at a time; its completion notification is the signal.")
+        return 2
+    _live.claim(f"hunt {HUNT_SEEDS}" if HUNT else "full" if FULL else "battery",
+                _stats._git("rev-parse", "HEAD"),
+                None if HUNT else _live.expected_wall(_stats._rows()))
+    try:
+        return _main()
+    finally:
+        _live.release()
+
+
+def _main() -> int:
     # OWNER RULE (2026-09-08, was FOUR): the battery runs every FIVE commits, not every
     # round — batched hunts run at ~15 min/bug where isolated ones paid ~80
     # (stats/battery.jsonl audit). The per-commit bar is the compile bar plus
     # a single-seed smoke serve. A RED run never resets the clock (only a
     # green does), so the closing re-run of a hunt is always allowed.
-    # CIV6_BATTERY_OWNER=1 is the owner's own door, nobody else's.
+    # CIV6_BATTERY_OWNER=1 and MEASURE mode are the owner's own doors, nobody else's.
     since = _stats._last_pass_head(_stats._rows())
-    if since and not HUNT and os.environ.get("CIV6_BATTERY_OWNER") != "1":
+    if (since and not HUNT and os.environ.get("CIV6_BATTERY_OWNER") != "1"
+            and _live.mode() != "measure"):
         try:
             n = int(_stats._git("rev-list", "--count", f"{since}..HEAD"))
         except ValueError:
@@ -834,6 +869,8 @@ def main() -> int:
                 L.sort(key=lambda s: -_cost.get(s[0], 30.0))
 
         _poke_names = [s[0] for l in lanes if len(l) > 5 for s in l]
+        with lock:
+            _live.update(stage="lanes", total=len(results) + sum(len(l) for l in lanes))
         threads = [
             threading.Thread(target=lane_parallel, args=(l, _pokes, POKE_OMP))
             if len(l) > 5
@@ -927,7 +964,7 @@ def main() -> int:
               + " (a probe, not a battery verdict — nothing recorded)")
         return 1 if failed.is_set() else 0
     _stats.record(results, wall, not failed.is_set() and not oom.is_set(), mem=_mem,
-                  oom=oom.is_set())
+                  oom=oom.is_set(), box="clean" if _live.mode() == "measure" else "working")
     if oom.is_set() and not failed.is_set():
         # NOT a pass — the run did not finish — and NOT a fail, because the
         # code is not what broke. The cadence clock does not advance.

@@ -26,6 +26,8 @@ DOC = ROOT / "docs" / "AUDIT.md"
 SECTION = re.compile(r"^\|\s*\*\*([ABC])\.[^|]*\|\s*\*\*(\d+)\*\*\s*\|")
 TOTAL = re.compile(r"^\|\s*\*\*OPEN, TOTAL\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|")
 # `| B-67 district price progression | 0 | ... |` — the id's LETTER is its section
+MAX_LINES = 250
+MAX_BULLET = 1600
 ENTRY = re.compile(r"^\|\s*([ABC])-([0-9A-Za-z]+)[^|]*\|\s*(\d+)\s*\|")
 
 
@@ -66,8 +68,19 @@ def main() -> int:
     elif grand != sum(rows.values()):
         faults.append(f"OPEN, TOTAL says {grand}, every row sums {sum(rows.values())}")
 
+    # THE SHAPE. The file is a list of open work and has twice grown into a
+    # work log that its owner could no longer read. Two ceilings stop the
+    # regrowth: the whole file, and any one bullet. History goes to git log.
+    if len(lines) > MAX_LINES:
+        faults.append(f"the file is {len(lines)} lines (cap {MAX_LINES}): trim history "
+                      "prose, delete resolved text — git log keeps it")
+    for i, ln in enumerate(lines, 1):
+        if ln.lstrip().startswith("- ") and len(ln) > MAX_BULLET:
+            faults.append(f"line {i}: a {len(ln)}-character bullet (cap {MAX_BULLET}) — "
+                          "state what is open, not how it was found")
+
     if faults:
-        print("AUDIT TOTALS FAILED — the summary disagrees with the rows:")
+        print("AUDIT CHECK FAILED:")
         for f in faults:
             print(f"  {f}")
         return 1
