@@ -75,17 +75,25 @@ def main() -> None:
     assert int(sim.civilian_at[0, t]) == slot + sim.POOL_LO["major"], "civilian_at not in snapshot"
     assert int(sim.major_unit_charges[0, slot]) == 3, "major_unit_charges not in snapshot"
 
-    # builders arise organically from DRIVEN production (bare steps queue
-    # nothing) — the plane must be POPULATED, and every alive civilian slot
-    # must be indexed by it (plane/slot coherence).
-    sim2 = developed(rules, paths[1], turns=40)
+    # civilians arise organically from DRIVEN production (bare steps queue
+    # nothing) — the plane must be POPULATED, and every alive civilian on land
+    # must be indexed by it (plane/slot coherence). Civilians come and go all
+    # game (settlers found, charges run out), so the run stops at a turn this
+    # fixture is known to hold several: turn 45.
+    sim2 = developed(rules, paths[1], turns=45)
     seen = bool((sim2.civilian_at >= 0).any())
-    assert seen, "no civ builder exists after a 40-turn driven run (B5b broken?)"
-    b2 = sim2._builder_idx
+    assert seen, "no civilian stands after a 45-turn driven run"
+    n_civ = 0
     for u in range(int(sim2.unit_next[0])):
-        if bool(sim2.major_unit_alive[0, u]) and int(sim2.major_unit_type[0, u]) == b2:
-            tt2 = int(sim2.major_unit_tile[0, u])
-            assert int(sim2.civilian_at[0, tt2]) == u, "alive builder not indexed by civilian_at"
+        if not bool(sim2.major_unit_alive[0, u]) or bool(sim2.major_unit_emb[0, u]):
+            continue
+        if not bool(sim2._type_civilian[int(sim2.major_unit_type[0, u])]):
+            continue
+        n_civ += 1
+        tt2 = int(sim2.major_unit_tile[0, u])
+        assert int(sim2.civilian_at[0, tt2]) == u + sim2.POOL_LO["major"], \
+            f"alive civilian {u} not indexed by civilian_at at tile {tt2}"
+    assert n_civ > 0, "the plane holds a civilian the pool does not"
 
     # THE REVERSE DIRECTION, which the forward one cannot see: every plane
     # entry must name a LIVE unit standing on that tile, in the plane its own
