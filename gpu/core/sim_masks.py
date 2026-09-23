@@ -828,11 +828,13 @@ class SimMasks:
     def _barb_unit_plane(self) -> torch.Tensor:
         """[B, T] — does a BARBARIAN unit stand on this tile? Both occupancy
         slots answer, so a raider is found whichever plane holds it (the
-        barbarians field no support chassis, so that plane never holds one)."""
+        barbarians field no support chassis, so that plane never holds one).
+        The barbarian seat alone (`isBarbSeat`): a Free City's units are not
+        barbarians."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for occ in (self.military_at, self.civilian_at):
             here = occ >= 0
-            out = out | (here & (self.unit_seat.gather(1, occ.clamp(min=0)) >= BARB_SEAT))
+            out = out | (here & (self.unit_seat.gather(1, occ.clamp(min=0)) == BARB_SEAT))
         return out
 
     def _religious_at(self, tiles: torch.Tensor) -> torch.Tensor:
