@@ -416,7 +416,8 @@ class SimMinors:
     def _adj_district_with(self, di: int, bi: int) -> torch.Tensor:
         """[B, T] — a completed district of type `di` next door whose CITY
         holds building `bi` (the Great Library's Library, Big Ben's Bank).
-        `cityAtTile`'s twin: the building lives on the city, not the tile."""
+        `cityAtTile`'s twin: the building lives on the city, not the tile,
+        and the city may be any major's or a Free City's."""
         nb = self.neigh
         nbc = nb.clamp(min=0)
         hit = ((self.district[:, nbc] == di) & self.district_complete[:, nbc]
@@ -424,7 +425,7 @@ class SimMinors:
         if not bool(hit.any()):
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         has = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        for r in range(self.n_majors):
+        for r in [*range(self.n_majors), self.FREE_ROW]:
             sl = self.city_slot_at(r)  # [B, T] owning city SLOT, -1 = not this row's
             bl = self.city_bldg[:, r, :, bi]
             has |= (sl >= 0) & bl.gather(1, sl.clamp(min=0))
