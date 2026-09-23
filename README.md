@@ -76,8 +76,8 @@ stats/    battery.jsonl — every recorded run, which the battery sizes itself f
   the owner's question ledger.
 - `docs/GPU_ENGINE.md` — the twin engine: seat model, storage geometry,
   the gate, the battery, hunting.
-- `docs/ROADMAP.md` — direction: the current phase, the RL self-play
-  program and its banked decisions, perf.
+- `docs/ROADMAP.md` — direction: the current phase, the engine-neutral
+  decision server next, the RL program's banked decisions.
 - `docs/PROVENANCE.md` — the constant-provenance baseline: every tagged
   constant against the install, re-checked in the battery's stage 0.
 - `docs/ROSTER.md` — the roster census: which trait modifiers ship,

@@ -1,95 +1,47 @@
-# Roadmap — the live program
+# Roadmap
 
 The goal (owner's words): **the best champion — duel or FFA — on an engine
-close enough to real Civ 6.** Everything else in the repo serves that.
-Work items live in the task list; fidelity gaps live in `docs/AUDIT.md`.
-This file holds only direction and the decisions already bought with runs,
-so they are not re-litigated.
+close enough to real Civ 6.** This file holds direction and the decisions
+already paid for, so they are not re-litigated. Open work is
+`docs/AUDIT.md` and nowhere else; how to work is `CLAUDE.md`.
 
-## Where the engine stands
+## Now: the AUDIT burn-down
 
-Both engines are seat-symmetric: every actor is a seat (0 and the civ
-seats are the same kind of actor; city-states 100+; barbarians 200), all
-decisions ride one wire record schema computed once per (turn, seat) by
-`policy/drive.py`, and every fact has one seat-indexed storage base with
-row views.
+Both engines (`cpu/`, `gpu/`) are seat-symmetric and driven by one scripted
+decision server (`policy/`). They are checked against each other by
+`gpu/battery.py` and against the game by the owner's install and the live
+game (`tools/civ6lab/`). The phase ends when `docs/AUDIT.md` has no open
+entry. What remains there is mostly ASK, LAB and DLL lines: the install
+under-determines them, so the owner or a live-game scene decides.
 
-The parity instrument is the battery, `python gpu/battery.py`: the static
-gates, then seed and export, then the decision-server gate sharded over
-every fixture seed to turn 250 — obs equality, shared decisions, per-turn
-state digests over `shared/statecompare.manifest.json` — beside the TS
-suite and the gpu poke lanes. The gate is never run on its own; a green is
-the step count and head sha recorded in `stats/battery.jsonl`, never an
-exit code.
+## Next: an engine-neutral decision server
 
-Current phase: **AUDIT burn-down**, and what is left there is owner-shaped
-rather than a build queue:
+Today the TS engine carries its own twin of the driver's compared tables
+(`cpu/driver/driver.ts` beside `policy/drive.py`), and the two must match
+clause by clause. The direction is one decision server that receives each
+engine's observation in a neutral format, does not know which engine asked,
+and answers each independently. The TS twin then goes away, and so does the
+class of fork it exists to catch.
 
-- **The question ledger** (`docs/AUDIT.md`) — the asks the source
-  under-determines. Neither engine ships a branch until the owner rules or
-  the live game answers.
-- **The live-game lab** — `tools/civ6lab/SESSION2.md` is the scene list
-  for the ledger lines the running game will state when asked; the lab
-  itself is `tools/civ6lab/README.md`.
-- **Two decisions only the owner can make** — whether this engine mirrors
-  the install's PER-GAME event counts or keeps rolling per object (ask 4),
-  and whether the diplomatic promises are worth a driver arm (C-2). Both
-  are written out in `docs/AUDIT.md`.
+## Then: RL (parked until AUDIT is empty)
 
-P8 training stays parked until that file is empty.
+The RL code was deleted in the restructure (only the engines, the policy and
+their tests survived); these decisions carry over to the rebuild:
 
-## RL program (parked until the owner is satisfied with the engine)
-
-Owner rulings in force: checkpoints and baselines are DISPOSABLE; net
-lanes die whenever dims change; exactly ONE baseline pass before P8
-training starts — no per-stage re-baselining.
-
-Decisions bought with runs (do not re-litigate without new evidence):
-
-- **Road A** (decided 2026-07-06): full-fidelity symmetric seats — now
-  structural in both engines. Self-play starts at **O=2 duel** (the
-  theoretically safe regime), scales to FFA on the same code.
-- **Reward phases**: dense per-turn score delta for single-agent
-  bootstrap (proven) → SYMMETRIZED relative score for self-play (own
-  delta minus opponents' — restores the zero-sum property; four
-  independent score-maximizers otherwise co-farm peacefully) →
-  optionally sparse win/objective later.
-- **League telemetry**: CCE via α-Rank, not Nash (PPAD-complete,
-  ill-posed selection).
-- The scripted policy (`policy/drive.py`, `policy/ladder.py`) survives as
-  the parity anchor and the league's baseline opponent. It is our own AI,
-  not Civ 6's: the engine is what this program models, so the game's
-  opinion scale, agendas and preference weights are out of scope
-  (owner ruling 2026-09-20).
-- **Search verdict**: a 1-ply value-leaf search cannot beat a strong
-  net's own greedy at any sampling temperature. The open lever is
-  **M3** — train the value head on search-improved targets and batch
-  the candidate evaluation (Gumbel-M3).
-- **Training method** (banked): masked multi-head PPO, all heads
-  mask-gated so silent heads contribute nothing; per-episode world
-  re-seeding; eval = N independent fixed-horizon episodes, comparable
-  only within one table. Measure the device before committing a run.
-- **Late-game verdict** (horizon-300 audit): a competent policy
-  SUSTAINS by playing tall — the late game is not structurally broken.
-  What raises the plateau is victory conditions and late content, plus
-  the loyalty soft-cap on wide play.
-
-## Perf
-
-The battery's wall is the bar, and the campaign that cut it (clean 650 s →
-344 s over six parity-verified rounds, closed 2026-09-15) bought it from
-WORK, not from lanes: fingerprint memos over recomputed planes, per-seat
-preludes, demoting poke lanes that never catch anything, and the TS
-composer memo. Narrower shards and fewer workers bought nothing — the box
-is 12 physical cores under 24 logical ones, so the wall is total CPU work
-divided by 12 and every lane's second is contention on the serve shards.
-
-Standing discipline: every perf change is a bit-identical refactor (same
-values, same draw order, same float association); BLAS association is
-batch-shape-dependent, so gate-equivalence is the bar; never read numbers
-off a contended box — a measurement run is asked for, and labelled clean
-or contended; an optimisation never earns a run of its own, it lands on
-the next run that was wanted anyway. Instruments: the gate's own
-`--profile` / `--cprofile` split in the battery's hunt mode,
-`tools/gpu/profile_step.py`, `tools/gpu/bench.py` and
-`tools/cpu/perf-turns.ts`.
+- **Road A**: full-fidelity symmetric seats, already structural. Self-play
+  starts at an O=2 duel and scales to FFA on the same code.
+- **Reward**: a dense per-turn score delta to bootstrap, then a SYMMETRIZED
+  relative score for self-play (own delta minus the opponents'). Without it,
+  independent score-maximizers co-farm peacefully.
+- **League telemetry**: α-Rank (CCE), not Nash.
+- **Training**: masked multi-head PPO with every head mask-gated, world
+  re-seeded per episode. Evaluation compares only within one table. Exactly
+  ONE baseline pass before training starts. Checkpoints are disposable.
+- **Search**: a 1-ply value-leaf search did not beat a strong net's own
+  greedy policy. The open lever is training the value head on
+  search-improved targets (Gumbel-style), with batched candidate evaluation.
+- **The scripted policy** stays as the league's baseline opponent. It is
+  our own AI, not Civ 6's (the program models the engine, not the game's
+  AI).
+- **The late game** is not structurally broken: a competent policy sustains
+  by playing tall. Victory conditions and late content raise the plateau.
