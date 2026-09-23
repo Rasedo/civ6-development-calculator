@@ -10,13 +10,19 @@ import type { GameState } from './types';
 import { cityHolders } from './seats';
 import { SEAT_GROUPS as SEAT_SCALARS } from './decideObsSeat';
 import { SEAT_GROUPS as SEAT_MASKS } from './decideObsMasks';
+import { SEAT_GROUPS as SEAT_BUY } from './decideObsBuy';
+import { SEAT_GROUPS as SEAT_CITIES } from './decideObsCities';
+import { SEAT_GROUPS as SEAT_TARGETS } from './decideObsTargets';
+import { SEAT_GROUPS as SEAT_UNITS } from './decideObsUnits';
 
 /** one per-seat group of the neutral observation: plain ints, lists, rows */
 export type SeatEmitter = (state: GameState, seat: number) => unknown;
 
 /** every registered per-seat group, one registry per module so two writers
  *  never share a file; a name registered twice is a programming error */
-const SEAT_REGISTRIES: readonly Record<string, SeatEmitter>[] = [SEAT_SCALARS, SEAT_MASKS];
+const SEAT_REGISTRIES: readonly Record<string, SeatEmitter>[] = [
+  SEAT_SCALARS, SEAT_MASKS, SEAT_BUY, SEAT_CITIES, SEAT_TARGETS, SEAT_UNITS,
+];
 
 /** The per-seat groups for one seat, by group name. */
 export function seatGroups(state: GameState, seat: number): Record<string, unknown> {
