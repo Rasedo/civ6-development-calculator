@@ -262,6 +262,23 @@ def local_player(t: Tuner) -> int:
         return 0
 
 
+COMMEMORATE = pathlib.Path(__file__).parent / "commemorate.lua"
+
+
+def commemorate_if_blocked(t: Tuner) -> bool:
+    """A new era's Dedication blocks the turn for the human seat, Autoplay
+    included; answer it with the offered choices (`commemorate.lua`). True
+    when it was the blocker."""
+    try:
+        name = t.run(IG, LUA_BLOCKER)[-1].split()[-1]
+    except (TunerError, IndexError):
+        return False
+    if name != "ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE":
+        return False
+    print("   ", t.run(IG, COMMEMORATE.read_text(encoding="utf-8").replace("ZPICK", ""))[-1])
+    return True
+
+
 def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
     """Move the game ONE turn and return the new turn number."""
     t0 = turn(t)
@@ -285,6 +302,9 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
             continue
         if tn > t0:
             return tn
+        if time.monotonic() - nagged > 20 and commemorate_if_blocked(t):
+            nagged = time.monotonic()
+            continue
         if how == "endturn" and time.monotonic() - nagged > 20:
             # a blocker raised AFTER the request (an escape prompt, a city
             # that just finished) needs the resolver again

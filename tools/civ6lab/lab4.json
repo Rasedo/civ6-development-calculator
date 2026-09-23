@@ -1,0 +1,11 @@
+{
+  "ruleset": "RULESET_EXPANSION_2",
+  "speed": "GAMESPEED_ONLINE",
+  "difficulty": "DIFFICULTY_PRINCE",
+  "map": "Continents.lua",
+  "size": "MAPSIZE_STANDARD",
+  "city_states": 12,
+  "realism": 2,
+  "start_era": "ERA_ANCIENT",
+  "turn_limit": "none"
+}

@@ -102,7 +102,10 @@ class Tuner:
     def _send(self, tag: int, payload: str) -> None:
         assert self.sock is not None
         data = payload.encode("utf-8") + b"\x00"
-        self.sock.sendall(HEADER.pack(len(data), tag) + data)
+        try:
+            self.sock.sendall(HEADER.pack(len(data), tag) + data)
+        except OSError as e:
+            raise TunerError(f"the game reset the tuner socket: {e}") from e
 
     def _recv(self, timeout: float) -> tuple[int, str] | None:
         assert self.sock is not None
@@ -113,6 +116,9 @@ class Tuner:
             body = self._exactly(length)
         except socket.timeout:
             return None
+        except OSError as e:
+            # a load or a new game resets the socket as the Lua states go
+            raise TunerError(f"the game reset the tuner socket: {e}") from e
         return tag, body.rstrip(b"\x00").decode("utf-8", errors="replace")
 
     def _exactly(self, n: int) -> bytes:

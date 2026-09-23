@@ -20,6 +20,36 @@ work, the calls that do not, the traps, and an index of what is here.
   `EnableTuner 1` and `EnableDebugMenu 1` under `[Debug]`.
 * FireTuner.exe must be CLOSED while the lab runs: the game accepts one client.
 
+## No clicks: `game.py`
+
+    python tools/civ6lab/game.py launch                         # the DX11 binary -> main menu
+    python tools/civ6lab/game.py new --config tools/civ6lab/lab4.json
+    python tools/civ6lab/game.py load <save name>              # Begin/Continue pressed by the game
+    python tools/civ6lab/game.py save <save name>
+
+Every click the owner used to make rides the game's OWN automation hooks
+(Firaxis's smoke test, `Base/Assets/UI/Automation/Automation_DailySmokeTest.lua`):
+`Automation.SetAutoStartEnabled(true)` makes the loading screen press Begin /
+Continue itself (`FrontEnd/LoadScreen.lua`); a new game is `GameConfiguration` /
+`MapConfiguration` written in the `FrontEnd` state and
+`Network.HostGame(ServerType.SERVER_TYPE_NONE)`; a load matches the save
+list's `Path` (its `Name` is not the file name) and calls `Network.LoadGame`.
+Hash="1" setup parameters take `DB.MakeHash(name)` (speed, difficulty, map
+size — verified by readback). The socket RESETS across a load or a host;
+`game.py` reconnects and waits for `GameCore_Tuner`. Verified 2026-09-23:
+new game, save, load, all with the input context reading `World` after.
+
+Two box facts it needed:
+* The Steam launch opens 2K's LaunchPad (a Play click); `game.py launch`
+  starts `Base/Binaries/Win64Steam/CivilizationVI.exe` (DX11) directly —
+  Steam must be running.
+* The COPYRIGHT-SCREEN HANG (no Continue button, the engine stalled in its
+  async init after FiraxisLive and EOS start) is the game waiting on its
+  online services. Windows Firewall outbound BLOCK rules on both binaries
+  ("Civ6 lab offline DX11" / "... DX12") cure it — with the firewall ON (it
+  was off on this box, so the rules did nothing at first). `PlayIntroVideo 0`
+  in AppOptions skips the intro.
+
 ## A session
 
 1. Launch Civ 6, start or load any Gathering Storm game, reach the map.
@@ -87,7 +117,7 @@ and twice it was the only one that had the right call shape.
 | `UI.RequestPlayerOperation(0, PlayerOperations.GIVE_INFLUENCE_TOKEN, {[PlayerOperations.PARAM_PLAYER_ONE]=id})` | one envoy per call |
 | **`CombatManager.SimulateAttackInto(unit:GetComponentID(), CombatTypes.AIR, x, y)`** | the UI's own preview: ATTACKER / DEFENDER / **ANTI_AIR** / **INTERCEPTOR** blocks keyed by `CombatResultParameters` hashes, giving the chosen interceptor's ID and tile, its base anti-air strength, the support bonus as TEXT and `DAMAGE_FROM`. **Deterministic** — seven seeds give byte-identical output — so the whole damage curve can be swept without firing. `SimulateAttackVersus(att, def [, CombatTypes.X])` is the same shape for a normal attack and refuses pairings that are not a legal attack |
 | `Game.GetFalloutManager():GetReactorAge(pCity)` / `:GetReactorAccidentThreshold(pCity)` | **InGame only, and they take a CITY object** — not an index, a plot or the reactor record (`ToolTipLoader_Expansion2.lua:172`) |
-| `Network.SaveGame{Name=, Location=SaveLocations.LOCAL_STORAGE, Type=SaveTypes.SINGLE_PLAYER, IsAutosave=false, IsQuicksave=false}` / `Network.LoadGame(...)` | saves land in `Documents\My Games\Sid Meier's Civilization VI\Saves\Single\`. **A LOAD COSTS THE OWNER A CLICK** — the call returns true, the game loads and then stops on a Start Game button, and the socket is down until a human presses it. Budget N reloads as N clicks; retry the first command after the transition once |
+| `Network.SaveGame{Name=, Location=SaveLocations.LOCAL_STORAGE, Type=SaveTypes.SINGLE_PLAYER, IsAutosave=false, IsQuicksave=false}` / `Network.LoadGame(...)` | saves land in `Documents\My Games\Sid Meier's Civilization VI\Saves\Single\`. **A LOAD COSTS THE OWNER A CLICK** — the call returns true, the game loads and then stops on a Start Game button unless `Automation.SetAutoStartEnabled(true)` was called first — `game.py load` does, and needs no click |
 | `GameRandomEvents.GetEventsForTurn(t)` | one record per turn: `{RandomEvent, Name, StartTurn, EndTurn, CurrentLocation, PopLost, UnitsLost, TilesDamaged, FertilityAdded, Volcano, River}` — walking every turn is a complete event history |
 | `Game.GetEmergencyManager():GetEmergencyInfoTable(0)` | empty after 21 warheads |
 | `NotificationManager.GetFirstEndTurnBlocking(me)` | names the blocker when autoplay stalls |
@@ -144,7 +174,7 @@ Nobody should type these again.
 | `CanStartOperation(WMD_STRIKE)` with the bomber ON the aim plot | InGame | `can=false`, silently — a bomber cannot nuke the tile it stands on |
 | `plot:IsValidFoundLocation()` | both | **false for every plot on the map**, including one a city was then founded on. Not a usable site reader |
 | `CityManager.RequestCommand(city, CityCommandTypes.MANAGE, {PARAM_MANAGE_CITIZEN, PARAM_X, PARAM_Y})` | InGame | `CanStartCommand` true, request returns ok, **no citizen moves**; `GetCommandTargets` comes back empty. There is no citizen-assignment path from the socket — build the layout out of what a city OWNS |
-| `UI.RequestPlayerOperation(me, PlayerOperations.COMMEMORATE, {PARAM_COMMEMORATION_TYPE = hash})` | InGame | does **not** clear `ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE`; the popup needs its own UI context. This one costs the owner a click |
+| `UI.RequestPlayerOperation(me, PlayerOperations.COMMEMORATE, {PARAM_COMMEMORATION_TYPE = hash})` | InGame | does not clear `ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE` because the parameter is the row's INDEX, not its Hash (`DedicationPopup.lua` OnConfirm passes `commemorationInfo.Index`, from `GetPlayerCommemorateChoices`). `commemorate.lua` passes the index, once per allowed Dedication, and `lab.py advance` runs it when the turn stalls on that blocker |
 | `Game.TriggerWMDAttack` / `Game.TriggerWMDStrike` / a `WMDManager` global | both | **nil** — a script circulating online that uses them is fabricated |
 | `CityCommandTypes.WMD_STRIKE` with `PARAM_X`/`PARAM_Y` | InGame | refused — the silo takes `PARAM_X0/Y0/X1/Y1` |
 | `city:GetBuildings():IsPillaged(hash)` for a building made by `CreateBuilding` | InGame | **throws** until the game has pillaged it once |
