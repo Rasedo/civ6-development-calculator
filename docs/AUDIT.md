@@ -46,14 +46,14 @@ re-adds them.
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
 | C-26 civilization abilities, the residue | 1 | three unread DLL clauses |
 | C-34 air combat's second half | 1 | Patrol and Priority Target carry no data |
-| C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
+| C-38 a city-state's play | 6 | its army (no unit on either engine), its production modifiers, its builders, what it spends (LAB), its build order and quests (model / DLL); its grid (C-1) |
 | C-41 Volcanic Soil | 1 | the proportion painted per severity, and the severity roll itself (LAB) |
 | C-49 named storms | 1 | the per-step draw is inferred from resultants, not watched step by step (LAB) |
 | C-60 the Free City's own play | 1 | its defence floor, its granted defenders — measured; the amenity residue, the positive ladder, rebellion (LAB) |
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-81 the tile swap's reach | 1 | which plots the DLL offers a claiming city (LAB) |
-| **C. Absent systems** | **13** | |
-| **OPEN, TOTAL** | **16** | |
+| **C. Absent systems** | **18** | |
+| **OPEN, TOTAL** | **21** | |
 
 ## The question ledger — owner asks
 
@@ -64,7 +64,6 @@ scenes cite them), so the gaps are closed asks.
 
 | ask | entry | the question | where the answer comes from |
 |---|---|---|---|
-| 9 | C-38 | what a city-state SPENDS gold and faith on. OBSERVED: it banks income minus upkeep and bought one defender when its army fell (~207 gold, 4 units -> 1); faith untouched, and two 40-turn bank snapshots moved without a purchase. **OWNER: is this AI behaviour (the row leaves under the 2026-09-20 ruling) or an engine rule (a lab watch)?** | the owner, then LAB if it stays |
 | 14 | C-16 | the spy's ESCAPE: the install's terms are all levels (`ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1, `_COUNTERSPY_LEVEL_MODIFIER` -1, `_POLICE_CORRECT_MODIFIER` -4, Ace Driver 4) and no row gives the SCALE or a route term; this engine's base is per route (Airplane 40 / Boat 50 / Vehicle 60 / Foot 70). One measured point (level 2, on foot, escaped) rules nothing out | LAB (a spy BOUGHT in a city travels in; gold and spies are both one socket call now) |
 | 18 | C-2 | DON'T SETTLE NEAR ME's reach: how near a new city must be to the asker's to break the promise. No row carries a distance (the AI modifier `STANDARD_DIPLOMACY_SETTLED_CITIES` has none, the congress discussion types have no columns); the warning's text reads "We settled too near their border" | LAB (found a city at 4, 6 and 8 tiles from a promisee's border and read the grievance log) |
 
@@ -111,11 +110,16 @@ close in the same commit.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 1.
   - DLL: PATROL is not a data row (no `UNITOPERATION_PATROL`, no command, no promotion in any layer, re-grepped) — it is the UI's name for a fighter sitting ready, and the live game exposes no stance to enter.
   - DLL: PRIORITY TARGET is a command with no data — `UNITCOMMAND_PRIORITY_TARGET` (`Expansion1_UnitCommands.xml`) has a category, an interface mode, an icon and a label, and no argument, requirement set or magnitude in any layer.
-- **C-38. A CITY-STATE'S CITY.** Weight 1.
-  Its food and culture ride the majors' own composers (`seatGrowth`, `cityBorderGrowth` / `_seat_city_growth`, `_seat_border_growth`); gold and faith only bank in `CityState.treasury` / `.faith`.
-  - ASK 9, then BUILD: a minor with fewer than N military units and a bank over a unit's price buys its best trainable land unit — N and the price threshold are the ask's magnitude. Re-read: `GlobalParameters.xml` holds five rows with MINOR in the name — four start-placement distances and `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER` — and none names a city-state purchase, build weight or reserve.
-  - BLOCKER C-1: its grid, when the ladder reaches a load.
-  - B-24r's Foreign Investor and Affluence wait on a minor that improves and accumulates.
+- **C-38. A CITY-STATE'S PLAY.** Weight 6.
+  OWNER 2026-09-23: a city-state is no agent, so its behaviour IS the environment an agent trains against, and a gap an agent can exploit there is a sim-to-real gap. Every observable city-state behaviour is therefore an engine rule: built from the install where it publishes rows, measured in the lab where it does not, and randomised per episode where neither settles it, so no policy leans on one guessed value. Its food and culture already ride the majors' composers (`seatGrowth`, `cityBorderGrowth` / `_seat_city_growth`, `_seat_border_growth`). The lines, most exploitable first:
+  - BUILD, ITS ARMY. A minor owns NO unit on either engine: it never trains, moves or attacks, and its centre never strikes (the city strike loop walks the majors' cities), so taking one costs a fraction of what it costs in the game. Sourced: `BonusMinorStartingUnits` (`Eras.xml`, re-shipped in GS's `Expansion1_Eras.xml`) — two Warriors in the Ancient era beside its settler; `Eras.StartingMeleeStrengthMinor` / `StartingRangedStrengthMinor` per era; the city ranged strike every walled city has; the `MINOR_CIV_PRODUCTION` modifiers in `Leaders.xml` — +200% toward military units while it holds fewer than 10 (`PLAYER_HAS_SMALL_MILITARY`), +200% toward walls, castles and star forts, 100% off unit upgrades. DLL, then LAB: what it trains and when, and how its units move — `Tactics.xml`'s minor rows name the behaviours (wander near the city, chase, attack high/medium/low priority, attack civilians, heal, move to safety, promotion, formation), the DLL weighs them; model them from the rows and measure the rest.
+  - LAB, WHAT IT SPENDS (ruled from ask 9). OBSERVED: it banks income minus upkeep and bought one defender when its army fell (~207 gold, 4 units -> 1); faith untouched, and two 40-turn bank snapshots moved without a purchase. Here gold and faith only bank (`CityState.treasury` / `.faith`). A watch of several minors over 50+ turns names the purchase trigger (army size — `PLAYER_HAS_SMALL_MILITARY`'s 10 is the data-backed candidate), the reserve, and what it buys. `GlobalParameters.xml`'s five MINOR rows (four start-placement distances, `WARMONGER_FINAL_MINOR_CITY_MULTIPLIER`) name none of it.
+  - BUILD, ITS PRODUCTION MODIFIERS (`Leaders.xml`, the `MINOR_CIV_PRODUCTION` set): -50% production in all its cities, +200% toward Builders, +500% toward the Harbor, and the walls and military rows above. Neither engine has any of them.
+  - BUILD, then LAB, ITS BUILDERS: in the game a minor improves its land (the homeland "Builder Outside Ring" behaviour, the Builder modifier); here it trains no Builder and improves nothing. B-24r's Foreign Investor and Affluence wait on it.
+  - MODEL, then LAB, ITS BUILD ORDER: the ladder both engines ship (Ancient Walls, the type's district, its tier-1 building, a Harbor, Medieval then Renaissance Walls — `minorBuild.ts` / `_minor_build`) is this engine's; `MinorCivCityBuilds`, `MinorCivDistricts` (ten districts disfavoured, the type's own favoured), `MinorCivUnitBuilds` and `MinorCivPseudoYields` give preferences, not an order. A census of what several minors build over a game.
+  - DLL, then LAB, ITS QUESTS: three kinds here (a camp within 6, the type's district, a trade route — `issueQuest`); the game's pool lives in the DLL. A census of the quests offered over a game.
+  - MODEL, ITS RESEARCH: the cheapest open tech and civic first (`minorBuild.ts` / `_minor_research`); `MinorCivTriggeredTrees` names only the tech and civic upgrade triggers.
+  - BLOCKER C-1: its grid, when its ladder reaches a building with a load.
 - **C-41. VOLCANIC SOIL.** Weight 1.
   The affected set is the RADIUS-1 RING, which both engines already scorch and fertilize (`disasterPhase` over `neighbors(map, volcano)`, the GPU over `neigh[volcano]`); the carrier (`addFeature` / `_add_feature`) is in.
   - LAB, then BUILD: PAINT. Measured over four eruptions: the soil replaces a standing feature on a PROPORTION of the ring (5/6, 2/3, 1/3 seen; gentle 0/6 and 1/1); an improvement on a painted tile is pillaged or removed; a bonus resource on a ring tile, land or sea, can be destroyed. The proportion per severity and pillaged-vs-removed need a dozen eruptions per severity; the engine rolls no eruption SEVERITY at all. The XML's own split, re-read — `RANDOM_EVENT_VOLCANO_GENTLE` takes `LOC_RANDOM_EVENT_PROP_DAMAGE_FERTILITY`, `_CATASTROPHIC` and `_MEGACOLOSSAL` take `..._ALL_...` — suggests the ruling: catastrophic+ paints every eligible ring tile, gentle a rolled share; a painted tile's improvement pillaged, its resource kept.
