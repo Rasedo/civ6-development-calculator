@@ -33,7 +33,7 @@ import { RESOURCES } from '../../world/resources';
 import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
-import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
+import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -562,6 +562,30 @@ export function acquireTile(state: GameState, city: City, tileIndex: number): vo
   setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   city.tilesAcquired += 1;
   revealAround(state, city.seat, tileIndex, 1);
+}
+
+/** CIV6 (LOC_PLOTINFO_SWAP_TILE_OWNER_TOOLTIP): "Claim this tile to be worked
+ *  by this city, instead of your other city. Ownership cannot be swapped if
+ *  the tile has a district, a wonder, or is next to the other city's center
+ *  tile." — and the Golf Course's and Open-Air Museum's "Tiles with <row>
+ *  cannot be swapped" (`noSwap`). The tile must be held by ANOTHER living
+ *  city of the claimant's seat. A district under construction and a wonder
+ *  site both stand on the plot, so both refuse; a city centre is a district
+ *  and is never swapped. The game's target set comes from the DLL
+ *  (`CityManager.GetCommandTargets`); the claimant's REACH here is its work
+ *  radius, the text's "to be worked by this city". The swap costs nothing.
+ *  `_swap_tile_ok` is the twin. */
+export function swapTileOk(state: GameState, city: City, tileIndex: number): boolean {
+  const t = state.map.tiles[tileIndex];
+  if (!t || tileSeat(t) !== city.seat || tileCity(t) === city.id) return false;
+  const loser = citiesOf(state, city.seat).find((c) => c.id === tileCity(t));
+  if (!loser) return false;
+  if (t.district || t.builtWonder) return false;
+  if (t.improvement && IMPROVEMENTS[t.improvement as ImprovementId].noSwap) return false;
+  const ctr = state.map.tiles[city.centerIndex];
+  if (hexDistance(ctr.col, ctr.row, t.col, t.row) > CITY_WORK_RADIUS) return false;
+  const lc = state.map.tiles[loser.centerIndex];
+  return hexDistance(lc.col, lc.row, t.col, t.row) > 1;
 }
 
 

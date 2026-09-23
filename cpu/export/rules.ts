@@ -1984,6 +1984,7 @@ export function buildRules() {
           // THE UNIQUE ROWS' own placement and clause columns. -1 / 0 means
           // "the row names none of this".
           onePerCity: def.onePerCity ? 1 : 0,
+          noSwap: def.noSwap ? 1 : 0,
           minAppeal: def.minAppeal ?? -1,
           appealY: def.appealYield
             ? [YIELD_KEYS.indexOf(def.appealYield.yield), def.appealYield.pct] : [-1, 0],

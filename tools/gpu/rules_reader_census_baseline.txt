@@ -1,6 +1,5 @@
-rules.json: 1517 key paths over 70 groups
+rules.json: 1547 key paths over 70 groups
   wire keys with NO GPU literal: 0
-provenance.json: 845 catalog columns
-  columns with NO TS property access: 1
-    improvements.noSwap
-READER CENSUS REPORTED
+provenance.json: 855 catalog columns
+  columns with NO TS property access: 0
+READER CENSUS OK

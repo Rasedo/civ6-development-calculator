@@ -117,7 +117,7 @@ def main() -> None:
     print(f"  6 rxp {float(rxp[0])}, rplun {float(tw[0])}, envoy1 {bool(e1[0])}, gpp {float(gpp[0].sum())}")
 
     # 6b) LIBERALISM's amenitiesIfSpecialty rides the district-conditional
-    #     applier as an amenity-only New Deal row (AUDIT C-80, census rule 1:
+    #     applier as an amenity-only New Deal row (the reader census:
     #     TS paid it in computeCityStats, the GPU never loaded the column).
     # the greedy fill takes economic cards in table order (GOD_KING,
     # RATIONALISM, FREE_MARKETS come before LIBERALISM), so a government

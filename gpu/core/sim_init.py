@@ -1591,7 +1591,8 @@ class SimInit:
         # park (its cluster's lowest index), -1 where there is none.
         self.park = torch.full((B, self.T), -1, dtype=torch.long, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
-        self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
+        self._work_radius = int(rr["workRadius"])  # CITY_WORK_RADIUS
+        self._off3 = tiles_within_offsets(self._work_radius).to(device)
         # THE WORKED-TILE PICK, one window per city slot, -1 unused.
         # It is a per-CITY fact, so it is a REGISTERED CITY PLANE and not a
         # side table: `_compact_city_rows` derives its list from `_MUTABLE` by
@@ -1871,6 +1872,8 @@ class SimInit:
         # half). Every one of these is -1 or 0 on a row that names none.
         _R = imp["rows"]
         self._imp_one_per_city = [bool(r.get("onePerCity", 0)) for r in _R]
+        # "Tiles with <row> cannot be swapped" — the tile-swap verb's refusal
+        self._imp_no_swap = torch.tensor([bool(r["noSwap"]) for r in _R], dtype=torch.bool, device=device)
         self._imp_min_appeal = [int(r.get("minAppeal", -1)) for r in _R]
         # [(yield idx, percent)] — the Chemamull's Culture off the tile's Appeal
         self._imp_appeal_y = [(int(r.get("appealY", [-1, 0])[0]), float(r.get("appealY", [-1, 0])[1])) for r in _R]
@@ -2298,7 +2301,7 @@ class SimInit:
             self._pol_nd_amen = torch.tensor([float(x[2]) for x in _pnd], dtype=dtype, device=device)
             # amenitiesIfSpecialty — LIBERALISM: TS pays it beside newDeal in
             # `computeCityStats`; this loader skipped the column and no seed
-            # had reached the card with the districts (AUDIT C-80, census rule 1)
+            # had reached the card with the districts (the reader census named it)
             _pai = [p.get("amenitiesIfSpecialty", [-1, 0]) for p in _pols]
             self._pol_ais_min = torch.tensor([int(x[0]) for x in _pai], dtype=torch.long, device=device)
             self._pol_ais_amen = torch.tensor([float(x[1]) for x in _pai], dtype=dtype, device=device)

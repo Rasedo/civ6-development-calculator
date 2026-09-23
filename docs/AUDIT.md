@@ -52,8 +52,8 @@ re-adds them.
 | C-49 named storms | 1 | the per-step draw is inferred from resultants, not watched step by step (LAB) |
 | C-60 the Free City's own play | 1 | its defence floor, its granted defenders, its amenity need — measured |
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
-| C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
-| C-80 constants vs the install | 1 | one rule the reader census names (noSwap) |
+| C-79 unique INFRASTRUCTURE absent | 1 | the Stepwell's two adjacencies |
+| C-81 the tile swap's reach | 1 | which plots the DLL offers a claiming city (LAB) |
 | **C. Absent systems** | **14** | |
 | **OPEN, TOTAL** | **18** | |
 
@@ -133,13 +133,11 @@ close in the same commit.
   - BUILD, measured against a 205-turn event history: Civ 6 fires AT MOST ONE random event per turn — the log carries a single slot per turn and 79 of 175 turns held one — drawn from the events currently ELIGIBLE, with `OccurrencesPerGame` as a WEIGHT and not an expected count or a cap (a parameter of 1 fired fourteen times, a parameter of 23 fired nine). Eligibility is what the map supplies: floodplains for a flood, a volcano for an eruption, a reactor past its `MinTurnAtRisk` for an accident — which is why `ERUPTION_CHANCE_PER_VOLCANO` had no per-object counterpart to find. `disasterPhase` rolls each family on its own clock (`nextRandom(state) < FLOOD_CHANCE * rate`, and again for drought) and can fire two in a turn where the game fires one; the per-turn chance readers (`GameClimate.GetFloodPercentChance` and friends) report the realised chance for THAT map, so they are a validation target, not a constant to copy.
 - **C-79. UNIQUE INFRASTRUCTURE ABSENT.** Weight 1.
   Every district, building and improvement row is built.
-  - BUILD, one clause with no carrier, recorded on the column that names it: "Tiles with <row> cannot be swapped" (Golf Course, Open-Air Museum) — the sentence is text only, no XML column carries it, and no tile-swap verb exists here to refuse.
   - BUILD: the Stepwell's "+1 Faith beside a Holy Site, +1 Food beside a Farm" IS sourced after all — `STEPWELL_FARMADJACENCY_FOOD` and `STEPWELL_HOLYSITEADJACENCY_FAITH`, both `MODIFIER_SINGLE_PLOT_ADJUST_PLOT_YIELDS` with Amount 1 and the requirement sets `PLOT_ADJACENT_TO_FARM_REQUIREMENTS` / `PLOT_ADJACENT_TO_HOLYSITE_REQUIREMENTS`, attached to `IMPROVEMENT_STEPWELL` in `Improvements.xml`. It is carried by MODIFIERS, not by an `Improvement_Adjacencies` row, which is the whole reason the earlier sweep read it as unpublished.
   - Out of scope by construction: LEY LINE adjacency (a Secret Societies resource class this map never places).
-- **C-80. CONSTANTS VS THE INSTALL.** Weight 1.
-  The instruments: every catalog constant carries a source tag (`cpu/data/provenance.ts`); `tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md` and the reader census (`tools/gpu/rules_reader_census.py`) run in battery stage 0 as RATCHETS — a new disagreement or a new unread key is red.
-  - The ONE RULE the reader census still names (its baseline line stays red-listed until built):
-    6. BUILD: `improvements.noSwap`: C-79's tile-swap refusal.
+- **C-81. THE TILE SWAP'S REACH.** Weight 1.
+  The verb ships on both engines (`swapTileOk` / `_swap_tile_ok`, applied from the record's `swapTiles` in `applySeatActionRecord` / `_apply_citizens`): the tooltip's three refusals (a district, a wonder, next to the other city's centre), the Golf Course's and Open-Air Museum's `noSwap`, same seat and another living city only, free of cost. REACHED by `tests/cpu/city/tile-swap.test.ts` and the `tile_swap` poke lane; the serve gate reaches it only when `_decide_swap` fires (a city with more citizens than plots beside a sibling with plots to spare).
+  - LAB: the claimant's REACH. The target set is the DLL's (`CityManager.GetCommandTargets(city, CityCommandTypes.SWAP_TILE_OWNER, ...)`, `Base/Assets/UI/WorldView/PlotInfo.lua` `ShowSwapTiles`), and no text states it; both engines read "to be worked by this city" as the claimant's work radius (3). The same scene answers whether a swap moves either city's border-growth count (`tilesAcquired` / `city_acquired`, untouched here) — `tools/civ6lab/SESSION2.md` scene 11.
 
 ## Harness — not weighted
 

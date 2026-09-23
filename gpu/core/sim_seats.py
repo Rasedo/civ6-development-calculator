@@ -490,6 +490,7 @@ class SimSeats:
         route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
+        swap: torch.Tensor | None = None,  # [B, K, 2] TILE SWAPS: (claiming city's centre, tile); -1 = padding
         vote: torch.Tensor | None = None,  # [B, 3, 3] the congress ballot: [outcome, target, extra votes] per slate slot
         gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
@@ -525,8 +526,8 @@ class SimSeats:
             self._driven_route[row] = route
         if nuke is not None:
             self._driven_nuke[row] = nuke
-        if spec is not None or lock is not None:
-            self._driven_citizens[row] = (spec, lock)
+        if spec is not None or lock is not None or swap is not None:
+            self._driven_citizens[row] = (spec, lock, swap)
         if vote is not None:
             self._driven_vote[row] = vote
         if gp_pass is not None:
@@ -1165,12 +1166,14 @@ class SimSeats:
         elif production is not None:
             self._apply_seat_production(row, production, dtile)
 
-    def _apply_citizens(self, row: int, active: torch.Tensor, spec, lock) -> None:
+    def _apply_citizens(self, row: int, active: torch.Tensor, spec, lock, swap=None) -> None:
         """The CITIZEN-ASSIGNMENT arm of the record. `spec` pins a count into
         each district's specialist slots (-1 hands one back to the automatic
-        rule, SPEC_KEEP leaves it as it was); `lock` flips a plot's own pin.
-        Both re-validate here — a pin needs a living city, a flip needs the
-        plot to be this seat's ground."""
+        rule, SPEC_KEEP leaves it as it was); `lock` flips a plot's own pin;
+        `swap` [B, K, 2] moves plots between the row's own cities, each
+        (claimant's centre, tile), -1 padding. All re-validate here — a pin
+        needs a living city, a flip needs the plot to be this seat's ground, a
+        swap the whole of `_swap_tile_ok` against the swaps before it."""
         ext = self.seat_ext[:, row]
         act = active & ext
         if spec is not None:
@@ -1193,6 +1196,55 @@ class SimSeats:
                     rows = ok.nonzero(as_tuple=True)[0]
                     self.tile_locked[rows, tc[rows]] = ~self.tile_locked[rows, tc[rows]]
                     self._eff_version += 1
+        if swap is not None:
+            sw = swap.to(torch.long)
+            if sw.dim() == 2:
+                sw = sw.unsqueeze(1)
+            for k in range(int(sw.shape[1])):
+                self._apply_swap(row, act, sw[:, k, 0], sw[:, k, 1])
+
+    def _swap_tile_ok(self, row: int, j: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """[B, N] `swapTileOk`'s twin: may city slot `j` [B, N] of `row`
+        claim tile `t` [B, N] from another of the row's cities? The tile is
+        held by ANOTHER living city of the row, lies within the claimant's
+        work radius, carries no district (a city centre included, which this
+        engine keeps apart in `centre_slot_at`), no wonder (complete or not)
+        and no `noSwap` improvement, and is not next to the losing city's
+        centre."""
+        jc, tc = j.clamp(min=0), t.clamp(min=0)
+        alive, ids, ctrs = self.city_alive[:, row], self.city_id[:, row], self.city_center[:, row]
+        owner = self.tile_city.gather(1, tc)
+        lose = alive.unsqueeze(1) & (ids.unsqueeze(1) == owner.unsqueeze(2)) & (owner >= 0).unsqueeze(2)
+        lctr = ctrs.gather(1, lose.long().argmax(dim=2))
+        ctr = ctrs.gather(1, jc)
+        ok = (
+            (j >= 0) & (t >= 0) & alive.gather(1, jc) & lose.any(dim=2)
+            & (self.tile_seat.gather(1, tc) == int(self._ROW_SEAT[row])) & (owner != ids.gather(1, jc))
+            & (self.district.gather(1, tc) < 0) & (self.centre_slot_at.gather(1, tc) < 0)
+            & (self.built_wonder.gather(1, tc) < 0)
+            & (self.pair_dist[ctr.clamp(min=0), tc].long() <= self._work_radius)
+            & (self.pair_dist[lctr.clamp(min=0), tc].long() > 1)
+        )
+        if self._imp_no_swap.numel():
+            imp = self.improvement.gather(1, tc)
+            ok = ok & ~((imp >= 0) & self._imp_no_swap[imp.clamp(min=0)])
+        return ok
+
+    def _apply_swap(self, row: int, act: torch.Tensor, centre: torch.Tensor, t: torch.Tensor) -> None:
+        """ONE recorded swap: the claimant is named by its CENTRE tile, the
+        predicate re-validates against the live state, and the plot is
+        retagged to the claimant — `setTileOwner` within one seat, which
+        keeps the plot's lock."""
+        hit = self.city_alive[:, row] & (self.city_center[:, row] == centre.unsqueeze(1)) & (centre >= 0).unsqueeze(1)
+        j = torch.where(hit.any(dim=1), hit.long().argmax(dim=1), torch.full_like(centre, -1))
+        ok = act & self._swap_tile_ok(row, j.unsqueeze(1), t.unsqueeze(1)).squeeze(1)
+        if not bool(ok.any()):
+            return
+        rows = ok.nonzero(as_tuple=True)[0]
+        self.tile_city[rows, t[rows]] = self.city_id[rows, row, j[rows]]
+        self._tile_owner_ver += 1
+        self._claim_version += 1
+        self._eff_version += 1
 
     def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None, dist=None) -> None:
         if buy is not None:

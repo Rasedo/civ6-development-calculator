@@ -181,7 +181,7 @@ export interface ImprovementDef {
   /** CIV6 (`DisasterResistant`): a storm or a flood leaves it standing. */
   disasterResistant?: boolean;
   /** CIV6 (Golf Course, Open-Air Museum): "Tiles with <row> cannot be
-   *  swapped" — recorded; this engine has no tile-swap verb. */
+   *  swapped" — the tile-swap verb refuses the plot (`swapTileOk`). */
   noSwap?: boolean;
   /**
    * CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION the

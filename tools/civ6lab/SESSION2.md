@@ -129,3 +129,15 @@ with the World Congress state read as well.
 * **The espionage roll** — it happens at the COMPLETION turn, where the stream
   is shared with every other actor, so seed accounting cannot isolate it. Only
   a real-mission sample can say what it consumes.
+
+## 11. The tile swap's reach (AUDIT C-81)
+
+`CityManager.GetCommandTargets(city, CityCommandTypes.SWAP_TILE_OWNER, {})`
+returns the plots the DLL offers (`tResults[CityCommandResults.PLOTS]`, read
+exactly as `Base/Assets/UI/WorldView/PlotInfo.lua` `ShowSwapTiles` reads it).
+Place two cities of one player four hexes apart, let the second own plots at
+distance 1, 2, 3 and 4 from the first centre (none next to its own centre, no
+district, no wonder), and read the list for the first city: the engines assume
+exactly the plots within 3 of the claimant. Then `RequestCommand` one swap and
+read both cities' plot-acquisition count before and after, to learn whether a
+swap moves the border-growth cost of either city.

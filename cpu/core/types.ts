@@ -247,6 +247,10 @@ export interface SeatActionRecord {
    * FLIPS this turn, in order. A flip is what the city screen's click does,
    * and both engines re-validate that the plot is this seat's ground. */
   lockTiles?: number[];
+  /** The TILE SWAP: [claiming city's centreTile, tile] each, in order — the
+   * plot moves from one of this seat's cities to the claiming one. Both
+   * engines re-validate every swap (`swapTileOk`) as it lands. */
+  swapTiles?: [number, number][];
   /** The WORLD CONGRESS ballot, one entry per slate slot in slate order
    * (slot 2 is the always-3rd Diplomatic Victory resolution): the outcome
    * (0 = A, 1 = B), the target index, and how many EXTRA votes to buy up the

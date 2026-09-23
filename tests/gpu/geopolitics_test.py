@@ -992,7 +992,7 @@ def poke_visibility(rules, path):
     # CIV6 (Flying Squadron, UNIQUE_LEADER_ADD_VISIBILITY): Catherine de
     # Medici's flat +1 with every civilization — the viewer's own row over
     # every target column, like Goddard's charge (`flatLevels`, which the
-    # loader bound and no loop read until AUDIT C-80's census named it)
+    # loader bound and no loop read until the reader census named it)
     _cat = sim._pair_leader.index("CATHERINE_DE_MEDICI")
     sim.row_leader[0, a] = _cat
     sim.row_civ[0, a] = sim._pair_civ[_cat]

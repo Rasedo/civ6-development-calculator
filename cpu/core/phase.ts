@@ -46,7 +46,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT } from '../data/constants';
 import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
-import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
+import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
@@ -1381,9 +1381,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       }
     }
   }
-  // CITIZEN ASSIGNMENT, in the GPU's arm order: the pins, then the plot
-  // flips. Both re-validate — a pin needs a living city of this seat, a flip
-  // needs the plot to be this seat's ground.
+  // CITIZEN ASSIGNMENT, in the GPU's arm order: the pins, the plot flips,
+  // then the tile swaps. All re-validate — a pin needs a living city of this
+  // seat, a flip needs the plot to be this seat's ground, a swap the whole of
+  // `swapTileOk` against the state the swaps before it left.
   for (const [centre, di, n] of rec.specialists ?? []) {
     const pinCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!pinCity || di < 0 || di >= PLACEABLE_DISTRICTS.length) continue;
@@ -1392,6 +1393,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   for (const tileIndex of rec.lockTiles ?? []) {
     const plot = state.map.tiles[tileIndex];
     if (plot && tileSeat(plot) === actor.seat) plot.locked = !plot.locked;
+  }
+  for (const [centre, tileIndex] of rec.swapTiles ?? []) {
+    const claim = actor.cities.find((c) => c.centerIndex === centre);
+    if (claim && swapTileOk(state, claim, tileIndex)) setTileOwner(state.map.tiles[tileIndex], claim.seat, claim.id);
   }
   // The WORLD CONGRESS ballot is banked, not spent: the session runs at the
   // turn tail, after every seat has had its phase.

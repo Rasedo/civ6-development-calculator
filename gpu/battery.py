@@ -684,6 +684,7 @@ def _main() -> int:
                 ("unique_units", [py, "tests/gpu/unique_units_test.py"], 2),  # the 31 unique chassis and their ability clauses
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
+                ("tile_swap", [py, "tests/gpu/tile_swap_test.py"], 2),  # the tile swap: every refusal, the record arm, the driver's rule
                 ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target
                 ("emergency", [py, "tests/gpu/emergency_test.py"], 2),  # the special session above the trigger: sponsorship, quiet window, forced war, both outcomes
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # the relic rides the MARTYR promotion, and the death draws nothing
