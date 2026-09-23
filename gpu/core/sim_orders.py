@@ -746,7 +746,14 @@ class SimOrders:
                 dirs = (a - 6).clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                valid = atk & (tgt >= 0)
+                # the validator's own early returns, re-read at APPLY time
+                # (`meleeAttackInner` / the ranged arm: "No movement left.",
+                # "The attack is spent."): a sequence planned before an
+                # earlier order of the same turn spent the unit — a form-up
+                # zeroes the host's moves — must not strike
+                _mp_now = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
+                _atk_now = self.unit_attacks.gather(1, sc.unsqueeze(1)).squeeze(1)
+                valid = atk & (tgt >= 0) & (_mp_now > 0) & (_atk_now > 0)
                 if bool(u_emb.any()):
                     # the amphibious reach: an embarked unit strikes an open
                     # LAND shore, with a MELEE attack, and nothing afloat.
