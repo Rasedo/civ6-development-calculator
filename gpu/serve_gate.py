@@ -167,6 +167,22 @@ def dump_diff(man: dict, group: str, gdump: dict, tdump: dict,
     return reps
 
 
+def neutral_seat_diffs(seat: int, gpu_obs: dict, msg: dict) -> tuple[list[str], int]:
+    """Every per-seat neutral group the TS child sent for `seat`, compared
+    with the GPU observation's group of the SAME NAME; a name the GPU does
+    not emit is a red. Returns (reds, groups compared)."""
+    ts = ((msg.get("neutral") or {}).get(str(seat))) or {}
+    reds: list[str] = []
+    for name, val in ts.items():
+        if name not in gpu_obs:
+            reds.append(f"seat{seat}.{name}: the GPU observation has no such group")
+            continue
+        d = neutral_diff(f"seat{seat}.{name}", gpu_obs[name], val)
+        if d:
+            reds.append(d)
+    return reds, len(ts)
+
+
 def neutral_diff(path: str, g, t) -> str | None:
     """The first place two neutral-observation values differ, as
     `<path>: GPU <value> vs TS <value>` naming the field and the row, or
@@ -413,6 +429,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     bad = 0
     first: str | None = None
     world_checked = 0
+    groups_checked = 0
 
     def flag(rep: str) -> None:
         nonlocal bad, first
@@ -464,6 +481,12 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # JOB and SPREAD tripwires read it against the TS driver's
                 # pre-turn twins, EVERY seat, row 0 included.
                 nobs_seat[seat] = neutral.seat_obs(sim, seat, gobs_all)
+                # ...and every per-seat group the TS child emitted for this seat
+                for b, msg in enumerate(msgs):
+                    _reds, _n = neutral_seat_diffs(seat, nobs_seat[seat][b], msg)
+                    for _d in _reds:
+                        flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {_d}")
+                    groups_checked += _n
                 # Every seat's unit rows ride `_seat_slot_map` — this seat's
                 # LIVING units in slot order, which IS the TS array order it
                 # emits per unit.
@@ -613,7 +636,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         sys.exit(1)
     print(f"SERVE GATE (BATCHED) OK — {len(seeds)} games x {turns} turns in one batch: "
           f"obs + unit targets equal everywhere, the neutral world group equal on {world_checked} "
-          "(game, turn) pairs, state digests agree on every group")
+          f"(game, turn) pairs and {groups_checked} per-seat groups, state digests agree on every group")
 
 
 def main() -> None:
@@ -731,6 +754,7 @@ def main() -> None:
     obs_bails = 0
     trace_bad = 0
     world_checked = 0
+    groups_checked = 0
     first_report: str | None = None
     for t in range(t0, args.turns):
         msg = read_msg()
@@ -773,6 +797,14 @@ def main() -> None:
         nobs_seat: dict = {}
         for seat in seats:
             nobs_seat[seat] = neutral.seat_obs(sim, seat, obs_seat[seat])
+            _reds, _n = neutral_seat_diffs(seat, nobs_seat[seat][0], msg)
+            for _d in _reds:
+                rep = f"turn {t + 1}: NEUTRAL {_d}"
+                print(rep)
+                if first_report is None:
+                    first_report = rep
+                obs_bails += 1
+            groups_checked += _n
             gj_t = drive._builder_jobs(st, nobs_seat[seat])
             gs_t = drive._spread_targets(st, nobs_seat[seat])
             gj = gj_t[0].tolist()
@@ -877,7 +909,8 @@ def main() -> None:
         print(f"SERVE GATE RED — first: {first_report}")
         sys.exit(1)
     print(f"SERVE GATE OK — seed {args.seed}, {args.turns} turns: obs equal on every (turn, seat), "
-          f"the neutral world group equal on {world_checked} turns, state digests agree on every group")
+          f"the neutral world group equal on {world_checked} turns and {groups_checked} per-seat groups, "
+          "state digests agree on every group")
 
 
 if __name__ == "__main__":

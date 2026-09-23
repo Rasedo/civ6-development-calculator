@@ -29,7 +29,7 @@ import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
-import { worldObs } from '../core/decideObs';
+import { worldObs, seatGroups } from '../core/decideObs';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
 import { hiddenResourcesFor } from '../core/seats';
@@ -427,10 +427,13 @@ for (let t = 0; t < N_TURNS; t++) {
     // driver-twin check fires HERE, and evidence that arrives one message
     // later is evidence the failing comparison never sees.
     const dlT = (globalThis as { __diffLog?: string[] }).__diffLog;
-    // `world` is the neutral observation's world group: the gate compares it
-    // with the GPU's before the decide, and nothing on this side reads it
+    // `world` is the neutral observation's world group and `neutral` its
+    // registered per-seat groups, by seat id: the gate compares each with the
+    // GPU's before the decide, and nothing on this side reads them
+    const neutralSeats: Record<number, Record<string, unknown>> = {};
+    for (const s of state.seats) neutralSeats[s.seat] = seatGroups(state, s.seat);
     o.send({
-      t: state.turn, obs, world: worldObs(state), jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg,
+      t: state.turn, obs, world: worldObs(state), neutral: neutralSeats, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg,
       ...(dlT ? { dl: trimByKind(dlT) } : {}),
     });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
