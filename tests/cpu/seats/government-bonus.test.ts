@@ -70,6 +70,17 @@ describe('the flat government bonus', () => {
   });
 });
 
+describe('the governor-gated inherent channels', () => {
+  it('reach the seat modifiers, for `withGovernor` to pay in a governed city', () => {
+    const state = scene('CLASS_STRUGGLE');
+    expect(computeAdoption(seatOf(state, 0)!.research).government).toBe('COMMUNISM');
+    expect(getModifiers(state, 0).governorPerCitizen).toEqual({ production: 0.6 });
+    const mr = scene('EXPLORATION');
+    expect(computeAdoption(seatOf(mr, 0)!.research).government).toBe('MERCHANT_REPUBLIC');
+    expect(getModifiers(mr, 0).governorYieldMult).toEqual({ gold: 1.1 });
+  });
+});
+
 describe('what a legacy card pays', () => {
   it("its government's inherent bonus, and never the flat one", () => {
     const state = scene(...Object.keys(CIVICS));

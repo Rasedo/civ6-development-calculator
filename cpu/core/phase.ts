@@ -2164,8 +2164,8 @@ export function seatPhase(state: GameState): void {
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         // CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
-          // CIV6 (Monarchy legacy): "bonus influence points toward earning
-          // more Envoys" — a percentage of the WHOLE per-turn sum, which is
+          // CIV6 (Monarchy, GOVERNMENTBONUS_ENVOYS): "+50% Influence Points" toward
+          // more Envoys — a percentage of the WHOLE per-turn sum, which is
           // why it multiplies here and not inside any one term.
           const _infl = INFLUENCE_PER_TURN + tier
             + getModifiers(state, actor.seat).influencePerTurn

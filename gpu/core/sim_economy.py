@@ -2350,6 +2350,8 @@ class SimEconomy:
                                ("grievhold", self._pol_griev_hold), ("noenvoy", self._pol_no_envoy)):
                     fx[_k] = fx[_k] | (cards & _t.unsqueeze(0)).any(dim=1)
                 fx["raidermove"] = fx["raidermove"] + (cards.long() * self._pol_raider_moves.unsqueeze(0)).sum(dim=1)
+                fx["allyroute"] = fx["allyroute"] + sd @ self._pol_ally_route
+                fx["allypts"] = fx["allypts"] + (cards.long() * self._pol_ally_pts.unsqueeze(0)).sum(dim=1)
                 fx["goldbuydisc"] = fx["goldbuydisc"] + sd @ self._pol_goldbuy
                 fx["faithbuydisc"] = fx["faithbuydisc"] + sd @ self._pol_faithbuy
                 fx["domroute"] = fx["domroute"] + sd @ self._pol_dom_route

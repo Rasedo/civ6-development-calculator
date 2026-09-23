@@ -2390,6 +2390,10 @@ class SimInit:
             self._pol_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _pols], dtype=dtype, device=device)
+            # Democracy's ally-route yields and alliance points: a legacy
+            # card carries its government's inherent bonus, these included
+            self._pol_ally_route = torch.tensor([[float(x) for x in r["allyRouteYield"]] for r in _pols], dtype=dtype, device=device)
+            self._pol_ally_pts = torch.tensor([int(r["alliancePointsPerTurn"]) for r in _pols], dtype=torch.long, device=device)
             self._pol_distprod = torch.tensor([float(r["districtProdMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_inflmult = torch.tensor([float(r["influenceMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_goldbuy = torch.tensor([float(r["goldBuyDiscountPct"]) for r in _pols], dtype=dtype, device=device)
@@ -2411,7 +2415,8 @@ class SimInit:
                 + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
                 + self._pol_govbldy.abs().sum()
                 + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
-                + self._pol_goldbuy.abs().sum() + self._pol_faithbuy.abs().sum())
+                + self._pol_goldbuy.abs().sum() + self._pol_faithbuy.abs().sum()
+                + self._pol_ally_route.abs().sum() + self._pol_ally_pts.abs().sum())
             self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
         # Master switch (rules.governmentsLive), mirroring the TS
         # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the

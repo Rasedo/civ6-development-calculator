@@ -81,6 +81,11 @@ def test_the_wire(rules, path) -> None:
         assert bool((t[leg] == 1).all()), "a legacy card carries a flat multiplier"
     for t in (sim._pol_goldbuy, sim._pol_faithbuy):
         assert bool((t[leg] == 0).all()), "a legacy card carries a flat discount"
+    # ...and a legacy card's INHERENT channels reach the policy table: Democracy's
+    # ally routes and alliance points, which only the government table read
+    dem_card = int((sim._pol_legacy == g["DEMOCRACY"]).nonzero()[0])
+    assert sim._pol_ally_route[dem_card].tolist()[:2] == [4.0, 4.0], "Democracy's legacy card: +4 food / +4 production on ally routes"
+    assert int(sim._pol_ally_pts[dem_card]) == 1, "Democracy's legacy card: the quarter alliance point"
     print("  1 the wire OK — nine flat bonuses on the government rows, none on a legacy card")
 
 

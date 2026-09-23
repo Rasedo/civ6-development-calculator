@@ -701,6 +701,14 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   addPartial(mods.domesticRouteYield, fx.domesticRouteYield);
   addPartial(mods.allyRouteYield, fx.allyRouteYield);
   mods.alliancePointsPerTurn += fx.alliancePointsPerTurn ?? 0;
+  // the two GOVERNOR-GATED channels (Merchant Republic's gold, Theocracy's
+  // and Communism's per-citizen yields) — `withGovernor` pays them in a
+  // governed city
+  for (const [k, m] of Object.entries(fx.governorYieldMult ?? {})) {
+    const key = k as keyof Yields;
+    mods.governorYieldMult[key] = (mods.governorYieldMult[key] ?? 1) * (m ?? 1);
+  }
+  addPartial(mods.governorPerCitizen, fx.governorPerCitizen);
   if (fx.routeYieldMult) mods.routeYieldMult *= fx.routeYieldMult;
   if (fx.noSettlers) mods.noSettlers = true;
   if (fx.healOnlyHome) mods.healOnlyHome = true;
