@@ -3647,6 +3647,33 @@ class SimSeats:
         at = self._air_train_tile(row).gather(1, col.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(air & (at >= 0), at, ctr)
 
+    def _upgrade_gold_cost(self, row: int, utp: torch.Tensor, nc: torch.Tensor,
+                           levied: torch.Tensor) -> torch.Tensor:
+        """[B, ...] f64 — `upgradeGoldCost`: the gap between the two chassis'
+        own gold purchase prices (`unitPurchaseCost` — Mercenary Companies on a
+        military chassis, Flower Power on a land one), never below 0. CIV6
+        (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
+        PERCENT): a LEVIED unit upgrades at the row's discount. `utp` and `nc`
+        are the old and new chassis, shaped [B] or [B, N]."""
+        B = self.B
+        shp = utp.shape
+        old = utp.clamp(min=0).reshape(B, -1)
+        new = nc.clamp(min=0).reshape(B, -1)
+        merc = self._congress_unit_buy_mult(0).unsqueeze(1)
+        land = self._land_unit_price_mult(row)
+
+        def price(t: torch.Tensor) -> torch.Tensor:
+            p = self._type_cost[t].double() * self.rules.gold_purchase_mult
+            p = torch.where(self._type_combat[t] > 0, p * merc, p)
+            return p * land.gather(1, t)
+
+        raw = (price(new) - price(old)).clamp(min=0)
+        pct = torch.zeros(B, dtype=torch.float64, device=self.device)
+        for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
+            pct = torch.where(self._row_is(row, _lc, _ll), pct.clamp(min=float(_ld)), pct)
+        disc = js_round(raw * (1.0 - pct.clamp(max=100.0).unsqueeze(1) / 100.0))
+        return torch.where(levied.reshape(B, -1), disc, raw).reshape(shp)
+
     def _upgrade_units(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
                        utp: torch.Tensor) -> None:
         """`upgradeUnit` — the ordered rungs that pass `_upgrade_ok` change
@@ -3666,9 +3693,8 @@ class SimSeats:
                               torch.ones_like(ok))
         ok = ok & torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(1)).squeeze(1),
                               torch.ones_like(ok))
-        price = (self._type_cost[nc] - self._type_cost[utp.clamp(min=0)]).clamp(min=0).double() \
-            * self.rules.gold_purchase_mult
-        ok = ok & (self.civ_treasury[:, row] >= price)
+        price = self._upgrade_gold_cost(row, utp, nc, self.unit_levied.gather(1, sc.unsqueeze(1)).squeeze(1))
+        ok = ok & self._afford(self.civ_treasury[:, row], price)
         slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
         want = (slot >= 0) & (cost > 0) & (self._type_res_slot[utp.clamp(min=0)] != slot)
         if self._n_strategic:

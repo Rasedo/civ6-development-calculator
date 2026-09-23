@@ -4097,24 +4097,9 @@ class SimMasks:
         ok = ok & have_t & have_c
         ok = ok & (self.tile_seat.gather(1, tc) == row)
         ok = ok & (self.unit_mp.gather(1, sc) > 0)
-        # the GOLD: the two chassis' own purchase prices, as `upgradeGoldCost`
-        price = (self._type_cost[nc] - self._type_cost[utype.clamp(min=0)]).clamp(min=0).double() \
-            * self.rules.gold_purchase_mult
-        # CIV6 (The Raven King,
-        # EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT): a LEVIED
-        # unit upgrades at 75% off. The row shipped long ago and nothing read
-        # it until now.
-        if self._levy_rows:
-            _lpct = 0
-            for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
-                if bool(self._row_is(row, _lc, _ll).any()):
-                    _lpct = max(_lpct, _ld)
-            if _lpct > 0:
-                _lvd = self.unit_levied.gather(1, sc)
-                price = torch.where(_lvd,
-                                    (price * (1.0 - min(100, _lpct) / 100.0)).round(),
-                                    price)
-        ok = ok & (self.civ_treasury[:, row].unsqueeze(1) >= price)
+        # the GOLD (`upgradeGoldCost`, the applier's own price)
+        price = self._upgrade_gold_cost(row, utype, nc, self.unit_levied.gather(1, sc))
+        ok = ok & self._afford(self.civ_treasury[:, row].unsqueeze(1), price)
         # the BANK: the new chassis' charge, and nothing when both rungs ask
         # for the same resource
         slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
