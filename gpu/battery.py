@@ -63,6 +63,10 @@ HUNT_SEEDS = _argval("--seeds")
 HUNT = HUNT_SEEDS is not None
 HUNT_RESUME = _argval("--resume")
 HUNT_CKPT_EVERY = _argval("--ckpt-every")
+# a hunt may stop early: `--turns N` serves N turns instead of the game's
+# 250 — the per-slice smoke of a change whose new comparison runs every
+# turn (early divergence is its job, late divergence the battery's)
+HUNT_TURNS = _argval("--turns")
 # SCOPED TO THE SEEDS. The TS checkpoint names its seed and the GPU snapshot
 # does not, so one directory holds one seed's GPU state — hunting a second
 # would overwrite the first, and the gate's seed assert would be the only
@@ -416,10 +420,11 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         if p.returncode == 0 and name.startswith("eval"):
             for ln in p.stdout.strip().splitlines()[-1:]:
                 print(f"    | {ln}", flush=True)
-        if p.returncode == 0 and name.startswith("serve") and "--profile" in sys.argv:
-            # a profiled hunt shard: its turn-loop split is the whole point
-            # of the run, and a green lane's stdout is otherwise dropped
-            _n = 90 if _argval("--cprofile") else 16
+        if p.returncode == 0 and name.startswith("serve") and (HUNT or "--profile" in sys.argv):
+            # a hunt shard's closing lines (the gate's OK line counts what it
+            # compared) and a profiled one's turn-loop split; a battery's green
+            # lane stdout is otherwise dropped
+            _n = 90 if _argval("--cprofile") else (16 if "--profile" in sys.argv else 4)
             for ln in p.stdout.strip().splitlines()[-_n:]:
                 print(f"    | {ln}", flush=True)
         if p.returncode != 0 and looks_oom(p.stdout + p.stderr):
@@ -633,7 +638,8 @@ def _main() -> int:
         _mem_free_start = mem_min_free[0]
         threading.Thread(target=mem_watch, daemon=True).start()
         _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
-        serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250"]
+        serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns",
+                     str(int(HUNT_TURNS)) if HUNT and HUNT_TURNS else "250"]
         if HUNT and (HUNT_RESUME or HUNT_CKPT_EVERY):
             serve_cmd += ["--ckpt-dir", HUNT_CKPT_DIR]
             if HUNT_CKPT_EVERY:
