@@ -765,7 +765,7 @@ export function placeSeatDistrict(
 /** IS THIS SITE LEGAL for this district, for this city, right now? One
  * predicate, so the BUILD verb and the PURCHASE verb refuse on the same
  * clauses rather than on two spellings of them. */
-function districtSiteLegal(
+export function districtSiteLegal(
   state: GameState, civCity: City, id: DistrictId, unlocks: Unlocks, tileIndex: number,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
@@ -870,27 +870,49 @@ export function purchaseSeatDistrict(
   return true;
 }
 
-export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
-  const civ = actor.seat;
+/** The plot `placeSeatWonder` would raise this wonder on in this city: the
+ *  lowest-index tile of its work radius `canPlaceWonder` admits, once the
+ *  wonder stands nowhere and its research is in; undefined where none. */
+export function wonderSite(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): Tile | undefined {
+  if (wonderExists(state, def.id)) return undefined;
+  if (def.requiresTech && !actor.research.techs.includes(def.requiresTech)) return undefined;
+  if (def.requiresCivic && !actor.research.civics.includes(def.requiresCivic)) return undefined;
   const center = state.map.tiles[civCity.centerIndex];
-  {
-    if (wonderExists(state, def.id)) return false;
-    if (def.requiresTech && !actor.research.techs.includes(def.requiresTech)) return false;
-    if (def.requiresCivic && !actor.research.civics.includes(def.requiresCivic)) return false;
-    const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
-      .filter((t) => canPlaceWonder(state, civCity, def.id, t.index, civ).ok)
-      .sort((a, b) => a.index - b.index);
-    const tile = cands[0];
-    if (!tile) return false;
-    tile.builtWonder = def.id;
-    tile.builtWonderComplete = false;
-    tile.improvement = null;
-    tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
-    if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-    civCity.wonders.push({ id: def.id, tileIndex: tile.index });
-    commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
-    return true;
-  }
+  return tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
+    .filter((t) => canPlaceWonder(state, civCity, def.id, t.index, actor.seat).ok)
+    .sort((a, b) => a.index - b.index)[0];
+}
+
+/** May this city train roster unit `id` as a FORMATION of `tier` (1 corps,
+ *  2 army) now? CIV6 (Military Academy, Seaport): a military chassis that
+ *  may form, the enabling building standing, the tier's civic in — the
+ *  roster's own civic for this tier and domain (EFFECT_ADJUST_CORPS_ARMY_PREREQ),
+ *  the catalog's otherwise — the chassis trainable here, and the TIER's own
+ *  strategic charge, which `trainableUnits` asked at the chassis' single rate. */
+export function formationOrderOk(state: GameState, actor: Seat, civCity: City, id: string, tier: 1 | 2): boolean {
+  const def = UNITS[id];
+  if (!def) return false;
+  const fRow = getModifiers(state, actor.seat).formations.find(
+    (r) => r.tier === tier && r.naval === !!def.naval && r.civic !== undefined);
+  const civic = fRow?.civic ?? FORMATION_CIVIC[tier];
+  return def.combat > 0 && unitDomain(id) === 'military' && !formationBanned(id)
+    && civCity.buildings.includes(def.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land)
+    && (!civic || isCivicComplete(state, civic, actor.seat))
+    && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)
+    && (state.sandbox || canTrainWithStockpile(state, actor.seat, id, tier));
+}
+
+export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
+  const tile = wonderSite(state, actor, civCity, def);
+  if (!tile) return false;
+  tile.builtWonder = def.id;
+  tile.builtWonderComplete = false;
+  tile.improvement = null;
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  civCity.wonders.push({ id: def.id, tileIndex: tile.index });
+  commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
+  return true;
 }
 
 export function queueSeatProject(state: GameState, civCity: City, projId: string): boolean {
@@ -1439,18 +1461,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       const tier = a < formLo + NU ? 1 : 2;
       const id = units[(a - formLo) % NU];
       const def = id ? UNITS[id] : undefined;
-      // CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the roster's own civic for
-      // this TIER and domain, the catalog's otherwise
-      const fRow = def && getModifiers(state, actor.seat).formations.find(
-        (r) => r.tier === tier && r.naval === !!def.naval && r.civic !== undefined);
-      const civic = fRow?.civic ?? FORMATION_CIVIC[tier];
-      if (def && def.combat > 0 && unitDomain(id) === 'military' && !formationBanned(id)
-          && civCity.buildings.includes(def.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land)
-          && (!civic || isCivicComplete(state, civic, actor.seat))
-          && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)
-          // the TIER's own strategic charge, which `trainableUnits` asked at the
-          // chassis' single rate
-          && (state.sandbox || canTrainWithStockpile(state, actor.seat, id, tier))) {
+      if (def && formationOrderOk(state, actor, civCity, id, tier)) {
         commitProduction(state, civCity.seat, civCity, {
           kind: 'unit', unit: id, formation: tier, progress: 0,
           cost: Math.round(def.cost * FORMATION_COST_MULT[tier] * FORMATION_TRAIN_DISCOUNT),
