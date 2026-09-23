@@ -268,11 +268,9 @@ CARDS_GREEDY, CARDS_LEGACY, CARDS_MILITARY, CARDS_DARK = 0, 1, 2, 3
 CARD_STYLE_NAMES = ("greedy", "legacy", "military", "dark")
 CARD_LEGACY_SHARE = 0.34     # r < this: legacy-first
 CARD_MILITARY_SHARE = 0.33   # the next band: military-first; the rest greedy
-# DARK is NOT in the draw. `card_style_of` splits [0, 1) into three bands and
-# every rollout on record depends on where those edges fall; a fourth band
-# would move every seat's style in every fixture for no fidelity reason. It
-# is reachable through the STYLE TABLE alone (`--styles darkage`), which is
-# what a reachability carrier is for.
+# DARK is NOT in the draw: the owner keeps it in the preset library
+# (`--styles darkage`) and out of the standing battery for now.
+# `card_style_of` splits [0, 1) into the three bands above.
 
 
 def card_style_of(r: torch.Tensor) -> torch.Tensor:

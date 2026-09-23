@@ -255,6 +255,22 @@ def _crash_text(ch, ef) -> str:
     return f"{head}:\n{tail}" if tail else f"{head} and wrote nothing to stderr"
 
 
+# THE RECORD LOG: `CIV6_REC_LOG=<dir>` appends every turn's decided records,
+# one JSONL file per seed (`recs_<seed>.jsonl`, shards never share a file).
+# It changes nothing the engines see; `tools/gpu/rec_diff.py` compares two
+# directories, which is how a driver refactor proves its decisions unchanged.
+_REC_LOG = os.environ.get("CIV6_REC_LOG")
+
+
+def _log_recs(seed: int, turn: int, recs: dict) -> None:
+    if not _REC_LOG:
+        return
+    d = Path(_REC_LOG)
+    d.mkdir(parents=True, exist_ok=True)
+    with open(d / f"recs_{seed}.jsonl", "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": turn, "recs": recs}, sort_keys=True) + "\n")
+
+
 def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 ckpt_dir: Path | None = None, resume: int = 0,
                 profile: bool = False, cprofile: str = "",
@@ -478,6 +494,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             for b, ch in enumerate(children):
                 recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], b),
                                    **drive._extract_geo(geo, row, b)} for row in seats}
+                _log_recs(seeds[b], t + 1, recs)
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
             prof["extract+send records"] += _pc() - _t
@@ -780,6 +797,7 @@ def main() -> None:
                            **drive._extract_geo(geo, row, 0)} for row in seats}
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
+        _log_recs(args.seed, t + 1, recs)
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
         sim.step()
