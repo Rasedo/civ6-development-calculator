@@ -11615,7 +11615,8 @@ class SimSeats:
                 one = torch.zeros(B, dtype=torch.bool, device=dev)
                 one[int(b_[j])] = True
                 self._unit_kill_event(row, self.unit_type[b_[j], u_[j]].reshape(1).expand(B),
-                                      (ds[j] == BARB_SEAT).reshape(1).expand(B), one)
+                                      (ds[j] == BARB_SEAT).reshape(1).expand(B), one,
+                                      vict_form=self.unit_formation[b_[j], u_[j]].reshape(1).expand(B))
             self._dig_at(b_, dt, ds)
             self._occ_clear(b_, dt, u_)
             self.unit_alive[b_, u_] = False
@@ -12322,7 +12323,10 @@ class SimSeats:
             striker_row,
             self.unit_type.gather(1, d_slot.clamp(min=0).unsqueeze(1)).squeeze(1),
             d_seat == BARB_SEAT,
-            strike & (d_slot >= 0) & ((def_hp - d) <= 0))
+            strike & (d_slot >= 0) & ((def_hp - d) <= 0),
+            # the victim's FORMATION: a Corps or Army felled by a city's strike
+            # pays To Arms! as `unitKillEvent` pays it off the unit itself
+            vict_form=self._form_tier(d_slot))
         rows = strike.nonzero(as_tuple=True)[0]
         for grp in (okm, ~okm & okc):
             g = rows[grp[rows]]
