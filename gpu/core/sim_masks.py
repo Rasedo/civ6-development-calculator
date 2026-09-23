@@ -2050,7 +2050,7 @@ class SimMasks:
         emb_blocks = (emb_seat >= 0) & ((emb_seat != seat) | emb_b)
         return mil_blocks | civ_blocks | sup_blocks | emb_blocks
 
-    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). `seat` is the ABSOLUTE seat spawning —
@@ -2060,6 +2060,9 @@ class SimMasks:
         naval_mask [B] bool marks rows spawning a NAVAL unit — those probe over
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
+        `utype` [B] is the chassis spawning: a CLOSED border refuses a plot as
+        `tileFreeForUnit`'s `borderClosedTo` does, the chassis' own exemptions
+        (a Trader, a religious unit) included.
         Returns (found [B], spot [B])."""
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
         okc = cand7.clamp(min=0)
@@ -2083,6 +2086,9 @@ class SimMasks:
                           | self._canal_pass().gather(1, okc))
             terr = torch.where(naval_mask.unsqueeze(1), water_terr, terr)
         ok7 = (cand7 >= 0) & terr & ~blocked
+        if 0 <= seat < self.n_majors:
+            ok7 = ok7 & ~self._border_closed(
+                cand7, seat, None if utype is None else utype.unsqueeze(1).expand_as(cand7))
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         return first < 7, spot
@@ -2437,6 +2443,7 @@ class SimMasks:
         naval_m = self.unit_naval[ti_n] & mask
         cart = self._row_ocean_open_naval(row)
         found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
+                                            utype=type_idx,
                                             sup_mask=self._type_support[type_idx.clamp(min=0)])
         if bool(no_hold.any()):
             found = torch.where(no_hold, at_tile >= 0, found)
