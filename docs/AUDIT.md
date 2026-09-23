@@ -39,7 +39,8 @@ re-adds them.
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
-| **B. Fidelity vs real Civ 6** | **4** | |
+| B-81 rows Gathering Storm deletes | 1 | 26 live constants sourced from `Expansion2_RemoveData.xml` deletes |
+| **B. Fidelity vs real Civ 6** | **5** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | the promises' engine half |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14) |
@@ -55,7 +56,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | the tile-swap refusal; the Stepwell's two adjacencies |
 | C-80 constants vs the install | 1 | one rule the reader census names (noSwap) |
 | **C. Absent systems** | **14** | |
-| **OPEN, TOTAL** | **18** | |
+| **OPEN, TOTAL** | **19** | |
 
 ## The question ledger — owner asks
 
@@ -86,6 +87,14 @@ close in the same commit.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
 - **B-56r. THE INERT PROMOTIONS.** Weight 1.
   - BUILD: GROUND_CREWS reads "Heal while patrolling or deployed" (`Promotions_Text.xml`), and its one modifier `GROUND_CREWS_BONUS_HEALTH` / `MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION` carries no argument and no requirement set — the modifier type is the whole rule and the engine's own healing supplies the number. The PATROL half is no verb anywhere: no `UNITOPERATION_PATROL`, no command, no promotion in any layer, and the live game offers no air-patrol stance (C-34). The DEPLOYED half is an air unit sitting at its base, which both engines already model (`cpu/core/air.ts` / the GPU's air rows) — so the promotion is buildable on that half and the entry is not a wait.
+- **B-81. ROWS GATHERING STORM DELETES.** Weight 1.
+  The provenance checker follows `<Delete>` through the schema's foreign keys now, and 26 catalog constants turn out to cite rows `DLC/Expansion2/Data/Expansion2_RemoveData.xml` deletes; `docs/PROVENANCE.md` lists them as known red. Each mechanic is still paid on both engines.
+  - BUILD, delete: the nine governments' ACCUMULATING bonuses (`*_ACCUMULATING`, `bonus.increment` / `bonus.interval` in `cpu/data/policies.ts`) — deleted with no replacement row anywhere in the Expansion2 layer; the same for America's per-government legacy rates (`TRAIT_*_BONUS_RATE`, `legacyRate.AMERICA.*`), where `Expansion2_Civilizations.xml` rewrites Founding Fathers' description and attaches new modifiers — source those and replace.
+  - BUILD, delete: the Genghis Khan great general (`GREAT_PERSON_INDIVIDUAL_GENGHIS_KHAN`, `cpu/data/greatPeople.ts`).
+  - BUILD, re-source: the building-yield doublings of Simultaneum, Grand Opera, Rationalism and Free Markets (`policies.*.effects.buildingYieldBoost.pct`) — the Expansion2 layer's copy of `Expansion1_Policies.xml` attaches NEW modifier rows to those four policies; read them and pay what they say.
+  - BUILD: `cpu/data/boosts.ts` still words CHEMISTRY's boost as a research agreement; the layered install's trigger is `BOOST_TRIGGER_HAVE_ALLIANCE_LEVEL_X` with NumItems 2. And `tools/civ6lab/xml_modifiers.py` ignores `<Delete>` and reads every DLC Data folder, scenarios included.
+  - The same file deletes more (Patriotic War, Police State, Machiavellianism, Military Research, New Deal, Public Transport, E-Commerce modifiers) — none of those is cited by a catalog tag today; check each against the engines' policy effects while here.
+
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
   - DLL: the PER-CITY war-weariness split. The install's numbers are `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0, NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`, `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`, `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200, TURN_AT_WAR 50}`, `_WARMONGER_BASE 16` — re-read in `GlobalParameters.xml`, all thirteen still there and still the whole of it; how the per-city rows compose is not published. The empire-wide rule ships (`warWearinessPenalty`).
   - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield and turn tables independently.
