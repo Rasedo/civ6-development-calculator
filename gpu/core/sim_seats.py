@@ -9315,7 +9315,8 @@ class SimSeats:
         half, in f64.
 
         baseHave = local (non-regional, unpillaged) building amenities + the
-        capital PALACE + regional BUILDING amenities; luxuryAmenities ranks on
+        capital PALACE + regional BUILDING amenities; the need is
+        ceil(pop / CITY_POP_PER_AMENITY); luxuryAmenities ranks on
         THAT and grants +1 to its luxAmenityCities neediest cities. The terms
         city.ts leaves OUT of the ranking then join the TIER balance only:
         government/policy amenitiesAll + newDeal, regional WONDER amenities,
@@ -9402,7 +9403,9 @@ class SimSeats:
         # THE RANKING BASE — everything `luxuryAmenities` ranks on, and the one
         # split point both engines share. Kept for the amenity log alone.
         _amen_base = have
-        need = torch.ceil((self.city_pop[:, row, :cols].double() - 2) / 2).clamp(min=0)
+        # CIV6 (CITY_POP_PER_AMENITY): one Amenity per this many citizens,
+        # rounded up
+        need = torch.ceil(self.city_pop[:, row, :cols].double() / self.rules.amenity_pop_per)
         lux_add = self._luxury_amenities(row, have, need)
         # A spent Great Person's permanent amenity joins AFTER the ranking, at
         # `computeCityStats`' own position: `luxuryAmenities` ranks on the

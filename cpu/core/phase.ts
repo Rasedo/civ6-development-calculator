@@ -43,7 +43,7 @@ import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, U
 import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
-import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT } from '../data/constants';
+import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum, swapTileOk } from './city';
@@ -686,13 +686,21 @@ function joinFromFreeCity(state: GameState, city: City): void {
   transferCity(state, FREE_SEAT, winner, city, 'joined');
 }
 
-/** The FREE CITIES player's turn, after every major's: each Free City heals
- *  as any unbesieged city does and runs `freeCityLoyaltyDelta`; the ones that
- *  reach 0 join their race's winner, in array order, after the walk. It
- *  fields no units and runs no strike of its own. */
+/** The FREE CITIES player's turn, after every major's: each Free City's
+ *  amenities are the ordinary composer's over the Free Cities seat — the full
+ *  need of its population, the supply of what that seat holds (its own
+ *  luxuries, buildings and districts; no government, policy or governor) —
+ *  and the tier is recorded off a loop-top snapshot of every Free City. Then
+ *  each heals as any unbesieged city does and runs `freeCityLoyaltyDelta`;
+ *  the ones that reach 0 join their race's winner, in array order, after the
+ *  walk. It fields no units and runs no strike of its own. */
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
+  const luxMap = luxuryAmenities(state, FREE_SEAT);
+  const mods = getModifiers(state, FREE_SEAT);
+  const tiers = free.cities.map((city) => amenityTierIndex(computeCityStats(state, city, luxMap, mods).amenities.tier.name));
+  free.cities.forEach((city, i) => { city.amenityTier = tiers[i]; });
   const joiners: City[] = [];
   for (const city of [...free.cities]) {
     const centre = state.map.tiles[city.centerIndex];

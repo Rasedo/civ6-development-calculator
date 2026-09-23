@@ -229,8 +229,14 @@ export function housingGrowthFactor(remaining: number): number {
   return 0.25;
 }
 
+/** CIV6 (CITY_POP_PER_AMENITY 2): a city needs one Amenity per this many
+ *  citizens, rounded up — the need `GetAmenitiesNeeded` reads in the live
+ *  game (1 at pop 1, 2 at 4, 3 at 5 and 6, 4 at 7, 5 at 9, 6 at 12, 7 at 13),
+ *  and the tier is the named supply less exactly that. */
+export const CITY_POP_PER_AMENITY = srcConst('amenityPopPer', 2, gp('CITY_POP_PER_AMENITY'));
+
 export function amenitiesNeeded(pop: number): number {
-  return Math.max(0, Math.ceil((pop - 2) / 2));
+  return Math.ceil(pop / CITY_POP_PER_AMENITY);
 }
 
 export interface AmenityTier {
@@ -239,15 +245,19 @@ export interface AmenityTier {
   yieldFactor: number;
 }
 
-/** Tier from amenity balance (have - needed). Real Civ 6 bands —
- * Content is exactly 0, Displeased −1..−2, Unhappy −3 and below (the Unrest/
- * Revolt tiers below that are unimplemented: no rebel mechanics here). */
+/** Tier from amenity balance (have - needed). CIV6 (`Happinesses`, all seven
+ * rows): `MinimumAmenityScore` is `min`, `GrowthModifier` and
+ * `NonFoodYieldModifier` are the two factors as 1 + pct/100 — Ecstatic 3+,
+ * Happy 1..2, Content 0, Displeased −1..−2, Unhappy −3..−4, Unrest −5..−6,
+ * Revolt −7 and below. The rows' `RebellionPoints` are not modelled. */
 export const AMENITY_TIERS: readonly (AmenityTier & { min: number })[] = [
   { min: 3, name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.1 },
   { min: 1, name: 'Happy', growthFactor: 1.1, yieldFactor: 1.05 },
   { min: 0, name: 'Content', growthFactor: 1, yieldFactor: 1 },
   { min: -2, name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 },
-  { min: -999, name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 },
+  { min: -4, name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 },
+  { min: -6, name: 'Unrest', growthFactor: 0, yieldFactor: 0.7 },
+  { min: -999, name: 'Revolt', growthFactor: 0, yieldFactor: 0.4 },
 ];
 
 export function amenityTier(balance: number): AmenityTier {

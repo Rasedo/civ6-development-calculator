@@ -25,17 +25,26 @@ describe('rule formulas', () => {
   });
 
   it('amenity needs and tiers', () => {
-    expect(amenitiesNeeded(1)).toBe(0);
-    expect(amenitiesNeeded(2)).toBe(0);
-    expect(amenitiesNeeded(3)).toBe(1);
-    expect(amenitiesNeeded(5)).toBe(2);
+    // CIV6 (CITY_POP_PER_AMENITY 2), as `GetAmenitiesNeeded` reads live
+    expect(amenitiesNeeded(1)).toBe(1);
+    expect(amenitiesNeeded(4)).toBe(2);
+    expect(amenitiesNeeded(5)).toBe(3);
+    expect(amenitiesNeeded(6)).toBe(3);
+    expect(amenitiesNeeded(7)).toBe(4);
+    expect(amenitiesNeeded(9)).toBe(5);
+    expect(amenitiesNeeded(12)).toBe(6);
+    expect(amenitiesNeeded(13)).toBe(7);
     expect(amenityTier(0).name).toBe('Content');
     expect(amenityTier(1).name).toBe('Happy');
     expect(amenityTier(3).name).toBe('Ecstatic');
     expect(amenityTier(-1).name).toBe('Displeased'); // Content is 0 only
     expect(amenityTier(-2).name).toBe('Displeased');
     expect(amenityTier(-3).name).toBe('Unhappy'); // Unhappy from -3
-    expect(amenityTier(-5).name).toBe('Unhappy');
+    expect(amenityTier(-4).name).toBe('Unhappy');
+    expect(amenityTier(-5).name).toBe('Unrest'); // Unrest -5..-6
+    expect(amenityTier(-6).name).toBe('Unrest');
+    expect(amenityTier(-7).name).toBe('Revolt'); // Revolt -7 and below
+    expect(amenityTier(-30).name).toBe('Revolt');
   });
 
   it('district slots scale with population', () => {

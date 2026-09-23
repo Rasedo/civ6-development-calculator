@@ -149,6 +149,7 @@ class Rules:
     housing_aq_fresh_bonus: float  # Aqueduct: +this to a fresh-water city
     housing_aq_no_fresh: float  # Aqueduct: raise a non-fresh city's water housing to this
     amenity_tiers: list  # [(min, growth, yield)]
+    amenity_pop_per: int  # CITY_POP_PER_AMENITY — the need is ceil(pop / this)
     # the install's `CivilizationLevels` table, one dict per class of player in
     # the exporter's order (TRIBE, CITY_STATE, FULL_CIV, FREE_CITIES). Ten
     # PERMISSIONS, not behaviours: a rule that forks on a class asks this row.
@@ -356,6 +357,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_aq_fresh_bonus=r["housing"].get("aqFreshBonus", 2),
         housing_aq_no_fresh=r["housing"].get("aqNoFreshTotal", 6),
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
+        amenity_pop_per=int(r["amenityPopPer"]),
         civ_levels=r["civLevels"],
         center_min_food=r.get("centerMinFood", 2),
         pillage_building_repair_pct=r["pillageBuildingRepairPct"],

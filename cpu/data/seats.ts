@@ -134,7 +134,6 @@ export const LOYALTY_AFTER_CULTURAL_TRANSFER = srcConst('seats.loyaltyAfterCultu
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
   gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_LOYALTY'));
-/** Per-turn loyalty by amenity tier name. Real Civ 6 ±6/±3. */
 /** CIV6 (`Happinesses_XP1.IdentityPerTurnChange`): the loyalty an amenity tier
  *  pays per turn, one install row per tier. */
 const happy = (tier: string) =>
@@ -145,6 +144,8 @@ export const LOYALTY_AMENITY: Record<string, number> = {
   Content: srcConst('seats.loyaltyAmenity.Content', 0, happy('CONTENT')),
   Displeased: srcConst('seats.loyaltyAmenity.Displeased', -3, happy('DISPLEASED')),
   Unhappy: srcConst('seats.loyaltyAmenity.Unhappy', -6, happy('UNHAPPY')),
+  Unrest: srcConst('seats.loyaltyAmenity.Unrest', -6, happy('UNREST')),
+  Revolt: srcConst('seats.loyaltyAmenity.Revolt', -6, happy('REVOLT')),
 };
 
 // --- war weariness ------------------------------------------------------

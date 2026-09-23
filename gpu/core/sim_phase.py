@@ -607,8 +607,12 @@ class SimPhase:
 
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
-        `freeCitiesPhase` twin. Each Free City heals as any unbesieged city
-        does and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
+        `freeCitiesPhase` twin. Each Free City's amenity tier is recorded
+        first, off one loop-top `_seat_amenity` over the free row: the full
+        need of its population and the supply the Free Cities seat holds (its
+        own luxuries, buildings and districts; no government, policy or
+        governor). Then each heals as any unbesieged city does and runs its
+        loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
         its own side and every major's (at that major's age factor) against,
         and the flat loyalty of what stands in it — no amenity, governor,
@@ -623,6 +627,10 @@ class SimPhase:
         alive = self.city_alive[:, row]
         if not bool(alive.any()):
             return
+        _tier = self._seat_amenity(row)[0]
+        self.city_amen_tier[:, row, : self.RC] = torch.where(
+            alive[:, : self.RC], _tier.to(self.city_amen_tier.dtype),
+            torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         scale = float(self.rules.seats.get("loyaltyScale", 20))

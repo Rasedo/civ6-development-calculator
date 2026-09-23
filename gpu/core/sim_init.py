@@ -1600,7 +1600,7 @@ class SimInit:
         # NATIONAL PARK membership: the ANCHOR tile that names this tile's
         # park (its cluster's lowest index), -1 where there is none.
         self.park = torch.full((B, self.T), -1, dtype=torch.long, device=device)
-        self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
+        self._loyalty_amenity = torch.tensor(rr["loyaltyAmenity"], dtype=dtype, device=device)
         self._work_radius = int(rr["workRadius"])  # CITY_WORK_RADIUS
         self._off3 = tiles_within_offsets(self._work_radius).to(device)
         # THE WORKED-TILE PICK, one window per city slot, -1 unused.

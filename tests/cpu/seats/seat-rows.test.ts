@@ -53,10 +53,10 @@ describe('the Scottish Enlightenment', () => {
     const yieldsOf = (row: number, luxuries: number) => {
       const state = sceneAs(row);
       const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
-      // pop 6 needs 2 Amenities and the capital's PALACE pays exactly 2
+      // pop 4 needs 2 Amenities and the capital's PALACE pays exactly 2
       // (Buildings.Entertainment), so every luxury here is pure SURPLUS and
       // the count alone decides the tier
-      city.population = 6;
+      city.population = 4;
       city.buildings.push('LIBRARY'); // something to scale
       giveLuxuries(state, city, luxuries);
       const st = computeCityStats(state, city);
@@ -83,9 +83,9 @@ describe('the Scottish Enlightenment', () => {
     const pointsOf = (row: number, luxuries: number): number => {
       const state = sceneAs(row);
       const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
-      // pop 6 needs 2 Amenities and the capital's PALACE pays exactly 2, so
+      // pop 4 needs 2 Amenities and the capital's PALACE pays exactly 2, so
       // every luxury here is pure surplus and the count alone sets the tier
-      city.population = 6;
+      city.population = 4;
       const t = neighbors(state.map, state.map.tiles[city.centerIndex])[5];
       setTileOwner(t, 0, city.id);
       t.district = 'CAMPUS';
