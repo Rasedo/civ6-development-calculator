@@ -21,7 +21,7 @@ then the other DLC packs alphabetically (the same order the memory
 `civ6-install-source` records: layer Base <- Exp1 <- Exp2, take the LAST), and
 applies each file's `<Row>` (insert or overwrite by key), `<Update>`
 (`<Where>` picks rows, `<Set>` writes columns) and `<Delete>` (`<Where>`, or
-attributes, picks rows) in document order. A `<Delete>` follows the schema's
+attributes, picks rows; an empty one takes them all) in document order. A `<Delete>` follows the schema's
 FOREIGN KEYs as the game's database does: Expansion1_Alliances.xml deletes
 DIPLOACTION_RESEARCH_AGREEMENT from `Types`, and DiplomaticActions (whose key
 references Types(Type) ON DELETE CASCADE) loses the row with it. Rows are keyed by the key columns
@@ -279,9 +279,10 @@ class Install:
                             who[k] = fname
             elif el.tag == "Delete":
                 where = el.find("Where")
+                # an EMPTY `<Delete/>` matches every row, as SQL's bare
+                # DELETE does (Expansion2_RemoveData.xml empties
+                # GovernmentBonusNames this way)
                 wc = _cells(where) if where is not None else _cells(el)
-                if not wc:
-                    continue
                 self._delete(table.tag, wc, f"deleted by {fname}")
 
     def _delete(self, table: str, where: dict[str, str], why: str) -> None:

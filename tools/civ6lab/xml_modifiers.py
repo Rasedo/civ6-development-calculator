@@ -1,60 +1,45 @@
-"""Every modifier of the given TYPES across the install, with its arguments.
+"""Every modifier of the given TYPES in the LAYERED install, with its arguments.
 
 The install writes modifier rows two ways — attribute rows
 (`<Row ModifierId=".." ModifierType=".."/>`) and element rows
 (`<Row><ModifierId>..</ModifierId><ModifierType>..</ModifierType></Row>`,
 the style Policies.xml uses) — and a line-oriented grep sees only the first.
-This parses the XML, so both count. Base <- Expansion1 <- Expansion2 <- the
-named DLC packs, every Data dir.
+This reads the install through `xml_check.Install`: the game's own load order
+(each pack's .modinfo, a Gathering Storm game with no game mode), `<Update>`
+and `<Delete>` applied with the schema's foreign-key cascades — so a modifier
+Expansion2_RemoveData.xml deletes is not listed, and a scenario's files are
+never read.
 
     python tools/civ6lab/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...
 """
 from __future__ import annotations
 
-import pathlib
 import sys
-import xml.etree.ElementTree as ET
 
-INSTALL = pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI")
-
-
-def rows(table: ET.Element):
-    for r in table.iter("Row"):
-        d = dict(r.attrib)
-        for child in r:
-            if child.tag not in d and child.text is not None:
-                d[child.tag] = child.text.strip()
-        yield d
+from xml_check import Install
 
 
 def main(types: list[str]) -> int:
     want = set(types)
+    inst = Install()
     mods: dict[str, tuple[str, str]] = {}      # ModifierId -> (type, file)
+    for cells, who in inst.tables.get("Modifiers", ()):
+        if cells.get("ModifierType") in want:
+            mods[cells["ModifierId"]] = (cells["ModifierType"], who.get("ModifierType", "?"))
     args: dict[str, list[tuple[str, str]]] = {}
+    for cells, _ in inst.tables.get("ModifierArguments", ()):
+        if "ModifierId" in cells and "Name" in cells:
+            args.setdefault(cells["ModifierId"], []).append((cells["Name"], cells.get("Value", "")))
     attach: dict[str, list[str]] = {}          # ModifierId -> who attaches it
-    files = sorted(INSTALL.glob("Base/Assets/Gameplay/Data/*.xml")) + sorted(INSTALL.glob("DLC/*/Data/*.xml"))
-    for f in files:
-        try:
-            root = ET.parse(f).getroot()
-        except ET.ParseError:
+    for tag, rows in inst.tables.items():
+        if not tag.endswith("Modifiers") or tag in ("Modifiers", "DynamicModifiers"):
             continue
-        for table in root:
-            tag = table.tag
-            if tag == "Modifiers":
-                for d in rows(table):
-                    if d.get("ModifierType") in want:
-                        mods[d["ModifierId"]] = (d["ModifierType"], f.name)
-            elif tag == "ModifierArguments":
-                for d in rows(table):
-                    if "ModifierId" in d and "Name" in d:
-                        args.setdefault(d["ModifierId"], []).append((d["Name"], d.get("Value", "")))
-            elif tag.endswith("Modifiers") and tag != "DynamicModifiers":
-                # PolicyModifiers, GovernorPromotionModifiers, BuildingModifiers, ...
-                for d in rows(table):
-                    mid = d.get("ModifierId")
-                    if mid:
-                        owner = next((v for k, v in d.items() if k != "ModifierId"), "?")
-                        attach.setdefault(mid, []).append(f"{tag[:-9]}:{owner}")
+        # PolicyModifiers, GovernorPromotionModifiers, BuildingModifiers, ...
+        for cells, _ in rows:
+            mid = cells.get("ModifierId")
+            if mid:
+                owner = next((v for k, v in cells.items() if k != "ModifierId"), "?")
+                attach.setdefault(mid, []).append(f"{tag[:-9]}:{owner}")
     for mid, (mt, fn) in sorted(mods.items(), key=lambda kv: (kv[1][0], kv[0])):
         a = " ".join(f"{k}={v}" for k, v in args.get(mid, []))
         who = ", ".join(sorted(set(attach.get(mid, [])))) or "(not attached by a *Modifiers table)"
