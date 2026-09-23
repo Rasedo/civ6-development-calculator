@@ -16,8 +16,11 @@ import sys
 
 PATH = re.compile(r"\.claude[\\/]+mode\b(?![\\/.\w])", re.I)
 MODE_SET = re.compile(r"tools[\\/]+mode\.py\s+\w", re.I)
-WRITE_VERB = re.compile(r">|\b(Set-Content|Out-File|Add-Content|New-Item|Copy-Item|Move-Item|"
-                        r"Remove-Item|tee|cp|mv|rm|echo|printf|write_text|open\()", re.I)
+# a redirect INTO the path (`2>/dev/null` elsewhere in a read is fine), or a
+# command that writes, copies, moves or deletes
+REDIRECT_INTO = re.compile(r">>?\s*[\"']?[^\s\"'|;&]*\.claude[\\/]+mode\b", re.I)
+WRITE_VERB = re.compile(r"\b(Set-Content|Out-File|Add-Content|New-Item|Copy-Item|Move-Item|"
+                        r"Remove-Item|tee|cp|mv|rm|write_text|open\()", re.I)
 MSG = ("BLOCKED: .claude/mode is the OWNER's switch (build / normal / measure). "
        "Ask the owner; they set it with `! python tools/mode.py <mode>`.\n")
 
@@ -33,7 +36,8 @@ def main() -> int:
         sys.stderr.write(MSG)
         return 2
     cmd = str(inp.get("command") or "")
-    if cmd and (MODE_SET.search(cmd) or (PATH.search(cmd) and WRITE_VERB.search(cmd))):
+    if cmd and (MODE_SET.search(cmd) or REDIRECT_INTO.search(cmd)
+                or (PATH.search(cmd) and WRITE_VERB.search(cmd))):
         sys.stderr.write(MSG)
         return 2
     return 0

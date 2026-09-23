@@ -11,6 +11,10 @@ CASES = [
     ("Set-Content mode",    {"tool_name": "PowerShell", "tool_input": {"command": "Set-Content .claude\\mode build"}}, 2),
     ("mode.py read ok",     {"tool_name": "Bash", "tool_input": {"command": "python tools/mode.py"}}, 0),
     ("cat mode ok",         {"tool_name": "Bash", "tool_input": {"command": "cat .claude/mode"}}, 0),
+    ("cat 2>/dev/null ok",  {"tool_name": "Bash", "tool_input": {"command": "cat .claude/mode 2>/dev/null"}}, 0),
+    ("Get-Content ok",      {"tool_name": "PowerShell", "tool_input": {"command": "Get-Content .claude\\mode"}}, 0),
+    ("write naming mode", {"tool_name": "PowerShell", "tool_input": {"command": "Add-Content .gitignore '.claude/mode'"}}, 2),
+    ("printf >> mode",      {"tool_name": "Bash", "tool_input": {"command": "printf x >> .claude/mode"}}, 2),
     ("Write mode.py ok",    {"tool_name": "Write", "tool_input": {"file_path": "C:/civ6-development-calculator/tools/mode.py"}}, 0),
     ("battery ok",          {"tool_name": "Bash", "tool_input": {"command": "python gpu/battery.py"}}, 0),
 ]
