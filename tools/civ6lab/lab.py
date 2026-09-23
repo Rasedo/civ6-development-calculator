@@ -347,16 +347,20 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
     deadline = time.monotonic() + wait
     nagged = time.monotonic()
     while time.monotonic() < deadline:
-        time.sleep(2.0)
+        # a short poll: the turn's own time is the AI's, and a coarse poll
+        # adds up to its whole interval to every turn
+        time.sleep(0.25)
         try:
             tn = turn(t)
         except TunerError:
             continue
         if tn > t0:
             return tn
-        if time.monotonic() - nagged > 20:
+        if time.monotonic() - nagged > 5:
+            # a stalled turn: a Dedication, an AI's open diplomacy session, or
+            # the screens it raised — popups alone never hold Autoplay
+            nagged = time.monotonic()
             if commemorate_if_blocked(t):
-                nagged = time.monotonic()
                 continue
             for msg in unstick(t):
                 print("    unstuck:", msg)

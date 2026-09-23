@@ -50,6 +50,47 @@ Two box facts it needed:
   was off on this box, so the rules did nothing at first). `PlayIntroVideo 0`
   in AppOptions skips the intro.
 
+## The lab profile, the startup patch, several instances
+
+    python tools/civ6lab/game.py patch apply        # logos off, copyright delay 0, steam_appid.txt
+    python tools/civ6lab/game.py profile apply      # the lean options (owner's files backed up)
+    python tools/civ6lab/game.py --host 127.0.0.2 launch   # instance 2, tiled into the window grid
+    python tools/civ6lab/game.py --host 127.0.0.2 bench --save lab4_t100 --turns 15
+    python tools/civ6lab/game.py profile restore    # the owner's options back, byte for byte
+    python tools/civ6lab/game.py patch revert
+
+Measured 2026-09-23 (Ryzen 9 3900X, RTX 4070 SUPER, 32 GB; save lab4_t100,
+15 Autoplay turns):
+
+| setup | s/turn | GPU | RAM per game |
+|---|---|---|---|
+| lean graphics, VSync OFF, 2 s poll (DX12) | 5.56 | 44 %, 40 W | 3.5 GB |
+| the same, 0.25 s poll | 2.67 | — | 3.3 GB |
+| + VSync ON + `UIOnlyRendering 1` (no 3D world) | 2.87 | 20 %, 22 W | 3.4 GB |
+| the same, window MINIMISED | 3.41 | 34 %, 31 W (worse) | 3.3 GB |
+| TWO DX11 instances at once | 3.13 each (1.84x throughput) | 33 %, 21 W, 6 GB VRAM | 2.8 GB |
+
+What each finding is:
+* Graphics settings barely move turn time — the turn is the AI's. The poll
+  interval was the tooling's own waste (`advance` polls every 0.25 s and
+  unsticks only a turn stalled 5 s).
+* VSync OFF lets the game render as fast as it can; ON caps it. A minimised
+  window renders MORE, not less — keep the windows visible (`window.ps1 grid`).
+* `AutoSaveFrequency 0` CRASHES the game (EXCEPTION_INT_DIVIDE_BY_ZERO at the
+  first turn end) — the profile uses 50.
+* DX11: `CivilizationVI.exe` started outside Steam exits with code 53 and
+  Steam relaunches the game through ITS launch path (the DX12 build). A
+  `steam_appid.txt` (289070) beside the binary makes it run as itself.
+* SEVERAL INSTANCES: they run side by side once the app id file is in; the
+  tuner listens on `-TunerIP <address>`:4318, so instance N is launched with
+  `-TunerIP 127.0.0.N` (`game.py --host 127.0.0.N launch`) and every command
+  takes the same `--host`. Without the flag a new instance takes 4318 from
+  the old one. All instances share one user dir (options, logs, saves) —
+  name saves per instance; autosaves collide.
+* The startup patch touches the install (the two logo movies renamed
+  `.lab-off`, IntroScreen.lua's ACCEPT_DELAY 0 with a `.lab-backup`) — a
+  Steam file check or a game update undoes it; `patch apply` again.
+
 ## A session
 
 1. Launch Civ 6, start or load any Gathering Storm game, reach the map.

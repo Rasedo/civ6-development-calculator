@@ -1,7 +1,7 @@
 """civ6lab game lifecycle — launch Civ 6, start a NEW game, load a save, save
 one, with no click from the owner.
 
-    python tools/civ6lab/game.py launch                     # the DX11 binary -> main menu, tuner up
+    python tools/civ6lab/game.py [--host 127.0.0.N] launch  # the DX11 binary -> main menu, tuner up, window grid
     python tools/civ6lab/game.py new --config lab4.json     # host a game from the main menu
     python tools/civ6lab/game.py load lab4_fresh            # load a named single-player save
     python tools/civ6lab/game.py save lab4_fresh            # write one (InGame)
@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import pathlib
 import subprocess
 import sys
@@ -53,6 +54,114 @@ FE, GC, IG = "FrontEnd", "GameCore_Tuner", "InGame"
 # hanging at the copyright screen on 2K's online services.
 CIV6_EXE = pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common"
                         r"\Sid Meier's Civilization VI\Base\Binaries\Win64Steam\CivilizationVI.exe")
+
+CIV6_APP = "289070"
+USER_DIR = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI"
+INSTALL = CIV6_EXE.parents[3]
+
+# THE LAB PROFILE: the options a lean autoplay run wants, per file. `profile
+# apply` backs each file up once (<file>.lab-backup) and writes these keys;
+# `profile restore` puts the owner's files back byte for byte.
+LAB_PROFILE: dict[str, dict[str, str]] = {
+    "AppOptions.txt": {"RenderWidth": "800", "RenderHeight": "600", "FullScreen": "0",
+                       "PlayIntroVideo": "0"},
+    "GraphicsOptions.txt": {
+        "MSAA": "0", "MSAAQuality": "0", "VSync": "1", "ShadowMapResolution": "512",
+        "AODepthResolution": "256", "AORenderResolution": "256", "ReducedAssetTextures": "1",
+        "TerrainQuality": "0", "ReducedTerrainMaterials": "1", "LowQualityTerrainShader": "1",
+        "SSReflectPasses": "0", "UseLowResWater": "1", "UseLowQualityWaterShader": "1",
+        "VFXDetailLevel": "0", "ClutterDetailLevel": "0", "EnableAO": "0", "EnableBloom": "0",
+        "EnableShadows": "0", "EnableDynamicLighting": "0", "EnableCloudShadows": "0",
+        "Quality": "0",
+        # no 3D world at all: half the GPU of the lean world render, turns unchanged
+        "UIOnlyRendering": "1",
+    },
+    "SoundOpts.txt": {"Master Volume": "0"},
+    "UserOptions.txt": {"QuickMovement": "1", "QuickCombat": "1", "LookAtPlayerTurnCombat": "0",
+                        "LookAtPlayerOffTurnCombat": "0", "PlayHistoricMomentAnimation": "0",
+                        "AutoSaveFrequency": "50"},
+}
+
+# THE STARTUP PATCH: what no mod reaches, because the engine plays it before
+# the mod system loads — the two logo movies (a missing movie is skipped) and
+# the copyright screen's 5 s legal delay (IntroScreen.lua ACCEPT_DELAY).
+LOGO_MOVIES = ("Base/Platforms/Windows/Movies/logos.bk2", "Base/Platforms/Windows/Movies/LOGO_2KFiraxis.bk2")
+INTRO_LUA = "Base/Assets/UI/FrontEnd/IntroScreen.lua"
+INTRO_RE = re.compile(r"local ACCEPT_DELAY\s*:number = UI\.IsFinalRelease\(\) and 5 or 0\.1;")
+INTRO_NEW = "local ACCEPT_DELAY :number = 0;"
+
+
+def _set_keys(path: pathlib.Path, keys: dict[str, str]) -> list[str]:
+    """Rewrite `Key value` lines in an options file; returns the keys it did
+    not find."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    missing = dict(keys)
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if not s or s.startswith(";") or s.startswith("["):
+            continue
+        for k in list(missing):
+            if s == k or (s.startswith(k + " ") and not s[len(k) + 1:].strip().startswith(";")):
+                lines[i] = f"{k} {missing.pop(k)}"
+                break
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return sorted(missing)
+
+
+def cmd_profile(a) -> int:
+    if a.action == "restore":
+        for name in LAB_PROFILE:
+            f, b = USER_DIR / name, USER_DIR / (name + ".lab-backup")
+            if b.exists():
+                f.write_bytes(b.read_bytes())
+                b.unlink()
+                print("restored", name)
+        return 0
+    for name, keys in LAB_PROFILE.items():
+        f, b = USER_DIR / name, USER_DIR / (name + ".lab-backup")
+        if not b.exists():
+            b.write_bytes(f.read_bytes())
+        miss = _set_keys(f, keys)
+        print("lab profile", name, "- not found:" if miss else "", *miss)
+    return 0
+
+
+def cmd_patch(a) -> int:
+    # Started outside Steam, the binary asks Steam to relaunch it through its
+    # own launch path (the DX12 build) and exits with code 53; the app id file
+    # beside it makes it run as itself — the DX11 build, and a second instance.
+    appid = CIV6_EXE.parent / "steam_appid.txt"
+    if a.action == "apply" and not appid.exists():
+        appid.write_text(CIV6_APP, encoding="ascii")
+        print("steam_appid.txt written")
+    elif a.action == "revert" and appid.exists():
+        appid.unlink()
+        print("steam_appid.txt removed")
+    for rel in LOGO_MOVIES:
+        f, b = INSTALL / rel, INSTALL / (rel + ".lab-off")
+        if a.action == "apply" and f.exists():
+            f.rename(b)
+            print("logo off:", rel)
+        elif a.action == "revert" and b.exists():
+            b.rename(f)
+            print("logo back:", rel)
+    f, b = INSTALL / INTRO_LUA, INSTALL / (INTRO_LUA + ".lab-backup")
+    if a.action == "apply":
+        s = f.read_bytes().decode("utf-8")
+        new, n = INTRO_RE.subn(INTRO_NEW, s, count=1)
+        if n:
+            if not b.exists():
+                b.write_bytes(f.read_bytes())
+            f.write_bytes(new.encode("utf-8"))
+            print("copyright delay: 0 s")
+        else:
+            print("copyright delay: already patched or the line changed")
+    elif b.exists():
+        f.write_bytes(b.read_bytes())
+        b.unlink()
+        print("copyright delay restored")
+    return 0
+
 
 LUA_NEW = """
 local cfg = CFG
@@ -197,10 +306,15 @@ def cmd_launch(a) -> int:
     if not exe.exists():
         print(f"no game binary at {exe}; pass --exe")
         return 1
-    subprocess.Popen([str(exe)], cwd=str(exe.parent))
+    # `-TunerIP` is the address the tuner LISTENS on: one instance per
+    # loopback address (127.0.0.1, 127.0.0.2, ...), all on port 4318
+    subprocess.Popen([str(exe), "-TunerIP", a.host], cwd=str(exe.parent))
     t = wait_for_state(a.host, a.port, FE, a.wait)
     print("main menu up; states:", ", ".join(sorted(t.states)))
     t.close()
+    grid = pathlib.Path(__file__).parent / "window.ps1"
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(grid), "grid"],
+                   capture_output=True, text=True)
     return 0
 
 
@@ -261,6 +375,41 @@ def cmd_save(a) -> int:
     return 0
 
 
+def _game_ram_mb() -> float:
+    """The running game's working set, MB (tasklist)."""
+    out = subprocess.run(["tasklist", "/fo", "csv", "/nh"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace").stdout
+    for ln in out.splitlines():
+        if ln.lower().startswith('"civilizationvi'):
+            mem = ln.rsplit(",", 1)[-1].strip('"').replace("\xa0", "").replace(" ", "")
+            digits = "".join(ch for ch in mem if ch.isdigit())
+            return int(digits) / 1024 if digits else 0.0
+    return 0.0
+
+
+def cmd_bench(a) -> int:
+    """Load a fixed save and time N Autoplay turns: the throughput a profile
+    buys, measured the same way every time."""
+    import lab
+    if a.save:
+        cmd_load(argparse.Namespace(host=a.host, port=a.port, name=a.save, wait=600.0))
+    t = _connect(a.host, a.port, 60)
+    lp = lab.local_player(t)
+    t0 = lab.turn(t)
+    per: list[float] = []
+    peak = _game_ram_mb()
+    for _ in range(a.turns):
+        s = time.monotonic()
+        lab.advance(t, "autoplay", lp, 600.0)
+        per.append(time.monotonic() - s)
+        peak = max(peak, _game_ram_mb())
+    t.close()
+    per.sort()
+    print(f"bench {a.label}: turns {t0}->{t0 + a.turns}  mean {sum(per) / len(per):.2f} s/turn"
+          f"  median {per[len(per) // 2]:.2f}  max {per[-1]:.2f}  peak RAM {peak:.0f} MB")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="127.0.0.1")
@@ -279,6 +428,17 @@ def main(argv=None) -> int:
     s.add_argument("name")
     s.add_argument("--wait", type=float, default=600.0)
     s.set_defaults(fn=cmd_load)
+    s = sub.add_parser("profile", help="apply / restore the lean lab profile in the owner's option files")
+    s.add_argument("action", choices=("apply", "restore"))
+    s.set_defaults(fn=cmd_profile)
+    s = sub.add_parser("patch", help="apply / revert the startup patch (logo movies off, copyright delay 0)")
+    s.add_argument("action", choices=("apply", "revert"))
+    s.set_defaults(fn=cmd_patch)
+    s = sub.add_parser("bench", help="load a save and time N Autoplay turns")
+    s.add_argument("--save", default="lab4_t100")
+    s.add_argument("--turns", type=int, default=15)
+    s.add_argument("--label", default="")
+    s.set_defaults(fn=cmd_bench)
     s = sub.add_parser("save", help="write a named single-player save (InGame)")
     s.add_argument("name")
     s.set_defaults(fn=cmd_save)
