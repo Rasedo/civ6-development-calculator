@@ -92,7 +92,7 @@ export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormF
 /**
  * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
  * WEIGHTED heading per latitude band, the heading a storm's walk draws each
- * step from (C-49; the walk is measured, ask 16). Eight bands, lower bound
+ * step from (the walk is measured, ask 16). Eight bands, lower bound
  * inclusive, by signed degree (north positive, `windBand`); each row's six
  * weights are in the hex direction order E, NE, NW, W, SW, SE (`AXIAL_DIRS`).
  *   60..90    NW 1  W 2  SW 2        -5..0     W 1   SW 1
@@ -156,7 +156,7 @@ export function windBand(row: number, height: number): number {
 export const STORM_MOVEMENT = srcConst('disasters.stormMovement', 8,
   xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_HURRICANE_CAT_4', 'Movement',
     { note: 'every storm row carries Movement 8; what the number MEANS — unit steps of the '
-      + 'centre\'s walk, drawn from PREVAILING_WINDS — is the lab reading (C-49, ask 16, '
+      + 'centre\'s walk, drawn from PREVAILING_WINDS — is the lab reading (ask 16, '
       + 'measured 2026-09-13)' }));
 
 export interface StormEvent {

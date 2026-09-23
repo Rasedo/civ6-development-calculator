@@ -822,7 +822,7 @@ function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileI
  * stays OUT: it is the scripted picker's heuristic,
  * and real Civ 6 lets any city raise any unlocked wonder. */
 /**
- * BUY A DISTRICT OUTRIGHT (B-24r).
+ * BUY A DISTRICT OUTRIGHT.
  *
  * CIV6 (Contractor): "Allows city to purchase Districts with Gold"; (Divine
  * Architect): the same in Faith. Both are pure permissions — CanPurchase

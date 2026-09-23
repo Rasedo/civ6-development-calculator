@@ -1,5 +1,5 @@
 /**
- * HOW SIGHT IS SPENT — measured 2026-09-13 in the live game (ask 11, B-56r;
+ * HOW SIGHT IS SPENT — measured 2026-09-13 in the live game (ask 11;
  * `tools/civ6lab/sight_find.lua` + `sight_read.lua`, 17 geometries): it is
  * OCCLUSION BY ELEVATION, not a budget. A tile on the ray from the observer
  * hides everything behind it iff its SightThroughModifier sum — its
