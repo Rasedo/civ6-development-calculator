@@ -6,7 +6,11 @@
 local a = CityManager.GetCity(0, ZA)
 local b = CityManager.GetCity(0, ZB)
 local offered = {}
-local res = CityManager.GetCommandTargets(a, CityCommandTypes.SWAP_TILE_OWNER, {})
+-- PARAM_SWAP_TILE_OWNER must carry a value (any): nil makes the DLL refuse the
+-- command outright; the UI passes its interface-mode parameter
+local q = {}
+q[CityCommandTypes.PARAM_SWAP_TILE_OWNER] = 1
+local res = CityManager.GetCommandTargets(a, CityCommandTypes.SWAP_TILE_OWNER, q)
 local list = res and res[CityCommandResults.PLOTS] or {}
 for _, id in pairs(list) do offered[id] = true end
 local n = 0
