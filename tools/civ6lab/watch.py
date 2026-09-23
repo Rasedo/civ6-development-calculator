@@ -14,10 +14,10 @@ Two ways to pass the turns:
 * a game with a human seat: Autoplay ONE turn at a time, handing the seat
   back after each (`lab.advance`, which answers a Dedication and unsticks an
   AI's open diplomacy session);
-* `--observer`, an all-AI game (`game.py new` with "all_ai": true): nobody to
-  hand the seat back to, so ONE Autoplay run of all the turns, observed as
-  PlayerTypes.OBSERVER — Firaxis's smoke test does exactly this — and the
-  watch logs each turn as the counter moves.
+* `--observer`, an all-AI game (`game.py new` with "all_ai": true): nothing
+  holds its turn, so it plays by itself and never stops — the watch logs each
+  turn as the counter moves and, at its target, takes the instance back to
+  the main menu (`Events.ExitToMainMenu`), ready for the next game.
 `--min-free-mb` stops the run (saving first) when the box's free memory falls
 below it, so a fleet of instances cannot starve the machine.
 """
@@ -37,12 +37,6 @@ import lab  # noqa: E402
 HERE = pathlib.Path(__file__).parent
 IG = "InGame"
 
-LUA_OBSERVE = """
-AutoplayManager.SetTurns(%d)
-AutoplayManager.SetObserveAsPlayer(PlayerTypes.OBSERVER)
-AutoplayManager.SetActive(true)
-print("autoplay " .. tostring(AutoplayManager.IsActive()))
-"""
 
 
 def _connect(host: str, port: int) -> Tuner:
@@ -70,7 +64,7 @@ def main(argv=None) -> int:
     p.add_argument("--turns", type=int, default=250, help="turns to play")
     p.add_argument("--save-every", type=int, default=25)
     p.add_argument("--tag", default="watch")
-    p.add_argument("--observer", action="store_true", help="an all-AI game: one Autoplay run, observed")
+    p.add_argument("--observer", action="store_true", help="an all-AI game: it plays itself; the watch follows and ends it")
     p.add_argument("--min-free-mb", type=float, default=2048.0)
     p.add_argument("--wait", type=float, default=600.0, help="seconds to allow one turn")
     a = p.parse_args(argv)
@@ -84,8 +78,6 @@ def main(argv=None) -> int:
     lp = -1 if a.observer else lab.local_player(t)
     print(f"watching {a.host} from turn {t0} for {a.turns} turns"
           f" ({'observer' if a.observer else f'seat {lp}'}) -> {out.name}", flush=True)
-    if a.observer:
-        print("   ", t.run(lab.GC, LUA_OBSERVE % a.turns)[-1], flush=True)
     last = t0
     with open(out, "a", encoding="utf-8") as fh:
         for ln in t.run(lab.GC, watch, timeout=60):
@@ -121,16 +113,17 @@ def main(argv=None) -> int:
                       flush=True)
                 print("   ", t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}_oom"))[-1], flush=True)
                 break
-    if a.observer:
-        # the run's own count did not end it: two lab games ran 11 and 22
-        # turns past SetTurns(250) — the watch's target is the end, so the
-        # watch ends it
-        print("   ", t.run(lab.GC, 'AutoplayManager.SetActive(false); print("autoplay stopped at turn "'
-                                  ' .. Game.GetCurrentGameTurn())')[-1], flush=True)
     hist = lab.RUNS / f"event_history_{a.tag}_{stamp}.txt"
     hist.write_text("\n".join(t.run(IG, (HERE / "event_history.lua").read_text(encoding="utf-8"), timeout=120)),
                     encoding="utf-8")
     print("event history ->", hist.name)
+    if a.observer:
+        # an all-AI game never stops: nothing holds its turn, and Autoplay
+        # has no part in it (SetActive(false) left the turns running). The
+        # watch's target is the end — the instance goes back to the main
+        # menu, ready to host the next game without a relaunch.
+        print("   ", t.run(IG, 'print("left the game at turn " .. Game.GetCurrentGameTurn());'
+                                ' Events.ExitToMainMenu()')[-1], flush=True)
     t.close()
     return 0
 
