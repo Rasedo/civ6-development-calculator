@@ -45,8 +45,8 @@ export interface Unlocks {
 }
 
 const BASELINE = {
-  // CIV6 (Ziggurat, Terrace Farm): neither has a prerequisite in the install
-  improvements: ['FARM', 'ZIGGURAT', 'TERRACE_FARM'],
+  // CIV6 (Ziggurat, Terrace Farm, Pa): none has a prerequisite in the install
+  improvements: ['FARM', 'ZIGGURAT', 'TERRACE_FARM', 'MAORI_PA'],
   buildings: ['MONUMENT'],
 };
 

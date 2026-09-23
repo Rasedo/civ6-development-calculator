@@ -411,6 +411,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('CRAFTSMANSHIP', 'Craftsmanship', 'Ancient', 40, ['CODE_OF_LAWS'], [
       { kind: 'unlockImprovement', improvement: 'SPHINX' }, // CIV6 (Sphinx): PrereqCivic
+      { kind: 'unlockImprovement', improvement: 'CHEMAMULL' }, // CIV6 (Chemamull): PrereqCivic
       { kind: 'unlockPolicy', policy: 'AGOGE' },
       { kind: 'unlockPolicy', policy: 'ILKUM' },
     ]),
@@ -478,6 +479,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('GUILDS', 'Guilds', 'Medieval', 420, ['FEUDALISM', 'CIVIL_SERVICE'], [
       { kind: 'unlockPolicy', policy: 'TOWN_CHARTERS' },
       { kind: 'unlockPolicy', policy: 'CRAFTSMEN' },
+      { kind: 'unlockImprovement', improvement: 'POLDER' }, // CIV6 (Polder): PrereqCivic
     ]),
     C('MEDIEVAL_FAIRES', 'Medieval Faires', 'Medieval', 420, ['FEUDALISM'], [
       { kind: 'unlockPolicy', policy: 'AESTHETICS' },
@@ -495,9 +497,11 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('REFORMED_CHURCH', 'Reformed Church', 'Renaissance', 440, ['GUILDS', 'DIVINE_RIGHT'], [
       { kind: 'unlockGovernment', government: 'THEOCRACY' },
       { kind: 'unlockPolicy', policy: 'SIMULTANEUM' },
+      { kind: 'unlockImprovement', improvement: 'GOLF_COURSE' }, // CIV6 (Golf Course): PrereqCivic
     ]),
     C('HUMANISM', 'Humanism', 'Renaissance', 600, ['MEDIEVAL_FAIRES', 'GUILDS'], [
       { kind: 'unlockBuilding', building: 'MUSEUM' },
+      { kind: 'unlockImprovement', improvement: 'CHATEAU' }, // CIV6 (Chateau): PrereqCivic
       // Real Civ 6 unlocks BOTH museums with Humanism — the Art Museum and
       // the Archaeological Museum are the same choice point. A building with
       // no unlock at all is worse than wrong: TS omits it from
@@ -517,7 +521,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'PUBLIC_WORKS' },
       { kind: 'unlockPolicy', policy: 'SKYSCRAPERS' },
     ]),
-    C('NATIONALISM', 'Nationalism', 'Industrial', 1010, ['ENLIGHTENMENT']),
+    C('NATIONALISM', 'Nationalism', 'Industrial', 1010, ['ENLIGHTENMENT'], [
+      { kind: 'unlockImprovement', improvement: 'OPEN_AIR_MUSEUM' }, // CIV6 (Open-Air Museum): PrereqCivic
+    ]),
     C('NATURAL_HISTORY', 'Natural History', 'Industrial', 1050, ['COLONIALISM'], [
       { kind: 'unlockBuilding', building: 'ZOO' },
       { kind: 'unlockDistrict', district: 'WATER_PARK' },
@@ -570,7 +576,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 800, ['ENLIGHTENMENT'], [
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
     ]),
-    C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM']),
+    C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM'], [
+      { kind: 'unlockImprovement', improvement: 'ICE_HOCKEY_RINK' }, // CIV6 (Ice Hockey Rink): PrereqCivic
+    ]),
     C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY'], [
       { kind: 'unlockBuilding', building: 'SANCTUARY' },
     ]),

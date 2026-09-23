@@ -280,6 +280,7 @@ def _buy_ctx(sim, row: int) -> dict:
     pat_f_ok, pat_f_cls, pat_g_ok, pat_g_cls = sim._seat_patronage_candidates(row, active)
     levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
     levy_ok = levy_ok & sim.war[:, row, : sim.n_majors].any(dim=1)
+    levy_cs = torch.where(levy_ok, levy_cs, torch.full_like(levy_cs, -1))
     return {"bldg_city": jj, "bldg": bb, "can_building": can_b, "bldg_price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_city": tile_j,

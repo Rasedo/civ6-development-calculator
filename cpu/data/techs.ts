@@ -539,10 +539,14 @@ const T = (
 
 export const TECHS: Record<string, TechDef> = Object.fromEntries(
   [
-    T('POTTERY', 'Pottery', 'Ancient', 25, [], [{ kind: 'unlockBuilding', building: 'GRANARY' }]),
+    T('POTTERY', 'Pottery', 'Ancient', 25, [], [
+      { kind: 'unlockBuilding', building: 'GRANARY' },
+      { kind: 'unlockImprovement', improvement: 'MEKEWAP' }, // CIV6 (Mekewap): PrereqTech
+    ]),
     T('ANIMAL_HUSBANDRY', 'Animal Husbandry', 'Ancient', 25, [], [
       { kind: 'unlockImprovement', improvement: 'PASTURE' },
       { kind: 'unlockImprovement', improvement: 'CAMP' },
+      { kind: 'unlockImprovement', improvement: 'KURGAN' }, // CIV6 (Kurgan): PrereqTech
     ]),
     T('MINING', 'Mining', 'Ancient', 25, [], [
       { kind: 'unlockImprovement', improvement: 'MINE' },
@@ -563,6 +567,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('IRRIGATION', 'Irrigation', 'Ancient', 50, ['POTTERY'], [
       { kind: 'unlockImprovement', improvement: 'PLANTATION' },
       { kind: 'unlockFeatureRemoval', feature: 'MARSH' },
+      { kind: 'unlockImprovement', improvement: 'STEPWELL' }, // CIV6 (Stepwell): PrereqTech
     ]),
     T('WRITING', 'Writing', 'Ancient', 50, ['POTTERY'], [
       { kind: 'unlockDistrict', district: 'CAMPUS' },
@@ -570,6 +575,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('MASONRY', 'Masonry', 'Ancient', 80, ['MINING'], [
       { kind: 'unlockBuilding', building: 'ANCIENT_WALLS' },
+      { kind: 'unlockImprovement', improvement: 'GREAT_WALL' }, // CIV6 (Great Wall): PrereqTech
     ]),
     T('BRONZE_WORKING', 'Bronze Working', 'Ancient', 80, ['MINING'], [
       { kind: 'unlockDistrict', district: 'ENCAMPMENT' },
@@ -612,6 +618,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('EDUCATION', 'Education', 'Medieval', 390, ['APPRENTICESHIP', 'MATHEMATICS'], [
       { kind: 'unlockBuilding', building: 'UNIVERSITY' },
+      { kind: 'unlockImprovement', improvement: 'MISSION' }, // CIV6 (Mission): PrereqTech
     ]),
     T('BANKING', 'Banking', 'Renaissance', 600, ['EDUCATION', 'STIRRUPS'], [
       { kind: 'unlockBuilding', building: 'BANK' },
