@@ -264,6 +264,58 @@ def local_player(t: Tuner) -> int:
 
 COMMEMORATE = pathlib.Path(__file__).parent / "commemorate.lua"
 
+# The popup and leader screens Autoplay leaves stacked on the human seat's UI.
+# Each lives in its own Lua state; the snippet runs THERE and calls that
+# screen's own close (the diplomacy view's `OnForceClose`, what the game runs
+# when a turn ends under a timer; `OnClose` / `Close` elsewhere) when the
+# context is visible. Autoplay is never blocked by them; the screen fills up.
+POPUP_STATES = (
+    "DiplomacyActionView", "DiplomacyDealView", "LeaderScene", "InGamePopup",
+    "EraCompletePopup", "EraReviewPopup", "HistoricMoments", "NaturalWonderPopup",
+    "NaturalDisasterPopup", "WonderBuiltPopup", "ProjectBuiltPopup", "BoostUnlockedPopup",
+    "TechCivicCompletedPopup", "GreatPeoplePopup", "WorldCongressIntro", "WorldCongressPopup",
+    "WorldCrisisPopup", "RockBandPopup", "EventPopup", "UnitCaptured", "PlayerChange",
+)
+LUA_DISMISS = """
+if ContextPtr == nil or ContextPtr:IsHidden() then return end
+local f = OnForceClose or OnClose or Close
+if f == nil then print("open, no close") return end
+local ok, err = pcall(f)
+print(ok and "closed" or ("close failed: " .. tostring(err)))
+"""
+
+
+CLOSE_SESSIONS = pathlib.Path(__file__).parent / "close_sessions.lua"
+
+
+def unstick(t: Tuner) -> list[str]:
+    """What holds an Autoplay turn with no end-turn blocker: an AI's open
+    diplomacy session with the human seat (`close_sessions.lua`) and the
+    screens it raised. Returns what was done."""
+    done = []
+    try:
+        out = t.run(IG, CLOSE_SESSIONS.read_text(encoding="utf-8"))[-1]
+        if not out.endswith("[]"):
+            done.append(out)
+    except (TunerError, IndexError):
+        pass
+    return done + dismiss_popups(t)
+
+
+def dismiss_popups(t: Tuner) -> list[str]:
+    """Close every visible popup / leader screen; return what was closed."""
+    closed = []
+    for s in POPUP_STATES:
+        if s not in t.states:
+            continue
+        try:
+            out = t.run(s, LUA_DISMISS, timeout=5)
+        except TunerError:
+            continue
+        if out:
+            closed.append(f"{s}: {out[-1]}")
+    return closed
+
 
 def commemorate_if_blocked(t: Tuner) -> bool:
     """A new era's Dedication blocks the turn for the human seat, Autoplay
@@ -302,9 +354,12 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
             continue
         if tn > t0:
             return tn
-        if time.monotonic() - nagged > 20 and commemorate_if_blocked(t):
-            nagged = time.monotonic()
-            continue
+        if time.monotonic() - nagged > 20:
+            if commemorate_if_blocked(t):
+                nagged = time.monotonic()
+                continue
+            for msg in unstick(t):
+                print("    unstuck:", msg)
         if how == "endturn" and time.monotonic() - nagged > 20:
             # a blocker raised AFTER the request (an escape prompt, a city
             # that just finished) needs the resolver again

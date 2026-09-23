@@ -66,6 +66,8 @@ def main(argv=None) -> int:
                 t = _connect(a.host, a.port)
                 continue
             played += 1
+            for msg in lab.unstick(t):
+                print("    unstuck:", msg, flush=True)
             for ln in t.run(lab.GC, watch, timeout=60):
                 fh.write(ln + "\n")
             fh.flush()
