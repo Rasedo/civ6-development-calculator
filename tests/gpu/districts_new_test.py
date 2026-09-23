@@ -241,16 +241,19 @@ def main() -> None:
 
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     m0, _ = s6._seat_housing(row)
+    t_none = int(s6._seat_amenity(row)[0][b, col])   # the tier with no park at all
     _put(s6, b, row, col, wp, a_t)
     m1, _ = s6._seat_housing(row)
     assert float(m1[b, col] - m0[b, col]) == 1.0, "CIV6 (Water Park): 1 Gold maintenance"
     t0 = s6._seat_amenity(row)[0][b, col].clone()
-    s6._d_amenity[wp] = 12.0   # amplified past the tier steps, so the read must show
+    s6._d_amenity[wp] = -12.0   # amplified past the tier steps, so the read must show
     s6._eff_version += 1
-    assert int(s6._seat_amenity(row)[0][b, col]) != int(t0), "the district's own amenity is read"
+    _ta = int(s6._seat_amenity(row)[0][b, col])
+    assert _ta != int(t0), f"the district's own amenity is read: tier {_ta} vs {int(t0)}"
     s6.district_pillaged[b, a_t] = True
     s6._eff_version += 1
-    assert int(s6._seat_amenity(row)[0][b, col]) == int(t0), "a pillaged district's amenity is dark"
+    _tp = int(s6._seat_amenity(row)[0][b, col])
+    assert _tp == t_none, f"a pillaged district's amenity is dark: tier {_tp}, with no park {t_none}"
     s6._d_amenity[wp] = 1.0
 
     # the Preserve's housing comes off the appeal band, not the catalog column

@@ -366,10 +366,17 @@ def test_research_cadence_and_rates(rules, path) -> None:
     sim.civ_tech_boosted[B0, 1, ta] = True   # the ally's boost counts as "researched or boosted"
     sim.civ_techs[B0, 1, tb] = True
     sim.civ_techs[B0, 0, tc] = True
+    held1 = (sim.civ_techs[B0, 1] | sim.civ_tech_boosted[B0, 1]).clone()
     sim.step()
     assert bool(sim.civ_tech_boosted[B0, 0, ta]) and not bool(sim.civ_tech_boosted[B0, 0, tb]), \
         "seat 0 did not take the first tech its ally holds"
-    assert bool(sim.civ_tech_boosted[B0, 1, tc]), "seat 1 did not take the tech seat 0 holds"
+    # seat 1 takes the FIRST tech in catalog order that seat 0 holds and it
+    # lacks — the turn's own research can hand seat 0 an earlier one than the
+    # scene's `tc` before the tick reads it, and then that one is the pick
+    new1 = (sim.civ_tech_boosted[B0, 1] & ~held1).nonzero().flatten().tolist()
+    want1 = ((sim.civ_techs[B0, 0] | sim.civ_tech_boosted[B0, 0]) & ~held1).nonzero().flatten().tolist()
+    assert len(new1) == 1 and want1 and new1[0] == want1[0], \
+        f"seat 1 did not take the first tech seat 0 holds: took {new1}, seat 0 holds {want1}"
     assert not bool(sim.civ_tech_boosted[B0, 0, tc]), "the boost landed on a tech the side already knows"
 
     # Research 3 reads the ally's stored science rate under co-research

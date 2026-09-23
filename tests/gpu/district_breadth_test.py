@@ -337,7 +337,10 @@ def poke_worship_buy(rules, rj, path):
     assert bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
     TEMPLE, HS = sim._temple_bidx, sim._hs_idx
     wb = sim._worship_bidx[(r + 1) % len(sim._worship_bidx)]
-    cost = sim._worship_cost
+    # the catalog price, then the five-step floor every purchase takes
+    # (`_purchase_step`, measured live)
+    _d = int(sim.rules.purchase_divisor)
+    cost = (int(sim._worship_cost) // _d) * _d
     assert TEMPLE >= 0 and HS >= 0 and wb >= 0, "worship anchors missing from export"
 
     # make city j the SOLE eligible city; found the religion; strip beliefs so
@@ -433,7 +436,8 @@ def poke_civ_palace(rules, rj, path):
             assert abs(a - b) < 1e-9, f"per-j vs batched twin disagree (city {jj}, col {k}): {a} != {b}"
 
     # housing / amenity constants wired; the palace amenity never lowers the tier
-    assert sim._palace_housing == 1.0 and sim._palace_amenities == 1.0, "palace housing/amenity must be +1/+1"
+    # Gathering Storm updates the Palace to 2 Amenities (Expansion2_Buildings.xml)
+    assert sim._palace_housing == 1.0 and sim._palace_amenities == 2.0, "palace housing/amenity must be +1/+2"
     yf_on = float(sim._seat_amenity(r + 1)[2][0, j])
     sim.city_is_cap[0, r + 1, j] = False
     yf_off = float(sim._seat_amenity(r + 1)[2][0, j])
