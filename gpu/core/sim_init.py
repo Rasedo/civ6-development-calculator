@@ -744,7 +744,7 @@ class SimInit:
         if _gp:
             for _k in ("cityYields", "perCitizen", "yieldMult", "adjacencyMult",
                        "loyaltyToOwn", "loyaltyToForeign",
-                       "faithPerSpecialty", "districtProdMult", "projectProdMult", "growthMult",
+                       "faithPerSpecialty", "districtProdMult", "projectProdPct", "growthMult",
                        "gppMult", "gwTourismMult", "pressureMult", "builderCharges",
                        "settlerFreePop", "harvestMult", "cityDefense", "territoryCS",
                        "extraStrikes", "freePromoOnTrain", "theologyCS", "fullHeal",

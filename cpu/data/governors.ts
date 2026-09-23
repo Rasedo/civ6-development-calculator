@@ -39,6 +39,32 @@ export interface GovernorDef {
 export const AIR_DEFENSE_INITIATIVE_CS = 25;
 
 
+/** CIV6 (Arms Race Proponent): one MODIFIER_SINGLE_CITY_ADJUST_PROJECT_PRODUCTION
+ *  row per nuclear project, each `ProjectType` + `Amount` 30; engine project id
+ *  -> the row's ModifierId. */
+const ARMS_RACE_MODIFIER: Readonly<Record<string, string>> = {
+  MANHATTAN_PROJECT: 'EDUCATOR_FASTER_MANHATTAN_PROJECT_RESEARCH',
+  OPERATION_IVY: 'EDUCATOR_FASTER_OPERATION_IVY_RESEARCH',
+  BUILD_NUCLEAR_DEVICE: 'EDUCATOR_FASTER_NUCLEAR_DEVICE_PRODUCTION',
+  BUILD_THERMONUCLEAR_DEVICE: 'EDUCATOR_FASTER_THERMONUCLEAR_DEVICE_PRODUCTION',
+};
+const ARMS_RACE_PROJECT_PCT: Readonly<Record<string, number>> =
+  Object.fromEntries(Object.keys(ARMS_RACE_MODIFIER).map((p) => [p, 30]));
+
+/** CIV6 (Space Initiative, MODIFIER_SINGLE_CITY_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION,
+ *  Amount 30): every project the install marks `SpaceRace`; engine project id
+ *  -> its install ProjectType. */
+const SPACE_RACE_PROJECT: Readonly<Record<string, string>> = {
+  LAUNCH_EARTH_SATELLITE: 'PROJECT_LAUNCH_EARTH_SATELLITE',
+  LAUNCH_MOON_LANDING: 'PROJECT_LAUNCH_MOON_LANDING',
+  LAUNCH_MARS_COLONY: 'PROJECT_LAUNCH_MARS_BASE',
+  EXOPLANET_EXPEDITION: 'PROJECT_LAUNCH_EXOPLANET_EXPEDITION',
+  TERRESTRIAL_LASER_STATION: 'PROJECT_TERRESTRIAL_LASER',
+  LAGRANGE_LASER_STATION: 'PROJECT_ORBITAL_LASER',
+};
+const SPACE_INITIATIVE_PROJECT_PCT: Readonly<Record<string, number>> =
+  Object.fromEntries(Object.keys(SPACE_RACE_PROJECT).map((p) => [p, 30]));
+
 /** the install's own name for each governor's role. */
 const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
   REYNA: 'GOVERNOR_THE_MERCHANT', VICTOR: 'GOVERNOR_THE_DEFENDER',
@@ -92,8 +118,10 @@ export interface GovernorEffects {
   adjacencyMult?: Partial<Record<DistrictId, number>>;
   /** production multiplier toward DISTRICTS in this city (Zoning Commissioner). */
   districtProdMult?: number;
-  /** production multiplier toward city PROJECTS (Space Initiative). */
-  projectProdMult?: number;
+  /** +percent production toward NAMED projects in this city, keyed by project
+   *  id (MODIFIER_SINGLE_CITY_ADJUST_PROJECT_PRODUCTION rows, one project
+   *  each; Space Initiative's space-race rows). A project absent pays nothing. */
+  projectProdPct?: Readonly<Record<string, number>>;
   /** growth multiplier (Surplus Logistics). */
   growthMult?: number;
   /** great-person points multiplier (Grants). */
@@ -460,13 +488,19 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
         'ModifierId=EDUCATOR_INCREASE_CITY_GREAT_PERSON_POINT_BONUS&Name=Amount', 'Value')],
     },
   },
-  SPACE_INITIATIVE: {
-    'effects.projectProdMult': {
-      derived: '1 + Amount/100 — the install writes the percentage (30), the catalog the multiplier',
-      inputs: [xml('ModifierArguments',
-        'ModifierId=EDUCATOR_FASTER_SPACE_RACE_PRODUCTION&Name=Amount', 'Value')],
-    },
-  },
+  SPACE_INITIATIVE: Object.fromEntries(Object.entries(SPACE_RACE_PROJECT).map(([p, iid]) => [
+    `effects.projectProdPct.${p}`, {
+      derived: 'Amount on every project the install marks SpaceRace',
+      inputs: [
+        xml('ModifierArguments', 'ModifierId=EDUCATOR_FASTER_SPACE_RACE_PRODUCTION&Name=Amount', 'Value'),
+        xml('Projects', `ProjectType=${iid}`, 'SpaceRace', { expect: true }),
+      ],
+    }])),
+  ARMS_RACE_PROPONENT: Object.fromEntries(Object.entries(ARMS_RACE_MODIFIER).map(([p, mid]) => [
+    `effects.projectProdPct.${p}`,
+    xml('ModifierArguments', `ModifierId=${mid}&Name=Amount`, 'Value',
+      { note: `its ProjectType row names PROJECT_${p}` }),
+  ])),
   CURATOR: {
     'effects.gwTourismMult': {
       derived: 'ScalingFactor/100 — the install writes 200 (double), the catalog the multiplier',
@@ -553,7 +587,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { airDefenseCS: AIR_DEFENSE_INITIATIVE_CS }, ['EMBRASURE']),
   G('ARMS_RACE_PROPONENT', 'VICTOR', 3, 'Arms Race Proponent',
     '30% Production increase to all nuclear armament projects in the city.',
-    {}, ['EMBRASURE']),
+    { projectProdPct: ARMS_RACE_PROJECT_PCT }, ['EMBRASURE']),
 
   // ---- AMANI, the Diplomat ----
   G('MESSENGER', 'AMANI', 0, 'Messenger',
@@ -650,7 +684,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { gppMult: 2 }, ['CONNOISSEUR', 'RESEARCHER']),
   G('SPACE_INITIATIVE', 'PINGALA', 3, 'Space Initiative',
     '30% Production increase to all space-program projects in the city.',
-    { projectProdMult: 1.3 }, ['GRANTS']),
+    { projectProdPct: SPACE_INITIATIVE_PROJECT_PCT }, ['GRANTS']),
   G('CURATOR', 'PINGALA', 3, 'Curator',
     '+100% Tourism from Great Works of Art, Music, and Writing in the city.',
     { gwTourismMult: 2 }, ['GRANTS']),

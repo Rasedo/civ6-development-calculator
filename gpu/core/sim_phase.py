@@ -895,8 +895,7 @@ class SimPhase:
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                 _emall = torch.where(_proj_i, _emall * _pp, _emall)
         # CIV6 (Zoning Commissioner): "+20% Production towards constructing
-        # Districts in the city"; (Grants): "+30% Production towards City
-        # Projects." The governor's are per CITY, not per seat.
+        # Districts in the city" — per CITY, not per seat.
         if self.n_governors and row < self.n_majors:
             _dm = self._gov_chan(row, "mult", "districtProdMult")[bidx, col].to(_emall.dtype)
             if bool((_dm != 1).any()):
@@ -908,12 +907,16 @@ class SimPhase:
             _dp = pre["fx"]["distprod"].to(_emall.dtype)
             _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
             _emall = torch.where(_dist_i, _emall * _dp, _emall)
-        if self.n_governors and row < self.n_majors:
-            _pm = self._gov_chan(row, "mult", "projectProdMult")[bidx, col].to(_emall.dtype)
-
-            if bool((_pm != 1).any()) and self._proj_rows:
-                _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-                _emall = torch.where(_proj_i, _emall * _pm, _emall)
+        # CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
+        # projects in the governor's city — a percent per (promotion, project)
+        if self.n_governors and row < self.n_majors and self._proj_rows:
+            _nP = len(self._proj_rows)
+            _gpi = cur - self.PROJECT_BASE
+            _gon = (_gpi >= 0) & (_gpi < _nP)
+            if bool(_gon.any()):
+                _gpct = self._governor_vec(row, "projectProdPct")[bidx, col]      # [B, nP]
+                _gpct = _gpct.gather(1, _gpi.clamp(min=0, max=_nP - 1).unsqueeze(1)).squeeze(1)
+                _emall = torch.where(_gon, _emall * (1.0 + _gpct / 100.0).to(_emall.dtype), _emall)
         # CIV6 (Hong Kong): "+20% Production towards city projects" — last of
         # the three project factors, the order TS composes them in.
         _hk = pre["hk"]

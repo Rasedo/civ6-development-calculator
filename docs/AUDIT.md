@@ -35,7 +35,7 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent's +30% on the three nuclear projects |
+| B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
@@ -79,7 +79,6 @@ close in the same commit.
 - **B-24r. GOVERNOR TAILS.** Weight 1.
   - BLOCKER C-38: Foreign Investor needs a minor that accumulates strategic resources; Affluence copies the ground's luxuries because a minor improves nothing.
   - BLOCKER C-1: Renewable Subsidizer and Industrialist wait on the plants.
-  - BUILD Arms Race Proponent: three `MODIFIER_SINGLE_CITY_ADJUST_PROJECT_PRODUCTION` rows, Amount 30 each, on PROJECT_MANHATTAN_PROJECT, PROJECT_OPERATION_IVY and PROJECT_BUILD_NUCLEAR_DEVICE (Expansion1_Governors.xml) — all three projects exist in the catalog; the old "waits on the armament projects" was false.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
   - DLL: `PLUNDER_ROUTE_GOLD` 50. `GlobalParameters.xml` carries no row with PLUNDER in its name at all, and the only trade-route plunder rows anywhere (Lisbon's immunity, an Admiral's bonus) publish no figure. The district `PlunderAmount` column (25 / 50) is sourced and ships, and so are the two plunder percentages (Total War 50, Letter of Marque 100); only the route's base is a model number.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.

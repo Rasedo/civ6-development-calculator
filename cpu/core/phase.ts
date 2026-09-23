@@ -2628,8 +2628,7 @@ export function seatPhase(state: GameState): void {
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
         // CIV6 (Zoning Commissioner): "+20% Production towards constructing
-        // Districts in the city"; (Grants): "+30% Production towards City
-        // Projects."
+        // Districts in the city".
         // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
         // (Flower Power): land units other than Rock Bands cost double, which
         // this model pays as a slower fill rather than a moved queue cost.
@@ -2653,8 +2652,10 @@ export function seatPhase(state: GameState): void {
         }
         // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
         if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
-        // CIV6 (Hong Kong): "+20% Production towards city projects"
-        if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
+        // CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
+        // projects in the governor's city; (Hong Kong): "+20% Production
+        // towards city projects"
+        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
         // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)

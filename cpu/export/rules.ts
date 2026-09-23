@@ -107,7 +107,8 @@ const governorEffectRow = (fx: GovernorEffects) => ({
   adjacencyMult: PLACEABLE_DISTRICTS.map((d) => fx.adjacencyMult?.[d] ?? 1),
   faithPerSpecialty: fx.faithPerSpecialty ?? 0,
   districtProdMult: fx.districtProdMult ?? 1,
-  projectProdMult: fx.projectProdMult ?? 1,
+  // +percent per project, in the `projects.rows` order
+  projectProdPct: Object.keys(PROJECTS).map((p) => fx.projectProdPct?.[p] ?? 0),
   growthMult: fx.growthMult ?? 1,
   gppMult: fx.gppMult ?? 1,
   gwTourismMult: fx.gwTourismMult ?? 1,
