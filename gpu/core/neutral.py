@@ -14,7 +14,11 @@ it) and `gp` (the Great Person offers and this seat's points). After them
 `cities`: one row per living city in the seat's ARRAY order, with its
 production columns, the plots each open district column may take, its
 specialist slots and pins, the plots it may work and the plots a sibling
-holds that it may claim.
+holds that it may claim. Then `targets`: the tile planes the unit planner
+walks toward (builder and engineer jobs, religious spread, founding, digs,
+park anchors, Great Person sites, villages), each emitted only for a game
+whose seat holds a unit that walks toward it. Last `units`: one row per
+living unit in the seat's array order.
 """
 from __future__ import annotations
 
@@ -23,10 +27,14 @@ from pathlib import Path
 
 import torch
 
+from . import simbase
+
 SCHEMA = json.loads((Path(__file__).resolve().parents[2] / "shared" / "decide.schema.json")
                     .read_text(encoding="utf-8"))
 SEAT_GROUPS: dict = {g: [(f[0], f[1]) for f in fields] for g, fields in SCHEMA["seat"].items()}
 CITY_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["city"]]
+TARGET_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["targets"]]
+UNIT_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["unit"]]
 
 
 def living_order(alive: torch.Tensor) -> torch.Tensor:
@@ -297,12 +305,189 @@ def _citizen_rows(sim, row: int, alive: torch.Tensor) -> tuple:
     return work, swap
 
 
+def _unit_cols(sim, row: int) -> tuple:
+    """(present [B, N] bool, {unit field: [B, N] long}) — seat `row`'s living
+    units on the slot-map axis (`_seat_slot_map`: the living in slot order,
+    which is the TS array order). A Great Person's site code and argument are
+    looked up from its class and roster position."""
+    smap = sim._seat_slot_map(row)
+    sc = smap.clamp(min=0)
+    present = smap >= 0
+    types = _as_long(sim.unit_type.gather(1, sc))
+    gp_at = _as_long(sim.unit_gp_at.gather(1, sc))
+    neg = torch.full_like(types, -1)
+    gsite, garg = neg, neg
+    if getattr(sim, "_A_GP", -1) >= 0:
+        cls = sim._gp_cls_of(types)
+        maxN = sim._gp_site.shape[1] - 1
+        ok = present & (cls >= 0) & (gp_at >= 0)
+        gsite = torch.where(ok, _as_long(sim._gp_site[cls.clamp(min=0), gp_at.clamp(min=0, max=maxN)]), neg)
+        garg = torch.where(ok, _as_long(sim._gp_site_district[cls.clamp(min=0), gp_at.clamp(min=0, max=maxN)]), neg)
+    cols = {"tile": _as_long(sim.unit_tile.gather(1, sc)), "type": types,
+            "charges": _as_long(sim.unit_charges.gather(1, sc)),
+            "gpAt": torch.where(present, gp_at, neg), "gpSite": gsite, "gpArg": garg}
+    return present, cols
+
+
+def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
+    """[B, T] — where a Great Person charge with this SITE code may be spent.
+    The unit mask is the authority on legality; this is only what a person
+    walks toward, so it answers per site rather than per person."""
+    own = sim.tile_seat == seat
+    if site == 0:  # the class's own completed district
+        if arg < 0:
+            return torch.zeros_like(own)
+        return own & (sim.district == arg) & sim.district_complete & ~sim.pillaged
+    if site == 1:  # anywhere — nothing to walk to
+        return torch.ones_like(own)
+    if site == 2:  # a city with an open slot taking a work of this class's kind
+        out = torch.zeros_like(own)
+        col = sim.city_slot_at(seat)
+        for kind in range(3):
+            if sim._gw_cls[kind] < 0:
+                continue
+            free = sim._gw_room_kind(seat, kind) & sim.city_alive[:, seat]
+            out = out | (own & (col >= 0) & free.gather(1, col.clamp(min=0)))
+        return out
+    if site == 3:  # inside any city-state's territory
+        return (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
+    if site == 4:  # an owned tile carrying a luxury
+        return own & (sim.lux_id >= 0)
+    if site == 6:  # a city-state's territory this seat is Suzerain of (Raffles)
+        if sim.S == 0:
+            return torch.zeros_like(own)
+        cs = (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
+        s = (sim.tile_seat - 100).clamp(min=0, max=sim.S - 1)
+        return cs & sim._suzerain_mask(seat).gather(1, s)
+    if site == 7:  # beside a barbarian unit (Boudica)
+        bp = sim._barb_unit_plane()
+        nb7 = sim.neigh
+        near = (bp[:, nb7.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)
+                & (nb7 >= 0).unsqueeze(0)).any(dim=2)
+        return near & sim.passable
+    if site == 8:  # the territory of a seat at war with this one (Tupac Amaru)
+        return sim._enemy_ground(seat, sim.tile_seat)
+    # 5: unclaimed ground next to this seat's territory
+    nb = sim.neigh
+    adj = (own[:, nb.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)
+           & (nb >= 0).unsqueeze(0)).any(dim=2)
+    return (sim.tile_seat < 0) & adj
+
+
+def _found_ok(sim, row: int, gate: torch.Tensor) -> torch.Tensor:
+    """[B, T] — `canFoundCity`'s own terms over the whole map, in the games
+    `gate` names: unowned, settle_ok, bare of district and wonder, >= 4 from
+    every live city (majors and city-states)."""
+    B, T, dev = sim.B, sim.T, sim.device
+    ok = torch.zeros(B, T, dtype=torch.bool, device=dev)
+    nrow = sim.n_majors
+    ctr = torch.cat((sim.city_center[:, :nrow].reshape(B, -1), sim.citystate_center), dim=1)
+    live = torch.cat((sim.city_alive[:, :nrow].reshape(B, -1), sim.citystate_alive), dim=1)
+    for b in range(B):
+        if not bool(gate[b]):
+            continue
+        cb = ctr[b][live[b]]
+        dmin = (sim.pair_dist[:, cb.clamp(min=0)].min(dim=1).values.to(torch.long)
+                if int(live[b].sum()) else torch.full((T,), 999, dtype=torch.long, device=dev))
+        ok[b] = ((sim.tile_seat[b] < 0) & sim.settle_ok[b]
+                 & (sim.district[b] < 0) & (sim.built_wonder[b] < 0) & (dmin >= 4))
+    return ok
+
+
+def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
+    """Seat `row`'s `targets`, one dict per game keyed by `TARGET_FIELDS`.
+    Each plane is built only when some game holds a unit that walks toward
+    it — the map-wide scans cost nothing on a seat without one — and listed
+    only for those games."""
+    B, T, NU, dev = sim.B, sim.T, sim.NU, sim.device
+    types, charges = cols["type"].clamp(min=0, max=NU - 1), cols["charges"]
+    charged = present & (charges > 0)
+    no = torch.zeros(B, dtype=torch.bool, device=dev)
+
+    def holds(idx: int, need_charge: bool = True) -> torch.Tensor:
+        """[B] — the seat holds a unit of type `idx` (with a charge)."""
+        if idx < 0:
+            return no
+        return ((charged if need_charge else present) & (types == idx)).any(dim=1)
+
+    allt = torch.arange(T, device=dev).reshape(1, -1).expand(B, -1)
+    planes: dict = {}                                                  # field -> (gate [B], plane [B, T])
+    if sim.improvements_on:
+        g = holds(sim._builder_idx)
+        if bool(g.any()):
+            planes["jobs"] = (g, sim._seat_job_mask(row))
+        g = holds(getattr(sim, "_eng_idx", -1))
+        if bool(g.any()):
+            planes["engJobs"] = (g, sim._seat_engineer_job_mask(row))
+    relig = no.unsqueeze(1).expand(B, types.shape[1])
+    for idx in (sim._missionary_idx, sim._apostle_idx):
+        if idx >= 0:
+            relig = relig | (types == idx)
+    g = (charged & relig).any(dim=1) & sim.civ_religion_done[:, row]
+    if bool(g.any()):
+        nrow = sim.n_majors
+        acc = torch.zeros(B, T, dtype=torch.long, device=dev)
+        acc.scatter_add_(1, sim.city_center[:, :nrow].clamp(min=0).reshape(B, -1),
+                         (sim.city_alive[:, :nrow] & (sim.city_followed[:, :nrow] != row)).long().reshape(B, -1))
+        planes["spread"] = (g, acc > 0)
+    if sim._settler_idx >= 0 and sim._A_FOUND >= 0:
+        g = holds(sim._settler_idx, need_charge=False) \
+            & (sim.city_alive[:, row].sum(dim=1) < int(sim.rules.seats.get("maxCities", 6)))
+        if bool(g.any()):
+            planes["foundOk"] = (g, _found_ok(sim, row, g))
+    if sim._archaeologist_idx >= 0 and sim._A_EXCAVATE >= 0:
+        g = holds(sim._archaeologist_idx)
+        if bool(g.any()):
+            digs = sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
+            planes["digs"] = (g, digs & sim._museum_room(row).unsqueeze(1))
+    if sim._naturalist_idx >= 0 and sim._A_PARK >= 0:
+        g = holds(sim._naturalist_idx)
+        if bool(g.any()):
+            planes["parks"] = (g, sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2))
+    planes["goody"] = (~no, sim.tile_goody)
+    out = [{f: [] for f, _k in TARGET_FIELDS} for _b in range(B)]
+    names = list(planes)
+    stack = torch.stack([pl & g.unsqueeze(1) for g, pl in planes.values()])  # [K, B, T]
+    for k, b, t in stack.nonzero().tolist():                          # field, game, tile ascending
+        out[b][names[k]].append(t)
+    # the Great Person sites: one plane per (site, arg) some charged person
+    # walks toward, listed for the games holding such a person
+    gs, ga = cols["gpSite"], cols["gpArg"]
+    walk = charged & (gs >= 0) & (gs != 1)
+    if bool(walk.any()):
+        bb, nn = walk.nonzero(as_tuple=True)
+        want = sorted({(s, a, b) for b, s, a in zip(bb.tolist(), gs[bb, nn].tolist(), ga[bb, nn].tolist())})
+        rows_: list = []
+        for key in sorted({(s, a) for s, a, _b in want}):
+            games = torch.tensor([b for s, a, b in want if (s, a) == key], dtype=torch.long, device=dev)
+            g = torch.zeros(B, dtype=torch.bool, device=dev).index_fill_(0, games, True)
+            pb, pt = (gp_site_plane(sim, row, *key) & g.unsqueeze(1)).nonzero(as_tuple=True)
+            rows_ += [[b, key[0], key[1], t] for b, t in zip(pb.tolist(), pt.tolist())]
+        for b, s, a, t in sorted(rows_):
+            out[b]["gpSites"].append([s, a, t])
+    return out
+
+
+def _unit_rows(present: torch.Tensor, cols: dict) -> list:
+    """The seat's `units`, one list per game: a dict per living unit in
+    array order keyed by `UNIT_FIELDS`."""
+    n = present.sum(dim=1).tolist()
+    mat = torch.stack([cols[f] for f, _k in UNIT_FIELDS], dim=2).tolist()   # [B, N, F]
+    names = [f for f, _k in UNIT_FIELDS]
+    return [[dict(zip(names, r)) for r in mat[b][:n[b]]] for b in range(len(n))]
+
+
 def seat_obs(sim, row: int) -> list:
     """Seat `row`'s observation, one dict per game of the batch (index = b):
     {group: {field: int | bool | list[int]}} over `SEAT_GROUPS`, then
     "cities": [{field: ...} over `CITY_FIELDS`, one per living city in array
-    order]. Reads only."""
+    order], "targets": {field: ...} over `TARGET_FIELDS` and "units":
+    [{field: ...} over `UNIT_FIELDS`, one per living unit in array order].
+    Reads only."""
     cities = _city_rows(sim, row)
+    present, ucols = _unit_cols(sim, row)
+    targets = _targets(sim, row, present, ucols)
+    units = _unit_rows(present, ucols)
     cols = _columns(sim, row)
     order = [(g, name, kind) for g in SEAT_GROUPS for name, kind in SEAT_GROUPS[g]]
     assert [(g, n) for g, n, _k in order] == list(cols), "the schema and the emitted columns disagree"
@@ -322,5 +507,7 @@ def seat_obs(sim, row: int) -> list:
             else:
                 ob[g][name] = bool(xs[0]) if kind == "bool" else int(xs[0])
         ob["cities"] = cities[b]
+        ob["targets"] = targets[b]
+        ob["units"] = units[b]
         out.append(ob)
     return out

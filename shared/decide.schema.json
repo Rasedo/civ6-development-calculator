@@ -1,5 +1,5 @@
 {
-  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every `seat` group is an object keyed by its field names in the order listed; after them, `cities` is a list with one object per LIVING city of the seat, in the seat's city-ARRAY order (TS `seat.cities`: founding order, a lost city spliced out, a gained one appended), each keyed by the `city` fields in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none; list = a list of plain integers, laid out as its meaning says (a dense list indexed by a table index, or ascending indices); table = a list of fixed-width rows of plain integers, ascending. Every price is an exact integer: no field carries a fraction. Emitters: gpu/core/neutral.py (GPU).",
+  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every `seat` group is an object keyed by its field names in the order listed; after them, `cities` is a list with one object per LIVING city of the seat, in the seat's city-ARRAY order (TS `seat.cities`: founding order, a lost city spliced out, a gained one appended), each keyed by the `city` fields in the order listed. Then `targets`, an object keyed by the `targets` fields in the order listed (the tile planes the unit planner walks toward), and `units`, a list with one object per LIVING unit of the seat in its unit-ARRAY order (TS `state.units` filtered to the seat; at most UNIT_SLOTS), each keyed by the `unit` fields in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none; list = a list of plain integers, laid out as its meaning says (a dense list indexed by a table index, or ascending indices); table = a list of fixed-width rows of plain integers, ascending. Every price is an exact integer: no field carries a fraction. Emitters: gpu/core/neutral.py (GPU).",
   "seat": {
     "buy": [
       ["bldg_city", "city", "the city holding the cheapest completable gold-buyable building"],
@@ -102,5 +102,23 @@
     ["specPin", "list", "per district table index: the citizens pinned into its slots (`City.specialistPref`), -1 where the automatic rule fills it; empty likewise"],
     ["workTiles", "table", "every plot the city may work (`workableTiles`), as [tile, resource priority, locked]: the plot's resource priority (0 = none) and 1 where its citizen pin is set (`Tile.locked`); ascending by tile"],
     ["swapFrom", "table", "every plot a sibling city holds that this city may claim (`swapTileOk`), as [tile, the holder's centre, worked, locked]: worked = 1 where any of the seat's cities works it, locked = 1 where its pin is set; ascending by tile"]
+  ],
+  "targets": [
+    ["jobs", "list", "the tiles a Builder has improvement work on (the TS driver's `jobTiles`: an owned tile that is pillaged, holds a pillaged district, or is bare and takes an improvement it has unlocked), ascending; empty where improvements are off or the seat holds no Builder with a charge"],
+    ["engJobs", "list", "the tiles a Military Engineer has work on (the TS driver's `engTiles`: a road it may lay, an engineer improvement site, or a 20%-charge site), ascending; empty where improvements are off or the seat holds no Military Engineer with a charge"],
+    ["spread", "list", "the CENTRE tiles of every living major city not following this seat's religion (the TS driver's `spreadTargets`), ascending; empty where the seat founded no religion or holds no Missionary or Apostle with a charge"],
+    ["foundOk", "list", "the tiles a city may be founded on (`canFoundCity`: unowned, settleable, bare of district and wonder, at least 4 from every living city and city-state centre), ascending; empty where the seat holds no Settler or stands at the city cap"],
+    ["digs", "list", "the tiles an Archaeologist may excavate (a dig underfoot on unowned or own ground) while a museum slot takes an Artifact, ascending; empty where the seat holds no Archaeologist with a charge"],
+    ["parks", "list", "the tiles that ANCHOR a legal National Park rhombus (`parkClusterLegal` on any of the tile's clusters), ascending; empty where the seat holds no Naturalist with a charge"],
+    ["gpSites", "table", "for every Great Person site a living person of this seat with a charge walks toward (its `gpSite`, `gpArg`; never site 1, which activates where it stands): each tile it may be spent on, as [site, arg, tile], ascending"],
+    ["goody", "list", "the tiles holding a Tribal Village, ascending"]
+  ],
+  "unit": [
+    ["tile", "int", "the tile the unit stands on"],
+    ["type", "int", "its unit table index"],
+    ["charges", "int", "the charges it holds"],
+    ["gpAt", "int", "a Great Person's roster position within its class, -1 for every other unit"],
+    ["gpSite", "int", "a Great Person's site code (GP_SITES: where its charge is spent), -1 for every other unit"],
+    ["gpArg", "int", "that site's argument (the district table index for site 0), -1 where none"]
   ]
 }

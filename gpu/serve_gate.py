@@ -422,20 +422,19 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             nobs_seat: dict = {}
             for seat in seats:
                 gobs_all = env.observe(seat)
-                gj_t = drive._builder_jobs(sim, seat)
-                gs_t = drive._spread_targets(sim, seat)
-                gj_all = gj_t.tolist()
-                gs_all = gs_t.tolist()
-                # Every seat's rows already ride `_seat_slot_map` — this
-                # seat's LIVING units in slot order, which IS the TS array
-                # order it emits per unit. No seat needs a compaction of its
-                # own any more.
                 # THE NEUTRAL OBSERVATION the decide pass reads, taken here
                 # pre-decide: nothing between here and the decide mutates its
-                # inputs (geo_decide_and_apply only STASHES). The BUY and
-                # ROUTE tripwires read it against the TS driver's pre-turn
-                # twins, EVERY seat, row 0 included.
+                # inputs (geo_decide_and_apply only STASHES). The BUY, ROUTE,
+                # JOB and SPREAD tripwires read it against the TS driver's
+                # pre-turn twins, EVERY seat, row 0 included.
                 nobs_seat[seat] = neutral.seat_obs(sim, seat)
+                # Every seat's unit rows ride `_seat_slot_map` — this seat's
+                # LIVING units in slot order, which IS the TS array order it
+                # emits per unit.
+                gj_t = drive._builder_jobs(sim, nobs_seat[seat])
+                gs_t = drive._spread_targets(sim, nobs_seat[seat])
+                gj_all = gj_t.tolist()
+                gs_all = gs_t.tolist()
                 gb_all = _buy_rows(nobs_seat[seat])
                 # the decide pass reuses the other pre-decide reads verbatim
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": gobs_all}
@@ -729,14 +728,14 @@ def main() -> None:
         pre_seat: dict = {}
         nobs_seat: dict = {}
         for seat in seats:
-            gj_t = drive._builder_jobs(sim, seat)
-            gs_t = drive._spread_targets(sim, seat)
+            nobs_seat[seat] = neutral.seat_obs(sim, seat)
+            gj_t = drive._builder_jobs(sim, nobs_seat[seat])
+            gs_t = drive._spread_targets(sim, nobs_seat[seat])
             gj = gj_t[0].tolist()
             gs = gs_t[0].tolist()
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
-                nobs_seat[seat] = neutral.seat_obs(sim, seat)
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": obs_seat[seat]}
                 gb = _buy_rows(nobs_seat[seat])[0]
                 tb = msg.get("buys", {}).get(str(seat), [])

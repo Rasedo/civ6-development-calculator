@@ -3473,7 +3473,7 @@ class SimEconomy:
 
     def _gw_room_kind(self, row: int, kind: int) -> torch.Tensor:
         """[B, RC] bool — an open slot taking ANY object of the kind: what a
-        person of the class walks toward (`_gp_site_plane`)."""
+        person of the class walks toward (`neutral.gp_site_plane`)."""
         rb = self._gw_room_by_obj(row)
         out = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
         for o in self._gw_kind_objs(kind):

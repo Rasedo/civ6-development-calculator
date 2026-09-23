@@ -138,7 +138,7 @@ def decide_and_apply(env, sim, row: int, nobs: list, roster: dict, classes: dict
     `drive.DECIDE_FIELDS` order."""
     dec = drive.decide_seat(env, sim, row, nobs, roster, classes, seeds=seeds, turn=turn, pre=pre)
     apply_decisions(sim, row, dec)
-    dec["seq"] = drive.plan_units(sim, row, max_steps, pre=pre)
+    dec["seq"] = drive.plan_units(sim, row, nobs, max_steps, pre=pre)
     stash_units(sim, row, dec["seq"])
     return tuple(dec[f] for f in drive.DECIDE_FIELDS)
 

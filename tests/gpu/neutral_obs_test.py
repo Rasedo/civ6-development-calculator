@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from collections import Counter
 from pathlib import Path
 
 import torch
@@ -49,6 +50,94 @@ def plain(v) -> bool:
     return type(v) in (int, bool)
 
 
+def target_ctx(sim, row: int) -> dict:
+    """The sim readers `targets` and `units` replace, for seat `row`, over
+    the whole batch: the unit rows off the slot map and every tile plane
+    unconditionally (the observation lists one only where a unit walks)."""
+    smap = sim._seat_slot_map(row)
+    sc = smap.clamp(min=0)
+    T = sim.T
+    allt = torch.arange(T).reshape(1, -1).expand(sim.B, -1)
+    nrow = sim.n_majors
+    spread = torch.zeros(sim.B, T, dtype=torch.bool)
+    for b in range(sim.B):
+        for r in range(nrow):
+            for j in range(sim.RC):
+                if bool(sim.city_alive[b, r, j]) and int(sim.city_followed[b, r, j]) != row:
+                    spread[b, int(sim.city_center[b, r, j])] = True
+    ctx = {"smap": smap, "tile": sim.unit_tile.gather(1, sc), "type": sim.unit_type.gather(1, sc),
+           "charges": sim.unit_charges.gather(1, sc), "gpAt": sim.unit_gp_at.gather(1, sc),
+           "spread": spread, "goody": sim.tile_goody,
+           "digs": (sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
+                    & sim._museum_room(row).unsqueeze(1))}
+    if sim.improvements_on:
+        ctx["jobs"] = sim._seat_job_mask(row)
+        ctx["engJobs"] = sim._seat_engineer_job_mask(row)
+    if sim._naturalist_idx >= 0:
+        ctx["parks"] = sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2)
+    return ctx
+
+
+def found_ok(sim, b: int) -> list:
+    """`canFoundCity`'s terms, tile by tile, in game `b`."""
+    ctrs = [int(c) for r in range(sim.n_majors) for c, a in zip(sim.city_center[b, r].tolist(), sim.city_alive[b, r].tolist()) if a]
+    ctrs += [int(c) for c, a in zip(sim.citystate_center[b].tolist(), sim.citystate_alive[b].tolist()) if a]
+    return [t for t in range(sim.T)
+            if int(sim.tile_seat[b, t]) < 0 and bool(sim.settle_ok[b, t]) and int(sim.district[b, t]) < 0
+            and int(sim.built_wonder[b, t]) < 0 and all(int(sim.pair_dist[t, c]) >= 4 for c in ctrs)]
+
+
+def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
+    """Seat `row`'s `units` and `targets` in game `b` against the sim readers
+    they replace: each plane listed exactly where a unit of the seat walks
+    toward it, and then exactly the plane's tiles."""
+    where = f"seat {row} game {b}"
+    assert list(ob["targets"]) == [f for f, _k in neutral.TARGET_FIELDS], f"{where}: targets fields {list(ob['targets'])}"
+    n = int((ctx["smap"][b] >= 0).sum())
+    units = ob["units"]
+    assert len(units) == n, f"{where}: {len(units)} unit rows for {n} living units"
+    live = Counter()
+    for k, u in enumerate(units):
+        assert list(u) == [f for f, _k in neutral.UNIT_FIELDS] and plain(u), f"{where}: unit row {u}"
+        for f in ("tile", "type", "charges", "gpAt"):
+            assert u[f] == int(ctx[f][b, k]), f"{where}: unit {k}.{f} = {u[f]} vs {int(ctx[f][b, k])}"
+        cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if getattr(sim, "_A_GP", -1) >= 0 else -1
+        if cls >= 0 and u["gpAt"] >= 0:
+            at = min(u["gpAt"], sim._gp_site.shape[1] - 1)
+            assert (u["gpSite"], u["gpArg"]) == (int(sim._gp_site[cls, at]), int(sim._gp_site_district[cls, at])), \
+                f"{where}: unit {k} Great Person site"
+        else:
+            assert (u["gpSite"], u["gpArg"]) == (-1, -1), f"{where}: unit {k} is no Great Person, site {u['gpSite']}"
+    charged = [u for u in units if u["charges"] > 0]
+
+    def holds(idx: int, pool=charged) -> bool:
+        return idx >= 0 and any(u["type"] == idx for u in pool)
+
+    def tiles(plane) -> list:
+        return plane[b].nonzero(as_tuple=True)[0].tolist()
+
+    tg = ob["targets"]
+    want = {
+        "jobs": tiles(ctx["jobs"]) if sim.improvements_on and holds(sim._builder_idx) else [],
+        "engJobs": tiles(ctx["engJobs"]) if sim.improvements_on and holds(getattr(sim, "_eng_idx", -1)) else [],
+        "spread": (tiles(ctx["spread"]) if bool(sim.civ_religion_done[b, row])
+                   and (holds(sim._missionary_idx) or holds(sim._apostle_idx)) else []),
+        "foundOk": (found_ok(sim, b) if sim._settler_idx >= 0 and sim._A_FOUND >= 0 and holds(sim._settler_idx, units)
+                    and int(sim.city_alive[b, row].sum()) < int(sim.rules.seats.get("maxCities", 6)) else []),
+        "digs": tiles(ctx["digs"]) if sim._A_EXCAVATE >= 0 and holds(sim._archaeologist_idx) else [],
+        "parks": tiles(ctx["parks"]) if sim._A_PARK >= 0 and holds(sim._naturalist_idx) else [],
+        "goody": tiles(ctx["goody"]),
+    }
+    for f, w in want.items():
+        assert tg[f] == w, f"{where}: targets.{f} {tg[f][:12]} vs {w[:12]}"
+        live[f] += len(w)
+    keys = sorted({(u["gpSite"], u["gpArg"]) for u in charged if u["gpSite"] >= 0 and u["gpSite"] != 1})
+    gp = sorted([s, a, t] for s, a in keys for t in tiles(neutral.gp_site_plane(sim, row, s, a)))
+    assert tg["gpSites"] == gp, f"{where}: targets.gpSites {tg['gpSites'][:8]} vs {gp[:8]}"
+    live["gpSites"] += len(gp)
+    return live
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()[:2]
@@ -62,17 +151,20 @@ def main() -> None:
             sim._q_clear(torch.arange(sim.B), row, j)
     live = live_research = live_cards = live_declare = live_cols = live_sites = 0
     live_work = live_swap = live_gp = 0
+    live_tgt: Counter = Counter()
+    live_units = 0
     for row in range(sim.n_majors):
         nobs = neutral.seat_obs(sim, row)
         pmask = sim._seat_production_mask(row)
         spec_slots = sim._city_spec_slots(row) if len(sim.districts_cat) else None
         win_t, win_v = sim._work_window(row)
         worked = [{int(t) for t in sim.city_worked[b, row].flatten().tolist() if t >= 0} for b in range(sim.B)]
+        tgt_ctx = target_ctx(sim, row)
         assert len(nobs) == sim.B, f"seat {row}: {len(nobs)} observations for {sim.B} games"
         for b, ob in enumerate(nobs):
             assert plain(ob), f"seat {row} game {b}: the observation holds a non-plain value"
             assert json.loads(json.dumps(ob)) == ob, f"seat {row} game {b}: JSON does not round-trip it"
-            assert list(ob) == [*neutral.SEAT_GROUPS, "cities"], f"seat {row} game {b}: groups {list(ob)}"
+            assert list(ob) == [*neutral.SEAT_GROUPS, "cities", "targets", "units"], f"seat {row} game {b}: groups {list(ob)}"
             centres = {int(c) for c, a in zip(sim.city_center[b, row].tolist(), sim.city_alive[b, row].tolist()) if a}
             for g, fields in neutral.SEAT_GROUPS.items():
                 assert list(ob[g]) == [f for f, _k in fields], f"seat {row} game {b}: {g} fields out of schema order"
@@ -201,6 +293,8 @@ def main() -> None:
             live_gp += sum(x >= 0 for x in gp["offer"])
             if not rows_c:
                 assert not bool(pmask[b].any()), f"{where}: no living city, yet a production column is open"
+            live_tgt += check_targets(sim, row, b, ob, tgt_ctx)
+            live_units += len(ob["units"])
     # A SESSION TURN, forced: forty turns never reach the Congress, so the
     # schedule is made to announce the first two resolutions with the
     # Diplomatic Victory vote, and every seat's preference is read back
@@ -225,7 +319,10 @@ def main() -> None:
     assert live_cols > 0 and live_sites > 0, f"the cities rows never filled: {live_cols} columns, {live_sites} plots"
     assert live_research > 0 and live_cards > 0 and live_declare > 0, (
         f"a list group never filled: {live_research} open items, {live_cards} cards, {live_declare} declarations")
+    assert live_units > 0 and live_tgt["jobs"] > 0 and live_tgt["goody"] + live_tgt["foundOk"] > 0, (
+        f"the unit rows or tile planes never filled: {live_units} units, {dict(live_tgt)}")
     print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
+          f"{live_units} unit rows, target tiles {dict(live_tgt)}, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
           f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
           f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences)")
