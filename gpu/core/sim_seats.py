@@ -10826,9 +10826,6 @@ class SimSeats:
         # CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
         # extracted."
         self._dedication_event(row, self._ded_wish, go)
-        # clear whichever dig was worked
-        lr = rows[land]
-        wr = rows[~land]
         # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_DIG_ARTIFACTS): a dig worked on
         # another major's ground is the digging the promise forbids
         owner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
@@ -10836,6 +10833,9 @@ class SimSeats:
         for _v in range(self.n_majors):
             if _v != row:
                 self._promise_incursion(_v, row, self.PROMISE_DIG, (go & (owner == _v)).long())
+        # clear whichever dig was worked
+        lr = rows[land]
+        wr = rows[~land]
         if lr.numel():
             self.antiquity[lr, tc[lr]] = False
             self.antiquity_era[lr, tc[lr]] = -1
