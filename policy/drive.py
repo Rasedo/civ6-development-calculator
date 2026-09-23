@@ -175,6 +175,109 @@ def _obs_plane(nobs: list, field: str, T: int, device) -> torch.Tensor:
     return m.to(device)
 
 
+def _obs_unit_mask(nobs: list, width: int, device) -> torch.Tensor:
+    """[B, N, width] bool — every unit's `mask` list on the unit-slot axis,
+    False past a game's last unit; one index write for the whole seat."""
+    idx = [(b, k, c) for b, o in enumerate(nobs) for k, u in enumerate(o["units"]) for c in u["mask"]]
+    m = torch.zeros(len(nobs), simbase.UNIT_SLOTS, width, dtype=torch.bool)
+    if idx:
+        bb, kk, cc = torch.tensor(idx, dtype=torch.long).unbind(dim=1)
+        m[bb, kk, cc] = True
+    return m.to(device)
+
+
+def _obs_war(nobs: list, T: int, device) -> dict:
+    """The war march's inputs off the observation: `at_war` [B], `imps`
+    [B, T] (the `warImps` plane), and the `warCities` rows padded to [B, M]
+    as `seat`, `centre` and `live`."""
+    B = len(nobs)
+    rows = [o["targets"]["warCities"] for o in nobs]
+    M = max((len(r) for r in rows), default=0)
+    sc = torch.full((B, M, 2), -1, dtype=torch.long)
+    for b, r in enumerate(rows):
+        if r:
+            sc[b, :len(r)] = torch.tensor(r, dtype=torch.long)
+    sc = sc.to(device)
+    return {"at_war": torch.tensor([bool(o["war"]["at_war"]) for o in nobs], dtype=torch.bool, device=device),
+            "imps": _obs_plane(nobs, "warImps", T, device),
+            "seat": sc[:, :, 0], "centre": sc[:, :, 1], "live": sc[:, :, 1] >= 0}
+
+
+def _march_targets(sim, war: dict, hcs: torch.Tensor) -> tuple:
+    """The war-march DESTINATION for units standing at `hcs` [B, N]: the
+    nearest of `war`'s improvement tiles within 13 (tile index breaking the
+    tie), else the nearest of its cities on `hostileUnitAct`'s key —
+    distance, then the owner's seat id, then the centre tile — else the
+    stand itself. Distances are the STATIC `pair_dist`. Returns (tgt,
+    has_imp, has_city), each [B, N]."""
+    B, N = hcs.shape
+    T = sim.T
+    no = torch.zeros(B, N, dtype=torch.bool, device=hcs.device)
+    has_imp, imp_tgt = no, hcs
+    imps = war["imps"]
+    # only a tile listed in SOME game can win the argmin, so the sweep runs
+    # over those columns alone
+    cand = imps.any(dim=0).nonzero(as_tuple=True)[0]                  # [K]
+    if int(cand.numel()):
+        d_s = sim.pair_dist.index_select(1, cand).index_select(0, hcs.reshape(-1)).to(torch.long).reshape(B, N, -1)
+        ikey = torch.where(imps.index_select(1, cand).unsqueeze(1) & (d_s < 13),
+                           d_s * (T + 1) + cand, torch.full_like(d_s, 10 ** 9))
+        imp_min, iwin = ikey.min(dim=2)
+        has_imp = imp_min < 10 ** 9
+        imp_tgt = cand[iwin]
+    has_city, city_tgt = no, hcs
+    live = war["live"]
+    if bool(live.any()):
+        cc = war["centre"].clamp(min=0)
+        d2 = sim.pair_dist[hcs.unsqueeze(2), cc.unsqueeze(1)].to(torch.long)
+        key = torch.where(live.unsqueeze(1), d2 * (2048 * 256) + (war["seat"] * 2048 + cc).unsqueeze(1),
+                          torch.full_like(d2, 10 ** 18))
+        ckey_min, cwin = key.min(dim=2)
+        has_city = ckey_min < 10 ** 18
+        city_tgt = torch.where(has_city, cc.gather(1, cwin), hcs)
+    return torch.where(has_imp, imp_tgt, city_tgt), has_imp, has_city
+
+
+def _unit_view(sim, nobs: list, present: torch.Tensor, tiles: torch.Tensor, war: dict) -> dict:
+    """The per-unit geometry `ladder.pick_unit_orders` reads, off the
+    observation's unit tiles, city centres and war targets and the STATIC
+    map (`neigh`, `ring2`, `pair_dist`). A distance with nothing to measure
+    to is the map's tile count, which no real distance reaches."""
+    B, N = tiles.shape
+    dev = tiles.device
+    BIG = sim.T
+    tc = tiles.clamp(min=0)
+    nb = sim.neigh[tc]                                                # [B, N, 6]
+    nbc = nb.clamp(min=0)
+    off = nb < 0
+    d_home = torch.full((B, N), BIG, dtype=torch.long, device=dev)
+    d_nb = torch.full((B, N, 6), BIG, dtype=torch.long, device=dev)
+    C = max((len(o["cities"]) for o in nobs), default=0)
+    if C:
+        ctr = torch.full((B, C), -1, dtype=torch.long)
+        for b, o in enumerate(nobs):
+            if o["cities"]:
+                ctr[b, :len(o["cities"])] = torch.tensor([c["centre"] for c in o["cities"]], dtype=torch.long)
+        ctr = ctr.to(dev)
+        ok = (ctr >= 0).unsqueeze(1)
+        cc = ctr.clamp(min=0).unsqueeze(1)
+        d_home = torch.where(ok, sim.pair_dist[tc.unsqueeze(2), cc].to(torch.long), BIG).amin(dim=2)
+        d_nb = torch.where(ok, sim.pair_dist[nbc.reshape(B, N * 6, 1), cc].to(torch.long), BIG) \
+            .amin(dim=2).reshape(B, N, 6)
+    d_nb = torch.where(off, BIG, d_nb)
+    at_war = war["at_war"].unsqueeze(1) & present
+    war_tgt = torch.full((B, N), -1, dtype=torch.long, device=dev)
+    if bool(at_war.any()):
+        tgt, hi, hc = _march_targets(sim, war, tc)
+        war_tgt = torch.where((hi | hc) & at_war, tgt, war_tgt)
+    has_wt = war_tgt >= 0
+    wtc = war_tgt.clamp(min=0)
+    d_war = torch.where(has_wt, sim.pair_dist[tc, wtc].to(torch.long), BIG)
+    d_war_nb = torch.where(has_wt.unsqueeze(2) & ~off, sim.pair_dist[nbc, wtc.unsqueeze(2)].to(torch.long), BIG)
+    return {"nb_tile": nb, "ring_tile": sim.ring2[tc], "d_home": d_home, "d_nb": d_nb,
+            "at_war": at_war, "d_war": d_war, "d_war_nb": d_war_nb}
+
+
 def _acting_slots(rows_all: torch.Tensor) -> list:
     """The unit SLOTS any game acts in, from one reduction and one transfer.
 
@@ -329,13 +432,14 @@ def _park_targets(sim, nobs: list, units=None) -> torch.Tensor:
 
 
 def _seat_unit_orders(sim, seat: int, nobs: list, job_t=None, spread_t=None):
-    um = sim._seat_unit_mask(seat)
-    uo = sim.seat_unit_obs(seat)
-    orders0 = ladder.pick_unit_orders(um, uo, a_pillage=sim._A_PILLAGE, a_snipe=sim._A_SNIPE, a_snipe3=sim._A_SNIPE3)
     # ONE read of the observation's units for the whole pass, shared by every
-    # target table below. Their rank IS the unit mask's slot-map row.
+    # target table below; a unit's rank is its row of the mask.
     units = _obs_units(nobs, sim.device)
     present, tiles, _types, _charges, _gs, _ga = units
+    um = _obs_unit_mask(nobs, len(sim._act_names), sim.device)
+    war = _obs_war(nobs, sim.T, sim.device)
+    view = _unit_view(sim, nobs, present, tiles, war)
+    orders0 = ladder.pick_unit_orders(um, view, a_pillage=sim._A_PILLAGE, a_snipe=sim._A_SNIPE, a_snipe3=sim._A_SNIPE3)
     # the serve tripwire computes both target tables pre-decide at the same
     # state; passing them here skips the recomputation (pure reads either way)
     if job_t is None:
@@ -564,7 +668,7 @@ def _seat_unit_orders(sim, seat: int, nobs: list, job_t=None, spread_t=None):
         chosen = torch.where(rep_ok, torch.full_like(orders0, sim._A_REPAIR), pick_b)
         take_b = on_job & (chosen >= 0)
         orders0 = torch.where(take_b, chosen, orders0)
-    return orders0, job_t, spread_t, settle_t, um, uo
+    return orders0, job_t, spread_t, settle_t, tiles, view["at_war"], war
 
 
 def _seat_envoys(nobs: list, device):
@@ -1200,15 +1304,12 @@ def plan_units(sim, row: int, nobs: list, max_steps: int = 4, pre: dict | None =
     Non-move verbs end the turn at rank 0, exactly like the scripted walkers.
     The phase executes the stash at the walkers' position and RE-VALIDATES
     every rank: an illegal later step refuses, never substitutes."""
-    orders0, job_t, spread_t, settle_t, um, uo = _seat_unit_orders(
+    orders0, job_t, spread_t, settle_t, cur, at_war_rows, war = _seat_unit_orders(
         sim, row, nobs,
         job_t=None if pre is None else pre.get("jobs"),
         spread_t=None if pre is None else pre.get("spreads"))
     B2, N2 = orders0.shape
     ranks = [orders0]
-    smap = sim._seat_slot_map(row)
-    cur = sim.unit_tile.gather(1, smap.clamp(min=0))
-    at_war_rows = uo[:, :, ladder.U_ATWAR] > 0
     # the march targets are chosen ONCE, off the rank-0 positions, and the
     # later ranks walk toward them; recomputing per rank would let a unit
     # re-aim mid-plan at somebody the phase has not seen it approach.
@@ -1226,7 +1327,7 @@ def plan_units(sim, row: int, nobs: list, max_steps: int = 4, pre: dict | None =
         # respecting the stop radius. Distances are read-only pair_dist plans;
         # terrain/occupancy legality is the PHASE's re-validation problem.
         if vplan_tgts is None:
-            tgt_b, hi_b, hcty_b = sim._war_march_targets(cur.clamp(min=0), row)
+            tgt_b, hi_b, hcty_b = _march_targets(sim, war, cur.clamp(min=0))
             vplan_tgts = torch.where(hi_b | hcty_b, tgt_b,
                                      torch.full((B2, N2), -1, dtype=torch.long, device=sim.device))
         tgts = vplan_tgts

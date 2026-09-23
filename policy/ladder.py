@@ -726,16 +726,20 @@ def pick_production(
 
 PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
 
-U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
-U_ATWAR, U_DWAR, U_DWARNB = 16, 17, 18   # the war half
-U_RINGTILE = 24                          # the 12 ring-2 tile ids
 PATROL_HOME_RADIUS = 3
 
 
-def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a_snipe: int,
+def pick_unit_orders(mask: torch.Tensor, view: dict, *, a_pillage: int, a_snipe: int,
                      a_snipe3: int = -1,
                      home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
-    """`a_pillage` / `a_snipe` / `a_snipe3` are the PILLAGE, SNIPE_0 and
+    """Each unit's rank-0 order off its mask [B, N, A] and `view`, the
+    per-unit geometry the driver derives from the observation, each [B, N]
+    or [B, N, 6]: `nb_tile` (the neighbour tiles, -1 off the map), `d_home`
+    and `d_nb` (distance to the seat's nearest city from the unit and from
+    each neighbour), `at_war`, `d_war` and `d_war_nb` (distance to the war
+    march's target, a value no step improves on where there is none), and
+    optionally `ring_tile` [B, N, 12] (the ring-2 tiles, -1 off the map).
+    `a_pillage` / `a_snipe` / `a_snipe3` are the PILLAGE, SNIPE_0 and
     SNIPE3_0 columns of the enum the mask was built from. They are arguments
     and not constants because appending one improvement moves them — every
     BUILD verb sits before them."""
@@ -743,20 +747,20 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a
     B, N, W = mask.shape
     dev = mask.device
     atk = mask[:, :, 6:12]
-    nb_tile = obs[:, :, U_NBTILE:U_NBTILE + 6]
-    BIG = float(10 ** 9)
+    nb_tile = view["nb_tile"]
+    BIG = 10 ** 9
 
     a_key = torch.where(atk, nb_tile, torch.full_like(nb_tile, BIG))
     adj_min = a_key.min(dim=2).values
     adj_dir = a_key.argmin(dim=2)
-    if W > A_SNIPE and obs.shape[2] > U_RINGTILE:
+    ring_tile = view.get("ring_tile")
+    if W > A_SNIPE and ring_tile is not None:
         snipe = mask[:, :, A_SNIPE:A_SNIPE + 12]
-        ring_tile = obs[:, :, U_RINGTILE:U_RINGTILE + 12]
         s_key = torch.where(snipe, ring_tile, torch.full_like(ring_tile, BIG))
         sn_min = s_key.min(dim=2).values
         sn_col = s_key.argmin(dim=2) + A_SNIPE
     else:
-        sn_min = torch.full((B, N), BIG, dtype=obs.dtype, device=dev)
+        sn_min = torch.full((B, N), BIG, dtype=nb_tile.dtype, device=dev)
         sn_col = torch.zeros(B, N, dtype=torch.long, device=dev)
     if a_snipe3 >= 0 and W > a_snipe3:
         s3 = mask[:, :, a_snipe3:a_snipe3 + 18]
@@ -774,22 +778,23 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a
     atk_col = torch.where(use_ring, sn_col, adj_dir + 6)
     atk_col = torch.where((adj_min >= BIG) & (sn_min >= BIG) & has_s3, s3_col, atk_col)
 
-    at_war = obs[:, :, U_ATWAR] > 0
-    d_war = obs[:, :, U_DWAR]
-    d_war_nb = obs[:, :, U_DWARNB:U_DWARNB + 6]
+    at_war = view["at_war"]
+    d_war = view["d_war"]
+    d_war_nb = view["d_war_nb"]
     legal_mv = mask[:, :, 0:6]
+    # no target leaves every neighbour at the same distance, so no step is
+    # closer and the march is off
     w_closer = legal_mv & (d_war_nb < d_war.unsqueeze(2))
     w_key = torch.where(w_closer,
                         d_war_nb * 8 + torch.arange(6, device=dev).view(1, 1, 6).to(d_war_nb.dtype),
-                        torch.full((B, N, 6), 1e9, dtype=d_war_nb.dtype, device=dev))
+                        torch.full((B, N, 6), BIG, dtype=d_war_nb.dtype, device=dev))
     has_wmv = w_closer.any(dim=2)
     w_dir = w_key.argmin(dim=2)
-    has_target = d_war < 1e6
     pillage_col = A_PILLAGE
     can_pillage = mask[:, :, pillage_col] if W > A_PILLAGE else torch.zeros(B, N, dtype=torch.bool, device=dev)
 
-    d_home = obs[:, :, U_DHOME]
-    d_nb = obs[:, :, U_DNB:U_DNB + 6]
+    d_home = view["d_home"]
+    d_nb = view["d_nb"]
     rank = torch.empty(6, dtype=torch.long, device=dev)
     for pos, d in enumerate(PATROL_DIR_PERM):
         rank[d] = pos
@@ -804,7 +809,7 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a
     # target is reachable (`moving = march & has_tgt`) — it never walks home.
     # A unit at war either marches on a target, fights, pillages, or HOLDS.
     out = torch.where(roam & ~at_war, mv_dir, out)               # peace drift only at peace
-    war_march = at_war & has_target & has_wmv
+    war_march = at_war & has_wmv
     out = torch.where(war_march, w_dir, out)
     out = torch.where(at_war & can_pillage, torch.full_like(out, pillage_col), out)
     out = torch.where(has_atk, atk_col, out)                     # attack outranks all

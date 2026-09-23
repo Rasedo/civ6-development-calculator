@@ -14,7 +14,10 @@ adjacency the placement ranks it by; the specialist slots and pins, the
 workable plots and the plots a sibling holds that `_swap_tile_ok` lets the
 city claim. The `congress` group reads the engine's own schedule and
 preference (a session turn is forced, forty turns never reach one), and the
-`gp` group the standing offers.
+`gp` group the standing offers. Every unit row lists exactly the unit mask's
+open columns, and the driver rebuilds that mask from them; a forced war
+lists the enemy's improvements and cities, and the driver marches every
+unit where a candidate-by-candidate scan would.
 
 Driven for a stretch first, over two worlds at once, so the seats hold
 cities and the buy candidates are live rather than all -1.
@@ -32,9 +35,10 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
+import drive
 from core import load_rules, load_fixture, fixture_paths
 from core.env import BatchEnv
-from core import neutral, records
+from core import neutral, records, simbase
 
 TURNS = 40
 # the row width of every `table` field, as its schema meaning lays it out
@@ -65,7 +69,8 @@ def target_ctx(sim, row: int) -> dict:
             for j in range(sim.RC):
                 if bool(sim.city_alive[b, r, j]) and int(sim.city_followed[b, r, j]) != row:
                     spread[b, int(sim.city_center[b, r, j])] = True
-    ctx = {"smap": smap, "tile": sim.unit_tile.gather(1, sc), "type": sim.unit_type.gather(1, sc),
+    ctx = {"smap": smap, "mask": sim._seat_unit_mask(row),
+           "tile": sim.unit_tile.gather(1, sc), "type": sim.unit_type.gather(1, sc),
            "charges": sim.unit_charges.gather(1, sc), "gpAt": sim.unit_gp_at.gather(1, sc),
            "spread": spread, "goody": sim.tile_goody,
            "digs": (sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
@@ -87,6 +92,47 @@ def found_ok(sim, b: int) -> list:
             and int(sim.built_wonder[b, t]) < 0 and all(int(sim.pair_dist[t, c]) >= 4 for c in ctrs)]
 
 
+def war_ref(sim, row: int, b: int) -> tuple:
+    """(warImps, warCities) of seat `row` in game `b`, tile by tile and city
+    by city off the war matrix: an unpillaged improvement or complete
+    unpillaged district on ground whose owner the seat fights, and every
+    living city of a city row it fights, as [seat id, centre]."""
+    wr = sim.war[b, row]
+    if not bool(wr.any()):
+        return [], []
+    imps = []
+    for t in range(sim.T):
+        s = int(sim.tile_seat[b, t])
+        if s < 0 or s >= simbase.BARB_SEAT or not bool(wr[int(sim._seat_row[s])]):
+            continue
+        if not (sim.improvements_on or sim.districts_on):
+            continue
+        imp = int(sim.improvement[b, t]) >= 0 and not bool(sim.pillaged[b, t])
+        dis = (sim.districts_on and int(sim.district[b, t]) >= 0 and bool(sim.district_complete[b, t])
+               and not bool(sim.district_pillaged[b, t]))
+        if imp or dis:
+            imps.append(t)
+    cities = []
+    for r in range(sim.city_center.shape[1]):
+        seat = r if r < sim.n_majors else (simbase.FREE_SEAT if r == sim.FREE_ROW else 100 + r - sim.n_majors)
+        for j in range(sim.RC):
+            if bool(sim.city_alive[b, r, j]) and bool(wr[r]):
+                cities.append([seat, int(sim.city_center[b, r, j])])
+    return imps, sorted(cities)
+
+
+def march_ref(sim, x: int, imps: list, cities: list) -> int:
+    """The war-march destination from tile `x`, one candidate at a time: the
+    nearest improvement within 13 (tile breaking the tie), else the city
+    with the lowest distance * 2048 * 256 + seat * 2048 + centre, else -1."""
+    near = [(int(sim.pair_dist[x, t]), t) for t in imps if int(sim.pair_dist[x, t]) < 13]
+    if near:
+        return min(near)[1]
+    if cities:
+        return min((int(sim.pair_dist[x, c]) * 2048 * 256 + s * 2048 + c, c) for s, c in cities)[1]
+    return -1
+
+
 def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
     """Seat `row`'s `units` and `targets` in game `b` against the sim readers
     they replace: each plane listed exactly where a unit of the seat walks
@@ -101,6 +147,9 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
         assert list(u) == [f for f, _k in neutral.UNIT_FIELDS] and plain(u), f"{where}: unit row {u}"
         for f in ("tile", "type", "charges", "gpAt"):
             assert u[f] == int(ctx[f][b, k]), f"{where}: unit {k}.{f} = {u[f]} vs {int(ctx[f][b, k])}"
+        assert u["mask"] == ctx["mask"][b, k].nonzero(as_tuple=True)[0].tolist(), \
+            f"{where}: unit {k}.mask {u['mask']} vs the unit mask's open columns"
+        live["mask"] += len(u["mask"])
         cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if getattr(sim, "_A_GP", -1) >= 0 else -1
         if cls >= 0 and u["gpAt"] >= 0:
             at = min(u["gpAt"], sim._gp_site.shape[1] - 1)
@@ -128,6 +177,8 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
         "parks": tiles(ctx["parks"]) if sim._A_PARK >= 0 and holds(sim._naturalist_idx) else [],
         "goody": tiles(ctx["goody"]),
     }
+    want["warImps"], want["warCities"] = war_ref(sim, row, b)
+    assert ob["war"]["at_war"] == bool(sim.war[b, row].any()), f"{where}: war.at_war"
     for f, w in want.items():
         assert tg[f] == w, f"{where}: targets.{f} {tg[f][:12]} vs {w[:12]}"
         live[f] += len(w)
@@ -136,6 +187,27 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
     assert tg["gpSites"] == gp, f"{where}: targets.gpSites {tg['gpSites'][:8]} vs {gp[:8]}"
     live["gpSites"] += len(gp)
     return live
+
+
+def check_driver_units(sim, row: int, nobs: list, mask: torch.Tensor) -> int:
+    """The driver's reads of the `units` rows and war targets against the
+    sim: the rebuilt mask IS `_seat_unit_mask`, and every unit's war-march
+    destination from where it stands is `march_ref`'s. Returns the number
+    of units that had a destination."""
+    um = drive._obs_unit_mask(nobs, len(sim._act_names), sim.device)
+    assert torch.equal(um, mask), f"seat {row}: the rebuilt unit mask differs from _seat_unit_mask"
+    present, tiles, *_r = drive._obs_units(nobs, sim.device)
+    war = drive._obs_war(nobs, sim.T, sim.device)
+    tgt, hi, hc = drive._march_targets(sim, war, tiles.clamp(min=0))
+    marched = 0
+    for b, ob in enumerate(nobs):
+        tg = ob["targets"]
+        for k, u in enumerate(ob["units"]):
+            want = march_ref(sim, u["tile"], tg["warImps"], tg["warCities"])
+            got = int(tgt[b, k]) if bool(hi[b, k] or hc[b, k]) else -1
+            assert got == want, f"seat {row} game {b}: unit {k} at {u['tile']} marches on {got}, want {want}"
+            marched += int(want >= 0)
+    return marched
 
 
 def main() -> None:
@@ -295,6 +367,7 @@ def main() -> None:
                 assert not bool(pmask[b].any()), f"{where}: no living city, yet a production column is open"
             live_tgt += check_targets(sim, row, b, ob, tgt_ctx)
             live_units += len(ob["units"])
+        check_driver_units(sim, row, nobs, tgt_ctx["mask"])
     # A SESSION TURN, forced: forty turns never reach the Congress, so the
     # schedule is made to announce the first two resolutions with the
     # Diplomatic Victory vote, and every seat's preference is read back
@@ -314,18 +387,36 @@ def main() -> None:
                 assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"seat {row} game {b}: pref slot {s}"
                 live_pref += 1
     del sim._congress_upcoming
+    # A WAR, forced: seats 0 and 1 fight, so both list the other's cities and
+    # improvements and their units have somewhere to march
+    sim.war[:, 0, 1] = True
+    sim.sync_war()
+    live_war: Counter = Counter()
+    marched = 0
+    for row in (0, 1):
+        nobs = neutral.seat_obs(sim, row)
+        tgt_ctx = target_ctx(sim, row)
+        for b, ob in enumerate(nobs):
+            assert ob["war"]["at_war"], f"seat {row} game {b}: the forced war is not in war.at_war"
+            live_war += check_targets(sim, row, b, ob, tgt_ctx)
+        marched += check_driver_units(sim, row, nobs, tgt_ctx["mask"])
+    assert live_war["warCities"] > 0 and marched > 0, (
+        f"the forced war listed no enemy city or marched nobody: {dict(live_war)}, {marched} marching")
     assert live > 0, "no seat held a city — the scene never exercised the city fields"
     assert live_work > 0, "no city listed a workable plot"
     assert live_cols > 0 and live_sites > 0, f"the cities rows never filled: {live_cols} columns, {live_sites} plots"
     assert live_research > 0 and live_cards > 0 and live_declare > 0, (
         f"a list group never filled: {live_research} open items, {live_cards} cards, {live_declare} declarations")
-    assert live_units > 0 and live_tgt["jobs"] > 0 and live_tgt["goody"] + live_tgt["foundOk"] > 0, (
-        f"the unit rows or tile planes never filled: {live_units} units, {dict(live_tgt)}")
+    assert live_units > 0 and live_tgt["mask"] > 0 and live_tgt["jobs"] > 0 \
+        and live_tgt["goody"] + live_tgt["foundOk"] > 0, (
+            f"the unit rows or tile planes never filled: {live_units} units, {dict(live_tgt)}")
     print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
           f"{live_units} unit rows, target tiles {dict(live_tgt)}, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
           f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
-          f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences)")
+          f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences; "
+          f"a forced war: {live_war['warImps']} enemy improvements, {live_war['warCities']} enemy cities, "
+          f"{marched} units marching)")
 
 
 if __name__ == "__main__":

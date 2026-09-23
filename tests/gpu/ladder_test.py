@@ -253,8 +253,8 @@ def main() -> None:
     # ---- g) the UNIT-ORDERS verb --------------------------------------------
     # Three arms: attack a hostile in reach (lowest TARGET TILE index), else
     # drift home past the stop radius, else hold. Legality is the mask's; the
-    # distances are the observation's — this verb is why the observation carries
-    # a per-unit block at all.
+    # distances are the per-unit view's, which the driver derives from the
+    # observation's positions and the static map.
     UW, UN = 26, 2
     # the synthetic enum's own geometry: PILLAGE last, SNIPE_0 just past it
     A_PIL, A_SN = UW - 1, UW
@@ -268,21 +268,18 @@ def main() -> None:
         return m
     BIGW = 1e9
     def uobs(rows, war=None):
-        # 24 wide: the war half defaults to "at peace, no target".
-        o = torch.zeros(1, UN, 24, dtype=torch.float64)
-        o[:, :, ladder.U_DWAR] = BIGW
-        o[:, :, ladder.U_DWARNB:ladder.U_DWARNB + 6] = BIGW
-        for j, (dh, dnb, nbt) in enumerate(rows):
-            o[0, j, ladder.U_DHOME] = dh
-            for i in range(6):
-                o[0, j, ladder.U_DNB + i] = dnb[i]
-                o[0, j, ladder.U_NBTILE + i] = nbt[i]
+        # no ring tiles; the war half defaults to "at peace, no target".
+        o = {"d_home": torch.tensor([[dh for dh, _n, _t in rows]], dtype=torch.float64),
+             "d_nb": torch.tensor([[dnb for _h, dnb, _t in rows]], dtype=torch.float64),
+             "nb_tile": torch.tensor([[nbt for _h, _n, nbt in rows]], dtype=torch.float64),
+             "at_war": torch.zeros(1, UN, dtype=torch.bool),
+             "d_war": torch.full((1, UN), BIGW, dtype=torch.float64),
+             "d_war_nb": torch.full((1, UN, 6), BIGW, dtype=torch.float64)}
         if war:
             for j, (dw, dwnb) in enumerate(war):
-                o[0, j, ladder.U_ATWAR] = 1.0
-                o[0, j, ladder.U_DWAR] = dw
-                for i in range(6):
-                    o[0, j, ladder.U_DWARNB + i] = dwnb[i]
+                o["at_war"][0, j] = True
+                o["d_war"][0, j] = dw
+                o["d_war_nb"][0, j] = torch.tensor(dwnb, dtype=torch.float64)
         return o
 
     far = [9.0] * 6
@@ -334,13 +331,13 @@ def main() -> None:
     # at war with NO reachable target: HOLD, never the peace drift — the
     # engine's war act stands its ground (`moving = march & has_tgt`).
     ow = uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)])
-    ow[0, 0, ladder.U_ATWAR] = 1.0
+    ow["at_war"][0, 0] = True
     assert int(pick(m, ow)[0, 0]) == 12, "at war with no target -> HOLD (no drift)"
     # ...and the SAME unit at peace still drifts (the rule is war-gated).
     assert int(pick(m, uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)]))[0, 0]) == 3
     # adjacent and RING targets interleave by TILE INDEX — an adjacent target on
     # tile 50 loses to a ring target on tile 10, because the engine scans all
-    # tiles in index order. Wide mask (38) + wide obs (36).
+    # tiles in index order. Wide mask (38) + the ring tiles.
     A_SN38 = 26
     def umask38(rows):
         m = torch.zeros(1, UN, 38, dtype=torch.bool)
@@ -348,20 +345,9 @@ def main() -> None:
             for c in cols:
                 m[0, j, c] = True
         return m
-    def uobs36(rows, war=None, ring=None):
-        o = torch.zeros(1, UN, 36, dtype=torch.float64)
-        o[:, :, ladder.U_DWAR] = BIGW
-        o[:, :, ladder.U_DWARNB:ladder.U_DWARNB + 6] = BIGW
-        o[:, :, ladder.U_RINGTILE:ladder.U_RINGTILE + 12] = -1.0
-        for j, (dh, dnb, nbt) in enumerate(rows):
-            o[0, j, ladder.U_DHOME] = dh
-            for i in range(6):
-                o[0, j, ladder.U_DNB + i] = dnb[i]
-                o[0, j, ladder.U_NBTILE + i] = nbt[i]
-        if ring:
-            for j, tiles in enumerate(ring):
-                for i, t in enumerate(tiles):
-                    o[0, j, ladder.U_RINGTILE + i] = t
+    def uobs36(rows, ring):
+        o = uobs(rows)
+        o["ring_tile"] = torch.tensor([ring], dtype=torch.float64)
         return o
     mi = umask38([[6, A_SN38 + 0], [12]])
     oi = uobs36([(2.0, [1.0] * 6, [50, 0, 0, 0, 0, 0]), (0.0, [9.0] * 6, [0] * 6)],

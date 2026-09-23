@@ -68,7 +68,8 @@
       ["declare", "list", "the target columns this seat may declare war on now, ascending"],
       ["sue", "list", "the target columns it may sue for peace with now, ascending"],
       ["kind_default", "list", "per MAJOR target column (the war head's leading columns, one per other major): the war kind a declaration there takes by default (`defaultWarKind`: the cheapest casus belli held), -1 where none is held or the column is not in `declare`"],
-      ["kind_own", "list", "per MAJOR target column: the leader's own buffed kind where it is allowed (`WAR_BUFF_ROWS`), else the default; -1 likewise"]
+      ["kind_own", "list", "per MAJOR target column: the leader's own buffed kind where it is allowed (`WAR_BUFF_ROWS`), else the default; -1 likewise"],
+      ["at_war", "bool", "this seat is at war with anyone: a major, a city-state, the Free Cities or the barbarians"]
     ],
     "envoy": [
       ["avail", "int", "envoys in this seat's bank"],
@@ -111,7 +112,9 @@
     ["digs", "list", "the tiles an Archaeologist may excavate (a dig underfoot on unowned or own ground) while a museum slot takes an Artifact, ascending; empty where the seat holds no Archaeologist with a charge"],
     ["parks", "list", "the tiles that ANCHOR a legal National Park rhombus (`parkClusterLegal` on any of the tile's clusters), ascending; empty where the seat holds no Naturalist with a charge"],
     ["gpSites", "table", "for every Great Person site a living person of this seat with a charge walks toward (its `gpSite`, `gpArg`; never site 1, which activates where it stands): each tile it may be spent on, as [site, arg, tile], ascending"],
-    ["goody", "list", "the tiles holding a Tribal Village, ascending"]
+    ["goody", "list", "the tiles holding a Tribal Village, ascending"],
+    ["warImps", "list", "the tiles a unit at war marches on first: an unpillaged improvement, or a complete unpillaged district, on ground owned by a seat this one is at war with (majors, city-states and the Free Cities alike), ascending; empty where the seat is at war with nobody"],
+    ["warCities", "table", "every living city of a seat this one is at war with, as [seat, centre]: the owner's seat id (a major's index, 100 + a city-state's index, 300 the Free Cities) and the city's CENTRE tile, ascending; the march takes the nearest, the seat id then the centre breaking a distance tie; empty where the seat is at war with nobody"]
   ],
   "unit": [
     ["tile", "int", "the tile the unit stands on"],
@@ -119,6 +122,7 @@
     ["charges", "int", "the charges it holds"],
     ["gpAt", "int", "a Great Person's roster position within its class, -1 for every other unit"],
     ["gpSite", "int", "a Great Person's site code (GP_SITES: where its charge is spent), -1 for every other unit"],
-    ["gpArg", "int", "that site's argument (the district table index for site 0), -1 where none"]
+    ["gpArg", "int", "that site's argument (the district table index for site 0), -1 where none"],
+    ["mask", "list", "the unit action columns it may take now (the one unit action layout, rules.json `actions.unit`), ascending"]
   ]
 }

@@ -21,7 +21,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
+import drive
+from core import BatchSim, load_rules, load_fixture, fixture_paths, neutral
 from core.engine import _MUTABLE
 from warmup import settle_all
 
@@ -231,16 +233,22 @@ def main() -> None:
     ctr5 = int(s5.citystate_center[0, cs5])
     here = next(int(t) for t in range(s5.T)
                 if int(s5.pair_dist[ctr5, t]) == 5 and not bool(s5.water[0, t]))
-    hc = torch.full((s5.B,), here, dtype=torch.long, device=s5.device)
+    hc = torch.full((s5.B, 1), here, dtype=torch.long, device=s5.device)
+
+    def march():
+        """Seat 0's war-march destination from `here`, as the driver takes
+        it off the observation's war targets."""
+        war = drive._obs_war(neutral.seat_obs(s5, 0), s5.T, s5.device)
+        return tuple(x[:, 0] for x in drive._march_targets(s5, war, hc))
 
     s5.war[:, 0, :] = False
     s5.war[:, :, 0] = False
-    _t0, _i0, _c0 = s5._war_march_target(hc, 0)
+    _t0, _i0, _c0 = march()
     assert not bool(_i0[0] or _c0[0]), "at peace with everyone there is nothing to march on"
 
     s5.war[:, 0, crow5] = True
     s5.war[:, crow5, 0] = True
-    tgt, has_i, has_c = s5._war_march_target(hc, 0)
+    tgt, has_i, has_c = march()
     assert bool(has_i[0] or has_c[0]), "a declared minor war left the walker no target"
     # the minor's OWN ground is what it found — its centre, or an improvement
     # or district on a tile the minor holds

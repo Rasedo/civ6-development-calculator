@@ -10,15 +10,18 @@ trade route it would open), `nuke` (the silo launch it would take),
 it may slot and the slots), `war` (the open war columns and the kind each
 declaration takes), `envoy` (the bank and the courtship per city-state),
 `congress` (the session the coming turn holds and this seat's preference on
-it) and `gp` (the Great Person offers and this seat's points). After them
+it) and `gp` (the Great Person offers and this seat's points); `war` also says
+whether the seat is at war with anyone. After them
 `cities`: one row per living city in the seat's ARRAY order, with its
 production columns, the plots each open district column may take, its
 specialist slots and pins, the plots it may work and the plots a sibling
 holds that it may claim. Then `targets`: the tile planes the unit planner
 walks toward (builder and engineer jobs, religious spread, founding, digs,
 park anchors, Great Person sites, villages), each emitted only for a game
-whose seat holds a unit that walks toward it. Last `units`: one row per
-living unit in the seat's array order.
+whose seat holds a unit that walks toward it, and the war march's targets
+(enemy improvements and cities) for a game whose seat is at war. Last
+`units`: one row per living unit in the seat's array order, with the unit
+action columns it may take.
 """
 from __future__ import annotations
 
@@ -166,6 +169,7 @@ def _columns(sim, row: int) -> dict:
     out["war", "targets"] = torch.full((B,), n, dtype=torch.long, device=dev)
     out["war", "declare"], out["war", "sue"] = declare, wm[:, n:]
     out["war", "kind_default"], out["war", "kind_own"] = sim._war_kind_table(row, declare[:, : sim.n_majors - 1])
+    out["war", "at_war"] = sim.war[:, row].any(dim=1)
     out["envoy", "avail"] = sim.civ_envoys_avail[:, row]
     met_live = sim.seat_citystate_met[:, row, : sim.S] & sim.citystate_alive[:, : sim.S]
     held = sim.seat_citystate_envoys[:, row, : sim.S]
@@ -394,11 +398,34 @@ def _found_ok(sim, row: int, gate: torch.Tensor) -> torch.Tensor:
     return ok
 
 
+def _war_targets(sim, war_row: torch.Tensor) -> tuple:
+    """([B, T] the improvement and district tiles a unit at war marches on,
+    sorted [b, seat, centre] rows for every living city of a seat this one
+    is at war with) — `war_row` [B, NS] is the seat's row of the war matrix.
+    A tile's owner is at war with the seat when its war cell is set; every
+    territorial owner alike, a barbarian tile never (it is not `owned`)."""
+    _ts = sim.tile_seat
+    owned = (_ts >= 0) & (_ts < simbase.BARB_SEAT)
+    at_war_t = owned & war_row.gather(1, sim._seat_row[torch.where(owned, _ts, torch.zeros_like(_ts))])
+    imps = torch.zeros_like(at_war_t)
+    if sim.improvements_on or sim.districts_on:
+        imps = (sim.improvement >= 0) & ~sim.pillaged & at_war_t
+        if sim.districts_on:
+            imps = imps | ((sim.district >= 0) & sim.district_complete & ~sim.district_pillaged & at_war_t)
+    B, CB = sim.B, sim.city_center.shape[1]
+    live = sim.city_alive.reshape(B, -1) & war_row[:, :CB].repeat_interleave(sim.RC, dim=1)
+    bb, cell = live.nonzero(as_tuple=True)
+    rows = torch.stack([bb, sim._march_seatkey[cell] // 2048,
+                        sim.city_center.reshape(B, -1)[bb, cell]], dim=1).tolist()
+    return imps, sorted(rows)
+
+
 def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     """Seat `row`'s `targets`, one dict per game keyed by `TARGET_FIELDS`.
     Each plane is built only when some game holds a unit that walks toward
     it — the map-wide scans cost nothing on a seat without one — and listed
-    only for those games."""
+    only for those games; the war march's targets only where the seat is at
+    war."""
     B, T, NU, dev = sim.B, sim.T, sim.NU, sim.device
     types, charges = cols["type"].clamp(min=0, max=NU - 1), cols["charges"]
     charged = present & (charges > 0)
@@ -445,7 +472,15 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
         if bool(g.any()):
             planes["parks"] = (g, sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2))
     planes["goody"] = (~no, sim.tile_goody)
+    war_row = sim.war[:, row]
+    at_war = war_row.any(dim=1)
+    city_rows: list = []
+    if bool(at_war.any()):
+        imps, city_rows = _war_targets(sim, war_row)
+        planes["warImps"] = (at_war, imps)
     out = [{f: [] for f, _k in TARGET_FIELDS} for _b in range(B)]
+    for b, s, c in city_rows:                                         # game, then seat, then centre
+        out[b]["warCities"].append([s, c])
     names = list(planes)
     stack = torch.stack([pl & g.unsqueeze(1) for g, pl in planes.values()])  # [K, B, T]
     for k, b, t in stack.nonzero().tolist():                          # field, game, tile ascending
@@ -468,13 +503,18 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     return out
 
 
-def _unit_rows(present: torch.Tensor, cols: dict) -> list:
+def _unit_rows(present: torch.Tensor, cols: dict, mask: torch.Tensor) -> list:
     """The seat's `units`, one list per game: a dict per living unit in
-    array order keyed by `UNIT_FIELDS`."""
+    array order keyed by `UNIT_FIELDS`. `mask` is `_seat_unit_mask` [B, N, A]
+    on the same slot-map axis; each unit lists its open columns, from one
+    `nonzero` and one transfer for the whole seat."""
     n = present.sum(dim=1).tolist()
-    mat = torch.stack([cols[f] for f, _k in UNIT_FIELDS], dim=2).tolist()   # [B, N, F]
-    names = [f for f, _k in UNIT_FIELDS]
-    return [[dict(zip(names, r)) for r in mat[b][:n[b]]] for b in range(len(n))]
+    names = [f for f, _k in UNIT_FIELDS if f != "mask"]
+    mat = torch.stack([cols[f] for f in names], dim=2).tolist()        # [B, N, F]
+    out = [[{**dict(zip(names, r)), "mask": []} for r in mat[b][:n[b]]] for b in range(len(n))]
+    for b, k, c in mask.nonzero().tolist():                          # game, unit, column ascending
+        out[b][k]["mask"].append(c)
+    return out
 
 
 def seat_obs(sim, row: int) -> list:
@@ -487,7 +527,7 @@ def seat_obs(sim, row: int) -> list:
     cities = _city_rows(sim, row)
     present, ucols = _unit_cols(sim, row)
     targets = _targets(sim, row, present, ucols)
-    units = _unit_rows(present, ucols)
+    units = _unit_rows(present, ucols, sim._seat_unit_mask(row))
     cols = _columns(sim, row)
     order = [(g, name, kind) for g in SEAT_GROUPS for name, kind in SEAT_GROUPS[g]]
     assert [(g, n) for g, n, _k in order] == list(cols), "the schema and the emitted columns disagree"
