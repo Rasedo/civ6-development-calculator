@@ -1,4 +1,5 @@
 import type { SeatEmitter } from './decideObs';
+import { unitRows } from './unitMask';
 
 /**
  * THE UNIT ROWS (tile, type, charges, the Great Person site, the legal action columns).
@@ -9,4 +10,6 @@ import type { SeatEmitter } from './decideObs';
  * compares each one with the GPU's group of that name, field by field, before
  * the decide. A name the GPU does not emit is a red.
  */
-export const SEAT_GROUPS: Record<string, SeatEmitter> = {};
+export const SEAT_GROUPS: Record<string, SeatEmitter> = {
+  units: unitRows,
+};
