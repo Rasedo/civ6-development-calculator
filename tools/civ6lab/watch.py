@@ -113,7 +113,9 @@ def main(argv=None) -> int:
             fh.flush()
             if a.save_every and tn % a.save_every == 0:
                 print("   ", t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}"))[-1], flush=True)
-            print(f"turn {tn}", flush=True)
+            # the throughput record: wall clock and the box's free memory per
+            # turn, so configurations compare turn window for turn window
+            print(f"turn {tn} at {time.time():.1f} free_mb {free_mb():.0f}", flush=True)
             if free_mb() < a.min_free_mb:
                 print(f"    free memory {free_mb():.0f} MB below {a.min_free_mb:.0f} — saving and stopping",
                       flush=True)
