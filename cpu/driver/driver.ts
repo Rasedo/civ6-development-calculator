@@ -32,7 +32,7 @@ import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { buildingCompletable, canBuildRoad, goldPurchasableBuildings, validImprovementsIn } from '../core/rules';
 import { hiddenResourcesFor } from '../core/seats';
-import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from '../core/effects';
+import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
@@ -203,9 +203,13 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     let tileOk = 0;
     let tileT = -1;
     let tileC = -1;
-    const actorMods = getModifiers(state, actor.seat);
+    // the SEAT's whole yield context, as the applier's own pick reads it
+    // (`makeYieldCtx`): a bare { map, mods } dropped the Preserve's Grove and
+    // Sanctuary terms, the hidden resources and every other per-seat clause,
+    // so the offered tile could differ from the one the buy then takes
+    const actorCtx = makeYieldCtx(state, actor.seat);
     for (const city of actor.cities) {
-      const next = pickBorderTile(state, city, { map: state.map, mods: actorMods });
+      const next = pickBorderTile(state, city, actorCtx);
       if (next === null) continue;
       if (goldAffordable(actor.treasury ?? 0, tilePurchaseCost(state, city, next))) {
         tileOk = 1;
