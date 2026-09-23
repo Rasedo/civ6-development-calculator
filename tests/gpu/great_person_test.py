@@ -137,14 +137,15 @@ def poke_catalog(rules, path):
     back = sim._gp_cls_of(torch.tensor(live, dtype=torch.long))
     assert [int(x) for x in back.tolist()] == [chassis.index(u) for u in live], \
         "the chassis -> class map does not invert"
-    n_sites = 6  # GP_SITES' width; the site predicate stacks exactly this many arms
+    n_sites = 9  # GP_SITES' width; the site predicate stacks exactly this many arms
     for c in range(n_cls):
         n = int(sim._gp_roster[c])
         for a in range(n):
             s = int(sim._gp_site[c, a])
             assert 0 <= s < n_sites, f"class {c} person {a} names site {s}"
             assert int(sim._gp_charges[c, a]) >= 1, f"class {c} person {a} carries no charge"
-    want = len(sim._gp_fx_names) + len(sim._gp_perm_names) + len(sim._gp_city_perm_names)
+    want = (len(sim._gp_fx_names) + len(sim._gp_perm_names) + len(sim._gp_city_perm_names)
+            + len(sim._gp_tile_perm_names))
     assert sim._gp_effects.shape[2] == want, \
         f"the dense row is {sim._gp_effects.shape[2]} wide, the names ask for {want}"
     assert sim._GP_PERM0 == len(sim._gp_fx_names)

@@ -100,6 +100,11 @@ def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100, emb: bool = 
     sim.major_unit_charges[0, slot] = 0
     sim.major_unit_fortify[0, slot] = 0
     sim.major_unit_emb[0, slot] = emb
+    # a unit placed for a scene starts its turn FRESH: full moves and one
+    # attack (the applier refuses a spent unit, as the TS validator does)
+    sim.major_unit_mp_full[0, slot] = sim._mp_scale * int(sim._type_moves[type_idx])
+    sim.major_unit_mp[0, slot] = sim.major_unit_mp_full[0, slot]
+    sim.major_unit_attacks[0, slot] = 1
     (sim.embarked_at if emb else sim.military_at)[0, t] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
     return slot
@@ -236,6 +241,10 @@ def poke_galley_city(rules, path, GALLEY):
     sim.city_hp[0, r + 1, j] = 1
     sim.city_outer_hp[0, r + 1, j] = 0
     sim.major_unit_hp[0, slot] = 100  # heal the ship (counter fire earlier)
+    # ...and give it the NEXT turn's moves and attack: the first strike spent
+    # them, and the applier refuses a spent unit as the TS validator does
+    sim.major_unit_mp[0, slot] = sim.major_unit_mp_full[0, slot]
+    sim.major_unit_attacks[0, slot] = 1
     ncity0 = int(sim.city_alive[0, 0].sum())
     sim._apply_seat_unit_actions(0, order(sim, slot, 6 + d))
     assert not bool(sim.city_alive[0, r + 1, j]), "coastal city at 1 HP not captured by the galley"
