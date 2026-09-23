@@ -1115,8 +1115,20 @@ export function transferCity(
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
+    // CIV6 (LOC_RAZE_CITY_DISTRICTS): "Raze city clearing it and all its
+    // districts and buildings from the map" — every district and wonder on
+    // the city's ground goes with it, finished or not, before the plots fall
+    // free; none is left for a later city to claim
     for (const t of state.map.tiles) {
-      if (tileBelongsTo(t, civCity)) setTileOwner(t, NO_SEAT);
+      if (!tileBelongsTo(t, civCity)) continue;
+      t.district = null;
+      t.districtComplete = false;
+      t.districtPillaged = false;
+      t.builtWonder = null;
+      t.builtWonderComplete = false;
+      t.encampHp = undefined;
+      t.encampOuterHp = undefined;
+      setTileOwner(t, NO_SEAT);
     }
     const centre = state.map.tiles[civCity.centerIndex];
     centre.district = null;

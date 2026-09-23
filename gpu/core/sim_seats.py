@@ -9563,6 +9563,19 @@ class SimSeats:
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
             # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
             # above — the `district` plane never encodes CITY_CENTER), no plunder.
+            # CIV6 (LOC_RAZE_CITY_DISTRICTS): "Raze city clearing it and all its
+            # districts and buildings from the map" — every district and wonder
+            # on its ground goes too, finished or not (`transferCity`'s raze)
+            self.district[b] = torch.where(owned, torch.full_like(self.district[b], -1), self.district[b])
+            self.district_complete[b] &= ~owned
+            self.district_pillaged[b] &= ~owned
+            self.district_dead[b] &= ~owned
+            self.built_wonder[b] = torch.where(owned, torch.full_like(self.built_wonder[b], -1), self.built_wonder[b])
+            self.built_wonder_complete[b] &= ~owned
+            self.encamp_hp[b] = torch.where(owned, torch.zeros_like(self.encamp_hp[b]), self.encamp_hp[b])
+            self.encamp_outer_hp[b] = torch.where(owned, torch.zeros_like(self.encamp_outer_hp[b]), self.encamp_outer_hp[b])
+            self._bldg_version += 1
+            self._claim_version += 1
             self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
             self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
             self._tile_owner_ver += 1
