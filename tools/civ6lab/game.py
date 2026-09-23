@@ -26,9 +26,9 @@ missing one:
      "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua",
      "size": "MAPSIZE_STANDARD", "city_states": 12, "realism": 2,
      "map_seed": 1234, "game_seed": 5678, "start_era": "ERA_ANCIENT",
-     "turn_limit": "none", "all_ai": false}
+     "turn_limit": "none", "all_ai": false, "majors": 6}
 `realism` is Gathering Storm's disaster intensity (GAME_REALISM, 0-4, default 2);
-`all_ai` turns the human slot into an AI one, for an observer-only autoplay
+`majors` overrides the map size's default number of major civs; `all_ai` turns the human slot into an AI one, for an observer-only autoplay
 game (the smoke test does the same). The keys map onto the install's
 Configuration Parameters rows; those with Hash="1" take DB.MakeHash of the
 value name.
@@ -183,6 +183,12 @@ if cfg.size then
       MapConfiguration.SetMaxMajorPlayers(def.DefaultPlayers)
       GameConfiguration.SetParticipatingPlayerCount(def.DefaultPlayers + GameConfiguration.GetHiddenPlayerCount())
     end
+  end)
+end
+if cfg.majors then
+  try("majors", function()
+    MapConfiguration.SetMaxMajorPlayers(cfg.majors)
+    GameConfiguration.SetParticipatingPlayerCount(cfg.majors + GameConfiguration.GetHiddenPlayerCount())
   end)
 end
 if cfg.city_states then try("city_states", function() GameConfiguration.SetValue("CITY_STATE_COUNT", cfg.city_states) end) end
