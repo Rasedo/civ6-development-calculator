@@ -291,14 +291,6 @@ export interface DealTerm {
   items: DealItem[];
 }
 
-/** CIV6 (Research Agreement): two parties "jointly research a target
- *  technology" — `tech` indexes the catalog, `progress` the science banked
- *  against its cost. ONE per pair, keyed lower seat first (`researchPactOf`). */
-export interface ResearchPact {
-  tech: number;
-  progress: number;
-}
-
 /** One scored competition's record; `cpu/core/competition.ts` owns it. Both
  *  arrays are dense over `state.seats`, so a seat's id IS its index. */
 export interface Competition {
@@ -380,9 +372,6 @@ export interface GameState {
    *  seat is handing over for the rest of the 30 turns, and what comes back
    *  when the clock runs out. */
   dealTerms?: Record<string, DealTerm>;
-  /** THE RESEARCH AGREEMENTS running, keyed `min>max` over the pair; the
-   *  GPU's symmetric `ra_tech` / `ra_prog` planes. */
-  researchPacts?: Record<string, ResearchPact>;
   /** CAPTURED SPIES, keyed owner -> captor: the LEVELS of the owner's spies
    *  that captor is holding, one entry per spy. They are "imprisoned, but not
    *  killed", still count against the owner's capacity, and come home at the

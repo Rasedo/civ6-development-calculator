@@ -21,7 +21,10 @@ then the other DLC packs alphabetically (the same order the memory
 `civ6-install-source` records: layer Base <- Exp1 <- Exp2, take the LAST), and
 applies each file's `<Row>` (insert or overwrite by key), `<Update>`
 (`<Where>` picks rows, `<Set>` writes columns) and `<Delete>` (`<Where>`, or
-attributes, picks rows) in document order. Rows are keyed by the key columns
+attributes, picks rows) in document order. A `<Delete>` follows the schema's
+FOREIGN KEYs as the game's database does: Expansion1_Alliances.xml deletes
+DIPLOACTION_RESEARCH_AGREEMENT from `Types`, and DiplomaticActions (whose key
+references Types(Type) ON DELETE CASCADE) loses the row with it. Rows are keyed by the key columns
 the TAG names, so no per-table primary-key knowledge is needed: two rows that
 agree on every `where` column are the same row. Attribute rows and element
 rows (the Policies.xml style) both count.
@@ -36,7 +39,9 @@ so no base file can undo another's write (2026-09-14). `*_Icons_*`,
 `*_Text*`, `*Civilopedia*` files are skipped. Needs the install on disk,
 no game running.
 
-THE KINDS `check` reports: XML compared (match / mism); DERIVED with every
+THE KINDS `check` reports: XML compared (match / mism), or its cell missing
+from the layered install — no such row, a row a later layer deleted, no
+such column (dangl — red); DERIVED with every
 XML input resolved (deriv) or one input missing (dangl — red); an input or
 tag marked `absent: true` passes when the cell is MISSING and is dangling
 when it is present; LAB with its runs/ file or AUDIT id found (lab) or
@@ -195,10 +200,21 @@ def _split_top(body: str) -> list[str]:
     return parts
 
 
-def schema_defaults() -> dict[str, dict[str, str]]:
-    """table -> {column: DEFAULT} from every gameplay schema .sql — an absent
-    cell in a row READS this, exactly as the game's database does"""
+FK_RE = re.compile(r'^\s*FOREIGN\s+KEY\s*\(\s*"?(\w+)"?\s*\)\s*REFERENCES\s+"?(\w+)"?\s*\(\s*"?(\w+)"?\s*\)'
+                   r'(?:.*?\bON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION))?', re.S | re.I)
+
+# parent table -> [(child table, child column, parent column, ON DELETE action)]
+ForeignKeys = dict[str, list[tuple[str, str, str, str]]]
+
+
+def schema() -> tuple[dict[str, dict[str, str]], ForeignKeys]:
+    """from every gameplay schema .sql: table -> {column: DEFAULT} (an absent
+    cell in a row READS this, exactly as the game's database does), and every
+    FOREIGN KEY keyed by the table it REFERENCES — a `<Delete>` from `Types`
+    removes the DiplomaticActions row whose key it names, because that key
+    column references Types(Type) ON DELETE CASCADE"""
     out: dict[str, dict[str, str]] = {}
+    fks: ForeignKeys = {}
     files = sorted(INSTALL.glob("Base/Assets/Gameplay/Data/Schema/*.sql")) \
         + sorted(INSTALL.glob("DLC/*/Data/**/*.sql"))
     for f in files:
@@ -210,10 +226,15 @@ def schema_defaults() -> dict[str, dict[str, str]]:
             table, body = m.group(1), m.group(2)
             cols = out.setdefault(table, {})
             for coldef in _split_top(body):
+                fk = FK_RE.match(coldef.strip())
+                if fk:
+                    action = " ".join((fk.group(4) or "NO ACTION").upper().split())
+                    fks.setdefault(fk.group(2), []).append((table, fk.group(1), fk.group(3), action))
+                    continue
                 cm = COLDEF_RE.match(coldef.strip())
                 if cm:
                     cols[cm.group(1)] = cm.group(2).strip().strip("'\"")
-    return out
+    return out, fks
 
 
 class Install:
@@ -222,7 +243,10 @@ class Install:
     def __init__(self) -> None:
         # table -> list of (cells dict, {col: file})
         self.tables: dict[str, list[tuple[dict[str, str], dict[str, str]]]] = {}
-        self.defaults = schema_defaults()
+        # table -> [(cells, "deleted by <file> ...")] — every row a later
+        # layer removed, so a tag citing one reads DANGLING with its cause
+        self.deleted: dict[str, list[tuple[dict[str, str], str]]] = {}
+        self.defaults, self.fks = schema()
         self.files = data_files()
         for f in self.files:
             try:
@@ -258,7 +282,30 @@ class Install:
                 wc = _cells(where) if where is not None else _cells(el)
                 if not wc:
                     continue
-                rows[:] = [(c, w) for c, w in rows if not all(c.get(k) == v for k, v in wc.items())]
+                self._delete(table.tag, wc, f"deleted by {fname}")
+
+    def _delete(self, table: str, where: dict[str, str], why: str) -> None:
+        """remove `table`'s rows matching `where`, then follow every FOREIGN
+        KEY that references `table`: ON DELETE CASCADE removes the child rows
+        (recursively), SET NULL / SET DEFAULT drop the child's cell so it
+        reads the schema DEFAULT (or nothing)."""
+        rows = self.tables.get(table)
+        if not rows:
+            return
+        gone = [c for c, _ in rows if all(c.get(k) == v for k, v in where.items())]
+        if not gone:
+            return
+        rows[:] = [(c, w) for c, w in rows if not all(c.get(k) == v for k, v in where.items())]
+        self.deleted.setdefault(table, []).extend((c, why) for c in gone)
+        for child, col, pcol, action in self.fks.get(table, ()):
+            for key in {c[pcol] for c in gone if pcol in c}:
+                if action == "CASCADE":
+                    self._delete(child, {col: key}, f"{why} (cascade {table}.{pcol} -> {child}.{col})")
+                elif action in ("SET NULL", "SET DEFAULT"):
+                    for cells, who in self.tables.get(child, ()):
+                        if cells.get(col) == key:
+                            cells.pop(col)
+                            who.pop(col, None)
 
     def find(self, table: str, where: dict[str, str]) -> tuple[dict[str, str], dict[str, str]] | None:
         """the LAST row of `table` matching every `where` column"""
@@ -269,8 +316,12 @@ class Install:
         return hit
 
     def get(self, table: str, where: str, col: str) -> tuple[str | None, str]:
-        row = self.find(table, parse_where(where))
+        w = parse_where(where)
+        row = self.find(table, w)
         if row is None:
+            for cells, why in reversed(self.deleted.get(table, ())):
+                if all(cells.get(k) == v for k, v in w.items()):
+                    return None, f"(row {why})"
             return None, "(no such row)"
         cells, who = row
         if col not in cells:
@@ -461,7 +512,12 @@ def cmd_check(inst: Install, path: pathlib.Path, baseline: pathlib.Path | None =
         elif "xml" in src:
             want = src.get("expect", e["value"])
             v, who = xml_cell(inst, src, want)
-            if v is not None and values_equal(want, v):
+            if v is None:
+                # the cited cell does not resolve in the LAYERED install: no
+                # such row, a row a later layer deleted, or no such column
+                hit("dangl")
+                red.append(f"DANGLING {name}: [{src['xml']}[{src['where']}].{src['col']}] {who}")
+            elif values_equal(want, v):
                 hit("match")
             else:
                 hit("mism")

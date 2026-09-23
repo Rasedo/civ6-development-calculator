@@ -29,14 +29,12 @@ import {
 } from '../../../cpu/core/seats';
 import { ALLIANCE_QP_DEAL } from '../../../cpu/data/seats';
 import {
-  dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable, dealItemPayable, dealPhase, researchPactOf,
+  dealOfferOf, dealTermOf, holdSpy, spyHeldWith, spyLevelsHeld, cityTradeable, dealItemPayable,
 } from '../../../cpu/core/deals';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN, DEAL_GREAT_WORK,
   DEAL_OPEN_BORDERS, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS, DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
-  DEAL_RESEARCH_AGREEMENT, RESEARCH_AGREEMENT_PCT, RESEARCH_AGREEMENT_TECH,
 } from '../../../cpu/data/seats';
-import { TECHS } from '../../../cpu/data/techs';
 import { WAR_KIND_JOINT } from '../../../cpu/data/warKinds';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import { grantStockpile, stockOf } from '../../../cpu/core/stockpile';
@@ -348,65 +346,6 @@ describe('the JOINT WAR', () => {
     expect(dealItemPayable(state, 0, 1, item(2))).toBe(true);
     state.seats[2]!.cities = []; // no living target
     expect(dealItemPayable(state, 0, 1, item(2))).toBe(false);
-  });
-});
-
-describe('the RESEARCH AGREEMENT', () => {
-  // CIV6 (DIPLOACTION_RESEARCH_AGREEMENT): Scientific Theory on both sides,
-  // priced only for Declared Friends and allies, one per pair; "jointly
-  // research a target technology ... At the duration of the agreement, each
-  // party earns the Boost" — DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE
-  // 10 of the two sciences a turn, banked against the target's cost.
-  const TECH_IDS = Object.keys(TECHS);
-  const POTTERY = TECH_IDS.indexOf('POTTERY');
-  const MINING = TECH_IDS.indexOf('MINING');
-  const item = (t: number): [number, number, number] => [DEAL_RESEARCH_AGREEMENT, t, 0];
-  const scene = (): GameState => {
-    const state = table();
-    for (const s of [0, 1]) state.seats[s]!.research.techs.push(RESEARCH_AGREEMENT_TECH);
-    setFriendTurnsWith(state, 0, 1, 20);
-    return state;
-  };
-
-  it('banks a share of both sciences against the target and pays both parties the Eureka', () => {
-    const state = scene();
-    const cost = TECHS.POTTERY!.cost;
-    play(state, { 0: { offer: [1, [item(POTTERY)], []] } });
-    play(state, { 1: { accept: [0] } });
-    expect(researchPactOf(state, 0, 1)).toEqual({ tech: POTTERY, progress: 0 });
-    expect(researchPactOf(state, 1, 0)).toEqual({ tech: POTTERY, progress: 0 }); // one record, either way round
-    // (4c + 1c) * 10% = c/2 a turn: the second tick completes it
-    state.seats[0]!.sciRate = cost * 4;
-    state.seats[1]!.sciRate = cost;
-    dealPhase(state);
-    expect(researchPactOf(state, 0, 1)!.progress).toBeCloseTo(cost * 5 * RESEARCH_AGREEMENT_PCT / 100, 9);
-    expect(state.seats[0]!.research.boosted).not.toContain('POTTERY');
-    dealPhase(state);
-    expect(researchPactOf(state, 0, 1)).toBeUndefined();
-    expect(state.seats[0]!.research.boosted).toContain('POTTERY');
-    expect(state.seats[1]!.research.boosted).toContain('POTTERY');
-  });
-
-  it('asks for Scientific Theory on both sides, a friend or ally, one pact per pair, and a technology neither holds', () => {
-    const state = scene();
-    expect(dealItemPayable(state, 0, 1, item(POTTERY))).toBe(true);
-    expect(dealItemPayable(state, 0, 2, item(POTTERY))).toBe(false); // 2: no Scientific Theory, no bond
-    state.seats[2]!.research.techs.push(RESEARCH_AGREEMENT_TECH);
-    expect(dealItemPayable(state, 0, 2, item(POTTERY))).toBe(false); // still no bond
-    setAllyTurnsWith(state, 0, 2, 20);
-    expect(dealItemPayable(state, 0, 2, item(POTTERY))).toBe(true);  // an ally will do
-    expect(dealItemPayable(state, 0, 1, item(TECH_IDS.length))).toBe(false); // off the table
-    state.seats[1]!.research.techs.push('POTTERY');
-    expect(dealItemPayable(state, 0, 1, item(POTTERY))).toBe(false); // one party holds it
-    play(state, { 0: { offer: [1, [item(MINING)], []] } });
-    play(state, { 1: { accept: [0] } });
-    expect(researchPactOf(state, 0, 1)?.tech).toBe(MINING);
-    expect(dealItemPayable(state, 0, 1, item(TECH_IDS.indexOf('ANIMAL_HUSBANDRY')))).toBe(false); // one pact per pair
-    // a party that researches the target on its own ends the pact, and nobody is paid
-    state.seats[0]!.research.techs.push('MINING');
-    dealPhase(state);
-    expect(researchPactOf(state, 0, 1)).toBeUndefined();
-    expect(state.seats[1]!.research.boosted).not.toContain('MINING');
   });
 });
 

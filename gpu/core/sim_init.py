@@ -477,11 +477,6 @@ class SimInit:
         self.deal_offer_ask = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
         self.deal_term_left = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.deal_term_item = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
-        # CIV6 (Research Agreement): the pair's target technology (-1 none) and
-        # the science banked against its cost — SYMMETRIC, both cells written
-        # (`GameState.researchPacts`, keyed lower seat first).
-        self.ra_tech = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
-        self.ra_prog = torch.zeros(B, _pw, _pw, dtype=torch.float64, device=device)
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
         # ...as COUNTS BY LEVEL, so the spy that is traded back is the one that
@@ -557,10 +552,6 @@ class SimInit:
         # WAR_KINDS code its move declares under
         self._joint_war_civic = int(rules.seats["jointWarCivic"])
         self._war_k_joint = int(rules.seats["jointWarKind"])
-        # the RESEARCH AGREEMENT: both parties' tech gate (catalog index), and
-        # the share of their combined science a turn the pact banks
-        self._ra_tech = int(rules.seats["researchAgreementTech"])
-        self._ra_pct = int(rules.seats["researchAgreementPct"])
         self._favor_per_alliance = int(rules.seats["favorPerAlliance"])
         self._valletta_walls_pct = int(rules.seats["vallettaWallsDiscountPct"])
         self._al_qp_turn = int(rules.seats["allianceQpTurn"])
@@ -659,7 +650,6 @@ class SimInit:
         self._deal_k_spy = self._deal_kinds.index("SPY")
         self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
         self._deal_k_joint = self._deal_kinds.index("JOINT_WAR")
-        self._deal_k_ra = self._deal_kinds.index("RESEARCH_AGREEMENT")
         self._comp_turns = int(_er2["competitionTurns"])
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])

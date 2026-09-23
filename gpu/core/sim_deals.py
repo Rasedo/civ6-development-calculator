@@ -105,18 +105,6 @@ class SimDeals:
                     out |= (sel & civic & self.city_alive[:, x].any(dim=1)
                             & self._joint_war_open(giver, x) & self._joint_war_open(taker, x))
             return out
-        if kind == self._deal_k_ra:
-            # CIV6 (DIPLOACTION_RESEARCH_AGREEMENT): Scientific Theory on both
-            # sides, friends or allies, no pact running between the pair, and
-            # a technology NEITHER holds. `researchPactPayable`'s twin.
-            nt = self.civ_techs.shape[2]
-            if self._ra_tech < 0 or self._ra_tech >= nt:
-                return z
-            col = va.clamp(min=0, max=nt - 1).unsqueeze(1)
-            held = (self.civ_techs[:, giver].gather(1, col) | self.civ_techs[:, taker].gather(1, col)).squeeze(1)
-            theory = self.civ_techs[:, giver, self._ra_tech] & self.civ_techs[:, taker, self._ra_tech]
-            bound = (self.seat_friend_turns[:, giver, taker] > 0) | (self.seat_ally_turns[:, giver, taker] > 0)
-            return (va >= 0) & (va < nt) & theory & bound & (self.ra_tech[:, giver, taker] < 0) & ~held
         return z
 
     def _joint_war_open(self, p: int, x: int) -> torch.Tensor:
@@ -190,12 +178,6 @@ class SimDeals:
                     continue
                 for p in (giver, taker):
                     self._declare_war_major(p, x, sel & self._joint_war_open(p, x), kind_vec, agreed=True)
-        elif kind == self._deal_k_ra:
-            # CIV6 (Research Agreement): the pact opens at zero on BOTH cells of
-            # the pair; `_research_pacts_tick` runs it
-            for g, t in ((giver, taker), (taker, giver)):
-                self.ra_tech[:, g, t] = torch.where(ok, va, self.ra_tech[:, g, t])
-                self.ra_prog[:, g, t] = torch.where(ok, torch.zeros_like(self.ra_prog[:, g, t]), self.ra_prog[:, g, t])
 
     def _deal_move_res(self, giver: int, taker: int, va: torch.Tensor,
                        vb: torch.Tensor, ok: torch.Tensor) -> None:
@@ -349,43 +331,6 @@ class SimDeals:
                 stale = self.deal_offer_left[:, a, b]
                 if bool((stale > 0).any()):
                     self.deal_offer_left[:, a, b] = (stale - 1).clamp(min=0)
-        self._research_pacts_tick()
-
-    def _research_pacts_tick(self) -> None:
-        """`researchPactsTick`'s twin — CIV6 (Research Agreement): "The more
-        expensive the technology, the longer the agreement will take. At the
-        duration of the agreement, each party earns the Boost for that
-        technology." The pact banks `_ra_pct` percent of the two parties'
-        combined science a turn against the target's cost (a READING of the
-        install's one number; the AUDIT's lab line measures it); a party that
-        researches the target on its own ends it. Pairs a < b ascending."""
-        NM = self.n_majors
-        nt = self.civ_techs.shape[2]
-        if not bool((self.ra_tech[:, :NM, :NM] >= 0).any()):
-            return
-        cost = self.rules_dev.t_cost.to(self.ra_prog.dtype)
-        for a in range(NM):
-            for b in range(a + 1, NM):
-                tech = self.ra_tech[:, a, b]
-                run = tech >= 0
-                if not bool(run.any()):
-                    continue
-                idx = tech.clamp(min=0, max=nt - 1)
-                col = idx.unsqueeze(1)
-                own = (self.civ_techs[:, a].gather(1, col) | self.civ_techs[:, b].gather(1, col)).squeeze(1)
-                live = run & ~own
-                prog = self.ra_prog[:, a, b] + (self.civ_sci_rate[:, a] + self.civ_sci_rate[:, b]) * self._ra_pct / 100
-                done = live & (prog >= cost[idx])
-                for r in (a, b):
-                    newly = (done & ~self.civ_techs[:, r].gather(1, col).squeeze(1)
-                             & ~self.civ_tech_boosted[:, r].gather(1, col).squeeze(1))
-                    rows = newly.nonzero(as_tuple=True)[0]
-                    self.civ_tech_boosted[rows, r, idx[rows]] = True
-                    self._dedication_event(r, self._ded_free_inquiry, newly.long())
-                keep = live & ~done
-                for g, t in ((a, b), (b, a)):
-                    self.ra_prog[:, g, t] = torch.where(keep, prog, torch.zeros_like(prog))
-                    self.ra_tech[:, g, t] = torch.where(keep, tech, torch.full_like(tech, -1))
 
     def _deal_end_term(self, giver: int, taker: int, items: torch.Tensor, done: torch.Tensor) -> None:
         """CIV6: "Resources and gold per turn ... are temporary, and once the

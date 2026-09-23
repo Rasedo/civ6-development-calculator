@@ -11,18 +11,15 @@
  * engines RE-VALIDATE every item at ACCEPT time, because the state the offer
  * was priced against has moved on by then.
  */
-import type { City, DealItem, DealOffer, DealTerm, GameState, ResearchPact } from './types';
+import type { City, DealItem, DealOffer, DealTerm, GameState } from './types';
 import { scoreGoldGift } from './competition';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN,
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
   ALLIANCE_QP_DEAL,
   DEAL_PERMANENT, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
-  DEAL_JOINT_WAR, JOINT_WAR_CIVIC, DEAL_RESEARCH_AGREEMENT, RESEARCH_AGREEMENT_PCT, RESEARCH_AGREEMENT_TECH,
-  DED_FREE_INQUIRY,
+  DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
 } from '../data/seats';
-import { TECHS } from '../data/techs';
-import { dedicationEvent } from './eras';
 import { WAR_KIND_JOINT } from '../data/warKinds';
 import { STRATEGIC_IDS } from '../data/constants';
 import { CITY_MAX_HP } from '../data/units';
@@ -139,33 +136,6 @@ export function jointWarPayable(state: GameState, giver: number, receiver: numbe
     && !seatsFriends(state, p, target) && treatyTurnsWith(state, p, target) === 0);
 }
 
-/** The research pact the pair runs, if any — ONE per pair, keyed lower seat first. */
-export function researchPactOf(state: GameState, a: number, b: number): ResearchPact | undefined {
-  if (a === b) return undefined;
-  return state.researchPacts?.[grantKey(Math.min(a, b), Math.max(a, b))];
-}
-
-/** CIV6 (DIPLOACTION_RESEARCH_AGREEMENT): `InitiatorPrereqTech` /
- *  `TargetPrereqTech` TECH_SCIENTIFIC_THEORY on both sides,
- *  `NoCurrentResearchAgreement` (one pact per pair), and the action is priced
- *  only at DIPLO_STATE_DECLARED_FRIEND / ALLIED (DiplomaticStateActions) — so
- *  the pair are friends or allies. The target is a technology NEITHER party
- *  holds: "jointly research a target technology". The GPU twin is
- *  `_deal_kind_ok`'s arm. */
-export function researchPactPayable(state: GameState, giver: number, receiver: number, tech: number): boolean {
-  if (!isCiv(giver) || !isCiv(receiver)) return false;
-  const ids = Object.keys(TECHS);
-  if (!Number.isInteger(tech) || tech < 0 || tech >= ids.length) return false;
-  const id = ids[tech]!;
-  const g = seatOf(state, giver)?.research;
-  const r = seatOf(state, receiver)?.research;
-  if (!g || !r) return false;
-  if (!g.techs.includes(RESEARCH_AGREEMENT_TECH) || !r.techs.includes(RESEARCH_AGREEMENT_TECH)) return false;
-  if (!seatsFriends(state, giver, receiver) && !seatsAllied(state, giver, receiver)) return false;
-  if (researchPactOf(state, giver, receiver)) return false;
-  return !g.techs.includes(id) && !r.techs.includes(id);
-}
-
 /** Can `giver` actually hand `receiver` this one thing, right now? */
 export function dealItemPayable(state: GameState, giver: number, receiver: number, it: DealItem): boolean {
   const [kind, a, b] = it;
@@ -201,8 +171,6 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
       return true;
     case DEAL_JOINT_WAR:
       return jointWarPayable(state, giver, receiver, a);
-    case DEAL_RESEARCH_AGREEMENT:
-      return researchPactPayable(state, giver, receiver, a);
     default:
       return false;
   }
@@ -265,11 +233,6 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       // the target by an earlier item of this table has nothing to declare.
       declareWar(state, giver, a, WAR_KIND_JOINT, true);
       declareWar(state, receiver, a, WAR_KIND_JOINT, true);
-      break;
-    case DEAL_RESEARCH_AGREEMENT:
-      // CIV6 (Research Agreement): the pact opens at zero; `researchPactsTick`
-      // runs it (the GPU writes both cells of its symmetric planes)
-      (state.researchPacts ??= {})[grantKey(Math.min(giver, receiver), Math.max(giver, receiver))] = { tech: a, progress: 0 };
       break;
     default:
       break;
@@ -373,39 +336,5 @@ export function dealPhase(state: GameState): void {
   for (const [key, o] of Object.entries(state.dealOffers ?? {}).sort(byPair)) {
     o.left -= 1;
     if (o.left <= 0) delete state.dealOffers![key];
-  }
-  researchPactsTick(state, byPair);
-}
-
-/**
- * CIV6 (Research Agreement): "The more expensive the technology, the longer
- * the agreement will take. At the duration of the agreement, each party
- * earns the Boost for that technology." The install publishes ONE number,
- * DIPLOMACY_RESEARCH_AGREEMENT_BEAKER_PERCENTAGE 10, and no duration: this
- * engine READS it as the share of the two parties' combined science per turn
- * banked against the technology's cost (docs/AUDIT.md C-2 holds the lab line
- * that measures it). A party that researches the technology on its own ends
- * the pact — nothing is left to research jointly. Pairs in ascending order,
- * the GPU's loop order (`_research_pacts_tick`).
- */
-export function researchPactsTick(state: GameState, order: (a: [string, unknown], b: [string, unknown]) => number): void {
-  const ids = Object.keys(TECHS);
-  for (const [key, p] of Object.entries(state.researchPacts ?? {}).sort(order)) {
-    const [a, b] = key.split('>').map(Number);
-    const sa = seatOf(state, a);
-    const sb = seatOf(state, b);
-    const id = ids[p.tech];
-    if (!sa || !sb || !id || sa.research.techs.includes(id) || sb.research.techs.includes(id)) {
-      delete state.researchPacts![key];
-      continue;
-    }
-    p.progress += ((sa.sciRate ?? 0) + (sb.sciRate ?? 0)) * RESEARCH_AGREEMENT_PCT / 100;
-    if (p.progress < TECHS[id]!.cost) continue;
-    for (const s of [sa, sb]) {
-      if (s.research.boosted.includes(id)) continue;
-      s.research.boosted.push(id);
-      dedicationEvent(state, s.seat, DED_FREE_INQUIRY);
-    }
-    delete state.researchPacts![key];
   }
 }
