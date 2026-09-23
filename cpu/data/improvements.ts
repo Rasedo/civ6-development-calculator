@@ -55,6 +55,10 @@ export interface ImpAdjacency {
   /** count a neighbour carrying THIS NAMED improvement — `sameImprovement`
    *  widened to a row that names somebody else's (the Kurgan's Pasture). */
   improvement?: ImprovementId;
+  /** CIV6 (`MODIFIER_SINGLE_PLOT_ADJUST_PLOT_YIELDS` over a `PLOT_ADJACENT_*`
+   *  requirement set): the requirement is a yes/no test of the plot, so the
+   *  row pays `yields` ONCE when any neighbour matches, however many do. */
+  once?: boolean;
 }
 
 export interface ImprovementDef {
@@ -745,12 +749,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     elevations: ['FLAT', 'HILLS'],
     features: ['FLOODPLAINS'],
     noAdjacentSame: true,
-    // CIV6 (SPHINX_WONDERADJACENCY_FAITH): "+2 Faith if next to a wonder"
-    adjacency: [{ builtWonder: true, per: 1, yields: { faith: 2 } }],
+    // CIV6 (SPHINX_WONDERADJACENCY_FAITH): "+2 Faith if next to a wonder" —
+    // a yes/no requirement set, so two wonders pay it once
+    adjacency: [{ builtWonder: true, once: true, per: 1, yields: { faith: 2 } }],
     // CIV6 (SPHINX_FLOODPLAINS_CULTURE): "+1 Culture if built on Floodplains"
     featureYields: { features: ['FLOODPLAINS'], yields: { culture: 1 } },
-    // Improvements.xml (Expansion2_Improvements.xml): `Appeal="2"`. An earlier
-    // round wrote 1 here and a comment claiming the XML said so; it does not.
+    // Improvements.xml (Expansion2_Improvements.xml): `Appeal="2"`
     appealAdjacent: 2,
     tourismFrom: 'culture',
     tourismTech: 'FLIGHT',
@@ -769,6 +773,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_SPHINX', 'SameAdjacentValid', { expect: false }),
       'adjacency.0.builtWonder': xml('ImprovementModifiers', 'ImprovementType=IMPROVEMENT_SPHINX&ModifierId=SPHINX_WONDERADJACENCY_FAITH', 'ModifierId', { expect: 'SPHINX_WONDERADJACENCY_FAITH' }),
       'adjacency.0.yields.faith': xml('ModifierArguments', 'ModifierId=SPHINX_WONDERADJACENCY_FAITH&Name=Amount', 'Value'),
+      'adjacency.0.once': xml('Modifiers', 'ModifierId=SPHINX_WONDERADJACENCY_FAITH', 'SubjectRequirementSetId', { expect: 'PLOT_ADJACENT_TO_WONDER_REQUIREMENTS' }),
       'featureYields.features': xml('ImprovementModifiers', 'ImprovementType=IMPROVEMENT_SPHINX&ModifierId=SPHINX_FLOODPLAINS_CULTURE', 'ModifierId', { expect: 'SPHINX_FLOODPLAINS_CULTURE' }),
       'featureYields.yields.culture': xml('ModifierArguments', 'ModifierId=SPHINX_FLOODPLAINS_CULTURE&Name=Amount', 'Value'),
       appealAdjacent: xml('Improvements', 'ImprovementType=IMPROVEMENT_SPHINX', 'Appeal'),
@@ -1345,10 +1350,14 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       { civic: 'FEUDALISM', yields: { faith: 1 } },
       { civic: 'PROFESSIONAL_SPORTS', yields: { food: 1 } },
     ],
-    // The description's "+1 Faith beside a Holy Site, +1 Food beside a Farm"
-    // has NO `Improvement_Adjacencies` row in the install — both halves are
-    // DLL-side, so they are recorded rather than invented.
-    description: '+1 food +1 housing on flat ground, never beside another Stepwell. +1 faith from Feudalism, +1 more food from Professional Sports.',
+    // CIV6 (STEPWELL_FARMADJACENCY_FOOD, STEPWELL_HOLYSITEADJACENCY_FAITH):
+    // two SINGLE_PLOT modifiers over yes/no requirement sets — +1 Food while
+    // any neighbour holds a Farm, +1 Faith while any holds a Holy Site
+    adjacency: [
+      { improvement: 'FARM', once: true, per: 1, yields: { food: 1 } },
+      { district: 'HOLY_SITE', once: true, per: 1, yields: { faith: 1 } },
+    ],
+    description: '+1 food +1 housing on flat ground, never beside another Stepwell. +1 food beside a Farm, +1 faith beside a Holy Site. +1 faith from Feudalism, +1 more food from Professional Sports.',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_STEPWELL', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_STEPWELL', 'PlunderAmount'),
@@ -1359,6 +1368,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_STEPWELL, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_STEPWELL', 'TerrainType')] },
       elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_STEPWELL', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_STEPWELL', 'TerrainType')] },
       noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_STEPWELL', 'SameAdjacentValid', { expect: false }),
+      'adjacency.0.improvement': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_ADJACENT_TO_FARM&Name=ImprovementType', 'Value', { expect: 'IMPROVEMENT_FARM' }),
+      'adjacency.0.yields.food': xml('ModifierArguments', 'ModifierId=STEPWELL_FARMADJACENCY_FOOD&Name=Amount', 'Value'),
+      'adjacency.0.once': xml('Modifiers', 'ModifierId=STEPWELL_FARMADJACENCY_FOOD', 'SubjectRequirementSetId', { expect: 'PLOT_ADJACENT_TO_FARM_REQUIREMENTS' }),
+      'adjacency.1.district': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_ADJACENT_TO_HOLYSITE&Name=DistrictType', 'Value', { expect: 'DISTRICT_HOLY_SITE' }),
+      'adjacency.1.yields.faith': xml('ModifierArguments', 'ModifierId=STEPWELL_HOLYSITEADJACENCY_FAITH&Name=Amount', 'Value'),
+      'adjacency.1.once': xml('Modifiers', 'ModifierId=STEPWELL_HOLYSITEADJACENCY_FAITH', 'SubjectRequirementSetId', { expect: 'PLOT_ADJACENT_TO_HOLYSITE_REQUIREMENTS' }),
       'researchYields.0.civic': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_STEPWELL&YieldType=YIELD_FAITH&PrereqCivic=CIVIC_FEUDALISM', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
       'researchYields.0.yields.faith': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_STEPWELL&YieldType=YIELD_FAITH&PrereqCivic=CIVIC_FEUDALISM', 'BonusYieldChange'),
       'researchYields.1.civic': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_STEPWELL&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_PROFESSIONAL_SPORTS', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),

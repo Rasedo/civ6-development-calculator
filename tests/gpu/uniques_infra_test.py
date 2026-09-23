@@ -10,7 +10,7 @@ Checks:
      feature clause) once the row's civic is held; the job mask offers the
      column and the applier lays it.
   B. their yields: the Sphinx's Floodplains Culture (`_imp_feat_plane`) and
-     its faith beside a COMPLETED wonder (`_imp_adjacency`).
+     its faith beside a COMPLETED wonder, once (`_imp_adjacency`).
   C. the Bath: +2 Housing on the Aqueduct's water and a flat Amenity for the
      row playing Rome, nothing for another row; the queue price halves.
   D. the Stave Church: the Holy Site's adjacency gains +1 per Woods where
@@ -20,6 +20,8 @@ Checks:
      after Flight and the Thermal Bath's on a fissure (`_building_tourism`).
   F. the Film Studio: the city's own tourism banked twice on a rival in the
      Modern era or later (`_late_era_tourism`, `_bank_tourism_per_rival`).
+  G. the Stepwell: +1 Food beside a live Farm, +1 Faith beside a completed
+     Holy Site, each paid once however many neighbours match (`_imp_adjacency`).
 """
 
 from __future__ import annotations
@@ -175,8 +177,14 @@ def main() -> None:
     sim.built_wonder_complete[0, w] = True
     sim._eff_version += 1
     assert float(sim._imp_adjacency(egypt)[0, t, 5]) == 2.0, "+2 Faith beside a completed wonder"
-    sim.built_wonder[0, w] = -1
-    sim.built_wonder_complete[0, w] = False
+    w2 = [int(x) for x in sim.neigh[t].tolist() if x >= 0][1]
+    sim.built_wonder[0, w2] = 1
+    sim.built_wonder_complete[0, w2] = True
+    sim._eff_version += 1
+    assert float(sim._imp_adjacency(egypt)[0, t, 5]) == 2.0, "a second wonder pays nothing more"
+    for x in (w, w2):
+        sim.built_wonder[0, x] = -1
+        sim.built_wonder_complete[0, x] = False
     sim._eff_version += 1
     print("  B yields OK")
 
@@ -450,6 +458,52 @@ def main() -> None:
     bump(sim)
     assert sim._late_era_tourism(rome, sim._tourism_inputs(rome, None)) is None, "the Broadcast Center carries no clause"
     print(f"  F Film Studio OK (city tourism {nat}: Modern rival x2, Ancient rival x1)")
+
+    # -- G: the Stepwell's two adjacencies ----------------------------------
+    sim = fresh(rules, path)
+    SW, FARM, hs = I["STEPWELL"], I["FARM"], sim._hs_idx
+    t = own_flat(sim, rome)
+    clear_tile(sim, t)
+    sim.improvement[0, t] = SW
+    nbs = [int(x) for x in sim.neigh[t].tolist() if x >= 0]
+    for x in nbs:
+        sim.improvement[0, x] = -1
+        if int(sim.district[0, x]) == hs:
+            sim.district[0, x] = -1
+    sim._eff_version += 1
+
+    def sw_y(k):
+        adj = sim._imp_adjacency(rome)
+        return 0.0 if adj is None else float(adj[0, t, k])
+
+    assert sw_y(0) == 0.0 and sw_y(5) == 0.0, "nothing beside, nothing paid"
+    a, b, c = nbs[0], nbs[1], nbs[2]
+    sim.improvement[0, a] = FARM
+    sim._eff_version += 1
+    assert sw_y(0) == 1.0, "CIV6 (STEPWELL_FARMADJACENCY_FOOD): +1 Food beside a Farm"
+    sim.improvement[0, b] = FARM
+    sim._eff_version += 1
+    assert sw_y(0) == 1.0, "a yes/no requirement set: two Farms pay once"
+    sim.pillaged[0, a] = True
+    sim.pillaged[0, b] = True
+    sim._eff_version += 1
+    assert sw_y(0) == 0.0, "a pillaged Farm is no Farm"
+    sim.district[0, c] = hs
+    sim.district_complete[0, c] = False
+    sim._eff_version += 1
+    assert sw_y(5) == 0.0, "a Holy Site in flight pays nothing"
+    sim.district_complete[0, c] = True
+    sim._eff_version += 1
+    assert sw_y(5) == 1.0, "CIV6 (STEPWELL_HOLYSITEADJACENCY_FAITH): +1 Faith beside a Holy Site"
+    sim.district[0, c] = sim._iz_idx
+    sim._eff_version += 1
+    assert sw_y(5) == 0.0, "another district pays nothing"
+    sim.district[0, c] = hs
+    sim.pillaged[0, a] = False
+    sim.pillaged[0, t] = True
+    sim._eff_version += 1
+    assert sw_y(0) == 0.0 and sw_y(5) == 0.0, "a pillaged Stepwell pays neither"
+    print("  G Stepwell OK (+1 Food beside a Farm, +1 Faith beside a Holy Site, once each)")
     print("UNIQUE INFRASTRUCTURE OK")
 
 

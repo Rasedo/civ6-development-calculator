@@ -28,8 +28,9 @@ function terrainYields(tile: Tile): Yields {
 /**
  * What a SUZERAIN improvement's neighbours pay it. Each rule counts the
  * neighbours matching any of its sources, divides by `per`, and pays its
- * yields once per whole group; a civic in `ctx.mods.impUpgrades` swaps in the
- * improved rate and payout (`_imp_adjacency`).
+ * yields once per whole group (a `once` rule: once if any match); a civic in
+ * `ctx.mods.impUpgrades` swaps in the improved rate and payout
+ * (`_imp_adjacency`).
  */
 export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: ImprovementId): Yields {
   const rules = IMPROVEMENTS[imp].adjacency;
@@ -64,7 +65,8 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (!!r.seaResource && nb.resource !== null && isWater(nb));
       if (hit) n += 1;
     }
-    const groups = Math.floor(n / Math.max(1, per));
+    // a yes/no requirement set pays once, however many neighbours match
+    const groups = r.once ? Math.min(1, n) : Math.floor(n / Math.max(1, per));
     if (groups > 0) addYields(out, pay, groups);
   }
   return out;

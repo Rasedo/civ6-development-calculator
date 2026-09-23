@@ -1935,6 +1935,8 @@ export function buildRules() {
             bw: r.builtWonder ? 1 : 0,
             feats: (r.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
             per: r.per,
+            // a yes/no requirement set: pays once if any neighbour matches
+            once: r.once ? 1 : 0,
             y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
             // the Terrace Farm's own two sources, its civic gate and its
             // TECH upgrade beside the civic one

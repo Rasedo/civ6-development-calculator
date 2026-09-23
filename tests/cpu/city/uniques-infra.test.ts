@@ -160,6 +160,11 @@ describe('the Sphinx and the Ziggurat', () => {
     expect(improvementAdjacency(ctx, sx, 'SPHINX').faith).toBe(0); // in flight: not yet
     w.builtWonderComplete = true;
     expect(improvementAdjacency(ctx, sx, 'SPHINX').faith).toBe(2);
+    // a yes/no requirement set: a second wonder pays nothing more
+    const w2 = neighbors(map, sx)[1];
+    w2.builtWonder = 'STONEHENGE';
+    w2.builtWonderComplete = true;
+    expect(improvementAdjacency(ctx, sx, 'SPHINX').faith).toBe(2);
     const zg = tileAtCoords(map, 5, 5);
     zg.improvement = 'ZIGGURAT';
     expect(tileYields(ctx, zg)).toMatchObject({ science: 2, culture: 0 });
@@ -169,5 +174,37 @@ describe('the Sphinx and the Ziggurat', () => {
     const nh = modifiersFromResearch({ techs: [], civics: ['NATURAL_HISTORY'] } as never);
     expect(nh.improvementYields.SPHINX?.culture).toBe(1);
     expect(nh.improvementYields.ZIGGURAT?.culture).toBe(1);
+  });
+});
+
+describe('the Stepwell (India)', () => {
+  it('pays +1 Food beside a Farm and +1 Faith beside a Holy Site, once each', () => {
+    const map = makeMap(8, 8, 'GRASSLAND');
+    const ctx = bareCtx(map);
+    const sw = tileAtCoords(map, 3, 3);
+    sw.improvement = 'STEPWELL';
+    const bare = tileYields(ctx, sw);
+    expect(improvementAdjacency(ctx, sw, 'STEPWELL')).toMatchObject({ food: 0, faith: 0 });
+    const [a, b, c] = neighbors(map, sw);
+    a.improvement = 'FARM';
+    expect(tileYields(ctx, sw).food - bare.food).toBe(1);
+    b.improvement = 'FARM';
+    expect(tileYields(ctx, sw).food - bare.food).toBe(1); // two Farms: still one
+    a.pillaged = true;
+    b.pillaged = true;
+    expect(tileYields(ctx, sw).food).toBe(bare.food); // a pillaged Farm is no Farm
+    c.district = 'HOLY_SITE';
+    expect(tileYields(ctx, sw).faith).toBe(bare.faith); // in flight: not yet
+    c.districtComplete = true;
+    expect(tileYields(ctx, sw).faith - bare.faith).toBe(1);
+    // another district pays nothing
+    c.district = 'CAMPUS';
+    expect(tileYields(ctx, sw).faith).toBe(bare.faith);
+    // a pillaged Stepwell pays neither
+    c.district = 'HOLY_SITE';
+    a.pillaged = false;
+    sw.pillaged = true;
+    expect(tileYields(ctx, sw).faith).toBe(0);
+    expect(tileYields(ctx, sw).food).toBe(bare.food - 1); // the grassland alone
   });
 });

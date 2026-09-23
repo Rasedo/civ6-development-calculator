@@ -7479,8 +7479,8 @@ class SimSeats:
         """[B, T, 6] — what a SUZERAIN improvement's neighbours pay it, or None
         where no such improvement stands on the map. Each catalog rule counts
         the neighbours matching any of its sources, divides by `per`, and pays
-        once per whole group; the row's civics swap in the improved rate and
-        payout (`improvementAdjacency`)."""
+        once per whole group (a `once` rule: once if any match); the row's
+        civics swap in the improved rate and payout (`improvementAdjacency`)."""
         if not self._imp_adj_live:
             return None
         live = (self.improvement >= 0) & ~self.pillaged
@@ -7542,6 +7542,9 @@ class SimSeats:
                                   torch.full_like(n, max(1, uper)),
                                   torch.full_like(n, max(1, int(r["per"]))))
                 groups = torch.div(n, per.clamp(min=1), rounding_mode="floor").to(self.dtype)
+                # a yes/no requirement set pays once, however many neighbours match
+                if int(r.get("once", 0)):
+                    groups = (n > 0).to(self.dtype)
                 if rc >= 0:
                     groups = groups * cv[:, rc].reshape(-1, 1).to(self.dtype)
                 base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
