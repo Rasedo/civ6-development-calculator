@@ -3915,11 +3915,18 @@ class SimSeats:
             live = live & (self.feat_id != self._soil_fid)
         return live
 
-    def _builder_ground(self) -> torch.Tensor:
+    def _res_bare(self, row: int) -> torch.Tensor:
+        """[B, T] — no resource here insists on its own improvement for seat
+        row `row`: none on the plot, or one this row cannot see yet
+        (`_res_hidden`, `validImprovementsIn`'s early resource return)."""
+        return (self.res_imp < 0) | ~self._res_live() | self._res_hidden(row)
+
+    def _builder_ground(self, row: int) -> torch.Tensor:
         """[B, T] — the ground `validImprovementsIn` reaches its catalog rows
-        on: a resourced tile offers its resource's improvement alone, a water
-        tile the water-only rows alone, and impassable ground nothing."""
-        return ~self.water & self.passable & (self.res_imp < 0)
+        on for seat row `row`: a resourced tile offers its resource's
+        improvement alone, a water tile the water-only rows alone, and
+        impassable ground nothing."""
+        return ~self.water & self.passable & self._res_bare(row)
 
     def _suz_improvement_ok(self, row: int, k: int) -> torch.Tensor:
         """[B, T] — may seat row `row` build suzerain improvement `k` here?
@@ -3929,7 +3936,7 @@ class SimSeats:
         if not self._imp_suz[k]:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         held = (self._suzerain_mask(row) & (self.citystate_suz_imp[:, : self.S] == k)).any(dim=1)
-        return (held.unsqueeze(1) & self._builder_ground() & self._imp_ground_ok(k)
+        return (held.unsqueeze(1) & self._builder_ground(row) & self._imp_ground_ok(k)
                 & self._imp_gov_ok(row, k))
 
     def _uniq_improvement_ok(self, row: int, k: int) -> torch.Tensor:
@@ -3948,8 +3955,8 @@ class SimSeats:
             ok = ok & self.civ_civics[:, row, uc]
         # a WATER row reaches a water plot with NO resource under it to insist
         # on a different improvement, exactly as the Builder's water arm does
-        ground = (self._builder_ground() if not self._imp_water[k]
-                  else (self.water & ~self.tile_submerged & (self.res_imp < 0)))
+        ground = (self._builder_ground(row) if not self._imp_water[k]
+                  else (self.water & ~self.tile_submerged & self._res_bare(row)))
         out = ok.unsqueeze(1) & ground & self._imp_ground_ok(k) & self._imp_gov_ok(row, k)
         # CIV6 (Great Wall, `BuildOnFrontier`): the seat's own BORDER — an
         # owned tile at least one of whose neighbours it does not hold.
