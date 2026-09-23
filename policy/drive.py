@@ -1,9 +1,25 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import torch
 
 import ladder
 from core import simbase
+
+# The NEUTRAL OBSERVATION's field spec (names, kinds, meanings), shared with
+# every engine that emits it.
+_SCHEMA = json.loads((Path(__file__).resolve().parents[1] / "shared" / "decide.schema.json")
+                     .read_text(encoding="utf-8"))
+
+
+def _obs_group(nobs: list, group: str, device) -> dict:
+    """One schema group of the per-game observations (`nobs[b]`) as [B]
+    tensors: `bool` fields as bool, every other field as long."""
+    fields = _SCHEMA["seat"][group]
+    t = torch.tensor([[o[group][f[0]] for f in fields] for o in nobs], dtype=torch.long, device=device)
+    return {f[0]: (t[:, i] != 0 if f[1] == "bool" else t[:, i]) for i, f in enumerate(fields)}
 
 
 # The per-seat STYLE assignment. None = today's behaviour exactly: every
@@ -793,20 +809,18 @@ def _decide_vote(sim, row: int):
     return out if bool((out[:, :, 0] >= 0).any()) else None
 
 
-def _decide_route(sim, row: int, pre=None):
-    """The route verb: TAKE the candidate whenever one exists — the old
-    eager rule's pacing, now a policy choice on the wire. `pre` is the
-    serve tripwire's precomputed candidate (frm [B], dst [B]); without it
-    the sim's own `_seat_route_candidate` scan answers."""
-    frm, dst = pre if pre is not None else sim._seat_route_candidate(row)
+def _decide_route(route: dict):
+    """The route verb: TAKE the observation's candidate whenever one exists
+    — the old eager rule's pacing, now a policy choice on the wire."""
+    frm, dst = route["from"], route["dest"]
     if not bool((frm >= 0).any()):
         return None
     return (frm, dst)
 
 
-def _decide_buys(sim, row: int, bctx: dict | None = None):
-    if bctx is None:
-        bctx = _buy_ctx(sim, row)
+def _decide_buys(bctx: dict):
+    """Every purchase of the turn from the observation's `buy` group. City
+    references stay CENTRE TILES, the wire's vocabulary."""
     buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"], bctx["tile_ok"])
     # A DISTRICT bought outright sits under the four standing rungs and over
     # patronage: it is the most expensive thing on the ladder and only a
@@ -814,107 +828,45 @@ def _decide_buys(sim, row: int, bctx: dict | None = None):
     buy_kind = torch.where((buy_kind == -1) & bctx["dist_g_ok"], torch.full_like(buy_kind, 5), buy_kind)
     # GOLD patronage is the LOWEST rung — only when nothing else buys.
     buy_kind = torch.where((buy_kind == -1) & bctx["pat_g_ok"], torch.full_like(buy_kind, 4), buy_kind)
-    buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["jj"])
+    buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["bldg_city"])
     buy_a = torch.where(buy_kind == 4, bctx["pat_g_cls"], buy_a)
-    buy_a = torch.where(buy_kind == 5, bctx["dist_g_t"], buy_a)
-    buy_b = torch.where(buy_kind == 3, bctx["tile_j"], bctx["bb"])
-    buy_b = torch.where(buy_kind == 5, bctx["dist_g_si"], buy_b)
+    buy_a = torch.where(buy_kind == 5, bctx["dist_g_tile"], buy_a)
+    buy_b = torch.where(buy_kind == 3, bctx["tile_city"], bctx["bldg"])
+    buy_b = torch.where(buy_kind == 5, bctx["dist_g_row"], buy_b)
     worship_ok, relig_kind = ladder.pick_faith(
         bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"], bctx["inquisitor_ok"],
         bctx["monk_ok"])
-    neg_w = torch.full_like(bctx["worship_j"], -1)
-    relig_j = torch.where(
-        relig_kind == 5, bctx["missionary_j"],
-        torch.where(relig_kind == 6, bctx["apostle_j"],
-                    torch.where(relig_kind == 11, bctx["inquisitor_j"],
-                                torch.where(relig_kind == 14, bctx["monk_j"], neg_w))))
+    neg_w = torch.full_like(bctx["worship_city"], -1)
+    relig_c = torch.where(
+        relig_kind == 5, bctx["missionary_city"],
+        torch.where(relig_kind == 6, bctx["apostle_city"],
+                    torch.where(relig_kind == 11, bctx["inquisitor_city"],
+                                torch.where(relig_kind == 14, bctx["monk_city"], neg_w))))
     monu_kind = ladder.pick_monu(bctx["monu_builder_ok"], bctx["monu_settler_ok"])
-    monu_j = torch.where(monu_kind >= 0, bctx["spawn_slot"], torch.full_like(bctx["spawn_slot"], -1))
-    nat_ok, nat_j = bctx["nat_ok"], bctx["nat_j"]
+    monu_c = torch.where(monu_kind >= 0, bctx["spawn_city"], torch.full_like(bctx["spawn_city"], -1))
+    nat_ok, nat_c = bctx["nat_ok"], bctx["nat_city"]
     nat_kind = torch.where(nat_ok, torch.full_like(monu_kind, 10), torch.full_like(monu_kind, -1))
-    band_j = torch.where(bctx["band_ok"], bctx["band_j"], torch.full_like(bctx["band_j"], -1))
+    band_c = torch.where(bctx["band_ok"], bctx["band_city"], torch.full_like(bctx["band_city"], -1))
     # FAITH patronage: its own once-per-turn slot, never the same turn as
     # the gold arm — one claim per turn keeps both engines' appliers aligned.
     pat = torch.where(bctx["pat_f_ok"] & (buy_kind != 4), bctx["pat_f_cls"],
                       torch.full_like(bctx["pat_f_cls"], -1))
     # the FAITH district is its own slot beside the faith civilians, never the
     # gold arm's — one currency each, both spendable in the same turn.
-    _dfn = torch.full_like(bctx["dist_f_t"], -1)
-    dist_f = (torch.where(bctx["dist_f_ok"], bctx["dist_f_t"], _dfn),
-              torch.where(bctx["dist_f_ok"], bctx["dist_f_si"], _dfn))
+    _dfn = torch.full_like(bctx["dist_f_tile"], -1)
+    dist_f = (torch.where(bctx["dist_f_ok"], bctx["dist_f_tile"], _dfn),
+              torch.where(bctx["dist_f_ok"], bctx["dist_f_row"], _dfn))
     return ((buy_kind, buy_a, buy_b),
-            torch.where(worship_ok, bctx["worship_j"], neg_w),
-            (relig_kind, relig_j),
+            torch.where(worship_ok, bctx["worship_city"], neg_w),
+            (relig_kind, relig_c),
             torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1)),
-            (monu_kind, monu_j),
-            (nat_kind, nat_j),
-            (bctx["cls_j"], bctx["cls_b"]),
-            (bctx["ucls_j"], bctx["ucls_b"]),
+            (monu_kind, monu_c),
+            (nat_kind, nat_c),
+            (bctx["cls_city"], bctx["cls_bldg"]),
+            (bctx["ucls_city"], bctx["ucls_unit"]),
             pat,
-            band_j,
+            band_c,
             dist_f)
-
-
-def _buy_ctx(sim, row: int) -> dict:
-    alive_row = sim.city_alive[:, row]
-    n_cities = alive_row.sum(dim=1)
-    active = sim.seat_ext[:, row] & (n_cities > 0) & sim.civ_alive[:, row]
-    jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
-    # `settlerCost` counts every settler on order, at any depth in any queue
-    _sq = (alive_row.unsqueeze(2) & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=(1, 2))
-    sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
-                 * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
-    mon_g = sim._golden_ded(row, sim._ded_monumentality)
-    sett_cost = sim._gold_price(row, sett_base * sim.rules.gold_purchase_mult)
-    sett_cost = torch.where(mon_g, sett_cost * 0.7, sett_cost)
-    # the buy SPAWNS a unit at the capital (else first city), which must have
-    # the pop to pay — the TS driver's tripwire mirrors this exactly.
-    _cap_is = sim.city_is_cap[:, row]
-    _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
-    _spawn_pop = sim.city_pop[:, row].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
-    settler_ok = active & (_spawn_pop >= sim.rules.settler_pop_gate) & sim._afford(sim.civ_treasury[:, row], sett_cost)
-    cand_u = sim._seat_buy_unit_candidates(row, sim._seat_trainable_units(row))
-    unit_ok = active & (sim._seat_army_count(row) < 2 * n_cities) & cand_u.any(dim=1)
-    tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)
-    w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j = sim._seat_faith_buy_candidates(row, active)
-    nat_ok, nat_j = sim._seat_naturalist_candidate(row, active)
-    band_ok, band_j = sim._seat_rock_band_candidate(row, active)
-    # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian
-    # units with Faith. Builders and Settlers are 30% cheaper to purchase with
-    # Faith and Gold." FAITH_PURCHASE_MULT with the literal 0.7 LAST; the
-    # POLICY gate (at most one live builder) is here, the rule is the applier's.
-    monu_b_ok = torch.zeros_like(mon_g)
-    if sim._builder_idx >= 0:
-        n_bl = (sim.major_unit_alive & (sim.major_unit_seat == row) & (sim.major_unit_type == sim._builder_idx)).sum(dim=1)
-        bl_cost = sim._faith_price(row, sim._builder_cost(sim.civ_builders_trained[:, row]).double() * sim.rules.faith_purchase_mult * 0.7)
-        monu_b_ok = active & mon_g & (n_bl < 1) & sim._afford(sim.civ_faith[:, row], bl_cost)
-    monu_s_ok = active & mon_g & (_spawn_pop >= sim.rules.settler_pop_gate) \
-        & sim._afford(sim.civ_faith[:, row], sim._faith_price(row, sett_base * sim.rules.faith_purchase_mult * 0.7))
-    dist_g_ok, dist_g_t, dist_g_si = sim._seat_district_buy_candidate(row, active, False)
-    dist_f_ok, dist_f_t, dist_f_si = sim._seat_district_buy_candidate(row, active, True)
-    cls_ok, cls_j, cls_b = sim._seat_class_buy_candidate(row, active)
-    ucls_ok, ucls_j, ucls_b = sim._seat_faith_unit_candidate(row, active)
-    pat_f_ok, pat_f_cls, pat_g_ok, pat_g_cls = sim._seat_patronage_candidates(row, active)
-    levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
-    levy_ok = levy_ok & sim.war[:, row, : sim.n_majors].any(dim=1)
-    return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
-            "settler_ok": settler_ok, "unit_ok": unit_ok,
-            "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
-            "monu_builder_ok": monu_b_ok, "monu_settler_ok": monu_s_ok, "spawn_slot": _spawn_slot,
-            "worship_ok": w_ok, "worship_j": w_j,
-            "missionary_ok": m_ok, "missionary_j": m_j,
-            "apostle_ok": a_ok, "apostle_j": a_j,
-            "inquisitor_ok": q_ok, "inquisitor_j": q_j,
-            "monk_ok": k_ok, "monk_j": k_j,
-            "levy_ok": levy_ok, "levy_cs": levy_cs,
-            "nat_ok": nat_ok, "nat_j": nat_j,
-            "band_ok": band_ok, "band_j": band_j,
-            "cls_ok": cls_ok, "cls_j": cls_j, "cls_b": cls_b,
-            "ucls_ok": ucls_ok, "ucls_j": ucls_j, "ucls_b": ucls_b,
-            "pat_f_ok": pat_f_ok, "pat_f_cls": pat_f_cls,
-            "pat_g_ok": pat_g_ok, "pat_g_cls": pat_g_cls,
-            "dist_g_ok": dist_g_ok, "dist_g_t": dist_g_t, "dist_g_si": dist_g_si,
-            "dist_f_ok": dist_f_ok, "dist_f_t": dist_f_t, "dist_f_si": dist_f_si}
 
 
 def decide_geo(sim, seeds=None):
@@ -1223,9 +1175,11 @@ DECIDE_FIELDS = (
 )
 
 
-def decide_seat(env, sim, row: int, roster: dict, classes: dict, seeds=None, turn=None, pre: dict | None = None) -> dict:
+def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, seeds=None, turn=None,
+                pre: dict | None = None) -> dict:
     """Seat `row`'s turn decisions, every DECIDE_FIELDS entry but the unit
-    plan, keyed by name. Writes nothing."""
+    plan, keyed by name. Writes nothing. `nobs` is the seat's neutral
+    observation, one dict per game (shared/decide.schema.json)."""
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     style = _seat_style(row)
@@ -1273,12 +1227,12 @@ def decide_seat(env, sim, row: int, roster: dict, classes: dict, seeds=None, tur
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
-    buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
-    route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
-    # THE SILO LAUNCH: take the candidate whenever one exists, exactly as the
-    # route verb does — the engine's own scan answers, so the driver's twin
-    # cannot drift from the clause it mirrors.
-    nuke = sim._seat_nuke_candidate(row)
+    buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist = _decide_buys(_obs_group(nobs, "buy", sim.device))
+    route = _decide_route(_obs_group(nobs, "route", sim.device))
+    # THE SILO LAUNCH: take the observation's candidate whenever one exists,
+    # exactly as the route verb does.
+    _nk = _obs_group(nobs, "nuke", sim.device)
+    nuke = (_nk["device"], _nk["tile"])
     spec, lock = _decide_citizens(sim, row)
     swap = _decide_swap(sim, row)
     vote = _decide_vote(sim, row)

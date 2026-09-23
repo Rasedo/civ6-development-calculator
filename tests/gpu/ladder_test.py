@@ -445,13 +445,12 @@ def main() -> None:
     assert rk.tolist() == [5, 5, 6, 11, -1], f"faith relig priority broken: {rk.tolist()}"
     assert w_ok.tolist() == [True, False, False, False, False], "worship must pass through untouched"
     # the driver ctx reads the engines' ONE legality bodies, per-row.
-    import drive as _drv
-    bctx = _drv._buy_ctx(s, 1)  # civ 0 is seat row 1
-    assert bctx["can_building"].shape == (s.B,) == bctx["settler_ok"].shape == bctx["unit_ok"].shape, "buy ctx must be per-row"
-    assert bctx["tile_ok"].shape == (s.B,) == bctx["worship_ok"].shape == bctx["levy_ok"].shape, "ctx must be per-row"
-    assert bctx["missionary_ok"].shape == (s.B,) == bctx["apostle_ok"].shape == bctx["levy_cs"].shape, "ctx must be per-row"
-    assert bctx["inquisitor_ok"].shape == (s.B,) == bctx["inquisitor_j"].shape, "ctx must be per-row"
-    print("  l purchase priority OK (building > settler > unit > tile; faith m>a>q; per-row ctx)")
+    from core import neutral
+    nobs = neutral.seat_obs(s, 1)  # civ 0 is seat row 1
+    assert len(nobs) == s.B, "the observation is one dict per game"
+    want = [f for f, _k in neutral.SEAT_GROUPS["buy"]]
+    assert all(list(o["buy"]) == want for o in nobs), "every game carries the whole buy group"
+    print("  l purchase priority OK (building > settler > unit > tile; faith m>a>q; per-game buy obs)")
 
     print("LADDER CONTRACT OK")
 

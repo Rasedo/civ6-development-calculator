@@ -74,7 +74,7 @@ from core import BatchEnv, load_rules, load_fixture, fixture_paths, FIXTURES  # 
 from core.simbase import js_round  # noqa: E402
 import drive  # noqa: E402
 import ladder  # noqa: E402
-from core import records  # noqa: E402
+from core import neutral, records  # noqa: E402
 
 # The district columns worth counting: the pop-gated Neighborhood and the six
 # whose unlocks sit in the Industrial era or later.
@@ -185,7 +185,8 @@ def main() -> None:
         records.geo_decide_and_apply(sim, seeds)
         gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
-            rec = records.decide_and_apply(env, sim, row, roster, classes, seeds=seeds, turn=t)
+            rec = records.decide_and_apply(env, sim, row, neutral.seat_obs(sim, row), roster, classes,
+                                           seeds=seeds, turn=t)
             # the seat's record, BY NAME. It used to be read by position
             # under a comment warning that a new column shifts everything
             # after it; one did, and this probe raised IndexError for as long

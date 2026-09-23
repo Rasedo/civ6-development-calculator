@@ -713,6 +713,7 @@ def _main() -> int:
                 ("air", [py, "tests/gpu/air_test.py"], 4),  # bases, slots, both air heads, the sortie and every way a base is lost
                 ("spy", [py, "tests/gpu/spy_test.py"], 4),  # capacity, the jump, both spy heads and what each mission does
                 ("drive", [py, "tests/gpu/drive_test.py"], 4),  # the ladder DRIVES a seat for a whole game
+                ("neutral_obs", [py, "tests/gpu/neutral_obs_test.py"], 4),  # the decision server's observation is a plain value
                 ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
                 ("gp_channels", [py, "tests/gpu/gp_channels_test.py"], 4),  # the seven Great Person CHANNEL clauses (B-61r batch A)
                 ("gp_verbs", [py, "tests/gpu/gp_verbs_test.py"], 4),  # the three Great Person VERB clauses: Raffles, Boudica, Tupac Amaru

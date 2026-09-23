@@ -37,7 +37,7 @@ from core import statecompare  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
 import drive  # noqa: E402
 import ladder  # noqa: E402
-from core import records  # noqa: E402
+from core import neutral, records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -167,43 +167,43 @@ def dump_diff(man: dict, group: str, gdump: dict, tdump: dict,
     return reps
 
 
-def _buy_row(sim, seat: int, bc: dict, rk, rj, mk, b: int) -> list:
-    """One row of the BUY-candidate tripwire, in the TS driver twin's exact
-    shape — shared by the batched and single-seed paths so the two cannot
-    drift: [centre, bIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
-    worshipCentre, religKind, religCentre, levyIdx, monuKind, monuCentre,
-    natKind, natCentre]."""
-    def ctr(j: int) -> int:
-        return int(sim.city_center[b, seat, j]) if j >= 0 else -1
+def _buy_row(o: dict, rk: int, rc: int, mk: int) -> list:
+    """One game's row of the BUY-candidate tripwire, read off the neutral
+    observation in the TS driver twin's exact shape — shared by the batched
+    and single-seed paths so the two cannot drift: [centre, bIdx, settlerOk,
+    unitOk, tileOk, tile, tileCentre, worshipCentre, religKind, religCentre,
+    levyIdx, monuKind, monuCentre, natKind, natCentre]."""
+    bu = o["buy"]
     return [
-        ctr(int(bc["jj"][b])) if bool(bc["can_building"][b]) else -1,
-        int(bc["bb"][b]) if bool(bc["can_building"][b]) else -1,
-        int(bool(bc["settler_ok"][b])), int(bool(bc["unit_ok"][b])),
-        int(bool(bc["tile_ok"][b])),
-        int(bc["tile"][b]) if bool(bc["tile_ok"][b]) else -1,
-        ctr(int(bc["tile_j"][b])) if bool(bc["tile_ok"][b]) else -1,
-        ctr(int(bc["worship_j"][b])) if bool(bc["worship_ok"][b]) else -1,
-        int(rk[b]),
-        ctr(int(rj[b])),
-        int(bc["levy_cs"][b]) if bool(bc["levy_ok"][b]) else -1,
-        int(mk[b]),
-        ctr(int(bc["spawn_slot"][b])) if int(mk[b]) >= 0 else -1,
-        10 if bool(bc["nat_ok"][b]) else -1,
-        ctr(int(bc["nat_j"][b])) if bool(bc["nat_ok"][b]) else -1,
+        bu["bldg_city"] if bu["can_building"] else -1,
+        bu["bldg"] if bu["can_building"] else -1,
+        int(bu["settler_ok"]), int(bu["unit_ok"]), int(bu["tile_ok"]),
+        bu["tile"] if bu["tile_ok"] else -1,
+        bu["tile_city"] if bu["tile_ok"] else -1,
+        bu["worship_city"] if bu["worship_ok"] else -1,
+        rk,
+        rc,
+        bu["levy_cs"] if bu["levy_ok"] else -1,
+        mk,
+        bu["spawn_city"] if mk >= 0 else -1,
+        10 if bu["nat_ok"] else -1,
+        bu["nat_city"] if bu["nat_ok"] else -1,
     ]
 
 
-def _buy_rows(sim, seat: int, bc: dict | None = None) -> list:
-    if bc is None:
-        bc = drive._buy_ctx(sim, seat)
+def _buy_rows(nobs: list) -> list:
+    """The tripwire rows of one seat, one per game. The TS twin picks the
+    religious unit among missionary, apostle and inquisitor only."""
+    bc = drive._obs_group(nobs, "buy", "cpu")
     _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"],
                               bc["inquisitor_ok"])
-    rj = torch.where(rk == 5, bc["missionary_j"],
-                     torch.where(rk == 6, bc["apostle_j"],
-                                 torch.where(rk == 11, bc["inquisitor_j"],
+    rc = torch.where(rk == 5, bc["missionary_city"],
+                     torch.where(rk == 6, bc["apostle_city"],
+                                 torch.where(rk == 11, bc["inquisitor_city"],
                                              torch.full_like(rk, -1))))
     mk = ladder.pick_monu(bc["monu_builder_ok"], bc["monu_settler_ok"])
-    return [_buy_row(sim, seat, bc, rk, rj, mk, b) for b in range(sim.B)]
+    rk_l, rc_l, mk_l = rk.tolist(), rc.tolist(), mk.tolist()
+    return [_buy_row(o, rk_l[b], rc_l[b], mk_l[b]) for b, o in enumerate(nobs)]
 
 
 def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
@@ -419,6 +419,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             prof["wait_obs (TS children)"] += _pc() - _t
             _t = _pc()
             pre_seat: dict = {}
+            nobs_seat: dict = {}
             for seat in seats:
                 gobs_all = env.observe(seat)
                 gj_t = drive._builder_jobs(sim, seat)
@@ -429,20 +430,15 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # seat's LIVING units in slot order, which IS the TS array
                 # order it emits per unit. No seat needs a compaction of its
                 # own any more.
-                # The BUY-candidate tripwire: _buy_ctx against the TS
-                # pre-turn twin, in the one row shape both paths share —
-                # EVERY seat, row 0 included.
-                bc = drive._buy_ctx(sim, seat)
-                gb_all = _buy_rows(sim, seat, bc)
-                # the ROUTE-candidate tripwire rides the same pattern: the
-                # GPU scan against the TS driver's routeCandidateRow, and the
-                # SAME reads feed the policy below.
-                gr_f, gr_d = sim._seat_route_candidate(seat)
-                # the decide pass reuses these pre-decide reads verbatim —
-                # nothing between here and the decide mutates their inputs
-                # (geo_decide_and_apply only STASHES; observe reads none of it)
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": gobs_all,
-                                  "route": (gr_f, gr_d)}
+                # THE NEUTRAL OBSERVATION the decide pass reads, taken here
+                # pre-decide: nothing between here and the decide mutates its
+                # inputs (geo_decide_and_apply only STASHES). The BUY and
+                # ROUTE tripwires read it against the TS driver's pre-turn
+                # twins, EVERY seat, row 0 included.
+                nobs_seat[seat] = neutral.seat_obs(sim, seat)
+                gb_all = _buy_rows(nobs_seat[seat])
+                # the decide pass reuses the other pre-decide reads verbatim
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": gobs_all}
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -466,7 +462,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         if tb and gb_all[b] != tb:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb_all[b]} vs TS {tb}")
                         tr = msg.get("routes", {}).get(str(seat), [])
-                        gr_b = [int(gr_f[b]), int(gr_d[b])]
+                        _rt = nobs_seat[seat][b]["route"]
+                        gr_b = [_rt["from"], _rt["dest"]]
                         if tr and gr_b != tr:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}")
                             # the DECOMPOSITION belongs to whatever flagged,
@@ -484,7 +481,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             _t = _pc()
             geo = records.geo_decide_and_apply(sim, seeds)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
-            per_seat = {row: records.decide_and_apply(env, sim, row, roster, classes, seeds=seeds, turn=t, pre=pre_seat.get(row)) for row in seats}
+            per_seat = {row: records.decide_and_apply(env, sim, row, nobs_seat[row], roster, classes, seeds=seeds, turn=t,
+                                                      pre=pre_seat[row]) for row in seats}
             prof["decide (policy on GPU)"] += _pc() - _t
             _t = _pc()
             for b, ch in enumerate(children):
@@ -729,6 +727,7 @@ def main() -> None:
         # the live count must be -1). EVERY seat rides `_seat_slot_map` now,
         # so no seat needs a compaction of its own.
         pre_seat: dict = {}
+        nobs_seat: dict = {}
         for seat in seats:
             gj_t = drive._builder_jobs(sim, seat)
             gs_t = drive._spread_targets(sim, seat)
@@ -737,11 +736,9 @@ def main() -> None:
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
-                bc = drive._buy_ctx(sim, seat)
-                gr_f, gr_d = sim._seat_route_candidate(seat)
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": obs_seat[seat],
-                                  "route": (gr_f, gr_d)}
-                gb = _buy_rows(sim, seat, bc)[0]
+                nobs_seat[seat] = neutral.seat_obs(sim, seat)
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": obs_seat[seat]}
+                gb = _buy_rows(nobs_seat[seat])[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
                     rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb} vs TS {tb}"
@@ -750,7 +747,8 @@ def main() -> None:
                         first_report = rep
                     obs_bails += 1
                 tr = msg.get("routes", {}).get(str(seat), [])
-                gr_b = [int(gr_f[0]), int(gr_d[0])]
+                _rt = nobs_seat[seat][0]["route"]
+                gr_b = [_rt["from"], _rt["dest"]]
                 if tr and gr_b != tr:
                     rep = f"turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}"
                     print(rep)
@@ -788,7 +786,8 @@ def main() -> None:
         if obs_bails:
             break
         geo = records.geo_decide_and_apply(sim, [args.seed])
-        per_seat = {row: records.decide_and_apply(env, sim, row, roster, classes, seeds=[args.seed], turn=t, pre=pre_seat.get(row)) for row in seats}
+        per_seat = {row: records.decide_and_apply(env, sim, row, nobs_seat[row], roster, classes, seeds=[args.seed], turn=t,
+                                                  pre=pre_seat[row]) for row in seats}
         recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], 0),
                            **records.extract_geo(geo, row, 0)} for row in seats}
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):

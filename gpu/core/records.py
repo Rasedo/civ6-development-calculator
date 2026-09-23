@@ -43,7 +43,7 @@ import torch
 
 import drive
 import ladder
-from . import simbase
+from . import neutral, simbase
 
 SCHEMA_VERSION = 3
 
@@ -52,16 +52,46 @@ def take_seat(sim, row: int) -> None:
     sim.seat_ext[:, row] = True
 
 
+def _slot_of(sim, row: int, centre: torch.Tensor) -> torch.Tensor:
+    """[B] CENTRE tile -> [B] city slot of seat `row`: the living city standing
+    there, -1 where none does (or the centre is -1)."""
+    hit = ((sim.city_center[:, row] == centre.unsqueeze(1)) & sim.city_alive[:, row]
+           & (centre >= 0).unsqueeze(1))
+    return torch.where(hit.any(dim=1), hit.long().argmax(dim=1), torch.full_like(centre, -1))
+
+
+def _buys_by_slot(sim, row: int, dec: dict) -> dict:
+    """The purchase decisions name cities by CENTRE; the engine's buy arms
+    take slots. Kind 0 names its city in `a`, kind 3 in `b`."""
+    out = {}
+    if dec["buy"] is not None:
+        kind, a, b = dec["buy"]
+        out["buy"] = (kind, torch.where(kind == 0, _slot_of(sim, row, a), a),
+                      torch.where(kind == 3, _slot_of(sim, row, b), b))
+    for name in ("relig", "monu", "nat"):
+        if dec[name] is not None:
+            out[name] = (dec[name][0], _slot_of(sim, row, dec[name][1]))
+    for name in ("cls", "ucls"):
+        if dec[name] is not None:
+            out[name] = (_slot_of(sim, row, dec[name][0]), dec[name][1])
+    for name in ("worship", "band"):
+        if dec[name] is not None:
+            out[name] = _slot_of(sim, row, dec[name])
+    return out
+
+
 def apply_decisions(sim, row: int, dec: dict) -> None:
     """Stash one seat's non-unit decisions (the DECIDE_FIELDS names) for the
     step to apply. production_tile rides along or the drive and its own record
     diverge: a district column without its tile is refused at the apply, while
     the replay side passes the recorded tile and places it."""
+    by_slot = _buys_by_slot(sim, row, dec)
     sim.apply_seat_actions(row, production=dec["prod"], production_tile=dec["dtile"], tech=dec["tech"],
                            civic=dec["civic"], policies=dec["policies"], war=dec["war"], war_kind=dec["war_kind"],
-                           envoys=dec["env_seq"], buy=dec["buy"], worship=dec["worship"], relig=dec["relig"],
-                           levy=dec["levy"], monu=dec["monu"], nat=dec["nat"], cls=dec["cls"], ucls=dec["ucls"],
-                           pat=dec["pat"], band=dec["band"], dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
+                           envoys=dec["env_seq"], buy=by_slot.get("buy"), worship=by_slot.get("worship"),
+                           relig=by_slot.get("relig"), levy=dec["levy"], monu=by_slot.get("monu"),
+                           nat=by_slot.get("nat"), cls=by_slot.get("cls"), ucls=by_slot.get("ucls"),
+                           pat=dec["pat"], band=by_slot.get("band"), dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
                            spec=dec["spec"], lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
                            gp_pass=dec["gp_pass"])
 
@@ -73,13 +103,14 @@ def stash_units(sim, row: int, seq: torch.Tensor) -> None:
     sim._driven_useq[row] = seq
 
 
-def decide_and_apply(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4,
+def decide_and_apply(env, sim, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
                      seeds=None, turn=None, pre: dict | None = None) -> tuple:
     """One seat's turn: decide, stash the decisions, then plan and stash the
     units — the unit plan is taken AFTER the seat's other decisions are
-    stashed, the order the step has always seen. Returns the positional
-    record in `drive.DECIDE_FIELDS` order."""
-    dec = drive.decide_seat(env, sim, row, roster, classes, seeds=seeds, turn=turn, pre=pre)
+    stashed, the order the step has always seen. `nobs` is the seat's
+    `neutral.seat_obs`. Returns the positional record in
+    `drive.DECIDE_FIELDS` order."""
+    dec = drive.decide_seat(env, sim, row, nobs, roster, classes, seeds=seeds, turn=turn, pre=pre)
     apply_decisions(sim, row, dec)
     dec["seq"] = drive.plan_units(sim, row, max_steps, pre=pre)
     stash_units(sim, row, dec["seq"])
@@ -156,7 +187,7 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
         rec["warKind"] = int(war_kind[b])  # the WAR_KINDS code the declaration takes
     if policies is not None:
         rec["policies"] = [i for i in range(int(policies.shape[1])) if bool(policies[b, i])]
-    rec.update(buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist))
+    rec.update(buy_record_fields(b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
     if nuke is not None and int(nuke[0][b]) >= 0 and int(nuke[1][b]) >= 0:
@@ -186,16 +217,16 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
     return rec
 
 
-def buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None, dist=None) -> dict:
+def buy_record_fields(b: int, buy, worship, relig, levy, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None, dist=None) -> dict:
     """The GOLD/FAITH/LEVY half of a seat's record, for ANY seat row — every
     city reference is CENTRE-KEYED like production, because ids are
-    engine-local and centres are the shared vocabulary. Every field is
-    OPTIONAL: absent = no purchase of that kind this turn."""
+    engine-local and centres are the shared vocabulary; the decisions carry
+    centres already. Every field is OPTIONAL: absent = no purchase of that
+    kind this turn."""
     out: dict = {}
-    RCn = int(sim.city_center.shape[2])
 
-    def _centre(j: int) -> int | None:
-        return int(sim.city_center[b, row, j]) if 0 <= j < RCn and bool(sim.city_alive[b, row, j]) else None
+    def _centre(c: int) -> int | None:
+        return c if c >= 0 else None
 
     if buy is not None:
         _k = int(buy[0][b])
@@ -295,82 +326,38 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     war_kind = None if _wk is None else torch.full((sim.B,), int(_wk), dtype=torch.long, device=dev)
     _ev = rec.get("envoys") or []
     env_seq = torch.tensor(_ev, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1) if _ev else None
-    # parse the CENTRE-KEYED buy intent back to tensors (the city resolution
-    # rule — match by centre + alive, never by slot).
-    _bv = rec.get("buy")
-    buy = None
-    if _bv is not None and int(_bv[0]) == 0:
-        hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(sim.RC):
-            m = (sim.city_center[:, row, j] == int(_bv[1])) & sim.city_alive[:, row, j]
-            hitj = torch.where(m, torch.full_like(hitj, j), hitj)
-        kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
-        buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
-    elif _bv is not None and int(_bv[0]) == 1:
-        neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        buy = (torch.ones((sim.B,), dtype=torch.long, device=dev), neg1, neg1)
-    elif _bv is not None and int(_bv[0]) == 2:
-        neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        buy = (torch.full((sim.B,), 2, dtype=torch.long, device=dev), neg1, neg1)
-    elif _bv is not None and int(_bv[0]) == 4:
-        neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        buy = (torch.full((sim.B,), 4, dtype=torch.long, device=dev),
-               torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev), neg1)
-    elif _bv is not None and int(_bv[0]) == 5:
-        # DISTRICT: [5, siteTile, scaffoldRow]. No centre resolution — the
-        # SITE names the city inside the engine, exactly as kind 3's tile does.
-        buy = (torch.full((sim.B,), 5, dtype=torch.long, device=dev),
-               torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev),
-               torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
-    elif _bv is not None and int(_bv[0]) == 3:
-        # TILE: [3, tileIndex, centreTile] -> (kind, tile, slot) by centre
-        # resolution (match by centre + alive, never by slot).
-        hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(sim.RC):
-            m3 = (sim.city_center[:, row, j] == int(_bv[2])) & sim.city_alive[:, row, j]
-            hitj = torch.where(m3, torch.full_like(hitj, j), hitj)
-        kind3 = torch.where(hitj >= 0, torch.full_like(hitj, 3), torch.full_like(hitj, -1))
-        buy = (kind3, torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev), hitj)
 
-    def _centre_slot(centre: int) -> torch.Tensor:
-        hj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(sim.RC):
-            mm = (sim.city_center[:, row, j] == centre) & sim.city_alive[:, row, j]
-            hj = torch.where(mm, torch.full_like(hj, j), hj)
-        return hj
+    def _full(v: int) -> torch.Tensor:
+        return torch.full((sim.B,), int(v), dtype=torch.long, device=dev)
+
+    # the buy intents stay CENTRE-KEYED, as the driver decides them;
+    # apply_decisions resolves each centre to the living city standing there.
+    _bv = rec.get("buy")
+    buy = None if _bv is None else (_full(_bv[0]), _full(_bv[1]), _full(_bv[2]))
 
     worship = relig = monu = nat = cls = ucls = pat = band = None
     dist = None
     for _ent in rec.get("buyFaith") or []:
         _fk, _fc = int(_ent[0]), int(_ent[1])
         if _fk == 15:
-            pat = torch.full((sim.B,), int(_ent[2]), dtype=torch.long, device=dev)
-            continue
-        if _fk in (12, 13):
-            _cjt = _centre_slot(_fc)
-            _pair = (_cjt, torch.where(_cjt >= 0, torch.full_like(_cjt, int(_ent[2])), torch.full_like(_cjt, -1)))
-            if _fk == 12:
-                cls = _pair
-            else:
-                ucls = _pair
-            continue
-        if _fk == 4:
-            worship = _centre_slot(_fc)
+            pat = _full(_ent[2])
+        elif _fk == 12:
+            cls = (_full(_fc), _full(_ent[2]))
+        elif _fk == 13:
+            ucls = (_full(_fc), _full(_ent[2]))
+        elif _fk == 4:
+            worship = _full(_fc)
         elif _fk in (5, 6, 11, 14):
-            _rjt = _centre_slot(_fc)
-            relig = (torch.where(_rjt >= 0, torch.full_like(_rjt, _fk), torch.full_like(_rjt, -1)), _rjt)
+            relig = (_full(_fk), _full(_fc))
         elif _fk in (8, 9):
-            _mjt = _centre_slot(_fc)
-            monu = (torch.where(_mjt >= 0, torch.full_like(_mjt, _fk), torch.full_like(_mjt, -1)), _mjt)
+            monu = (_full(_fk), _full(_fc))
         elif _fk == 10:
-            _njt = _centre_slot(_fc)
-            nat = (torch.where(_njt >= 0, torch.full_like(_njt, 10), torch.full_like(_njt, -1)), _njt)
+            nat = (_full(10), _full(_fc))
         elif _fk == 16:
-            band = _centre_slot(_fc)
+            band = _full(_fc)
         elif _fk == 17:
             # a DISTRICT bought with FAITH: `a` is the SITE tile, not a centre.
-            dist = (torch.full((sim.B,), _fc, dtype=torch.long, device=dev),
-                    torch.full((sim.B,), int(_ent[2]), dtype=torch.long, device=dev))
+            dist = (_full(_fc), _full(_ent[2]))
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
     _rv = rec.get("route")
@@ -389,7 +376,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         nD = sim.city_spec_pin.shape[3]
         spec = torch.full((sim.B, sim.RC, nD), simbase.SPEC_KEEP, dtype=torch.long, device=dev)
         for _c, _di, _n in _sp:
-            _hj = _centre_slot(int(_c))
+            _hj = _slot_of(sim, row, _full(_c))
             _rw = (_hj >= 0).nonzero(as_tuple=True)[0]
             if len(_rw) and 0 <= int(_di) < nD:
                 spec[_rw, _hj[_rw], int(_di)] = int(_n)
@@ -506,7 +493,8 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     logs = [[] for _ in range(B)]
     game_seeds = list(seeds) if seeds is not None else list(range(B))
     for t in range(turns):
-        per_seat = {row: decide_and_apply(env, sim, row, roster, classes, seeds=game_seeds, turn=t) for row in seats}
+        per_seat = {row: decide_and_apply(env, sim, row, neutral.seat_obs(sim, row), roster, classes,
+                                          seeds=game_seeds, turn=t) for row in seats}
         for b in range(B):
             turn_rec = {"turn": t}
             for row in seats:

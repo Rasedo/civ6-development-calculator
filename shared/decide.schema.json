@@ -1,0 +1,59 @@
+{
+  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every group is an object keyed by its field names in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none. Emitters: gpu/core/neutral.py (GPU).",
+  "seat": {
+    "buy": [
+      ["bldg_city", "city", "the city holding the cheapest completable gold-buyable building"],
+      ["bldg", "int", "that building's table index"],
+      ["can_building", "bool", "the treasury clears its price plus the peace-gold reserve"],
+      ["bldg_price", "int", "its gold price"],
+      ["settler_ok", "bool", "a gold settler buy is affordable and the spawn city has the pop"],
+      ["unit_ok", "bool", "a gold military unit buy is open (under 2x cities, a candidate type)"],
+      ["tile_ok", "bool", "a gold tile buy is open"],
+      ["tile", "int", "the tile to buy"],
+      ["tile_city", "city", "the city that buys it"],
+      ["monu_builder_ok", "bool", "Monumentality: a faith builder buy is open"],
+      ["monu_settler_ok", "bool", "Monumentality: a faith settler buy is open"],
+      ["spawn_city", "city", "where a bought unit spawns: the capital, else the first living city"],
+      ["worship_ok", "bool", "a faith worship-building buy is open"],
+      ["worship_city", "city", "the city that takes it"],
+      ["missionary_ok", "bool", "a faith missionary buy is open"],
+      ["missionary_city", "city", "the city that trains it"],
+      ["apostle_ok", "bool", "a faith apostle buy is open"],
+      ["apostle_city", "city", "the city that trains it"],
+      ["inquisitor_ok", "bool", "a faith inquisitor buy is open"],
+      ["inquisitor_city", "city", "the city that trains it"],
+      ["monk_ok", "bool", "a faith warrior monk buy is open"],
+      ["monk_city", "city", "the city that trains it"],
+      ["levy_ok", "bool", "a levy is open and the seat is at war with a major"],
+      ["levy_cs", "int", "the city-state index to levy"],
+      ["nat_ok", "bool", "a faith naturalist buy is open"],
+      ["nat_city", "city", "the city that buys it"],
+      ["band_ok", "bool", "a faith rock band buy is open"],
+      ["band_city", "city", "the city that buys it"],
+      ["cls_ok", "bool", "a faith class-building buy is open (Valletta)"],
+      ["cls_city", "city", "the city that buys it"],
+      ["cls_bldg", "int", "the building's table index, -1 where none"],
+      ["ucls_ok", "bool", "a faith land combat unit buy is open"],
+      ["ucls_city", "city", "the city that buys it"],
+      ["ucls_unit", "int", "the unit type index, -1 where none"],
+      ["pat_f_ok", "bool", "a faith Great Person patronage is open"],
+      ["pat_f_cls", "int", "its Great Person class"],
+      ["pat_g_ok", "bool", "a gold Great Person patronage is open"],
+      ["pat_g_cls", "int", "its Great Person class"],
+      ["dist_g_ok", "bool", "a gold district buy is open"],
+      ["dist_g_tile", "int", "its site tile"],
+      ["dist_g_row", "int", "its district scaffold row"],
+      ["dist_f_ok", "bool", "a faith district buy is open"],
+      ["dist_f_tile", "int", "its site tile"],
+      ["dist_f_row", "int", "its district scaffold row"]
+    ],
+    "route": [
+      ["from", "city", "the origin city of the trade route this seat would open"],
+      ["dest", "int", "its destination: a CENTRE tile, or -(2 + city-state index); -1 where none"]
+    ],
+    "nuke": [
+      ["device", "int", "the WMD device index a silo would launch, -1 where none"],
+      ["tile", "int", "the target tile, -1 where none"]
+    ]
+  }
+}
